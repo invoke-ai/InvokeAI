@@ -3,22 +3,22 @@ import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
-  controlNetImageChanged,
-  controlNetIsEnabledChanged,
-  ipAdapterImageChanged,
-  isIPAdapterEnabledChanged,
-} from 'features/controlNet/store/controlNetSlice';
-import {
+  controlAdapterImageChanged,
+  controlAdapterIsEnabledChanged,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
+import type {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
+import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
+import { workflowExposedFieldAdded } from 'features/nodes/store/workflowSlice';
 import {
-  fieldImageValueChanged,
-  workflowExposedFieldAdded,
-} from 'features/nodes/store/nodesSlice';
-import { initialImageChanged } from 'features/parameters/store/generationSlice';
+  initialImageChanged,
+  selectOptimalDimension,
+} from 'features/parameters/store/generationSlice';
 import { imagesApi } from 'services/api/endpoints/images';
+
 import { startAppListening } from '../';
 
 export const dndDropped = createAction<{
@@ -29,7 +29,7 @@ export const dndDropped = createAction<{
 export const addImageDroppedListener = () => {
   startAppListening({
     actionCreator: dndDropped,
-    effect: async (action, { dispatch }) => {
+    effect: async (action, { dispatch, getState }) => {
       const log = logger('dnd');
       const { activeData, overData } = action.payload;
 
@@ -90,36 +90,23 @@ export const addImageDroppedListener = () => {
        * Image dropped on ControlNet
        */
       if (
-        overData.actionType === 'SET_CONTROLNET_IMAGE' &&
+        overData.actionType === 'SET_CONTROL_ADAPTER_IMAGE' &&
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
-        const { controlNetId } = overData.context;
+        const { id } = overData.context;
         dispatch(
-          controlNetImageChanged({
+          controlAdapterImageChanged({
+            id,
             controlImage: activeData.payload.imageDTO.image_name,
-            controlNetId,
           })
         );
         dispatch(
-          controlNetIsEnabledChanged({
-            controlNetId,
+          controlAdapterIsEnabledChanged({
+            id,
             isEnabled: true,
           })
         );
-        return;
-      }
-
-      /**
-       * Image dropped on IP Adapter image
-       */
-      if (
-        overData.actionType === 'SET_IP_ADAPTER_IMAGE' &&
-        activeData.payloadType === 'IMAGE_DTO' &&
-        activeData.payload.imageDTO
-      ) {
-        dispatch(ipAdapterImageChanged(activeData.payload.imageDTO));
-        dispatch(isIPAdapterEnabledChanged(true));
         return;
       }
 
@@ -131,7 +118,12 @@ export const addImageDroppedListener = () => {
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
-        dispatch(setInitialCanvasImage(activeData.payload.imageDTO));
+        dispatch(
+          setInitialCanvasImage(
+            activeData.payload.imageDTO,
+            selectOptimalDimension(getState())
+          )
+        );
         return;
       }
 

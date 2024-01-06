@@ -1,42 +1,22 @@
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { redo } from 'features/canvas/store/canvasSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
 import { FaRedo } from 'react-icons/fa';
 
-import { redo } from 'features/canvas/store/canvasSlice';
-
-import { stateSelector } from 'app/store/store';
-import { isEqual } from 'lodash-es';
-import { useTranslation } from 'react-i18next';
-
-const canvasRedoSelector = createSelector(
-  [stateSelector, activeTabNameSelector],
-  ({ canvas }, activeTabName) => {
-    const { futureLayerStates } = canvas;
-
-    return {
-      canRedo: futureLayerStates.length > 0,
-      activeTabName,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
-
-export default function IAICanvasRedoButton() {
+const IAICanvasRedoButton = () => {
   const dispatch = useAppDispatch();
-  const { canRedo, activeTabName } = useAppSelector(canvasRedoSelector);
+  const canRedo = useAppSelector((s) => s.canvas.futureLayerStates.length > 0);
+  const activeTabName = useAppSelector(activeTabNameSelector);
 
   const { t } = useTranslation();
 
-  const handleRedo = () => {
+  const handleRedo = useCallback(() => {
     dispatch(redo());
-  };
+  }, [dispatch]);
 
   useHotkeys(
     ['meta+shift+z', 'ctrl+shift+z', 'control+y', 'meta+y'],
@@ -51,7 +31,7 @@ export default function IAICanvasRedoButton() {
   );
 
   return (
-    <IAIIconButton
+    <InvIconButton
       aria-label={`${t('unifiedCanvas.redo')} (Ctrl+Shift+Z)`}
       tooltip={`${t('unifiedCanvas.redo')} (Ctrl+Shift+Z)`}
       icon={<FaRedo />}
@@ -59,4 +39,6 @@ export default function IAICanvasRedoButton() {
       isDisabled={!canRedo}
     />
   );
-}
+};
+
+export default memo(IAICanvasRedoButton);

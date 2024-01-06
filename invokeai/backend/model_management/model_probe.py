@@ -32,6 +32,8 @@ class ModelProbeInfo(object):
     upcast_attention: bool
     format: Literal["diffusers", "checkpoint", "lycoris", "olive", "onnx"]
     image_size: int
+    name: Optional[str] = None
+    description: Optional[str] = None
 
 
 class ProbeBase(object):
@@ -53,10 +55,12 @@ class ModelProbe(object):
         "StableDiffusionXLPipeline": ModelType.Main,
         "StableDiffusionXLImg2ImgPipeline": ModelType.Main,
         "StableDiffusionXLInpaintPipeline": ModelType.Main,
+        "LatentConsistencyModelPipeline": ModelType.Main,
         "AutoencoderKL": ModelType.Vae,
         "AutoencoderTiny": ModelType.Vae,
         "ControlNetModel": ModelType.ControlNet,
         "CLIPVisionModelWithProjection": ModelType.CLIPVision,
+        "T2IAdapter": ModelType.T2IAdapter,
     }
 
     @classmethod
@@ -111,12 +115,16 @@ class ModelProbe(object):
             base_type = probe.get_base_type()
             variant_type = probe.get_variant_type()
             prediction_type = probe.get_scheduler_prediction_type()
+            name = cls.get_model_name(model_path)
+            description = f"{base_type.value} {model_type.value} model {name}"
             format = probe.get_format()
             model_info = ModelProbeInfo(
                 model_type=model_type,
                 base_type=base_type,
                 variant_type=variant_type,
                 prediction_type=prediction_type,
+                name=name,
+                description=description,
                 upcast_attention=(
                     base_type == BaseModelType.StableDiffusion2
                     and prediction_type == SchedulerPredictionType.VPrediction
@@ -139,6 +147,13 @@ class ModelProbe(object):
             raise
 
         return model_info
+
+    @classmethod
+    def get_model_name(cls, model_path: Path) -> str:
+        if model_path.suffix in {".safetensors", ".bin", ".pt", ".ckpt"}:
+            return model_path.stem
+        else:
+            return model_path.name
 
     @classmethod
     def get_model_type_from_checkpoint(cls, model_path: Path, checkpoint: dict) -> ModelType:
@@ -182,12 +197,13 @@ class ModelProbe(object):
         if model:
             class_name = model.__class__.__name__
         else:
+            for suffix in ["bin", "safetensors"]:
+                if (folder_path / f"learned_embeds.{suffix}").exists():
+                    return ModelType.TextualInversion
+                if (folder_path / f"pytorch_lora_weights.{suffix}").exists():
+                    return ModelType.Lora
             if (folder_path / "unet/model.onnx").exists():
                 return ModelType.ONNX
-            if (folder_path / "learned_embeds.bin").exists():
-                return ModelType.TextualInversion
-            if (folder_path / "pytorch_lora_weights.bin").exists():
-                return ModelType.Lora
             if (folder_path / "image_encoder.txt").exists():
                 return ModelType.IPAdapter
 
@@ -222,7 +238,7 @@ class ModelProbe(object):
         with SilenceWarnings():
             if model_path.suffix.endswith((".ckpt", ".pt", ".bin")):
                 cls._scan_model(model_path, model_path)
-                return torch.load(model_path)
+                return torch.load(model_path, map_location="cpu")
             else:
                 return safetensors.torch.load_file(model_path)
 
@@ -235,7 +251,7 @@ class ModelProbe(object):
         # scan model
         scan_result = scan_file_path(checkpoint)
         if scan_result.infected_files != 0:
-            raise "The model {model_name} is potentially infected by malware. Aborting import."
+            raise Exception("The model {model_name} is potentially infected by malware. Aborting import.")
 
 
 # ##################################################3
@@ -370,12 +386,16 @@ class TextualInversionCheckpointProbe(CheckpointProbeBase):
             token_dim = list(checkpoint["string_to_param"].values())[0].shape[-1]
         elif "emb_params" in checkpoint:
             token_dim = checkpoint["emb_params"].shape[-1]
+        elif "clip_g" in checkpoint:
+            token_dim = checkpoint["clip_g"].shape[-1]
         else:
-            token_dim = list(checkpoint.values())[0].shape[0]
+            token_dim = list(checkpoint.values())[0].shape[-1]
         if token_dim == 768:
             return BaseModelType.StableDiffusion1
         elif token_dim == 1024:
             return BaseModelType.StableDiffusion2
+        elif token_dim == 1280:
+            return BaseModelType.StableDiffusionXL
         else:
             return None
 
@@ -404,6 +424,11 @@ class IPAdapterCheckpointProbe(CheckpointProbeBase):
 
 
 class CLIPVisionCheckpointProbe(CheckpointProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        raise NotImplementedError()
+
+
+class T2IAdapterCheckpointProbe(CheckpointProbeBase):
     def get_base_type(self) -> BaseModelType:
         raise NotImplementedError()
 
@@ -595,6 +620,26 @@ class CLIPVisionFolderProbe(FolderProbeBase):
         return BaseModelType.Any
 
 
+class T2IAdapterFolderProbe(FolderProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        config_file = self.folder_path / "config.json"
+        if not config_file.exists():
+            raise InvalidModelException(f"Cannot determine base type for {self.folder_path}")
+        with open(config_file, "r") as file:
+            config = json.load(file)
+
+        adapter_type = config.get("adapter_type", None)
+        if adapter_type == "full_adapter_xl":
+            return BaseModelType.StableDiffusionXL
+        elif adapter_type == "full_adapter" or "light_adapter":
+            # I haven't seen any T2I adapter models for SD2, so assume that this is an SD1 adapter.
+            return BaseModelType.StableDiffusion1
+        else:
+            raise InvalidModelException(
+                f"Unable to determine base model for '{self.folder_path}' (adapter_type = {adapter_type})."
+            )
+
+
 ############## register probe classes ######
 ModelProbe.register_probe("diffusers", ModelType.Main, PipelineFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.Vae, VaeFolderProbe)
@@ -603,6 +648,7 @@ ModelProbe.register_probe("diffusers", ModelType.TextualInversion, TextualInvers
 ModelProbe.register_probe("diffusers", ModelType.ControlNet, ControlNetFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.IPAdapter, IPAdapterFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.CLIPVision, CLIPVisionFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.T2IAdapter, T2IAdapterFolderProbe)
 
 ModelProbe.register_probe("checkpoint", ModelType.Main, PipelineCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.Vae, VaeCheckpointProbe)
@@ -611,5 +657,6 @@ ModelProbe.register_probe("checkpoint", ModelType.TextualInversion, TextualInver
 ModelProbe.register_probe("checkpoint", ModelType.ControlNet, ControlNetCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.IPAdapter, IPAdapterCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.CLIPVision, CLIPVisionCheckpointProbe)
+ModelProbe.register_probe("checkpoint", ModelType.T2IAdapter, T2IAdapterCheckpointProbe)
 
 ModelProbe.register_probe("onnx", ModelType.ONNX, ONNXFolderProbe)

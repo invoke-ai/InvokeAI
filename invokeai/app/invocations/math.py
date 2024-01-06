@@ -3,11 +3,12 @@
 from typing import Literal
 
 import numpy as np
-from pydantic import validator
+from pydantic import ValidationInfo, field_validator
 
 from invokeai.app.invocations.primitives import FloatOutput, IntegerOutput
+from invokeai.app.shared.fields import FieldDescriptions
 
-from .baseinvocation import BaseInvocation, FieldDescriptions, InputField, InvocationContext, invocation
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
 
 
 @invocation("add", title="Add Integers", tags=["math", "add"], category="math", version="1.0.0")
@@ -65,11 +66,32 @@ class DivideInvocation(BaseInvocation):
 class RandomIntInvocation(BaseInvocation):
     """Outputs a single random integer."""
 
-    low: int = InputField(default=0, description="The inclusive low value")
-    high: int = InputField(default=np.iinfo(np.int32).max, description="The exclusive high value")
+    low: int = InputField(default=0, description=FieldDescriptions.inclusive_low)
+    high: int = InputField(default=np.iinfo(np.int32).max, description=FieldDescriptions.exclusive_high)
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
         return IntegerOutput(value=np.random.randint(self.low, self.high))
+
+
+@invocation(
+    "rand_float",
+    title="Random Float",
+    tags=["math", "float", "random"],
+    category="math",
+    version="1.0.1",
+    use_cache=False,
+)
+class RandomFloatInvocation(BaseInvocation):
+    """Outputs a single random float"""
+
+    low: float = InputField(default=0.0, description=FieldDescriptions.inclusive_low)
+    high: float = InputField(default=1.0, description=FieldDescriptions.exclusive_high)
+    decimals: int = InputField(default=2, description=FieldDescriptions.decimal_places)
+
+    def invoke(self, context: InvocationContext) -> FloatOutput:
+        random_float = np.random.uniform(self.low, self.high)
+        rounded_float = round(random_float, self.decimals)
+        return FloatOutput(value=rounded_float)
 
 
 @invocation(
@@ -123,17 +145,17 @@ INTEGER_OPERATIONS = Literal[
 ]
 
 
-INTEGER_OPERATIONS_LABELS = dict(
-    ADD="Add A+B",
-    SUB="Subtract A-B",
-    MUL="Multiply A*B",
-    DIV="Divide A/B",
-    EXP="Exponentiate A^B",
-    MOD="Modulus A%B",
-    ABS="Absolute Value of A",
-    MIN="Minimum(A,B)",
-    MAX="Maximum(A,B)",
-)
+INTEGER_OPERATIONS_LABELS = {
+    "ADD": "Add A+B",
+    "SUB": "Subtract A-B",
+    "MUL": "Multiply A*B",
+    "DIV": "Divide A/B",
+    "EXP": "Exponentiate A^B",
+    "MOD": "Modulus A%B",
+    "ABS": "Absolute Value of A",
+    "MIN": "Minimum(A,B)",
+    "MAX": "Maximum(A,B)",
+}
 
 
 @invocation(
@@ -161,16 +183,16 @@ class IntegerMathInvocation(BaseInvocation):
     operation: INTEGER_OPERATIONS = InputField(
         default="ADD", description="The operation to perform", ui_choice_labels=INTEGER_OPERATIONS_LABELS
     )
-    a: int = InputField(default=0, description=FieldDescriptions.num_1)
-    b: int = InputField(default=0, description=FieldDescriptions.num_2)
+    a: int = InputField(default=1, description=FieldDescriptions.num_1)
+    b: int = InputField(default=1, description=FieldDescriptions.num_2)
 
-    @validator("b")
-    def no_unrepresentable_results(cls, v, values):
-        if values["operation"] == "DIV" and v == 0:
+    @field_validator("b")
+    def no_unrepresentable_results(cls, v: int, info: ValidationInfo):
+        if info.data["operation"] == "DIV" and v == 0:
             raise ValueError("Cannot divide by zero")
-        elif values["operation"] == "MOD" and v == 0:
+        elif info.data["operation"] == "MOD" and v == 0:
             raise ValueError("Cannot divide by zero")
-        elif values["operation"] == "EXP" and v < 0:
+        elif info.data["operation"] == "EXP" and v < 0:
             raise ValueError("Result of exponentiation is not an integer")
         return v
 
@@ -209,17 +231,17 @@ FLOAT_OPERATIONS = Literal[
 ]
 
 
-FLOAT_OPERATIONS_LABELS = dict(
-    ADD="Add A+B",
-    SUB="Subtract A-B",
-    MUL="Multiply A*B",
-    DIV="Divide A/B",
-    EXP="Exponentiate A^B",
-    ABS="Absolute Value of A",
-    SQRT="Square Root of A",
-    MIN="Minimum(A,B)",
-    MAX="Maximum(A,B)",
-)
+FLOAT_OPERATIONS_LABELS = {
+    "ADD": "Add A+B",
+    "SUB": "Subtract A-B",
+    "MUL": "Multiply A*B",
+    "DIV": "Divide A/B",
+    "EXP": "Exponentiate A^B",
+    "ABS": "Absolute Value of A",
+    "SQRT": "Square Root of A",
+    "MIN": "Minimum(A,B)",
+    "MAX": "Maximum(A,B)",
+}
 
 
 @invocation(
@@ -235,16 +257,16 @@ class FloatMathInvocation(BaseInvocation):
     operation: FLOAT_OPERATIONS = InputField(
         default="ADD", description="The operation to perform", ui_choice_labels=FLOAT_OPERATIONS_LABELS
     )
-    a: float = InputField(default=0, description=FieldDescriptions.num_1)
-    b: float = InputField(default=0, description=FieldDescriptions.num_2)
+    a: float = InputField(default=1, description=FieldDescriptions.num_1)
+    b: float = InputField(default=1, description=FieldDescriptions.num_2)
 
-    @validator("b")
-    def no_unrepresentable_results(cls, v, values):
-        if values["operation"] == "DIV" and v == 0:
+    @field_validator("b")
+    def no_unrepresentable_results(cls, v: float, info: ValidationInfo):
+        if info.data["operation"] == "DIV" and v == 0:
             raise ValueError("Cannot divide by zero")
-        elif values["operation"] == "EXP" and values["a"] == 0 and v < 0:
+        elif info.data["operation"] == "EXP" and info.data["a"] == 0 and v < 0:
             raise ValueError("Cannot raise zero to a negative power")
-        elif values["operation"] == "EXP" and type(values["a"] ** v) is complex:
+        elif info.data["operation"] == "EXP" and isinstance(info.data["a"] ** v, complex):
             raise ValueError("Root operation resulted in a complex number")
         return v
 

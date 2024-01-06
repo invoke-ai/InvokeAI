@@ -7,17 +7,18 @@ import {
   TabPanel,
   TabPanels,
   Tabs,
-  Text,
 } from '@chakra-ui/react';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { InvText } from 'common/components/InvText/wrapper';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { memo } from 'react';
-import { useGetImageMetadataFromFileQuery } from 'services/api/endpoints/images';
-import { ImageDTO } from 'services/api/types';
+import { useTranslation } from 'react-i18next';
+import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
+import type { ImageDTO } from 'services/api/types';
+
 import DataViewer from './DataViewer';
 import ImageMetadataActions from './ImageMetadataActions';
-import { useAppSelector } from '../../../../app/store/storeHooks';
-import { configSelector } from '../../../system/store/configSelectors';
-import { useTranslation } from 'react-i18next';
+import ImageMetadataWorkflowTabContent from './ImageMetadataWorkflowTabContent';
 
 type ImageMetadataViewerProps = {
   image: ImageDTO;
@@ -31,53 +32,53 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   // });
   const { t } = useTranslation();
 
-  const { shouldFetchMetadataFromApi } = useAppSelector(configSelector);
-
-  const { metadata, workflow } = useGetImageMetadataFromFileQuery(
-    { image, shouldFetchMetadataFromApi },
-    {
-      selectFromResult: (res) => ({
-        metadata: res?.currentData?.metadata,
-        workflow: res?.currentData?.workflow,
-      }),
-    }
-  );
+  const { metadata } = useDebouncedMetadata(image.image_name);
 
   return (
     <Flex
       layerStyle="first"
-      sx={{
-        padding: 4,
-        gap: 1,
-        flexDirection: 'column',
-        width: 'full',
-        height: 'full',
-        borderRadius: 'base',
-        position: 'absolute',
-        overflow: 'hidden',
-      }}
+      padding={4}
+      gap={1}
+      flexDirection="column"
+      width="full"
+      height="full"
+      borderRadius="base"
+      position="absolute"
+      overflow="hidden"
     >
       <Flex gap={2}>
-        <Text fontWeight="semibold">File:</Text>
+        <InvText fontWeight="semibold">{t('common.file')}:</InvText>
         <Link href={image.image_url} isExternal maxW="calc(100% - 3rem)">
           {image.image_name}
           <ExternalLinkIcon mx="2px" />
         </Link>
       </Flex>
 
-      <ImageMetadataActions metadata={metadata} />
-
       <Tabs
         variant="line"
-        sx={{ display: 'flex', flexDir: 'column', w: 'full', h: 'full' }}
+        isLazy={true}
+        display="flex"
+        flexDir="column"
+        w="full"
+        h="full"
       >
         <TabList>
+          <Tab>{t('metadata.recallParameters')}</Tab>
           <Tab>{t('metadata.metadata')}</Tab>
           <Tab>{t('metadata.imageDetails')}</Tab>
           <Tab>{t('metadata.workflow')}</Tab>
         </TabList>
 
         <TabPanels>
+          <TabPanel>
+            {metadata ? (
+              <ScrollableContent>
+                <ImageMetadataActions metadata={metadata} />
+              </ScrollableContent>
+            ) : (
+              <IAINoContentFallback label={t('metadata.noRecallParameters')} />
+            )}
+          </TabPanel>
           <TabPanel>
             {metadata ? (
               <DataViewer data={metadata} label={t('metadata.metadata')} />
@@ -93,11 +94,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
             )}
           </TabPanel>
           <TabPanel>
-            {workflow ? (
-              <DataViewer data={workflow} label={t('metadata.workflow')} />
-            ) : (
-              <IAINoContentFallback label={t('nodes.noWorkflow')} />
-            )}
+            <ImageMetadataWorkflowTabContent image={image} />
           </TabPanel>
         </TabPanels>
       </Tabs>

@@ -192,7 +192,7 @@ def test_deny_nodes(patch_rootdir):
     # must parse config before importing Graph, so its nodes union uses the config
     conf = InvokeAIAppConfig().get_config()
     conf.parse_args(conf=allow_deny_nodes_conf, argv=[])
-    from invokeai.app.services.graph import Graph
+    from invokeai.app.services.shared.graph import Graph
 
     # confirm graph validation fails when using denied node
     Graph(nodes={"1": {"id": "1", "type": "integer"}})
@@ -206,9 +206,9 @@ def test_deny_nodes(patch_rootdir):
     # confirm invocations union will not have denied nodes
     all_invocations = BaseInvocation.get_invocations()
 
-    has_integer = len([i for i in all_invocations if i.__fields__.get("type").default == "integer"]) == 1
-    has_string = len([i for i in all_invocations if i.__fields__.get("type").default == "string"]) == 1
-    has_float = len([i for i in all_invocations if i.__fields__.get("type").default == "float"]) == 1
+    has_integer = len([i for i in all_invocations if i.model_fields.get("type").default == "integer"]) == 1
+    has_string = len([i for i in all_invocations if i.model_fields.get("type").default == "string"]) == 1
+    has_float = len([i for i in all_invocations if i.model_fields.get("type").default == "float"]) == 1
 
     assert has_integer
     assert has_string

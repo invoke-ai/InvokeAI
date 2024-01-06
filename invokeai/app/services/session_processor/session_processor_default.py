@@ -1,12 +1,12 @@
-from threading import BoundedSemaphore
+import traceback
+from threading import BoundedSemaphore, Thread
 from threading import Event as ThreadEvent
-from threading import Thread
 from typing import Optional
 
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.typing import Event as FastAPIEvent
 
-from invokeai.app.services.events import EventServiceBase
+from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 
 from ..invoker import Invoker
@@ -32,9 +32,11 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self.__thread = Thread(
             name="session_processor",
             target=self.__process,
-            kwargs=dict(
-                stop_event=self.__stop_event, poll_now_event=self.__poll_now_event, resume_event=self.__resume_event
-            ),
+            kwargs={
+                "stop_event": self.__stop_event,
+                "poll_now_event": self.__poll_now_event,
+                "resume_event": self.__resume_event,
+            },
         )
         self.__thread.start()
 
@@ -47,20 +49,27 @@ class DefaultSessionProcessor(SessionProcessorBase):
     async def _on_queue_event(self, event: FastAPIEvent) -> None:
         event_name = event[1]["event"]
 
-        match event_name:
-            case "graph_execution_state_complete" | "invocation_error" | "session_retrieval_error" | "invocation_retrieval_error":
-                self.__queue_item = None
-                self._poll_now()
-            case "session_canceled" if self.__queue_item is not None and self.__queue_item.session_id == event[1][
-                "data"
-            ]["graph_execution_state_id"]:
-                self.__queue_item = None
-                self._poll_now()
-            case "batch_enqueued":
-                self._poll_now()
-            case "queue_cleared":
-                self.__queue_item = None
-                self._poll_now()
+        # This was a match statement, but match is not supported on python 3.9
+        if event_name in [
+            "graph_execution_state_complete",
+            "invocation_error",
+            "session_retrieval_error",
+            "invocation_retrieval_error",
+        ]:
+            self.__queue_item = None
+            self._poll_now()
+        elif (
+            event_name == "session_canceled"
+            and self.__queue_item is not None
+            and self.__queue_item.session_id == event[1]["data"]["graph_execution_state_id"]
+        ):
+            self.__queue_item = None
+            self._poll_now()
+        elif event_name == "batch_enqueued":
+            self._poll_now()
+        elif event_name == "queue_cleared":
+            self.__queue_item = None
+            self._poll_now()
 
     def resume(self) -> SessionProcessorStatus:
         if not self.__resume_event.is_set():
@@ -89,7 +98,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
             resume_event.set()
             self.__threadLimit.acquire()
             queue_item: Optional[SessionQueueItem] = None
-            self.__invoker.services.logger
             while not stop_event.is_set():
                 poll_now_event.clear()
                 try:
@@ -106,6 +114,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                                 session_queue_id=queue_item.queue_id,
                                 session_queue_item_id=queue_item.item_id,
                                 graph_execution_state=queue_item.session,
+                                workflow=queue_item.workflow,
                                 invoke_all=True,
                             )
                             queue_item = None
@@ -116,6 +125,10 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         continue
                 except Exception as e:
                     self.__invoker.services.logger.error(f"Error in session processor: {e}")
+                    if queue_item is not None:
+                        self.__invoker.services.session_queue.cancel_queue_item(
+                            queue_item.item_id, error=traceback.format_exc()
+                        )
                     poll_now_event.wait(POLLING_INTERVAL)
                     continue
         except Exception as e:

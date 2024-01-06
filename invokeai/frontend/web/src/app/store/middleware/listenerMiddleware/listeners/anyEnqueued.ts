@@ -1,15 +1,10 @@
-import { isAnyOf } from '@reduxjs/toolkit';
 import { queueApi } from 'services/api/endpoints/queue';
-import { startAppListening } from '..';
 
-const matcher = isAnyOf(
-  queueApi.endpoints.enqueueBatch.matchFulfilled,
-  queueApi.endpoints.enqueueGraph.matchFulfilled
-);
+import { startAppListening } from '..';
 
 export const addAnyEnqueuedListener = () => {
   startAppListening({
-    matcher,
+    matcher: queueApi.endpoints.enqueueBatch.matchFulfilled,
     effect: async (_, { dispatch, getState }) => {
       const { data } = queueApi.endpoints.getQueueStatus.select()(getState());
 

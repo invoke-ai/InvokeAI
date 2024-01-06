@@ -1,7 +1,8 @@
-import { PopoverProps } from '@chakra-ui/react';
+import type { PopoverProps } from '@chakra-ui/react';
 
 export type Feature =
   | 'clipSkip'
+  | 'hrf'
   | 'paramNegativeConditioning'
   | 'paramPositiveConditioning'
   | 'paramScheduler'
@@ -24,6 +25,7 @@ export type Feature =
   | 'lora'
   | 'noiseUseCPU'
   | 'paramCFGScale'
+  | 'paramCFGRescaleMultiplier'
   | 'paramDenoisingStrength'
   | 'paramIterations'
   | 'paramModel'

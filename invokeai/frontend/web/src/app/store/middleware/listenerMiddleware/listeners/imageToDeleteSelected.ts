@@ -4,6 +4,7 @@ import {
   imagesToDeleteSelected,
   isModalOpenChanged,
 } from 'features/deleteImageModal/store/slice';
+
 import { startAppListening } from '..';
 
 export const addImageToDeleteSelectedListener = () => {
@@ -18,8 +19,7 @@ export const addImageToDeleteSelectedListener = () => {
       const isImageInUse =
         imagesUsage.some((i) => i.isCanvasImage) ||
         imagesUsage.some((i) => i.isInitialImage) ||
-        imagesUsage.some((i) => i.isControlNetImage) ||
-        imagesUsage.some((i) => i.isIPAdapterImage) ||
+        imagesUsage.some((i) => i.isControlImage) ||
         imagesUsage.some((i) => i.isNodesImage);
 
       if (shouldConfirmOnDelete || isImageInUse) {

@@ -1,68 +1,41 @@
-import { Flex, Image, Text } from '@chakra-ui/react';
-import InvokeAILogoImage from 'assets/images/logo.png';
-import { AnimatePresence, motion } from 'framer-motion';
-import { memo, useRef } from 'react';
-import { useHoverDirty } from 'react-use';
+/* eslint-disable i18next/no-literal-string */
+import { Image } from '@chakra-ui/react';
+import { useStore } from '@nanostores/react';
+import { $logo } from 'app/store/nanostores/logo';
+import InvokeLogoYellow from 'assets/images/invoke-key-ylw-sm.svg';
+import { InvText } from 'common/components/InvText/wrapper';
+import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { memo, useMemo, useRef } from 'react';
 import { useGetAppVersionQuery } from 'services/api/endpoints/appInfo';
 
-interface Props {
-  showVersion?: boolean;
-}
-
-const InvokeAILogoComponent = ({ showVersion = true }: Props) => {
+const InvokeAILogoComponent = () => {
   const { data: appVersion } = useGetAppVersionQuery();
   const ref = useRef(null);
-  const isHovered = useHoverDirty(ref);
+  const logoOverride = useStore($logo);
+  const tooltip = useMemo(() => {
+    if (appVersion) {
+      return <InvText fontWeight="semibold">v{appVersion.version}</InvText>;
+    }
+    return null;
+  }, [appVersion]);
+
+  if (logoOverride) {
+    return logoOverride;
+  }
 
   return (
-    <Flex alignItems="center" gap={5} ps={1} ref={ref}>
+    <InvTooltip placement="right" label={tooltip} p={1} px={2} gutter={16}>
       <Image
-        src={InvokeAILogoImage}
-        alt="invoke-ai-logo"
-        sx={{
-          w: '32px',
-          h: '32px',
-          minW: '32px',
-          minH: '32px',
-          userSelect: 'none',
-        }}
+        ref={ref}
+        src={InvokeLogoYellow}
+        alt="invoke-logo"
+        w="24px"
+        h="24px"
+        minW="24px"
+        minH="24px"
+        userSelect="none"
       />
-      <Flex sx={{ gap: 3, alignItems: 'center' }}>
-        <Text sx={{ fontSize: 'xl', userSelect: 'none' }}>
-          invoke <strong>ai</strong>
-        </Text>
-        <AnimatePresence>
-          {showVersion && isHovered && appVersion && (
-            <motion.div
-              key="statusText"
-              initial={{
-                opacity: 0,
-              }}
-              animate={{
-                opacity: 1,
-                transition: { duration: 0.15 },
-              }}
-              exit={{
-                opacity: 0,
-                transition: { delay: 0.8 },
-              }}
-            >
-              <Text
-                sx={{
-                  fontWeight: 600,
-                  marginTop: 1,
-                  color: 'base.300',
-                  fontSize: 14,
-                }}
-                variant="subtext"
-              >
-                {appVersion.version}
-              </Text>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </Flex>
-    </Flex>
+    </InvTooltip>
   );
 };
 

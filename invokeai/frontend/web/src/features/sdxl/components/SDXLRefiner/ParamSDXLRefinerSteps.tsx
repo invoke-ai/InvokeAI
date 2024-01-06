@@ -1,71 +1,48 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAINumberInput from 'common/components/IAINumberInput';
-import IAISlider from 'common/components/IAISlider';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setRefinerSteps } from 'features/sdxl/store/sdxlSlice';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useIsRefinerAvailable } from 'services/api/hooks/useIsRefinerAvailable';
-
-const selector = createSelector(
-  [stateSelector],
-  ({ sdxl, ui }) => {
-    const { refinerSteps } = sdxl;
-    const { shouldUseSliders } = ui;
-
-    return {
-      refinerSteps,
-      shouldUseSliders,
-    };
-  },
-  defaultSelectorOptions
-);
 
 const ParamSDXLRefinerSteps = () => {
-  const { refinerSteps, shouldUseSliders } = useAppSelector(selector);
-  const isRefinerAvailable = useIsRefinerAvailable();
-
-  const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const refinerSteps = useAppSelector((s) => s.sdxl.refinerSteps);
+  const initial = useAppSelector((s) => s.config.sd.steps.initial);
+  const min = useAppSelector((s) => s.config.sd.steps.min);
+  const sliderMax = useAppSelector((s) => s.config.sd.steps.sliderMax);
+  const inputMax = useAppSelector((s) => s.config.sd.steps.inputMax);
+  const coarseStep = useAppSelector((s) => s.config.sd.steps.coarseStep);
+  const fineStep = useAppSelector((s) => s.config.sd.steps.fineStep);
 
-  const handleChange = useCallback(
+  const marks = useMemo(
+    () => [min, Math.floor(sliderMax / 2), sliderMax],
+    [sliderMax, min]
+  );
+
+  const onChange = useCallback(
     (v: number) => {
       dispatch(setRefinerSteps(v));
     },
     [dispatch]
   );
-  const handleReset = useCallback(() => {
-    dispatch(setRefinerSteps(20));
-  }, [dispatch]);
 
-  return shouldUseSliders ? (
-    <IAISlider
-      label={t('sdxl.steps')}
-      min={1}
-      max={100}
-      step={1}
-      onChange={handleChange}
-      handleReset={handleReset}
-      value={refinerSteps}
-      withInput
-      withReset
-      withSliderMarks
-      sliderNumberInputProps={{ max: 500 }}
-      isDisabled={!isRefinerAvailable}
-    />
-  ) : (
-    <IAINumberInput
-      label={t('sdxl.steps')}
-      min={1}
-      max={500}
-      step={1}
-      onChange={handleChange}
-      value={refinerSteps}
-      numberInputFieldProps={{ textAlign: 'center' }}
-      isDisabled={!isRefinerAvailable}
-    />
+  return (
+    <InvControl label={t('sdxl.steps')}>
+      <InvSlider
+        value={refinerSteps}
+        defaultValue={initial}
+        min={min}
+        max={sliderMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        onChange={onChange}
+        withNumberInput
+        marks={marks}
+        numberInputMax={inputMax}
+      />
+    </InvControl>
   );
 };
 

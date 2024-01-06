@@ -1,31 +1,15 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
-import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { some } from 'lodash-es';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useMemo } from 'react';
-import { FOOTER_FIELDS } from '../types/constants';
-import { isInvocationNode } from '../types/types';
 
-export const useHasImageOutputs = (nodeId: string) => {
-  const selector = useMemo(
-    () =>
-      createSelector(
-        stateSelector,
-        ({ nodes }) => {
-          const node = nodes.nodes.find((node) => node.id === nodeId);
-          if (!isInvocationNode(node)) {
-            return false;
-          }
-          return some(node.data.outputs, (output) =>
-            FOOTER_FIELDS.includes(output.type)
-          );
-        },
-        defaultSelectorOptions
-      ),
-    [nodeId]
+import { useHasImageOutput } from './useHasImageOutput';
+
+export const useWithFooter = (nodeId: string) => {
+  const hasImageOutput = useHasImageOutput(nodeId);
+  const isCacheEnabled = useFeatureStatus('invocationCache').isFeatureEnabled;
+
+  const withFooter = useMemo(
+    () => hasImageOutput || isCacheEnabled,
+    [hasImageOutput, isCacheEnabled]
   );
-
-  const withFooter = useAppSelector(selector);
   return withFooter;
 };

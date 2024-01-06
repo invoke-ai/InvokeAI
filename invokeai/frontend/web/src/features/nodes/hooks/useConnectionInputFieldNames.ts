@@ -1,42 +1,39 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { map } from 'lodash-es';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
+import { isInvocationNode } from 'features/nodes/types/invocation';
+import { getSortedFilteredFieldNames } from 'features/nodes/util/node/getSortedFilteredFieldNames';
+import { TEMPLATE_BUILDER_MAP } from 'features/nodes/util/schema/buildFieldInputTemplate';
+import { keys, map } from 'lodash-es';
 import { useMemo } from 'react';
-import {
-  POLYMORPHIC_TYPES,
-  TYPES_WITH_INPUT_COMPONENTS,
-} from '../types/constants';
-import { isInvocationNode } from '../types/types';
 
 export const useConnectionInputFieldNames = (nodeId: string) => {
   const selector = useMemo(
     () =>
-      createSelector(
-        stateSelector,
-        ({ nodes }) => {
+      createMemoizedSelector(
+        selectNodesSlice,
+        selectNodeTemplatesSlice,
+        (nodes, nodeTemplates) => {
           const node = nodes.nodes.find((node) => node.id === nodeId);
           if (!isInvocationNode(node)) {
             return [];
           }
-          const nodeTemplate = nodes.nodeTemplates[node.data.type];
+          const nodeTemplate = nodeTemplates.templates[node.data.type];
           if (!nodeTemplate) {
             return [];
           }
-          return map(nodeTemplate.inputs)
-            .filter(
-              (field) =>
-                (field.input === 'connection' &&
-                  !POLYMORPHIC_TYPES.includes(field.type)) ||
-                !TYPES_WITH_INPUT_COMPONENTS.includes(field.type)
-            )
-            .filter((field) => !field.ui_hidden)
-            .sort((a, b) => (a.ui_order ?? 0) - (b.ui_order ?? 0))
-            .map((field) => field.name)
-            .filter((fieldName) => fieldName !== 'is_intermediate');
-        },
-        defaultSelectorOptions
+
+          // get the visible fields
+          const fields = map(nodeTemplate.inputs).filter(
+            (field) =>
+              (field.input === 'connection' &&
+                !field.type.isCollectionOrScalar) ||
+              !keys(TEMPLATE_BUILDER_MAP).includes(field.type.name)
+          );
+
+          return getSortedFilteredFieldNames(fields);
+        }
       ),
     [nodeId]
   );

@@ -1,23 +1,17 @@
 import { Flex } from '@chakra-ui/react';
+import { useStore } from '@nanostores/react';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
-import { useWorkflow } from 'features/nodes/hooks/useWorkflow';
+import { $builtWorkflow } from 'features/nodes/hooks/useWorkflowWatcher';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const WorkflowJSONTab = () => {
-  const workflow = useWorkflow();
+  const workflow = useStore($builtWorkflow);
   const { t } = useTranslation();
 
   return (
-    <Flex
-      sx={{
-        flexDir: 'column',
-        alignItems: 'flex-start',
-        gap: 2,
-        h: 'full',
-      }}
-    >
-      <DataViewer data={workflow} label={t('nodes.workflow')} />
+    <Flex flexDir="column" alignItems="flex-start" gap={2} h="full">
+      <DataViewer data={workflow ?? {}} label={t('nodes.workflow')} />
     </Flex>
   );
 };

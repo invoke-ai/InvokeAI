@@ -2,7 +2,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useUploadImageMutation } from 'services/api/endpoints/images';
-import { PostUploadAction } from 'services/api/types';
+import type { PostUploadAction } from 'services/api/types';
 
 type UseImageUploadButtonArgs = {
   postUploadAction?: PostUploadAction;
@@ -15,7 +15,7 @@ type UseImageUploadButtonArgs = {
  * @example
  * const { getUploadButtonProps, getUploadInputProps, openUploader } = useImageUploadButton({
  *   postUploadAction: {
- *     type: 'SET_CONTROLNET_IMAGE',
+ *     type: 'SET_CONTROL_ADAPTER_IMAGE',
  *     controlNetId: '12345',
  *   },
  *   isDisabled: getIsUploadDisabled(),
@@ -32,9 +32,7 @@ export const useImageUploadButton = ({
   postUploadAction,
   isDisabled,
 }: UseImageUploadButtonArgs) => {
-  const autoAddBoardId = useAppSelector(
-    (state) => state.gallery.autoAddBoardId
-  );
+  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const [uploadImage] = useUploadImageMutation();
   const onDropAccepted = useCallback(
     (files: File[]) => {

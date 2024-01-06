@@ -2,6 +2,7 @@
 Utility (backend) functions used by model_install.py
 """
 import os
+import re
 import shutil
 import warnings
 from dataclasses import dataclass, field
@@ -88,6 +89,7 @@ class ModelLoadInfo:
     base_type: BaseModelType
     path: Optional[Path] = None
     repo_id: Optional[str] = None
+    subfolder: Optional[str] = None
     description: str = ""
     installed: bool = False
     recommended: bool = False
@@ -118,7 +120,7 @@ class ModelInstall(object):
         be treated uniformly. It also sorts the models alphabetically
         by their name, to improve the display somewhat.
         """
-        model_dict = dict()
+        model_dict = {}
 
         # first populate with the entries in INITIAL_MODELS.yaml
         for key, value in self.datasets.items():
@@ -126,10 +128,13 @@ class ModelInstall(object):
             value["name"] = name
             value["base_type"] = base
             value["model_type"] = model_type
-            model_dict[key] = ModelLoadInfo(**value)
+            model_info = ModelLoadInfo(**value)
+            if model_info.subfolder and model_info.repo_id:
+                model_info.repo_id += f":{model_info.subfolder}"
+            model_dict[key] = model_info
 
         # supplement with entries in models.yaml
-        installed_models = [x for x in self.mgr.list_models()]
+        installed_models = list(self.mgr.list_models())
 
         for md in installed_models:
             base = md["base_model"]
@@ -171,7 +176,7 @@ class ModelInstall(object):
     # logic here a little reversed to maintain backward compatibility
     def starter_models(self, all_models: bool = False) -> Set[str]:
         models = set()
-        for key, value in self.datasets.items():
+        for key, _value in self.datasets.items():
             name, base, model_type = ModelManager.parse_key(key)
             if all_models or model_type in [ModelType.Main, ModelType.Vae]:
                 models.add(key)
@@ -179,7 +184,7 @@ class ModelInstall(object):
 
     def recommended_models(self) -> Set[str]:
         starters = self.starter_models(all_models=True)
-        return set([x for x in starters if self.datasets[x].get("recommended", False)])
+        return {x for x in starters if self.datasets[x].get("recommended", False)}
 
     def default_model(self) -> str:
         starters = self.starter_models()
@@ -229,21 +234,32 @@ class ModelInstall(object):
         """
 
         if not models_installed:
-            models_installed = dict()
+            models_installed = {}
+
+        model_path_id_or_url = str(model_path_id_or_url).strip("\"' ")
 
         # A little hack to allow nested routines to retrieve info on the requested ID
         self.current_id = model_path_id_or_url
         path = Path(model_path_id_or_url)
+
+        # fix relative paths
+        if path.exists() and not path.is_absolute():
+            path = path.absolute()  # make relative to current WD
+
         # checkpoint file, or similar
         if path.is_file():
             models_installed.update({str(path): self._install_path(path)})
 
         # folders style or similar
         elif path.is_dir() and any(
-            [
-                (path / x).exists()
-                for x in {"config.json", "model_index.json", "learned_embeds.bin", "pytorch_lora_weights.bin"}
-            ]
+            (path / x).exists()
+            for x in {
+                "config.json",
+                "model_index.json",
+                "learned_embeds.bin",
+                "pytorch_lora_weights.bin",
+                "pytorch_lora_weights.safetensors",
+            }
         ):
             models_installed.update({str(model_path_id_or_url): self._install_path(path)})
 
@@ -317,46 +333,63 @@ class ModelInstall(object):
         return self._install_path(Path(models_path), info)
 
     def _install_repo(self, repo_id: str) -> AddModelResult:
+        # hack to recover models stored in subfolders --
+        # Required to get the "v2" model of monster-labs/control_v1p_sd15_qrcode_monster
+        subfolder = None
+        if match := re.match(r"^([^/]+/[^/]+):(\w+)$", repo_id):
+            repo_id = match.group(1)
+            subfolder = match.group(2)
+
         hinfo = HfApi().model_info(repo_id)
 
         # we try to figure out how to download this most economically
         # list all the files in the repo
         files = [x.rfilename for x in hinfo.siblings]
+        if subfolder:
+            files = [x for x in files if x.startswith(f"{subfolder}/")]
+        prefix = f"{subfolder}/" if subfolder else ""
+
         location = None
 
         with TemporaryDirectory(dir=self.config.models_path) as staging:
             staging = Path(staging)
-            if "model_index.json" in files:
-                location = self._download_hf_pipeline(repo_id, staging)  # pipeline
-            elif "unet/model.onnx" in files:
+            if f"{prefix}model_index.json" in files:
+                location = self._download_hf_pipeline(repo_id, staging, subfolder=subfolder)  # pipeline
+            elif f"{prefix}unet/model.onnx" in files:
                 location = self._download_hf_model(repo_id, files, staging)
             else:
                 for suffix in ["safetensors", "bin"]:
-                    if f"pytorch_lora_weights.{suffix}" in files:
-                        location = self._download_hf_model(repo_id, ["pytorch_lora_weights.bin"], staging)  # LoRA
+                    if f"{prefix}pytorch_lora_weights.{suffix}" in files:
+                        location = self._download_hf_model(
+                            repo_id, [f"pytorch_lora_weights.{suffix}"], staging, subfolder=subfolder
+                        )  # LoRA
                         break
                     elif (
-                        self.config.precision == "float16" and f"diffusion_pytorch_model.fp16.{suffix}" in files
+                        self.config.precision == "float16" and f"{prefix}diffusion_pytorch_model.fp16.{suffix}" in files
                     ):  # vae, controlnet or some other standalone
                         files = ["config.json", f"diffusion_pytorch_model.fp16.{suffix}"]
-                        location = self._download_hf_model(repo_id, files, staging)
+                        location = self._download_hf_model(repo_id, files, staging, subfolder=subfolder)
                         break
-                    elif f"diffusion_pytorch_model.{suffix}" in files:
+                    elif f"{prefix}diffusion_pytorch_model.{suffix}" in files:
                         files = ["config.json", f"diffusion_pytorch_model.{suffix}"]
-                        location = self._download_hf_model(repo_id, files, staging)
+                        location = self._download_hf_model(repo_id, files, staging, subfolder=subfolder)
                         break
-                    elif f"learned_embeds.{suffix}" in files:
-                        location = self._download_hf_model(repo_id, [f"learned_embeds.{suffix}"], staging)
+                    elif f"{prefix}learned_embeds.{suffix}" in files:
+                        location = self._download_hf_model(
+                            repo_id, [f"learned_embeds.{suffix}"], staging, subfolder=subfolder
+                        )
                         break
-                    elif "image_encoder.txt" in files and f"ip_adapter.{suffix}" in files:  # IP-Adapter
+                    elif (
+                        f"{prefix}image_encoder.txt" in files and f"{prefix}ip_adapter.{suffix}" in files
+                    ):  # IP-Adapter
                         files = ["image_encoder.txt", f"ip_adapter.{suffix}"]
-                        location = self._download_hf_model(repo_id, files, staging)
+                        location = self._download_hf_model(repo_id, files, staging, subfolder=subfolder)
                         break
-                    elif f"model.{suffix}" in files and "config.json" in files:
+                    elif f"{prefix}model.{suffix}" in files and f"{prefix}config.json" in files:
                         # This elif-condition is pretty fragile, but it is intended to handle CLIP Vision models hosted
                         # by InvokeAI for use with IP-Adapters.
                         files = ["config.json", f"model.{suffix}"]
-                        location = self._download_hf_model(repo_id, files, staging)
+                        location = self._download_hf_model(repo_id, files, staging, subfolder=subfolder)
                         break
             if not location:
                 logger.warning(f"Could not determine type of repo {repo_id}. Skipping install.")
@@ -398,17 +431,17 @@ class ModelInstall(object):
 
         rel_path = self.relative_to_root(path, self.config.models_path)
 
-        attributes = dict(
-            path=str(rel_path),
-            description=str(description),
-            model_format=info.format,
-        )
+        attributes = {
+            "path": str(rel_path),
+            "description": str(description),
+            "model_format": info.format,
+        }
         legacy_conf = None
         if info.model_type == ModelType.Main or info.model_type == ModelType.ONNX:
             attributes.update(
-                dict(
-                    variant=info.variant_type,
-                )
+                {
+                    "variant": info.variant_type,
+                }
             )
             if info.format == "checkpoint":
                 try:
@@ -431,9 +464,15 @@ class ModelInstall(object):
             possible_conf = path.with_suffix(".yaml")
             if possible_conf.exists():
                 legacy_conf = str(self.relative_to_root(possible_conf))
+            else:
+                legacy_conf = Path(
+                    self.config.root_path,
+                    "configs/controlnet",
+                    ("cldm_v15.yaml" if info.base_type == BaseModelType("sd-1") else "cldm_v21.yaml"),
+                )
 
         if legacy_conf:
-            attributes.update(dict(config=str(legacy_conf)))
+            attributes.update({"config": str(legacy_conf)})
         return attributes
 
     def relative_to_root(self, path: Path, root: Optional[Path] = None) -> Path:
@@ -443,9 +482,9 @@ class ModelInstall(object):
         else:
             return path
 
-    def _download_hf_pipeline(self, repo_id: str, staging: Path) -> Path:
+    def _download_hf_pipeline(self, repo_id: str, staging: Path, subfolder: str = None) -> Path:
         """
-        This retrieves a StableDiffusion model from cache or remote and then
+        Retrieve a StableDiffusion model from cache or remote and then
         does a save_pretrained() to the indicated staging area.
         """
         _, name = repo_id.split("/")
@@ -460,6 +499,7 @@ class ModelInstall(object):
                     variant=variant,
                     torch_dtype=precision,
                     safety_checker=None,
+                    subfolder=subfolder,
                 )
             except Exception as e:  # most errors are due to fp16 not being present. Fix this to catch other errors
                 if "fp16" not in str(e):
@@ -474,10 +514,10 @@ class ModelInstall(object):
         model.save_pretrained(staging / name, safe_serialization=True)
         return staging / name
 
-    def _download_hf_model(self, repo_id: str, files: List[str], staging: Path) -> Path:
+    def _download_hf_model(self, repo_id: str, files: List[str], staging: Path, subfolder: None) -> Path:
         _, name = repo_id.split("/")
         location = staging / name
-        paths = list()
+        paths = []
         for filename in files:
             filePath = Path(filename)
             p = hf_download_with_resume(
@@ -485,7 +525,7 @@ class ModelInstall(object):
                 model_dir=location / filePath.parent,
                 model_name=filePath.name,
                 access_token=self.access_token,
-                subfolder=filePath.parent,
+                subfolder=filePath.parent / subfolder if subfolder else filePath.parent,
             )
             if p:
                 paths.append(p)

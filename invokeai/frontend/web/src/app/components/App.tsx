@@ -1,25 +1,29 @@
-import { Flex, Grid } from '@chakra-ui/react';
+import { Box } from '@chakra-ui/react';
+import { useSocketIO } from 'app/hooks/useSocketIO';
 import { useLogger } from 'app/logging/useLogger';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { PartialAppConfig } from 'app/types/invokeai';
-import ImageUploader from 'common/components/ImageUploader';
+import type { PartialAppConfig } from 'app/types/invokeai';
+import ImageUploadOverlay from 'common/components/ImageUploadOverlay';
+import { useClearStorage } from 'common/hooks/useClearStorage';
+import { useFullscreenDropzone } from 'common/hooks/useFullscreenDropzone';
+import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
+import { useGlobalModifiersInit } from 'common/hooks/useGlobalModifiers';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
-import SiteHeader from 'features/system/components/SiteHeader';
+import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
+import { AnimatePresence } from 'framer-motion';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
 import { memo, useCallback, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
-import { usePreselectedImage } from '../../features/parameters/hooks/usePreselectedImage';
+
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
-import GlobalHotkeys from './GlobalHotkeys';
+import PreselectedImage from './PreselectedImage';
 import Toaster from './Toaster';
-import { useStore } from '@nanostores/react';
-import { $headerComponent } from 'app/store/nanostores/headerComponent';
 
 const DEFAULT_CONFIG = {};
 
@@ -33,16 +37,23 @@ interface Props {
 
 const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   const language = useAppSelector(languageSelector);
-
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
-  const { handleSendToCanvas, handleSendToImg2Img, handleUseAllMetadata } =
-    usePreselectedImage(selectedImage?.imageName);
+  const clearStorage = useClearStorage();
+
+  // singleton!
+  useSocketIO();
+  useGlobalModifiersInit();
+  useGlobalHotkeys();
+
+  const { dropzone, isHandlingUpload, setIsHandlingUpload } =
+    useFullscreenDropzone();
+
   const handleReset = useCallback(() => {
-    localStorage.clear();
+    clearStorage();
     location.reload();
     return false;
-  }, []);
+  }, [clearStorage]);
 
   useEffect(() => {
     i18n.changeLanguage(language);
@@ -59,59 +70,35 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
     dispatch(appStarted());
   }, [dispatch]);
 
-  useEffect(() => {
-    if (selectedImage && selectedImage.action === 'sendToCanvas') {
-      handleSendToCanvas();
-    }
-  }, [selectedImage, handleSendToCanvas]);
-
-  useEffect(() => {
-    if (selectedImage && selectedImage.action === 'sendToImg2Img') {
-      handleSendToImg2Img();
-    }
-  }, [selectedImage, handleSendToImg2Img]);
-
-  useEffect(() => {
-    if (selectedImage && selectedImage.action === 'useAllParameters') {
-      handleUseAllMetadata();
-    }
-  }, [selectedImage, handleUseAllMetadata]);
-
-  const headerComponent = useStore($headerComponent);
-
   return (
     <ErrorBoundary
       onReset={handleReset}
       FallbackComponent={AppErrorBoundaryFallback}
     >
-      <Grid w="100vw" h="100vh" position="relative" overflow="hidden">
-        <ImageUploader>
-          <Grid
-            sx={{
-              gap: 4,
-              p: 4,
-              gridAutoRows: 'min-content auto',
-              w: 'full',
-              h: 'full',
-            }}
-          >
-            {headerComponent || <SiteHeader />}
-            <Flex
-              sx={{
-                gap: 4,
-                w: 'full',
-                h: 'full',
-              }}
-            >
-              <InvokeTabs />
-            </Flex>
-          </Grid>
-        </ImageUploader>
-      </Grid>
+      <Box
+        id="invoke-app-wrapper"
+        w="100vw"
+        h="100vh"
+        position="relative"
+        overflow="hidden"
+        {...dropzone.getRootProps()}
+      >
+        <input {...dropzone.getInputProps()} />
+        <InvokeTabs />
+        <AnimatePresence>
+          {dropzone.isDragActive && isHandlingUpload && (
+            <ImageUploadOverlay
+              dropzone={dropzone}
+              setIsHandlingUpload={setIsHandlingUpload}
+            />
+          )}
+        </AnimatePresence>
+      </Box>
       <DeleteImageModal />
       <ChangeBoardModal />
+      <DynamicPromptsModal />
       <Toaster />
-      <GlobalHotkeys />
+      <PreselectedImage selectedImage={selectedImage} />
     </ErrorBoundary>
   );
 };

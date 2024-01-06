@@ -1,74 +1,45 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAINumberInput from 'common/components/IAINumberInput';
-import IAISlider from 'common/components/IAISlider';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setRefinerCFGScale } from 'features/sdxl/store/sdxlSlice';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useIsRefinerAvailable } from 'services/api/hooks/useIsRefinerAvailable';
-
-const selector = createSelector(
-  [stateSelector],
-  ({ sdxl, ui, hotkeys }) => {
-    const { refinerCFGScale } = sdxl;
-    const { shouldUseSliders } = ui;
-    const { shift } = hotkeys;
-
-    return {
-      refinerCFGScale,
-      shouldUseSliders,
-      shift,
-    };
-  },
-  defaultSelectorOptions
-);
 
 const ParamSDXLRefinerCFGScale = () => {
-  const { refinerCFGScale, shouldUseSliders, shift } = useAppSelector(selector);
-  const isRefinerAvailable = useIsRefinerAvailable();
-  const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const refinerCFGScale = useAppSelector((s) => s.sdxl.refinerCFGScale);
+  const min = useAppSelector((s) => s.config.sd.guidance.min);
+  const inputMax = useAppSelector((s) => s.config.sd.guidance.inputMax);
+  const sliderMax = useAppSelector((s) => s.config.sd.guidance.sliderMax);
+  const coarseStep = useAppSelector((s) => s.config.sd.guidance.coarseStep);
+  const fineStep = useAppSelector((s) => s.config.sd.guidance.fineStep);
+  const initial = useAppSelector((s) => s.config.sd.guidance.initial);
+  const marks = useMemo(
+    () => [min, Math.floor(sliderMax / 2), sliderMax],
+    [sliderMax, min]
+  );
 
-  const handleChange = useCallback(
+  const onChange = useCallback(
     (v: number) => dispatch(setRefinerCFGScale(v)),
     [dispatch]
   );
 
-  const handleReset = useCallback(
-    () => dispatch(setRefinerCFGScale(7)),
-    [dispatch]
-  );
-
-  return shouldUseSliders ? (
-    <IAISlider
-      label={t('sdxl.cfgScale')}
-      step={shift ? 0.1 : 0.5}
-      min={1}
-      max={20}
-      onChange={handleChange}
-      handleReset={handleReset}
-      value={refinerCFGScale}
-      sliderNumberInputProps={{ max: 200 }}
-      withInput
-      withReset
-      withSliderMarks
-      isInteger={false}
-      isDisabled={!isRefinerAvailable}
-    />
-  ) : (
-    <IAINumberInput
-      label={t('sdxl.cfgScale')}
-      step={0.5}
-      min={1}
-      max={200}
-      onChange={handleChange}
-      value={refinerCFGScale}
-      isInteger={false}
-      numberInputFieldProps={{ textAlign: 'center' }}
-      isDisabled={!isRefinerAvailable}
-    />
+  return (
+    <InvControl label={t('sdxl.cfgScale')}>
+      <InvSlider
+        value={refinerCFGScale}
+        defaultValue={initial}
+        min={min}
+        max={sliderMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        onChange={onChange}
+        withNumberInput
+        numberInputMax={inputMax}
+        marks={marks}
+      />
+    </InvControl>
   );
 };
 

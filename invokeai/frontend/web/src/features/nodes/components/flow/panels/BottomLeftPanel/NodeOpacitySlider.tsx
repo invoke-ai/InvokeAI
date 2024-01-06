@@ -1,18 +1,13 @@
-import {
-  Flex,
-  Slider,
-  SliderFilledTrack,
-  SliderThumb,
-  SliderTrack,
-} from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { nodeOpacityChanged } from 'features/nodes/store/nodesSlice';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export default function NodeOpacitySlider() {
+const NodeOpacitySlider = () => {
   const dispatch = useAppDispatch();
-  const nodeOpacity = useAppSelector((state) => state.nodes.nodeOpacity);
+  const nodeOpacity = useAppSelector((s) => s.nodes.nodeOpacity);
   const { t } = useTranslation();
 
   const handleChange = useCallback(
@@ -24,22 +19,19 @@ export default function NodeOpacitySlider() {
 
   return (
     <Flex alignItems="center">
-      <Slider
+      <InvSlider
         aria-label={t('nodes.nodeOpacity')}
         value={nodeOpacity}
+        defaultValue={1}
         min={0.5}
         max={1}
         step={0.01}
         onChange={handleChange}
         orientation="vertical"
-        defaultValue={30}
         h="calc(100% - 0.5rem)"
-      >
-        <SliderTrack>
-          <SliderFilledTrack />
-        </SliderTrack>
-        <SliderThumb />
-      </Slider>
+      />
     </Flex>
   );
-}
+};
+
+export default memo(NodeOpacitySlider);

@@ -1,20 +1,26 @@
-import { Flex, MenuItem, Spinner } from '@chakra-ui/react';
+import { Flex, Spinner } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
 import { useAppToaster } from 'app/components/Toaster';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
+import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
   imagesToChangeSelected,
   isModalOpenChanged,
 } from 'features/changeBoardModal/store/slice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
-import { workflowLoadRequested } from 'features/nodes/store/actions';
+import {
+  sentImageToCanvas,
+  sentImageToImg2Img,
+} from 'features/gallery/store/actions';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { useCopyImageToClipboard } from 'features/ui/hooks/useCopyImageToClipboard';
 import { setActiveTab } from 'features/ui/store/uiSlice';
+import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
 import { memo, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -32,13 +38,11 @@ import {
 import { FaCircleNodes } from 'react-icons/fa6';
 import { MdStar, MdStarBorder } from 'react-icons/md';
 import {
-  useGetImageMetadataFromFileQuery,
   useStarImagesMutation,
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
-import { ImageDTO } from 'services/api/types';
-import { configSelector } from '../../../system/store/configSelectors';
-import { sentImageToCanvas, sentImageToImg2Img } from '../../store/actions';
+import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
+import type { ImageDTO } from 'services/api/types';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -46,26 +50,23 @@ type SingleSelectionMenuItemsProps = {
 
 const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const { imageDTO } = props;
-
+  const optimalDimension = useAppSelector(selectOptimalDimension);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
   const toaster = useAppToaster();
-
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
-  const { shouldFetchMetadataFromApi } = useAppSelector(configSelector);
   const customStarUi = useStore($customStarUI);
 
-  const { metadata, workflow, isLoading } = useGetImageMetadataFromFileQuery(
-    { image: imageDTO, shouldFetchMetadataFromApi },
-    {
-      selectFromResult: (res) => ({
-        isLoading: res.isFetching,
-        metadata: res?.currentData?.metadata,
-        workflow: res?.currentData?.workflow,
-      }),
-    }
+  const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(
+    imageDTO?.image_name
   );
+
+  const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } =
+    useGetAndLoadEmbeddedWorkflow({});
+
+  const handleLoadWorkflow = useCallback(() => {
+    getAndLoadEmbeddedWorkflow(imageDTO.image_name);
+  }, [getAndLoadEmbeddedWorkflow, imageDTO.image_name]);
 
   const [starImages] = useStarImagesMutation();
   const [unstarImages] = useUnstarImagesMutation();
@@ -103,13 +104,6 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     recallSeed(metadata?.seed);
   }, [metadata?.seed, recallSeed]);
 
-  const handleLoadWorkflow = useCallback(() => {
-    if (!workflow) {
-      return;
-    }
-    dispatch(workflowLoadRequested(workflow));
-  }, [dispatch, workflow]);
-
   const handleSendToImageToImage = useCallback(() => {
     dispatch(sentImageToImg2Img());
     dispatch(initialImageSelected(imageDTO));
@@ -120,7 +114,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     flushSync(() => {
       dispatch(setActiveTab('unifiedCanvas'));
     });
-    dispatch(setInitialCanvasImage(imageDTO));
+    dispatch(setInitialCanvasImage(imageDTO, optimalDimension));
 
     toaster({
       title: t('toast.sentToUnifiedCanvas'),
@@ -128,7 +122,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       duration: 2500,
       isClosable: true,
     });
-  }, [dispatch, imageDTO, t, toaster]);
+  }, [dispatch, imageDTO, t, toaster, optimalDimension]);
 
   const handleUseAllParameters = useCallback(() => {
     recallAllParameters(metadata);
@@ -157,20 +151,20 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
 
   return (
     <>
-      <MenuItem
+      <InvMenuItem
         as="a"
         href={imageDTO.image_url}
         target="_blank"
         icon={<FaExternalLinkAlt />}
       >
         {t('common.openInNewTab')}
-      </MenuItem>
+      </InvMenuItem>
       {isClipboardAPIAvailable && (
-        <MenuItem icon={<FaCopy />} onClickCapture={handleCopyImage}>
+        <InvMenuItem icon={<FaCopy />} onClickCapture={handleCopyImage}>
           {t('parameters.copyImage')}
-        </MenuItem>
+        </InvMenuItem>
       )}
-      <MenuItem
+      <InvMenuItem
         as="a"
         download={true}
         href={imageDTO.image_url}
@@ -179,80 +173,86 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         w="100%"
       >
         {t('parameters.downloadImage')}
-      </MenuItem>
-      <MenuItem
-        icon={isLoading ? <SpinnerIcon /> : <FaCircleNodes />}
+      </InvMenuItem>
+      <InvMenuItem
+        icon={
+          getAndLoadEmbeddedWorkflowResult.isLoading ? (
+            <SpinnerIcon />
+          ) : (
+            <FaCircleNodes />
+          )
+        }
         onClickCapture={handleLoadWorkflow}
-        isDisabled={isLoading || !workflow}
+        isDisabled={!imageDTO.has_workflow}
       >
         {t('nodes.loadWorkflow')}
-      </MenuItem>
-      <MenuItem
-        icon={isLoading ? <SpinnerIcon /> : <FaQuoteRight />}
+      </InvMenuItem>
+      <InvMenuItem
+        icon={isLoadingMetadata ? <SpinnerIcon /> : <FaQuoteRight />}
         onClickCapture={handleRecallPrompt}
         isDisabled={
-          isLoading ||
+          isLoadingMetadata ||
           (metadata?.positive_prompt === undefined &&
             metadata?.negative_prompt === undefined)
         }
       >
         {t('parameters.usePrompt')}
-      </MenuItem>
-      <MenuItem
-        icon={isLoading ? <SpinnerIcon /> : <FaSeedling />}
+      </InvMenuItem>
+      <InvMenuItem
+        icon={isLoadingMetadata ? <SpinnerIcon /> : <FaSeedling />}
         onClickCapture={handleRecallSeed}
-        isDisabled={isLoading || metadata?.seed === undefined}
+        isDisabled={isLoadingMetadata || metadata?.seed === undefined}
       >
         {t('parameters.useSeed')}
-      </MenuItem>
-      <MenuItem
-        icon={isLoading ? <SpinnerIcon /> : <FaAsterisk />}
+      </InvMenuItem>
+      <InvMenuItem
+        icon={isLoadingMetadata ? <SpinnerIcon /> : <FaAsterisk />}
         onClickCapture={handleUseAllParameters}
-        isDisabled={isLoading || !metadata}
+        isDisabled={isLoadingMetadata || !metadata}
       >
         {t('parameters.useAll')}
-      </MenuItem>
-      <MenuItem
+      </InvMenuItem>
+      <InvMenuItem
         icon={<FaShare />}
         onClickCapture={handleSendToImageToImage}
         id="send-to-img2img"
       >
         {t('parameters.sendToImg2Img')}
-      </MenuItem>
+      </InvMenuItem>
       {isCanvasEnabled && (
-        <MenuItem
+        <InvMenuItem
           icon={<FaShare />}
           onClickCapture={handleSendToCanvas}
           id="send-to-canvas"
         >
           {t('parameters.sendToUnifiedCanvas')}
-        </MenuItem>
+        </InvMenuItem>
       )}
-      <MenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>
-        Change Board
-      </MenuItem>
+      <InvMenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>
+        {t('boards.changeBoard')}
+      </InvMenuItem>
       {imageDTO.starred ? (
-        <MenuItem
+        <InvMenuItem
           icon={customStarUi ? customStarUi.off.icon : <MdStar />}
           onClickCapture={handleUnstarImage}
         >
-          {customStarUi ? customStarUi.off.text : `Unstar Image`}
-        </MenuItem>
+          {customStarUi ? customStarUi.off.text : t('gallery.unstarImage')}
+        </InvMenuItem>
       ) : (
-        <MenuItem
+        <InvMenuItem
           icon={customStarUi ? customStarUi.on.icon : <MdStarBorder />}
           onClickCapture={handleStarImage}
         >
-          {customStarUi ? customStarUi.on.text : `Star Image`}
-        </MenuItem>
+          {customStarUi ? customStarUi.on.text : t('gallery.starImage')}
+        </InvMenuItem>
       )}
-      <MenuItem
-        sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
+      <InvMenuItem
+        color="error.300"
         icon={<FaTrash />}
         onClickCapture={handleDelete}
       >
         {t('gallery.deleteImage')}
-      </MenuItem>
+      </InvMenuItem>
     </>
   );
 };

@@ -1,4 +1,4 @@
-import { RgbaColor, RgbColor } from 'react-colorful';
+import type { RgbaColor, RgbColor } from 'react-colorful';
 
 export const rgbaColorToString = (color: RgbaColor): string => {
   const { r, g, b, a } = color;

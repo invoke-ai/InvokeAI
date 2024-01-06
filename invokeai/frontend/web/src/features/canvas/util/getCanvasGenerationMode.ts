@@ -2,7 +2,7 @@ import {
   areAnyPixelsBlack,
   getImageDataTransparency,
 } from 'common/util/arrayBuffer';
-import { GenerationMode } from '../store/canvasTypes';
+import type { GenerationMode } from 'features/canvas/store/canvasTypes';
 
 export const getCanvasGenerationMode = (
   baseImageData: ImageData,

@@ -1,22 +1,24 @@
 import { logger } from 'app/logging/logger';
-import { canvasImageToControlNet } from 'features/canvas/store/actions';
+import { canvasImageToControlAdapter } from 'features/canvas/store/actions';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
-import { controlNetImageChanged } from 'features/controlNet/store/controlNetSlice';
+import { controlAdapterImageChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { addToast } from 'features/system/store/systemSlice';
-import { imagesApi } from 'services/api/endpoints/images';
-import { startAppListening } from '..';
 import { t } from 'i18next';
+import { imagesApi } from 'services/api/endpoints/images';
+
+import { startAppListening } from '..';
 
 export const addCanvasImageToControlNetListener = () => {
   startAppListening({
-    actionCreator: canvasImageToControlNet,
+    actionCreator: canvasImageToControlAdapter,
     effect: async (action, { dispatch, getState }) => {
       const log = logger('canvas');
       const state = getState();
+      const { id } = action.payload;
 
-      let blob;
+      let blob: Blob;
       try {
-        blob = await getBaseLayerBlob(state);
+        blob = await getBaseLayerBlob(state, true);
       } catch (err) {
         log.error(String(err));
         dispatch(
@@ -36,10 +38,10 @@ export const addCanvasImageToControlNetListener = () => {
           file: new File([blob], 'savedCanvas.png', {
             type: 'image/png',
           }),
-          image_category: 'mask',
+          image_category: 'control',
           is_intermediate: false,
           board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-          crop_visible: true,
+          crop_visible: false,
           postUploadAction: {
             type: 'TOAST',
             toastOptions: { title: t('toast.canvasSentControlnetAssets') },
@@ -50,8 +52,8 @@ export const addCanvasImageToControlNetListener = () => {
       const { image_name } = imageDTO;
 
       dispatch(
-        controlNetImageChanged({
-          controlNetId: action.payload.controlNet.controlNetId,
+        controlAdapterImageChanged({
+          id,
           controlImage: image_name,
         })
       );

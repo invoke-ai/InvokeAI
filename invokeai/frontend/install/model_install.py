@@ -20,6 +20,7 @@ from multiprocessing import Process
 from multiprocessing.connection import Connection, Pipe
 from pathlib import Path
 from shutil import get_terminal_size
+from typing import Optional
 
 import npyscreen
 import torch
@@ -71,7 +72,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
     def __init__(self, parentApp, name, multipage=False, *args, **keywords):
         self.multipage = multipage
         self.subprocess = None
-        super().__init__(parentApp=parentApp, name=name, *args, **keywords)
+        super().__init__(parentApp=parentApp, name=name, *args, **keywords)  # noqa: B026 # TODO: maybe this is bad?
 
     def create(self):
         self.keypress_timeout = 10
@@ -98,15 +99,16 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         self.tabs = self.add_widget_intelligent(
             SingleSelectColumns,
             values=[
-                "STARTER MODELS",
-                "MAIN MODELS",
+                "STARTERS",
+                "MAINS",
                 "CONTROLNETS",
+                "T2I-ADAPTERS",
                 "IP-ADAPTERS",
-                "LORA/LYCORIS",
-                "TEXTUAL INVERSION",
+                "LORAS",
+                "TI EMBEDDINGS",
             ],
             value=[self.current_tab],
-            columns=6,
+            columns=7,
             max_height=2,
             relx=8,
             scroll_exit=True,
@@ -131,6 +133,12 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         )
         bottom_of_table = max(bottom_of_table, self.nextrely)
 
+        self.nextrely = top_of_table
+        self.t2i_models = self.add_model_widgets(
+            model_type=ModelType.T2IAdapter,
+            window_width=window_width,
+        )
+        bottom_of_table = max(bottom_of_table, self.nextrely)
         self.nextrely = top_of_table
         self.ipadapter_models = self.add_model_widgets(
             model_type=ModelType.IPAdapter,
@@ -195,14 +203,14 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         )
 
         # This restores the selected page on return from an installation
-        for i in range(1, self.current_tab + 1):
+        for _i in range(1, self.current_tab + 1):
             self.tabs.h_cursor_line_down(1)
         self._toggle_tables([self.current_tab])
 
     ############# diffusers tab ##########
     def add_starter_pipelines(self) -> dict[str, npyscreen.widget]:
         """Add widgets responsible for selecting diffusers models"""
-        widgets = dict()
+        widgets = {}
         models = self.all_models
         starters = self.starter_models
         starter_model_labels = self.model_labels
@@ -250,10 +258,12 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         model_type: ModelType,
         window_width: int = 120,
         install_prompt: str = None,
-        exclude: set = set(),
+        exclude: set = None,
     ) -> dict[str, npyscreen.widget]:
         """Generic code to create model selection widgets"""
-        widgets = dict()
+        if exclude is None:
+            exclude = set()
+        widgets = {}
         model_list = [x for x in self.all_models if self.all_models[x].model_type == model_type and x not in exclude]
         model_labels = [self.model_labels[x] for x in model_list]
 
@@ -351,19 +361,20 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             self.starter_pipelines,
             self.pipeline_models,
             self.controlnet_models,
+            self.t2i_models,
             self.ipadapter_models,
             self.lora_models,
             self.ti_models,
         ]
 
         for group in widgets:
-            for k, v in group.items():
+            for _k, v in group.items():
                 try:
                     v.hidden = True
                     v.editable = False
                 except Exception:
                     pass
-        for k, v in widgets[selected_tab].items():
+        for _k, v in widgets[selected_tab].items():
             try:
                 v.hidden = False
                 if not isinstance(v, (npyscreen.FixedText, npyscreen.TitleFixedText, CenteredTitleText)):
@@ -382,7 +393,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         label_width = max([len(models[x].name) for x in models])
         description_width = window_width - label_width - checkbox_width - spacing_width
 
-        result = dict()
+        result = {}
         for x in models.keys():
             description = models[x].description
             description = (
@@ -424,11 +435,11 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         parent_conn, child_conn = Pipe()
         p = Process(
             target=process_and_execute,
-            kwargs=dict(
-                opt=app.program_opts,
-                selections=app.install_selections,
-                conn_out=child_conn,
-            ),
+            kwargs={
+                "opt": app.program_opts,
+                "selections": app.install_selections,
+                "conn_out": child_conn,
+            },
         )
         p.start()
         child_conn.close()
@@ -541,6 +552,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
             self.starter_pipelines,
             self.pipeline_models,
             self.controlnet_models,
+            self.t2i_models,
             self.ipadapter_models,
             self.lora_models,
             self.ti_models,
@@ -548,7 +560,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         for section in ui_sections:
             if "models_selected" not in section:
                 continue
-            selected = set([section["models"][x] for x in section["models_selected"].value])
+            selected = {section["models"][x] for x in section["models_selected"].value}
             models_to_install = [x for x in selected if not self.all_models[x].installed]
             models_to_remove = [x for x in section["models"] if x not in selected and self.all_models[x].installed]
             selections.remove_models.extend(models_to_remove)
@@ -621,21 +633,23 @@ def ask_user_for_prediction_type(model_path: Path, tui_conn: Connection = None) 
         return _ask_user_for_pt_cmdline(model_path)
 
 
-def _ask_user_for_pt_cmdline(model_path: Path) -> SchedulerPredictionType:
+def _ask_user_for_pt_cmdline(model_path: Path) -> Optional[SchedulerPredictionType]:
     choices = [SchedulerPredictionType.Epsilon, SchedulerPredictionType.VPrediction, None]
     print(
         f"""
-Please select the type of the V2 checkpoint named {model_path.name}:
-[1] A model based on Stable Diffusion v2 trained on 512 pixel images (SD-2-base)
-[2] A model based on Stable Diffusion v2 trained on 768 pixel images (SD-2-768)
-[3] Skip this model and come back later.
+Please select the scheduler prediction type of the checkpoint named {model_path.name}:
+[1] "epsilon" - most v1.5 models and v2 models trained on 512 pixel images
+[2] "vprediction" - v2 models trained on 768 pixel images and a few v1.5 models
+[3] Accept the best guess;  you can fix it in the Web UI later
 """
     )
     choice = None
     ok = False
     while not ok:
         try:
-            choice = input("select> ").strip()
+            choice = input("select [3]> ").strip()
+            if not choice:
+                return None
             choice = choices[int(choice) - 1]
             ok = True
         except (ValueError, IndexError):
@@ -646,22 +660,18 @@ Please select the type of the V2 checkpoint named {model_path.name}:
 
 
 def _ask_user_for_pt_tui(model_path: Path, tui_conn: Connection) -> SchedulerPredictionType:
-    try:
-        tui_conn.send_bytes(f"*need v2 config for:{model_path}".encode("utf-8"))
-        # note that we don't do any status checking here
-        response = tui_conn.recv_bytes().decode("utf-8")
-        if response is None:
-            return None
-        elif response == "epsilon":
-            return SchedulerPredictionType.epsilon
-        elif response == "v":
-            return SchedulerPredictionType.VPrediction
-        elif response == "abort":
-            logger.info("Conversion aborted")
-            return None
-        else:
-            return response
-    except Exception:
+    tui_conn.send_bytes(f"*need v2 config for:{model_path}".encode("utf-8"))
+    # note that we don't do any status checking here
+    response = tui_conn.recv_bytes().decode("utf-8")
+    if response is None:
+        return None
+    elif response == "epsilon":
+        return SchedulerPredictionType.epsilon
+    elif response == "v":
+        return SchedulerPredictionType.VPrediction
+    elif response == "guess":
+        return None
+    else:
         return None
 
 

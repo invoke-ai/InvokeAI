@@ -38,6 +38,7 @@ SAMPLER_CHOICES = [
     "k_heun",
     "k_lms",
     "plms",
+    "lcm",
 ]
 
 PRECISION_CHOICES = [

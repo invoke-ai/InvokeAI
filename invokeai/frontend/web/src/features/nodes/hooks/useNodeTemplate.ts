@@ -1,20 +1,20 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { useMemo } from 'react';
 
 export const useNodeTemplate = (nodeId: string) => {
   const selector = useMemo(
     () =>
-      createSelector(
-        stateSelector,
-        ({ nodes }) => {
+      createMemoizedSelector(
+        selectNodesSlice,
+        selectNodeTemplatesSlice,
+        (nodes, nodeTemplates) => {
           const node = nodes.nodes.find((node) => node.id === nodeId);
-          const nodeTemplate = nodes.nodeTemplates[node?.data.type ?? ''];
+          const nodeTemplate = nodeTemplates.templates[node?.data.type ?? ''];
           return nodeTemplate;
-        },
-        defaultSelectorOptions
+        }
       ),
     [nodeId]
   );

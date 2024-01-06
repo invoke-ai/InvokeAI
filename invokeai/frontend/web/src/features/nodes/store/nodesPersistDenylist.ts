@@ -1,15 +1,17 @@
-import { NodesState } from './types';
+import type { NodesState } from './types';
 
 /**
  * Nodes slice persist denylist
  */
 export const nodesPersistDenylist: (keyof NodesState)[] = [
-  'nodeTemplates',
   'connectionStartParams',
-  'currentConnectionFieldType',
+  'connectionStartFieldType',
   'selectedNodes',
   'selectedEdges',
   'isReady',
   'nodesToCopy',
   'edgesToCopy',
+  'connectionMade',
+  'modifyingEdge',
+  'addNewNodePosition',
 ];

@@ -1,14 +1,17 @@
-import { TagDescription } from '@reduxjs/toolkit/dist/query/endpointDefinitions';
-import {
+import type {
   BaseQueryFn,
   FetchArgs,
   FetchBaseQueryError,
-  createApi,
-  fetchBaseQuery,
+  TagDescription,
 } from '@reduxjs/toolkit/query/react';
-import { $authToken, $baseUrl, $projectId } from 'services/api/client';
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { $authToken } from 'app/store/nanostores/authToken';
+import { $baseUrl } from 'app/store/nanostores/baseUrl';
+import { $projectId } from 'app/store/nanostores/projectId';
 
 export const tagTypes = [
+  'AppVersion',
+  'AppConfig',
   'Board',
   'BoardImagesTotal',
   'BoardAssetsTotal',
@@ -16,16 +19,28 @@ export const tagTypes = [
   'ImageNameList',
   'ImageList',
   'ImageMetadata',
+  'ImageWorkflow',
   'ImageMetadataFromFile',
-  'Model',
+  'IntermediatesCount',
   'SessionQueueItem',
-  'SessionQueueItemDTO',
-  'SessionQueueItemDTOList',
   'SessionQueueStatus',
   'SessionProcessorStatus',
+  'CurrentSessionQueueItem',
+  'NextSessionQueueItem',
   'BatchStatus',
   'InvocationCacheStatus',
-];
+  'Model',
+  'T2IAdapterModel',
+  'MainModel',
+  'VaeModel',
+  'IPAdapterModel',
+  'TextualInversionModel',
+  'ControlNetModel',
+  'LoRAModel',
+  'SDXLRefinerModel',
+  'Workflow',
+  'WorkflowsRecent',
+] as const;
 export type ApiTagDescription = TagDescription<(typeof tagTypes)[number]>;
 export const LIST_TAG = 'LIST';
 

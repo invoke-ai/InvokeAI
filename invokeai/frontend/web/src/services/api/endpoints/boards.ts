@@ -2,15 +2,17 @@ import {
   ASSETS_CATEGORIES,
   IMAGE_CATEGORIES,
 } from 'features/gallery/store/types';
-import {
+import type {
   BoardDTO,
   ListBoardsArg,
   OffsetPaginatedResults_BoardDTO_,
   OffsetPaginatedResults_ImageDTO_,
   UpdateBoardArg,
 } from 'services/api/types';
-import { ApiTagDescription, LIST_TAG, api } from '..';
-import { getListImagesUrl } from '../util';
+import { getListImagesUrl } from 'services/api/util';
+
+import type { ApiTagDescription } from '..';
+import { api, LIST_TAG } from '..';
 
 export const boardsApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -70,7 +72,7 @@ export const boardsApi = api.injectEndpoints({
       keepUnusedDataFor: 0,
     }),
 
-    getBoardImagesTotal: build.query<number, string | undefined>({
+    getBoardImagesTotal: build.query<{ total: number }, string | undefined>({
       query: (board_id) => ({
         url: getListImagesUrl({
           board_id: board_id ?? 'none',
@@ -85,11 +87,11 @@ export const boardsApi = api.injectEndpoints({
         { type: 'BoardImagesTotal', id: arg ?? 'none' },
       ],
       transformResponse: (response: OffsetPaginatedResults_ImageDTO_) => {
-        return response.total;
+        return { total: response.total };
       },
     }),
 
-    getBoardAssetsTotal: build.query<number, string | undefined>({
+    getBoardAssetsTotal: build.query<{ total: number }, string | undefined>({
       query: (board_id) => ({
         url: getListImagesUrl({
           board_id: board_id ?? 'none',
@@ -104,7 +106,7 @@ export const boardsApi = api.injectEndpoints({
         { type: 'BoardAssetsTotal', id: arg ?? 'none' },
       ],
       transformResponse: (response: OffsetPaginatedResults_ImageDTO_) => {
-        return response.total;
+        return { total: response.total };
       },
     }),
 

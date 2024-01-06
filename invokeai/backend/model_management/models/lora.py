@@ -68,11 +68,12 @@ class LoRAModel(ModelBase):
             raise ModelNotFoundException()
 
         if os.path.isdir(path):
-            if os.path.exists(os.path.join(path, "pytorch_lora_weights.bin")):
-                return LoRAModelFormat.Diffusers
+            for ext in ["safetensors", "bin"]:
+                if os.path.exists(os.path.join(path, f"pytorch_lora_weights.{ext}")):
+                    return LoRAModelFormat.Diffusers
 
         if os.path.isfile(path):
-            if any([path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]]):
+            if any(path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt"]):
                 return LoRAModelFormat.LyCORIS
 
         raise InvalidModelException(f"Not a valid model: {path}")
@@ -86,8 +87,10 @@ class LoRAModel(ModelBase):
         base_model: BaseModelType,
     ) -> str:
         if cls.detect_format(model_path) == LoRAModelFormat.Diffusers:
-            # TODO: add diffusers lora when it stabilizes a bit
-            raise NotImplementedError("Diffusers lora not supported")
+            for ext in ["safetensors", "bin"]:  # return path to the safetensors file inside the folder
+                path = Path(model_path, f"pytorch_lora_weights.{ext}")
+                if path.exists():
+                    return path
         else:
             return model_path
 
@@ -440,32 +443,18 @@ class IA3Layer(LoRALayerBase):
 class LoRAModelRaw:  # (torch.nn.Module):
     _name: str
     layers: Dict[str, LoRALayer]
-    _device: torch.device
-    _dtype: torch.dtype
 
     def __init__(
         self,
         name: str,
         layers: Dict[str, LoRALayer],
-        device: torch.device,
-        dtype: torch.dtype,
     ):
         self._name = name
-        self._device = device or torch.cpu
-        self._dtype = dtype or torch.float32
         self.layers = layers
 
     @property
     def name(self):
         return self._name
-
-    @property
-    def device(self):
-        return self._device
-
-    @property
-    def dtype(self):
-        return self._dtype
 
     def to(
         self,
@@ -473,10 +462,8 @@ class LoRAModelRaw:  # (torch.nn.Module):
         dtype: Optional[torch.dtype] = None,
     ):
         # TODO: try revert if exception?
-        for key, layer in self.layers.items():
+        for _key, layer in self.layers.items():
             layer.to(device=device, dtype=dtype)
-        self._device = device
-        self._dtype = dtype
 
     def calc_size(self) -> int:
         model_size = 0
@@ -512,7 +499,7 @@ class LoRAModelRaw:  # (torch.nn.Module):
         stability_unet_keys = list(SDXL_UNET_STABILITY_TO_DIFFUSERS_MAP)
         stability_unet_keys.sort()
 
-        new_state_dict = dict()
+        new_state_dict = {}
         for full_key, value in state_dict.items():
             if full_key.startswith("lora_unet_"):
                 search_key = full_key.replace("lora_unet_", "")
@@ -557,10 +544,8 @@ class LoRAModelRaw:  # (torch.nn.Module):
             file_path = Path(file_path)
 
         model = cls(
-            device=device,
-            dtype=dtype,
             name=file_path.stem,  # TODO:
-            layers=dict(),
+            layers={},
         )
 
         if file_path.suffix == ".safetensors":
@@ -608,12 +593,12 @@ class LoRAModelRaw:  # (torch.nn.Module):
 
     @staticmethod
     def _group_state(state_dict: dict):
-        state_dict_groupped = dict()
+        state_dict_groupped = {}
 
         for key, value in state_dict.items():
             stem, leaf = key.split(".", 1)
             if stem not in state_dict_groupped:
-                state_dict_groupped[stem] = dict()
+                state_dict_groupped[stem] = {}
             state_dict_groupped[stem][leaf] = value
 
         return state_dict_groupped

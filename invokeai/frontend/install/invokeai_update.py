@@ -4,6 +4,7 @@ pip install <path_to_git_source>.
 """
 import os
 import platform
+from distutils.version import LooseVersion
 
 import pkg_resources
 import psutil
@@ -31,10 +32,6 @@ else:
     console = Console(style=Style(color="grey74", bgcolor="grey19"))
 
 
-def get_versions() -> dict:
-    return requests.get(url=INVOKE_AI_REL).json()
-
-
 def invokeai_is_running() -> bool:
     for p in psutil.process_iter():
         try:
@@ -50,20 +47,31 @@ def invokeai_is_running() -> bool:
     return False
 
 
-def welcome(versions: dict):
+def get_pypi_versions():
+    url = "https://pypi.org/pypi/invokeai/json"
+    try:
+        data = requests.get(url).json()
+    except Exception:
+        raise Exception("Unable to fetch version information from PyPi")
+
+    versions = list(data["releases"].keys())
+    versions.sort(key=LooseVersion, reverse=True)
+    latest_version = [v for v in versions if "rc" not in v][0]
+    latest_release_candidate = [v for v in versions if "rc" in v][0]
+    return latest_version, latest_release_candidate, versions
+
+
+def welcome(latest_release: str, latest_prerelease: str):
     @group()
     def text():
         yield f"InvokeAI Version: [bold yellow]{__version__}"
         yield ""
         yield "This script will update InvokeAI to the latest release, or to the development version of your choice."
         yield ""
-        yield "When updating to an arbitrary tag or branch, be aware that the front end may be mismatched to the backend,"
-        yield "making the web frontend unusable. Please downgrade to the latest release if this happens."
-        yield ""
         yield "[bold yellow]Options:"
-        yield f"""[1] Update to the latest official release ([italic]{versions[0]['tag_name']}[/italic])
-[2] Manually enter the [bold]tag name[/bold] for the version you wish to update to
-[3] Manually enter the [bold]branch name[/bold] for the version you wish to update to"""
+        yield f"""[1] Update to the latest [bold]official release[/bold] ([italic]{latest_release}[/italic])
+[2] Update to the latest [bold]pre-release[/bold] (may be buggy, database backups are recommended before installation; caveat emptor!) ([italic]{latest_prerelease}[/italic])
+[3] Manually enter the [bold]version[/bold] you wish to update to"""
 
     console.rule()
     print(
@@ -91,37 +99,35 @@ def get_extras():
 
 
 def main():
-    versions = get_versions()
     if invokeai_is_running():
         print(":exclamation: [bold red]Please terminate all running instances of InvokeAI before updating.[/red bold]")
         input("Press any key to continue...")
         return
 
-    welcome(versions)
+    latest_release, latest_prerelease, versions = get_pypi_versions()
 
-    tag = None
-    branch = None
-    release = None
-    choice = Prompt.ask("Choice:", choices=["1", "2", "3", "4"], default="1")
+    welcome(latest_release, latest_prerelease)
+
+    release = latest_release
+    choice = Prompt.ask("Choice:", choices=["1", "2", "3"], default="1")
 
     if choice == "1":
-        release = versions[0]["tag_name"]
+        release = latest_release
     elif choice == "2":
-        while not tag:
-            tag = Prompt.ask("Enter an InvokeAI tag name")
+        release = latest_prerelease
     elif choice == "3":
-        while not branch:
-            branch = Prompt.ask("Enter an InvokeAI branch name")
+        while True:
+            release = Prompt.ask("Enter an InvokeAI version")
+            release.strip()
+            if release in versions:
+                break
+            print(f":exclamation: [bold red]'{release}' is not a recognized InvokeAI release.[/red bold]")
 
     extras = get_extras()
 
-    print(f":crossed_fingers: Upgrading to [yellow]{tag or release or branch}[/yellow]")
-    if release:
-        cmd = f'pip install "invokeai{extras} @ {INVOKE_AI_SRC}/{release}.zip" --use-pep517 --upgrade'
-    elif tag:
-        cmd = f'pip install "invokeai{extras} @ {INVOKE_AI_TAG}/{tag}.zip" --use-pep517 --upgrade'
-    else:
-        cmd = f'pip install "invokeai{extras} @ {INVOKE_AI_BRANCH}/{branch}.zip" --use-pep517 --upgrade'
+    print(f":crossed_fingers: Upgrading to [yellow]{release}[/yellow]")
+    cmd = f'pip install "invokeai{extras}=={release}" --use-pep517 --upgrade'
+
     print("")
     print("")
     if os.system(cmd) == 0:

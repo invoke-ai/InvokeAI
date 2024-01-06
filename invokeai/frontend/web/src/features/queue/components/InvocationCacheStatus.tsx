@@ -1,26 +1,16 @@
-import { ButtonGroup } from '@chakra-ui/react';
-import { useAppSelector } from 'app/store/storeHooks';
+import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetInvocationCacheStatusQuery } from 'services/api/endpoints/appInfo';
-import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
+
 import ClearInvocationCacheButton from './ClearInvocationCacheButton';
-import ToggleInvocationCacheButton from './ToggleInvocationCacheButton';
 import StatusStatGroup from './common/StatusStatGroup';
 import StatusStatItem from './common/StatusStatItem';
+import ToggleInvocationCacheButton from './ToggleInvocationCacheButton';
 
 const InvocationCacheStatus = () => {
   const { t } = useTranslation();
-  const isConnected = useAppSelector((state) => state.system.isConnected);
-  const { data: queueStatus } = useGetQueueStatusQuery(undefined);
-  const { data: cacheStatus } = useGetInvocationCacheStatusQuery(undefined, {
-    pollingInterval:
-      isConnected &&
-      queueStatus?.processor.is_started &&
-      queueStatus?.queue.pending > 0
-        ? 5000
-        : 0,
-  });
+  const { data: cacheStatus } = useGetInvocationCacheStatusQuery(undefined);
 
   return (
     <StatusStatGroup>
@@ -44,10 +34,10 @@ const InvocationCacheStatus = () => {
         label={t('invocationCache.maxCacheSize')}
         value={cacheStatus?.max_size ?? 0}
       />
-      <ButtonGroup w={24} orientation="vertical" size="xs">
+      <InvButtonGroup w={24} orientation="vertical" size="sm">
         <ClearInvocationCacheButton />
         <ToggleInvocationCacheButton />
-      </ButtonGroup>
+      </InvButtonGroup>
     </StatusStatGroup>
   );
 };

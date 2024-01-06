@@ -1,38 +1,31 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { uniq } from 'lodash-es';
-import { MouseEvent, useCallback, useMemo } from 'react';
-import { useListImagesQuery } from 'services/api/endpoints/images';
-import { ImageDTO } from 'services/api/types';
-import { selectionChanged } from '../store/gallerySlice';
+import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
+import {
+  selectGallerySlice,
+  selectionChanged,
+} from 'features/gallery/store/gallerySlice';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import type { MouseEvent } from 'react';
+import { useCallback, useMemo } from 'react';
+import type { ImageDTO } from 'services/api/types';
 import { imagesSelectors } from 'services/api/util';
-import { useFeatureStatus } from '../../system/hooks/useFeatureStatus';
 
-const selector = createSelector(
-  [stateSelector, selectListImagesBaseQueryArgs],
-  ({ gallery }, queryArgs) => {
-    const selection = gallery.selection;
-
-    return {
-      queryArgs,
-      selection,
-    };
-  },
-  defaultSelectorOptions
+const selectGallerySelection = createMemoizedSelector(
+  selectGallerySlice,
+  (gallery) => gallery.selection
 );
+
+const EMPTY_ARRAY: ImageDTO[] = [];
 
 export const useMultiselect = (imageDTO?: ImageDTO) => {
   const dispatch = useAppDispatch();
-  const { queryArgs, selection } = useAppSelector(selector);
-
-  const { imageDTOs } = useListImagesQuery(queryArgs, {
-    selectFromResult: (result) => ({
-      imageDTOs: result.data ? imagesSelectors.selectAll(result.data) : [],
-    }),
-  });
+  const selection = useAppSelector(selectGallerySelection);
+  const { data } = useGalleryImages().queryResult;
+  const imageDTOs = useMemo(
+    () => (data ? imagesSelectors.selectAll(data) : EMPTY_ARRAY),
+    [data]
+  );
 
   const isMultiSelectEnabled = useFeatureStatus('multiselect').isFeatureEnabled;
 
@@ -60,7 +53,7 @@ export const useMultiselect = (imageDTO?: ImageDTO) => {
           const start = Math.min(lastClickedIndex, currentClickedIndex);
           const end = Math.max(lastClickedIndex, currentClickedIndex);
           const imagesToSelect = imageDTOs.slice(start, end + 1);
-          dispatch(selectionChanged(uniq(selection.concat(imagesToSelect))));
+          dispatch(selectionChanged(selection.concat(imagesToSelect)));
         }
       } else if (e.ctrlKey || e.metaKey) {
         if (
@@ -73,7 +66,7 @@ export const useMultiselect = (imageDTO?: ImageDTO) => {
             )
           );
         } else {
-          dispatch(selectionChanged(uniq(selection.concat(imageDTO))));
+          dispatch(selectionChanged(selection.concat(imageDTO)));
         }
       } else {
         dispatch(selectionChanged([imageDTO]));

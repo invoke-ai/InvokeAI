@@ -1,10 +1,12 @@
 import { Box } from '@chakra-ui/react';
 import { useDroppableTypesafe } from 'features/dnd/hooks/typesafeHooks';
-import { TypesafeDroppableData } from 'features/dnd/types';
+import type { TypesafeDroppableData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
 import { AnimatePresence } from 'framer-motion';
-import { ReactNode, memo, useRef } from 'react';
+import type { ReactNode } from 'react';
+import { memo, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+
 import IAIDropOverlay from './IAIDropOverlay';
 
 type IAIDroppableProps = {

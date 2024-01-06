@@ -1,25 +1,20 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 import { useMemo } from 'react';
-import { isInvocationNode } from '../types/types';
 
 export const useNodeLabel = (nodeId: string) => {
   const selector = useMemo(
     () =>
-      createSelector(
-        stateSelector,
-        ({ nodes }) => {
-          const node = nodes.nodes.find((node) => node.id === nodeId);
-          if (!isInvocationNode(node)) {
-            return false;
-          }
+      createSelector(selectNodesSlice, (nodes) => {
+        const node = nodes.nodes.find((node) => node.id === nodeId);
+        if (!isInvocationNode(node)) {
+          return false;
+        }
 
-          return node.data.label;
-        },
-        defaultSelectorOptions
-      ),
+        return node.data.label;
+      }),
     [nodeId]
   );
 

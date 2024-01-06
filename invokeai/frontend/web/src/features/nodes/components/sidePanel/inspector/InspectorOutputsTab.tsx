@@ -1,21 +1,23 @@
 import { Box, Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
-import { isInvocationNode } from 'features/nodes/types/types';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 import { memo } from 'react';
-import { ImageOutput } from 'services/api/types';
-import { AnyResult } from 'services/events/types';
-import ScrollableContent from '../ScrollableContent';
-import ImageOutputPreview from './outputs/ImageOutputPreview';
 import { useTranslation } from 'react-i18next';
+import type { ImageOutput } from 'services/api/types';
+import type { AnyResult } from 'services/events/types';
 
-const selector = createSelector(
-  stateSelector,
-  ({ nodes }) => {
+import ImageOutputPreview from './outputs/ImageOutputPreview';
+
+const selector = createMemoizedSelector(
+  selectNodesSlice,
+  selectNodeTemplatesSlice,
+  (nodes, nodeTemplates) => {
     const lastSelectedNodeId =
       nodes.selectedNodes[nodes.selectedNodes.length - 1];
 
@@ -24,66 +26,64 @@ const selector = createSelector(
     );
 
     const lastSelectedNodeTemplate = lastSelectedNode
-      ? nodes.nodeTemplates[lastSelectedNode.data.type]
+      ? nodeTemplates.templates[lastSelectedNode.data.type]
       : undefined;
 
     const nes =
       nodes.nodeExecutionStates[lastSelectedNodeId ?? '__UNKNOWN_NODE__'];
 
+    if (
+      !isInvocationNode(lastSelectedNode) ||
+      !nes ||
+      !lastSelectedNodeTemplate
+    ) {
+      return;
+    }
+
     return {
-      node: lastSelectedNode,
-      template: lastSelectedNodeTemplate,
-      nes,
+      outputs: nes.outputs,
+      outputType: lastSelectedNodeTemplate.outputType,
     };
-  },
-  defaultSelectorOptions
+  }
 );
 
 const InspectorOutputsTab = () => {
-  const { node, template, nes } = useAppSelector(selector);
+  const data = useAppSelector(selector);
   const { t } = useTranslation();
 
-  if (!node || !nes || !isInvocationNode(node)) {
+  if (!data) {
     return (
       <IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />
     );
   }
 
-  if (nes.outputs.length === 0) {
+  if (data.outputs.length === 0) {
     return (
       <IAINoContentFallback label={t('nodes.noOutputRecorded')} icon={null} />
     );
   }
 
   return (
-    <Box
-      sx={{
-        position: 'relative',
-        w: 'full',
-        h: 'full',
-      }}
-    >
+    <Box position="relative" w="full" h="full">
       <ScrollableContent>
         <Flex
-          sx={{
-            position: 'relative',
-            flexDir: 'column',
-            alignItems: 'flex-start',
-            p: 1,
-            gap: 2,
-            h: 'full',
-            w: 'full',
-          }}
+          position="relative"
+          flexDir="column"
+          alignItems="flex-start"
+          p={1}
+          gap={2}
+          h="full"
+          w="full"
         >
-          {template?.outputType === 'image_output' ? (
-            nes.outputs.map((result, i) => (
+          {data.outputType === 'image_output' ? (
+            data.outputs.map((result, i) => (
               <ImageOutputPreview
                 key={getKey(result, i)}
                 output={result as ImageOutput}
               />
             ))
           ) : (
-            <DataViewer data={nes.outputs} label={t('nodes.nodeOutputs')} />
+            <DataViewer data={data.outputs} label={t('nodes.nodeOutputs')} />
           )}
         </Flex>
       </ScrollableContent>

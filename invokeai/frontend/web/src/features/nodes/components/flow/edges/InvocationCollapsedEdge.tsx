@@ -2,12 +2,9 @@ import { Badge, Flex } from '@chakra-ui/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useChakraThemeTokens } from 'common/hooks/useChakraThemeTokens';
 import { memo, useMemo } from 'react';
-import {
-  BaseEdge,
-  EdgeLabelRenderer,
-  EdgeProps,
-  getBezierPath,
-} from 'reactflow';
+import type { EdgeProps } from 'reactflow';
+import { BaseEdge, EdgeLabelRenderer, getBezierPath } from 'reactflow';
+
 import { makeEdgeSelector } from './util/makeEdgeSelector';
 
 const InvocationCollapsedEdge = ({
@@ -50,37 +47,32 @@ const InvocationCollapsedEdge = ({
 
   const { base500 } = useChakraThemeTokens();
 
+  const edgeStyles = useMemo(
+    () => ({
+      strokeWidth: isSelected ? 3 : 2,
+      stroke: base500,
+      opacity: isSelected ? 0.8 : 0.5,
+      animation: shouldAnimate ? 'dashdraw 0.5s linear infinite' : undefined,
+      strokeDasharray: shouldAnimate ? 5 : 'none',
+    }),
+    [base500, isSelected, shouldAnimate]
+  );
+
   return (
     <>
-      <BaseEdge
-        path={edgePath}
-        markerEnd={markerEnd}
-        style={{
-          strokeWidth: isSelected ? 3 : 2,
-          stroke: base500,
-          opacity: isSelected ? 0.8 : 0.5,
-          animation: shouldAnimate
-            ? 'dashdraw 0.5s linear infinite'
-            : undefined,
-          strokeDasharray: shouldAnimate ? 5 : 'none',
-        }}
-      />
+      <BaseEdge path={edgePath} markerEnd={markerEnd} style={edgeStyles} />
       {data?.count && data.count > 1 && (
         <EdgeLabelRenderer>
           <Flex
-            sx={{
-              position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-            }}
+            position="absolute"
+            transform={`translate(-50%, -50%) translate(${labelX}px,${labelY}px)`}
             className="nodrag nopan"
           >
             <Badge
               variant="solid"
-              sx={{
-                bg: 'base.500',
-                opacity: isSelected ? 0.8 : 0.5,
-                boxShadow: 'base',
-              }}
+              bg="base.500"
+              opacity={isSelected ? 0.8 : 0.5}
+              boxShadow="base"
             >
               {data.count}
             </Badge>

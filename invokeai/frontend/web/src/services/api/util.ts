@@ -1,11 +1,13 @@
+import { createEntityAdapter } from '@reduxjs/toolkit';
+import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
+import { dateComparator } from 'common/util/dateComparator';
 import {
   ASSETS_CATEGORIES,
   IMAGE_CATEGORIES,
 } from 'features/gallery/store/types';
-import { ImageCache, ImageDTO, ListImagesArgs } from './types';
-import { createEntityAdapter } from '@reduxjs/toolkit';
-import { dateComparator } from 'common/util/dateComparator';
 import queryString from 'query-string';
+
+import type { ImageCache, ImageDTO, ListImagesArgs } from './types';
 
 export const getIsImageInDateRange = (
   data: ImageCache | undefined,
@@ -66,7 +68,7 @@ export const getCategories = (imageDTO: ImageDTO) => {
 
 // The adapter is not actually the data store - it just provides helper functions to interact
 // with some other store of data. We will use the RTK Query cache as that store.
-export const imagesAdapter = createEntityAdapter<ImageDTO>({
+export const imagesAdapter = createEntityAdapter<ImageDTO, string>({
   selectId: (image) => image.image_name,
   sortComparer: (a, b) => {
     // Compare starred images first
@@ -81,7 +83,10 @@ export const imagesAdapter = createEntityAdapter<ImageDTO>({
 });
 
 // Create selectors for the adapter.
-export const imagesSelectors = imagesAdapter.getSelectors();
+export const imagesSelectors = imagesAdapter.getSelectors(
+  undefined,
+  getSelectorsOptions
+);
 
 // Helper to create the url for the listImages endpoint. Also we use it to create the cache key.
 export const getListImagesUrl = (queryArgs: ListImagesArgs) =>

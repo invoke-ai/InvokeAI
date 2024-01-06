@@ -1,8 +1,5 @@
 .idea/
 
-# ignore the Anaconda/Miniconda installer used while building Docker image
-anaconda.sh
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -19,7 +16,7 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-# dist/
+dist/
 downloads/
 eggs/
 .eggs/
@@ -136,12 +133,10 @@ celerybeat.pid
 
 # Environments
 .env
-.venv
+.venv*
 env/
 venv/
 ENV/
-env.bak/
-venv.bak/
 
 # Spyder project settings
 .spyderproject
@@ -186,14 +181,10 @@ cython_debug/
 .scratch/
 .vscode/
 
-# ignore environment.yml and requirements.txt
-# these are links to the real files in environments-and-requirements
-environment.yml
-requirements.txt
-
 # source installer files
 installer/*zip
 installer/install.bat
 installer/install.sh
 installer/update.bat
 installer/update.sh
+installer/InvokeAI-Installer/

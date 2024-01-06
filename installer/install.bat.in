@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-@rem This script requires the user to install Python 3.9 or higher. All other
+@rem This script requires the user to install Python 3.10 or higher. All other
 @rem requirements are downloaded as needed.
 
 @rem change to the script's directory
@@ -19,7 +19,7 @@ set INVOKEAI_VERSION=latest
 set INSTRUCTIONS=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/
 set TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting
 set PYTHON_URL=https://www.python.org/downloads/windows/
-set MINIMUM_PYTHON_VERSION=3.9.0
+set MINIMUM_PYTHON_VERSION=3.10.0
 set PYTHON_URL=https://www.python.org/downloads/release/python-3109/
 
 set err_msg=An error has occurred and the script could not continue.
@@ -28,8 +28,7 @@ set err_msg=An error has occurred and the script could not continue.
 echo This script will install InvokeAI and its dependencies.
 echo.
 echo BEFORE YOU START PLEASE MAKE SURE TO DO THE FOLLOWING
-echo 1. Install python 3.9 or 3.10. Python version 3.11 and above are
-echo    not supported at the moment.
+echo 1. Install python 3.10 or 3.11. Python version 3.9 is no longer supported.
 echo 2. Double-click on the file WinLongPathsEnabled.reg in order to
 echo    enable long path support on your system.
 echo 3. Install the Visual C++ core libraries.
@@ -46,19 +45,19 @@ echo ***** Checking and Updating Python *****
 
 call python --version >.tmp1 2>.tmp2
 if %errorlevel% == 1 (
-   set err_msg=Please install Python 3.10. See %INSTRUCTIONS% for details.
+   set err_msg=Please install Python 3.10-11. See %INSTRUCTIONS% for details.
    goto err_exit
 )
 
 for /f "tokens=2" %%i in (.tmp1) do set python_version=%%i
 if "%python_version%" == "" (
-   set err_msg=No python was detected on your system. Please install Python version %MINIMUM_PYTHON_VERSION% or higher. We recommend Python 3.10.9 from %PYTHON_URL%
+   set err_msg=No python was detected on your system. Please install Python version %MINIMUM_PYTHON_VERSION% or higher. We recommend Python 3.10.12 from %PYTHON_URL%
    goto err_exit
 )
 
 call :compareVersions %MINIMUM_PYTHON_VERSION% %python_version%
 if %errorlevel% == 1 (
-   set err_msg=Your version of Python is too low. You need at least %MINIMUM_PYTHON_VERSION% but you have %python_version%. We recommend Python 3.10.9 from %PYTHON_URL%
+   set err_msg=Your version of Python is too low. You need at least %MINIMUM_PYTHON_VERSION% but you have %python_version%. We recommend Python 3.10.12 from %PYTHON_URL%
    goto err_exit
 )
 

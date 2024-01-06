@@ -1,14 +1,17 @@
-import {
-  AnyAction,
+import type {
   EntityState,
   ThunkDispatch,
-  createEntityAdapter,
+  UnknownAction,
 } from '@reduxjs/toolkit';
-import { $queueId } from 'features/queue/store/nanoStores';
+import { createEntityAdapter } from '@reduxjs/toolkit';
+import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
+import { $queueId } from 'app/store/nanostores/queueId';
 import { listParamsReset } from 'features/queue/store/queueSlice';
 import queryString from 'query-string';
-import { ApiTagDescription, api } from '..';
-import { components, paths } from '../schema';
+import type { components, paths } from 'services/api/schema';
+
+import type { ApiTagDescription } from '..';
+import { api } from '..';
 
 const getListQueueItemsUrl = (
   queryArgs?: paths['/api/v1/queue/{queue_id}/list']['get']['parameters']['query']
@@ -33,9 +36,10 @@ export type SessionQueueItemStatus = NonNullable<
 >;
 
 export const queueItemsAdapter = createEntityAdapter<
-  components['schemas']['SessionQueueItemDTO']
+  components['schemas']['SessionQueueItemDTO'],
+  string
 >({
-  selectId: (queueItem) => queueItem.item_id,
+  selectId: (queueItem) => String(queueItem.item_id),
   sortComparer: (a, b) => {
     // Sort by priority in descending order
     if (a.priority > b.priority) {
@@ -56,6 +60,10 @@ export const queueItemsAdapter = createEntityAdapter<
     return 0;
   },
 });
+export const queueItemsAdapterSelectors = queueItemsAdapter.getSelectors(
+  undefined,
+  getSelectorsOptions
+);
 
 export const queueApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -65,30 +73,6 @@ export const queueApi = api.injectEndpoints({
     >({
       query: (arg) => ({
         url: `queue/${$queueId.get()}/enqueue_batch`,
-        body: arg,
-        method: 'POST',
-      }),
-      invalidatesTags: [
-        'SessionQueueStatus',
-        'CurrentSessionQueueItem',
-        'NextSessionQueueItem',
-      ],
-      onQueryStarted: async (arg, api) => {
-        const { dispatch, queryFulfilled } = api;
-        try {
-          await queryFulfilled;
-          resetListQueryData(dispatch);
-        } catch {
-          // no-op
-        }
-      },
-    }),
-    enqueueGraph: build.mutation<
-      paths['/api/v1/queue/{queue_id}/enqueue_graph']['post']['responses']['201']['content']['application/json'],
-      paths['/api/v1/queue/{queue_id}/enqueue_graph']['post']['requestBody']['content']['application/json']
-    >({
-      query: (arg) => ({
-        url: `queue/${$queueId.get()}/enqueue_graph`,
         body: arg,
         method: 'POST',
       }),
@@ -135,12 +119,7 @@ export const queueApi = api.injectEndpoints({
         url: `queue/${$queueId.get()}/prune`,
         method: 'PUT',
       }),
-      invalidatesTags: [
-        'SessionQueueStatus',
-        'BatchStatus',
-        'SessionQueueItem',
-        'SessionQueueItemDTO',
-      ],
+      invalidatesTags: ['SessionQueueStatus', 'BatchStatus'],
       onQueryStarted: async (arg, api) => {
         const { dispatch, queryFulfilled } = api;
         try {
@@ -165,8 +144,6 @@ export const queueApi = api.injectEndpoints({
         'BatchStatus',
         'CurrentSessionQueueItem',
         'NextSessionQueueItem',
-        'SessionQueueItem',
-        'SessionQueueItemDTO',
       ],
       onQueryStarted: async (arg, api) => {
         const { dispatch, queryFulfilled } = api;
@@ -218,7 +195,6 @@ export const queueApi = api.injectEndpoints({
         url: `queue/${$queueId.get()}/status`,
         method: 'GET',
       }),
-
       providesTags: ['SessionQueueStatus'],
     }),
     getBatchStatus: build.query<
@@ -268,8 +244,12 @@ export const queueApi = api.injectEndpoints({
               undefined,
               (draft) => {
                 queueItemsAdapter.updateOne(draft, {
-                  id: item_id,
-                  changes: { status: data.status },
+                  id: String(item_id),
+                  changes: {
+                    status: data.status,
+                    completed_at: data.completed_at,
+                    updated_at: data.updated_at,
+                  },
                 });
               }
             )
@@ -284,7 +264,6 @@ export const queueApi = api.injectEndpoints({
         }
         return [
           { type: 'SessionQueueItem', id: result.item_id },
-          { type: 'SessionQueueItemDTO', id: result.item_id },
           { type: 'BatchStatus', id: result.batch_id },
         ];
       },
@@ -307,14 +286,10 @@ export const queueApi = api.injectEndpoints({
           // no-op
         }
       },
-      invalidatesTags: [
-        'SessionQueueItem',
-        'SessionQueueItemDTO',
-        'BatchStatus',
-      ],
+      invalidatesTags: ['SessionQueueStatus', 'BatchStatus'],
     }),
     listQueueItems: build.query<
-      EntityState<components['schemas']['SessionQueueItemDTO']> & {
+      EntityState<components['schemas']['SessionQueueItemDTO'], string> & {
         has_more: boolean;
       },
       { cursor?: number; priority?: number } | undefined
@@ -338,7 +313,7 @@ export const queueApi = api.injectEndpoints({
       merge: (cache, response) => {
         queueItemsAdapter.addMany(
           cache,
-          queueItemsAdapter.getSelectors().selectAll(response)
+          queueItemsAdapterSelectors.selectAll(response)
         );
         cache.has_more = response.has_more;
       },
@@ -350,7 +325,6 @@ export const queueApi = api.injectEndpoints({
 
 export const {
   useCancelByBatchIdsMutation,
-  useEnqueueGraphMutation,
   useEnqueueBatchMutation,
   usePauseProcessorMutation,
   useResumeProcessorMutation,
@@ -365,8 +339,10 @@ export const {
   useGetBatchStatusQuery,
 } = queueApi;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const resetListQueryData = (dispatch: ThunkDispatch<any, any, AnyAction>) => {
+const resetListQueryData = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  dispatch: ThunkDispatch<any, any, UnknownAction>
+) => {
   dispatch(
     queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
       // remove all items from the list

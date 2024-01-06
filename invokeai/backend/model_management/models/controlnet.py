@@ -104,7 +104,7 @@ class ControlNetModel(ModelBase):
                 return ControlNetModelFormat.Diffusers
 
         if os.path.isfile(path):
-            if any([path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt", "pth"]]):
+            if any(path.endswith(f".{ext}") for ext in ["safetensors", "ckpt", "pt", "pth"]):
                 return ControlNetModelFormat.Checkpoint
 
         raise InvalidModelException(f"Not a valid model: {path}")
@@ -132,13 +132,14 @@ def _convert_controlnet_ckpt_and_cache(
     model_path: str,
     output_path: str,
     base_model: BaseModelType,
-    model_config: ControlNetModel.CheckpointConfig,
+    model_config: str,
 ) -> str:
     """
     Convert the controlnet from checkpoint format to diffusers format,
     cache it to disk, and return Path to converted
     file. If already on disk then just returns Path.
     """
+    print(f"DEBUG: controlnet config = {model_config}")
     app_config = InvokeAIAppConfig.get_config()
     weights = app_config.root_path / model_path
     output_path = Path(output_path)

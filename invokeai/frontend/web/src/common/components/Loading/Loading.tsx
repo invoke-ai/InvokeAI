@@ -1,5 +1,5 @@
 import { Flex, Image, Spinner } from '@chakra-ui/react';
-import InvokeAILogoImage from 'assets/images/logo.png';
+import InvokeLogoWhite from 'assets/images/invoke-key-wht-lrg.svg';
 import { memo } from 'react';
 
 // This component loads before the theme so we cannot use theme tokens here
@@ -14,7 +14,7 @@ const Loading = () => {
       justifyContent="center"
       bg="#151519"
     >
-      <Image src={InvokeAILogoImage} w="8rem" h="8rem" />
+      <Image src={InvokeLogoWhite} w="8rem" h="8rem" />
       <Spinner
         label="Loading"
         color="grey"

@@ -1,9 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
-import { getIsGraphAcyclic } from 'features/nodes/hooks/useIsValidConnection';
-import { FieldType } from 'features/nodes/types/types';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import type { FieldType } from 'features/nodes/types/field';
 import i18n from 'i18next';
-import { HandleType } from 'reactflow';
+import type { HandleType } from 'reactflow';
+
+import { getIsGraphAcyclic } from './getIsGraphAcyclic';
 import { validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
 
 /**
@@ -17,15 +18,15 @@ export const makeConnectionErrorSelector = (
   handleType: HandleType,
   fieldType?: FieldType
 ) => {
-  return createSelector(stateSelector, (state) => {
+  return createSelector(selectNodesSlice, (nodesSlice) => {
     if (!fieldType) {
       return i18n.t('nodes.noFieldType');
     }
 
-    const { currentConnectionFieldType, connectionStartParams, nodes, edges } =
-      state.nodes;
+    const { connectionStartFieldType, connectionStartParams, nodes, edges } =
+      nodesSlice;
 
-    if (!connectionStartParams || !currentConnectionFieldType) {
+    if (!connectionStartParams || !connectionStartFieldType) {
       return i18n.t('nodes.noConnectionInProgress');
     }
 
@@ -40,9 +41,9 @@ export const makeConnectionErrorSelector = (
     }
 
     const targetType =
-      handleType === 'target' ? fieldType : currentConnectionFieldType;
+      handleType === 'target' ? fieldType : connectionStartFieldType;
     const sourceType =
-      handleType === 'source' ? fieldType : currentConnectionFieldType;
+      handleType === 'source' ? fieldType : connectionStartFieldType;
 
     if (nodeId === connectionNodeId) {
       return i18n.t('nodes.cannotConnectToSelf');
@@ -55,12 +56,32 @@ export const makeConnectionErrorSelector = (
       return i18n.t('nodes.cannotConnectInputToInput');
     }
 
+    // we have to figure out which is the target and which is the source
+    const target = handleType === 'target' ? nodeId : connectionNodeId;
+    const targetHandle =
+      handleType === 'target' ? fieldName : connectionFieldName;
+    const source = handleType === 'source' ? nodeId : connectionNodeId;
+    const sourceHandle =
+      handleType === 'source' ? fieldName : connectionFieldName;
+
     if (
       edges.find((edge) => {
-        return edge.target === nodeId && edge.targetHandle === fieldName;
+        edge.target === target &&
+          edge.targetHandle === targetHandle &&
+          edge.source === source &&
+          edge.sourceHandle === sourceHandle;
+      })
+    ) {
+      // We already have a connection from this source to this target
+      return i18n.t('nodes.cannotDuplicateConnection');
+    }
+
+    if (
+      edges.find((edge) => {
+        return edge.target === target && edge.targetHandle === targetHandle;
       }) &&
       // except CollectionItem inputs can have multiples
-      targetType !== 'CollectionItem'
+      targetType.name !== 'CollectionItemField'
     ) {
       return i18n.t('nodes.inputMayOnlyHaveOneConnection');
     }
@@ -80,6 +101,6 @@ export const makeConnectionErrorSelector = (
       return i18n.t('nodes.connectionWouldCreateCycle');
     }
 
-    return null;
+    return;
   });
 };

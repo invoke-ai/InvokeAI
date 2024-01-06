@@ -1,10 +1,10 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
+import { KIND_MAP } from 'features/nodes/types/constants';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 import { useMemo } from 'react';
-import { KIND_MAP } from '../types/constants';
-import { isInvocationNode } from '../types/types';
 
 export const useFieldTemplate = (
   nodeId: string,
@@ -13,17 +13,17 @@ export const useFieldTemplate = (
 ) => {
   const selector = useMemo(
     () =>
-      createSelector(
-        stateSelector,
-        ({ nodes }) => {
+      createMemoizedSelector(
+        selectNodesSlice,
+        selectNodeTemplatesSlice,
+        (nodes, nodeTemplates) => {
           const node = nodes.nodes.find((node) => node.id === nodeId);
           if (!isInvocationNode(node)) {
             return;
           }
-          const nodeTemplate = nodes.nodeTemplates[node?.data.type ?? ''];
+          const nodeTemplate = nodeTemplates.templates[node?.data.type ?? ''];
           return nodeTemplate?.[KIND_MAP[kind]][fieldName];
-        },
-        defaultSelectorOptions
+        }
       ),
     [fieldName, kind, nodeId]
   );

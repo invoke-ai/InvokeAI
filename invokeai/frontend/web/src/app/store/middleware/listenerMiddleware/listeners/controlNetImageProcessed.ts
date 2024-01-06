@@ -1,67 +1,66 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
-import { controlNetImageProcessed } from 'features/controlNet/store/actions';
-import { controlNetProcessedImageChanged } from 'features/controlNet/store/controlNetSlice';
-import { SAVE_IMAGE } from 'features/nodes/util/graphBuilders/constants';
+import { controlAdapterImageProcessed } from 'features/controlAdapters/store/actions';
+import {
+  controlAdapterImageChanged,
+  controlAdapterProcessedImageChanged,
+  pendingControlImagesCleared,
+  selectControlAdapterById,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
+import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
+import { isImageOutput } from 'features/nodes/types/common';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
-import { isImageOutput } from 'services/api/guards';
-import { Graph, ImageDTO } from 'services/api/types';
+import type { BatchConfig, ImageDTO } from 'services/api/types';
 import { socketInvocationComplete } from 'services/events/actions';
+
 import { startAppListening } from '..';
 
 export const addControlNetImageProcessedListener = () => {
   startAppListening({
-    actionCreator: controlNetImageProcessed,
+    actionCreator: controlAdapterImageProcessed,
     effect: async (action, { dispatch, getState, take }) => {
       const log = logger('session');
-      const { controlNetId } = action.payload;
-      const controlNet = getState().controlNet.controlNets[controlNetId];
+      const { id } = action.payload;
+      const ca = selectControlAdapterById(getState().controlAdapters, id);
 
-      if (!controlNet?.controlImage) {
+      if (!ca?.controlImage || !isControlNetOrT2IAdapter(ca)) {
         log.error('Unable to process ControlNet image');
+        return;
+      }
+
+      if (ca.processorType === 'none' || ca.processorNode.type === 'none') {
         return;
       }
 
       // ControlNet one-off procressing graph is just the processor node, no edges.
       // Also we need to grab the image.
-      const graph: Graph = {
-        nodes: {
-          [controlNet.processorNode.id]: {
-            ...controlNet.processorNode,
-            is_intermediate: true,
-            image: { image_name: controlNet.controlImage },
+
+      const nodeId = ca.processorNode.id;
+      const enqueueBatchArg: BatchConfig = {
+        prepend: true,
+        batch: {
+          graph: {
+            nodes: {
+              [ca.processorNode.id]: {
+                ...ca.processorNode,
+                is_intermediate: true,
+                use_cache: false,
+                image: { image_name: ca.controlImage },
+              },
+            },
           },
-          [SAVE_IMAGE]: {
-            id: SAVE_IMAGE,
-            type: 'save_image',
-            is_intermediate: true,
-            use_cache: false,
-          },
+          runs: 1,
         },
-        edges: [
-          {
-            source: {
-              node_id: controlNet.processorNode.id,
-              field: 'image',
-            },
-            destination: {
-              node_id: SAVE_IMAGE,
-              field: 'image',
-            },
-          },
-        ],
       };
+
       try {
         const req = dispatch(
-          queueApi.endpoints.enqueueGraph.initiate(
-            { graph, prepend: true },
-            {
-              fixedCacheKey: 'enqueueGraph',
-            }
-          )
+          queueApi.endpoints.enqueueBatch.initiate(enqueueBatchArg, {
+            fixedCacheKey: 'enqueueBatch',
+          })
         );
         const enqueueResult = await req.unwrap();
         req.reset();
@@ -73,9 +72,9 @@ export const addControlNetImageProcessedListener = () => {
         const [invocationCompleteAction] = await take(
           (action): action is ReturnType<typeof socketInvocationComplete> =>
             socketInvocationComplete.match(action) &&
-            action.payload.data.graph_execution_state_id ===
-              enqueueResult.queue_item.session_id &&
-            action.payload.data.source_node_id === SAVE_IMAGE
+            action.payload.data.queue_batch_id ===
+              enqueueResult.batch.batch_id &&
+            action.payload.data.source_node_id === nodeId
         );
 
         // We still have to check the output type
@@ -99,14 +98,28 @@ export const addControlNetImageProcessedListener = () => {
 
           // Update the processed image in the store
           dispatch(
-            controlNetProcessedImageChanged({
-              controlNetId,
+            controlAdapterProcessedImageChanged({
+              id,
               processedControlImage: processedControlImage.image_name,
             })
           );
         }
-      } catch {
-        log.error({ graph: parseify(graph) }, t('queue.graphFailedToQueue'));
+      } catch (error) {
+        log.error(
+          { enqueueBatchArg: parseify(enqueueBatchArg) },
+          t('queue.graphFailedToQueue')
+        );
+
+        if (error instanceof Object) {
+          if ('data' in error && 'status' in error) {
+            if (error.status === 403) {
+              dispatch(pendingControlImagesCleared());
+              dispatch(controlAdapterImageChanged({ id, controlImage: null }));
+              return;
+            }
+          }
+        }
+
         dispatch(
           addToast({
             title: t('queue.graphFailedToQueue'),

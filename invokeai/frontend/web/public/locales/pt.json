@@ -1,11 +1,8 @@
 {
     "common": {
-        "greenTheme": "Verde",
         "langArabic": "العربية",
-        "themeLabel": "Tema",
         "reportBugLabel": "Reportar Bug",
         "settingsLabel": "Configurações",
-        "lightTheme": "Claro",
         "langBrPortuguese": "Português do Brasil",
         "languagePickerLabel": "Seletor de Idioma",
         "langDutch": "Nederlands",
@@ -57,14 +54,11 @@
         "statusModelChanged": "Modelo Alterado",
         "githubLabel": "Github",
         "discordLabel": "Discord",
-        "darkTheme": "Escuro",
         "training": "Treinando",
         "statusGeneratingOutpainting": "Geração de Ampliação",
         "statusGenerationComplete": "Geração Completa",
         "statusMergingModels": "Mesclando Modelos",
         "statusMergedModels": "Modelos Mesclados",
-        "oceanTheme": "Oceano",
-        "pinOptionsPanel": "Fixar painel de opções",
         "loading": "A carregar",
         "loadingInvokeAI": "A carregar Invoke AI",
         "langPortuguese": "Português"
@@ -74,7 +68,6 @@
         "gallerySettings": "Configurações de Galeria",
         "maintainAspectRatio": "Mater Proporções",
         "autoSwitchNewImages": "Trocar para Novas Imagens Automaticamente",
-        "pinGallery": "Fixar Galeria",
         "singleColumnLayout": "Disposição em Coluna Única",
         "allImagesLoaded": "Todas as Imagens Carregadas",
         "loadMore": "Carregar Mais",
@@ -88,10 +81,6 @@
     "hotkeys": {
         "generalHotkeys": "Atalhos Gerais",
         "galleryHotkeys": "Atalhos da Galeria",
-        "toggleViewer": {
-            "title": "Ativar Visualizador",
-            "desc": "Abrir e fechar o Visualizador de Imagens"
-        },
         "maximizeWorkSpace": {
             "desc": "Fechar painéis e maximixar área de trabalho",
             "title": "Maximizar a Área de Trabalho"
@@ -238,10 +227,6 @@
         "deleteImage": {
             "title": "Apagar Imagem",
             "desc": "Apaga a imagem atual"
-        },
-        "toggleGalleryPin": {
-            "title": "Ativar Fixar Galeria",
-            "desc": "Fixa e desafixa a galeria na interface"
         },
         "increaseGalleryThumbSize": {
             "title": "Aumentar Tamanho da Galeria de Imagem",
@@ -407,7 +392,6 @@
         "width": "Largura",
         "seed": "Seed",
         "hiresStrength": "Força da Alta Resolução",
-        "negativePrompts": "Indicações negativas",
         "general": "Geral",
         "randomizeSeed": "Seed Aleatório",
         "shuffle": "Embaralhar",
@@ -425,10 +409,6 @@
         "hiresOptim": "Otimização de Alta Res",
         "imageFit": "Caber Imagem Inicial No Tamanho de Saída",
         "codeformerFidelity": "Fidelidade",
-        "seamSize": "Tamanho da Fronteira",
-        "seamBlur": "Desfoque da Fronteira",
-        "seamStrength": "Força da Fronteira",
-        "seamSteps": "Passos da Fronteira",
         "tileSize": "Tamanho do Ladrilho",
         "boundingBoxHeader": "Caixa Delimitadora",
         "seamCorrectionHeader": "Correção de Fronteira",
@@ -436,12 +416,10 @@
         "img2imgStrength": "Força de Imagem Para Imagem",
         "toggleLoopback": "Ativar Loopback",
         "symmetry": "Simetria",
-        "promptPlaceholder": "Digite o prompt aqui. [tokens negativos], (upweight)++, (downweight)--, trocar e misturar estão disponíveis (veja docs)",
         "sendTo": "Mandar para",
         "openInViewer": "Abrir No Visualizador",
         "closeViewer": "Fechar Visualizador",
         "usePrompt": "Usar Prompt",
-        "deleteImage": "Apagar Imagem",
         "initialImage": "Imagem inicial",
         "showOptionsPanel": "Mostrar Painel de Opções",
         "strength": "Força",
@@ -449,12 +427,10 @@
         "upscale": "Redimensionar",
         "upscaleImage": "Redimensionar Imagem",
         "scaleBeforeProcessing": "Escala Antes do Processamento",
-        "invoke": "Invocar",
         "images": "Imagems",
         "steps": "Passos",
         "cfgScale": "Escala CFG",
         "height": "Altura",
-        "sampler": "Amostrador",
         "imageToImage": "Imagem para Imagem",
         "variationAmount": "Quntidade de Variatções",
         "scaledWidth": "L Escalada",
@@ -481,7 +457,6 @@
     "settings": {
         "confirmOnDelete": "Confirmar Antes de Apagar",
         "displayHelpIcons": "Mostrar Ícones de Ajuda",
-        "useCanvasBeta": "Usar Layout de Telas Beta",
         "enableImageDebugging": "Ativar Depuração de Imagem",
         "useSlidersForAll": "Usar deslizadores para todas as opções",
         "resetWebUIDesc1": "Reiniciar a interface apenas reinicia o cache local do broswer para imagens e configurações lembradas. Não apaga nenhuma imagem do disco.",
@@ -494,7 +469,6 @@
     },
     "toast": {
         "uploadFailed": "Envio Falhou",
-        "uploadFailedMultipleImagesDesc": "Várias imagens copiadas, só é permitido uma imagem de cada vez",
         "uploadFailedUnableToLoadDesc": "Não foj possível carregar o ficheiro",
         "downloadImageStarted": "Download de Imagem Começou",
         "imageNotLoadedDesc": "Nenhuma imagem encontrada a enviar para o módulo de imagem para imagem",
@@ -611,7 +585,6 @@
         "flipVertically": "Espelhar verticalmente",
         "modifyConfig": "Modificar config",
         "toggleAutoscroll": "Alternar rolagem automática",
-        "showGallery": "Mostrar galeria",
         "showOptionsPanel": "Mostrar painel de opções",
         "uploadImage": "Enviar imagem",
         "previousImage": "Imagem anterior",

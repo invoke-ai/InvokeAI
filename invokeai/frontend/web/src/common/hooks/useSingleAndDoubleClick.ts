@@ -1,6 +1,5 @@
 // https://stackoverflow.com/a/73731908
-
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 export function useSingleAndDoubleClick(
   handleSingleClick: () => void,
@@ -24,5 +23,7 @@ export function useSingleAndDoubleClick(
     return () => clearTimeout(timer);
   }, [click, handleSingleClick, handleDoubleClick, delay]);
 
-  return () => setClick((prev) => prev + 1);
+  const onClick = useCallback(() => setClick((prev) => prev + 1), []);
+
+  return onClick;
 }

@@ -1,18 +1,19 @@
 import copy
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+from invokeai.app.shared.fields import FieldDescriptions
+from invokeai.app.shared.models import FreeUConfig
 
 from ...backend.model_management import BaseModelType, ModelType, SubModelType
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
     Input,
     InputField,
     InvocationContext,
     OutputField,
-    UIType,
     invocation,
     invocation_output,
 )
@@ -24,6 +25,8 @@ class ModelInfo(BaseModel):
     model_type: ModelType = Field(description="Info to load submodel")
     submodel: Optional[SubModelType] = Field(default=None, description="Info to load submodel")
 
+    model_config = ConfigDict(protected_namespaces=())
+
 
 class LoraInfo(ModelInfo):
     weight: float = Field(description="Lora's weight which to use when apply to model")
@@ -34,6 +37,7 @@ class UNetField(BaseModel):
     scheduler: ModelInfo = Field(description="Info to load scheduler submodel")
     loras: List[LoraInfo] = Field(description="Loras to apply on model loading")
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')
+    freeu_config: Optional[FreeUConfig] = Field(default=None, description="FreeU configuration")
 
 
 class ClipField(BaseModel):
@@ -49,13 +53,32 @@ class VaeField(BaseModel):
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')
 
 
-@invocation_output("model_loader_output")
-class ModelLoaderOutput(BaseInvocationOutput):
-    """Model loader output"""
+@invocation_output("unet_output")
+class UNetOutput(BaseInvocationOutput):
+    """Base class for invocations that output a UNet field"""
 
     unet: UNetField = OutputField(description=FieldDescriptions.unet, title="UNet")
-    clip: ClipField = OutputField(description=FieldDescriptions.clip, title="CLIP")
+
+
+@invocation_output("vae_output")
+class VAEOutput(BaseInvocationOutput):
+    """Base class for invocations that output a VAE field"""
+
     vae: VaeField = OutputField(description=FieldDescriptions.vae, title="VAE")
+
+
+@invocation_output("clip_output")
+class CLIPOutput(BaseInvocationOutput):
+    """Base class for invocations that output a CLIP field"""
+
+    clip: ClipField = OutputField(description=FieldDescriptions.clip, title="CLIP")
+
+
+@invocation_output("model_loader_output")
+class ModelLoaderOutput(UNetOutput, CLIPOutput, VAEOutput):
+    """Model loader output"""
+
+    pass
 
 
 class MainModelField(BaseModel):
@@ -65,6 +88,8 @@ class MainModelField(BaseModel):
     base_model: BaseModelType = Field(description="Base model")
     model_type: ModelType = Field(description="Model Type")
 
+    model_config = ConfigDict(protected_namespaces=())
+
 
 class LoRAModelField(BaseModel):
     """LoRA model field"""
@@ -72,8 +97,16 @@ class LoRAModelField(BaseModel):
     model_name: str = Field(description="Name of the LoRA model")
     base_model: BaseModelType = Field(description="Base model")
 
+    model_config = ConfigDict(protected_namespaces=())
 
-@invocation("main_model_loader", title="Main Model", tags=["model"], category="model", version="1.0.0")
+
+@invocation(
+    "main_model_loader",
+    title="Main Model",
+    tags=["model"],
+    category="model",
+    version="1.0.0",
+)
 class MainModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
 
@@ -180,10 +213,16 @@ class LoraLoaderInvocation(BaseInvocation):
     lora: LoRAModelField = InputField(description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA")
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
     unet: Optional[UNetField] = InputField(
-        default=None, description=FieldDescriptions.unet, input=Input.Connection, title="UNet"
+        default=None,
+        description=FieldDescriptions.unet,
+        input=Input.Connection,
+        title="UNet",
     )
     clip: Optional[ClipField] = InputField(
-        default=None, description=FieldDescriptions.clip, input=Input.Connection, title="CLIP"
+        default=None,
+        description=FieldDescriptions.clip,
+        input=Input.Connection,
+        title="CLIP",
     )
 
     def invoke(self, context: InvocationContext) -> LoraLoaderOutput:
@@ -244,20 +283,35 @@ class SDXLLoraLoaderOutput(BaseInvocationOutput):
     clip2: Optional[ClipField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP 2")
 
 
-@invocation("sdxl_lora_loader", title="SDXL LoRA", tags=["lora", "model"], category="model", version="1.0.0")
+@invocation(
+    "sdxl_lora_loader",
+    title="SDXL LoRA",
+    tags=["lora", "model"],
+    category="model",
+    version="1.0.0",
+)
 class SDXLLoraLoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
     lora: LoRAModelField = InputField(description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA")
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
     unet: Optional[UNetField] = InputField(
-        default=None, description=FieldDescriptions.unet, input=Input.Connection, title="UNet"
+        default=None,
+        description=FieldDescriptions.unet,
+        input=Input.Connection,
+        title="UNet",
     )
     clip: Optional[ClipField] = InputField(
-        default=None, description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 1"
+        default=None,
+        description=FieldDescriptions.clip,
+        input=Input.Connection,
+        title="CLIP 1",
     )
     clip2: Optional[ClipField] = InputField(
-        default=None, description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 2"
+        default=None,
+        description=FieldDescriptions.clip,
+        input=Input.Connection,
+        title="CLIP 2",
     )
 
     def invoke(self, context: InvocationContext) -> SDXLLoraLoaderOutput:
@@ -330,12 +384,7 @@ class VAEModelField(BaseModel):
     model_name: str = Field(description="Name of the model")
     base_model: BaseModelType = Field(description="Base model")
 
-
-@invocation_output("vae_loader_output")
-class VaeLoaderOutput(BaseInvocationOutput):
-    """VAE output"""
-
-    vae: VaeField = OutputField(description=FieldDescriptions.vae, title="VAE")
+    model_config = ConfigDict(protected_namespaces=())
 
 
 @invocation("vae_loader", title="VAE", tags=["vae", "model"], category="model", version="1.0.0")
@@ -343,10 +392,12 @@ class VaeLoaderInvocation(BaseInvocation):
     """Loads a VAE model, outputting a VaeLoaderOutput"""
 
     vae_model: VAEModelField = InputField(
-        description=FieldDescriptions.vae_model, input=Input.Direct, ui_type=UIType.VaeModel, title="VAE"
+        description=FieldDescriptions.vae_model,
+        input=Input.Direct,
+        title="VAE",
     )
 
-    def invoke(self, context: InvocationContext) -> VaeLoaderOutput:
+    def invoke(self, context: InvocationContext) -> VAEOutput:
         base_model = self.vae_model.base_model
         model_name = self.vae_model.model_name
         model_type = ModelType.Vae
@@ -357,7 +408,7 @@ class VaeLoaderInvocation(BaseInvocation):
             model_type=model_type,
         ):
             raise Exception(f"Unkown vae name: {model_name}!")
-        return VaeLoaderOutput(
+        return VAEOutput(
             vae=VaeField(
                 vae=ModelInfo(
                     model_name=model_name,
@@ -372,19 +423,31 @@ class VaeLoaderInvocation(BaseInvocation):
 class SeamlessModeOutput(BaseInvocationOutput):
     """Modified Seamless Model output"""
 
-    unet: Optional[UNetField] = OutputField(description=FieldDescriptions.unet, title="UNet")
-    vae: Optional[VaeField] = OutputField(description=FieldDescriptions.vae, title="VAE")
+    unet: Optional[UNetField] = OutputField(default=None, description=FieldDescriptions.unet, title="UNet")
+    vae: Optional[VaeField] = OutputField(default=None, description=FieldDescriptions.vae, title="VAE")
 
 
-@invocation("seamless", title="Seamless", tags=["seamless", "model"], category="model", version="1.0.0")
+@invocation(
+    "seamless",
+    title="Seamless",
+    tags=["seamless", "model"],
+    category="model",
+    version="1.0.0",
+)
 class SeamlessModeInvocation(BaseInvocation):
     """Applies the seamless transformation to the Model UNet and VAE."""
 
     unet: Optional[UNetField] = InputField(
-        default=None, description=FieldDescriptions.unet, input=Input.Connection, title="UNet"
+        default=None,
+        description=FieldDescriptions.unet,
+        input=Input.Connection,
+        title="UNet",
     )
     vae: Optional[VaeField] = InputField(
-        default=None, description=FieldDescriptions.vae_model, input=Input.Connection, title="VAE"
+        default=None,
+        description=FieldDescriptions.vae_model,
+        input=Input.Connection,
+        title="VAE",
     )
     seamless_y: bool = InputField(default=True, input=Input.Any, description="Specify whether Y axis is seamless")
     seamless_x: bool = InputField(default=True, input=Input.Any, description="Specify whether X axis is seamless")
@@ -407,3 +470,24 @@ class SeamlessModeInvocation(BaseInvocation):
             vae.seamless_axes = seamless_axes_list
 
         return SeamlessModeOutput(unet=unet, vae=vae)
+
+
+@invocation("freeu", title="FreeU", tags=["freeu"], category="unet", version="1.0.0")
+class FreeUInvocation(BaseInvocation):
+    """
+    Applies FreeU to the UNet. Suggested values (b1/b2/s1/s2):
+
+    SD1.5: 1.2/1.4/0.9/0.2,
+    SD2: 1.1/1.2/0.9/0.2,
+    SDXL: 1.1/1.2/0.6/0.4,
+    """
+
+    unet: UNetField = InputField(description=FieldDescriptions.unet, input=Input.Connection, title="UNet")
+    b1: float = InputField(default=1.2, ge=-1, le=3, description=FieldDescriptions.freeu_b1)
+    b2: float = InputField(default=1.4, ge=-1, le=3, description=FieldDescriptions.freeu_b2)
+    s1: float = InputField(default=0.9, ge=-1, le=3, description=FieldDescriptions.freeu_s1)
+    s2: float = InputField(default=0.2, ge=-1, le=3, description=FieldDescriptions.freeu_s2)
+
+    def invoke(self, context: InvocationContext) -> UNetOutput:
+        self.unet.freeu_config = FreeUConfig(s1=self.s1, s2=self.s2, b1=self.b1, b2=self.b2)
+        return UNetOutput(unet=self.unet)

@@ -1,12 +1,10 @@
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
-import {
-  controlNetReset,
-  ipAdapterStateReset,
-} from 'features/controlNet/store/controlNetSlice';
+import { controlAdaptersReset } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { getImageUsage } from 'features/deleteImageModal/store/selectors';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { imagesApi } from 'services/api/endpoints/images';
+
 import { startAppListening } from '..';
 
 export const addDeleteBoardAndImagesFulfilledListener = () => {
@@ -20,12 +18,17 @@ export const addDeleteBoardAndImagesFulfilledListener = () => {
       let wasInitialImageReset = false;
       let wasCanvasReset = false;
       let wasNodeEditorReset = false;
-      let wasControlNetReset = false;
-      let wasIPAdapterReset = false;
+      let wereControlAdaptersReset = false;
 
-      const state = getState();
+      const { generation, canvas, nodes, controlAdapters } = getState();
       deleted_images.forEach((image_name) => {
-        const imageUsage = getImageUsage(state, image_name);
+        const imageUsage = getImageUsage(
+          generation,
+          canvas,
+          nodes,
+          controlAdapters,
+          image_name
+        );
 
         if (imageUsage.isInitialImage && !wasInitialImageReset) {
           dispatch(clearInitialImage());
@@ -42,14 +45,9 @@ export const addDeleteBoardAndImagesFulfilledListener = () => {
           wasNodeEditorReset = true;
         }
 
-        if (imageUsage.isControlNetImage && !wasControlNetReset) {
-          dispatch(controlNetReset());
-          wasControlNetReset = true;
-        }
-
-        if (imageUsage.isIPAdapterImage && !wasIPAdapterReset) {
-          dispatch(ipAdapterStateReset());
-          wasIPAdapterReset = true;
+        if (imageUsage.isControlImage && !wereControlAdaptersReset) {
+          dispatch(controlAdaptersReset());
+          wereControlAdaptersReset = true;
         }
       });
     },

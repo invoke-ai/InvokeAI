@@ -1,23 +1,27 @@
-import { Middleware } from '@reduxjs/toolkit';
-import { store } from 'app/store/store';
-import { PartialAppConfig } from 'app/types/invokeai';
-import React, {
-  lazy,
-  memo,
-  PropsWithChildren,
-  ReactNode,
-  useEffect,
-} from 'react';
+import 'i18n';
+
+import type { Middleware } from '@reduxjs/toolkit';
+import { $socketOptions } from 'app/hooks/useSocketIO';
+import { $authToken } from 'app/store/nanostores/authToken';
+import { $baseUrl } from 'app/store/nanostores/baseUrl';
+import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
+import type { CustomStarUi } from 'app/store/nanostores/customStarUI';
+import { $customStarUI } from 'app/store/nanostores/customStarUI';
+import { $galleryHeader } from 'app/store/nanostores/galleryHeader';
+import { $isDebugging } from 'app/store/nanostores/isDebugging';
+import { $logo } from 'app/store/nanostores/logo';
+import { $projectId } from 'app/store/nanostores/projectId';
+import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
+import { $store } from 'app/store/nanostores/store';
+import { createStore } from 'app/store/store';
+import type { PartialAppConfig } from 'app/types/invokeai';
+import Loading from 'common/components/Loading/Loading';
+import AppDndContext from 'features/dnd/components/AppDndContext';
+import type { PropsWithChildren, ReactNode } from 'react';
+import React, { lazy, memo, useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
-import { $authToken, $baseUrl, $projectId } from 'services/api/client';
-import { socketMiddleware } from 'services/events/middleware';
-import Loading from '../../common/components/Loading/Loading';
-import '../../i18n';
-import AppDndContext from '../../features/dnd/components/AppDndContext';
-import { $customStarUI, CustomStarUi } from 'app/store/nanostores/customStarUI';
-import { $headerComponent } from 'app/store/nanostores/headerComponent';
-import { $queueId, DEFAULT_QUEUE_ID } from 'features/queue/store/nanoStores';
+import type { ManagerOptions, SocketOptions } from 'socket.io-client';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -26,27 +30,35 @@ interface Props extends PropsWithChildren {
   apiUrl?: string;
   token?: string;
   config?: PartialAppConfig;
-  headerComponent?: ReactNode;
+  customNavComponent?: ReactNode;
   middleware?: Middleware[];
   projectId?: string;
+  galleryHeader?: ReactNode;
   queueId?: string;
   selectedImage?: {
     imageName: string;
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
   customStarUi?: CustomStarUi;
+  socketOptions?: Partial<ManagerOptions & SocketOptions>;
+  isDebugging?: boolean;
+  logo?: ReactNode;
 }
 
 const InvokeAIUI = ({
   apiUrl,
   token,
   config,
-  headerComponent,
+  customNavComponent,
   middleware,
   projectId,
+  galleryHeader,
   queueId,
   selectedImage,
   customStarUi,
+  socketOptions,
+  isDebugging = false,
+  logo,
 }: Props) => {
   useEffect(() => {
     // configure API client token
@@ -79,9 +91,7 @@ const InvokeAIUI = ({
 
     // rebuild socket middleware with token and apiUrl
     if (middleware && middleware.length > 0) {
-      addMiddleware(socketMiddleware(), ...middleware);
-    } else {
-      addMiddleware(socketMiddleware());
+      addMiddleware(...middleware);
     }
 
     return () => {
@@ -104,14 +114,69 @@ const InvokeAIUI = ({
   }, [customStarUi]);
 
   useEffect(() => {
-    if (headerComponent) {
-      $headerComponent.set(headerComponent);
+    if (customNavComponent) {
+      $customNavComponent.set(customNavComponent);
     }
 
     return () => {
-      $headerComponent.set(undefined);
+      $customNavComponent.set(undefined);
     };
-  }, [headerComponent]);
+  }, [customNavComponent]);
+
+  useEffect(() => {
+    if (galleryHeader) {
+      $galleryHeader.set(galleryHeader);
+    }
+
+    return () => {
+      $galleryHeader.set(undefined);
+    };
+  }, [galleryHeader]);
+
+  useEffect(() => {
+    if (logo) {
+      $logo.set(logo);
+    }
+
+    return () => {
+      $logo.set(undefined);
+    };
+  }, [logo]);
+
+  useEffect(() => {
+    if (socketOptions) {
+      $socketOptions.set(socketOptions);
+    }
+    return () => {
+      $socketOptions.set({});
+    };
+  }, [socketOptions]);
+
+  useEffect(() => {
+    if (isDebugging) {
+      $isDebugging.set(isDebugging);
+    }
+    return () => {
+      $isDebugging.set(false);
+    };
+  }, [isDebugging]);
+
+  const store = useMemo(() => {
+    return createStore(projectId);
+  }, [projectId]);
+
+  useEffect(() => {
+    $store.set(store);
+    if (import.meta.env.MODE === 'development') {
+      window.$store = $store;
+    }
+    () => {
+      $store.set(undefined);
+      if (import.meta.env.MODE === 'development') {
+        window.$store = undefined;
+      }
+    };
+  }, [store]);
 
   return (
     <React.StrictMode>

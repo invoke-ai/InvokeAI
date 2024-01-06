@@ -1,10 +1,13 @@
 import { Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
-import IAIIconButton from 'common/components/IAIIconButton';
-import IAIPopover from 'common/components/IAIPopover';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import { InvCheckbox } from 'common/components/InvCheckbox/wrapper';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import {
+  InvPopoverBody,
+  InvPopoverContent,
+  InvPopoverTrigger,
+} from 'common/components/InvPopover/wrapper';
+import ClearCanvasHistoryButtonModal from 'features/canvas/components/ClearCanvasHistoryButtonModal';
 import {
   setShouldAntialias,
   setShouldAutoSave,
@@ -16,63 +19,35 @@ import {
   setShouldShowIntermediates,
   setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
-import { isEqual } from 'lodash-es';
-
-import { ChangeEvent, memo } from 'react';
+import { InvIconButton, InvPopover } from 'index';
+import type { ChangeEvent } from 'react';
+import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { FaWrench } from 'react-icons/fa';
-import ClearCanvasHistoryButtonModal from '../ClearCanvasHistoryButtonModal';
-
-export const canvasControlsSelector = createSelector(
-  [canvasSelector],
-  (canvas) => {
-    const {
-      shouldAutoSave,
-      shouldCropToBoundingBoxOnSave,
-      shouldDarkenOutsideBoundingBox,
-      shouldShowCanvasDebugInfo,
-      shouldShowGrid,
-      shouldShowIntermediates,
-      shouldSnapToGrid,
-      shouldRestrictStrokesToBox,
-      shouldAntialias,
-    } = canvas;
-
-    return {
-      shouldAutoSave,
-      shouldCropToBoundingBoxOnSave,
-      shouldDarkenOutsideBoundingBox,
-      shouldShowCanvasDebugInfo,
-      shouldShowGrid,
-      shouldShowIntermediates,
-      shouldSnapToGrid,
-      shouldRestrictStrokesToBox,
-      shouldAntialias,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
 
 const IAICanvasSettingsButtonPopover = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
-  const {
-    shouldAutoSave,
-    shouldCropToBoundingBoxOnSave,
-    shouldDarkenOutsideBoundingBox,
-    shouldShowCanvasDebugInfo,
-    shouldShowGrid,
-    shouldShowIntermediates,
-    shouldSnapToGrid,
-    shouldRestrictStrokesToBox,
-    shouldAntialias,
-  } = useAppSelector(canvasControlsSelector);
+  const shouldAutoSave = useAppSelector((s) => s.canvas.shouldAutoSave);
+  const shouldCropToBoundingBoxOnSave = useAppSelector(
+    (s) => s.canvas.shouldCropToBoundingBoxOnSave
+  );
+  const shouldDarkenOutsideBoundingBox = useAppSelector(
+    (s) => s.canvas.shouldDarkenOutsideBoundingBox
+  );
+  const shouldShowCanvasDebugInfo = useAppSelector(
+    (s) => s.canvas.shouldShowCanvasDebugInfo
+  );
+  const shouldShowGrid = useAppSelector((s) => s.canvas.shouldShowGrid);
+  const shouldShowIntermediates = useAppSelector(
+    (s) => s.canvas.shouldShowIntermediates
+  );
+  const shouldSnapToGrid = useAppSelector((s) => s.canvas.shouldSnapToGrid);
+  const shouldRestrictStrokesToBox = useAppSelector(
+    (s) => s.canvas.shouldRestrictStrokesToBox
+  );
+  const shouldAntialias = useAppSelector((s) => s.canvas.shouldAntialias);
 
   useHotkeys(
     ['n'],
@@ -86,80 +61,124 @@ const IAICanvasSettingsButtonPopover = () => {
     [shouldSnapToGrid]
   );
 
-  const handleChangeShouldSnapToGrid = (e: ChangeEvent<HTMLInputElement>) =>
-    dispatch(setShouldSnapToGrid(e.target.checked));
+  const handleChangeShouldSnapToGrid = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldSnapToGrid(e.target.checked)),
+    [dispatch]
+  );
+
+  const handleChangeShouldShowIntermediates = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldShowIntermediates(e.target.checked)),
+    [dispatch]
+  );
+  const handleChangeShouldShowGrid = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldShowGrid(e.target.checked)),
+    [dispatch]
+  );
+  const handleChangeShouldDarkenOutsideBoundingBox = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldDarkenOutsideBoundingBox(e.target.checked)),
+    [dispatch]
+  );
+  const handleChangeShouldAutoSave = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldAutoSave(e.target.checked)),
+    [dispatch]
+  );
+  const handleChangeShouldCropToBoundingBoxOnSave = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldCropToBoundingBoxOnSave(e.target.checked)),
+    [dispatch]
+  );
+  const handleChangeShouldRestrictStrokesToBox = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldRestrictStrokesToBox(e.target.checked)),
+    [dispatch]
+  );
+  const handleChangeShouldShowCanvasDebugInfo = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldShowCanvasDebugInfo(e.target.checked)),
+    [dispatch]
+  );
+  const handleChangeShouldAntialias = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) =>
+      dispatch(setShouldAntialias(e.target.checked)),
+    [dispatch]
+  );
 
   return (
-    <IAIPopover
-      isLazy={false}
-      triggerComponent={
-        <IAIIconButton
+    <InvPopover>
+      <InvPopoverTrigger>
+        <InvIconButton
           tooltip={t('unifiedCanvas.canvasSettings')}
           aria-label={t('unifiedCanvas.canvasSettings')}
           icon={<FaWrench />}
         />
-      }
-    >
-      <Flex direction="column" gap={2}>
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.showIntermediates')}
-          isChecked={shouldShowIntermediates}
-          onChange={(e) =>
-            dispatch(setShouldShowIntermediates(e.target.checked))
-          }
-        />
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.showGrid')}
-          isChecked={shouldShowGrid}
-          onChange={(e) => dispatch(setShouldShowGrid(e.target.checked))}
-        />
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.snapToGrid')}
-          isChecked={shouldSnapToGrid}
-          onChange={handleChangeShouldSnapToGrid}
-        />
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.darkenOutsideSelection')}
-          isChecked={shouldDarkenOutsideBoundingBox}
-          onChange={(e) =>
-            dispatch(setShouldDarkenOutsideBoundingBox(e.target.checked))
-          }
-        />
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.autoSaveToGallery')}
-          isChecked={shouldAutoSave}
-          onChange={(e) => dispatch(setShouldAutoSave(e.target.checked))}
-        />
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.saveBoxRegionOnly')}
-          isChecked={shouldCropToBoundingBoxOnSave}
-          onChange={(e) =>
-            dispatch(setShouldCropToBoundingBoxOnSave(e.target.checked))
-          }
-        />
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.limitStrokesToBox')}
-          isChecked={shouldRestrictStrokesToBox}
-          onChange={(e) =>
-            dispatch(setShouldRestrictStrokesToBox(e.target.checked))
-          }
-        />
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.showCanvasDebugInfo')}
-          isChecked={shouldShowCanvasDebugInfo}
-          onChange={(e) =>
-            dispatch(setShouldShowCanvasDebugInfo(e.target.checked))
-          }
-        />
-
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.antialiasing')}
-          isChecked={shouldAntialias}
-          onChange={(e) => dispatch(setShouldAntialias(e.target.checked))}
-        />
-        <ClearCanvasHistoryButtonModal />
-      </Flex>
-    </IAIPopover>
+      </InvPopoverTrigger>
+      <InvPopoverContent>
+        <InvPopoverBody>
+          <Flex direction="column" gap={2}>
+            <InvControl label={t('unifiedCanvas.showIntermediates')}>
+              <InvCheckbox
+                isChecked={shouldShowIntermediates}
+                onChange={handleChangeShouldShowIntermediates}
+              />
+            </InvControl>
+            <InvControl label={t('unifiedCanvas.showGrid')}>
+              <InvCheckbox
+                isChecked={shouldShowGrid}
+                onChange={handleChangeShouldShowGrid}
+              />
+            </InvControl>
+            <InvControl label={t('unifiedCanvas.snapToGrid')}>
+              <InvCheckbox
+                isChecked={shouldSnapToGrid}
+                onChange={handleChangeShouldSnapToGrid}
+              />
+            </InvControl>
+            <InvControl label={t('unifiedCanvas.darkenOutsideSelection')}>
+              <InvCheckbox
+                isChecked={shouldDarkenOutsideBoundingBox}
+                onChange={handleChangeShouldDarkenOutsideBoundingBox}
+              />
+            </InvControl>
+            <InvControl label={t('unifiedCanvas.autoSaveToGallery')}>
+              <InvCheckbox
+                isChecked={shouldAutoSave}
+                onChange={handleChangeShouldAutoSave}
+              />
+            </InvControl>
+            <InvControl label={t('unifiedCanvas.saveBoxRegionOnly')}>
+              <InvCheckbox
+                isChecked={shouldCropToBoundingBoxOnSave}
+                onChange={handleChangeShouldCropToBoundingBoxOnSave}
+              />
+            </InvControl>
+            <InvControl label={t('unifiedCanvas.limitStrokesToBox')}>
+              <InvCheckbox
+                isChecked={shouldRestrictStrokesToBox}
+                onChange={handleChangeShouldRestrictStrokesToBox}
+              />
+            </InvControl>
+            <InvControl label={t('unifiedCanvas.showCanvasDebugInfo')}>
+              <InvCheckbox
+                isChecked={shouldShowCanvasDebugInfo}
+                onChange={handleChangeShouldShowCanvasDebugInfo}
+              />
+            </InvControl>
+            <InvControl label={t('unifiedCanvas.antialiasing')}>
+              <InvCheckbox
+                isChecked={shouldAntialias}
+                onChange={handleChangeShouldAntialias}
+              />
+            </InvControl>
+            <ClearCanvasHistoryButtonModal />
+          </Flex>
+        </InvPopoverBody>
+      </InvPopoverContent>
+    </InvPopover>
   );
 };
 

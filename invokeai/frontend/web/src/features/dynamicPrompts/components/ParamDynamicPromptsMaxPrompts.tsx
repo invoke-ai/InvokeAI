@@ -1,37 +1,23 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAISlider from 'common/components/IAISlider';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { maxPromptsChanged } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo, useCallback } from 'react';
-import {
-  maxPromptsChanged,
-  maxPromptsReset,
-} from '../store/dynamicPromptsSlice';
 import { useTranslation } from 'react-i18next';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
-
-const selector = createSelector(
-  stateSelector,
-  (state) => {
-    const { maxPrompts, combinatorial } = state.dynamicPrompts;
-    const { min, sliderMax, inputMax } =
-      state.config.sd.dynamicPrompts.maxPrompts;
-
-    return {
-      maxPrompts,
-      min,
-      sliderMax,
-      inputMax,
-      isDisabled: !combinatorial,
-    };
-  },
-  defaultSelectorOptions
-);
 
 const ParamDynamicPromptsMaxPrompts = () => {
-  const { maxPrompts, min, sliderMax, inputMax, isDisabled } =
-    useAppSelector(selector);
+  const maxPrompts = useAppSelector((s) => s.dynamicPrompts.maxPrompts);
+  const min = useAppSelector((s) => s.config.sd.dynamicPrompts.maxPrompts.min);
+  const sliderMax = useAppSelector(
+    (s) => s.config.sd.dynamicPrompts.maxPrompts.sliderMax
+  );
+  const inputMax = useAppSelector(
+    (s) => s.config.sd.dynamicPrompts.maxPrompts.inputMax
+  );
+  const initial = useAppSelector(
+    (s) => s.config.sd.dynamicPrompts.maxPrompts.initial
+  );
+  const isDisabled = useAppSelector((s) => !s.dynamicPrompts.combinatorial);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -42,26 +28,24 @@ const ParamDynamicPromptsMaxPrompts = () => {
     [dispatch]
   );
 
-  const handleReset = useCallback(() => {
-    dispatch(maxPromptsReset());
-  }, [dispatch]);
-
   return (
-    <IAIInformationalPopover feature="dynamicPromptsMaxPrompts">
-      <IAISlider
-        label={t('dynamicPrompts.maxPrompts')}
-        isDisabled={isDisabled}
+    <InvControl
+      label={t('dynamicPrompts.maxPrompts')}
+      isDisabled={isDisabled}
+      feature="dynamicPromptsMaxPrompts"
+      renderInfoPopoverInPortal={false}
+    >
+      <InvSlider
         min={min}
         max={sliderMax}
         value={maxPrompts}
+        defaultValue={initial}
         onChange={handleChange}
-        sliderNumberInputProps={{ max: inputMax }}
-        withSliderMarks
-        withInput
-        withReset
-        handleReset={handleReset}
+        marks
+        withNumberInput
+        numberInputMax={inputMax}
       />
-    </IAIInformationalPopover>
+    </InvControl>
   );
 };
 

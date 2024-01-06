@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
-import { zControlNetModel } from 'features/parameters/types/parameterSchemas';
-import { ControlNetModelField } from 'services/api/types';
+import { zParameterControlNetModel } from 'features/parameters/types/parameterSchemas';
+import type { ControlNetModelField } from 'services/api/types';
 
 export const modelIdToControlNetModelParam = (
   controlNetModelId: string
@@ -8,7 +8,7 @@ export const modelIdToControlNetModelParam = (
   const log = logger('models');
   const [base_model, _model_type, model_name] = controlNetModelId.split('/');
 
-  const result = zControlNetModel.safeParse({
+  const result = zParameterControlNetModel.safeParse({
     base_model,
     model_name,
   });

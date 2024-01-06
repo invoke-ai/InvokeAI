@@ -1,15 +1,25 @@
-import { AnyListenerPredicate } from '@reduxjs/toolkit';
+import type { AnyListenerPredicate } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import { RootState } from 'app/store/store';
-import { controlNetImageProcessed } from 'features/controlNet/store/actions';
+import type { RootState } from 'app/store/store';
+import { controlAdapterImageProcessed } from 'features/controlAdapters/store/actions';
 import {
-  controlNetAutoConfigToggled,
-  controlNetImageChanged,
-  controlNetModelChanged,
-  controlNetProcessorParamsChanged,
-  controlNetProcessorTypeChanged,
-} from 'features/controlNet/store/controlNetSlice';
+  controlAdapterAutoConfigToggled,
+  controlAdapterImageChanged,
+  controlAdapterModelChanged,
+  controlAdapterProcessorParamsChanged,
+  controlAdapterProcessortTypeChanged,
+  selectControlAdapterById,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
+import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
+
 import { startAppListening } from '..';
+
+type AnyControlAdapterParamChangeAction =
+  | ReturnType<typeof controlAdapterProcessorParamsChanged>
+  | ReturnType<typeof controlAdapterModelChanged>
+  | ReturnType<typeof controlAdapterImageChanged>
+  | ReturnType<typeof controlAdapterProcessortTypeChanged>
+  | ReturnType<typeof controlAdapterAutoConfigToggled>;
 
 const predicate: AnyListenerPredicate<RootState> = (
   action,
@@ -17,35 +27,37 @@ const predicate: AnyListenerPredicate<RootState> = (
   prevState
 ) => {
   const isActionMatched =
-    controlNetProcessorParamsChanged.match(action) ||
-    controlNetModelChanged.match(action) ||
-    controlNetImageChanged.match(action) ||
-    controlNetProcessorTypeChanged.match(action) ||
-    controlNetAutoConfigToggled.match(action);
+    controlAdapterProcessorParamsChanged.match(action) ||
+    controlAdapterModelChanged.match(action) ||
+    controlAdapterImageChanged.match(action) ||
+    controlAdapterProcessortTypeChanged.match(action) ||
+    controlAdapterAutoConfigToggled.match(action);
 
   if (!isActionMatched) {
     return false;
   }
 
-  if (controlNetAutoConfigToggled.match(action)) {
+  const { id } = action.payload;
+  const prevCA = selectControlAdapterById(prevState.controlAdapters, id);
+  const ca = selectControlAdapterById(state.controlAdapters, id);
+  if (
+    !prevCA ||
+    !isControlNetOrT2IAdapter(prevCA) ||
+    !ca ||
+    !isControlNetOrT2IAdapter(ca)
+  ) {
+    return false;
+  }
+
+  if (controlAdapterAutoConfigToggled.match(action)) {
     // do not process if the user just disabled auto-config
-    if (
-      prevState.controlNet.controlNets[action.payload.controlNetId]
-        ?.shouldAutoConfig === true
-    ) {
+    if (prevCA.shouldAutoConfig === true) {
       return false;
     }
   }
 
-  const cn = state.controlNet.controlNets[action.payload.controlNetId];
-
-  if (!cn) {
-    // something is wrong, the controlNet should exist
-    return false;
-  }
-
-  const { controlImage, processorType, shouldAutoConfig } = cn;
-  if (controlNetModelChanged.match(action) && !shouldAutoConfig) {
+  const { controlImage, processorType, shouldAutoConfig } = ca;
+  if (controlAdapterModelChanged.match(action) && !shouldAutoConfig) {
     // do not process if the action is a model change but the processor settings are dirty
     return false;
   }
@@ -57,25 +69,27 @@ const predicate: AnyListenerPredicate<RootState> = (
   return isProcessorSelected && hasControlImage;
 };
 
+const DEBOUNCE_MS = 300;
+
 /**
  * Listener that automatically processes a ControlNet image when its processor parameters are changed.
  *
- * The network request is debounced by 1 second.
+ * The network request is debounced.
  */
 export const addControlNetAutoProcessListener = () => {
   startAppListening({
     predicate,
     effect: async (action, { dispatch, cancelActiveListeners, delay }) => {
       const log = logger('session');
-      const { controlNetId } = action.payload;
+      const { id } = (action as AnyControlAdapterParamChangeAction).payload;
 
       // Cancel any in-progress instances of this listener
       cancelActiveListeners();
       log.trace('ControlNet auto-process triggered');
       // Delay before starting actual work
-      await delay(300);
+      await delay(DEBOUNCE_MS);
 
-      dispatch(controlNetImageProcessed({ controlNetId }));
+      dispatch(controlAdapterImageProcessed({ id }));
     },
   });
 };

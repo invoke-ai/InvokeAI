@@ -7,18 +7,23 @@ import {
   imageSelected,
 } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
-import { CANVAS_OUTPUT } from 'features/nodes/util/graphBuilders/constants';
+import { isImageOutput } from 'features/nodes/types/common';
+import {
+  LINEAR_UI_OUTPUT,
+  nodeIDDenyList,
+} from 'features/nodes/util/graph/constants';
+import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
-import { isImageOutput } from 'services/api/guards';
 import { imagesAdapter } from 'services/api/util';
 import {
   appSocketInvocationComplete,
   socketInvocationComplete,
 } from 'services/events/actions';
+
 import { startAppListening } from '../..';
 
 // These nodes output an image, but do not actually *save* an image, so we don't want to handle the gallery logic on them
-const nodeDenylist = ['load_image', 'image'];
+const nodeTypeDenylist = ['load_image', 'image'];
 
 export const addInvocationCompleteEventListener = () => {
   startAppListening({
@@ -31,22 +36,31 @@ export const addInvocationCompleteEventListener = () => {
         `Invocation complete (${action.payload.data.node.type})`
       );
 
-      const { result, node, queue_batch_id } = data;
+      const { result, node, queue_batch_id, source_node_id } = data;
 
       // This complete event has an associated image output
-      if (isImageOutput(result) && !nodeDenylist.includes(node.type)) {
+      if (
+        isImageOutput(result) &&
+        !nodeTypeDenylist.includes(node.type) &&
+        !nodeIDDenyList.includes(source_node_id)
+      ) {
         const { image_name } = result.image;
         const { canvas, gallery } = getState();
 
         // This populates the `getImageDTO` cache
-        const imageDTO = await dispatch(
-          imagesApi.endpoints.getImageDTO.initiate(image_name)
-        ).unwrap();
+        const imageDTORequest = dispatch(
+          imagesApi.endpoints.getImageDTO.initiate(image_name, {
+            forceRefetch: true,
+          })
+        );
+
+        const imageDTO = await imageDTORequest.unwrap();
+        imageDTORequest.unsubscribe();
 
         // Add canvas images to the staging area
         if (
           canvas.batchIds.includes(queue_batch_id) &&
-          [CANVAS_OUTPUT].includes(data.source_node_id)
+          [LINEAR_UI_OUTPUT].includes(data.source_node_id)
         ) {
           dispatch(addImageToStagingArea(imageDTO));
         }
@@ -70,10 +84,21 @@ export const addInvocationCompleteEventListener = () => {
             )
           );
 
+          // update the total images for the board
+          dispatch(
+            boardsApi.util.updateQueryData(
+              'getBoardImagesTotal',
+              imageDTO.board_id ?? 'none',
+              (draft) => {
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                draft.total += 1;
+              }
+            )
+          );
+
           dispatch(
             imagesApi.util.invalidateTags([
-              { type: 'BoardImagesTotal', id: imageDTO.board_id },
-              { type: 'BoardAssetsTotal', id: imageDTO.board_id },
+              { type: 'Board', id: imageDTO.board_id ?? 'none' },
             ])
           );
 
@@ -81,9 +106,32 @@ export const addInvocationCompleteEventListener = () => {
 
           // If auto-switch is enabled, select the new image
           if (shouldAutoSwitch) {
-            // if auto-add is enabled, switch the board as the image comes in
-            dispatch(galleryViewChanged('images'));
-            dispatch(boardIdSelected(imageDTO.board_id ?? 'none'));
+            // if auto-add is enabled, switch the gallery view and board if needed as the image comes in
+            if (gallery.galleryView !== 'images') {
+              dispatch(galleryViewChanged('images'));
+            }
+
+            if (
+              imageDTO.board_id &&
+              imageDTO.board_id !== gallery.selectedBoardId
+            ) {
+              dispatch(
+                boardIdSelected({
+                  boardId: imageDTO.board_id,
+                  selectedImageName: imageDTO.image_name,
+                })
+              );
+            }
+
+            if (!imageDTO.board_id && gallery.selectedBoardId !== 'none') {
+              dispatch(
+                boardIdSelected({
+                  boardId: 'none',
+                  selectedImageName: imageDTO.image_name,
+                })
+              );
+            }
+
             dispatch(imageSelected(imageDTO));
           }
         }

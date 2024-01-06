@@ -1,20 +1,23 @@
+import type { SystemStyleObject } from '@chakra-ui/react';
 import {
   Editable,
   EditableInput,
   EditablePreview,
   Flex,
-  Tooltip,
   forwardRef,
   useEditableControls,
 } from '@chakra-ui/react';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { useFieldLabel } from 'features/nodes/hooks/useFieldLabel';
 import { useFieldTemplateTitle } from 'features/nodes/hooks/useFieldTemplateTitle';
 import { fieldLabelChanged } from 'features/nodes/store/nodesSlice';
-import { MouseEvent, memo, useCallback, useEffect, useState } from 'react';
-import FieldTooltipContent from './FieldTooltipContent';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
+import type { MouseEvent } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import FieldTooltipContent from './FieldTooltipContent';
 
 interface Props {
   nodeId: string;
@@ -62,7 +65,7 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
   }, [label, fieldTemplateTitle, t]);
 
   return (
-    <Tooltip
+    <InvTooltip
       label={
         withTooltip ? (
           <FieldTooltipContent
@@ -73,65 +76,51 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
         ) : undefined
       }
       openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
-      placement="top"
-      hasArrow
     >
-      <Flex
+      <Editable
+        value={localTitle}
+        onChange={handleChange}
+        onSubmit={handleSubmit}
+        as={Flex}
         ref={ref}
-        sx={{
-          position: 'relative',
-          overflow: 'hidden',
-          alignItems: 'center',
-          justifyContent: 'flex-start',
-          gap: 1,
-          h: 'full',
-        }}
+        position="relative"
+        overflow="hidden"
+        alignItems="center"
+        justifyContent="flex-start"
+        gap={1}
+        w="full"
       >
-        <Editable
-          value={localTitle}
-          onChange={handleChange}
-          onSubmit={handleSubmit}
-          as={Flex}
-          sx={{
-            position: 'relative',
-            alignItems: 'center',
-            h: 'full',
-          }}
-        >
-          <EditablePreview
-            sx={{
-              p: 0,
-              fontWeight: isMissingInput ? 600 : 400,
-              textAlign: 'left',
-              _hover: {
-                fontWeight: '600 !important',
-              },
-            }}
-            noOfLines={1}
-          />
-          <EditableInput
-            className="nodrag"
-            sx={{
-              p: 0,
-              w: 'full',
-              fontWeight: 600,
-              color: 'base.900',
-              _dark: {
-                color: 'base.100',
-              },
-              _focusVisible: {
-                p: 0,
-                textAlign: 'left',
-                boxShadow: 'none',
-              },
-            }}
-          />
-          <EditableControls />
-        </Editable>
-      </Flex>
-    </Tooltip>
+        <EditablePreview
+          fontWeight="semibold"
+          sx={editablePreviewStyles}
+          noOfLines={1}
+          color={isMissingInput ? 'error.300' : 'base.300'}
+        />
+        <EditableInput className="nodrag" sx={editableInputStyles} />
+        <EditableControls />
+      </Editable>
+    </InvTooltip>
   );
 });
+
+const editableInputStyles: SystemStyleObject = {
+  p: 0,
+  w: 'full',
+  fontWeight: 'semibold',
+  color: 'base.100',
+  _focusVisible: {
+    p: 0,
+    textAlign: 'left',
+    boxShadow: 'none',
+  },
+};
+const editablePreviewStyles: SystemStyleObject = {
+  p: 0,
+  textAlign: 'left',
+  _hover: {
+    fontWeight: 'semibold !important',
+  },
+};
 
 export default memo(EditableFieldTitle);
 

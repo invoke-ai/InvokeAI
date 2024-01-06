@@ -10,13 +10,12 @@ import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
 import { getCanvasGenerationMode } from 'features/canvas/util/getCanvasGenerationMode';
 import { canvasGraphBuilt } from 'features/nodes/store/actions';
-import { buildCanvasGraph } from 'features/nodes/util/graphBuilders/buildCanvasGraph';
-import { prepareLinearUIBatch } from 'features/nodes/util/graphBuilders/buildLinearBatchConfig';
-import { addToast } from 'features/system/store/systemSlice';
-import { t } from 'i18next';
+import { buildCanvasGraph } from 'features/nodes/util/graph/buildCanvasGraph';
+import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { imagesApi } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
-import { ImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
+
 import { startAppListening } from '..';
 
 /**
@@ -140,8 +139,6 @@ export const addEnqueueRequestedCanvasListener = () => {
         const enqueueResult = await req.unwrap();
         req.reset();
 
-        log.debug({ enqueueResult: parseify(enqueueResult) }, 'Batch enqueued');
-
         const batchId = enqueueResult.batch.batch_id as string; // we know the is a string, backend provides it
 
         // Prep the canvas staging area if it is not yet initialized
@@ -158,28 +155,8 @@ export const addEnqueueRequestedCanvasListener = () => {
 
         // Associate the session with the canvas session ID
         dispatch(canvasBatchIdAdded(batchId));
-
-        dispatch(
-          addToast({
-            title: t('queue.batchQueued'),
-            description: t('queue.batchQueuedDesc', {
-              item_count: enqueueResult.enqueued,
-              direction: prepend ? t('queue.front') : t('queue.back'),
-            }),
-            status: 'success',
-          })
-        );
       } catch {
-        log.error(
-          { batchConfig: parseify(batchConfig) },
-          t('queue.batchFailedToQueue')
-        );
-        dispatch(
-          addToast({
-            title: t('queue.batchFailedToQueue'),
-            status: 'error',
-          })
-        );
+        // no-op
       }
     },
   });

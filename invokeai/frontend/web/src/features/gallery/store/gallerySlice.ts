@@ -1,16 +1,19 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
+import { uniqBy } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
-import { ImageDTO } from 'services/api/types';
-import { BoardId, GalleryState, GalleryView } from './types';
+import type { ImageDTO } from 'services/api/types';
+
+import type { BoardId, GalleryState, GalleryView } from './types';
 
 export const initialGalleryState: GalleryState = {
   selection: [],
   shouldAutoSwitch: true,
   autoAssignBoardOnClick: true,
   autoAddBoardId: 'none',
-  galleryImageMinimumWidth: 96,
+  galleryImageMinimumWidth: 90,
   selectedBoardId: 'none',
   galleryView: 'images',
   boardSearchText: '',
@@ -24,7 +27,7 @@ export const gallerySlice = createSlice({
       state.selection = action.payload ? [action.payload] : [];
     },
     selectionChanged: (state, action: PayloadAction<ImageDTO[]>) => {
-      state.selection = action.payload;
+      state.selection = uniqBy(action.payload, (i) => i.image_name);
     },
     shouldAutoSwitchChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoSwitch = action.payload;
@@ -35,8 +38,11 @@ export const gallerySlice = createSlice({
     autoAssignBoardOnClickChanged: (state, action: PayloadAction<boolean>) => {
       state.autoAssignBoardOnClick = action.payload;
     },
-    boardIdSelected: (state, action: PayloadAction<BoardId>) => {
-      state.selectedBoardId = action.payload;
+    boardIdSelected: (
+      state,
+      action: PayloadAction<{ boardId: BoardId; selectedImageName?: string }>
+    ) => {
+      state.selectedBoardId = action.payload.boardId;
       state.galleryView = 'images';
     },
     autoAddBoardIdChanged: (state, action: PayloadAction<BoardId>) => {
@@ -98,3 +104,5 @@ const isAnyBoardDeleted = isAnyOf(
   imagesApi.endpoints.deleteBoard.matchFulfilled,
   imagesApi.endpoints.deleteBoardAndImages.matchFulfilled
 );
+
+export const selectGallerySlice = (state: RootState) => state.gallery;

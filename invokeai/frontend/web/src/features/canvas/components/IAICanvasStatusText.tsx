@@ -1,79 +1,71 @@
 import { Box, Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
-import GenerationModeStatusText from 'features/parameters/components/Parameters/Canvas/GenerationModeStatusText';
-import { isEqual } from 'lodash-es';
-import { useTranslation } from 'react-i18next';
-import roundToHundreth from '../util/roundToHundreth';
-import IAICanvasStatusTextCursorPos from './IAICanvasStatusText/IAICanvasStatusTextCursorPos';
+import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
+import roundToHundreth from 'features/canvas/util/roundToHundreth';
+import GenerationModeStatusText from 'features/parameters/components/Canvas/GenerationModeStatusText';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import IAICanvasStatusTextCursorPos from './IAICanvasStatusText/IAICanvasStatusTextCursorPos';
 
 const warningColor = 'var(--invokeai-colors-warning-500)';
 
-const selector = createSelector(
-  [canvasSelector],
-  (canvas) => {
-    const {
-      stageDimensions: { width: stageWidth, height: stageHeight },
-      stageCoordinates: { x: stageX, y: stageY },
-      boundingBoxDimensions: { width: boxWidth, height: boxHeight },
-      scaledBoundingBoxDimensions: {
-        width: scaledBoxWidth,
-        height: scaledBoxHeight,
-      },
-      boundingBoxCoordinates: { x: boxX, y: boxY },
-      stageScale,
-      shouldShowCanvasDebugInfo,
-      layer,
-      boundingBoxScaleMethod,
-      shouldPreserveMaskedArea,
-    } = canvas;
-
-    let boundingBoxColor = 'inherit';
-
-    if (
-      (boundingBoxScaleMethod === 'none' &&
-        (boxWidth < 512 || boxHeight < 512)) ||
-      (boundingBoxScaleMethod === 'manual' &&
-        scaledBoxWidth * scaledBoxHeight < 512 * 512)
-    ) {
-      boundingBoxColor = warningColor;
-    }
-
-    const activeLayerColor = layer === 'mask' ? warningColor : 'inherit';
-
-    return {
-      activeLayerColor,
-      activeLayerString: layer.charAt(0).toUpperCase() + layer.slice(1),
-      boundingBoxColor,
-      boundingBoxCoordinatesString: `(${roundToHundreth(
-        boxX
-      )}, ${roundToHundreth(boxY)})`,
-      boundingBoxDimensionsString: `${boxWidth}×${boxHeight}`,
-      scaledBoundingBoxDimensionsString: `${scaledBoxWidth}×${scaledBoxHeight}`,
-      canvasCoordinatesString: `${roundToHundreth(stageX)}×${roundToHundreth(
-        stageY
-      )}`,
-      canvasDimensionsString: `${stageWidth}×${stageHeight}`,
-      canvasScaleString: Math.round(stageScale * 100),
-      shouldShowCanvasDebugInfo,
-      shouldShowBoundingBox: boundingBoxScaleMethod !== 'auto',
-      shouldShowScaledBoundingBox: boundingBoxScaleMethod !== 'none',
-      shouldPreserveMaskedArea,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
+const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
+  const {
+    stageDimensions: { width: stageWidth, height: stageHeight },
+    stageCoordinates: { x: stageX, y: stageY },
+    boundingBoxDimensions: { width: boxWidth, height: boxHeight },
+    scaledBoundingBoxDimensions: {
+      width: scaledBoxWidth,
+      height: scaledBoxHeight,
     },
+    boundingBoxCoordinates: { x: boxX, y: boxY },
+    stageScale,
+    shouldShowCanvasDebugInfo,
+    layer,
+    boundingBoxScaleMethod,
+    shouldPreserveMaskedArea,
+  } = canvas;
+
+  let boundingBoxColor = 'inherit';
+
+  if (
+    (boundingBoxScaleMethod === 'none' &&
+      (boxWidth < 512 || boxHeight < 512)) ||
+    (boundingBoxScaleMethod === 'manual' &&
+      scaledBoxWidth * scaledBoxHeight < 512 * 512)
+  ) {
+    boundingBoxColor = warningColor;
   }
-);
+
+  const activeLayerColor = layer === 'mask' ? warningColor : 'inherit';
+
+  return {
+    activeLayerColor,
+    layer,
+    boundingBoxColor,
+    boundingBoxCoordinatesString: `(${roundToHundreth(boxX)}, ${roundToHundreth(
+      boxY
+    )})`,
+    boundingBoxDimensionsString: `${boxWidth}×${boxHeight}`,
+    scaledBoundingBoxDimensionsString: `${scaledBoxWidth}×${scaledBoxHeight}`,
+    canvasCoordinatesString: `${roundToHundreth(stageX)}×${roundToHundreth(
+      stageY
+    )}`,
+    canvasDimensionsString: `${stageWidth}×${stageHeight}`,
+    canvasScaleString: Math.round(stageScale * 100),
+    shouldShowCanvasDebugInfo,
+    shouldShowBoundingBox: boundingBoxScaleMethod !== 'auto',
+    shouldShowScaledBoundingBox: boundingBoxScaleMethod !== 'none',
+    shouldPreserveMaskedArea,
+  };
+});
 
 const IAICanvasStatusText = () => {
   const {
     activeLayerColor,
-    activeLayerString,
+    layer,
     boundingBoxColor,
     boundingBoxCoordinatesString,
     boundingBoxDimensionsString,
@@ -91,57 +83,38 @@ const IAICanvasStatusText = () => {
 
   return (
     <Flex
-      sx={{
-        flexDirection: 'column',
-        position: 'absolute',
-        top: 0,
-        insetInlineStart: 0,
-        opacity: 0.65,
-        display: 'flex',
-        fontSize: 'sm',
-        padding: 1,
-        px: 2,
-        minWidth: 48,
-        margin: 1,
-        borderRadius: 'base',
-        pointerEvents: 'none',
-        bg: 'base.200',
-        _dark: {
-          bg: 'base.800',
-        },
-      }}
+      flexDirection="column"
+      position="absolute"
+      top={0}
+      insetInlineStart={0}
+      opacity={0.65}
+      display="flex"
+      fontSize="sm"
+      padding={1}
+      px={2}
+      minWidth={48}
+      margin={1}
+      borderRadius="base"
+      pointerEvents="none"
+      bg="base.800"
     >
       <GenerationModeStatusText />
-      <Box
-        style={{
-          color: activeLayerColor,
-        }}
-      >{`${t('unifiedCanvas.activeLayer')}: ${activeLayerString}`}</Box>
+      <Box color={activeLayerColor}>{`${t('unifiedCanvas.activeLayer')}: ${t(
+        `unifiedCanvas.${layer}`
+      )}`}</Box>
       <Box>{`${t('unifiedCanvas.canvasScale')}: ${canvasScaleString}%`}</Box>
       {shouldPreserveMaskedArea && (
-        <Box
-          style={{
-            color: warningColor,
-          }}
-        >
-          Preserve Masked Area: On
+        <Box color={warningColor}>
+          {t('unifiedCanvas.preserveMaskedArea')}: {t('common.on')}
         </Box>
       )}
       {shouldShowBoundingBox && (
-        <Box
-          style={{
-            color: boundingBoxColor,
-          }}
-        >{`${t(
+        <Box color={boundingBoxColor}>{`${t(
           'unifiedCanvas.boundingBox'
         )}: ${boundingBoxDimensionsString}`}</Box>
       )}
       {shouldShowScaledBoundingBox && (
-        <Box
-          style={{
-            color: boundingBoxColor,
-          }}
-        >{`${t(
+        <Box color={boundingBoxColor}>{`${t(
           'unifiedCanvas.scaledBoundingBox'
         )}: ${scaledBoundingBoxDimensionsString}`}</Box>
       )}

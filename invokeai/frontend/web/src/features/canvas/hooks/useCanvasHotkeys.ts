@@ -1,72 +1,37 @@
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
+  resetCanvasInteractionState,
+  resetToolInteractionState,
+} from 'features/canvas/store/canvasNanostore';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   clearMask,
-  resetCanvasInteractionState,
   setIsMaskEnabled,
   setShouldShowBoundingBox,
   setShouldSnapToGrid,
   setTool,
 } from 'features/canvas/store/canvasSlice';
+import type { CanvasTool } from 'features/canvas/store/canvasTypes';
+import { getCanvasStage } from 'features/canvas/util/konvaInstanceProvider';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { isEqual } from 'lodash-es';
-
-import { useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { CanvasTool } from '../store/canvasTypes';
-import { getCanvasStage } from '../util/konvaInstanceProvider';
-
-const selector = createSelector(
-  [canvasSelector, activeTabNameSelector, isStagingSelector],
-  (canvas, activeTabName, isStaging) => {
-    const {
-      cursorPosition,
-      shouldLockBoundingBox,
-      shouldShowBoundingBox,
-      tool,
-      isMaskEnabled,
-      shouldSnapToGrid,
-    } = canvas;
-
-    return {
-      activeTabName,
-      isCursorOnCanvas: Boolean(cursorPosition),
-      shouldLockBoundingBox,
-      shouldShowBoundingBox,
-      tool,
-      isStaging,
-      isMaskEnabled,
-      shouldSnapToGrid,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
 
 const useInpaintingCanvasHotkeys = () => {
   const dispatch = useAppDispatch();
-  const {
-    activeTabName,
-    shouldShowBoundingBox,
-    tool,
-    isStaging,
-    isMaskEnabled,
-    shouldSnapToGrid,
-  } = useAppSelector(selector);
-
+  const activeTabName = useAppSelector(activeTabNameSelector);
+  const shouldShowBoundingBox = useAppSelector(
+    (s) => s.canvas.shouldShowBoundingBox
+  );
+  const tool = useAppSelector((s) => s.canvas.tool);
+  const isStaging = useAppSelector(isStagingSelector);
+  const isMaskEnabled = useAppSelector((s) => s.canvas.isMaskEnabled);
+  const shouldSnapToGrid = useAppSelector((s) => s.canvas.shouldSnapToGrid);
   const previousToolRef = useRef<CanvasTool | null>(null);
-
   const canvasStage = getCanvasStage();
 
   // Beta Keys
-  const handleClearMask = () => dispatch(clearMask());
+  const handleClearMask = useCallback(() => dispatch(clearMask()), [dispatch]);
 
   useHotkeys(
     ['shift+c'],
@@ -111,7 +76,7 @@ const useInpaintingCanvasHotkeys = () => {
   useHotkeys(
     'esc',
     () => {
-      dispatch(resetCanvasInteractionState());
+      resetCanvasInteractionState();
     },
     {
       enabled: () => true,
@@ -143,6 +108,7 @@ const useInpaintingCanvasHotkeys = () => {
       if (tool !== 'move') {
         previousToolRef.current = tool;
         dispatch(setTool('move'));
+        resetToolInteractionState();
       }
 
       if (

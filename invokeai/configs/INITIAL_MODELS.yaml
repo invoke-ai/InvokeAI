@@ -32,9 +32,9 @@ sd-1/main/Analog-Diffusion:
    description: An SD-1.5 model trained on diverse analog photographs (2.13 GB)
    repo_id: wavymulder/Analog-Diffusion
    recommended: False
-sd-1/main/Deliberate:
+sd-1/main/Deliberate_v5:
    description: Versatile model that produces detailed images up to 768px (4.27 GB)
-   repo_id: XpucT/Deliberate
+   path: https://huggingface.co/XpucT/Deliberate/resolve/main/Deliberate_v5.safetensors
    recommended: False
 sd-1/main/Dungeons-and-Diffusion:
    description: Dungeons & Dragons characters (2.13 GB)
@@ -60,6 +60,9 @@ sd-1/main/trinart_stable_diffusion_v2:
    description: An SD-1.5 model finetuned with ~40K assorted high resolution manga/anime-style images (2.13 GB)
    repo_id: naclbit/trinart_stable_diffusion_v2
    recommended: False
+sd-1/controlnet/qrcode_monster:
+   repo_id: monster-labs/control_v1p_sd15_qrcode_monster
+   subfolder: v2
 sd-1/controlnet/canny:
    repo_id: lllyasviel/control_v11p_sd15_canny
    recommended: True
@@ -93,14 +96,27 @@ sd-1/controlnet/tile:
    repo_id: lllyasviel/control_v11f1e_sd15_tile
 sd-1/controlnet/ip2p:
    repo_id: lllyasviel/control_v11e_sd15_ip2p
+sd-1/t2i_adapter/canny-sd15:
+   repo_id: TencentARC/t2iadapter_canny_sd15v2
+sd-1/t2i_adapter/sketch-sd15:
+   repo_id: TencentARC/t2iadapter_sketch_sd15v2
+sd-1/t2i_adapter/depth-sd15:
+   repo_id: TencentARC/t2iadapter_depth_sd15v2
+sd-1/t2i_adapter/zoedepth-sd15:
+   repo_id: TencentARC/t2iadapter_zoedepth_sd15v1
+sdxl/t2i_adapter/canny-sdxl:
+   repo_id: TencentARC/t2i-adapter-canny-sdxl-1.0
+sdxl/t2i_adapter/zoedepth-sdxl:
+   repo_id: TencentARC/t2i-adapter-depth-zoe-sdxl-1.0
+sdxl/t2i_adapter/lineart-sdxl:
+   repo_id: TencentARC/t2i-adapter-lineart-sdxl-1.0
+sdxl/t2i_adapter/sketch-sdxl:
+   repo_id: TencentARC/t2i-adapter-sketch-sdxl-1.0
 sd-1/embedding/EasyNegative:
    path: https://huggingface.co/embed/EasyNegative/resolve/main/EasyNegative.safetensors
    recommended: True
 sd-1/embedding/ahx-beta-453407d:
    repo_id: sd-concepts-library/ahx-beta-453407d
-sd-1/lora/LowRA:
-   path: https://civitai.com/api/download/models/63006
-   recommended: True
 sd-1/lora/Ink scenery:
    path: https://civitai.com/api/download/models/83390
 sd-1/ip_adapter/ip_adapter_sd15:

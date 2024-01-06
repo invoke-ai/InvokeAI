@@ -123,7 +123,7 @@ class InvokeAIDiffuserComponent:
         # control_data should be type List[ControlNetData]
         # this loop covers both ControlNet (one ControlNetData in list)
         #      and MultiControlNet (multiple ControlNetData in list)
-        for i, control_datum in enumerate(control_data):
+        for _i, control_datum in enumerate(control_data):
             control_mode = control_datum.control_mode
             # soft_injection and cfg_injection are the two ControlNet control_mode booleans
             #     that are combined at higher level to make control_mode enum
@@ -214,7 +214,7 @@ class InvokeAIDiffuserComponent:
                     # add controlnet outputs together if have multiple controlnets
                     down_block_res_samples = [
                         samples_prev + samples_curr
-                        for samples_prev, samples_curr in zip(down_block_res_samples, down_samples)
+                        for samples_prev, samples_curr in zip(down_block_res_samples, down_samples, strict=True)
                     ]
                     mid_block_res_sample += mid_sample
 
@@ -260,7 +260,6 @@ class InvokeAIDiffuserComponent:
                 conditioning_data,
                 **kwargs,
             )
-
         else:
             (
                 unconditioned_next_x,
@@ -345,13 +344,14 @@ class InvokeAIDiffuserComponent:
 
         cross_attention_kwargs = None
         if conditioning_data.ip_adapter_conditioning is not None:
+            # Note that we 'stack' to produce tensors of shape (batch_size, num_ip_images, seq_len, token_len).
             cross_attention_kwargs = {
-                "ip_adapter_image_prompt_embeds": torch.cat(
-                    [
-                        conditioning_data.ip_adapter_conditioning.uncond_image_prompt_embeds,
-                        conditioning_data.ip_adapter_conditioning.cond_image_prompt_embeds,
-                    ]
-                )
+                "ip_adapter_image_prompt_embeds": [
+                    torch.stack(
+                        [ipa_conditioning.uncond_image_prompt_embeds, ipa_conditioning.cond_image_prompt_embeds]
+                    )
+                    for ipa_conditioning in conditioning_data.ip_adapter_conditioning
+                ]
             }
 
         added_cond_kwargs = None
@@ -409,6 +409,15 @@ class InvokeAIDiffuserComponent:
                 uncond_down_block.append(_uncond_down)
                 cond_down_block.append(_cond_down)
 
+        uncond_down_intrablock, cond_down_intrablock = None, None
+        down_intrablock_additional_residuals = kwargs.pop("down_intrablock_additional_residuals", None)
+        if down_intrablock_additional_residuals is not None:
+            uncond_down_intrablock, cond_down_intrablock = [], []
+            for down_intrablock in down_intrablock_additional_residuals:
+                _uncond_down, _cond_down = down_intrablock.chunk(2)
+                uncond_down_intrablock.append(_uncond_down)
+                cond_down_intrablock.append(_cond_down)
+
         uncond_mid_block, cond_mid_block = None, None
         mid_block_additional_residual = kwargs.pop("mid_block_additional_residual", None)
         if mid_block_additional_residual is not None:
@@ -417,8 +426,12 @@ class InvokeAIDiffuserComponent:
         # Run unconditional UNet denoising.
         cross_attention_kwargs = None
         if conditioning_data.ip_adapter_conditioning is not None:
+            # Note that we 'unsqueeze' to produce tensors of shape (batch_size=1, num_ip_images, seq_len, token_len).
             cross_attention_kwargs = {
-                "ip_adapter_image_prompt_embeds": conditioning_data.ip_adapter_conditioning.uncond_image_prompt_embeds
+                "ip_adapter_image_prompt_embeds": [
+                    torch.unsqueeze(ipa_conditioning.uncond_image_prompt_embeds, dim=0)
+                    for ipa_conditioning in conditioning_data.ip_adapter_conditioning
+                ]
             }
 
         added_cond_kwargs = None
@@ -436,6 +449,7 @@ class InvokeAIDiffuserComponent:
             cross_attention_kwargs=cross_attention_kwargs,
             down_block_additional_residuals=uncond_down_block,
             mid_block_additional_residual=uncond_mid_block,
+            down_intrablock_additional_residuals=uncond_down_intrablock,
             added_cond_kwargs=added_cond_kwargs,
             **kwargs,
         )
@@ -443,8 +457,12 @@ class InvokeAIDiffuserComponent:
         # Run conditional UNet denoising.
         cross_attention_kwargs = None
         if conditioning_data.ip_adapter_conditioning is not None:
+            # Note that we 'unsqueeze' to produce tensors of shape (batch_size=1, num_ip_images, seq_len, token_len).
             cross_attention_kwargs = {
-                "ip_adapter_image_prompt_embeds": conditioning_data.ip_adapter_conditioning.cond_image_prompt_embeds
+                "ip_adapter_image_prompt_embeds": [
+                    torch.unsqueeze(ipa_conditioning.cond_image_prompt_embeds, dim=0)
+                    for ipa_conditioning in conditioning_data.ip_adapter_conditioning
+                ]
             }
 
         added_cond_kwargs = None
@@ -461,6 +479,7 @@ class InvokeAIDiffuserComponent:
             cross_attention_kwargs=cross_attention_kwargs,
             down_block_additional_residuals=cond_down_block,
             mid_block_additional_residual=cond_mid_block,
+            down_intrablock_additional_residuals=cond_down_intrablock,
             added_cond_kwargs=added_cond_kwargs,
             **kwargs,
         )
@@ -484,6 +503,15 @@ class InvokeAIDiffuserComponent:
                 _uncond_down, _cond_down = down_block.chunk(2)
                 uncond_down_block.append(_uncond_down)
                 cond_down_block.append(_cond_down)
+
+        uncond_down_intrablock, cond_down_intrablock = None, None
+        down_intrablock_additional_residuals = kwargs.pop("down_intrablock_additional_residuals", None)
+        if down_intrablock_additional_residuals is not None:
+            uncond_down_intrablock, cond_down_intrablock = [], []
+            for down_intrablock in down_intrablock_additional_residuals:
+                _uncond_down, _cond_down = down_intrablock.chunk(2)
+                uncond_down_intrablock.append(_uncond_down)
+                cond_down_intrablock.append(_cond_down)
 
         uncond_mid_block, cond_mid_block = None, None
         mid_block_additional_residual = kwargs.pop("mid_block_additional_residual", None)
@@ -513,6 +541,7 @@ class InvokeAIDiffuserComponent:
             {"swap_cross_attn_context": cross_attn_processor_context},
             down_block_additional_residuals=uncond_down_block,
             mid_block_additional_residual=uncond_mid_block,
+            down_intrablock_additional_residuals=uncond_down_intrablock,
             added_cond_kwargs=added_cond_kwargs,
             **kwargs,
         )
@@ -532,6 +561,7 @@ class InvokeAIDiffuserComponent:
             {"swap_cross_attn_context": cross_attn_processor_context},
             down_block_additional_residuals=cond_down_block,
             mid_block_additional_residual=cond_mid_block,
+            down_intrablock_additional_residuals=cond_down_intrablock,
             added_cond_kwargs=added_cond_kwargs,
             **kwargs,
         )
@@ -612,7 +642,9 @@ class InvokeAIDiffuserComponent:
 
         deltas = None
         uncond_latents = None
-        weighted_cond_list = c_or_weighted_c_list if type(c_or_weighted_c_list) is list else [(c_or_weighted_c_list, 1)]
+        weighted_cond_list = (
+            c_or_weighted_c_list if isinstance(c_or_weighted_c_list, list) else [(c_or_weighted_c_list, 1)]
+        )
 
         # below is fugly omg
         conditionings = [uc] + [c for c, weight in weighted_cond_list]

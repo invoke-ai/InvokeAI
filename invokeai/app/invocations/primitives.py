@@ -5,10 +5,11 @@ from typing import Optional, Tuple
 import torch
 from pydantic import BaseModel, Field
 
+from invokeai.app.shared.fields import FieldDescriptions
+
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
     Input,
     InputField,
     InvocationContext,
@@ -61,12 +62,12 @@ class BooleanInvocation(BaseInvocation):
     title="Boolean Collection Primitive",
     tags=["primitives", "boolean", "collection"],
     category="primitives",
-    version="1.0.0",
+    version="1.0.1",
 )
 class BooleanCollectionInvocation(BaseInvocation):
     """A collection of boolean primitive values"""
 
-    collection: list[bool] = InputField(default_factory=list, description="The collection of boolean values")
+    collection: list[bool] = InputField(default=[], description="The collection of boolean values")
 
     def invoke(self, context: InvocationContext) -> BooleanCollectionOutput:
         return BooleanCollectionOutput(collection=self.collection)
@@ -110,12 +111,12 @@ class IntegerInvocation(BaseInvocation):
     title="Integer Collection Primitive",
     tags=["primitives", "integer", "collection"],
     category="primitives",
-    version="1.0.0",
+    version="1.0.1",
 )
 class IntegerCollectionInvocation(BaseInvocation):
     """A collection of integer primitive values"""
 
-    collection: list[int] = InputField(default_factory=list, description="The collection of integer values")
+    collection: list[int] = InputField(default=[], description="The collection of integer values")
 
     def invoke(self, context: InvocationContext) -> IntegerCollectionOutput:
         return IntegerCollectionOutput(collection=self.collection)
@@ -157,12 +158,12 @@ class FloatInvocation(BaseInvocation):
     title="Float Collection Primitive",
     tags=["primitives", "float", "collection"],
     category="primitives",
-    version="1.0.0",
+    version="1.0.1",
 )
 class FloatCollectionInvocation(BaseInvocation):
     """A collection of float primitive values"""
 
-    collection: list[float] = InputField(default_factory=list, description="The collection of float values")
+    collection: list[float] = InputField(default=[], description="The collection of float values")
 
     def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
         return FloatCollectionOutput(collection=self.collection)
@@ -204,12 +205,12 @@ class StringInvocation(BaseInvocation):
     title="String Collection Primitive",
     tags=["primitives", "string", "collection"],
     category="primitives",
-    version="1.0.0",
+    version="1.0.1",
 )
 class StringCollectionInvocation(BaseInvocation):
     """A collection of string primitive values"""
 
-    collection: list[str] = InputField(default_factory=list, description="The collection of string values")
+    collection: list[str] = InputField(default=[], description="The collection of string values")
 
     def invoke(self, context: InvocationContext) -> StringCollectionOutput:
         return StringCollectionOutput(collection=self.collection)
@@ -251,7 +252,9 @@ class ImageCollectionOutput(BaseInvocationOutput):
 
 
 @invocation("image", title="Image Primitive", tags=["primitives", "image"], category="primitives", version="1.0.0")
-class ImageInvocation(BaseInvocation):
+class ImageInvocation(
+    BaseInvocation,
+):
     """An image primitive value"""
 
     image: ImageField = InputField(description="The image to load")
@@ -291,7 +294,7 @@ class DenoiseMaskField(BaseModel):
     """An inpaint mask field"""
 
     mask_name: str = Field(description="The name of the mask image")
-    masked_latents_name: Optional[str] = Field(description="The name of the masked image latents")
+    masked_latents_name: Optional[str] = Field(default=None, description="The name of the masked image latents")
 
 
 @invocation_output("denoise_mask_output")
@@ -464,13 +467,13 @@ class ConditioningInvocation(BaseInvocation):
     title="Conditioning Collection Primitive",
     tags=["primitives", "conditioning", "collection"],
     category="primitives",
-    version="1.0.0",
+    version="1.0.1",
 )
 class ConditioningCollectionInvocation(BaseInvocation):
     """A collection of conditioning tensor primitive values"""
 
     collection: list[ConditioningField] = InputField(
-        default_factory=list,
+        default=[],
         description="The collection of conditioning tensors",
     )
 

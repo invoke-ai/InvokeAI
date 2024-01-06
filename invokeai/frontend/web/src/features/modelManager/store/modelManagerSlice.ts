@@ -1,0 +1,33 @@
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
+
+type ModelManagerState = {
+  searchFolder: string | null;
+  advancedAddScanModel: string | null;
+};
+
+const initialModelManagerState: ModelManagerState = {
+  searchFolder: null,
+  advancedAddScanModel: null,
+};
+
+export const modelManagerSlice = createSlice({
+  name: 'modelmanager',
+  initialState: initialModelManagerState,
+  reducers: {
+    setSearchFolder: (state, action: PayloadAction<string | null>) => {
+      state.searchFolder = action.payload;
+    },
+    setAdvancedAddScanModel: (state, action: PayloadAction<string | null>) => {
+      state.advancedAddScanModel = action.payload;
+    },
+  },
+});
+
+export const { setSearchFolder, setAdvancedAddScanModel } =
+  modelManagerSlice.actions;
+
+export default modelManagerSlice.reducer;
+
+export const selectModelManagerSlice = (state: RootState) => state.modelmanager;

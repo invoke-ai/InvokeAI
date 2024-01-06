@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import platform
 from contextlib import nullcontext
 from typing import Union
 
 import torch
-from packaging import version
 from torch import autocast
 
 from invokeai.app.services.config import InvokeAIAppConfig
@@ -37,7 +35,7 @@ def choose_precision(device: torch.device) -> str:
         device_name = torch.cuda.get_device_name(device)
         if not ("GeForce GTX 1660" in device_name or "GeForce GTX 1650" in device_name):
             return "float16"
-    elif device.type == "mps" and version.parse(platform.mac_ver()[0]) < version.parse("14.0.0"):
+    elif device.type == "mps":
         return "float16"
     return "float32"
 
@@ -46,7 +44,7 @@ def torch_dtype(device: torch.device) -> torch.dtype:
     if config.full_precision:
         return torch.float32
     if choose_precision(device) == "float16":
-        return torch.float16
+        return torch.bfloat16 if device.type == "cuda" else torch.float16
     else:
         return torch.float32
 

@@ -3,20 +3,15 @@ import {
   // useCancelByBatchIdsMutation,
   useClearQueueMutation,
   useEnqueueBatchMutation,
-  useEnqueueGraphMutation,
+  usePauseProcessorMutation,
   usePruneQueueMutation,
   useResumeProcessorMutation,
-  usePauseProcessorMutation,
 } from 'services/api/endpoints/queue';
 
 export const useIsQueueMutationInProgress = () => {
   const [_triggerEnqueueBatch, { isLoading: isLoadingEnqueueBatch }] =
     useEnqueueBatchMutation({
       fixedCacheKey: 'enqueueBatch',
-    });
-  const [_triggerEnqueueGraph, { isLoading: isLoadingEnqueueGraph }] =
-    useEnqueueGraphMutation({
-      fixedCacheKey: 'enqueueGraph',
     });
   const [_triggerResumeProcessor, { isLoading: isLoadingResumeProcessor }] =
     useResumeProcessorMutation({
@@ -44,7 +39,6 @@ export const useIsQueueMutationInProgress = () => {
   //   });
   return (
     isLoadingEnqueueBatch ||
-    isLoadingEnqueueGraph ||
     isLoadingResumeProcessor ||
     isLoadingPauseProcessor ||
     isLoadingCancelQueue ||

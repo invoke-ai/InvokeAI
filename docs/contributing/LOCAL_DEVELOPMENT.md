@@ -47,34 +47,9 @@ pip install ".[dev,test]"
 These are optional groups of packages which are defined within the `pyproject.toml`
 and will be required for testing the changes you make to the code.
 
-### Running Tests
+### Tests
 
-We use [pytest](https://docs.pytest.org/en/7.2.x/) for our test suite. Tests can
-be found under the `./tests` folder and can be run with a single `pytest`
-command. Optionally, to review test coverage you can append `--cov`.
-
-```zsh
-pytest --cov
-```
-
-Test outcomes and coverage will be reported in the terminal. In addition a more
-detailed report is created in both XML and HTML format in the `./coverage`
-folder. The HTML one in particular can help identify missing statements
-requiring tests to ensure coverage. This can be run by opening
-`./coverage/html/index.html`.
-
-For example.
-
-```zsh
-pytest --cov; open ./coverage/html/index.html
-```
-
-??? info "HTML coverage report output"
-
-    ![html-overview](../assets/contributing/html-overview.png)
-
-    ![html-detail](../assets/contributing/html-detail.png)
-
+See the [tests documentation](./TESTS.md) for information about running and writing tests.
 ### Reloading Changes
 
 Experimenting with changes to the Python source code is a drag if you have to re-start the server —
@@ -166,6 +141,23 @@ for the python interpreter to run in. This will default to your `venv` python,
 and so you'll have access to the same python environment as the InvokeAI app.
 
 This is _super_ handy.
+
+#### Enabling Type-Checking with Pylance
+
+We use python's typing system in InvokeAI. PR reviews will include checking that types are present and correct. We don't enforce types with `mypy` at this time, but that is on the horizon.
+
+Using a code analysis tool to automatically type check your code (and types) is very important when writing with types. These tools provide immediate feedback in your editor when types are incorrect, and following their suggestions lead to fewer runtime bugs.
+
+Pylance, installed at the beginning of this guide, is the de-facto python LSP (language server protocol). It provides type checking in the editor (among many other features). Once installed, you do need to enable type checking manually:
+
+- Open a python file
+- Look along the status bar in VSCode for `{ } Python`
+- Click the `{ }`
+- Turn type checking on - basic is fine
+
+You'll now see red squiggly lines where type issues are detected. Hover your cursor over the indicated symbols to see what's wrong.
+
+In 99% of cases when the type checker says there is a problem, there really is a problem, and you should take some time to understand and resolve what it is pointing out.
 
 #### Debugging configs with `launch.json`
 

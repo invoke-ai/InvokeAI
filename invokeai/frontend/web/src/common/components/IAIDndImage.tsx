@@ -1,46 +1,35 @@
-import {
+import type {
   ChakraProps,
-  Flex,
   FlexProps,
-  Icon,
-  Image,
-  useColorMode,
+  SystemStyleObject,
 } from '@chakra-ui/react';
+import { Flex, Icon, Image } from '@chakra-ui/react';
 import {
   IAILoadingImageFallback,
   IAINoContentFallback,
 } from 'common/components/IAIImageFallback';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
+import type {
+  TypesafeDraggableData,
+  TypesafeDroppableData,
+} from 'features/dnd/types';
 import ImageContextMenu from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
-import {
+import type {
   MouseEvent,
   ReactElement,
   ReactNode,
   SyntheticEvent,
-  memo,
-  useCallback,
-  useState,
 } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { FaImage, FaUpload } from 'react-icons/fa';
-import { ImageDTO, PostUploadAction } from 'services/api/types';
-import { mode } from 'theme/util/mode';
+import type { ImageDTO, PostUploadAction } from 'services/api/types';
+
 import IAIDraggable from './IAIDraggable';
 import IAIDroppable from './IAIDroppable';
 import SelectionOverlay from './SelectionOverlay';
-import {
-  TypesafeDraggableData,
-  TypesafeDroppableData,
-} from 'features/dnd/types';
 
-const defaultUploadElement = (
-  <Icon
-    as={FaUpload}
-    sx={{
-      boxSize: 16,
-    }}
-  />
-);
+const defaultUploadElement = <Icon as={FaUpload} boxSize={16} />;
 
 const defaultNoContentFallback = <IAINoContentFallback icon={FaImage} />;
 
@@ -67,6 +56,7 @@ type IAIDndImageProps = FlexProps & {
   withHoverOverlay?: boolean;
   children?: JSX.Element;
   uploadElement?: ReactNode;
+  dataTestId?: string;
 };
 
 const IAIDndImage = (props: IAIDndImageProps) => {
@@ -94,9 +84,9 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     children,
     onMouseOver,
     onMouseOut,
+    dataTestId,
   } = props;
 
-  const { colorMode } = useColorMode();
   const [isHovered, setIsHovered] = useState(false);
   const handleMouseOver = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
@@ -122,16 +112,30 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     isDisabled: isUploadDisabled,
   });
 
-  const uploadButtonStyles = isUploadDisabled
-    ? {}
-    : {
+  const uploadButtonStyles = useMemo<SystemStyleObject>(() => {
+    const styles: SystemStyleObject = {
+      minH: minSize,
+      w: 'full',
+      h: 'full',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 'base',
+      transitionProperty: 'common',
+      transitionDuration: '0.1s',
+      color: 'base.500',
+    };
+    if (!isUploadDisabled) {
+      Object.assign(styles, {
         cursor: 'pointer',
-        bg: mode('base.200', 'base.700')(colorMode),
+        bg: 'base.700',
         _hover: {
-          bg: mode('base.300', 'base.650')(colorMode),
-          color: mode('base.500', 'base.300')(colorMode),
+          bg: 'base.650',
+          color: 'base.300',
         },
-      };
+      });
+    }
+    return styles;
+  }, [isUploadDisabled, minSize]);
 
   return (
     <ImageContextMenu imageDTO={imageDTO}>
@@ -140,27 +144,23 @@ const IAIDndImage = (props: IAIDndImageProps) => {
           ref={ref}
           onMouseOver={handleMouseOver}
           onMouseOut={handleMouseOut}
-          sx={{
-            width: 'full',
-            height: 'full',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-            minW: minSize ? minSize : undefined,
-            minH: minSize ? minSize : undefined,
-            userSelect: 'none',
-            cursor: isDragDisabled || !imageDTO ? 'default' : 'pointer',
-          }}
+          width="full"
+          height="full"
+          alignItems="center"
+          justifyContent="center"
+          position="relative"
+          minW={minSize ? minSize : undefined}
+          minH={minSize ? minSize : undefined}
+          userSelect="none"
+          cursor={isDragDisabled || !imageDTO ? 'default' : 'pointer'}
         >
           {imageDTO && (
             <Flex
-              sx={{
-                w: 'full',
-                h: 'full',
-                position: fitContainer ? 'absolute' : 'relative',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+              w="full"
+              h="full"
+              position={fitContainer ? 'absolute' : 'relative'}
+              alignItems="center"
+              justifyContent="center"
             >
               <Image
                 src={thumbnail ? imageDTO.thumbnail_url : imageDTO.image_url}
@@ -175,14 +175,13 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                 }
                 onError={onError}
                 draggable={false}
-                sx={{
-                  w: imageDTO.width,
-                  objectFit: 'contain',
-                  maxW: 'full',
-                  maxH: 'full',
-                  borderRadius: 'base',
-                  ...imageSx,
-                }}
+                w={imageDTO.width}
+                objectFit="contain"
+                maxW="full"
+                maxH="full"
+                borderRadius="base"
+                sx={imageSx}
+                data-testid={dataTestId}
               />
               {withMetadataOverlay && (
                 <ImageMetadataOverlay imageDTO={imageDTO} />
@@ -195,21 +194,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
           )}
           {!imageDTO && !isUploadDisabled && (
             <>
-              <Flex
-                sx={{
-                  minH: minSize,
-                  w: 'full',
-                  h: 'full',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: 'base',
-                  transitionProperty: 'common',
-                  transitionDuration: '0.1s',
-                  color: mode('base.500', 'base.500')(colorMode),
-                  ...uploadButtonStyles,
-                }}
-                {...getUploadButtonProps()}
-              >
+              <Flex sx={uploadButtonStyles} {...getUploadButtonProps()}>
                 <input {...getUploadInputProps()} />
                 {uploadElement}
               </Flex>

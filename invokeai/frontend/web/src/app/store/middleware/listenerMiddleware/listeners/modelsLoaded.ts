@@ -1,26 +1,28 @@
 import { logger } from 'app/logging/logger';
-import { controlNetRemoved } from 'features/controlNet/store/controlNetSlice';
+import {
+  controlAdapterModelCleared,
+  selectAllControlNets,
+  selectAllIPAdapters,
+  selectAllT2IAdapters,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import {
   modelChanged,
   vaeSelected,
 } from 'features/parameters/store/generationSlice';
 import {
-  zMainOrOnnxModel,
-  zSDXLRefinerModel,
-  zVaeModel,
+  zParameterModel,
+  zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
-import {
-  refinerModelChanged,
-  setShouldUseSDXLRefiner,
-} from 'features/sdxl/store/sdxlSlice';
+import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
 import { forEach, some } from 'lodash-es';
 import {
-  mainModelsAdapter,
+  mainModelsAdapterSelectors,
   modelsApi,
-  vaeModelsAdapter,
+  vaeModelsAdapterSelectors,
 } from 'services/api/endpoints/models';
-import { TypeGuardFor } from 'services/api/types';
+import type { TypeGuardFor } from 'services/api/types';
+
 import { startAppListening } from '..';
 
 export const addModelsLoadedListener = () => {
@@ -41,7 +43,7 @@ export const addModelsLoadedListener = () => {
       );
 
       const currentModel = getState().generation.model;
-      const models = mainModelsAdapter.getSelectors().selectAll(action.payload);
+      const models = mainModelsAdapterSelectors.selectAll(action.payload);
 
       if (models.length === 0) {
         // No models loaded at all
@@ -62,7 +64,7 @@ export const addModelsLoadedListener = () => {
         return;
       }
 
-      const result = zMainOrOnnxModel.safeParse(models[0]);
+      const result = zParameterModel.safeParse(models[0]);
 
       if (!result.success) {
         log.error(
@@ -92,12 +94,11 @@ export const addModelsLoadedListener = () => {
       );
 
       const currentModel = getState().sdxl.refinerModel;
-      const models = mainModelsAdapter.getSelectors().selectAll(action.payload);
+      const models = mainModelsAdapterSelectors.selectAll(action.payload);
 
       if (models.length === 0) {
         // No models loaded at all
         dispatch(refinerModelChanged(null));
-        dispatch(setShouldUseSDXLRefiner(false));
         return;
       }
 
@@ -110,21 +111,10 @@ export const addModelsLoadedListener = () => {
           )
         : false;
 
-      if (isCurrentModelAvailable) {
+      if (!isCurrentModelAvailable) {
+        dispatch(refinerModelChanged(null));
         return;
       }
-
-      const result = zSDXLRefinerModel.safeParse(models[0]);
-
-      if (!result.success) {
-        log.error(
-          { error: result.error.format() },
-          'Failed to parse SDXL Refiner Model'
-        );
-        return;
-      }
-
-      dispatch(refinerModelChanged(result.data));
     },
   });
   startAppListening({
@@ -155,9 +145,7 @@ export const addModelsLoadedListener = () => {
         return;
       }
 
-      const firstModel = vaeModelsAdapter
-        .getSelectors()
-        .selectAll(action.payload)[0];
+      const firstModel = vaeModelsAdapterSelectors.selectAll(action.payload)[0];
 
       if (!firstModel) {
         // No custom VAEs loaded at all; use the default
@@ -165,7 +153,7 @@ export const addModelsLoadedListener = () => {
         return;
       }
 
-      const result = zVaeModel.safeParse(firstModel);
+      const result = zParameterVAEModel.safeParse(firstModel);
 
       if (!result.success) {
         log.error(
@@ -216,21 +204,71 @@ export const addModelsLoadedListener = () => {
         `ControlNet models loaded (${action.payload.ids.length})`
       );
 
-      const controlNets = getState().controlNet.controlNets;
-
-      forEach(controlNets, (controlNet, controlNetId) => {
-        const isControlNetAvailable = some(
+      selectAllControlNets(getState().controlAdapters).forEach((ca) => {
+        const isModelAvailable = some(
           action.payload.entities,
           (m) =>
-            m?.model_name === controlNet?.model?.model_name &&
-            m?.base_model === controlNet?.model?.base_model
+            m?.model_name === ca?.model?.model_name &&
+            m?.base_model === ca?.model?.base_model
         );
 
-        if (isControlNetAvailable) {
+        if (isModelAvailable) {
           return;
         }
 
-        dispatch(controlNetRemoved({ controlNetId }));
+        dispatch(controlAdapterModelCleared({ id: ca.id }));
+      });
+    },
+  });
+  startAppListening({
+    matcher: modelsApi.endpoints.getT2IAdapterModels.matchFulfilled,
+    effect: async (action, { getState, dispatch }) => {
+      // ControlNet models loaded - need to remove missing ControlNets from state
+      const log = logger('models');
+      log.info(
+        { models: action.payload.entities },
+        `ControlNet models loaded (${action.payload.ids.length})`
+      );
+
+      selectAllT2IAdapters(getState().controlAdapters).forEach((ca) => {
+        const isModelAvailable = some(
+          action.payload.entities,
+          (m) =>
+            m?.model_name === ca?.model?.model_name &&
+            m?.base_model === ca?.model?.base_model
+        );
+
+        if (isModelAvailable) {
+          return;
+        }
+
+        dispatch(controlAdapterModelCleared({ id: ca.id }));
+      });
+    },
+  });
+  startAppListening({
+    matcher: modelsApi.endpoints.getIPAdapterModels.matchFulfilled,
+    effect: async (action, { getState, dispatch }) => {
+      // ControlNet models loaded - need to remove missing ControlNets from state
+      const log = logger('models');
+      log.info(
+        { models: action.payload.entities },
+        `IP Adapter models loaded (${action.payload.ids.length})`
+      );
+
+      selectAllIPAdapters(getState().controlAdapters).forEach((ca) => {
+        const isModelAvailable = some(
+          action.payload.entities,
+          (m) =>
+            m?.model_name === ca?.model?.model_name &&
+            m?.base_model === ca?.model?.base_model
+        );
+
+        if (isModelAvailable) {
+          return;
+        }
+
+        dispatch(controlAdapterModelCleared({ id: ca.id }));
       });
     },
   });

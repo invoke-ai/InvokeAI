@@ -1,52 +1,44 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
-import { GroupConfig } from 'konva/lib/Group';
-import { isEqual } from 'lodash-es';
-
-import { Group, Rect } from 'react-konva';
-import IAICanvasImage from './IAICanvasImage';
+import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
+import type { GroupConfig } from 'konva/lib/Group';
 import { memo } from 'react';
+import { Group, Rect } from 'react-konva';
 
-const selector = createSelector(
-  [canvasSelector],
-  (canvas) => {
-    const {
-      layerState,
-      shouldShowStagingImage,
-      shouldShowStagingOutline,
-      boundingBoxCoordinates: { x, y },
-      boundingBoxDimensions: { width, height },
-    } = canvas;
+import IAICanvasImage from './IAICanvasImage';
 
-    const { selectedImageIndex, images } = layerState.stagingArea;
+const dash = [4, 4];
 
-    return {
-      currentStagingAreaImage:
-        images.length > 0 && selectedImageIndex !== undefined
-          ? images[selectedImageIndex]
-          : undefined,
-      isOnFirstImage: selectedImageIndex === 0,
-      isOnLastImage: selectedImageIndex === images.length - 1,
-      shouldShowStagingImage,
-      shouldShowStagingOutline,
-      x,
-      y,
-      width,
-      height,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
+const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
+  const {
+    layerState,
+    shouldShowStagingImage,
+    shouldShowStagingOutline,
+    boundingBoxCoordinates: stageBoundingBoxCoordinates,
+    boundingBoxDimensions: stageBoundingBoxDimensions,
+  } = canvas;
+
+  const { selectedImageIndex, images, boundingBox } = layerState.stagingArea;
+
+  return {
+    currentStagingAreaImage:
+      images.length > 0 && selectedImageIndex !== undefined
+        ? images[selectedImageIndex]
+        : undefined,
+    isOnFirstImage: selectedImageIndex === 0,
+    isOnLastImage: selectedImageIndex === images.length - 1,
+    shouldShowStagingImage,
+    shouldShowStagingOutline,
+    x: boundingBox?.x ?? stageBoundingBoxCoordinates.x,
+    y: boundingBox?.y ?? stageBoundingBoxCoordinates.y,
+    width: boundingBox?.width ?? stageBoundingBoxDimensions.width,
+    height: boundingBox?.height ?? stageBoundingBoxDimensions.height,
+  };
+});
 
 type Props = GroupConfig;
 
 const IAICanvasStagingArea = (props: Props) => {
-  const { ...rest } = props;
   const {
     currentStagingAreaImage,
     shouldShowStagingImage,
@@ -58,12 +50,12 @@ const IAICanvasStagingArea = (props: Props) => {
   } = useAppSelector(selector);
 
   return (
-    <Group {...rest}>
+    <Group {...props}>
       {shouldShowStagingImage && currentStagingAreaImage && (
         <IAICanvasImage canvasImage={currentStagingAreaImage} />
       )}
       {shouldShowStagingOutline && (
-        <Group>
+        <Group listening={false}>
           <Rect
             x={x}
             y={y}
@@ -72,16 +64,18 @@ const IAICanvasStagingArea = (props: Props) => {
             strokeWidth={1}
             stroke="white"
             strokeScaleEnabled={false}
+            listening={false}
           />
           <Rect
             x={x}
             y={y}
             width={width}
             height={height}
-            dash={[4, 4]}
+            dash={dash}
             strokeWidth={1}
             stroke="black"
             strokeScaleEnabled={false}
+            listening={false}
           />
         </Group>
       )}

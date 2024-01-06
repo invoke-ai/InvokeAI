@@ -12,7 +12,7 @@ To get started, take a look at our [new contributors checklist](newContributorCh
 Once you're setup, for more information, you can review the documentation specific to your area of interest:
 
 * #### [InvokeAI Architecure](../ARCHITECTURE.md)
-* #### [Frontend Documentation](development_guides/contributingToFrontend.md)
+* #### [Frontend Documentation](./contributingToFrontend.md)
 * #### [Node Documentation](../INVOCATIONS.md)
 * #### [Local Development](../LOCAL_DEVELOPMENT.md)
 
@@ -38,12 +38,12 @@ There are two paths to making a development contribution:
 
 If you need help, you can ask questions in the [#dev-chat](https://discord.com/channels/1020123559063990373/1049495067846524939) channel of the Discord.
 
-For frontend related work, **@pyschedelicious** is the best person to reach out to. 
+For frontend related work, **@psychedelicious** is the best person to reach out to. 
 
-For backend related work, please reach out to **@blessedcoolant**, **@lstein**, **@StAlKeR7779** or **@pyschedelicious**.
+For backend related work, please reach out to **@blessedcoolant**, **@lstein**, **@StAlKeR7779** or **@psychedelicious**.
 
 
 ## **What does the Code of Conduct mean for me?**
 
-Our [Code of Conduct](CODE_OF_CONDUCT.md)  means that you are responsible for treating everyone on the project with respect and courtesy regardless of their identity. If you are the victim of any inappropriate behavior or comments as described in our Code of Conduct, we are here for you and will do the best to ensure that the abuser is reprimanded appropriately, per our code.
+Our [Code of Conduct](../../CODE_OF_CONDUCT.md)  means that you are responsible for treating everyone on the project with respect and courtesy regardless of their identity. If you are the victim of any inappropriate behavior or comments as described in our Code of Conduct, we are here for you and will do the best to ensure that the abuser is reprimanded appropriately, per our code.
 

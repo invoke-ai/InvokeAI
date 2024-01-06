@@ -20,7 +20,7 @@ a single convenient digital artist-optimized user interface.
 ### * [Prompt Engineering](PROMPTS.md)
 Get the images you want with the InvokeAI  prompt engineering language.
 
-### * The [LoRA, LyCORIS and Textual Inversion Models](CONCEPTS.md)
+### * The [LoRA, LyCORIS, LCM-LoRA Models](CONCEPTS.md)
 Add custom subjects and styles using a variety of fine-tuned models.
 
 ### * [ControlNet](CONTROLNET.md)
@@ -28,7 +28,7 @@ Learn how to install and use ControlNet models for fine control over
 image output.
 
 ### * [Image-to-Image Guide](IMG2IMG.md)
-Use a seed image to build new creations in the CLI.
+Use a seed image to build new creations.
 
 ## Model Management
 
@@ -40,7 +40,7 @@ guide also covers optimizing models to load quickly.
 Teach an old model new tricks. Merge 2-3 models together to create a
 new model that combines characteristics of the originals.
 
-### * [Textual Inversion](TRAINING.md)
+### * [Textual Inversion](TEXTUAL_INVERSIONS.md)
 Personalize models by adding your own style or subjects.
 
 ## Other Features

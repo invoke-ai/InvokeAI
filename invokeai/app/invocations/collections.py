@@ -2,10 +2,10 @@
 
 
 import numpy as np
-from pydantic import validator
+from pydantic import ValidationInfo, field_validator
 
 from invokeai.app.invocations.primitives import IntegerCollectionOutput
-from invokeai.app.util.misc import SEED_MAX, get_random_seed
+from invokeai.app.util.misc import SEED_MAX
 
 from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
 
@@ -20,9 +20,9 @@ class RangeInvocation(BaseInvocation):
     stop: int = InputField(default=10, description="The stop of the range")
     step: int = InputField(default=1, description="The step of the range")
 
-    @validator("stop")
-    def stop_gt_start(cls, v, values):
-        if "start" in values and v <= values["start"]:
+    @field_validator("stop")
+    def stop_gt_start(cls, v: int, info: ValidationInfo):
+        if "start" in info.data and v <= info.data["start"]:
             raise ValueError("stop must be greater than start")
         return v
 
@@ -55,7 +55,7 @@ class RangeOfSizeInvocation(BaseInvocation):
     title="Random Range",
     tags=["range", "integer", "random", "collection"],
     category="collections",
-    version="1.0.0",
+    version="1.0.1",
     use_cache=False,
 )
 class RandomRangeInvocation(BaseInvocation):
@@ -65,10 +65,10 @@ class RandomRangeInvocation(BaseInvocation):
     high: int = InputField(default=np.iinfo(np.int32).max, description="The exclusive high value")
     size: int = InputField(default=1, description="The number of values to generate")
     seed: int = InputField(
+        default=0,
         ge=0,
         le=SEED_MAX,
         description="The seed for the RNG (omit for random)",
-        default_factory=get_random_seed,
     )
 
     def invoke(self, context: InvocationContext) -> IntegerCollectionOutput:

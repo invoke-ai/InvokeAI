@@ -1,11 +1,12 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from abc import ABC
 from typing import Optional
 
-from .graph import Graph, GraphExecutionState
-from .invocation_queue import InvocationQueueItem
+from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
+
+from .invocation_queue.invocation_queue_common import InvocationQueueItem
 from .invocation_services import InvocationServices
+from .shared.graph import Graph, GraphExecutionState
 
 
 class Invoker:
@@ -23,6 +24,7 @@ class Invoker:
         session_queue_item_id: int,
         session_queue_batch_id: str,
         graph_execution_state: GraphExecutionState,
+        workflow: Optional[WorkflowWithoutID] = None,
         invoke_all: bool = False,
     ) -> Optional[str]:
         """Determines the next node to invoke and enqueues it, preparing if needed.
@@ -44,6 +46,7 @@ class Invoker:
                 session_queue_batch_id=session_queue_batch_id,
                 graph_execution_state_id=graph_execution_state.id,
                 invocation_id=invocation.id,
+                workflow=workflow,
                 invoke_all=invoke_all,
             )
         )
@@ -84,7 +87,3 @@ class Invoker:
             self.__stop_service(getattr(self.services, service))
 
         self.services.queue.put(None)
-
-
-class InvocationProcessorABC(ABC):
-    pass

@@ -1,6 +1,12 @@
-import { PayloadAction, createSlice } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
+import { z } from 'zod';
 
-export type SeedBehaviour = 'PER_ITERATION' | 'PER_PROMPT';
+export const zSeedBehaviour = z.enum(['PER_ITERATION', 'PER_PROMPT']);
+export type SeedBehaviour = z.infer<typeof zSeedBehaviour>;
+export const isSeedBehaviour = (v: unknown): v is SeedBehaviour =>
+  zSeedBehaviour.safeParse(v).success;
 export interface DynamicPromptsState {
   maxPrompts: number;
   combinatorial: boolean;
@@ -39,7 +45,10 @@ export const dynamicPromptsSlice = createSlice({
     promptsChanged: (state, action: PayloadAction<string[]>) => {
       state.prompts = action.payload;
     },
-    parsingErrorChanged: (state, action: PayloadAction<string | undefined>) => {
+    parsingErrorChanged: (
+      state,
+      action: PayloadAction<string | null | undefined>
+    ) => {
       state.parsingError = action.payload;
     },
     isErrorChanged: (state, action: PayloadAction<boolean>) => {
@@ -66,3 +75,6 @@ export const {
 } = dynamicPromptsSlice.actions;
 
 export default dynamicPromptsSlice.reducer;
+
+export const selectDynamicPromptsSlice = (state: RootState) =>
+  state.dynamicPrompts;

@@ -7,13 +7,13 @@ import numpy as np
 from PIL import Image, ImageOps
 
 from invokeai.app.invocations.primitives import ColorField, ImageField, ImageOutput
-from invokeai.app.util.misc import SEED_MAX, get_random_seed
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.util.misc import SEED_MAX
 from invokeai.backend.image_util.cv2_inpaint import cv2_inpaint
 from invokeai.backend.image_util.lama import LaMA
 from invokeai.backend.image_util.patchmatch import PatchMatch
 
-from ..models.image import ImageCategory, ResourceOrigin
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
+from .baseinvocation import BaseInvocation, InputField, InvocationContext, WithMetadata, invocation
 from .image import PIL_RESAMPLING_MAP, PIL_RESAMPLING_MODES
 
 
@@ -118,8 +118,8 @@ def tile_fill_missing(im: Image.Image, tile_size: int = 16, seed: Optional[int] 
     return si
 
 
-@invocation("infill_rgba", title="Solid Color Infill", tags=["image", "inpaint"], category="inpaint", version="1.0.0")
-class InfillColorInvocation(BaseInvocation):
+@invocation("infill_rgba", title="Solid Color Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.0")
+class InfillColorInvocation(BaseInvocation, WithMetadata):
     """Infills transparent areas of an image with a solid color"""
 
     image: ImageField = InputField(description="The image to infill")
@@ -143,7 +143,8 @@ class InfillColorInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
-            workflow=self.workflow,
+            metadata=self.metadata,
+            workflow=context.workflow,
         )
 
         return ImageOutput(
@@ -153,17 +154,17 @@ class InfillColorInvocation(BaseInvocation):
         )
 
 
-@invocation("infill_tile", title="Tile Infill", tags=["image", "inpaint"], category="inpaint", version="1.0.0")
-class InfillTileInvocation(BaseInvocation):
+@invocation("infill_tile", title="Tile Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.1")
+class InfillTileInvocation(BaseInvocation, WithMetadata):
     """Infills transparent areas of an image with tiles of the image"""
 
     image: ImageField = InputField(description="The image to infill")
     tile_size: int = InputField(default=32, ge=1, description="The tile size (px)")
     seed: int = InputField(
+        default=0,
         ge=0,
         le=SEED_MAX,
         description="The seed to use for tile generation (omit for random)",
-        default_factory=get_random_seed,
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -179,7 +180,8 @@ class InfillTileInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
-            workflow=self.workflow,
+            metadata=self.metadata,
+            workflow=context.workflow,
         )
 
         return ImageOutput(
@@ -190,9 +192,9 @@ class InfillTileInvocation(BaseInvocation):
 
 
 @invocation(
-    "infill_patchmatch", title="PatchMatch Infill", tags=["image", "inpaint"], category="inpaint", version="1.0.0"
+    "infill_patchmatch", title="PatchMatch Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.0"
 )
-class InfillPatchMatchInvocation(BaseInvocation):
+class InfillPatchMatchInvocation(BaseInvocation, WithMetadata):
     """Infills transparent areas of an image using the PatchMatch algorithm"""
 
     image: ImageField = InputField(description="The image to infill")
@@ -232,7 +234,8 @@ class InfillPatchMatchInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
-            workflow=self.workflow,
+            metadata=self.metadata,
+            workflow=context.workflow,
         )
 
         return ImageOutput(
@@ -242,8 +245,8 @@ class InfillPatchMatchInvocation(BaseInvocation):
         )
 
 
-@invocation("infill_lama", title="LaMa Infill", tags=["image", "inpaint"], category="inpaint", version="1.0.0")
-class LaMaInfillInvocation(BaseInvocation):
+@invocation("infill_lama", title="LaMa Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.0")
+class LaMaInfillInvocation(BaseInvocation, WithMetadata):
     """Infills transparent areas of an image using the LaMa model"""
 
     image: ImageField = InputField(description="The image to infill")
@@ -260,6 +263,8 @@ class LaMaInfillInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            metadata=self.metadata,
+            workflow=context.workflow,
         )
 
         return ImageOutput(
@@ -269,8 +274,8 @@ class LaMaInfillInvocation(BaseInvocation):
         )
 
 
-@invocation("infill_cv2", title="CV2 Infill", tags=["image", "inpaint"], category="inpaint")
-class CV2InfillInvocation(BaseInvocation):
+@invocation("infill_cv2", title="CV2 Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.0")
+class CV2InfillInvocation(BaseInvocation, WithMetadata):
     """Infills transparent areas of an image using OpenCV Inpainting"""
 
     image: ImageField = InputField(description="The image to infill")
@@ -287,6 +292,8 @@ class CV2InfillInvocation(BaseInvocation):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
+            metadata=self.metadata,
+            workflow=context.workflow,
         )
 
         return ImageOutput(

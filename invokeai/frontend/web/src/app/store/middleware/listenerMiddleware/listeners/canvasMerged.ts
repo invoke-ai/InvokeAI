@@ -4,9 +4,10 @@ import { setMergedCanvas } from 'features/canvas/store/canvasSlice';
 import { getFullBaseLayerBlob } from 'features/canvas/util/getFullBaseLayerBlob';
 import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { addToast } from 'features/system/store/systemSlice';
-import { imagesApi } from 'services/api/endpoints/images';
-import { startAppListening } from '..';
 import { t } from 'i18next';
+import { imagesApi } from 'services/api/endpoints/images';
+
+import { startAppListening } from '..';
 
 export const addCanvasMergedListener = () => {
   startAppListening({
@@ -44,7 +45,7 @@ export const addCanvasMergedListener = () => {
       }
 
       const baseLayerRect = canvasBaseLayer.getClientRect({
-        relativeTo: canvasBaseLayer.getParent(),
+        relativeTo: canvasBaseLayer.getParent() ?? undefined,
       });
 
       const imageDTO = await dispatch(

@@ -1,13 +1,9 @@
 {
     "common": {
         "hotkeysLabel": "Skróty klawiszowe",
-        "themeLabel": "Motyw",
         "languagePickerLabel": "Wybór języka",
         "reportBugLabel": "Zgłoś błąd",
         "settingsLabel": "Ustawienia",
-        "darkTheme": "Ciemny",
-        "lightTheme": "Jasny",
-        "greenTheme": "Zielony",
         "img2img": "Obraz na obraz",
         "unifiedCanvas": "Tryb uniwersalny",
         "nodes": "Węzły",
@@ -43,7 +39,11 @@
         "statusUpscaling": "Powiększanie obrazu",
         "statusUpscalingESRGAN": "Powiększanie (ESRGAN)",
         "statusLoadingModel": "Wczytywanie modelu",
-        "statusModelChanged": "Zmieniono model"
+        "statusModelChanged": "Zmieniono model",
+        "githubLabel": "GitHub",
+        "discordLabel": "Discord",
+        "darkMode": "Tryb ciemny",
+        "lightMode": "Tryb jasny"
     },
     "gallery": {
         "generations": "Wygenerowane",
@@ -56,7 +56,6 @@
         "maintainAspectRatio": "Zachowaj proporcje",
         "autoSwitchNewImages": "Przełączaj na nowe obrazy",
         "singleColumnLayout": "Układ jednokolumnowy",
-        "pinGallery": "Przypnij galerię",
         "allImagesLoaded": "Koniec listy",
         "loadMore": "Wczytaj więcej",
         "noImagesInGallery": "Brak obrazów w galerii"
@@ -86,10 +85,6 @@
         "pinOptions": {
             "title": "Przypnij opcje",
             "desc": "Przypina panel opcji"
-        },
-        "toggleViewer": {
-            "title": "Przełącz podgląd",
-            "desc": "Otwiera lub zamyka widok podglądu"
         },
         "toggleGallery": {
             "title": "Przełącz galerię",
@@ -150,10 +145,6 @@
         "nextImage": {
             "title": "Następny obraz",
             "desc": "Aktywuje następny obraz z galerii"
-        },
-        "toggleGalleryPin": {
-            "title": "Przypnij galerię",
-            "desc": "Przypina lub odpina widok galerii"
         },
         "increaseGalleryThumbSize": {
             "title": "Powiększ obrazy",
@@ -274,7 +265,6 @@
         "cfgScale": "Skala CFG",
         "width": "Szerokość",
         "height": "Wysokość",
-        "sampler": "Próbkowanie",
         "seed": "Inicjator",
         "randomizeSeed": "Losowy inicjator",
         "shuffle": "Losuj",
@@ -296,10 +286,6 @@
         "hiresOptim": "Optymalizacja wys. rozdzielczości",
         "imageFit": "Przeskaluj oryginalny obraz",
         "codeformerFidelity": "Dokładność",
-        "seamSize": "Rozmiar",
-        "seamBlur": "Rozmycie",
-        "seamStrength": "Siła",
-        "seamSteps": "Kroki",
         "scaleBeforeProcessing": "Tryb skalowania",
         "scaledWidth": "Sk. do szer.",
         "scaledHeight": "Sk. do wys.",
@@ -310,8 +296,6 @@
         "infillScalingHeader": "Wypełnienie i skalowanie",
         "img2imgStrength": "Wpływ sugestii na obraz",
         "toggleLoopback": "Wł/wył sprzężenie zwrotne",
-        "invoke": "Wywołaj",
-        "promptPlaceholder": "W tym miejscu wprowadź swoje sugestie. [negatywne sugestie], (wzmocnienie), (osłabienie)--, po więcej opcji (np. swap lub blend) zajrzyj do dokumentacji",
         "sendTo": "Wyślij do",
         "sendToImg2Img": "Użyj w trybie \"Obraz na obraz\"",
         "sendToUnifiedCanvas": "Użyj w trybie uniwersalnym",
@@ -324,7 +308,6 @@
         "useAll": "Skopiuj wszystko",
         "useInitImg": "Użyj oryginalnego obrazu",
         "info": "Informacje",
-        "deleteImage": "Usuń obraz",
         "initialImage": "Oryginalny obraz",
         "showOptionsPanel": "Pokaż panel ustawień"
     },
@@ -334,7 +317,6 @@
         "saveSteps": "Zapisuj obrazy co X kroków",
         "confirmOnDelete": "Potwierdzaj usuwanie",
         "displayHelpIcons": "Wyświetlaj ikony pomocy",
-        "useCanvasBeta": "Nowy układ trybu uniwersalnego",
         "enableImageDebugging": "Włącz debugowanie obrazu",
         "resetWebUI": "Zresetuj interfejs",
         "resetWebUIDesc1": "Resetowanie interfejsu wyczyści jedynie dane i ustawienia zapisane w pamięci przeglądarki. Nie usunie żadnych obrazów z dysku.",
@@ -344,7 +326,6 @@
     "toast": {
         "tempFoldersEmptied": "Wyczyszczono folder tymczasowy",
         "uploadFailed": "Błąd przesyłania obrazu",
-        "uploadFailedMultipleImagesDesc": "Możliwe jest przesłanie tylko jednego obrazu na raz",
         "uploadFailedUnableToLoadDesc": "Błąd wczytywania obrazu",
         "downloadImageStarted": "Rozpoczęto pobieranie",
         "imageCopied": "Skopiowano obraz",
@@ -446,5 +427,27 @@
         "betaDarkenOutside": "Przyciemnienie",
         "betaLimitToBox": "Ogranicz do zaznaczenia",
         "betaPreserveMasked": "Zachowaj obszar"
+    },
+    "accessibility": {
+        "zoomIn": "Przybliż",
+        "exitViewer": "Wyjdź z podglądu",
+        "modelSelect": "Wybór modelu",
+        "invokeProgressBar": "Pasek postępu",
+        "reset": "Zerowanie",
+        "useThisParameter": "Użyj tego parametru",
+        "copyMetadataJson": "Kopiuj metadane JSON",
+        "uploadImage": "Wgrywanie obrazu",
+        "previousImage": "Poprzedni obraz",
+        "nextImage": "Następny obraz",
+        "zoomOut": "Oddal",
+        "rotateClockwise": "Obróć zgodnie ze wskazówkami zegara",
+        "rotateCounterClockwise": "Obróć przeciwnie do wskazówek zegara",
+        "flipHorizontally": "Odwróć horyzontalnie",
+        "flipVertically": "Odwróć wertykalnie",
+        "modifyConfig": "Modyfikuj ustawienia",
+        "toggleAutoscroll": "Przełącz autoprzewijanie",
+        "toggleLogViewer": "Przełącz podgląd logów",
+        "showOptionsPanel": "Pokaż panel opcji",
+        "menu": "Menu"
     }
 }

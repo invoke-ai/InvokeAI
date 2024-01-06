@@ -1,12 +1,11 @@
-import { components } from 'services/api/schema';
-import { O } from 'ts-toolbelt';
-import {
+import type { components } from 'services/api/schema';
+import type {
   BaseModelType,
   Graph,
   GraphExecutionState,
   ModelType,
   SubModelType,
-} from '../api/types';
+} from 'services/api/types';
 
 /**
  * A progress image, we get one for each step in the generation
@@ -16,11 +15,6 @@ export type ProgressImage = {
   width: number;
   height: number;
 };
-
-export type AnyInvocationType = O.Required<
-  NonNullable<NonNullable<Graph['nodes']>[string]>,
-  'type'
->['type'];
 
 export type AnyInvocation = NonNullable<NonNullable<Graph['nodes']>[string]>;
 
@@ -170,16 +164,40 @@ export type InvocationRetrievalErrorEvent = {
  */
 export type QueueItemStatusChangedEvent = {
   queue_id: string;
-  queue_item_id: number;
-  queue_batch_id: string;
-  session_id: string;
-  graph_execution_state_id: string;
-  status: components['schemas']['SessionQueueItemDTO']['status'];
-  error: string | undefined;
-  created_at: string;
-  updated_at: string;
-  started_at: string | undefined;
-  completed_at: string | undefined;
+  queue_item: {
+    queue_id: string;
+    item_id: number;
+    batch_id: string;
+    session_id: string;
+    status: components['schemas']['SessionQueueItemDTO']['status'];
+    error: string | undefined;
+    created_at: string;
+    updated_at: string;
+    started_at: string | undefined;
+    completed_at: string | undefined;
+  };
+  batch_status: {
+    queue_id: string;
+    batch_id: string;
+    pending: number;
+    in_progress: number;
+    completed: number;
+    failed: number;
+    canceled: number;
+    total: number;
+  };
+  queue_status: {
+    queue_id: string;
+    item_id?: number;
+    batch_id?: string;
+    session_id?: string;
+    pending: number;
+    in_progress: number;
+    completed: number;
+    failed: number;
+    canceled: number;
+    total: number;
+  };
 };
 
 export type ClientEmitSubscribeQueue = {

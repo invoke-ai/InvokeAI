@@ -1,17 +1,23 @@
+import type { SystemStyleObject } from '@chakra-ui/react';
 import { Box, Flex } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
+import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
+import { $shift } from 'common/hooks/useGlobalModifiers';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
-import {
-  ImageDTOsDraggableData,
+import type {
   ImageDraggableData,
+  ImageDTOsDraggableData,
   TypesafeDraggableData,
 } from 'features/dnd/types';
+import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
 import { useMultiselect } from 'features/gallery/hooks/useMultiselect';
-import { MouseEvent, memo, useCallback, useMemo, useState } from 'react';
+import { useScrollIntoView } from 'features/gallery/hooks/useScrollIntoView';
+import type { MouseEvent } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaTrash } from 'react-icons/fa';
 import { MdStar, MdStarBorder } from 'react-icons/md';
@@ -20,23 +26,34 @@ import {
   useStarImagesMutation,
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
-import IAIDndImageIcon from '../../../../common/components/IAIDndImageIcon';
 
+const imageSx: SystemStyleObject = { w: 'full', h: 'full' };
+const imageIconStyleOverrides: SystemStyleObject = {
+  bottom: 2,
+  top: 'auto',
+};
 interface HoverableImageProps {
   imageName: string;
+  index: number;
 }
 
 const GalleryImage = (props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
   const { imageName } = props;
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName);
-  const shift = useAppSelector((state) => state.hotkeys.shift);
+  const shift = useStore($shift);
   const { t } = useTranslation();
 
   const { handleClick, isSelected, selection, selectionCount } =
     useMultiselect(imageDTO);
 
   const customStarUi = useStore($customStarUI);
+
+  const imageContainerRef = useScrollIntoView(
+    isSelected,
+    props.index,
+    selectionCount
+  );
 
   const handleDelete = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
@@ -112,20 +129,29 @@ const GalleryImage = (props: HoverableImageProps) => {
     return '';
   }, [imageDTO?.starred, customStarUi]);
 
+  const dataTestId = useMemo(
+    () => getGalleryImageDataTestId(imageDTO?.image_name),
+    [imageDTO?.image_name]
+  );
+
   if (!imageDTO) {
     return <IAIFillSkeleton />;
   }
 
   return (
-    <Box sx={{ w: 'full', h: 'full', touchAction: 'none' }}>
+    <Box
+      w="full"
+      h="full"
+      className="gallerygrid-image"
+      data-testid={dataTestId}
+    >
       <Flex
+        ref={imageContainerRef}
         userSelect="none"
-        sx={{
-          position: 'relative',
-          justifyContent: 'center',
-          alignItems: 'center',
-          aspectRatio: '1/1',
-        }}
+        position="relative"
+        justifyContent="center"
+        alignItems="center"
+        aspectRatio="1/1"
       >
         <IAIDndImage
           onClick={handleClick}
@@ -133,7 +159,7 @@ const GalleryImage = (props: HoverableImageProps) => {
           draggableData={draggableData}
           isSelected={isSelected}
           minSize={0}
-          imageSx={{ w: 'full', h: 'full' }}
+          imageSx={imageSx}
           isDropDisabled={true}
           isUploadDisabled={true}
           thumbnail={true}
@@ -153,10 +179,7 @@ const GalleryImage = (props: HoverableImageProps) => {
                 onClick={handleDelete}
                 icon={<FaTrash />}
                 tooltip={t('gallery.deleteImage')}
-                styleOverrides={{
-                  bottom: 2,
-                  top: 'auto',
-                }}
+                styleOverrides={imageIconStyleOverrides}
               />
             )}
           </>

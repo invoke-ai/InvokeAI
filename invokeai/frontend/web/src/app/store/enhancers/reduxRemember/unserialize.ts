@@ -1,5 +1,5 @@
 import { initialCanvasState } from 'features/canvas/store/canvasSlice';
-import { initialControlNetState } from 'features/controlNet/store/controlNetSlice';
+import { initialControlAdapterState } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { initialDynamicPromptsState } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { initialGalleryState } from 'features/gallery/store/gallerySlice';
 import { initialNodesState } from 'features/nodes/store/nodesSlice';
@@ -8,10 +8,9 @@ import { initialPostprocessingState } from 'features/parameters/store/postproces
 import { initialSDXLState } from 'features/sdxl/store/sdxlSlice';
 import { initialConfigState } from 'features/system/store/configSlice';
 import { initialSystemState } from 'features/system/store/systemSlice';
-import { initialHotkeysState } from 'features/ui/store/hotkeysSlice';
 import { initialUIState } from 'features/ui/store/uiSlice';
 import { defaultsDeep } from 'lodash-es';
-import { UnserializeFunction } from 'redux-remember';
+import type { UnserializeFunction } from 'redux-remember';
 
 const initialStates: {
   [key: string]: object; // TODO: type this properly
@@ -24,8 +23,7 @@ const initialStates: {
   system: initialSystemState,
   config: initialConfigState,
   ui: initialUIState,
-  hotkeys: initialHotkeysState,
-  controlNet: initialControlNetState,
+  controlAdapters: initialControlAdapterState,
   dynamicPrompts: initialDynamicPromptsState,
   sdxl: initialSDXLState,
 };

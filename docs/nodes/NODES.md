@@ -4,12 +4,12 @@ The workflow editor is a blank canvas allowing for the use of individual functio
 
 If you're not familiar with Diffusion, take a look at our [Diffusion Overview.](../help/diffusion.md) Understanding how diffusion works will enable you to more easily use the Workflow Editor and build workflows to suit your needs.
 
-## UI Features
+## Features
 
 ### Linear View
 The Workflow Editor allows you to create a UI for your workflow, to make it easier to iterate on your generations. 
 
-To add an input to the Linear UI, right click on the input and select "Add to Linear View".
+To add an input to the Linear UI, right click on the input label and select "Add to Linear View".
 
 The Linear UI View will also be part of the saved workflow, allowing you share workflows and enable other to use them, regardless of complexity. 
 
@@ -24,6 +24,10 @@ Any node or input field can be renamed in the workflow editor. If the input fiel
 * Ctrl+V to paste a node
 * Backspace/Delete to delete a node
 * Shift+Click to drag and select multiple nodes 
+
+### Node Caching 
+
+Nodes have a "Use Cache" option in their footer. This allows for performance improvements by using the previously cached values during the workflow processing. 
 
 
 ## Important Concepts 

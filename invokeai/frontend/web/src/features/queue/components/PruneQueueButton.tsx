@@ -1,7 +1,8 @@
+import { usePruneQueue } from 'features/queue/hooks/usePruneQueue';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BsStars } from 'react-icons/bs';
-import { usePruneQueue } from '../hooks/usePruneQueue';
+
 import QueueButton from './common/QueueButton';
 
 type Props = {
@@ -21,7 +22,7 @@ const PruneQueueButton = ({ asIconButton }: Props) => {
       tooltip={t('queue.pruneTooltip', { item_count: finishedCount })}
       icon={<BsStars />}
       onClick={pruneQueue}
-      colorScheme="blue"
+      colorScheme="invokeBlue"
     />
   );
 };

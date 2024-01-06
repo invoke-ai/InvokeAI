@@ -1,13 +1,15 @@
 name: PyPI Release
 
 on:
-  push:
-    paths:
-      - 'invokeai/version/invokeai_version.py'
   workflow_dispatch:
+    inputs:
+      publish_package:
+        description: 'Publish build on PyPi? [true/false]'
+        required: true
+        default: 'false'
 
 jobs:
-  release:
+  build-and-release:
     if: github.repository == 'invoke-ai/InvokeAI'
     runs-on: ubuntu-22.04
     env:
@@ -15,20 +17,44 @@ jobs:
       TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
       TWINE_NON_INTERACTIVE: 1
     steps:
-      - name: checkout sources
-        uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: install deps
+      - name: Setup Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8.12.1'
+
+      - name: Install frontend dependencies
+        run: pnpm install --prefer-frozen-lockfile
+        working-directory: invokeai/frontend/web
+
+      - name: Build frontend
+        run: pnpm run build
+        working-directory: invokeai/frontend/web
+
+      - name: Install python dependencies
         run: pip install --upgrade build twine
 
-      - name: build package
+      - name: Build python package
         run: python3 -m build
 
-      - name: check distribution
+      - name: Upload build as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Check distribution
         run: twine check dist/*
 
-      - name: check PyPI versions
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/v2.3'
+      - name: Check PyPI versions
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
         run: |
           pip install --upgrade requests
           python -c "\
@@ -36,6 +62,6 @@ jobs:
           EXISTS=scripts.pypi_helper.local_on_pypi(); \
           print(f'PACKAGE_EXISTS={EXISTS}')" >> $GITHUB_ENV
 
-      - name: upload package
-        if: env.PACKAGE_EXISTS == 'False' && env.TWINE_PASSWORD != ''
+      - name: Publish build on PyPi
+        if: env.PACKAGE_EXISTS == 'False' && env.TWINE_PASSWORD != '' && github.event.inputs.publish_package == 'true'
         run: twine upload dist/*

@@ -32,7 +32,7 @@ from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionS
 from huggingface_hub import HfFolder
 from huggingface_hub import login as hf_hub_login
 from omegaconf import OmegaConf
-from pydantic.error_wrappers import ValidationError
+from pydantic import ValidationError
 from tqdm import tqdm
 from transformers import AutoFeatureExtractor, BertTokenizerFast, CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 
@@ -70,7 +70,6 @@ def get_literal_fields(field) -> list[Any]:
 config = InvokeAIAppConfig.get_config()
 
 Model_dir = "models"
-
 Default_config_file = config.model_conf_path
 SD_Configs = config.legacy_conf_path
 
@@ -198,7 +197,7 @@ def download_with_progress_bar(model_url: str, model_dest: str, label: str = "th
 
 def download_conversion_models():
     target_dir = config.models_path / "core/convert"
-    kwargs = dict()  # for future use
+    kwargs = {}  # for future use
     try:
         logger.info("Downloading core tokenizers and text encoders")
 
@@ -253,26 +252,26 @@ def download_conversion_models():
 def download_realesrgan():
     logger.info("Installing ESRGAN Upscaling models...")
     URLs = [
-        dict(
-            url="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
-            dest="core/upscaling/realesrgan/RealESRGAN_x4plus.pth",
-            description="RealESRGAN_x4plus.pth",
-        ),
-        dict(
-            url="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth",
-            dest="core/upscaling/realesrgan/RealESRGAN_x4plus_anime_6B.pth",
-            description="RealESRGAN_x4plus_anime_6B.pth",
-        ),
-        dict(
-            url="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
-            dest="core/upscaling/realesrgan/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
-            description="ESRGAN_SRx4_DF2KOST_official.pth",
-        ),
-        dict(
-            url="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth",
-            dest="core/upscaling/realesrgan/RealESRGAN_x2plus.pth",
-            description="RealESRGAN_x2plus.pth",
-        ),
+        {
+            "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+            "dest": "core/upscaling/realesrgan/RealESRGAN_x4plus.pth",
+            "description": "RealESRGAN_x4plus.pth",
+        },
+        {
+            "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth",
+            "dest": "core/upscaling/realesrgan/RealESRGAN_x4plus_anime_6B.pth",
+            "description": "RealESRGAN_x4plus_anime_6B.pth",
+        },
+        {
+            "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
+            "dest": "core/upscaling/realesrgan/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
+            "description": "ESRGAN_SRx4_DF2KOST_official.pth",
+        },
+        {
+            "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth",
+            "dest": "core/upscaling/realesrgan/RealESRGAN_x2plus.pth",
+            "description": "RealESRGAN_x2plus.pth",
+        },
     ]
     for model in URLs:
         download_with_progress_bar(model["url"], config.models_path / model["dest"], model["description"])
@@ -458,7 +457,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         )
         self.add_widget_intelligent(
             npyscreen.TitleFixedText,
-            name="Model RAM cache size (GB). Make this at least large enough to hold a single full model.",
+            name="Model RAM cache size (GB). Make this at least large enough to hold a single full model (2GB for SD-1, 6GB for SDXL).",
             begin_entry_at=0,
             editable=False,
             color="CONTROL",
@@ -651,8 +650,19 @@ def edit_opts(program_opts: Namespace, invokeai_opts: Namespace) -> argparse.Nam
     return editApp.new_opts()
 
 
+def default_ramcache() -> float:
+    """Run a heuristic for the default RAM cache based on installed RAM."""
+
+    # Note that on my 64 GB machine, psutil.virtual_memory().total gives 62 GB,
+    # So we adjust everthing down a bit.
+    return (
+        15.0 if MAX_RAM >= 60 else 7.5 if MAX_RAM >= 30 else 4 if MAX_RAM >= 14 else 2.1
+    )  # 2.1 is just large enough for sd 1.5 ;-)
+
+
 def default_startup_options(init_file: Path) -> Namespace:
     opts = InvokeAIAppConfig.get_config()
+    opts.ram = opts.ram or default_ramcache()
     return opts
 
 
@@ -670,7 +680,7 @@ def default_user_selections(program_opts: Namespace) -> InstallSelections:
         if program_opts.default_only
         else [models[x].path or models[x].repo_id for x in installer.recommended_models()]
         if program_opts.yes_to_all
-        else list(),
+        else [],
     )
 
 
@@ -783,7 +793,11 @@ def migrate_init_file(legacy_format: Path):
     old = legacy_parser.parse_args([f"@{str(legacy_format)}"])
     new = InvokeAIAppConfig.get_config()
 
-    fields = [x for x, y in InvokeAIAppConfig.__fields__.items() if y.field_info.extra.get("category") != "DEPRECATED"]
+    fields = [
+        x
+        for x, y in InvokeAIAppConfig.model_fields.items()
+        if (y.json_schema_extra.get("category", None) if y.json_schema_extra else None) != "DEPRECATED"
+    ]
     for attr in fields:
         if hasattr(old, attr):
             try:

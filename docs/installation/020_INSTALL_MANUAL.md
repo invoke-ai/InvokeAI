@@ -32,7 +32,7 @@ gaming):
 
 * **Python**
 
-    version 3.9 through 3.11
+    version 3.10 through 3.11
 
 * **CUDA Tools**
 
@@ -65,7 +65,7 @@ gaming):
 To install InvokeAI with virtual environments and the PIP package
 manager, please follow these steps:
 
-1.  Please make sure you are using Python 3.9 through 3.11. The rest of the install
+1.  Please make sure you are using Python 3.10 through 3.11. The rest of the install
     procedure depends on this and will not work with other versions:
 
     ```bash
@@ -148,7 +148,7 @@ manager, please follow these steps:
     === "CUDA (NVidia)"
 
         ```bash
-        pip install "InvokeAI[xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu118
+        pip install "InvokeAI[xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
         ```
 
     === "ROCm (AMD)"
@@ -256,6 +256,10 @@ manager, please follow these steps:
         *highly recommended** if your virtual environment is located outside of
         your runtime directory.
 
+    !!! tip
+
+        On linux, it is recommended to run invokeai with the following env var: `MALLOC_MMAP_THRESHOLD_=1048576`. For example: `MALLOC_MMAP_THRESHOLD_=1048576 invokeai --web`. This helps to prevent memory fragmentation that can lead to memory accumulation over time. This env var is set automatically when running via `invoke.sh`.
+
 10.  Render away!
 
     Browse the [features](../features/index.md) section to learn about all the
@@ -289,6 +293,19 @@ manager, please follow these steps:
 
 ## Developer Install
 
+!!! warning
+
+    InvokeAI uses a SQLite database. By running on `main`, you accept responsibility for your database. This
+    means making regular backups (especially before pulling) and/or fixing it yourself in the event that a
+    PR introduces a schema change.
+    
+    If you don't need persistent backend storage, you can use an ephemeral in-memory database by setting
+    `use_memory_db: true` under `Path:` in your `invokeai.yaml` file.
+
+    If this is untenable, you should run the application via the official installer or a manual install of the
+    python package from pypi. These releases will not break your database.
+
+
 If you have an interest in how InvokeAI works, or you would like to
 add features or bugfixes, you are encouraged to install the source
 code for InvokeAI. For this to work, you will need to install the
@@ -296,8 +313,18 @@ code for InvokeAI. For this to work, you will need to install the
 on your system, please see the [Git Installation
 Guide](https://github.com/git-guides/install-git)
 
+You will also need to install the [frontend development toolchain](https://github.com/invoke-ai/InvokeAI/blob/main/docs/contributing/contribution_guides/contributingToFrontend.md).
+
+If you have a "normal" installation, you should create a totally separate virtual environment for the git-based installation, else the two may interfere.
+
+> **Why do I need the frontend toolchain**?
+>
+> The InvokeAI project uses trunk-based development. That means our `main` branch is the development branch, and releases are tags on that branch. Because development is very active, we don't keep an updated build of the UI in `main` - we only build it for production releases.
+>
+> That means that between releases, to have a functioning application when running directly from the repo, you will need to run the UI in dev mode or build it regularly (any time the UI code changes).
+
 1. Create a fork of the InvokeAI repository through the GitHub UI or [this link](https://github.com/invoke-ai/InvokeAI/fork) 
-1. From the command line, run this command:
+2. From the command line, run this command:
    ```bash
    git clone https://github.com/<your_github_username>/InvokeAI.git
    ```
@@ -305,15 +332,15 @@ Guide](https://github.com/git-guides/install-git)
     This will create a directory named `InvokeAI` and populate it with the
     full source code from your fork of the InvokeAI repository.
 
-2. Activate the InvokeAI virtual environment as per step (4) of the manual
+3. Activate the InvokeAI virtual environment as per step (4) of the manual
 installation protocol (important!)
 
-3. Enter the InvokeAI repository directory and run one of these
+4. Enter the InvokeAI repository directory and run one of these
    commands, based on your GPU:
 
     === "CUDA (NVidia)"
         ```bash
-        pip install -e .[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu118
+        pip install -e .[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
         ```
 
     === "ROCm (AMD)"
@@ -334,11 +361,15 @@ installation protocol (important!)
     Be sure to pass `-e` (for an editable install) and don't forget the
     dot ("."). It is part of the command.
 
-    You can now run `invokeai` and its related commands. The code will be
+5.  Install the [frontend toolchain](https://github.com/invoke-ai/InvokeAI/blob/main/docs/contributing/contribution_guides/contributingToFrontend.md) and do a production build of the UI as described.
+
+6.  You can now run `invokeai` and its related commands. The code will be
     read from the repository, so that you can edit the .py source files
     and watch the code's behavior change.
 
-4.  If you wish to contribute to the InvokeAI project, you are
+    When you pull in new changes to the repo, be sure to re-build the UI.
+
+7.  If you wish to contribute to the InvokeAI project, you are
     encouraged to establish a GitHub account and "fork"
     https://github.com/invoke-ai/InvokeAI into your own copy of the
     repository. You can then use GitHub functions to create and submit
@@ -357,7 +388,7 @@ you can do so using this unsupported recipe:
 mkdir ~/invokeai
 conda create -n invokeai python=3.10
 conda activate invokeai
-pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu118
+pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
 invokeai-configure --root ~/invokeai
 invokeai --root ~/invokeai --web
 ```
@@ -370,3 +401,5 @@ environment variable INVOKEAI_ROOT to point to the installation directory.
 
 Note that if you run into problems with the Conda installation, the InvokeAI
 staff will **not** be able to help you out. Caveat Emptor!
+
+[dev-chat]: https://discord.com/channels/1020123559063990373/1049495067846524939

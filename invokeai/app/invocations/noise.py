@@ -2,16 +2,16 @@
 
 
 import torch
-from pydantic import validator
+from pydantic import field_validator
 
 from invokeai.app.invocations.latent import LatentsField
-from invokeai.app.util.misc import SEED_MAX, get_random_seed
+from invokeai.app.shared.fields import FieldDescriptions
+from invokeai.app.util.misc import SEED_MAX
 
 from ...backend.util.devices import choose_torch_device, torch_dtype
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    FieldDescriptions,
     InputField,
     InvocationContext,
     OutputField,
@@ -65,7 +65,7 @@ Nodes
 class NoiseOutput(BaseInvocationOutput):
     """Invocation noise output"""
 
-    noise: LatentsField = OutputField(default=None, description=FieldDescriptions.noise)
+    noise: LatentsField = OutputField(description=FieldDescriptions.noise)
     width: int = OutputField(description=FieldDescriptions.width)
     height: int = OutputField(description=FieldDescriptions.height)
 
@@ -78,15 +78,21 @@ def build_noise_output(latents_name: str, latents: torch.Tensor, seed: int):
     )
 
 
-@invocation("noise", title="Noise", tags=["latents", "noise"], category="latents", version="1.0.0")
+@invocation(
+    "noise",
+    title="Noise",
+    tags=["latents", "noise"],
+    category="latents",
+    version="1.0.1",
+)
 class NoiseInvocation(BaseInvocation):
     """Generates latent noise."""
 
     seed: int = InputField(
+        default=0,
         ge=0,
         le=SEED_MAX,
         description=FieldDescriptions.seed,
-        default_factory=get_random_seed,
     )
     width: int = InputField(
         default=512,
@@ -105,7 +111,7 @@ class NoiseInvocation(BaseInvocation):
         description="Use CPU for noise generation (for reproducible results across platforms)",
     )
 
-    @validator("seed", pre=True)
+    @field_validator("seed", mode="before")
     def modulo_seed(cls, v):
         """Returns the seed modulo (SEED_MAX + 1) to ensure it is within the valid range."""
         return v % (SEED_MAX + 1)
