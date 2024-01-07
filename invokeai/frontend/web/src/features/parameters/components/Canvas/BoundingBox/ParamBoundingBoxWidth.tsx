@@ -2,21 +2,32 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import {
-  CANVAS_GRID_SIZE_COARSE,
-  CANVAS_GRID_SIZE_FINE,
-} from 'features/canvas/store/constants';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamBoundingBoxWidth = () => {
-  const isStaging = useAppSelector(isStagingSelector);
-  const initial = useAppSelector(selectOptimalDimension);
-  const ctx = useImageSizeContext();
   const { t } = useTranslation();
-
+  const ctx = useImageSizeContext();
+  const isStaging = useAppSelector(isStagingSelector);
+  const optimalDimension = useAppSelector(selectOptimalDimension);
+  const sliderMin = useAppSelector(
+    (s) => s.config.sd.boundingBoxWidth.sliderMin
+  );
+  const sliderMax = useAppSelector(
+    (s) => s.config.sd.boundingBoxWidth.sliderMax
+  );
+  const numberInputMin = useAppSelector(
+    (s) => s.config.sd.boundingBoxWidth.numberInputMin
+  );
+  const numberInputMax = useAppSelector(
+    (s) => s.config.sd.boundingBoxWidth.numberInputMax
+  );
+  const coarseStep = useAppSelector(
+    (s) => s.config.sd.boundingBoxWidth.coarseStep
+  );
+  const fineStep = useAppSelector((s) => s.config.sd.boundingBoxWidth.fineStep);
   const onChange = useCallback(
     (v: number) => {
       ctx.widthChanged(v);
@@ -27,15 +38,16 @@ const ParamBoundingBoxWidth = () => {
   return (
     <InvControl label={t('parameters.width')} isDisabled={isStaging}>
       <InvSlider
-        min={64}
-        max={1536}
-        step={CANVAS_GRID_SIZE_COARSE}
-        fineStep={CANVAS_GRID_SIZE_FINE}
+        min={sliderMin}
+        max={sliderMax}
+        step={coarseStep}
+        fineStep={fineStep}
         value={ctx.width}
-        defaultValue={initial}
+        defaultValue={optimalDimension}
         onChange={onChange}
         withNumberInput
-        numberInputMax={4096}
+        numberInputMin={numberInputMin}
+        numberInputMax={numberInputMax}
         marks
       />
     </InvControl>

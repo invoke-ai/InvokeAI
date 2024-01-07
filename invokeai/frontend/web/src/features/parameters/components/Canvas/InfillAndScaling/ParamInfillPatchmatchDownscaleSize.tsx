@@ -11,6 +11,27 @@ const ParamInfillPatchmatchDownscaleSize = () => {
   const infillPatchmatchDownscaleSize = useAppSelector(
     (s) => s.generation.infillPatchmatchDownscaleSize
   );
+  const initial = useAppSelector(
+    (s) => s.config.sd.infillPatchmatchDownscaleSize.initial
+  );
+  const sliderMin = useAppSelector(
+    (s) => s.config.sd.infillPatchmatchDownscaleSize.sliderMin
+  );
+  const sliderMax = useAppSelector(
+    (s) => s.config.sd.infillPatchmatchDownscaleSize.sliderMax
+  );
+  const numberInputMin = useAppSelector(
+    (s) => s.config.sd.infillPatchmatchDownscaleSize.numberInputMin
+  );
+  const numberInputMax = useAppSelector(
+    (s) => s.config.sd.infillPatchmatchDownscaleSize.numberInputMax
+  );
+  const coarseStep = useAppSelector(
+    (s) => s.config.sd.infillPatchmatchDownscaleSize.coarseStep
+  );
+  const fineStep = useAppSelector(
+    (s) => s.config.sd.infillPatchmatchDownscaleSize.fineStep
+  );
 
   const { t } = useTranslation();
 
@@ -27,12 +48,16 @@ const ParamInfillPatchmatchDownscaleSize = () => {
       label={t('parameters.patchmatchDownScaleSize')}
     >
       <InvSlider
-        min={1}
-        max={10}
+        min={sliderMin}
+        max={sliderMax}
+        step={coarseStep}
+        fineStep={fineStep}
         value={infillPatchmatchDownscaleSize}
-        defaultValue={1}
+        defaultValue={initial}
         onChange={handleChange}
         withNumberInput
+        numberInputMin={numberInputMin}
+        numberInputMax={numberInputMax}
         marks
       />
     </InvControl>

@@ -1,4 +1,4 @@
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
 import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
@@ -17,10 +17,22 @@ type ParamControlAdapterWeightProps = {
 const formatValue = (v: number) => v.toFixed(2);
 
 const ParamControlAdapterWeight = ({ id }: ParamControlAdapterWeightProps) => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
   const isEnabled = useControlAdapterIsEnabled(id);
   const weight = useControlAdapterWeight(id);
-  const dispatch = useAppDispatch();
-  const { t } = useTranslation();
+  const initial = useAppSelector((s) => s.config.sd.ca.weight.initial);
+  const sliderMin = useAppSelector((s) => s.config.sd.ca.weight.sliderMin);
+  const sliderMax = useAppSelector((s) => s.config.sd.ca.weight.sliderMax);
+  const numberInputMin = useAppSelector(
+    (s) => s.config.sd.ca.weight.numberInputMin
+  );
+  const numberInputMax = useAppSelector(
+    (s) => s.config.sd.ca.weight.numberInputMax
+  );
+  const coarseStep = useAppSelector((s) => s.config.sd.ca.weight.coarseStep);
+  const fineStep = useAppSelector((s) => s.config.sd.ca.weight.fineStep);
+
   const onChange = useCallback(
     (weight: number) => {
       dispatch(controlAdapterWeightChanged({ id, weight }));
@@ -43,23 +55,23 @@ const ParamControlAdapterWeight = ({ id }: ParamControlAdapterWeightProps) => {
         <InvSlider
           value={weight}
           onChange={onChange}
-          defaultValue={1}
-          min={0}
-          max={2}
-          step={0.05}
-          fineStep={0.01}
+          defaultValue={initial}
+          min={sliderMin}
+          max={sliderMax}
+          step={coarseStep}
+          fineStep={fineStep}
           marks={marks}
           formatValue={formatValue}
         />
         <InvNumberInput
           value={weight}
           onChange={onChange}
-          min={-1}
-          max={2}
-          step={0.05}
-          fineStep={0.01}
+          min={numberInputMin}
+          max={numberInputMax}
+          step={coarseStep}
+          fineStep={fineStep}
           maxW={20}
-          defaultValue={1}
+          defaultValue={initial}
         />
       </InvControl>
     </InvControlGroup>
