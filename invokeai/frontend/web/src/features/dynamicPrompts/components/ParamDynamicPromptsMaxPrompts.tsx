@@ -7,12 +7,17 @@ import { useTranslation } from 'react-i18next';
 
 const ParamDynamicPromptsMaxPrompts = () => {
   const maxPrompts = useAppSelector((s) => s.dynamicPrompts.maxPrompts);
-  const min = useAppSelector((s) => s.config.sd.dynamicPrompts.maxPrompts.min);
+  const sliderMin = useAppSelector(
+    (s) => s.config.sd.dynamicPrompts.maxPrompts.sliderMin
+  );
   const sliderMax = useAppSelector(
     (s) => s.config.sd.dynamicPrompts.maxPrompts.sliderMax
   );
-  const inputMax = useAppSelector(
-    (s) => s.config.sd.dynamicPrompts.maxPrompts.inputMax
+  const numberInputMin = useAppSelector(
+    (s) => s.config.sd.dynamicPrompts.maxPrompts.numberInputMin
+  );
+  const numberInputMax = useAppSelector(
+    (s) => s.config.sd.dynamicPrompts.maxPrompts.numberInputMax
   );
   const initial = useAppSelector(
     (s) => s.config.sd.dynamicPrompts.maxPrompts.initial
@@ -36,14 +41,15 @@ const ParamDynamicPromptsMaxPrompts = () => {
       renderInfoPopoverInPortal={false}
     >
       <InvSlider
-        min={min}
+        min={sliderMin}
         max={sliderMax}
         value={maxPrompts}
         defaultValue={initial}
         onChange={handleChange}
         marks
         withNumberInput
-        numberInputMax={inputMax}
+        numberInputMin={numberInputMin}
+        numberInputMax={numberInputMax}
       />
     </InvControl>
   );
