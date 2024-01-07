@@ -3,16 +3,16 @@ import { isInitializedChanged } from 'features/system/store/systemSlice';
 import { size } from 'lodash-es';
 import { api } from 'services/api';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
-import { appSocketConnected, socketConnected } from 'services/events/actions';
+import { socketConnected } from 'services/events/actions';
 
 import { startAppListening } from '../..';
+
+const log = logger('socketio');
 
 export const addSocketConnectedEventListener = () => {
   startAppListening({
     actionCreator: socketConnected,
     effect: (action, { dispatch, getState }) => {
-      const log = logger('socketio');
-
       log.debug('Connected');
 
       const { nodeTemplates, config, system } = getState();
@@ -29,9 +29,6 @@ export const addSocketConnectedEventListener = () => {
       } else {
         dispatch(isInitializedChanged(true));
       }
-
-      // pass along the socket event as an application action
-      dispatch(appSocketConnected(action.payload));
     },
   });
 };

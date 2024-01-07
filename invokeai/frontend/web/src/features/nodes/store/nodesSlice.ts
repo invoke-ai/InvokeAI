@@ -74,11 +74,11 @@ import {
 } from 'reactflow';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import {
-  appSocketGeneratorProgress,
-  appSocketInvocationComplete,
-  appSocketInvocationError,
-  appSocketInvocationStarted,
-  appSocketQueueItemStatusChanged,
+  socketGeneratorProgress,
+  socketInvocationComplete,
+  socketInvocationError,
+  socketInvocationStarted,
+  socketQueueItemStatusChanged,
 } from 'services/events/actions';
 import { v4 as uuidv4 } from 'uuid';
 import type { z } from 'zod';
@@ -838,14 +838,14 @@ const nodesSlice = createSlice({
       }, {});
     });
 
-    builder.addCase(appSocketInvocationStarted, (state, action) => {
+    builder.addCase(socketInvocationStarted, (state, action) => {
       const { source_node_id } = action.payload.data;
       const node = state.nodeExecutionStates[source_node_id];
       if (node) {
         node.status = zNodeStatus.enum.IN_PROGRESS;
       }
     });
-    builder.addCase(appSocketInvocationComplete, (state, action) => {
+    builder.addCase(socketInvocationComplete, (state, action) => {
       const { source_node_id, result } = action.payload.data;
       const nes = state.nodeExecutionStates[source_node_id];
       if (nes) {
@@ -856,7 +856,7 @@ const nodesSlice = createSlice({
         nes.outputs.push(result);
       }
     });
-    builder.addCase(appSocketInvocationError, (state, action) => {
+    builder.addCase(socketInvocationError, (state, action) => {
       const { source_node_id } = action.payload.data;
       const node = state.nodeExecutionStates[source_node_id];
       if (node) {
@@ -866,7 +866,7 @@ const nodesSlice = createSlice({
         node.progressImage = null;
       }
     });
-    builder.addCase(appSocketGeneratorProgress, (state, action) => {
+    builder.addCase(socketGeneratorProgress, (state, action) => {
       const { source_node_id, step, total_steps, progress_image } =
         action.payload.data;
       const node = state.nodeExecutionStates[source_node_id];
@@ -876,7 +876,7 @@ const nodesSlice = createSlice({
         node.progressImage = progress_image ?? null;
       }
     });
-    builder.addCase(appSocketQueueItemStatusChanged, (state, action) => {
+    builder.addCase(socketQueueItemStatusChanged, (state, action) => {
       if (['in_progress'].includes(action.payload.data.queue_item.status)) {
         forEach(state.nodeExecutionStates, (nes) => {
           nes.status = zNodeStatus.enum.PENDING;

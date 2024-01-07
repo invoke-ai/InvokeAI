@@ -23,7 +23,7 @@ import { clamp, cloneDeep } from 'lodash-es';
 import type { RgbaColor } from 'react-colorful';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { ImageDTO } from 'services/api/types';
-import { appSocketQueueItemStatusChanged } from 'services/events/actions';
+import { socketQueueItemStatusChanged } from 'services/events/actions';
 
 import type {
   BoundingBoxScaleMethod,
@@ -695,7 +695,7 @@ export const canvasSlice = createSlice({
       );
     });
 
-    builder.addCase(appSocketQueueItemStatusChanged, (state, action) => {
+    builder.addCase(socketQueueItemStatusChanged, (state, action) => {
       const batch_status = action.payload.data.batch_status;
       if (!state.batchIds.includes(batch_status.batch_id)) {
         return;

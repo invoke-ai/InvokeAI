@@ -9,7 +9,7 @@ import type {
   ParameterT2IAdapterModel,
 } from 'features/parameters/types/parameterSchemas';
 import { cloneDeep, merge, uniq } from 'lodash-es';
-import { appSocketInvocationError } from 'services/events/actions';
+import { socketInvocationError } from 'services/events/actions';
 import { v4 as uuidv4 } from 'uuid';
 
 import { controlAdapterImageProcessed } from './actions';
@@ -454,7 +454,7 @@ export const controlAdaptersSlice = createSlice({
       }
     });
 
-    builder.addCase(appSocketInvocationError, (state) => {
+    builder.addCase(socketInvocationError, (state) => {
       state.pendingControlImages = [];
     });
   },
