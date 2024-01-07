@@ -10,11 +10,18 @@ const marks = [0, 0.5, 1];
 const ImageToImageStrength = () => {
   const img2imgStrength = useAppSelector((s) => s.generation.img2imgStrength);
   const initial = useAppSelector((s) => s.config.sd.img2imgStrength.initial);
-  const min = useAppSelector((s) => s.config.sd.img2imgStrength.min);
+  const sliderMin = useAppSelector(
+    (s) => s.config.sd.img2imgStrength.sliderMin
+  );
   const sliderMax = useAppSelector(
     (s) => s.config.sd.img2imgStrength.sliderMax
   );
-  const inputMax = useAppSelector((s) => s.config.sd.img2imgStrength.inputMax);
+  const numberInputMin = useAppSelector(
+    (s) => s.config.sd.img2imgStrength.numberInputMin
+  );
+  const numberInputMax = useAppSelector(
+    (s) => s.config.sd.img2imgStrength.numberInputMax
+  );
   const coarseStep = useAppSelector(
     (s) => s.config.sd.img2imgStrength.coarseStep
   );
@@ -35,14 +42,15 @@ const ImageToImageStrength = () => {
       <InvSlider
         step={coarseStep}
         fineStep={fineStep}
-        min={min}
+        min={sliderMin}
         max={sliderMax}
         onChange={handleChange}
         value={img2imgStrength}
         defaultValue={initial}
         marks={marks}
         withNumberInput
-        numberInputMax={inputMax}
+        numberInputMin={numberInputMin}
+        numberInputMax={numberInputMax}
       />
     </InvControl>
   );
