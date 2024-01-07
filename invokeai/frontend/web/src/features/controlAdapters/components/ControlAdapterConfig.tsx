@@ -89,7 +89,7 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
           />
         </InvControl>
       </Flex>
-      <Flex gap={2} alignItems="center" borderBottomWidth="1px" paddingBottom="0.5rem">
+      <Flex gap={4} alignItems="center">
         <Box
           minW={0}
           w="full"
@@ -102,15 +102,14 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
           <ControlNetCanvasImageImports id={id} />
         )}
         <InvIconButton
-          size="md"
+          size="sm"
           tooltip={t('controlnet.duplicate')}
           aria-label={t('controlnet.duplicate')}
           onClick={handleDuplicate}
-          variant="ghost"
           icon={<PiCopyBold />}
         />
         <InvIconButton
-          size="md"
+          size="sm"
           tooltip={t('controlnet.delete')}
           aria-label={t('controlnet.delete')}
           colorScheme="error"
@@ -118,7 +117,7 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
           icon={<PiTrashSimpleBold />}
         />
         <InvIconButton
-          size="md"
+          size="sm"
           tooltip={
             isExpanded
               ? t('controlnet.hideAdvanced')

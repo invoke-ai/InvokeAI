@@ -29,7 +29,7 @@ const ControlNetCanvasImageImports = (
   }, [id, dispatch]);
 
   return (
-    <Flex gap={2}>
+    <Flex gap={4}>
       <InvIconButton
         size="sm"
         icon={<PiImageSquareBold />}
