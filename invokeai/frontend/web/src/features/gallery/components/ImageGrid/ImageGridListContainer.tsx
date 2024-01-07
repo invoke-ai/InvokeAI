@@ -4,6 +4,8 @@ import { useAppSelector } from 'app/store/storeHooks';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 
+export const imageListContainerTestId = 'image-list-container';
+
 type ListContainerProps = PropsWithChildren & FlexProps;
 const ListContainer = forwardRef((props: ListContainerProps, ref) => {
   const galleryImageMinimumWidth = useAppSelector(
@@ -16,7 +18,7 @@ const ListContainer = forwardRef((props: ListContainerProps, ref) => {
       className="list-container"
       ref={ref}
       gridTemplateColumns={`repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, 1fr))`}
-      data-testid="image-list-container"
+      data-testid={imageListContainerTestId}
     >
       {props.children}
     </Grid>
