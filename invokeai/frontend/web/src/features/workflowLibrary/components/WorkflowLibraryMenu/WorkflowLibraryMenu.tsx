@@ -16,7 +16,7 @@ import SettingsMenuItem from 'features/workflowLibrary/components/WorkflowLibrar
 import UploadWorkflowMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/UploadWorkflowMenuItem';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiDotsThreeOutlineFill } from 'react-icons/pi'
+import { PiDotsThreeOutlineFill } from 'react-icons/pi';
 
 const WorkflowLibraryMenu = () => {
   const { t } = useTranslation();

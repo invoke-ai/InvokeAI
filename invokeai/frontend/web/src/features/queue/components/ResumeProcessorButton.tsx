@@ -1,7 +1,7 @@
 import { useResumeProcessor } from 'features/queue/hooks/useResumeProcessor';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiPlayFill } from 'react-icons/pi'
+import { PiPlayFill } from 'react-icons/pi';
 
 import QueueButton from './common/QueueButton';
 

@@ -25,7 +25,11 @@ import { memo, useCallback } from 'react';
 import type { RgbaColor } from 'react-colorful';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { PiExcludeBold, PiFloppyDiskBackFill, PiTrashSimpleFill } from 'react-icons/pi'
+import {
+  PiExcludeBold,
+  PiFloppyDiskBackFill,
+  PiTrashSimpleFill,
+} from 'react-icons/pi';
 
 const IAICanvasMaskOptions = () => {
   const dispatch = useAppDispatch();
@@ -136,7 +140,11 @@ const IAICanvasMaskOptions = () => {
                 onChange={handleChangeMaskColor}
               />
             </Box>
-            <InvButton size="sm" leftIcon={<PiFloppyDiskBackFill />} onClick={handleSaveMask}>
+            <InvButton
+              size="sm"
+              leftIcon={<PiFloppyDiskBackFill />}
+              onClick={handleSaveMask}
+            >
               {t('unifiedCanvas.saveMask')}
             </InvButton>
             <InvButton

@@ -10,8 +10,8 @@ import { useQueueBack } from 'features/queue/hooks/useQueueBack';
 import type { UsePanelReturn } from 'features/ui/hooks/usePanel';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiSlidersHorizontalBold } from 'react-icons/pi'
-import { RiSparklingFill } from 'react-icons/ri'
+import { PiSlidersHorizontalBold } from 'react-icons/pi';
+import { RiSparklingFill } from 'react-icons/ri';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 import { spinAnimationSlow } from 'theme/animations';
 

@@ -17,7 +17,7 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiPauseFill, PiPlayFill, PiXBold } from 'react-icons/pi'
+import { PiPauseFill, PiPlayFill, PiXBold } from 'react-icons/pi';
 import { RiListCheck, RiPlayList2Fill } from 'react-icons/ri';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
@@ -97,10 +97,7 @@ export const QueueActionsMenuButton = memo(() => {
             </InvMenuItem>
           )}
           <InvMenuDivider />
-          <InvMenuItem
-            icon={<RiPlayList2Fill />}
-            onClick={openQueue}
-          >
+          <InvMenuItem icon={<RiPlayList2Fill />} onClick={openQueue}>
             {t('queue.openQueue')}
           </InvMenuItem>
         </InvMenuList>

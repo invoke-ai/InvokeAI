@@ -4,7 +4,7 @@ import { InvButton } from 'common/components/InvButton/InvButton';
 import { QueueIterationsNumberInput } from 'features/queue/components/QueueIterationsNumberInput';
 import { useQueueBack } from 'features/queue/hooks/useQueueBack';
 import { memo } from 'react';
-import { RiSparkling2Fill } from 'react-icons/ri'
+import { RiSparkling2Fill } from 'react-icons/ri';
 
 import { QueueButtonTooltip } from './QueueButtonTooltip';
 

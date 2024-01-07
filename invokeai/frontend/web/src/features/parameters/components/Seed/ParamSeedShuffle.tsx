@@ -5,7 +5,7 @@ import randomInt from 'common/util/randomInt';
 import { setSeed } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiShuffleBold } from 'react-icons/pi'
+import { PiShuffleBold } from 'react-icons/pi';
 
 export const ParamSeedShuffle = memo(() => {
   const dispatch = useAppDispatch();

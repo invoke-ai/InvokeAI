@@ -5,7 +5,7 @@ import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiXBold } from 'react-icons/pi'
+import { PiXBold } from 'react-icons/pi';
 
 const BoardsSearch = () => {
   const dispatch = useAppDispatch();

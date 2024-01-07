@@ -6,7 +6,7 @@ import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { clearCanvasHistory } from 'features/canvas/store/canvasSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiTrashSimpleFill } from 'react-icons/pi'
+import { PiTrashSimpleFill } from 'react-icons/pi';
 
 const ClearCanvasHistoryButtonModal = () => {
   const isStaging = useAppSelector(isStagingSelector);

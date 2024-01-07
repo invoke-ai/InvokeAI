@@ -1,7 +1,7 @@
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiPlusBold } from 'react-icons/pi'
+import { PiPlusBold } from 'react-icons/pi';
 import { useCreateBoardMutation } from 'services/api/endpoints/boards';
 
 const AddBoardButton = () => {

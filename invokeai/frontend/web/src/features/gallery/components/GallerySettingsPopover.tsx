@@ -19,7 +19,7 @@ import {
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RiSettings4Fill } from 'react-icons/ri'
+import { RiSettings4Fill } from 'react-icons/ri';
 
 import BoardAutoAddSelect from './Boards/BoardAutoAddSelect';
 

@@ -3,7 +3,7 @@ import { InvButton } from 'common/components/InvButton/InvButton';
 import { WorkflowLibraryModalContext } from 'features/workflowLibrary/context/WorkflowLibraryModalContext';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiBooksBold } from 'react-icons/pi'
+import { PiBooksBold } from 'react-icons/pi';
 
 import WorkflowLibraryModal from './WorkflowLibraryModal';
 

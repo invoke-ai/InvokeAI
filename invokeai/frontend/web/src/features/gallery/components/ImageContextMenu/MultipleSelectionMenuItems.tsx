@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
-import { InvMenuDivider } from 'common/components/InvMenu/wrapper'
+import { InvMenuDivider } from 'common/components/InvMenu/wrapper';
 import {
   imagesToChangeSelected,
   isModalOpenChanged,
@@ -12,7 +12,13 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { addToast } from 'features/system/store/systemSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiDownloadSimpleBold, PiFoldersBold, PiStarBold, PiStarFill, PiTrashSimpleBold } from 'react-icons/pi'
+import {
+  PiDownloadSimpleBold,
+  PiFoldersBold,
+  PiStarBold,
+  PiStarFill,
+  PiTrashSimpleBold,
+} from 'react-icons/pi';
 import {
   useBulkDownloadImagesMutation,
   useStarImagesMutation,
@@ -105,7 +111,10 @@ const MultipleSelectionMenuItems = () => {
         </InvMenuItem>
       )}
       {isBulkDownloadEnabled && (
-        <InvMenuItem icon={<PiDownloadSimpleBold />} onClickCapture={handleBulkDownload}>
+        <InvMenuItem
+          icon={<PiDownloadSimpleBold />}
+          onClickCapture={handleBulkDownload}
+        >
           {t('gallery.downloadSelection')}
         </InvMenuItem>
       )}

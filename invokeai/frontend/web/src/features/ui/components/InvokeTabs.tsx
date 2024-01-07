@@ -33,8 +33,14 @@ import type { CSSProperties, MouseEvent, ReactElement, ReactNode } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { PiFlowArrowBold } from 'react-icons/pi'
-import { RiBox2Line, RiBrushLine, RiImage2Line, RiInputMethodLine, RiPlayList2Fill } from 'react-icons/ri';
+import { PiFlowArrowBold } from 'react-icons/pi';
+import {
+  RiBox2Line,
+  RiBrushLine,
+  RiImage2Line,
+  RiInputMethodLine,
+  RiPlayList2Fill,
+} from 'react-icons/ri';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 

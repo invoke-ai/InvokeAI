@@ -24,7 +24,7 @@ import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { PiGearSixBold } from 'react-icons/pi'
+import { PiGearSixBold } from 'react-icons/pi';
 
 const IAICanvasSettingsButtonPopover = () => {
   const dispatch = useAppDispatch();

@@ -2,7 +2,7 @@ import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { useQueueFront } from 'features/queue/hooks/useQueueFront';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AiFillThunderbolt } from 'react-icons/ai'
+import { AiFillThunderbolt } from 'react-icons/ai';
 
 import { QueueButtonTooltip } from './QueueButtonTooltip';
 

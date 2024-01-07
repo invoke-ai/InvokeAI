@@ -5,7 +5,7 @@ import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import type { UsePanelReturn } from 'features/ui/hooks/usePanel';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiImagesSquareBold } from 'react-icons/pi'
+import { PiImagesSquareBold } from 'react-icons/pi';
 
 type Props = {
   panelApi: UsePanelReturn;

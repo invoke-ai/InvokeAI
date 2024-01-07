@@ -4,7 +4,7 @@ import { useAppToaster } from 'app/components/Toaster';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
-import { InvMenuDivider } from 'common/components/InvMenu/wrapper'
+import { InvMenuDivider } from 'common/components/InvMenu/wrapper';
 import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
@@ -25,7 +25,19 @@ import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/us
 import { memo, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { PiAsteriskBold, PiCopyBold, PiDownloadSimpleBold, PiFlowArrowBold, PiFoldersBold, PiPlantBold, PiQuotesBold, PiShareFatBold, PiStarBold, PiStarFill, PiTrashSimpleBold } from 'react-icons/pi'
+import {
+  PiAsteriskBold,
+  PiCopyBold,
+  PiDownloadSimpleBold,
+  PiFlowArrowBold,
+  PiFoldersBold,
+  PiPlantBold,
+  PiQuotesBold,
+  PiShareFatBold,
+  PiStarBold,
+  PiStarFill,
+  PiTrashSimpleBold,
+} from 'react-icons/pi';
 import {
   useStarImagesMutation,
   useUnstarImagesMutation,

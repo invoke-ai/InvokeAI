@@ -7,7 +7,12 @@ import {
 } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiFrameCornersBold, PiMagnifyingGlassMinusBold, PiMagnifyingGlassPlusBold, PiMapPinBold } from 'react-icons/pi'
+import {
+  PiFrameCornersBold,
+  PiMagnifyingGlassMinusBold,
+  PiMagnifyingGlassPlusBold,
+  PiMapPinBold,
+} from 'react-icons/pi';
 import { useReactFlow } from 'reactflow';
 
 const ViewportControls = () => {

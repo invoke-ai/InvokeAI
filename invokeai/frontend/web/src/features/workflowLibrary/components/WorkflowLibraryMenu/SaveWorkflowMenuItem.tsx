@@ -2,7 +2,7 @@ import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
 import { useSaveLibraryWorkflow } from 'features/workflowLibrary/hooks/useSaveWorkflow';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiFloppyDiskBold } from 'react-icons/pi'
+import { PiFloppyDiskBold } from 'react-icons/pi';
 
 const SaveLibraryWorkflowMenuItem = () => {
   const { t } = useTranslation();

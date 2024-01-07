@@ -7,7 +7,7 @@ import {
 } from 'features/canvas/store/actions';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiExcludeBold, PiImageSquareBold } from 'react-icons/pi'
+import { PiExcludeBold, PiImageSquareBold } from 'react-icons/pi';
 
 type ControlNetCanvasImageImportsProps = {
   id: string;

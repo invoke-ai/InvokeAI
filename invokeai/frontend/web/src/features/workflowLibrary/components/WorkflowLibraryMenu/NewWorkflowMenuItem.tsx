@@ -8,7 +8,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiFlowArrowBold } from 'react-icons/pi'
+import { PiFlowArrowBold } from 'react-icons/pi';
 
 const NewWorkflowMenuItem = () => {
   const { t } = useTranslation();

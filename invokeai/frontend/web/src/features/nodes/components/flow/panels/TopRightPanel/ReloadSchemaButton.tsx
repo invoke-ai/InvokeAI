@@ -2,7 +2,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsClockwiseBold } from 'react-icons/pi'
+import { PiArrowsClockwiseBold } from 'react-icons/pi';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 
 const ReloadNodeTemplatesButton = () => {

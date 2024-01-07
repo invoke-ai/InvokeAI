@@ -15,8 +15,8 @@ import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup'
 import { galleryViewChanged } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiImagesBold } from 'react-icons/pi'
-import { RiServerLine } from 'react-icons/ri'
+import { PiImagesBold } from 'react-icons/pi';
+import { RiServerLine } from 'react-icons/ri';
 
 import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';

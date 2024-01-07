@@ -28,7 +28,16 @@ import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/us
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { PiAsteriskBold, PiDotsThreeOutlineFill, PiFlowArrowBold, PiHourglassHighBold, PiInfoBold, PiPlantBold, PiQuotesBold, PiRulerBold } from 'react-icons/pi'
+import {
+  PiAsteriskBold,
+  PiDotsThreeOutlineFill,
+  PiFlowArrowBold,
+  PiHourglassHighBold,
+  PiInfoBold,
+  PiPlantBold,
+  PiQuotesBold,
+  PiRulerBold,
+} from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 

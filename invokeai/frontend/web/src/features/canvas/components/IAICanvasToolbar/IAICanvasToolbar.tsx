@@ -29,7 +29,16 @@ import { InvIconButton } from 'index';
 import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { PiCopyBold, PiCrosshairSimpleBold, PiDownloadSimpleBold, PiFloppyDiskBold, PiHandGrabbingBold, PiStackBold, PiTrashSimpleBold, PiUploadSimpleBold } from 'react-icons/pi'
+import {
+  PiCopyBold,
+  PiCrosshairSimpleBold,
+  PiDownloadSimpleBold,
+  PiFloppyDiskBold,
+  PiHandGrabbingBold,
+  PiStackBold,
+  PiTrashSimpleBold,
+  PiUploadSimpleBold,
+} from 'react-icons/pi';
 
 import IAICanvasMaskOptions from './IAICanvasMaskOptions';
 import IAICanvasRedoButton from './IAICanvasRedoButton';

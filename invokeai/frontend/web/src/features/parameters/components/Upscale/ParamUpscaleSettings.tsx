@@ -13,7 +13,7 @@ import { useIsAllowedToUpscale } from 'features/parameters/hooks/useIsAllowedToU
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiFrameCornersBold } from 'react-icons/pi'
+import { PiFrameCornersBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
 import ParamESRGANModel from './ParamRealESRGANModel';

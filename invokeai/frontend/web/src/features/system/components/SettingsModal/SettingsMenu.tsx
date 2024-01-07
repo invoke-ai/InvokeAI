@@ -12,8 +12,12 @@ import HotkeysModal from 'features/system/components/HotkeysModal/HotkeysModal';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiBugBeetleBold, PiKeyboardBold, PiToggleRightFill } from 'react-icons/pi'
-import { RiDiscordFill, RiGithubFill, RiSettings4Line } from 'react-icons/ri'
+import {
+  PiBugBeetleBold,
+  PiKeyboardBold,
+  PiToggleRightFill,
+} from 'react-icons/pi';
+import { RiDiscordFill, RiGithubFill, RiSettings4Line } from 'react-icons/ri';
 
 import SettingsModal from './SettingsModal';
 const SettingsMenu = () => {

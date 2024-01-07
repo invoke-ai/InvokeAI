@@ -3,7 +3,7 @@ import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiXBold } from 'react-icons/pi'
+import { PiXBold } from 'react-icons/pi';
 type Props = {
   sx?: ChakraProps['sx'];
 };

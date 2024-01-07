@@ -18,7 +18,15 @@ import { InvIconButton } from 'index';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { PiArrowLeftBold, PiArrowRightBold, PiCheckBold, PiEyeBold, PiEyeSlashBold, PiFloppyDiskBold, PiXBold } from 'react-icons/pi'
+import {
+  PiArrowLeftBold,
+  PiArrowRightBold,
+  PiCheckBold,
+  PiEyeBold,
+  PiEyeSlashBold,
+  PiFloppyDiskBold,
+  PiXBold,
+} from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {

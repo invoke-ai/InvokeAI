@@ -3,7 +3,7 @@ import type { InvIconButtonProps } from 'common/components/InvIconButton/types';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsClockwiseBold } from 'react-icons/pi'
+import { PiArrowsClockwiseBold } from 'react-icons/pi';
 
 import { useSyncModels } from './useSyncModels';
 

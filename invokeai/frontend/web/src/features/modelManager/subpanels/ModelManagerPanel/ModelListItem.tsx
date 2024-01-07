@@ -10,7 +10,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiTrashSimpleBold } from 'react-icons/pi'
+import { PiTrashSimpleBold } from 'react-icons/pi';
 import type {
   LoRAModelConfigEntity,
   MainModelConfigEntity,

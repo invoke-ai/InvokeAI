@@ -3,7 +3,7 @@ import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadW
 import { memo, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
-import { PiUploadSimpleBold } from 'react-icons/pi'
+import { PiUploadSimpleBold } from 'react-icons/pi';
 
 const UploadWorkflowMenuItem = () => {
   const { t } = useTranslation();

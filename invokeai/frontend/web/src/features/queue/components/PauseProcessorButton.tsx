@@ -1,7 +1,7 @@
 import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiPauseFill } from 'react-icons/pi'
+import { PiPauseFill } from 'react-icons/pi';
 
 import QueueButton from './common/QueueButton';
 

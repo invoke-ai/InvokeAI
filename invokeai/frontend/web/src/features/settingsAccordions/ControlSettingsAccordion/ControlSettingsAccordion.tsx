@@ -20,7 +20,7 @@ import {
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { Fragment, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiPlusBold } from 'react-icons/pi'
+import { PiPlusBold } from 'react-icons/pi';
 
 const selector = createMemoizedSelector(
   selectControlAdaptersSlice,

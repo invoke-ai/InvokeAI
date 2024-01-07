@@ -19,7 +19,7 @@ import { useScrollIntoView } from 'features/gallery/hooks/useScrollIntoView';
 import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiStarBold, PiStarFill, PiTrashSimpleFill } from 'react-icons/pi'
+import { PiStarBold, PiStarFill, PiTrashSimpleFill } from 'react-icons/pi';
 import {
   useGetImageDTOQuery,
   useStarImagesMutation,

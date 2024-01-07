@@ -25,7 +25,14 @@ import { memo, useCallback } from 'react';
 import type { RgbaColor } from 'react-colorful';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { PiEraserBold, PiEyedropperBold, PiPaintBrushBold, PiPaintBucketBold, PiSlidersHorizontalBold, PiXBold } from 'react-icons/pi'
+import {
+  PiEraserBold,
+  PiEyedropperBold,
+  PiPaintBrushBold,
+  PiPaintBucketBold,
+  PiSlidersHorizontalBold,
+  PiXBold,
+} from 'react-icons/pi';
 
 const IAICanvasToolChooserOptions = () => {
   const dispatch = useAppDispatch();

@@ -5,7 +5,7 @@ import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQu
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiTrashSimpleFill } from 'react-icons/pi'
+import { PiTrashSimpleFill } from 'react-icons/pi';
 
 type Props = InvButtonProps;
 

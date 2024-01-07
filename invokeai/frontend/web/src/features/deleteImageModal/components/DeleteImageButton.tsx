@@ -3,7 +3,7 @@ import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import type { InvIconButtonProps } from 'common/components/InvIconButton/types';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiTrashSimpleBold } from 'react-icons/pi'
+import { PiTrashSimpleBold } from 'react-icons/pi';
 
 type DeleteImageButtonProps = Omit<InvIconButtonProps, 'aria-label'> & {
   onClick: () => void;
