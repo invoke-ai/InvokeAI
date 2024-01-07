@@ -8,7 +8,13 @@ import { useTranslation } from 'react-i18next';
 
 const ParamClipSkip = () => {
   const clipSkip = useAppSelector((s) => s.generation.clipSkip);
-
+  const initial = useAppSelector((s) => s.config.sd.clipSkip.initial);
+  const sliderMin = useAppSelector((s) => s.config.sd.clipSkip.sliderMin);
+  const numberInputMin = useAppSelector(
+    (s) => s.config.sd.clipSkip.numberInputMin
+  );
+  const coarseStep = useAppSelector((s) => s.config.sd.clipSkip.coarseStep);
+  const fineStep = useAppSelector((s) => s.config.sd.clipSkip.fineStep);
   const { model } = useAppSelector((s) => s.generation);
 
   const dispatch = useAppDispatch();
@@ -43,12 +49,15 @@ const ParamClipSkip = () => {
     <InvControl label={t('parameters.clipSkip')} feature="clipSkip">
       <InvSlider
         value={clipSkip}
-        defaultValue={0}
-        min={0}
+        defaultValue={initial}
+        min={sliderMin}
         max={max}
-        step={1}
+        step={coarseStep}
+        fineStep={fineStep}
         onChange={handleClipSkipChange}
         withNumberInput
+        numberInputMin={numberInputMin}
+        numberInputMax={max}
         marks={sliderMarks}
       />
     </InvControl>

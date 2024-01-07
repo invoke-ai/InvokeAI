@@ -35,7 +35,6 @@ export const initialGenerationState: GenerationState = {
   img2imgStrength: 0.75,
   infillMethod: 'patchmatch',
   iterations: 1,
-  perlin: 0,
   positivePrompt: '',
   negativePrompt: '',
   scheduler: 'euler',
@@ -45,19 +44,12 @@ export const initialGenerationState: GenerationState = {
   canvasCoherenceSteps: 20,
   canvasCoherenceStrength: 0.3,
   seed: 0,
-  seedWeights: '',
   shouldFitToWidthHeight: true,
-  shouldGenerateVariations: false,
   shouldRandomizeSeed: true,
   steps: 50,
-  threshold: 0,
   infillTileSize: 32,
   infillPatchmatchDownscaleSize: 1,
-  variationAmount: 0.1,
   width: 512,
-  shouldUseSymmetry: false,
-  horizontalSymmetrySteps: 0,
-  verticalSymmetrySteps: 0,
   model: null,
   vae: null,
   vaePrecision: 'fp32',
@@ -85,18 +77,6 @@ export const generationSlice = createSlice({
     setSteps: (state, action: PayloadAction<number>) => {
       state.steps = action.payload;
     },
-    clampSymmetrySteps: (state) => {
-      state.horizontalSymmetrySteps = clamp(
-        state.horizontalSymmetrySteps,
-        0,
-        state.steps
-      );
-      state.verticalSymmetrySteps = clamp(
-        state.verticalSymmetrySteps,
-        0,
-        state.steps
-      );
-    },
     setCfgScale: (state, action: PayloadAction<ParameterCFGScale>) => {
       state.cfgScale = action.payload;
     },
@@ -105,12 +85,6 @@ export const generationSlice = createSlice({
       action: PayloadAction<ParameterCFGRescaleMultiplier>
     ) => {
       state.cfgRescaleMultiplier = action.payload;
-    },
-    setThreshold: (state, action: PayloadAction<number>) => {
-      state.threshold = action.payload;
-    },
-    setPerlin: (state, action: PayloadAction<number>) => {
-      state.perlin = action.payload;
     },
     setScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
       state.scheduler = action.payload;
@@ -133,17 +107,6 @@ export const generationSlice = createSlice({
     },
     resetSeed: (state) => {
       state.seed = -1;
-    },
-    setShouldGenerateVariations: (state, action: PayloadAction<boolean>) => {
-      state.shouldGenerateVariations = action.payload;
-    },
-    setVariationAmount: (state, action: PayloadAction<number>) => {
-      state.variationAmount = action.payload;
-    },
-    setSeedWeights: (state, action: PayloadAction<string>) => {
-      state.seedWeights = action.payload;
-      state.shouldGenerateVariations = true;
-      state.variationAmount = 0;
     },
     resetParametersState: (state) => {
       return {
@@ -189,15 +152,6 @@ export const generationSlice = createSlice({
       action: PayloadAction<number>
     ) => {
       state.infillPatchmatchDownscaleSize = action.payload;
-    },
-    setShouldUseSymmetry: (state, action: PayloadAction<boolean>) => {
-      state.shouldUseSymmetry = action.payload;
-    },
-    setHorizontalSymmetrySteps: (state, action: PayloadAction<number>) => {
-      state.horizontalSymmetrySteps = action.payload;
-    },
-    setVerticalSymmetrySteps: (state, action: PayloadAction<number>) => {
-      state.verticalSymmetrySteps = action.payload;
     },
     initialImageChanged: (state, action: PayloadAction<ImageDTO>) => {
       const { image_name, width, height } = action.payload;
@@ -282,7 +236,6 @@ export const generationSlice = createSlice({
 });
 
 export const {
-  clampSymmetrySteps,
   clearInitialImage,
   resetParametersState,
   resetSeed,
@@ -291,7 +244,6 @@ export const {
   setImg2imgStrength,
   setInfillMethod,
   setIterations,
-  setPerlin,
   setPositivePrompt,
   setNegativePrompt,
   setScheduler,
@@ -301,18 +253,11 @@ export const {
   setCanvasCoherenceSteps,
   setCanvasCoherenceStrength,
   setSeed,
-  setSeedWeights,
   setShouldFitToWidthHeight,
-  setShouldGenerateVariations,
   setShouldRandomizeSeed,
   setSteps,
-  setThreshold,
   setInfillTileSize,
   setInfillPatchmatchDownscaleSize,
-  setVariationAmount,
-  setShouldUseSymmetry,
-  setHorizontalSymmetrySteps,
-  setVerticalSymmetrySteps,
   initialImageChanged,
   modelChanged,
   vaeSelected,

@@ -1,6 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
@@ -11,9 +10,14 @@ export const ParamWidth = memo(() => {
   const { t } = useTranslation();
   const ctx = useImageSizeContext();
   const optimalDimension = useAppSelector(selectOptimalDimension);
-  const min = useAppSelector((s) => s.config.sd.width.min);
+  const sliderMin = useAppSelector((s) => s.config.sd.width.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.width.sliderMax);
-  const inputMax = useAppSelector((s) => s.config.sd.width.inputMax);
+  const numberInputMin = useAppSelector(
+    (s) => s.config.sd.width.numberInputMin
+  );
+  const numberInputMax = useAppSelector(
+    (s) => s.config.sd.width.numberInputMax
+  );
   const coarseStep = useAppSelector((s) => s.config.sd.width.coarseStep);
   const fineStep = useAppSelector((s) => s.config.sd.width.fineStep);
 
@@ -25,8 +29,8 @@ export const ParamWidth = memo(() => {
   );
 
   const marks = useMemo(
-    () => [min, optimalDimension, sliderMax],
-    [min, optimalDimension, sliderMax]
+    () => [sliderMin, optimalDimension, sliderMax],
+    [sliderMin, optimalDimension, sliderMax]
   );
 
   return (
@@ -35,20 +39,14 @@ export const ParamWidth = memo(() => {
         value={ctx.width}
         onChange={onChange}
         defaultValue={optimalDimension}
-        min={min}
+        min={sliderMin}
         max={sliderMax}
         step={coarseStep}
         fineStep={fineStep}
         marks={marks}
-      />
-      <InvNumberInput
-        value={ctx.width}
-        onChange={onChange}
-        min={min}
-        max={inputMax}
-        step={coarseStep}
-        fineStep={fineStep}
-        defaultValue={optimalDimension}
+        withNumberInput
+        numberInputMin={numberInputMin}
+        numberInputMax={numberInputMax}
       />
     </InvControl>
   );
