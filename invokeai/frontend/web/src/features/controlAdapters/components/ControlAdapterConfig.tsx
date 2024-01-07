@@ -16,7 +16,7 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaCopy, FaTrash } from 'react-icons/fa';
+import { PiCopyBold, PiTrashSimpleBold } from 'react-icons/pi';
 import { useToggle } from 'react-use';
 
 import ControlAdapterImagePreview from './ControlAdapterImagePreview';
@@ -106,7 +106,7 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
           tooltip={t('controlnet.duplicate')}
           aria-label={t('controlnet.duplicate')}
           onClick={handleDuplicate}
-          icon={<FaCopy />}
+          icon={<PiCopyBold />}
         />
         <InvIconButton
           size="sm"
@@ -114,7 +114,7 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
           aria-label={t('controlnet.delete')}
           colorScheme="error"
           onClick={handleDelete}
-          icon={<FaTrash />}
+          icon={<PiTrashSimpleBold />}
         />
         <InvIconButton
           size="sm"
@@ -132,8 +132,6 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
           variant="ghost"
           icon={
             <ChevronUpIcon
-              boxSize={4}
-              color="base.300"
               transform={isExpanded ? 'rotate(0deg)' : 'rotate(180deg)'}
               transitionProperty="common"
               transitionDuration="normal"
@@ -143,7 +141,7 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
       </Flex>
 
       <Flex w="full" flexDir="column" gap={4}>
-        <Flex gap={4} w="full" alignItems="center">
+        <Flex gap={8} w="full" alignItems="center">
           <Flex flexDir="column" gap={2} h={32} w="full">
             <ParamControlAdapterWeight id={id} />
             <ParamControlAdapterBeginEnd id={id} />

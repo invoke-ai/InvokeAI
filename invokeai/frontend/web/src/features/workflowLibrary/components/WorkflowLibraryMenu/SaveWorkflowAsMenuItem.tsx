@@ -9,7 +9,7 @@ import { getWorkflowCopyName } from 'features/workflowLibrary/util/getWorkflowCo
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaClone } from 'react-icons/fa';
+import { PiCopyBold } from 'react-icons/pi';
 
 const SaveWorkflowAsButton = () => {
   const currentName = useAppSelector((s) => s.workflow.name);
@@ -35,7 +35,7 @@ const SaveWorkflowAsButton = () => {
 
   return (
     <>
-      <InvMenuItem as="button" icon={<FaClone />} onClick={onOpenCallback}>
+      <InvMenuItem as="button" icon={<PiCopyBold />} onClick={onOpenCallback}>
         {t('workflows.saveWorkflowAs')}
       </InvMenuItem>
 

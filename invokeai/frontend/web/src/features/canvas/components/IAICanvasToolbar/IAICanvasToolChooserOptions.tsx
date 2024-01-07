@@ -26,13 +26,13 @@ import type { RgbaColor } from 'react-colorful';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
-  FaEraser,
-  FaEyeDropper,
-  FaFillDrip,
-  FaPaintBrush,
-  FaSlidersH,
-  FaTimes,
-} from 'react-icons/fa';
+  PiEraserBold,
+  PiEyedropperBold,
+  PiPaintBrushBold,
+  PiPaintBucketBold,
+  PiSlidersHorizontalBold,
+  PiXBold,
+} from 'react-icons/pi';
 
 const IAICanvasToolChooserOptions = () => {
   const dispatch = useAppDispatch();
@@ -198,7 +198,7 @@ const IAICanvasToolChooserOptions = () => {
       <InvIconButton
         aria-label={`${t('unifiedCanvas.brush')} (B)`}
         tooltip={`${t('unifiedCanvas.brush')} (B)`}
-        icon={<FaPaintBrush />}
+        icon={<PiPaintBrushBold />}
         isChecked={tool === 'brush' && !isStaging}
         onClick={handleSelectBrushTool}
         isDisabled={isStaging}
@@ -206,7 +206,7 @@ const IAICanvasToolChooserOptions = () => {
       <InvIconButton
         aria-label={`${t('unifiedCanvas.eraser')} (E)`}
         tooltip={`${t('unifiedCanvas.eraser')} (E)`}
-        icon={<FaEraser />}
+        icon={<PiEraserBold />}
         isChecked={tool === 'eraser' && !isStaging}
         isDisabled={isStaging}
         onClick={handleSelectEraserTool}
@@ -214,21 +214,21 @@ const IAICanvasToolChooserOptions = () => {
       <InvIconButton
         aria-label={`${t('unifiedCanvas.fillBoundingBox')} (Shift+F)`}
         tooltip={`${t('unifiedCanvas.fillBoundingBox')} (Shift+F)`}
-        icon={<FaFillDrip />}
+        icon={<PiPaintBucketBold />}
         isDisabled={isStaging}
         onClick={handleFillRect}
       />
       <InvIconButton
         aria-label={`${t('unifiedCanvas.eraseBoundingBox')} (Del/Backspace)`}
         tooltip={`${t('unifiedCanvas.eraseBoundingBox')} (Del/Backspace)`}
-        icon={<FaTimes />}
+        icon={<PiXBold />}
         isDisabled={isStaging}
         onClick={handleEraseBoundingBox}
       />
       <InvIconButton
         aria-label={`${t('unifiedCanvas.colorPicker')} (C)`}
         tooltip={`${t('unifiedCanvas.colorPicker')} (C)`}
-        icon={<FaEyeDropper />}
+        icon={<PiEyedropperBold />}
         isChecked={tool === 'colorPicker' && !isStaging}
         isDisabled={isStaging}
         onClick={handleSelectColorPickerTool}
@@ -238,7 +238,7 @@ const IAICanvasToolChooserOptions = () => {
           <InvIconButton
             aria-label={t('unifiedCanvas.brushOptions')}
             tooltip={t('unifiedCanvas.brushOptions')}
-            icon={<FaSlidersH />}
+            icon={<PiSlidersHorizontalBold />}
           />
         </InvPopoverTrigger>
         <InvPopoverContent>

@@ -10,8 +10,8 @@ import { useQueueBack } from 'features/queue/hooks/useQueueBack';
 import type { UsePanelReturn } from 'features/ui/hooks/usePanel';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaSlidersH } from 'react-icons/fa';
-import { IoSparkles } from 'react-icons/io5';
+import { PiSlidersHorizontalBold } from 'react-icons/pi';
+import { RiSparklingFill } from 'react-icons/ri';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 import { spinAnimationSlow } from 'theme/animations';
 
@@ -34,7 +34,7 @@ const FloatingSidePanelButtons = (props: Props) => {
       !isDisabled && queueStatus?.processor.is_processing ? (
         <SpinnerIcon animation={spinAnimationSlow} />
       ) : (
-        <IoSparkles />
+        <RiSparklingFill size="16px" />
       ),
     [isDisabled, queueStatus?.processor.is_processing]
   );
@@ -61,7 +61,7 @@ const FloatingSidePanelButtons = (props: Props) => {
             aria-label={t('accessibility.showOptionsPanel')}
             onClick={props.panelApi.expand}
             sx={floatingButtonStyles}
-            icon={<FaSlidersH />}
+            icon={<PiSlidersHorizontalBold size="16px" />}
           />
           <InvIconButton
             aria-label={t('queue.queueBack')}

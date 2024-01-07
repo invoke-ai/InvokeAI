@@ -19,8 +19,7 @@ import { useScrollIntoView } from 'features/gallery/hooks/useScrollIntoView';
 import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaTrash } from 'react-icons/fa';
-import { MdStar, MdStarBorder } from 'react-icons/md';
+import { PiStarBold, PiStarFill, PiTrashSimpleFill } from 'react-icons/pi';
 import {
   useGetImageDTOQuery,
   useStarImagesMutation,
@@ -112,10 +111,10 @@ const GalleryImage = (props: HoverableImageProps) => {
 
   const starIcon = useMemo(() => {
     if (imageDTO?.starred) {
-      return customStarUi ? customStarUi.on.icon : <MdStar size="20" />;
+      return customStarUi ? customStarUi.on.icon : <PiStarFill size="20" />;
     }
     if (!imageDTO?.starred && isHovered) {
-      return customStarUi ? customStarUi.off.icon : <MdStarBorder size="20" />;
+      return customStarUi ? customStarUi.off.icon : <PiStarBold size="20" />;
     }
   }, [imageDTO?.starred, isHovered, customStarUi]);
 
@@ -177,7 +176,7 @@ const GalleryImage = (props: HoverableImageProps) => {
             {isHovered && shift && (
               <IAIDndImageIcon
                 onClick={handleDelete}
-                icon={<FaTrash />}
+                icon={<PiTrashSimpleFill size="16px" />}
                 tooltip={t('gallery.deleteImage')}
                 styleOverrides={imageIconStyleOverrides}
               />

@@ -16,7 +16,7 @@ import SettingsMenuItem from 'features/workflowLibrary/components/WorkflowLibrar
 import UploadWorkflowMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/UploadWorkflowMenuItem';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaEllipsis } from 'react-icons/fa6';
+import { PiDotsThreeOutlineFill } from 'react-icons/pi';
 
 const WorkflowLibraryMenu = () => {
   const { t } = useTranslation();
@@ -31,7 +31,7 @@ const WorkflowLibraryMenu = () => {
       <InvMenuButton
         as={InvIconButton}
         aria-label={t('workflows.workflowEditorMenu')}
-        icon={<FaEllipsis />}
+        icon={<PiDotsThreeOutlineFill />}
         pointerEvents="auto"
       />
       <InvMenuList pointerEvents="auto">

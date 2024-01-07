@@ -2,7 +2,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaSyncAlt } from 'react-icons/fa';
+import { PiArrowsClockwiseBold } from 'react-icons/pi';
 import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 
 const ReloadNodeTemplatesButton = () => {
@@ -15,7 +15,7 @@ const ReloadNodeTemplatesButton = () => {
 
   return (
     <InvButton
-      leftIcon={<FaSyncAlt />}
+      leftIcon={<PiArrowsClockwiseBold />}
       tooltip={t('nodes.reloadNodeTemplates')}
       aria-label={t('nodes.reloadNodeTemplates')}
       onClick={handleReloadSchema}

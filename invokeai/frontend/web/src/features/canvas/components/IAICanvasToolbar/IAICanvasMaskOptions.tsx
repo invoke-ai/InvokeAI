@@ -25,7 +25,11 @@ import { memo, useCallback } from 'react';
 import type { RgbaColor } from 'react-colorful';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { FaMask, FaSave, FaTrash } from 'react-icons/fa';
+import {
+  PiExcludeBold,
+  PiFloppyDiskBackFill,
+  PiTrashSimpleFill,
+} from 'react-icons/pi';
 
 const IAICanvasMaskOptions = () => {
   const dispatch = useAppDispatch();
@@ -110,7 +114,7 @@ const IAICanvasMaskOptions = () => {
         <InvIconButton
           aria-label={t('unifiedCanvas.maskingOptions')}
           tooltip={t('unifiedCanvas.maskingOptions')}
-          icon={<FaMask />}
+          icon={<PiExcludeBold />}
           isChecked={layer === 'mask'}
           isDisabled={isStaging}
         />
@@ -136,12 +140,16 @@ const IAICanvasMaskOptions = () => {
                 onChange={handleChangeMaskColor}
               />
             </Box>
-            <InvButton size="sm" leftIcon={<FaSave />} onClick={handleSaveMask}>
+            <InvButton
+              size="sm"
+              leftIcon={<PiFloppyDiskBackFill />}
+              onClick={handleSaveMask}
+            >
               {t('unifiedCanvas.saveMask')}
             </InvButton>
             <InvButton
               size="sm"
-              leftIcon={<FaTrash />}
+              leftIcon={<PiTrashSimpleFill />}
               onClick={handleClearMask}
             >
               {t('unifiedCanvas.clearMask')}

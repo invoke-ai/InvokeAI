@@ -29,14 +29,15 @@ import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
-  FaAsterisk,
-  FaCode,
-  FaHourglassHalf,
-  FaQuoteRight,
-  FaRulerVertical,
-  FaSeedling,
-} from 'react-icons/fa';
-import { FaCircleNodes, FaEllipsis } from 'react-icons/fa6';
+  PiAsteriskBold,
+  PiDotsThreeOutlineFill,
+  PiFlowArrowBold,
+  PiHourglassHighBold,
+  PiInfoBold,
+  PiPlantBold,
+  PiQuotesBold,
+  PiRulerBold,
+} from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 
@@ -210,7 +211,7 @@ const CurrentImageButtons = () => {
               aria-label={t('parameters.imageActions')}
               tooltip={t('parameters.imageActions')}
               isDisabled={!imageDTO}
-              icon={<FaEllipsis />}
+              icon={<PiDotsThreeOutlineFill />}
             />
             <InvMenuList>
               {imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}
@@ -220,7 +221,7 @@ const CurrentImageButtons = () => {
 
         <InvButtonGroup isDisabled={shouldDisableToolbarButtons}>
           <InvIconButton
-            icon={<FaCircleNodes />}
+            icon={<PiFlowArrowBold />}
             tooltip={`${t('nodes.loadWorkflow')} (W)`}
             aria-label={`${t('nodes.loadWorkflow')} (W)`}
             isDisabled={!imageDTO?.has_workflow}
@@ -229,7 +230,7 @@ const CurrentImageButtons = () => {
           />
           <InvIconButton
             isLoading={isLoadingMetadata}
-            icon={<FaQuoteRight />}
+            icon={<PiQuotesBold />}
             tooltip={`${t('parameters.usePrompt')} (P)`}
             aria-label={`${t('parameters.usePrompt')} (P)`}
             isDisabled={!metadata?.positive_prompt}
@@ -237,7 +238,7 @@ const CurrentImageButtons = () => {
           />
           <InvIconButton
             isLoading={isLoadingMetadata}
-            icon={<FaSeedling />}
+            icon={<PiPlantBold />}
             tooltip={`${t('parameters.useSeed')} (S)`}
             aria-label={`${t('parameters.useSeed')} (S)`}
             isDisabled={metadata?.seed === null || metadata?.seed === undefined}
@@ -245,7 +246,7 @@ const CurrentImageButtons = () => {
           />
           <InvIconButton
             isLoading={isLoadingMetadata}
-            icon={<FaRulerVertical />}
+            icon={<PiRulerBold />}
             tooltip={`${t('parameters.useSize')} (D)`}
             aria-label={`${t('parameters.useSize')} (D)`}
             isDisabled={
@@ -258,7 +259,7 @@ const CurrentImageButtons = () => {
           />
           <InvIconButton
             isLoading={isLoadingMetadata}
-            icon={<FaAsterisk />}
+            icon={<PiAsteriskBold />}
             tooltip={`${t('parameters.useAll')} (A)`}
             aria-label={`${t('parameters.useAll')} (A)`}
             isDisabled={!metadata}
@@ -274,7 +275,7 @@ const CurrentImageButtons = () => {
 
         <InvButtonGroup>
           <InvIconButton
-            icon={<FaCode />}
+            icon={<PiInfoBold />}
             tooltip={`${t('parameters.info')} (I)`}
             aria-label={`${t('parameters.info')} (I)`}
             isChecked={shouldShowImageDetails}
@@ -286,7 +287,7 @@ const CurrentImageButtons = () => {
           <InvIconButton
             aria-label={t('settings.displayInProgress')}
             tooltip={t('settings.displayInProgress')}
-            icon={<FaHourglassHalf />}
+            icon={<PiHourglassHighBold />}
             isChecked={shouldShowProgressInViewer}
             onClick={handleClickProgressImagesToggle}
           />

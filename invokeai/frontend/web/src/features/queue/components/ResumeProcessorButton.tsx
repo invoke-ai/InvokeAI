@@ -1,7 +1,7 @@
 import { useResumeProcessor } from 'features/queue/hooks/useResumeProcessor';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaPlay } from 'react-icons/fa';
+import { PiPlayFill } from 'react-icons/pi';
 
 import QueueButton from './common/QueueButton';
 
@@ -20,7 +20,7 @@ const ResumeProcessorButton = ({ asIconButton }: Props) => {
       tooltip={t('queue.resumeTooltip')}
       isDisabled={isDisabled}
       isLoading={isLoading}
-      icon={<FaPlay />}
+      icon={<PiPlayFill />}
       onClick={resumeProcessor}
       colorScheme="green"
     />

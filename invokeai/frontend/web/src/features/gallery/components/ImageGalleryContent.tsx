@@ -15,7 +15,8 @@ import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup'
 import { galleryViewChanged } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaImages, FaServer } from 'react-icons/fa';
+import { PiImagesBold } from 'react-icons/pi';
+import { RiServerLine } from 'react-icons/ri';
 
 import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';
@@ -83,7 +84,7 @@ const ImageGalleryContent = () => {
                   isChecked={galleryView === 'images'}
                   onClick={handleClickImages}
                   w="full"
-                  leftIcon={<FaImages />}
+                  leftIcon={<PiImagesBold size="16px" />}
                   data-testid="images-tab"
                 >
                   {t('parameters.images')}
@@ -94,7 +95,7 @@ const ImageGalleryContent = () => {
                   isChecked={galleryView === 'assets'}
                   onClick={handleClickAssets}
                   w="full"
-                  leftIcon={<FaServer />}
+                  leftIcon={<RiServerLine size="16px" />}
                   data-testid="assets-tab"
                 >
                   {t('gallery.assets')}

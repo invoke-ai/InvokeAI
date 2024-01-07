@@ -20,7 +20,7 @@ import {
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { Fragment, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaPlus } from 'react-icons/fa';
+import { PiPlusBold } from 'react-icons/pi';
 
 const selector = createMemoizedSelector(
   selectControlAdaptersSlice,
@@ -103,7 +103,7 @@ export const ControlSettingsAccordion: React.FC = memo(() => {
         >
           <InvButton
             tooltip={t('controlnet.addControlNet')}
-            leftIcon={<FaPlus />}
+            leftIcon={<PiPlusBold />}
             onClick={addControlNet}
             data-testid="add controlnet"
             flexGrow={1}
@@ -113,7 +113,7 @@ export const ControlSettingsAccordion: React.FC = memo(() => {
           </InvButton>
           <InvButton
             tooltip={t('controlnet.addIPAdapter')}
-            leftIcon={<FaPlus />}
+            leftIcon={<PiPlusBold />}
             onClick={addIPAdapter}
             data-testid="add ip adapter"
             flexGrow={1}
@@ -123,7 +123,7 @@ export const ControlSettingsAccordion: React.FC = memo(() => {
           </InvButton>
           <InvButton
             tooltip={t('controlnet.addT2IAdapter')}
-            leftIcon={<FaPlus />}
+            leftIcon={<PiPlusBold />}
             onClick={addT2IAdapter}
             data-testid="add t2i adapter"
             flexGrow={1}
