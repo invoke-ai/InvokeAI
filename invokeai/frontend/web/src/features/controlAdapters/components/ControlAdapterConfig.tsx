@@ -16,7 +16,6 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-// import { FaCopy, FaTrash } from 'react-icons/fa';
 import { PiCopyBold, PiTrashSimpleBold } from 'react-icons/pi';
 import { useToggle } from 'react-use';
 

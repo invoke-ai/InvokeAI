@@ -21,7 +21,6 @@ const AddBoardButton = () => {
       onClick={handleCreateBoard}
       size="sm"
       data-testid="add-board-button"
-      variant="ghost"
     />
   );
 };

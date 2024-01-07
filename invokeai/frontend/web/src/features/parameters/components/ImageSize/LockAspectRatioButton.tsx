@@ -17,9 +17,8 @@ export const LockAspectRatioButton = memo(() => {
       aria-label={t('parameters.lockAspectRatio')}
       onClick={onClick}
       variant={ctx.aspectRatioState.isLocked ? 'outline' : 'ghost'}
-      size="md"
+      size="sm"
       icon={ctx.aspectRatioState.isLocked ? <PiLockSimpleFill /> : <PiLockSimpleOpenBold />}
-      colorScheme={ctx.aspectRatioState.isLocked ? 'red' : 'base'}
     />
   );
 });

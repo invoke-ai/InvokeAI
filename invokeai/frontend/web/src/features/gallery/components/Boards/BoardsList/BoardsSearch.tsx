@@ -1,4 +1,3 @@
-// import { CloseIcon } from '@chakra-ui/icons';
 import { Input, InputGroup, InputRightElement } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';

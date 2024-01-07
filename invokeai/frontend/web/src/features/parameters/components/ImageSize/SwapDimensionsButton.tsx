@@ -16,7 +16,7 @@ export const SwapDimensionsButton = memo(() => {
       aria-label={t('parameters.swapDimensions')}
       onClick={onClick}
       variant="ghost"
-      size="md"
+      size="sm"
       icon={<PiArrowsDownUpBold />}
     />
   );

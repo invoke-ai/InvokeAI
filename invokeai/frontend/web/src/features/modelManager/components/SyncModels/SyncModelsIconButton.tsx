@@ -24,7 +24,7 @@ export const SyncModelsIconButton = memo(
         aria-label={t('modelManager.syncModels')}
         isLoading={isLoading}
         onClick={syncModels}
-        size="md"
+        size="sm"
         variant="ghost"
         {...props}
       />

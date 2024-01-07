@@ -88,7 +88,7 @@ export const ImageSettingsAccordion = memo(() => {
         )}
         <InvExpander>
           <Flex gap={4} pb={4} flexDir="column">
-            <Flex gap={4} alignItems="center" borderBottomWidth="1px" paddingBottom="1.35rem">
+            <Flex gap={4} alignItems="center">
               <ParamSeedNumberInput />
               <ParamSeedShuffle />
               <ParamSeedRandomize />

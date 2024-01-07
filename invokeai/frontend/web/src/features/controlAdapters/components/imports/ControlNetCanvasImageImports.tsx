@@ -31,17 +31,15 @@ const ControlNetCanvasImageImports = (
   return (
     <Flex gap={2}>
       <InvIconButton
-        size="md"
+        size="sm"
         icon={<PiImageSquareBold />}
-        variant="ghost"
         tooltip={t('controlnet.importImageFromCanvas')}
         aria-label={t('controlnet.importImageFromCanvas')}
         onClick={handleImportImageFromCanvas}
       />
       <InvIconButton
-        size="md"
+        size="sm"
         icon={<PiExcludeBold />}
-        variant="ghost"
         tooltip={t('controlnet.importMaskFromCanvas')}
         aria-label={t('controlnet.importMaskFromCanvas')}
         onClick={handleImportMaskFromCanvas}

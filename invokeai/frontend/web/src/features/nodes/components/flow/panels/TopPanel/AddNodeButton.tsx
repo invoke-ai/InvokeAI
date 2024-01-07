@@ -3,7 +3,6 @@ import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { addNodePopoverOpened } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-// import { FaPlus } from 'react-icons/fa';
 import { PiPlusBold } from 'react-icons/pi'
 
 const AddNodeButton = () => {

@@ -22,7 +22,6 @@ export const ParamSeedShuffle = memo(() => {
   return (
     <InvButton
       size="sm"
-      variant="ghost"
       isDisabled={shouldRandomizeSeed}
       onClick={handleClickRandomizeSeed}
       leftIcon={<PiShuffleBold />}

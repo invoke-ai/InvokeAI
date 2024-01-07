@@ -55,7 +55,7 @@ export const AdvancedSettingsAccordion = memo(() => {
   return (
     <InvSingleAccordion label={t('accordions.advanced.title')} badges={badges}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column">
-        <Flex gap={4} w="full" borderBottomWidth="1px" paddingBottom="0.75rem">
+        <Flex gap={4} w="full">
           <ParamVAEModelSelect />
           <ParamVAEPrecision />
         </Flex>
@@ -63,7 +63,7 @@ export const AdvancedSettingsAccordion = memo(() => {
           <ParamClipSkip />
           <ParamCFGRescaleMultiplier />
         </InvControlGroup>
-        <Flex gap={4} w="full" borderTopWidth="1px" paddingTop="0.5rem">
+        <Flex gap={4} w="full">
           <InvControlGroup labelProps={labelProps2}>
             <ParamSeamlessXAxis />
             <ParamSeamlessYAxis />

@@ -41,7 +41,7 @@ export const SetOptimalSizeButton = memo(() => {
       aria-label={t('parameters.setToOptimalSize')}
       onClick={onClick}
       variant="ghost"
-      size="md"
+      size="sm"
       icon={<RiSparklingFill />}
       colorScheme={isSizeTooSmall || isSizeTooLarge ? 'warning' : 'base'}
     />

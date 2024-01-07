@@ -23,7 +23,7 @@ export const ImageSize = memo((props: ImageSizeProps) => {
       <Flex gap={4} alignItems="center">
         <Flex gap={4} flexDirection="column" width="full">
           <InvControlGroup labelProps={labelProps}>
-            <Flex gap={2} alignItems="center" borderBottomWidth="1px" paddingY="0.5rem">
+            <Flex gap={4}>
               <AspectRatioSelect />
               <SwapDimensionsButton />
               <LockAspectRatioButton />
