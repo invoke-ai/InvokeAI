@@ -1,6 +1,7 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
-import { GALLERY_IMAGE_PADDING_PX } from 'features/gallery/components/ImageGrid/ImageGridItemContainer';
+import { imageItemContainerTestId } from 'features/gallery/components/ImageGrid/ImageGridItemContainer';
+import { imageListContainerTestId } from 'features/gallery/components/ImageGrid/ImageGridListContainer';
 import { virtuosoGridRefs } from 'features/gallery/components/ImageGrid/types';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
@@ -27,23 +28,17 @@ import { imagesSelectors } from 'services/api/util';
  * Gets the number of images per row in the gallery by grabbing their DOM elements.
  */
 const getImagesPerRow = (): number => {
-  const imageRect = Object.values(
-    document.getElementsByClassName('gallerygrid-image')
-  )[0]?.getBoundingClientRect();
+  const widthOfGalleryImage =
+    document
+      .querySelector(`[data-testid="${imageItemContainerTestId}"]`)
+      ?.getBoundingClientRect().width ?? 1;
 
-  // We have to manually take into account the padding of the image container, else
-  // imagesPerRow will be wrong when the gallery is large or images are very small.
-  const widthOfGalleryImage = imageRect
-    ? imageRect.width + GALLERY_IMAGE_PADDING_PX * 2
-    : 0;
+  const widthOfGalleryGrid =
+    document
+      .querySelector(`[data-testid="${imageListContainerTestId}"]`)
+      ?.getBoundingClientRect().width ?? 0;
 
-  const galleryGridRect = document
-    .getElementById('gallery-grid')
-    ?.getBoundingClientRect();
-
-  const widthOfGalleryGrid = galleryGridRect?.width ?? 0;
-
-  const imagesPerRow = Math.floor(widthOfGalleryGrid / widthOfGalleryImage);
+  const imagesPerRow = Math.round(widthOfGalleryGrid / widthOfGalleryImage);
 
   return imagesPerRow;
 };
@@ -104,11 +99,11 @@ const getUpImage = (images: ImageDTO[], currentIndex: number) => {
 
 const getDownImage = (images: ImageDTO[], currentIndex: number) => {
   const imagesPerRow = getImagesPerRow();
-  // If we are on the first row, we want to stay on the first row, not go to last image
-  const isOnLastRow = currentIndex >= images.length - imagesPerRow;
-  const index = isOnLastRow
-    ? currentIndex
-    : clamp(currentIndex + imagesPerRow, 0, images.length - 1);
+  // If there are no images below the current image, we want to stay where we are
+  const areImagesBelow = currentIndex < images.length - imagesPerRow;
+  const index = areImagesBelow
+    ? clamp(currentIndex + imagesPerRow, 0, images.length - 1)
+    : currentIndex;
   const image = images[index];
   return { index, image };
 };
@@ -164,7 +159,7 @@ export const useGalleryNavigation = (): UseGalleryNavigationReturn => {
         imagesSelectors.selectAll(data),
         lastSelectedImageIndex
       );
-      if (!image) {
+      if (!image || index === lastSelectedImageIndex) {
         return;
       }
       dispatch(imageSelected(image));
