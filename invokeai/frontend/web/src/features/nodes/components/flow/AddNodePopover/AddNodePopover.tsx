@@ -155,8 +155,9 @@ const AddNodePopover = () => {
         return;
       }
       addNode(v.value);
+      dispatch(addNodePopoverClosed());
     },
-    [addNode]
+    [addNode, dispatch]
   );
 
   const onClose = useCallback(() => {
@@ -235,6 +236,7 @@ const AddNodePopover = () => {
             onMenuClose={onClose}
             onKeyDown={onKeyDown}
             inputRef={inputRef}
+            closeMenuOnSelect={false}
           />
         </InvPopoverBody>
       </InvPopoverContent>
