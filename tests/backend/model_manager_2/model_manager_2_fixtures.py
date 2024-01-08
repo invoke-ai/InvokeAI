@@ -1,6 +1,7 @@
 # Fixtures to support testing of the model_manager v2 installer, metadata and record store
 
 import os
+import shutil
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -9,7 +10,6 @@ from pydantic import BaseModel
 from requests.sessions import Session
 from requests_testadapter import TestAdapter, TestSession
 
-import tests.data as test_data
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadQueueService
 from invokeai.app.services.events.events_base import EventServiceBase
@@ -53,36 +53,40 @@ class DummyEventService(EventServiceBase):
         self.events.append(DummyEvent(event_name=payload["event"], payload=payload["data"]))
 
 
+# Create a temporary directory using the contents of `./data/invokeai_root` as the template
 @pytest.fixture
-def root_dir() -> Path:
-    return Path(str(test_data.__path__[0]))
-
-
-@pytest.fixture
-def embedding_file(root_dir: Path) -> Path:
-    return root_dir / "models" / "test_embedding.safetensors"
-
-
-@pytest.fixture
-def diffusers_dir(root_dir: Path) -> Path:
-    return root_dir / "models" / "test-diffusers-main"
+def mm2_root_dir(tmp_path_factory) -> Path:
+    root_template = Path(__file__).resolve().parent / "data" / "invokeai_root"
+    temp_dir: Path = tmp_path_factory.mktemp("data") / "invokeai_root"
+    shutil.copytree(root_template, temp_dir)
+    return temp_dir
 
 
 @pytest.fixture
-def mm2_app_config(shared_datadir: Path) -> InvokeAIAppConfig:
+def mm2_model_files(tmp_path_factory) -> Path:
+    root_template = Path(__file__).resolve().parent / "data" / "test_files"
+    temp_dir: Path = tmp_path_factory.mktemp("data") / "test_files"
+    shutil.copytree(root_template, temp_dir)
+    return temp_dir
+
+
+@pytest.fixture
+def embedding_file(mm2_model_files: Path) -> Path:
+    return mm2_model_files / "test_embedding.safetensors"
+
+
+@pytest.fixture
+def diffusers_dir(mm2_model_files: Path) -> Path:
+    return mm2_model_files / "test-diffusers-main"
+
+
+@pytest.fixture
+def mm2_app_config(mm2_root_dir: Path) -> InvokeAIAppConfig:
     app_config = InvokeAIAppConfig(
-        root=shared_datadir,
-        models_dir=shared_datadir / "models",
+        root=mm2_root_dir,
+        models_dir=mm2_root_dir / "models",
     )
     return app_config
-
-
-# def mm2_app_config(root_dir: Path) -> InvokeAIAppConfig:
-#     app_config = InvokeAIAppConfig(
-#         root=root_dir,
-#         models_dir=root_dir / "models",
-#     )
-#     return app_config
 
 
 @pytest.fixture
@@ -155,6 +159,7 @@ def mm2_metadata_store(mm2_record_store: ModelRecordServiceSQL) -> ModelMetadata
 
 @pytest.fixture
 def mm2_session(embedding_file: Path, diffusers_dir: Path) -> Session:
+    """This fixtures defines a series of mock URLs for testing download and installation."""
     sess = TestSession()
     sess.mount(
         "https://huggingface.co/api/models/stabilityai/sdxl-turbo",
