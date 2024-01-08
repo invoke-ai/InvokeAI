@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Optional
+from typing import Callable, Optional, List
 
 from PIL.Image import Image as PILImageType
 
@@ -10,7 +10,7 @@ from invokeai.app.services.image_records.image_records_common import (
     ImageRecordChanges,
     ResourceOrigin,
 )
-from invokeai.app.services.images.images_common import ImageDTO
+from invokeai.app.services.images.images_common import ImageDTO, ImageUploadData
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 
@@ -40,6 +40,10 @@ class ImageServiceABC(ABC):
     def _on_deleted(self, item_id: str) -> None:
         for callback in self._on_deleted_callbacks:
             callback(item_id)
+    
+    @abstractmethod
+    async def create_eryx(self, upload_data_list: List[ImageUploadData]) -> List[ImageDTO]:
+        pass
 
     @abstractmethod
     def create(

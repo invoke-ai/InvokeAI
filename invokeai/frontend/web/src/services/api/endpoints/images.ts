@@ -698,10 +698,119 @@ export const imagesApi = api.injectEndpoints({
         }
       },
     }),
+    /*==============================================================*/
+    /*=========================  ERYX CODE =========================*/
+    /*==============================================================*/
+    uploadMultipleImages: build.mutation<
+      ImageDTO[],
+      {
+        formData: File[];
+        image_category: ImageCategory;
+        is_intermediate: boolean;
+        postUploadAction?: PostUploadAction;
+        session_id?: string;
+        board_id?: string;
+        crop_visible?: boolean;
+      }
+    >({
+      query: ({
+        formData,
+        image_category,
+        is_intermediate,
+        session_id,
+        board_id,
+        crop_visible,
+      }) => {
+        
+
+        return {
+          url: `images/upload_multiple`,
+          method: 'POST',
+          body: formData,
+          params: {
+            image_category,
+            is_intermediate,
+            session_id,
+            board_id: board_id === 'none' ? undefined : board_id,
+            crop_visible,
+          },
+        };
+      },
+
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          /**
+           * NOTE: PESSIMISTIC UPDATE
+           * Cache changes for `uploadImage`:
+           * - IF the image is an intermediate:
+           *    - BAIL OUT
+           * - *add* to `getImageDTO`
+           * - *add* to no_board/assets
+           * - update the image's board's assets total
+           */
+
+          const { data: imageDTOs } = await queryFulfilled;
+          console.log("this is intermediate image")
+          imageDTOs.forEach((imageDTO) => {
+            if (imageDTO.is_intermediate) {
+                console.log("this is intermediate image")
+              // Don't add it to anything
+              return;
+            }
+
+            // *add* to `getImageDTO`
+            dispatch(
+              imagesApi.util.upsertQueryData(
+                'getImageDTO',
+                imageDTO.image_name,
+                imageDTO
+              )
+            );
+
+            const categories = getCategories(imageDTO);
+
+            // *add* to no_board/assets
+            dispatch(
+              imagesApi.util.updateQueryData(
+                'listImages',
+                {
+                  board_id: imageDTO.board_id ?? 'none',
+                  categories,
+                },
+                (draft) => {
+                  imagesAdapter.addOne(draft, imageDTO);
+                }
+              )
+            );
+
+            // increment new board's total
+            dispatch(
+              boardsApi.util.updateQueryData(
+                'getBoardAssetsTotal',
+                imageDTO.board_id ?? 'none',
+                (draft) => {
+                  draft.total += 1;
+                }
+              )
+            );
+          });
+        } catch (error) {
+          console.error('Error in onQueryStarted:', error);
+          // query failed, no action needed
+        }
+      },
+    }),
+    /*==============================================================*/
+    /*==============================================================*/
+    /*==============================================================*/
+
+    /*==============================================================*/
+    /*=====================  ORIGINAL CODE =========================*/
+    /*==============================================================*/
     uploadImage: build.mutation<
       ImageDTO,
       {
-        file: File;
+        file: File; // Expecting a single File object
         image_category: ImageCategory;
         is_intermediate: boolean;
         postUploadAction?: PostUploadAction;
@@ -1583,7 +1692,11 @@ export const {
   useLazyGetImageWorkflowQuery,
   useDeleteImageMutation,
   useDeleteImagesMutation,
+
+  useUploadMultipleImagesMutation,
+
   useUploadImageMutation,
+  
   useClearIntermediatesMutation,
   useAddImagesToBoardMutation,
   useRemoveImagesFromBoardMutation,

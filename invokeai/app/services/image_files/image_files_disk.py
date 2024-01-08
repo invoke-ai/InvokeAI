@@ -1,7 +1,11 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 from pathlib import Path
 from queue import Queue
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, List
+
+# Eryx Imports
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from PIL import Image, PngImagePlugin
 from PIL.Image import Image as PILImageType
@@ -52,6 +56,9 @@ class DiskImageFileStorage(ImageFileStorageBase):
         except FileNotFoundError as e:
             raise ImageFileNotFoundException from e
 
+    ############################################################################################################
+    ############################    ORIGINAL CODE   ############################################################
+    ############################################################################################################
     def save(
         self,
         image: PILImageType,
@@ -94,6 +101,10 @@ class DiskImageFileStorage(ImageFileStorageBase):
             self.__set_cache(thumbnail_path, thumbnail_image)
         except Exception as e:
             raise ImageFileSaveException from e
+
+    ############################################################################################################
+    ############################################################################################################
+    ############################################################################################################
 
     def delete(self, image_name: str) -> None:
         try:

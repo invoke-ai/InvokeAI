@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
+from ast import Tuple
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from invokeai.app.invocations.metadata import MetadataField
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
@@ -65,6 +66,11 @@ class ImageRecordStorageBase(ABC):
     @abstractmethod
     def get_intermediates_count(self) -> int:
         """Gets a count of all intermediate images."""
+        pass
+
+    @abstractmethod
+    def save_record_eryx(self, image_records: List[Tuple]) -> List[datetime]:
+        """Saves an image record."""
         pass
 
     @abstractmethod

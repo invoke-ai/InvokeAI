@@ -188,3 +188,9 @@ installer/install.sh
 installer/update.bat
 installer/update.sh
 installer/InvokeAI-Installer/
+
+
+# eryx added
+outputs/**/*
+models/**/*
+configs/**/*
