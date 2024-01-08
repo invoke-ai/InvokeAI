@@ -51,10 +51,12 @@ export const {
   selectTotal: selectControlAdapterTotal,
 } = caAdapterSelectors;
 
-export const initialControlAdapterState: ControlAdaptersState =
+export const initialControlAdaptersState: ControlAdaptersState =
   caAdapter.getInitialState<{
+    _version: 1;
     pendingControlImages: string[];
   }>({
+    _version: 1,
     pendingControlImages: [],
   });
 
@@ -96,7 +98,7 @@ export const selectValidT2IAdapters = (controlAdapters: ControlAdaptersState) =>
 
 export const controlAdaptersSlice = createSlice({
   name: 'controlAdapters',
-  initialState: initialControlAdapterState,
+  initialState: initialControlAdaptersState,
   reducers: {
     controlAdapterAdded: {
       reducer: (
@@ -435,7 +437,7 @@ export const controlAdaptersSlice = createSlice({
       caAdapter.updateOne(state, update);
     },
     controlAdaptersReset: () => {
-      return cloneDeep(initialControlAdapterState);
+      return cloneDeep(initialControlAdaptersState);
     },
     pendingControlImagesCleared: (state) => {
       state.pendingControlImages = [];
@@ -493,3 +495,11 @@ export const isAnyControlAdapterAdded = isAnyOf(
 
 export const selectControlAdaptersSlice = (state: RootState) =>
   state.controlAdapters;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateControlAdaptersState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

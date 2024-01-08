@@ -7,6 +7,7 @@ import type { InvokeTabName } from './tabMap';
 import type { UIState } from './uiTypes';
 
 export const initialUIState: UIState = {
+  _version: 1,
   activeTab: 'txt2img',
   shouldShowImageDetails: false,
   shouldShowExistingModelsInSearch: false,
@@ -63,3 +64,11 @@ export const {
 export default uiSlice.reducer;
 
 export const selectUiSlice = (state: RootState) => state.ui;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateUIState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

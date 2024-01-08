@@ -29,6 +29,7 @@ import type { ImageDTO } from 'services/api/types';
 import type { GenerationState } from './types';
 
 export const initialGenerationState: GenerationState = {
+  _version: 1,
   cfgScale: 7.5,
   cfgRescaleMultiplier: 0,
   height: 512,
@@ -276,3 +277,12 @@ export const { selectOptimalDimension } = generationSlice.selectors;
 export default generationSlice.reducer;
 
 export const selectGenerationSlice = (state: RootState) => state.generation;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateGenerationState = (state: any): GenerationState => {
+  if (!('_version' in state)) {
+    state._version = 1;
+    state.aspectRatio = initialAspectRatioState;
+  }
+  return state;
+};

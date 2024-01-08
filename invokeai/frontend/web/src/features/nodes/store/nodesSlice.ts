@@ -96,6 +96,7 @@ const initialNodeExecutionState: Omit<NodeExecutionState, 'nodeId'> = {
 };
 
 export const initialNodesState: NodesState = {
+  _version: 1,
   nodes: [],
   edges: [],
   isReady: false,
@@ -990,3 +991,11 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
 export default nodesSlice.reducer;
 
 export const selectNodesSlice = (state: RootState) => state.nodes;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateNodesState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

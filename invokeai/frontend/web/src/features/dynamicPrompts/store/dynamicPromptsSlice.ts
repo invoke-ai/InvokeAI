@@ -7,7 +7,9 @@ export const zSeedBehaviour = z.enum(['PER_ITERATION', 'PER_PROMPT']);
 export type SeedBehaviour = z.infer<typeof zSeedBehaviour>;
 export const isSeedBehaviour = (v: unknown): v is SeedBehaviour =>
   zSeedBehaviour.safeParse(v).success;
+
 export interface DynamicPromptsState {
+  _version: 1;
   maxPrompts: number;
   combinatorial: boolean;
   prompts: string[];
@@ -18,6 +20,7 @@ export interface DynamicPromptsState {
 }
 
 export const initialDynamicPromptsState: DynamicPromptsState = {
+  _version: 1,
   maxPrompts: 100,
   combinatorial: true,
   prompts: [],
@@ -78,3 +81,11 @@ export default dynamicPromptsSlice.reducer;
 
 export const selectDynamicPromptsSlice = (state: RootState) =>
   state.dynamicPrompts;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateDynamicPromptsState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

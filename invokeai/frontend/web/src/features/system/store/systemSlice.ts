@@ -25,6 +25,7 @@ import {
 import type { Language, SystemState } from './types';
 
 export const initialSystemState: SystemState = {
+  _version: 1,
   isInitialized: false,
   isConnected: false,
   shouldConfirmOnDelete: true,
@@ -217,3 +218,11 @@ const isAnyServerError = isAnyOf(
 );
 
 export const selectSystemSlice = (state: RootState) => state.system;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateSystemState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

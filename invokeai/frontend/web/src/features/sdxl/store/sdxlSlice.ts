@@ -9,6 +9,7 @@ import type {
 } from 'features/parameters/types/parameterSchemas';
 
 type SDXLState = {
+  _version: 1;
   positiveStylePrompt: ParameterPositiveStylePromptSDXL;
   negativeStylePrompt: ParameterNegativeStylePromptSDXL;
   shouldConcatSDXLStylePrompt: boolean;
@@ -22,6 +23,7 @@ type SDXLState = {
 };
 
 export const initialSDXLState: SDXLState = {
+  _version: 1,
   positiveStylePrompt: '',
   negativeStylePrompt: '',
   shouldConcatSDXLStylePrompt: true,
@@ -96,3 +98,11 @@ export const {
 export default sdxlSlice.reducer;
 
 export const selectSdxlSlice = (state: RootState) => state.sdxl;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateSDXLState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

@@ -19,6 +19,7 @@ import type {
 } from 'features/parameters/types/parameterSchemas';
 
 export interface GenerationState {
+  _version: 1;
   cfgScale: ParameterCFGScale;
   cfgRescaleMultiplier: ParameterCFGRescaleMultiplier;
   height: ParameterHeight;
