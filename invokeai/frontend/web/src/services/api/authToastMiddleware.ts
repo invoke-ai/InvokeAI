@@ -21,7 +21,6 @@ const zRejectedForbiddenAction = z.object({
 export const authToastMiddleware: Middleware =
   (api: MiddlewareAPI) => (next) => (action) => {
     if (isRejectedWithValue(action)) {
-      console.log(action)
       try {
         const parsed = zRejectedForbiddenAction.parse(action);
         if (parsed.meta?.arg?.endpointName === "getImageDTO") {
