@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field, ValidationError
 
 from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordChanges, ResourceOrigin
-from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException
 from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID, WorkflowWithoutIDValidator
@@ -373,13 +372,16 @@ async def unstar_images_in_list(
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to unstar images")
 
+
 class ImagesDownloaded(BaseModel):
     response: Optional[str] = Field(
         description="If defined, the message to display to the user when images begin downloading"
     )
 
 
-@images_router.post("/download", operation_id="download_images_from_list", response_model=ImagesDownloaded, status_code=202)
+@images_router.post(
+    "/download", operation_id="download_images_from_list", response_model=ImagesDownloaded, status_code=202
+)
 async def download_images_from_list(
     background_tasks: BackgroundTasks,
     image_names: list[str] = Body(description="The list of names of images to download", embed=True),
@@ -389,6 +391,7 @@ async def download_images_from_list(
 ) -> ImagesDownloaded:
     if (image_names is None or len(image_names) == 0) and board_id is None:
         raise HTTPException(status_code=400, detail="No images or board id specified.")
-    background_tasks.add_task(ApiDependencies.invoker.services.bulk_download.handler, ApiDependencies.invoker, image_names, board_id)
+    background_tasks.add_task(
+        ApiDependencies.invoker.services.bulk_download.handler, ApiDependencies.invoker, image_names, board_id
+    )
     return ImagesDownloaded(response="Your images are preparing to be downloaded")
-    
