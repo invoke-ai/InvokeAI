@@ -1,8 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
-import {
-  socketQueueItemStatusChanged,
-} from 'services/events/actions';
+import { socketQueueItemStatusChanged } from 'services/events/actions';
 
 import { startAppListening } from '../..';
 

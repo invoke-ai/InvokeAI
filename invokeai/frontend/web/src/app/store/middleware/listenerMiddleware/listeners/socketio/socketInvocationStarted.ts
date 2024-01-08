@@ -1,7 +1,5 @@
 import { logger } from 'app/logging/logger';
-import {
-  socketInvocationStarted,
-} from 'services/events/actions';
+import { socketInvocationStarted } from 'services/events/actions';
 
 import { startAppListening } from '../..';
 

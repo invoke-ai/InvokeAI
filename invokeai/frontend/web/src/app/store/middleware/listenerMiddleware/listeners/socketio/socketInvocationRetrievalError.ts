@@ -1,7 +1,5 @@
 import { logger } from 'app/logging/logger';
-import {
-  socketInvocationRetrievalError,
-} from 'services/events/actions';
+import { socketInvocationRetrievalError } from 'services/events/actions';
 
 import { startAppListening } from '../..';
 
