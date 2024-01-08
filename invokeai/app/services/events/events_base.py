@@ -16,6 +16,7 @@ from invokeai.backend.model_manager import AnyModelConfig
 
 class EventServiceBase:
     queue_event: str = "queue_event"
+    bulk_download_event: str = "bulk_download_event"
     download_event: str = "download_event"
     model_event: str = "model_event"
 
@@ -23,6 +24,14 @@ class EventServiceBase:
 
     def dispatch(self, event_name: str, payload: Any) -> None:
         pass
+
+    def _emit_bulk_download_event(self, event_name: str, payload: dict) -> None:
+        """Bulk download events are emitted to a room with queue_id as the room name"""
+        payload["timestamp"] = get_timestamp()
+        self.dispatch(
+            event_name=EventServiceBase.bulk_download_event,
+            payload={"event": event_name, "data": payload},
+        )
 
     def __emit_queue_event(self, event_name: str, payload: dict) -> None:
         """Queue events are emitted to a room with queue_id as the room name"""
@@ -429,4 +438,26 @@ class EventServiceBase:
                 "error_type": error_type,
                 "error": error,
             },
+        )
+
+    def emit_bulk_download_started(self, bulk_download_id: str) -> None:
+        """Emitted when a bulk download starts"""
+        self._emit_bulk_download_event(
+            event_name="bulk_download_started",
+            payload={"bulk_download_id": bulk_download_id, }
+        )
+    
+    def emit_bulk_download_completed(self, bulk_download_id: str, file_path: str) -> None:
+        """Emitted when a bulk download completes"""
+        self._emit_bulk_download_event(
+            event_name="bulk_download_completed",
+            payload={"bulk_download_id": bulk_download_id,
+                    "file_path": file_path}
+        )
+    
+    def emit_bulk_download_failed(self, bulk_download_id: str, error: str) -> None:
+        """Emitted when a bulk download fails"""
+        self._emit_bulk_download_event(
+            event_name="bulk_download_failed",
+            payload={"bulk_download_id": bulk_download_id, "error": error}
         )
