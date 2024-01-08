@@ -11,13 +11,24 @@ const zRejectedForbiddenAction = z.object({
       detail: z.string(),
     }),
   }),
+  meta: z.object({
+    arg: z.object({
+      endpointName: z.string().optional()
+    }).optional()
+  }).optional()
 });
 
 export const authToastMiddleware: Middleware =
   (api: MiddlewareAPI) => (next) => (action) => {
     if (isRejectedWithValue(action)) {
+      console.log(action)
       try {
         const parsed = zRejectedForbiddenAction.parse(action);
+        if (parsed.meta?.arg?.endpointName === "getImageDTO") {
+          // do not show toast if problem is image access
+          return;
+        }
+
         const { dispatch } = api;
         const customMessage =
           parsed.payload.data.detail !== 'Forbidden'
