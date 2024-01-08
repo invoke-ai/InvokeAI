@@ -14,16 +14,18 @@ export const defaultLoRAConfig = {
 };
 
 export type LoraState = {
+  _version: 1;
   loras: Record<string, LoRA>;
 };
 
-export const intialLoraState: LoraState = {
+export const initialLoraState: LoraState = {
+  _version: 1,
   loras: {},
 };
 
 export const loraSlice = createSlice({
   name: 'lora',
-  initialState: intialLoraState,
+  initialState: initialLoraState,
   reducers: {
     loraAdded: (state, action: PayloadAction<LoRAModelConfigEntity>) => {
       const { model_name, id, base_model } = action.payload;
@@ -77,3 +79,11 @@ export const {
 export default loraSlice.reducer;
 
 export const selectLoraSlice = (state: RootState) => state.lora;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateLoRAState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

@@ -106,3 +106,11 @@ const isAnyBoardDeleted = isAnyOf(
 );
 
 export const selectGallerySlice = (state: RootState) => state.gallery;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateGalleryState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

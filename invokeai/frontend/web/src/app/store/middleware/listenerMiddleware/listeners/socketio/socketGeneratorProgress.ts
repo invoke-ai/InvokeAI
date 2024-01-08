@@ -1,20 +1,15 @@
 import { logger } from 'app/logging/logger';
-import {
-  appSocketGeneratorProgress,
-  socketGeneratorProgress,
-} from 'services/events/actions';
+import { socketGeneratorProgress } from 'services/events/actions';
 
 import { startAppListening } from '../..';
+
+const log = logger('socketio');
 
 export const addGeneratorProgressEventListener = () => {
   startAppListening({
     actionCreator: socketGeneratorProgress,
-    effect: (action, { dispatch }) => {
-      const log = logger('socketio');
-
+    effect: (action) => {
       log.trace(action.payload, `Generator progress`);
-
-      dispatch(appSocketGeneratorProgress(action.payload));
     },
   });
 };

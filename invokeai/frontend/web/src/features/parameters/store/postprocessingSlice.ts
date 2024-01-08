@@ -14,10 +14,12 @@ export const isParamESRGANModelName = (v: unknown): v is ParamESRGANModelName =>
   zParamESRGANModelName.safeParse(v).success;
 
 export interface PostprocessingState {
+  _version: 1;
   esrganModelName: ParamESRGANModelName;
 }
 
 export const initialPostprocessingState: PostprocessingState = {
+  _version: 1,
   esrganModelName: 'RealESRGAN_x4plus.pth',
 };
 
@@ -40,3 +42,11 @@ export default postprocessingSlice.reducer;
 
 export const selectPostprocessingSlice = (state: RootState) =>
   state.postprocessing;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migratePostprocessingState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};
