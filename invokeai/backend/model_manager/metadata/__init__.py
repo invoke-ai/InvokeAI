@@ -22,6 +22,7 @@ from .fetch import CivitaiMetadataFetch, HuggingFaceMetadataFetch
 from .metadata_base import (
     AnyModelRepoMetadata,
     AnyModelRepoMetadataValidator,
+    BaseMetadata,
     CivitaiMetadata,
     CommercialUsage,
     HuggingFaceMetadata,
@@ -42,7 +43,7 @@ __all__ = [
     "HuggingFaceMetadataFetch",
     "LicenseRestrictions",
     "ModelMetadataStore",
-    "ModelMetadataStore",
+    "BaseMetadata",
     "ModelMetadataWithFiles",
     "RemoteModelFile",
     "UnknownMetadataException",

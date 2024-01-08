@@ -118,6 +118,16 @@ class ModelMetadataStore:
 
         return self.get_metadata(model_key)
 
+    def list_tags(self) -> Set[str]:
+        """Return all tags in the tags table."""
+        self._cursor.execute(
+            """--sql
+            select tag_text from tags;
+            """,
+            (),
+        )
+        return {x[0] for x in self._cursor.fetchall()}
+
     def search_by_tag(self, tags: Set[str]) -> Set[str]:
         """Return the keys of models containing all of the listed tags."""
         with self._db.lock:

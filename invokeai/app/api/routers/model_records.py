@@ -16,8 +16,11 @@ from invokeai.app.services.model_install import ModelInstallJob, ModelSource
 from invokeai.app.services.model_records import (
     DuplicateModelException,
     InvalidModelException,
+    ModelRecordOrderBy,
+    ModelSummary,
     UnknownModelException,
 )
+from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
@@ -97,6 +100,16 @@ async def get_model_record(
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@model_records_router.get("/meta", operation_id="list_model_summary")
+async def list_model_summary(
+    page: int = Query(default=0, description="The page to get"),
+    per_page: int = Query(default=10, description="The number of models per page"),
+    order_by: ModelRecordOrderBy = Query(default=ModelRecordOrderBy.Default, description="The attribute to order by"),
+) -> PaginatedResults[ModelSummary]:
+    """Gets a page of model summary data."""
+    return ApiDependencies.invoker.services.model_records.list_models(page=page, per_page=per_page, order_by=order_by)
+
+
 @model_records_router.get(
     "/meta/i/{key}",
     operation_id="get_model_metadata",
@@ -119,21 +132,12 @@ async def get_model_metadata(
 
 @model_records_router.get(
     "/tags",
-    operation_id="list_model_tags",
+    operation_id="list_tags",
 )
-async def list_model_tags(
-    key: Optional[str] = Query(default=None, description="Optional model key; otherwise returns tags for all models"),
-) -> List[ModelTagSet]:
-    """Get a list of models."""
+async def list_tags() -> Set[str]:
+    """Get a unique set of all the model tags."""
     record_store = ApiDependencies.invoker.services.model_records
-    if key:
-        if metadata := record_store.get_metadata(key):
-            return [ModelTagSet(key=key, name=metadata.name, author=metadata.author, tags=metadata.tags)]
-        else:
-            return []
-    else:
-        all_metadata = record_store.list_all_metadata()
-        return [ModelTagSet(key=x[0], name=x[1].name, author=x[1].author, tags=x[1].tags) for x in all_metadata]
+    return record_store.list_tags()
 
 
 @model_records_router.get(
@@ -222,9 +226,7 @@ async def del_model_record(
 async def add_model_record(
     config: Annotated[AnyModelConfig, Body(description="Model config", discriminator="type")],
 ) -> AnyModelConfig:
-    """
-    Add a model using the configuration information appropriate for its type.
-    """
+    """Add a model using the configuration information appropriate for its type."""
     logger = ApiDependencies.invoker.services.logger
     record_store = ApiDependencies.invoker.services.model_records
     if config.key == "<NOKEY>":

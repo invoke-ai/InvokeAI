@@ -76,6 +76,12 @@ class ModelMetadataBase(BaseModel):
     tags: Set[str] = Field(description="tags provided by model source")
 
 
+class BaseMetadata(ModelMetadataBase):
+    """Adds typing data for discriminated union."""
+
+    type: Literal["basemetadata"] = "basemetadata"
+
+
 class ModelMetadataWithFiles(ModelMetadataBase):
     """Base class for metadata that contains a list of downloadable model file(s)."""
 
@@ -192,5 +198,5 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
         return [x for x in self.files if x.path in paths]
 
 
-AnyModelRepoMetadata = Annotated[Union[HuggingFaceMetadata, CivitaiMetadata], Field(discriminator="type")]
+AnyModelRepoMetadata = Annotated[Union[BaseMetadata, HuggingFaceMetadata, CivitaiMetadata], Field(discriminator="type")]
 AnyModelRepoMetadataValidator = TypeAdapter(AnyModelRepoMetadata)

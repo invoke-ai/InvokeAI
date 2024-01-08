@@ -73,11 +73,23 @@ def test_install(
     assert model_record.source == embedding_file.as_posix()
 
 
+@pytest.mark.parametrize(
+    "fixture_name,size,destination",
+    [
+        ("embedding_file", 15440, "sd-1/embedding/test_embedding.safetensors"),
+        ("diffusers_dir", 7942, "sdxl/main/test-diffusers-main"),
+    ],
+)
 def test_background_install(
-    mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
+    mm2_installer: ModelInstallServiceBase,
+    fixture_name: str,
+    size: int,
+    destination: str,
+    mm2_app_config: InvokeAIAppConfig,
+    request: pytest.FixtureRequest,
 ) -> None:
     """Note: may want to break this down into several smaller unit tests."""
-    path = embedding_file
+    path: Path = request.getfixturevalue(fixture_name)
     description = "Test of metadata assignment"
     source = LocalModelSource(path=path, inplace=False)
     job = mm2_installer.import_model(source, config={"description": description})
@@ -93,6 +105,7 @@ def test_background_install(
     my_job = [x for x in jobs if x.source == source]
     assert len(my_job) == 1
     assert my_job[0].status == InstallStatus.COMPLETED
+    assert my_job[0].total_bytes == size
 
     # test that the expected events were issued
     bus = mm2_installer.event_bus
@@ -111,7 +124,7 @@ def test_background_install(
     # see if the thing actually got installed at the expected location
     model_record = mm2_installer.record_store.get_model(key)
     assert model_record is not None
-    assert model_record.path == "sd-1/embedding/test_embedding.safetensors"
+    assert model_record.path == destination
     assert Path(mm2_app_config.models_dir / model_record.path).exists()
 
     # see if metadata was properly passed through

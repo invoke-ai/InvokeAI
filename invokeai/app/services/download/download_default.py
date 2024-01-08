@@ -239,6 +239,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         if not resp.ok:
             raise HTTPError(resp.reason)
 
+        job.content_type = resp.headers.get("Content-Type")
         content_length = int(resp.headers.get("content-length", 0))
         job.total_bytes = content_length
 

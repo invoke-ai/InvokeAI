@@ -216,6 +216,11 @@ exclude = [
 ]
 #=== End: Ruff
 
+#=== Begin: Flake8
+[tool.flake8]
+max-line-length = 120
+#=== End: Flake8
+
 #=== Begin: MyPy
 
 # global mypy config

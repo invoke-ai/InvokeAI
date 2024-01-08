@@ -1,5 +1,6 @@
 """Model installation class."""
 
+import os
 import re
 import threading
 import time
@@ -289,11 +290,15 @@ class ModelInstallService(ModelInstallServiceBase):
             try:
                 if job.cancelled:
                     self._signal_job_cancelled(job)
+
                 elif job.errored:
                     self._signal_job_errored(job)
+
                 elif (
                     job.waiting or job.downloading
                 ):  # local jobs will be in waiting state, remote jobs will be downloading state
+                    job.total_bytes = self._stat_size(job.local_path)
+                    job.bytes = job.total_bytes
                     self._signal_job_running(job)
                     if job.inplace:
                         key = self.register_path(job.local_path, job.config_in)
@@ -307,11 +312,14 @@ class ModelInstallService(ModelInstallServiceBase):
                     self._signal_job_completed(job)
 
             except InvalidModelConfigException as excp:
-                if "unrecognized suffix" in str(excp):
-                    excp = InvalidModelConfigException(
-                        f"The file {job.local_path} is not recognized as a model. Check the URL and access token."
+                if any(x.content_type is not None and "text/html" in x.content_type for x in job.download_parts):
+                    job.set_error(
+                        InvalidModelConfigException(
+                            f"At least one file in {job.local_path} is an HTML page, not a model. This can happen when an access token is required to download."
+                        )
                     )
-                job.set_error(excp)
+                else:
+                    job.set_error(excp)
                 self._signal_job_errored(job)
 
             except (OSError, DuplicateModelException) as excp:
@@ -601,6 +609,16 @@ class ModelInstallService(ModelInstallServiceBase):
                 on_cancelled=self._download_cancelled_callback,
             )
         return install_job
+
+    def _stat_size(self, path: Path) -> int:
+        size = 0
+        if path.is_file():
+            size = path.stat().st_size
+        elif path.is_dir():
+            for root, dirs, files in os.walk(path):
+                size += sum(self._stat_size(Path(root, x)) for x in files)
+                size += sum(Path(root, x).stat().st_size for x in dirs)
+        return size
 
     # ------------------------------------------------------------------
     # Callbacks are executed by the download queue in a separate thread

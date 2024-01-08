@@ -23,10 +23,11 @@ from tests.backend.model_manager_2.model_manager_2_fixtures import *  # noqa F40
 
 
 def test_metadata_store_put_get(mm2_metadata_store: ModelMetadataStore) -> None:
+    tags = {"text-to-image", "diffusers"}
     input_metadata = HuggingFaceMetadata(
         name="sdxl-vae",
         author="stabilityai",
-        tags={"text-to-image", "diffusers"},
+        tags=tags,
         id="stabilityai/sdxl-vae",
         tag_dict={"license": "other"},
         last_modified=datetime.datetime.now(),
@@ -36,6 +37,7 @@ def test_metadata_store_put_get(mm2_metadata_store: ModelMetadataStore) -> None:
     assert input_metadata == output_metadata
     with pytest.raises(UnknownMetadataException):
         mm2_metadata_store.add_metadata("unknown_key", input_metadata)
+    assert mm2_metadata_store.list_tags() == tags
 
 
 def test_metadata_store_update(mm2_metadata_store: ModelMetadataStore) -> None:
@@ -110,8 +112,16 @@ def test_metadata_search(mm2_metadata_store: ModelMetadataStore) -> None:
     # does the tag table update correctly?
     matches = mm2_metadata_store.search_by_tag({"checkpoint", "licensed-for-commercial-use"})
     assert not matches
+    assert mm2_metadata_store.list_tags() == {"text-to-image", "diffusers", "community-contributed", "checkpoint"}
     metadata3.tags.add("licensed-for-commercial-use")
     mm2_metadata_store.update_metadata("test_config_3", metadata3)
+    assert mm2_metadata_store.list_tags() == {
+        "text-to-image",
+        "diffusers",
+        "community-contributed",
+        "checkpoint",
+        "licensed-for-commercial-use",
+    }
     matches = mm2_metadata_store.search_by_tag({"checkpoint", "licensed-for-commercial-use"})
     assert len(matches) == 1
 

@@ -169,9 +169,7 @@ class ModelInstallJob(BaseModel):
     bytes: Optional[int] = Field(
         default=None, description="For a remote model, the number of bytes downloaded so far (may not be available)"
     )
-    total_bytes: Optional[int] = Field(
-        default=None, description="Total size of the model to be installed (may not be available)"
-    )
+    total_bytes: int = Field(default=0, description="Total size of the model to be installed")
     download_parts: Set[DownloadJob] = Field(
         default_factory=set, description="Download jobs contributing to this install"
     )

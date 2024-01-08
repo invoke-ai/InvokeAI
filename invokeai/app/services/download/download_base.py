@@ -56,6 +56,7 @@ class DownloadJob(BaseModel):
     job_ended: Optional[str] = Field(
         default=None, description="Timestamp for when the download job ende1d (completed or errored)"
     )
+    content_type: Optional[str] = Field(default=None, description="Content type of downloaded file")
     bytes: int = Field(default=0, description="Bytes downloaded so far")
     total_bytes: int = Field(default=0, description="Total file size (bytes)")
 

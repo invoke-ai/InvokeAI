@@ -54,13 +54,18 @@ class DummyEventService(EventServiceBase):
 
 
 @pytest.fixture
-def embedding_file() -> Path:
-    return Path(str(test_data.__path__[0]), "models", "test_embedding.safetensors")
+def root_dir() -> Path:
+    return Path(str(test_data.__path__[0]))
 
 
 @pytest.fixture
-def diffusers_dir() -> Path:
-    return Path(str(test_data.__path__[0]), "models", "test-diffusers-main")
+def embedding_file(root_dir: Path) -> Path:
+    return root_dir / "models" / "test_embedding.safetensors"
+
+
+@pytest.fixture
+def diffusers_dir(root_dir: Path) -> Path:
+    return root_dir / "models" / "test-diffusers-main"
 
 
 @pytest.fixture
@@ -72,12 +77,20 @@ def mm2_app_config(shared_datadir: Path) -> InvokeAIAppConfig:
     return app_config
 
 
+# def mm2_app_config(root_dir: Path) -> InvokeAIAppConfig:
+#     app_config = InvokeAIAppConfig(
+#         root=root_dir,
+#         models_dir=root_dir / "models",
+#     )
+#     return app_config
+
+
 @pytest.fixture
 def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceSQL:
     logger = InvokeAILogger.get_logger(config=mm2_app_config)
     db = create_mock_sqlite_database(mm2_app_config, logger)
     store = ModelRecordServiceSQL(db)
-    # add three simple config records to the database
+    # add five simple config records to the database
     raw1 = {
         "path": "/tmp/foo1",
         "format": ModelFormat("diffusers"),
@@ -106,10 +119,31 @@ def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceSQL
         "type": ModelType("main"),
         "original_hash": "111222333444",
         "source": "author3/model3",
+        "description": "This is test 3",
+    }
+    raw4 = {
+        "path": "/tmp/foo4",
+        "format": ModelFormat("diffusers"),
+        "name": "test4",
+        "base": BaseModelType("sdxl"),
+        "type": ModelType("lora"),
+        "original_hash": "111222333444",
+        "source": "author4/model4",
+    }
+    raw5 = {
+        "path": "/tmp/foo5",
+        "format": ModelFormat("diffusers"),
+        "name": "test5",
+        "base": BaseModelType("sd-1"),
+        "type": ModelType("lora"),
+        "original_hash": "111222333444",
+        "source": "author4/model5",
     }
     store.add_model("test_config_1", raw1)
     store.add_model("test_config_2", raw2)
     store.add_model("test_config_3", raw3)
+    store.add_model("test_config_4", raw4)
+    store.add_model("test_config_5", raw5)
     return store
 
 
