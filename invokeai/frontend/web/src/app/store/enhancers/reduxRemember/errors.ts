@@ -3,32 +3,26 @@ import { parseify } from 'common/util/serialize';
 import { PersistError, RehydrateError } from 'redux-remember';
 import { serializeError } from 'serialize-error';
 
-export class StorageSetError extends Error {
+export type StorageErrorArgs = {
   key: string;
   /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ // any is correct
-  value: any;
+  value?: any;
+  originalError?: unknown;
+};
+
+export class StorageError extends Error {
+  key: string;
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ // any is correct
+  value?: any;
   originalError?: Error;
 
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ // any is correct
-  constructor(key: string, value: any, originalError?: unknown) {
+  constructor({ key, value, originalError }: StorageErrorArgs) {
     super(`Error setting ${key}`);
     this.name = 'StorageSetError';
     this.key = key;
-    this.value = value;
-    if (originalError instanceof Error) {
-      this.originalError = originalError;
+    if (value !== undefined) {
+      this.value = value;
     }
-  }
-}
-
-export class StorageGetError extends Error {
-  key: string;
-  originalError?: Error;
-
-  constructor(key: string, originalError?: unknown) {
-    super(`Error getting ${key}`);
-    this.name = 'StorageSetError';
-    this.key = key;
     if (originalError instanceof Error) {
       this.originalError = originalError;
     }

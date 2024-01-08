@@ -1,7 +1,4 @@
-import {
-  StorageGetError,
-  StorageSetError,
-} from 'app/store/enhancers/reduxRemember/errors';
+import { StorageError } from 'app/store/enhancers/reduxRemember/errors';
 import type { UseStore } from 'idb-keyval';
 import {
   clear,
@@ -26,15 +23,15 @@ export const idbKeyValDriver: Driver = {
   getItem: (key) => {
     try {
       return get(key, $idbKeyValStore.get());
-    } catch (err) {
-      throw new StorageGetError(key, err);
+    } catch (originalError) {
+      throw new StorageError({ key, originalError });
     }
   },
   setItem: (key, value) => {
     try {
       return set(key, value, $idbKeyValStore.get());
-    } catch (err) {
-      throw new StorageSetError(key, value, err);
+    } catch (originalError) {
+      throw new StorageError({ key, value, originalError });
     }
   },
 };
