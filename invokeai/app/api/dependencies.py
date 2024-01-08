@@ -15,6 +15,7 @@ from ..services.board_image_records.board_image_records_sqlite import SqliteBoar
 from ..services.board_images.board_images_default import BoardImagesService
 from ..services.board_records.board_records_sqlite import SqliteBoardRecordStorage
 from ..services.boards.boards_default import BoardService
+from ..services.bulk_download.bulk_download_defauilt import BulkDownloadService
 from ..services.config import InvokeAIAppConfig
 from ..services.download import DownloadQueueService
 from ..services.image_files.image_files_disk import DiskImageFileStorage
@@ -81,6 +82,7 @@ class ApiDependencies:
         board_records = SqliteBoardRecordStorage(db=db)
         boards = BoardService()
         events = FastAPIEventService(event_handler_id)
+        bulk_download = BulkDownloadService(output_folder=f"{output_folder}", event_bus=events)
         image_records = SqliteImageRecordStorage(db=db)
         images = ImageService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
@@ -110,6 +112,7 @@ class ApiDependencies:
             board_images=board_images,
             board_records=board_records,
             boards=boards,
+            bulk_download=bulk_download,
             configuration=configuration,
             events=events,
             image_files=image_files,
