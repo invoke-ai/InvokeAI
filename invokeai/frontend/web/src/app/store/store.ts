@@ -4,6 +4,8 @@ import {
   combineReducers,
   configureStore,
 } from '@reduxjs/toolkit';
+import { idbKeyValDriver } from 'app/store/enhancers/reduxRemember/driver';
+import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
 import canvasReducer from 'features/canvas/store/canvasSlice';
 import changeBoardModalReducer from 'features/changeBoardModal/store/slice';
 import controlAdaptersReducer from 'features/controlAdapters/store/controlAdaptersSlice';
@@ -23,9 +25,7 @@ import sdxlReducer from 'features/sdxl/store/sdxlSlice';
 import configReducer from 'features/system/store/configSlice';
 import systemReducer from 'features/system/store/systemSlice';
 import uiReducer from 'features/ui/store/uiSlice';
-import { createStore as createIDBKeyValStore, get, set } from 'idb-keyval';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
-import type { Driver } from 'redux-remember';
 import { rememberEnhancer, rememberReducer } from 'redux-remember';
 import { api } from 'services/api';
 import { authToastMiddleware } from 'services/api/authToastMiddleware';
@@ -82,15 +82,6 @@ const rememberedKeys: (keyof typeof allReducers)[] = [
   'hrf',
 ];
 
-// Create a custom idb-keyval store (just needed to customize the name)
-export const idbKeyValStore = createIDBKeyValStore('invoke', 'invoke-store');
-
-// Create redux-remember driver, wrapping idb-keyval
-const idbKeyValDriver: Driver = {
-  getItem: (key) => get(key, idbKeyValStore),
-  setItem: (key, value) => set(key, value, idbKeyValStore),
-};
-
 export const createStore = (uniqueStoreKey?: string, persist = true) =>
   configureStore({
     reducer: rememberedRootReducer,
@@ -114,6 +105,7 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
             prefix: uniqueStoreKey
               ? `${STORAGE_PREFIX}${uniqueStoreKey}-`
               : STORAGE_PREFIX,
+            errorHandler,
           })
         );
       }
@@ -124,21 +116,9 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
       stateSanitizer,
       trace: true,
       predicate: (state, action) => {
-        // TODO: hook up to the log level param in system slice
-        // manually type state, cannot type the arg
-        // const typedState = state as ReturnType<typeof rootReducer>;
-
-        // TODO: doing this breaks the rtk query devtools, commenting out for now
-        // if (action.type.startsWith('api/')) {
-        //   // don't log api actions, with manual cache updates they are extremely noisy
-        //   return false;
-        // }
-
         if (actionsDenylist.includes(action.type)) {
-          // don't log other noisy actions
           return false;
         }
-
         return true;
       },
     },
