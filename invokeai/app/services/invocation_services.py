@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from .board_images.board_images_base import BoardImagesServiceABC
     from .board_records.board_records_base import BoardRecordStorageBase
     from .boards.boards_base import BoardServiceABC
+    from .bulk_download.bulk_download_base import BulkDownloadBase
     from .config import InvokeAIAppConfig
     from .download import DownloadQueueServiceBase
     from .events.events_base import EventServiceBase
@@ -41,6 +42,7 @@ class InvocationServices:
         board_image_records: "BoardImageRecordStorageBase",
         boards: "BoardServiceABC",
         board_records: "BoardRecordStorageBase",
+        bulk_download: "BulkDownloadBase",
         configuration: "InvokeAIAppConfig",
         events: "EventServiceBase",
         images: "ImageServiceABC",
@@ -63,6 +65,7 @@ class InvocationServices:
         self.board_image_records = board_image_records
         self.boards = boards
         self.board_records = board_records
+        self.bulk_download = bulk_download
         self.configuration = configuration
         self.events = events
         self.images = images
