@@ -269,31 +269,29 @@ export const controlAdaptersSlice = createSlice({
 
       const update: Update<ControlNetConfig | T2IAdapterConfig, string> = {
         id,
-        changes: { model },
+        changes: { model, shouldAutoConfig: true },
       };
 
       update.changes.processedControlImage = null;
 
-      if (cn.shouldAutoConfig) {
-        let processorType: ControlAdapterProcessorType | undefined = undefined;
+      let processorType: ControlAdapterProcessorType | undefined = undefined;
 
-        for (const modelSubstring in CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS) {
-          if (model.model_name.includes(modelSubstring)) {
-            processorType =
-              CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS[modelSubstring];
-            break;
-          }
+      for (const modelSubstring in CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS) {
+        if (model.model_name.includes(modelSubstring)) {
+          processorType =
+            CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS[modelSubstring];
+          break;
         }
+      }
 
-        if (processorType) {
-          update.changes.processorType = processorType;
-          update.changes.processorNode = CONTROLNET_PROCESSORS[processorType]
-            .default as RequiredControlAdapterProcessorNode;
-        } else {
-          update.changes.processorType = 'none';
-          update.changes.processorNode = CONTROLNET_PROCESSORS.none
-            .default as RequiredControlAdapterProcessorNode;
-        }
+      if (processorType) {
+        update.changes.processorType = processorType;
+        update.changes.processorNode = CONTROLNET_PROCESSORS[processorType]
+          .default as RequiredControlAdapterProcessorNode;
+      } else {
+        update.changes.processorType = 'none';
+        update.changes.processorNode = CONTROLNET_PROCESSORS.none
+          .default as RequiredControlAdapterProcessorNode;
       }
 
       caAdapter.updateOne(state, update);
