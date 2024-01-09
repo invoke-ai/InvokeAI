@@ -462,10 +462,31 @@ export const canvasSlice = createSlice({
     },
     resetCanvas: (state) => {
       state.pastLayerStates.push(cloneDeep(state.layerState));
-
       state.layerState = cloneDeep(initialLayerState);
       state.futureLayerStates = [];
       state.batchIds = [];
+      state.boundingBoxCoordinates = {
+        ...initialCanvasState.boundingBoxCoordinates,
+      };
+      state.boundingBoxDimensions = {
+        ...initialCanvasState.boundingBoxDimensions,
+      };
+      state.stageScale = calculateScale(
+        state.stageDimensions.width,
+        state.stageDimensions.height,
+        state.boundingBoxDimensions.width,
+        state.boundingBoxDimensions.height,
+        STAGE_PADDING_PERCENTAGE
+      );
+      state.stageCoordinates = calculateCoordinates(
+        state.stageDimensions.width,
+        state.stageDimensions.height,
+        0,
+        0,
+        state.boundingBoxDimensions.width,
+        state.boundingBoxDimensions.height,
+        1
+      );
     },
     canvasResized: (
       state,
