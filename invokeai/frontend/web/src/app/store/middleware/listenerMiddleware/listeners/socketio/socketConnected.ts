@@ -25,8 +25,11 @@ export const addSocketConnectedEventListener = () => {
       /**
        * The rest of this listener has recovery logic for when the socket disconnects and reconnects.
        *
-       * If the queue totals have changed while we were disconnected, re-fetch everything, updating
-       * the gallery and queue to recover.
+       * We need to re-fetch if something has changed while we were disconnected. In practice, the only
+       * thing that could change while disconnected is a queue item finishes processing.
+       *
+       * The queue status is a proxy for this - if the queue status has changed, we need to re-fetch
+       * the queries that may have changed while we were disconnected.
        */
 
       // Bail on the recovery logic if this is the first connection - we don't need to recover anything
@@ -35,10 +38,8 @@ export const addSocketConnectedEventListener = () => {
         return;
       }
 
-      /**
-       * Else, we need to compare the last-known queue status with the current queue status, re-fetching
-       * everything if it has changed.
-       */
+      // Else, we need to compare the last-known queue status with the current queue status, re-fetching
+      // everything if it has changed.
 
       if ($baseUrl.get()) {
         // If we have a baseUrl (e.g. not localhost), we need to debounce the re-fetch to not hammer server
@@ -59,32 +60,14 @@ export const addSocketConnectedEventListener = () => {
         const nextQueueStatusData = await queueStatusRequest.unwrap();
         queueStatusRequest.unsubscribe();
 
-        // If the queue hasn't changed, we don't need to recover
+        // If the queue hasn't changed, we don't need to do anything.
         if (isEqual(prevQueueStatusData?.queue, nextQueueStatusData.queue)) {
           return;
         }
 
-        /**
-         * The queue has changed. We need to reset the API state to update everything and recover
-         * from the disconnect.
-         *
-         * TODO: This is rather inefficient. We don't actually need to re-fetch *all* queries, but
-         * determining which queries to re-fetch and how to re-initialize them is non-trivial:
-         *
-         * - We need to keep track of which queries might have different data in this scenario. This
-         * could be handled via tags, but it feels risky - if we miss tagging a critical query, we
-         * could end up with a de-sync'd UI.
-         *
-         * - We need to re-initialize the queries with *the right query args*. This is very tricky,
-         * because the query args are not stored in the API state, but rather in the component state.
-         *
-         * By totally resetting the API state, we also re-fetch things like model lists, which is
-         * probably a good idea anyways.
-         *
-         * PS: RTKQ provides a related abstraction for recovery:
-         * https://redux-toolkit.js.org/rtk-query/api/setupListeners
-         */
-        dispatch(api.util.resetApiState());
+        //The queue has changed. We need to re-fetch everything that may have changed while we were
+        // disconnected.
+        dispatch(api.util.invalidateTags(['FetchOnReconnect']));
       } catch {
         // no-op
         log.debug('Unable to get current queue status on reconnect');
