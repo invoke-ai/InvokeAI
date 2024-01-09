@@ -1,5 +1,8 @@
 import { logger } from 'app/logging/logger';
-import { $canvasBaseLayer , $canvasStage } from 'features/canvas/store/canvasNanostore';
+import {
+  $canvasBaseLayer,
+  $canvasStage,
+} from 'features/canvas/store/canvasNanostore';
 import type {
   CanvasLayerState,
   Dimensions,

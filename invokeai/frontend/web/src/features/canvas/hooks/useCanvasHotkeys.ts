@@ -1,9 +1,11 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
- $canvasStage,  $tool,
+  $canvasStage,
+  $tool,
   $toolStash,
   resetCanvasInteractionState,
-  resetToolInteractionState } from 'features/canvas/store/canvasNanostore';
+  resetToolInteractionState,
+} from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   clearMask,

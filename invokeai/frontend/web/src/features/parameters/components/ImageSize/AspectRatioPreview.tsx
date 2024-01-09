@@ -76,7 +76,11 @@ export const AspectRatioPreview = () => {
               exit={MOTION_ICON_EXIT}
               style={ICON_CONTAINER_STYLES}
             >
-              <Icon as={PiFrameCorners} color="base.700" boxSize={BOX_SIZE_CSS_CALC} />
+              <Icon
+                as={PiFrameCorners}
+                color="base.700"
+                boxSize={BOX_SIZE_CSS_CALC}
+              />
             </Flex>
           )}
         </AnimatePresence>

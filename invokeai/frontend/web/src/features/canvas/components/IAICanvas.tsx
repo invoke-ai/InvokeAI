@@ -10,11 +10,14 @@ import useCanvasMouseOut from 'features/canvas/hooks/useCanvasMouseOut';
 import useCanvasMouseUp from 'features/canvas/hooks/useCanvasMouseUp';
 import useCanvasWheel from 'features/canvas/hooks/useCanvasZoom';
 import {
- $canvasBaseLayer,  $canvasStage,$isModifyingBoundingBox,
+  $canvasBaseLayer,
+  $canvasStage,
+  $isModifyingBoundingBox,
   $isMouseOverBoundingBox,
   $isMovingStage,
   $isTransformingBoundingBox,
-  $tool  } from 'features/canvas/store/canvasNanostore';
+  $tool,
+} from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   canvasResized,

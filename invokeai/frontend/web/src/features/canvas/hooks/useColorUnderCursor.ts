@@ -1,5 +1,9 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import { $canvasBaseLayer,$canvasStage,$tool   } from 'features/canvas/store/canvasNanostore';
+import {
+  $canvasBaseLayer,
+  $canvasStage,
+  $tool,
+} from 'features/canvas/store/canvasNanostore';
 import {
   commitColorPickerColor,
   setColorPickerColor,
