@@ -15,7 +15,7 @@ import {
   canvasMerged,
   canvasSavedToGallery,
 } from 'features/canvas/store/actions';
-import { $canvasBaseLayer,$tool  } from 'features/canvas/store/canvasNanostore';
+import { $canvasBaseLayer, $tool } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   resetCanvas,
@@ -135,26 +135,35 @@ const IAICanvasToolbar = () => {
     $tool.set('move');
   }, []);
 
-  const handleClickResetCanvasView = useSingleAndDoubleClick(
-    () => handleResetCanvasView(false),
-    () => handleResetCanvasView(true)
+  const handleResetCanvasView = useCallback(
+    (shouldScaleTo1 = false) => {
+      const canvasBaseLayer = $canvasBaseLayer.get();
+      if (!canvasBaseLayer) {
+        return;
+      }
+      const clientRect = canvasBaseLayer.getClientRect({
+        skipTransform: true,
+      });
+      dispatch(
+        resetCanvasView({
+          contentRect: clientRect,
+          shouldScaleTo1,
+        })
+      );
+    },
+    [dispatch]
   );
+  const onSingleClick = useCallback(() => {
+    handleResetCanvasView(false);
+  }, [handleResetCanvasView]);
+  const onDoubleClick = useCallback(() => {
+    handleResetCanvasView(true);
+  }, [handleResetCanvasView]);
 
-  const handleResetCanvasView = (shouldScaleTo1 = false) => {
-    const canvasBaseLayer = $canvasBaseLayer.get();
-    if (!canvasBaseLayer) {
-      return;
-    }
-    const clientRect = canvasBaseLayer.getClientRect({
-      skipTransform: true,
-    });
-    dispatch(
-      resetCanvasView({
-        contentRect: clientRect,
-        shouldScaleTo1,
-      })
-    );
-  };
+  const handleClickResetCanvasView = useSingleAndDoubleClick({
+    onSingleClick,
+    onDoubleClick,
+  });
 
   const handleResetCanvas = useCallback(() => {
     dispatch(resetCanvas());

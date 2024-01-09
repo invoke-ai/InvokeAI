@@ -488,32 +488,28 @@ export const canvasSlice = createSlice({
         stageDimensions: { width: stageWidth, height: stageHeight },
       } = state;
 
-      const { x, y, width, height } = contentRect;
+      const newScale = shouldScaleTo1
+        ? 1
+        : calculateScale(
+            stageWidth,
+            stageHeight,
+            contentRect.width || state.boundingBoxDimensions.width,
+            contentRect.height || state.boundingBoxDimensions.height,
+            STAGE_PADDING_PERCENTAGE
+          );
 
-      if (width !== 0 && height !== 0) {
-        const newScale = shouldScaleTo1
-          ? 1
-          : calculateScale(
-              stageWidth,
-              stageHeight,
-              width,
-              height,
-              STAGE_PADDING_PERCENTAGE
-            );
+      const newCoordinates = calculateCoordinates(
+        stageWidth,
+        stageHeight,
+        contentRect.x || state.boundingBoxCoordinates.x,
+        contentRect.y || state.boundingBoxCoordinates.y,
+        contentRect.width || state.boundingBoxDimensions.width,
+        contentRect.height || state.boundingBoxDimensions.height,
+        newScale
+      );
 
-        const newCoordinates = calculateCoordinates(
-          stageWidth,
-          stageHeight,
-          x,
-          y,
-          width,
-          height,
-          newScale
-        );
-
-        state.stageScale = newScale;
-        state.stageCoordinates = newCoordinates;
-      }
+      state.stageScale = newScale;
+      state.stageCoordinates = newCoordinates;
     },
     nextStagingAreaImage: (state) => {
       if (!state.layerState.stagingArea.images.length) {
