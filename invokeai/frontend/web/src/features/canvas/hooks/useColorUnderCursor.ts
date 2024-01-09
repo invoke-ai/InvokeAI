@@ -1,4 +1,5 @@
 import { useAppDispatch } from 'app/store/storeHooks';
+import { $tool } from 'features/canvas/store/canvasNanostore';
 import {
   commitColorPickerColor,
   setColorPickerColor,
@@ -51,6 +52,7 @@ const useColorPicker = () => {
 
   const commitColorUnderCursor = useCallback(() => {
     dispatch(commitColorPickerColor());
+    $tool.set('brush')
   }, [dispatch]);
 
   return { updateColorUnderCursor, commitColorUnderCursor };

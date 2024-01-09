@@ -14,6 +14,7 @@ import {
   $isMouseOverBoundingBox,
   $isMovingStage,
   $isTransformingBoundingBox,
+  $tool,
 } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
@@ -61,7 +62,6 @@ const IAICanvas = () => {
   );
   const shouldShowGrid = useAppSelector((s) => s.canvas.shouldShowGrid);
   const stageScale = useAppSelector((s) => s.canvas.stageScale);
-  const tool = useAppSelector((s) => s.canvas.tool);
   const shouldShowIntermediates = useAppSelector(
     (s) => s.canvas.shouldShowIntermediates
   );
@@ -78,6 +78,7 @@ const IAICanvas = () => {
   const isMovingStage = useStore($isMovingStage);
   const isTransformingBoundingBox = useStore($isTransformingBoundingBox);
   const isMouseOverBoundingBox = useStore($isMouseOverBoundingBox);
+  const tool = useStore($tool);
   useCanvasHotkeys();
   const canvasStageRefCallback = useCallback((el: Konva.Stage) => {
     setCanvasStage(el as Konva.Stage);

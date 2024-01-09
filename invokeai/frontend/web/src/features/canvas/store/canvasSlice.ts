@@ -10,7 +10,6 @@ import calculateScale from 'features/canvas/util/calculateScale';
 import { STAGE_PADDING_PERCENTAGE } from 'features/canvas/util/constants';
 import floorCoordinates from 'features/canvas/util/floorCoordinates';
 import getScaledBoundingBoxDimensions from 'features/canvas/util/getScaledBoundingBoxDimensions';
-import roundDimensionsToMultiple from 'features/canvas/util/roundDimensionsToMultiple';
 import { initialAspectRatioState } from 'features/parameters/components/ImageSize/constants';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import { modelChanged } from 'features/parameters/store/generationSlice';
@@ -86,7 +85,6 @@ export const initialCanvasState: CanvasState = {
   stageCoordinates: { x: 0, y: 0 },
   stageDimensions: { width: 0, height: 0 },
   stageScale: 1,
-  tool: 'brush',
   batchIds: [],
   aspectRatio: {
     id: '1:1',
@@ -119,17 +117,8 @@ export const canvasSlice = createSlice({
   name: 'canvas',
   initialState: initialCanvasState,
   reducers: {
-    setTool: (state, action: PayloadAction<CanvasTool>) => {
-      state.tool = action.payload;
-    },
     setLayer: (state, action: PayloadAction<CanvasLayer>) => {
       state.layer = action.payload;
-    },
-    toggleTool: (state) => {
-      const currentTool = state.tool;
-      if (currentTool !== 'move') {
-        state.tool = currentTool === 'brush' ? 'eraser' : 'brush';
-      }
     },
     setMaskColor: (state, action: PayloadAction<RgbaColor>) => {
       state.maskColor = action.payload;
@@ -376,9 +365,13 @@ export const canvasSlice = createSlice({
 
       state.futureLayerStates = [];
     },
-    addLine: (state, action: PayloadAction<number[]>) => {
-      const { tool, layer, brushColor, brushSize, shouldRestrictStrokesToBox } =
+    addLine: (
+      state,
+      action: PayloadAction<{ points: number[]; tool: CanvasTool }>
+    ) => {
+      const { layer, brushColor, brushSize, shouldRestrictStrokesToBox } =
         state;
+      const { points, tool } = action.payload;
 
       if (tool === 'move' || tool === 'colorPicker') {
         return;
@@ -401,7 +394,7 @@ export const canvasSlice = createSlice({
         layer,
         tool,
         strokeWidth: newStrokeWidth,
-        points: action.payload,
+        points,
         ...newColor,
       };
 
@@ -664,7 +657,6 @@ export const canvasSlice = createSlice({
         ...state.colorPickerColor,
         a: state.brushColor.a,
       };
-      state.tool = 'brush';
     },
     setMergedCanvas: (state, action: PayloadAction<CanvasImage>) => {
       state.pastLayerStates.push(cloneDeep(state.layerState));
@@ -771,9 +763,7 @@ export const {
   setShouldSnapToGrid,
   setStageCoordinates,
   setStageScale,
-  setTool,
   toggleShouldLockBoundingBox,
-  toggleTool,
   undo,
   setScaledBoundingBoxDimensions,
   setShouldRestrictStrokesToBox,
