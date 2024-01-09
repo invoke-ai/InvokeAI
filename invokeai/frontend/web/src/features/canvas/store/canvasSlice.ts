@@ -682,6 +682,12 @@ export const canvasSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(modelChanged, (state, action) => {
+      if (
+        action.meta.previousModel?.base_model === action.payload?.base_model
+      ) {
+        // The base model hasn't changed, we don't need to optimize the size
+        return;
+      }
       const optimalDimension = getOptimalDimension(action.payload);
       const { width, height } = state.boundingBoxDimensions;
       if (getIsSizeOptimal(width, height, optimalDimension)) {
