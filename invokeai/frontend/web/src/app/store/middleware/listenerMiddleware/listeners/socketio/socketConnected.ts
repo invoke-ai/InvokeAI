@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
-import { size } from 'lodash-es';
+import { isEqual, size } from 'lodash-es';
 import { atom } from 'nanostores';
 import { api } from 'services/api';
 import { queueApi, selectQueueStatus } from 'services/api/endpoints/queue';
@@ -25,27 +25,20 @@ export const addSocketConnectedEventListener = () => {
       /**
        * The rest of this listener has recovery logic for when the socket disconnects and reconnects.
        *
-       * If a queue item completed during while disconnected, we need to reset the API state to re-
-       * fetch everything, updating the gallery and queue.
+       * If the queue totals have changed while we were disconnected, re-fetch everything, updating
+       * the gallery and queue to recover.
        */
 
+      // Bail on the recovery logic if this is the first connection - we don't need to recover anything
       if ($isFirstConnection.get()) {
-        // Bail on the recovery logic if this is the first connection - we don't need to recover anything
         $isFirstConnection.set(false);
         return;
       }
 
-      const { data: prevQueueStatusData } = selectQueueStatus(getState());
-
-      // Bail if queue was empty before - we have nothing to recover
-      if (
-        !prevQueueStatusData?.queue.in_progress &&
-        !prevQueueStatusData?.queue.pending
-      ) {
-        return;
-      }
-
-      // Else, we need to re-fetch the queue status to see if it has changed
+      /**
+       * Else, we need to compare the last-known queue status with the current queue status, re-fetching
+       * everything if it has changed.
+       */
 
       if ($baseUrl.get()) {
         // If we have a baseUrl (e.g. not localhost), we need to debounce the re-fetch to not hammer server
@@ -54,6 +47,8 @@ export const addSocketConnectedEventListener = () => {
         await delay(1000 + Math.random() * 1000);
       }
 
+      const prevQueueStatusData = selectQueueStatus(getState()).data;
+
       try {
         // Fetch the queue status again
         const queueStatusRequest = dispatch(
@@ -61,27 +56,33 @@ export const addSocketConnectedEventListener = () => {
             forceRefetch: true,
           })
         );
-
         const nextQueueStatusData = await queueStatusRequest.unwrap();
         queueStatusRequest.unsubscribe();
 
-        // If we haven't completed more items since the last check, bail
-        if (
-          prevQueueStatusData.queue.completed ===
-          nextQueueStatusData.queue.completed
-        ) {
+        // If the queue hasn't changed, we don't need to recover
+        if (isEqual(prevQueueStatusData?.queue, nextQueueStatusData.queue)) {
           return;
         }
 
         /**
-         * Else, we need to reset the API state to update everything.
+         * The queue has changed. We need to reset the API state to update everything and recover
+         * from the disconnect.
          *
-         * TODO: This is rather inefficient. We don't actually need to re-fetch *all* network requests,
-         * but determining which ones to re-fetch is non-trivial. It's at least the queue related ones
-         * and gallery, but likely others. We'd also need to keep track of which requests need to be
-         * re-fetch in this situation, which opens the door for bugs.
+         * TODO: This is rather inefficient. We don't actually need to re-fetch *all* queries, but
+         * determining which queries to re-fetch and how to re-initialize them is non-trivial:
          *
-         * Optimize this later.
+         * - We need to keep track of which queries might have different data in this scenario. This
+         * could be handled via tags, but it feels risky - if we miss tagging a critical query, we
+         * could end up with a de-sync'd UI.
+         *
+         * - We need to re-initialize the queries with *the right query args*. This is very tricky,
+         * because the query args are not stored in the API state, but rather in the component state.
+         *
+         * By totally resetting the API state, we also re-fetch things like model lists, which is
+         * probably a good idea anyways.
+         *
+         * PS: RTKQ provides a related abstraction for recovery:
+         * https://redux-toolkit.js.org/rtk-query/api/setupListeners
          */
         dispatch(api.util.resetApiState());
       } catch {
