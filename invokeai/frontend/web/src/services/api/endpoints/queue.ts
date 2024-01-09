@@ -339,6 +339,8 @@ export const {
   useGetBatchStatusQuery,
 } = queueApi;
 
+export const selectQueueStatus = queueApi.endpoints.getQueueStatus.select();
+
 const resetListQueryData = (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dispatch: ThunkDispatch<any, any, UnknownAction>

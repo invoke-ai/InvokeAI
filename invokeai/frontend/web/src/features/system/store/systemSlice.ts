@@ -26,7 +26,6 @@ import type { Language, SystemState } from './types';
 
 export const initialSystemState: SystemState = {
   _version: 1,
-  isInitialized: false,
   isConnected: false,
   shouldConfirmOnDelete: true,
   enableImageDebugging: false,
@@ -84,9 +83,6 @@ export const systemSlice = createSlice({
       action: PayloadAction<boolean>
     ) {
       state.shouldEnableInformationalPopovers = action.payload;
-    },
-    isInitializedChanged(state, action: PayloadAction<boolean>) {
-      state.isInitialized = action.payload;
     },
   },
   extraReducers(builder) {
@@ -206,7 +202,6 @@ export const {
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
   setShouldEnableInformationalPopovers,
-  isInitializedChanged,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
