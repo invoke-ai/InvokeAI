@@ -1,15 +1,15 @@
 import { logger } from 'app/logging/logger';
+import { $canvasBaseLayer , $canvasStage } from 'features/canvas/store/canvasNanostore';
 import type {
   CanvasLayerState,
   Dimensions,
 } from 'features/canvas/store/canvasTypes';
 import { isCanvasMaskLine } from 'features/canvas/store/canvasTypes';
+import { konvaNodeToImageData } from 'features/canvas/util/konvaNodeToImageData';
 import type { Vector2d } from 'konva/lib/types';
 
 import createMaskStage from './createMaskStage';
-import { getCanvasBaseLayer, getCanvasStage } from './konvaInstanceProvider';
 import { konvaNodeToBlob } from './konvaNodeToBlob';
-import { konvaNodeToImageData } from './konvaNodeToImageData';
 
 /**
  * Gets Blob and ImageData objects for the base and mask layers
@@ -23,8 +23,8 @@ export const getCanvasData = async (
 ) => {
   const log = logger('canvas');
 
-  const canvasBaseLayer = getCanvasBaseLayer();
-  const canvasStage = getCanvasStage();
+  const canvasBaseLayer = $canvasBaseLayer.get();
+  const canvasStage = $canvasStage.get();
 
   if (!canvasBaseLayer || !canvasStage) {
     log.error('Unable to find canvas / stage');

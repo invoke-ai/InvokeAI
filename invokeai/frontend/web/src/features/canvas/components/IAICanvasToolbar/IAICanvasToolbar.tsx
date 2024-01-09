@@ -15,7 +15,7 @@ import {
   canvasMerged,
   canvasSavedToGallery,
 } from 'features/canvas/store/actions';
-import { $tool } from 'features/canvas/store/canvasNanostore';
+import { $canvasBaseLayer,$tool  } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   resetCanvas,
@@ -25,7 +25,6 @@ import {
 } from 'features/canvas/store/canvasSlice';
 import type { CanvasLayer } from 'features/canvas/store/canvasTypes';
 import { LAYER_NAMES_DICT } from 'features/canvas/store/canvasTypes';
-import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { InvIconButton } from 'index';
 import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -53,7 +52,6 @@ const IAICanvasToolbar = () => {
   const layer = useAppSelector((s) => s.canvas.layer);
   const tool = useStore($tool);
   const isStaging = useAppSelector(isStagingSelector);
-  const canvasBaseLayer = getCanvasBaseLayer();
   const { t } = useTranslation();
   const { isClipboardAPIAvailable } = useCopyImageToClipboard();
 
@@ -82,7 +80,7 @@ const IAICanvasToolbar = () => {
       enabled: () => true,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    []
   );
 
   useHotkeys(
@@ -94,7 +92,7 @@ const IAICanvasToolbar = () => {
       enabled: () => !isStaging,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    []
   );
 
   useHotkeys(
@@ -106,7 +104,7 @@ const IAICanvasToolbar = () => {
       enabled: () => !isStaging,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    []
   );
 
   useHotkeys(
@@ -118,7 +116,7 @@ const IAICanvasToolbar = () => {
       enabled: () => !isStaging && isClipboardAPIAvailable,
       preventDefault: true,
     },
-    [canvasBaseLayer, isClipboardAPIAvailable]
+    [isClipboardAPIAvailable]
   );
 
   useHotkeys(
@@ -130,7 +128,7 @@ const IAICanvasToolbar = () => {
       enabled: () => !isStaging,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    []
   );
 
   const handleSelectMoveTool = useCallback(() => {
@@ -143,7 +141,7 @@ const IAICanvasToolbar = () => {
   );
 
   const handleResetCanvasView = (shouldScaleTo1 = false) => {
-    const canvasBaseLayer = getCanvasBaseLayer();
+    const canvasBaseLayer = $canvasBaseLayer.get();
     if (!canvasBaseLayer) {
       return;
     }
