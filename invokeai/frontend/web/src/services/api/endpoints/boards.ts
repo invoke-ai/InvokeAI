@@ -23,7 +23,10 @@ export const boardsApi = api.injectEndpoints({
       query: (arg) => ({ url: 'boards/', params: arg }),
       providesTags: (result) => {
         // any list of boards
-        const tags: ApiTagDescription[] = [{ type: 'Board', id: LIST_TAG }];
+        const tags: ApiTagDescription[] = [
+          { type: 'Board', id: LIST_TAG },
+          'FetchOnReconnect',
+        ];
 
         if (result) {
           // and individual tags for each board
@@ -46,7 +49,10 @@ export const boardsApi = api.injectEndpoints({
       }),
       providesTags: (result) => {
         // any list of boards
-        const tags: ApiTagDescription[] = [{ type: 'Board', id: LIST_TAG }];
+        const tags: ApiTagDescription[] = [
+          { type: 'Board', id: LIST_TAG },
+          'FetchOnReconnect',
+        ];
 
         if (result) {
           // and individual tags for each board
@@ -68,6 +74,7 @@ export const boardsApi = api.injectEndpoints({
       }),
       providesTags: (result, error, arg) => [
         { type: 'ImageNameList', id: arg },
+        'FetchOnReconnect',
       ],
       keepUnusedDataFor: 0,
     }),
@@ -85,6 +92,7 @@ export const boardsApi = api.injectEndpoints({
       }),
       providesTags: (result, error, arg) => [
         { type: 'BoardImagesTotal', id: arg ?? 'none' },
+        'FetchOnReconnect',
       ],
       transformResponse: (response: OffsetPaginatedResults_ImageDTO_) => {
         return { total: response.total };
@@ -104,6 +112,7 @@ export const boardsApi = api.injectEndpoints({
       }),
       providesTags: (result, error, arg) => [
         { type: 'BoardAssetsTotal', id: arg ?? 'none' },
+        'FetchOnReconnect',
       ],
       transformResponse: (response: OffsetPaginatedResults_ImageDTO_) => {
         return { total: response.total };

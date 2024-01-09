@@ -47,6 +47,7 @@ export const imagesApi = api.injectEndpoints({
       providesTags: (result, error, { board_id, categories }) => [
         // Make the tags the same as the cache key
         { type: 'ImageList', id: getListImagesUrl({ board_id, categories }) },
+        'FetchOnReconnect',
       ],
       serializeQueryArgs: ({ queryArgs }) => {
         // Create cache & key based on board_id and categories - skip the other args.
@@ -100,7 +101,7 @@ export const imagesApi = api.injectEndpoints({
     }),
     getIntermediatesCount: build.query<number, void>({
       query: () => ({ url: 'images/intermediates' }),
-      providesTags: ['IntermediatesCount'],
+      providesTags: ['IntermediatesCount', 'FetchOnReconnect'],
     }),
     clearIntermediates: build.mutation<number, void>({
       query: () => ({ url: `images/intermediates`, method: 'DELETE' }),

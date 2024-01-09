@@ -14,6 +14,9 @@ export const utilitiesApi = api.injectEndpoints({
         method: 'POST',
       }),
       keepUnusedDataFor: 86400, // 24 hours
+      // We need to fetch this on reconnect bc the user may have changed the text field while
+      // disconnected.
+      providesTags: ['FetchOnReconnect'],
     }),
   }),
 });
