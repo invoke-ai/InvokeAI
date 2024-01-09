@@ -1,8 +1,8 @@
-import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
+  $cursorPosition,
   $isDrawing,
-  setCursorPosition,
+  $tool,
 } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { addPointToCurrentLine } from 'features/canvas/store/canvasSlice';
@@ -20,8 +20,6 @@ const useCanvasMouseMove = (
   lastCursorPositionRef: MutableRefObject<Vector2d>
 ) => {
   const dispatch = useAppDispatch();
-  const isDrawing = useStore($isDrawing);
-  const tool = useAppSelector((s) => s.canvas.tool);
   const isStaging = useAppSelector(isStagingSelector);
   const { updateColorUnderCursor } = useColorPicker();
 
@@ -36,16 +34,17 @@ const useCanvasMouseMove = (
       return;
     }
 
-    setCursorPosition(scaledCursorPosition);
+    $cursorPosition.set(scaledCursorPosition);
 
     lastCursorPositionRef.current = scaledCursorPosition;
+    const tool = $tool.get();
 
     if (tool === 'colorPicker') {
       updateColorUnderCursor();
       return;
     }
 
-    if (!isDrawing || tool === 'move' || isStaging) {
+    if (!$isDrawing.get() || tool === 'move' || isStaging) {
       return;
     }
 
@@ -56,11 +55,9 @@ const useCanvasMouseMove = (
   }, [
     didMouseMoveRef,
     dispatch,
-    isDrawing,
     isStaging,
     lastCursorPositionRef,
     stageRef,
-    tool,
     updateColorUnderCursor,
   ]);
 };

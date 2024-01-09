@@ -8,11 +8,11 @@ import {
 } from 'common/util/roundDownToMultiple';
 import {
   $isDrawing,
+  $isMouseOverBoundingBox,
+  $isMouseOverBoundingBoxOutline,
   $isMovingBoundingBox,
   $isTransformingBoundingBox,
-  setIsMouseOverBoundingBox,
-  setIsMovingBoundingBox,
-  setIsTransformingBoundingBox,
+  $tool,
 } from 'features/canvas/store/canvasNanostore';
 import {
   aspectRatioChanged,
@@ -30,7 +30,7 @@ import type Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { Group, Rect, Transformer } from 'react-konva';
 
@@ -49,18 +49,19 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
   );
   const stageScale = useAppSelector((s) => s.canvas.stageScale);
   const shouldSnapToGrid = useAppSelector((s) => s.canvas.shouldSnapToGrid);
-  const tool = useAppSelector((s) => s.canvas.tool);
   const hitStrokeWidth = useAppSelector((s) => 20 / s.canvas.stageScale);
   const aspectRatio = useAppSelector((s) => s.canvas.aspectRatio);
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const transformerRef = useRef<Konva.Transformer>(null);
   const shapeRef = useRef<Konva.Rect>(null);
   const shift = useStore($shift);
+  const tool = useStore($tool);
   const isDrawing = useStore($isDrawing);
   const isMovingBoundingBox = useStore($isMovingBoundingBox);
   const isTransformingBoundingBox = useStore($isTransformingBoundingBox);
-  const [isMouseOverBoundingBoxOutline, setIsMouseOverBoundingBoxOutline] =
-    useState(false);
+  const isMouseOverBoundingBoxOutline = useStore(
+    $isMouseOverBoundingBoxOutline
+  );
 
   useEffect(() => {
     if (!transformerRef.current || !shapeRef.current) {
@@ -228,43 +229,43 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
   );
 
   const handleStartedTransforming = useCallback(() => {
-    setIsTransformingBoundingBox(true);
+    $isTransformingBoundingBox.set(true);
   }, []);
 
   const handleEndedTransforming = useCallback(() => {
-    setIsTransformingBoundingBox(false);
-    setIsMovingBoundingBox(false);
-    setIsMouseOverBoundingBox(false);
-    setIsMouseOverBoundingBoxOutline(false);
+    $isTransformingBoundingBox.set(false);
+    $isMovingBoundingBox.set(false);
+    $isMouseOverBoundingBox.set(false);
+    $isMouseOverBoundingBoxOutline.set(false);
   }, []);
 
   const handleStartedMoving = useCallback(() => {
-    setIsMovingBoundingBox(true);
+    $isMovingBoundingBox.set(true);
   }, []);
 
   const handleEndedModifying = useCallback(() => {
-    setIsTransformingBoundingBox(false);
-    setIsMovingBoundingBox(false);
-    setIsMouseOverBoundingBox(false);
-    setIsMouseOverBoundingBoxOutline(false);
+    $isTransformingBoundingBox.set(false);
+    $isMovingBoundingBox.set(false);
+    $isMouseOverBoundingBox.set(false);
+    $isMouseOverBoundingBoxOutline.set(false);
   }, []);
 
   const handleMouseOver = useCallback(() => {
-    setIsMouseOverBoundingBoxOutline(true);
+    $isMouseOverBoundingBoxOutline.set(true);
   }, []);
 
   const handleMouseOut = useCallback(() => {
     !isTransformingBoundingBox &&
       !isMovingBoundingBox &&
-      setIsMouseOverBoundingBoxOutline(false);
+      $isMouseOverBoundingBoxOutline.set(false);
   }, [isMovingBoundingBox, isTransformingBoundingBox]);
 
   const handleMouseEnterBoundingBox = useCallback(() => {
-    setIsMouseOverBoundingBox(true);
+    $isMouseOverBoundingBox.set(true);
   }, []);
 
   const handleMouseLeaveBoundingBox = useCallback(() => {
-    setIsMouseOverBoundingBox(false);
+    $isMouseOverBoundingBox.set(false);
   }, []);
 
   const stroke = useMemo(() => {

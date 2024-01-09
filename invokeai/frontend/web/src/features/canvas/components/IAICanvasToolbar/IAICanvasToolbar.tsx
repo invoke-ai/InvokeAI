@@ -1,4 +1,5 @@
 import { Flex } from '@chakra-ui/react';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
 import { InvControl } from 'common/components/InvControl/InvControl';
@@ -14,13 +15,13 @@ import {
   canvasMerged,
   canvasSavedToGallery,
 } from 'features/canvas/store/actions';
+import { $tool } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   resetCanvas,
   resetCanvasView,
   setIsMaskEnabled,
   setLayer,
-  setTool,
 } from 'features/canvas/store/canvasSlice';
 import type { CanvasLayer } from 'features/canvas/store/canvasTypes';
 import { LAYER_NAMES_DICT } from 'features/canvas/store/canvasTypes';
@@ -50,7 +51,7 @@ const IAICanvasToolbar = () => {
   const dispatch = useAppDispatch();
   const isMaskEnabled = useAppSelector((s) => s.canvas.isMaskEnabled);
   const layer = useAppSelector((s) => s.canvas.layer);
-  const tool = useAppSelector((s) => s.canvas.tool);
+  const tool = useStore($tool);
   const isStaging = useAppSelector(isStagingSelector);
   const canvasBaseLayer = getCanvasBaseLayer();
   const { t } = useTranslation();
@@ -133,8 +134,8 @@ const IAICanvasToolbar = () => {
   );
 
   const handleSelectMoveTool = useCallback(() => {
-    dispatch(setTool('move'));
-  }, [dispatch]);
+    $tool.set('move');
+  }, []);
 
   const handleClickResetCanvasView = useSingleAndDoubleClick(
     () => handleResetCanvasView(false),
