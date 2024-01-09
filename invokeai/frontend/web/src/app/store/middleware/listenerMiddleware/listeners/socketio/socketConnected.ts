@@ -73,12 +73,12 @@ export const addSocketConnectedEventListener = () => {
 
         /**
          * Else, we need to reset the API state to update everything.
-         * 
+         *
          * TODO: This is rather inefficient. We don't actually need to re-fetch *all* network requests,
          * but determining which ones to re-fetch is non-trivial. It's at least the queue related ones
          * and gallery, but likely others. We'd also need to keep track of which requests need to be
          * re-fetch in this situation, which opens the door for bugs.
-         * 
+         *
          * Optimize this later.
          */
         dispatch(api.util.resetApiState());
