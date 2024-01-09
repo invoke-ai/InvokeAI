@@ -1,10 +1,9 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
-  $tool,
+ $canvasStage,  $tool,
   $toolStash,
   resetCanvasInteractionState,
-  resetToolInteractionState,
-} from 'features/canvas/store/canvasNanostore';
+  resetToolInteractionState } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   clearMask,
@@ -12,7 +11,6 @@ import {
   setShouldShowBoundingBox,
   setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
-import { getCanvasStage } from 'features/canvas/util/konvaInstanceProvider';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -26,7 +24,6 @@ const useInpaintingCanvasHotkeys = () => {
   const isStaging = useAppSelector(isStagingSelector);
   const isMaskEnabled = useAppSelector((s) => s.canvas.isMaskEnabled);
   const shouldSnapToGrid = useAppSelector((s) => s.canvas.shouldSnapToGrid);
-  const canvasStage = getCanvasStage();
 
   // Beta Keys
   const handleClearMask = useCallback(() => dispatch(clearMask()), [dispatch]);
@@ -102,35 +99,29 @@ const useInpaintingCanvasHotkeys = () => {
     });
   }, []);
 
-  const onKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.repeat || e.key !== ' ') {
-        return;
-      }
-      if ($toolStash.get() || $tool.get() === 'move') {
-        return;
-      }
-      canvasStage?.container().focus();
-      $toolStash.set($tool.get());
-      $tool.set('move');
-      resetToolInteractionState();
-    },
-    [canvasStage]
-  );
-  const onKeyUp = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.repeat || e.key !== ' ') {
-        return;
-      }
-      if (!$toolStash.get() || $tool.get() !== 'move') {
-        return;
-      }
-      canvasStage?.container().focus();
-      $tool.set($toolStash.get() ?? 'move');
-      $toolStash.set(null);
-    },
-    [canvasStage]
-  );
+  const onKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.repeat || e.key !== ' ') {
+      return;
+    }
+    if ($toolStash.get() || $tool.get() === 'move') {
+      return;
+    }
+    $canvasStage.get()?.container().focus();
+    $toolStash.set($tool.get());
+    $tool.set('move');
+    resetToolInteractionState();
+  }, []);
+  const onKeyUp = useCallback((e: KeyboardEvent) => {
+    if (e.repeat || e.key !== ' ') {
+      return;
+    }
+    if (!$toolStash.get() || $tool.get() !== 'move') {
+      return;
+    }
+    $canvasStage.get()?.container().focus();
+    $tool.set($toolStash.get() ?? 'move');
+    $toolStash.set(null);
+  }, []);
 
   useEffect(() => {
     window.addEventListener('keydown', onKeyDown);

@@ -1,4 +1,5 @@
 import type { CanvasTool } from 'features/canvas/store/canvasTypes';
+import type Konva from "konva";
 import type { Vector2d } from 'konva/lib/types';
 import { atom, computed } from 'nanostores';
 
@@ -38,4 +39,6 @@ export const resetToolInteractionState = () => {
 
 export const setCanvasInteractionStateMouseOut = () => {
   $cursorPosition.set(null);
-};
+};export const $canvasBaseLayer = atom<Konva.Layer | null>(null);
+export const $canvasStage = atom<Konva.Stage | null>(null);
+

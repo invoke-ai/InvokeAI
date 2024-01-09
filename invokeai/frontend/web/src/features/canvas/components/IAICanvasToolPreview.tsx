@@ -5,6 +5,7 @@ import {
   $cursorPosition,
   $isMovingBoundingBox,
   $isTransformingBoundingBox,
+  $tool,
 } from 'features/canvas/store/canvasNanostore';
 import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
@@ -89,7 +90,7 @@ const IAICanvasToolPreview = (props: GroupConfig) => {
   const maskColorString = useAppSelector((s) =>
     rgbaColorToString({ ...s.canvas.maskColor, a: 0.5 })
   );
-  const tool = useAppSelector((s) => s.canvas.tool);
+  const tool = useStore($tool);
   const layer = useAppSelector((s) => s.canvas.layer);
   const dotRadius = useAppSelector((s) => 1.5 / s.canvas.stageScale);
   const strokeWidth = useAppSelector((s) => 1.5 / s.canvas.stageScale);
