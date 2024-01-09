@@ -101,13 +101,10 @@ const setBoundingBoxDimensionsReducer = (
   optimalDimension: number
 ) => {
   const boundingBoxDimensions = payload;
-  const newDimensions = roundDimensionsToMultiple(
-    {
-      ...state.boundingBoxDimensions,
-      ...boundingBoxDimensions,
-    },
-    CANVAS_GRID_SIZE_FINE
-  );
+  const newDimensions = {
+    ...state.boundingBoxDimensions,
+    ...boundingBoxDimensions,
+  };
   state.boundingBoxDimensions = newDimensions;
   if (state.boundingBoxScaleMethod === 'auto') {
     const scaledDimensions = getScaledBoundingBoxDimensions(
