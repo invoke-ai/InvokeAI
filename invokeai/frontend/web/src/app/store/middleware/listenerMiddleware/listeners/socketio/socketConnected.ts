@@ -24,11 +24,13 @@ export const addSocketConnectedEventListener = () => {
 
       /**
        * The rest of this listener has recovery logic for when the socket disconnects and reconnects.
-       * If we had generations in progress, we need to reset the API state to re-fetch everything.
+       *
+       * If a queue item completed during while disconnected, we need to reset the API state to re-
+       * fetch everything, updating the gallery and queue.
        */
 
       if ($isFirstConnection.get()) {
-        // Bail on the recovery logic if this is the first connection
+        // Bail on the recovery logic if this is the first connection - we don't need to recover anything
         $isFirstConnection.set(false);
         return;
       }
@@ -93,6 +95,7 @@ export const addSocketConnectedEventListener = () => {
     actionCreator: socketConnected,
     effect: async (action, { dispatch, getState }) => {
       const { nodeTemplates, config } = getState();
+      // We only want to re-fetch the schema if we don't have any node templates
       if (
         !size(nodeTemplates.templates) &&
         !config.disabledTabs.includes('nodes')
