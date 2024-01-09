@@ -344,6 +344,7 @@ class ModelManager(object):
         self.app_config = InvokeAIAppConfig.get_config()
         self.logger = logger
         self.cache = ModelCache(
+            app_config=self.app_config,
             max_cache_size=max_cache_size,
             max_vram_cache_size=self.app_config.vram_cache_size,
             lazy_offloading=self.app_config.lazy_offload,
