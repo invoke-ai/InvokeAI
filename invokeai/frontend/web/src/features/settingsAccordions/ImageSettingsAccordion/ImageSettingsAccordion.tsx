@@ -1,12 +1,13 @@
 import { Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
 import type { InvLabelProps } from 'common/components/InvControl/types';
 import { InvExpander } from 'common/components/InvExpander/InvExpander';
 import { InvSingleAccordion } from 'common/components/InvSingleAccordion/InvSingleAccordion';
+import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import { HrfSettings } from 'features/hrf/components/HrfSettings';
+import { selectHrfSlice } from 'features/hrf/store/hrfSlice';
 import ParamScaleBeforeProcessing from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaleBeforeProcessing';
 import ParamScaledHeight from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledHeight';
 import ParamScaledWidth from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledWidth';
@@ -15,6 +16,7 @@ import ImageToImageStrength from 'features/parameters/components/ImageToImage/Im
 import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamSeedNumberInput';
 import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
 import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
+import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,8 +25,13 @@ import { ImageSizeCanvas } from './ImageSizeCanvas';
 import { ImageSizeLinear } from './ImageSizeLinear';
 
 const selector = createMemoizedSelector(
-  [stateSelector, activeTabNameSelector],
-  ({ generation, canvas, hrf }, activeTabName) => {
+  [
+    selectGenerationSlice,
+    selectCanvasSlice,
+    selectHrfSlice,
+    activeTabNameSelector,
+  ],
+  (generation, canvas, hrf, activeTabName) => {
     const { shouldRandomizeSeed } = generation;
     const { hrfEnabled } = hrf;
     const badges: string[] = [];
@@ -81,7 +88,7 @@ export const ImageSettingsAccordion = memo(() => {
         )}
         <InvExpander>
           <Flex gap={4} pb={4} flexDir="column">
-            <Flex gap={4}>
+            <Flex gap={4} alignItems="center">
               <ParamSeedNumberInput />
               <ParamSeedShuffle />
               <ParamSeedRandomize />

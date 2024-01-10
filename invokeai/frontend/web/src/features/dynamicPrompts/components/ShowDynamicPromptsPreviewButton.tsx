@@ -14,7 +14,7 @@ const loadingStyles: SystemStyleObject = {
 
 export const ShowDynamicPromptsPreviewButton = memo(() => {
   const { t } = useTranslation();
-  const isLoading = useAppSelector((state) => state.dynamicPrompts.isLoading);
+  const isLoading = useAppSelector((s) => s.dynamicPrompts.isLoading);
   const { isOpen, onOpen } = useDynamicPromptsModal();
   return (
     <InvTooltip

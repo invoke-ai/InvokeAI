@@ -11,7 +11,7 @@ import { memo, useCallback, useEffect } from 'react';
  */
 const Toaster = () => {
   const dispatch = useAppDispatch();
-  const toastQueue = useAppSelector((state) => state.system.toastQueue);
+  const toastQueue = useAppSelector((s) => s.system.toastQueue);
   const toast = useToast();
   useEffect(() => {
     toastQueue.forEach((t) => {

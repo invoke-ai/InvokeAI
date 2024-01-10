@@ -43,7 +43,7 @@ export const useSocketIO = () => {
   }, [baseUrl]);
 
   const socketOptions = useMemo(() => {
-    const options: Parameters<typeof io>[0] = {
+    const options: Partial<ManagerOptions & SocketOptions> = {
       timeout: 60000,
       path: '/ws/socket.io',
       autoConnect: false, // achtung! removing this breaks the dynamic middleware
@@ -71,7 +71,7 @@ export const useSocketIO = () => {
     setEventListeners({ dispatch, socket });
     socket.connect();
 
-    if ($isDebugging.get()) {
+    if ($isDebugging.get() || import.meta.env.MODE === 'development') {
       window.$socketOptions = $socketOptions;
       console.log('Socket initialized', socket);
     }
@@ -79,7 +79,7 @@ export const useSocketIO = () => {
     $isSocketInitialized.set(true);
 
     return () => {
-      if ($isDebugging.get()) {
+      if ($isDebugging.get() || import.meta.env.MODE === 'development') {
         window.$socketOptions = undefined;
         console.log('Socket teardown', socket);
       }

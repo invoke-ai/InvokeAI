@@ -1,12 +1,15 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 
 type ModelManagerState = {
+  _version: 1;
   searchFolder: string | null;
   advancedAddScanModel: string | null;
 };
 
-const initialModelManagerState: ModelManagerState = {
+export const initialModelManagerState: ModelManagerState = {
+  _version: 1,
   searchFolder: null,
   advancedAddScanModel: null,
 };
@@ -28,3 +31,13 @@ export const { setSearchFolder, setAdvancedAddScanModel } =
   modelManagerSlice.actions;
 
 export default modelManagerSlice.reducer;
+
+export const selectModelManagerSlice = (state: RootState) => state.modelmanager;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateModelManagerState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

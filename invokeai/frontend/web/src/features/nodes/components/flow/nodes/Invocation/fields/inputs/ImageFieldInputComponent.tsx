@@ -26,7 +26,7 @@ const ImageFieldInputComponent = (
 ) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
-  const isConnected = useAppSelector((state) => state.system.isConnected);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
   const { currentData: imageDTO, isError } = useGetImageDTOQuery(
     field.value?.image_name ?? skipToken
   );

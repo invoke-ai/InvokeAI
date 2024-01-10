@@ -1,6 +1,5 @@
 import { Flex } from '@chakra-ui/layout';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
 import type { InvLabelProps } from 'common/components/InvControl/types';
@@ -15,11 +14,13 @@ import {
 } from 'common/components/InvTabs/wrapper';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
+import { selectLoraSlice } from 'features/lora/store/loraSlice';
 import { SyncModelsIconButton } from 'features/modelManager/components/SyncModels/SyncModelsIconButton';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
+import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { size } from 'lodash-es';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,8 +30,9 @@ const labelProps: InvLabelProps = {
 };
 
 const badgesSelector = createMemoizedSelector(
-  stateSelector,
-  ({ lora, generation }) => {
+  selectLoraSlice,
+  selectGenerationSlice,
+  (lora, generation) => {
     const loraTabBadges = size(lora.loras) ? [size(lora.loras)] : [];
     const accordionBadges: (string | number)[] = [];
     if (generation.model) {
@@ -61,7 +63,7 @@ export const GenerationSettingsAccordion = memo(() => {
         </InvTabList>
         <InvTabPanels>
           <InvTabPanel overflow="visible" px={4} pt={4}>
-            <Flex gap={4}>
+            <Flex gap={4} alignItems="center">
               <ParamMainModelSelect />
               <SyncModelsIconButton />
             </Flex>

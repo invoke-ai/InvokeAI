@@ -19,6 +19,7 @@ import type {
 } from 'features/parameters/types/parameterSchemas';
 
 export interface GenerationState {
+  _version: 1;
   cfgScale: ParameterCFGScale;
   cfgRescaleMultiplier: ParameterCFGRescaleMultiplier;
   height: ParameterHeight;
@@ -26,7 +27,6 @@ export interface GenerationState {
   infillMethod: string;
   initialImage?: { imageName: string; width: number; height: number };
   iterations: number;
-  perlin: number;
   positivePrompt: ParameterPositivePrompt;
   negativePrompt: ParameterNegativePrompt;
   scheduler: ParameterScheduler;
@@ -36,19 +36,12 @@ export interface GenerationState {
   canvasCoherenceSteps: number;
   canvasCoherenceStrength: ParameterStrength;
   seed: ParameterSeed;
-  seedWeights: string;
   shouldFitToWidthHeight: boolean;
-  shouldGenerateVariations: boolean;
   shouldRandomizeSeed: boolean;
   steps: ParameterSteps;
-  threshold: number;
   infillTileSize: number;
   infillPatchmatchDownscaleSize: number;
-  variationAmount: number;
   width: ParameterWidth;
-  shouldUseSymmetry: boolean;
-  horizontalSymmetrySteps: number;
-  verticalSymmetrySteps: number;
   model: ParameterModel | null;
   vae: ParameterVAEModel | null;
   vaePrecision: ParameterPrecision;

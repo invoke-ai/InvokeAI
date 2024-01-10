@@ -1,6 +1,5 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
@@ -8,24 +7,22 @@ import type {
   TypesafeDraggableData,
   TypesafeDroppableData,
 } from 'features/dnd/types';
-import { clearInitialImage } from 'features/parameters/store/generationSlice';
+import {
+  clearInitialImage,
+  selectGenerationSlice,
+} from 'features/parameters/store/generationSlice';
 import { memo, useEffect, useMemo } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
-const selector = createMemoizedSelector([stateSelector], (state) => {
-  const { initialImage } = state.generation;
-  const { isConnected } = state.system;
-
-  return {
-    initialImage,
-    isResetButtonDisabled: !initialImage,
-    isConnected,
-  };
-});
+const selectInitialImage = createMemoizedSelector(
+  selectGenerationSlice,
+  (generation) => generation.initialImage
+);
 
 const InitialImage = () => {
   const dispatch = useAppDispatch();
-  const { initialImage, isConnected } = useAppSelector(selector);
+  const initialImage = useAppSelector(selectInitialImage);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
 
   const { currentData: imageDTO, isError } = useGetImageDTOQuery(
     initialImage?.imageName ?? skipToken

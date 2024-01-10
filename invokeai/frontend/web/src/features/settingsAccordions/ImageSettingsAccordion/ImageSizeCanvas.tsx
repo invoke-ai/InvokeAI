@@ -13,9 +13,9 @@ import { memo, useCallback } from 'react';
 export const ImageSizeCanvas = memo(() => {
   const dispatch = useAppDispatch();
   const { width, height } = useAppSelector(
-    (state) => state.canvas.boundingBoxDimensions
+    (s) => s.canvas.boundingBoxDimensions
   );
-  const aspectRatioState = useAppSelector((state) => state.canvas.aspectRatio);
+  const aspectRatioState = useAppSelector((s) => s.canvas.aspectRatio);
   const optimalDimension = useAppSelector(selectOptimalDimension);
 
   const onChangeWidth = useCallback(

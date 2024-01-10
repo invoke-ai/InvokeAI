@@ -5,10 +5,10 @@ import { memo, useMemo } from 'react';
 
 const CurrentImagePreview = () => {
   const progress_image = useAppSelector(
-    (state) => state.system.denoiseProgress?.progress_image
+    (s) => s.system.denoiseProgress?.progress_image
   );
   const shouldAntialiasProgressImage = useAppSelector(
-    (state) => state.system.shouldAntialiasProgressImage
+    (s) => s.system.shouldAntialiasProgressImage
   );
 
   const sx = useMemo<SystemStyleObject>(

@@ -1,4 +1,3 @@
-import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
@@ -8,11 +7,15 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamClipSkip = () => {
-  const clipSkip = useAppSelector(
-    (state: RootState) => state.generation.clipSkip
+  const clipSkip = useAppSelector((s) => s.generation.clipSkip);
+  const initial = useAppSelector((s) => s.config.sd.clipSkip.initial);
+  const sliderMin = useAppSelector((s) => s.config.sd.clipSkip.sliderMin);
+  const numberInputMin = useAppSelector(
+    (s) => s.config.sd.clipSkip.numberInputMin
   );
-
-  const { model } = useAppSelector((state: RootState) => state.generation);
+  const coarseStep = useAppSelector((s) => s.config.sd.clipSkip.coarseStep);
+  const fineStep = useAppSelector((s) => s.config.sd.clipSkip.fineStep);
+  const { model } = useAppSelector((s) => s.generation);
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -46,12 +49,15 @@ const ParamClipSkip = () => {
     <InvControl label={t('parameters.clipSkip')} feature="clipSkip">
       <InvSlider
         value={clipSkip}
-        defaultValue={0}
-        min={0}
+        defaultValue={initial}
+        min={sliderMin}
         max={max}
-        step={1}
+        step={coarseStep}
+        fineStep={fineStep}
         onChange={handleClipSkipChange}
         withNumberInput
+        numberInputMin={numberInputMin}
+        numberInputMax={max}
         marks={sliderMarks}
       />
     </InvControl>

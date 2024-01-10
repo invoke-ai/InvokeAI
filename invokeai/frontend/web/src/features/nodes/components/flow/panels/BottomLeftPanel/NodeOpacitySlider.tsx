@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 const NodeOpacitySlider = () => {
   const dispatch = useAppDispatch();
-  const nodeOpacity = useAppSelector((state) => state.nodes.nodeOpacity);
+  const nodeOpacity = useAppSelector((s) => s.nodes.nodeOpacity);
   const { t } = useTranslation();
 
   const handleChange = useCallback(

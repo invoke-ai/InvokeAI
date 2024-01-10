@@ -18,7 +18,7 @@ const options: InvSelectOption[] = [
 const ParamHrfMethodSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const hrfMethod = useAppSelector((state) => state.hrf.hrfMethod);
+  const hrfMethod = useAppSelector((s) => s.hrf.hrfMethod);
 
   const onChange = useCallback<InvSelectOnChange>(
     (v) => {

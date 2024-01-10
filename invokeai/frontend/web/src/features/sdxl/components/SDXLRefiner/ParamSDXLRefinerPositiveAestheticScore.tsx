@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 const ParamSDXLRefinerPositiveAestheticScore = () => {
   const refinerPositiveAestheticScore = useAppSelector(
-    (state) => state.sdxl.refinerPositiveAestheticScore
+    (s) => s.sdxl.refinerPositiveAestheticScore
   );
   const dispatch = useAppDispatch();
   const { t } = useTranslation();

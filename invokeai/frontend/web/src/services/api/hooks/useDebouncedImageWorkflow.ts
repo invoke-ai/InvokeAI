@@ -6,7 +6,7 @@ import { useDebounce } from 'use-debounce';
 
 export const useDebouncedImageWorkflow = (imageDTO?: ImageDTO | null) => {
   const workflowFetchDebounce = useAppSelector(
-    (state) => state.config.workflowFetchDebounce ?? 300
+    (s) => s.config.workflowFetchDebounce ?? 300
   );
 
   const [debouncedImageName] = useDebounce(

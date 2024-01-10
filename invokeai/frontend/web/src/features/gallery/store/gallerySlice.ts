@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import { uniqBy } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -103,3 +104,13 @@ const isAnyBoardDeleted = isAnyOf(
   imagesApi.endpoints.deleteBoard.matchFulfilled,
   imagesApi.endpoints.deleteBoardAndImages.matchFulfilled
 );
+
+export const selectGallerySlice = (state: RootState) => state.gallery;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateGalleryState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

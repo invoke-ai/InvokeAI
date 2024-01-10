@@ -1,27 +1,27 @@
 import type { ChakraProps } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSelect } from 'common/components/InvSelect/InvSelect';
 import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
-import { loraAdded } from 'features/lora/store/loraSlice';
+import { loraAdded, selectLoraSlice } from 'features/lora/store/loraSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
 
-const selector = createMemoizedSelector(stateSelector, ({ lora }) => ({
-  addedLoRAs: lora.loras,
-}));
+const selectAddedLoRAs = createMemoizedSelector(
+  selectLoraSlice,
+  (lora) => lora.loras
+);
 
 const LoRASelect = () => {
   const dispatch = useAppDispatch();
   const { data, isLoading } = useGetLoRAModelsQuery();
   const { t } = useTranslation();
-  const { addedLoRAs } = useAppSelector(selector);
+  const addedLoRAs = useAppSelector(selectAddedLoRAs);
   const currentBaseModel = useAppSelector(
-    (state) => state.generation.model?.base_model
+    (s) => s.generation.model?.base_model
   );
 
   const getIsDisabled = (lora: LoRAModelConfigEntity): boolean => {

@@ -11,7 +11,7 @@ export const useEnableInvocationCache = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { data: cacheStatus } = useGetInvocationCacheStatusQuery();
-  const isConnected = useAppSelector((state) => state.system.isConnected);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
   const [trigger, { isLoading }] = useEnableInvocationCacheMutation({
     fixedCacheKey: 'enableInvocationCache',
   });

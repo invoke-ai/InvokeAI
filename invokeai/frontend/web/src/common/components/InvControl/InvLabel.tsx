@@ -13,7 +13,7 @@ export const InvLabel = memo(
       ref
     ) => {
       const shouldEnableInformationalPopovers = useAppSelector(
-        (state) => state.system.shouldEnableInformationalPopovers
+        (s) => s.system.shouldEnableInformationalPopovers
       );
 
       const ctx = useContext(InvControlGroupContext);

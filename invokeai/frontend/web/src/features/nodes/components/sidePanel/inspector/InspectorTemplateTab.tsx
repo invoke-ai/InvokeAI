@@ -1,14 +1,16 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createMemoizedSelector(
-  stateSelector,
-  ({ nodes, nodeTemplates }) => {
+  selectNodesSlice,
+  selectNodeTemplatesSlice,
+  (nodes, nodeTemplates) => {
     const lastSelectedNodeId =
       nodes.selectedNodes[nodes.selectedNodes.length - 1];
 

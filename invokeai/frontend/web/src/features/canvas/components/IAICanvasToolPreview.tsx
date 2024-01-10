@@ -1,12 +1,12 @@
 import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   $cursorPosition,
   $isMovingBoundingBox,
   $isTransformingBoundingBox,
 } from 'features/canvas/store/canvasNanostore';
+import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import {
   COLOR_PICKER_SIZE,
@@ -17,16 +17,9 @@ import { memo, useMemo } from 'react';
 import { Circle, Group } from 'react-konva';
 
 const canvasBrushPreviewSelector = createMemoizedSelector(
-  stateSelector,
-  ({ canvas }) => {
+  selectCanvasSlice,
+  (canvas) => {
     const {
-      brushSize,
-      colorPickerColor,
-      maskColor,
-      brushColor,
-      tool,
-      layer,
-      stageScale,
       stageDimensions,
       boundingBoxCoordinates,
       boundingBoxDimensions,
@@ -82,17 +75,6 @@ const canvasBrushPreviewSelector = createMemoizedSelector(
     //   : undefined;
 
     return {
-      radius: brushSize / 2,
-      colorPickerOuterRadius: COLOR_PICKER_SIZE / stageScale,
-      colorPickerInnerRadius:
-        (COLOR_PICKER_SIZE - COLOR_PICKER_STROKE_RADIUS + 1) / stageScale,
-      maskColorString: rgbaColorToString({ ...maskColor, a: 0.5 }),
-      brushColorString: rgbaColorToString(brushColor),
-      colorPickerColorString: rgbaColorToString(colorPickerColor),
-      tool,
-      layer,
-      strokeWidth: 1.5 / stageScale,
-      dotRadius: 1.5 / stageScale,
       clip,
       stageDimensions,
     };
@@ -103,20 +85,28 @@ const canvasBrushPreviewSelector = createMemoizedSelector(
  * Draws a black circle around the canvas brush preview.
  */
 const IAICanvasToolPreview = (props: GroupConfig) => {
-  const {
-    radius,
-    maskColorString,
-    tool,
-    layer,
-    dotRadius,
-    strokeWidth,
-    brushColorString,
-    colorPickerColorString,
-    colorPickerInnerRadius,
-    colorPickerOuterRadius,
-    clip,
-    stageDimensions,
-  } = useAppSelector(canvasBrushPreviewSelector);
+  const radius = useAppSelector((s) => s.canvas.brushSize / 2);
+  const maskColorString = useAppSelector((s) =>
+    rgbaColorToString({ ...s.canvas.maskColor, a: 0.5 })
+  );
+  const tool = useAppSelector((s) => s.canvas.tool);
+  const layer = useAppSelector((s) => s.canvas.layer);
+  const dotRadius = useAppSelector((s) => 1.5 / s.canvas.stageScale);
+  const strokeWidth = useAppSelector((s) => 1.5 / s.canvas.stageScale);
+  const brushColorString = useAppSelector((s) =>
+    rgbaColorToString(s.canvas.brushColor)
+  );
+  const colorPickerColorString = useAppSelector((s) =>
+    rgbaColorToString(s.canvas.colorPickerColor)
+  );
+  const colorPickerInnerRadius = useAppSelector(
+    (s) =>
+      (COLOR_PICKER_SIZE - COLOR_PICKER_STROKE_RADIUS + 1) / s.canvas.stageScale
+  );
+  const colorPickerOuterRadius = useAppSelector(
+    (s) => COLOR_PICKER_SIZE / s.canvas.stageScale
+  );
+  const { clip, stageDimensions } = useAppSelector(canvasBrushPreviewSelector);
 
   const cursorPosition = useStore($cursorPosition);
   const isMovingBoundingBox = useStore($isMovingBoundingBox);

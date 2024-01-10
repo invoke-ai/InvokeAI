@@ -8,35 +8,26 @@ import {
   VStack,
 } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { $galleryHeader } from 'app/store/nanostores/galleryHeader';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
 import { galleryViewChanged } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaImages, FaServer } from 'react-icons/fa';
+import { PiImagesBold } from 'react-icons/pi';
+import { RiServerLine } from 'react-icons/ri';
 
 import BoardsList from './Boards/BoardsList/BoardsList';
 import GalleryBoardName from './GalleryBoardName';
 import GallerySettingsPopover from './GallerySettingsPopover';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 
-const selector = createMemoizedSelector([stateSelector], (state) => {
-  const { galleryView } = state.gallery;
-
-  return {
-    galleryView,
-  };
-});
-
 const ImageGalleryContent = () => {
   const { t } = useTranslation();
   const resizeObserverRef = useRef<HTMLDivElement>(null);
   const galleryGridRef = useRef<HTMLDivElement>(null);
-  const { galleryView } = useAppSelector(selector);
+  const galleryView = useAppSelector((s) => s.gallery.galleryView);
   const dispatch = useAppDispatch();
   const galleryHeader = useStore($galleryHeader);
   const { isOpen: isBoardListOpen, onToggle: onToggleBoardList } =
@@ -93,7 +84,7 @@ const ImageGalleryContent = () => {
                   isChecked={galleryView === 'images'}
                   onClick={handleClickImages}
                   w="full"
-                  leftIcon={<FaImages />}
+                  leftIcon={<PiImagesBold size="16px" />}
                   data-testid="images-tab"
                 >
                   {t('parameters.images')}
@@ -104,7 +95,7 @@ const ImageGalleryContent = () => {
                   isChecked={galleryView === 'assets'}
                   onClick={handleClickAssets}
                   w="full"
-                  leftIcon={<FaServer />}
+                  leftIcon={<RiServerLine size="16px" />}
                   data-testid="assets-tab"
                 >
                   {t('gallery.assets')}

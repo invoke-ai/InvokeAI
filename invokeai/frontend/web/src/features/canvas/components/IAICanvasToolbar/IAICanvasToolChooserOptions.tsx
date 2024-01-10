@@ -1,6 +1,4 @@
 import { Box, Flex } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
@@ -28,31 +26,20 @@ import type { RgbaColor } from 'react-colorful';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
-  FaEraser,
-  FaEyeDropper,
-  FaFillDrip,
-  FaPaintBrush,
-  FaSlidersH,
-  FaTimes,
-} from 'react-icons/fa';
-
-export const selector = createMemoizedSelector(
-  [stateSelector, isStagingSelector],
-  ({ canvas }, isStaging) => {
-    const { tool, brushColor, brushSize } = canvas;
-
-    return {
-      tool,
-      isStaging,
-      brushColor,
-      brushSize,
-    };
-  }
-);
+  PiEraserBold,
+  PiEyedropperBold,
+  PiPaintBrushBold,
+  PiPaintBucketBold,
+  PiSlidersHorizontalBold,
+  PiXBold,
+} from 'react-icons/pi';
 
 const IAICanvasToolChooserOptions = () => {
   const dispatch = useAppDispatch();
-  const { tool, brushColor, brushSize, isStaging } = useAppSelector(selector);
+  const tool = useAppSelector((s) => s.canvas.tool);
+  const brushColor = useAppSelector((s) => s.canvas.brushColor);
+  const brushSize = useAppSelector((s) => s.canvas.brushSize);
+  const isStaging = useAppSelector(isStagingSelector);
   const { t } = useTranslation();
 
   useHotkeys(
@@ -211,7 +198,7 @@ const IAICanvasToolChooserOptions = () => {
       <InvIconButton
         aria-label={`${t('unifiedCanvas.brush')} (B)`}
         tooltip={`${t('unifiedCanvas.brush')} (B)`}
-        icon={<FaPaintBrush />}
+        icon={<PiPaintBrushBold />}
         isChecked={tool === 'brush' && !isStaging}
         onClick={handleSelectBrushTool}
         isDisabled={isStaging}
@@ -219,7 +206,7 @@ const IAICanvasToolChooserOptions = () => {
       <InvIconButton
         aria-label={`${t('unifiedCanvas.eraser')} (E)`}
         tooltip={`${t('unifiedCanvas.eraser')} (E)`}
-        icon={<FaEraser />}
+        icon={<PiEraserBold />}
         isChecked={tool === 'eraser' && !isStaging}
         isDisabled={isStaging}
         onClick={handleSelectEraserTool}
@@ -227,21 +214,21 @@ const IAICanvasToolChooserOptions = () => {
       <InvIconButton
         aria-label={`${t('unifiedCanvas.fillBoundingBox')} (Shift+F)`}
         tooltip={`${t('unifiedCanvas.fillBoundingBox')} (Shift+F)`}
-        icon={<FaFillDrip />}
+        icon={<PiPaintBucketBold />}
         isDisabled={isStaging}
         onClick={handleFillRect}
       />
       <InvIconButton
         aria-label={`${t('unifiedCanvas.eraseBoundingBox')} (Del/Backspace)`}
         tooltip={`${t('unifiedCanvas.eraseBoundingBox')} (Del/Backspace)`}
-        icon={<FaTimes />}
+        icon={<PiXBold />}
         isDisabled={isStaging}
         onClick={handleEraseBoundingBox}
       />
       <InvIconButton
         aria-label={`${t('unifiedCanvas.colorPicker')} (C)`}
         tooltip={`${t('unifiedCanvas.colorPicker')} (C)`}
-        icon={<FaEyeDropper />}
+        icon={<PiEyedropperBold />}
         isChecked={tool === 'colorPicker' && !isStaging}
         isDisabled={isStaging}
         onClick={handleSelectColorPickerTool}
@@ -251,7 +238,7 @@ const IAICanvasToolChooserOptions = () => {
           <InvIconButton
             aria-label={t('unifiedCanvas.brushOptions')}
             tooltip={t('unifiedCanvas.brushOptions')}
-            icon={<FaSlidersH />}
+            icon={<PiSlidersHorizontalBold />}
           />
         </InvPopoverTrigger>
         <InvPopoverContent>

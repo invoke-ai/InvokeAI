@@ -9,7 +9,7 @@ import {
 
 export const useResumeProcessor = () => {
   const dispatch = useAppDispatch();
-  const isConnected = useAppSelector((state) => state.system.isConnected);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
   const { data: queueStatus } = useGetQueueStatusQuery();
   const { t } = useTranslation();
   const [trigger, { isLoading }] = useResumeProcessorMutation({

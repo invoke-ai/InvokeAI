@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { FaExclamationTriangle } from 'react-icons/fa';
 
 const StatusIndicator = () => {
-  const isConnected = useAppSelector((state) => state.system.isConnected);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
   const { t } = useTranslation();
 
   if (!isConnected) {

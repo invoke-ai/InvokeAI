@@ -1,7 +1,7 @@
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaPlus } from 'react-icons/fa';
+import { PiPlusBold } from 'react-icons/pi';
 import { useCreateBoardMutation } from 'services/api/endpoints/boards';
 
 const AddBoardButton = () => {
@@ -14,7 +14,7 @@ const AddBoardButton = () => {
 
   return (
     <InvIconButton
-      icon={<FaPlus />}
+      icon={<PiPlusBold />}
       isLoading={isLoading}
       tooltip={t('boards.addBoard')}
       aria-label={t('boards.addBoard')}

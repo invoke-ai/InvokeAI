@@ -42,9 +42,9 @@ const line = definePartsStyle(() => ({
     px: 4,
     py: 1,
     fontSize: 'sm',
-    color: 'base.400',
+    color: 'base.200',
     _selected: {
-      color: 'blue.400',
+      color: 'blue.200',
     },
   },
   tabpanel: {

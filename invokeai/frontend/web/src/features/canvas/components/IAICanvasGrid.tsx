@@ -1,23 +1,25 @@
 // Grid drawing adapted from https://longviewcoder.com/2021/12/08/konva-a-better-grid/
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import type { ReactElement } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { Group, Line as KonvaLine } from 'react-konva';
 import { getArbitraryBaseColor } from 'theme/colors';
 
-const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
-  const { stageScale, stageCoordinates, stageDimensions } = canvas;
-  return { stageScale, stageCoordinates, stageDimensions };
+const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
+  return {
+    stageCoordinates: canvas.stageCoordinates,
+    stageDimensions: canvas.stageDimensions,
+  };
 });
 
 const baseGridLineColor = getArbitraryBaseColor(27);
 const fineGridLineColor = getArbitraryBaseColor(18);
 
 const IAICanvasGrid = () => {
-  const { stageScale, stageCoordinates, stageDimensions } =
-    useAppSelector(selector);
+  const { stageCoordinates, stageDimensions } = useAppSelector(selector);
+  const stageScale = useAppSelector((s) => s.canvas.stageScale);
 
   const gridSpacing = useMemo(() => {
     if (stageScale >= 2) {

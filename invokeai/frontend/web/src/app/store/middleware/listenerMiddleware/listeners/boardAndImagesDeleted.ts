@@ -20,9 +20,15 @@ export const addDeleteBoardAndImagesFulfilledListener = () => {
       let wasNodeEditorReset = false;
       let wereControlAdaptersReset = false;
 
-      const state = getState();
+      const { generation, canvas, nodes, controlAdapters } = getState();
       deleted_images.forEach((image_name) => {
-        const imageUsage = getImageUsage(state, image_name);
+        const imageUsage = getImageUsage(
+          generation,
+          canvas,
+          nodes,
+          controlAdapters,
+          image_name
+        );
 
         if (imageUsage.isInitialImage && !wasInitialImageReset) {
           dispatch(clearInitialImage());

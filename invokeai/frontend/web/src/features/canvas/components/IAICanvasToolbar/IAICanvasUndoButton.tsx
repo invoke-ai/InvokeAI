@@ -1,5 +1,3 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { undo } from 'features/canvas/store/canvasSlice';
@@ -7,26 +5,13 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { FaUndo } from 'react-icons/fa';
-
-const canvasUndoSelector = createMemoizedSelector(
-  [stateSelector, activeTabNameSelector],
-  ({ canvas }, activeTabName) => {
-    const { pastLayerStates } = canvas;
-
-    return {
-      canUndo: pastLayerStates.length > 0,
-      activeTabName,
-    };
-  }
-);
+import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 
 const IAICanvasUndoButton = () => {
   const dispatch = useAppDispatch();
-
   const { t } = useTranslation();
-
-  const { canUndo, activeTabName } = useAppSelector(canvasUndoSelector);
+  const activeTabName = useAppSelector(activeTabNameSelector);
+  const canUndo = useAppSelector((s) => s.canvas.pastLayerStates.length > 0);
 
   const handleUndo = useCallback(() => {
     dispatch(undo());
@@ -48,7 +33,7 @@ const IAICanvasUndoButton = () => {
     <InvIconButton
       aria-label={`${t('unifiedCanvas.undo')} (Ctrl+Z)`}
       tooltip={`${t('unifiedCanvas.undo')} (Ctrl+Z)`}
-      icon={<FaUndo />}
+      icon={<PiArrowCounterClockwiseBold />}
       onClick={handleUndo}
       isDisabled={!canUndo}
     />

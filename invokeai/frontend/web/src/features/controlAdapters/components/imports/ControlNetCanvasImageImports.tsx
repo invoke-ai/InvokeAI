@@ -7,7 +7,7 @@ import {
 } from 'features/canvas/store/actions';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaImage, FaMask } from 'react-icons/fa';
+import { PiExcludeBold, PiImageSquareBold } from 'react-icons/pi';
 
 type ControlNetCanvasImageImportsProps = {
   id: string;
@@ -29,17 +29,17 @@ const ControlNetCanvasImageImports = (
   }, [id, dispatch]);
 
   return (
-    <Flex gap={2}>
+    <Flex gap={4}>
       <InvIconButton
         size="sm"
-        icon={<FaImage />}
+        icon={<PiImageSquareBold />}
         tooltip={t('controlnet.importImageFromCanvas')}
         aria-label={t('controlnet.importImageFromCanvas')}
         onClick={handleImportImageFromCanvas}
       />
       <InvIconButton
         size="sm"
-        icon={<FaMask />}
+        icon={<PiExcludeBold />}
         tooltip={t('controlnet.importMaskFromCanvas')}
         aria-label={t('controlnet.importMaskFromCanvas')}
         onClick={handleImportMaskFromCanvas}

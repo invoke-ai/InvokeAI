@@ -1,5 +1,7 @@
 import type { PayloadAction, Update } from '@reduxjs/toolkit';
 import { createEntityAdapter, createSlice, isAnyOf } from '@reduxjs/toolkit';
+import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
+import type { RootState } from 'app/store/store';
 import { buildControlAdapter } from 'features/controlAdapters/util/buildControlAdapter';
 import type {
   ParameterControlNetModel,
@@ -7,7 +9,7 @@ import type {
   ParameterT2IAdapterModel,
 } from 'features/parameters/types/parameterSchemas';
 import { cloneDeep, merge, uniq } from 'lodash-es';
-import { appSocketInvocationError } from 'services/events/actions';
+import { socketInvocationError } from 'services/events/actions';
 import { v4 as uuidv4 } from 'uuid';
 
 import { controlAdapterImageProcessed } from './actions';
@@ -36,6 +38,10 @@ import {
 export const caAdapter = createEntityAdapter<ControlAdapterConfig, string>({
   selectId: (ca) => ca.id,
 });
+export const caAdapterSelectors = caAdapter.getSelectors(
+  undefined,
+  getSelectorsOptions
+);
 
 export const {
   selectById: selectControlAdapterById,
@@ -43,12 +49,14 @@ export const {
   selectEntities: selectControlAdapterEntities,
   selectIds: selectControlAdapterIds,
   selectTotal: selectControlAdapterTotal,
-} = caAdapter.getSelectors();
+} = caAdapterSelectors;
 
-export const initialControlAdapterState: ControlAdaptersState =
+export const initialControlAdaptersState: ControlAdaptersState =
   caAdapter.getInitialState<{
+    _version: 1;
     pendingControlImages: string[];
   }>({
+    _version: 1,
     pendingControlImages: [],
   });
 
@@ -90,7 +98,7 @@ export const selectValidT2IAdapters = (controlAdapters: ControlAdaptersState) =>
 
 export const controlAdaptersSlice = createSlice({
   name: 'controlAdapters',
-  initialState: initialControlAdapterState,
+  initialState: initialControlAdaptersState,
   reducers: {
     controlAdapterAdded: {
       reducer: (
@@ -261,31 +269,29 @@ export const controlAdaptersSlice = createSlice({
 
       const update: Update<ControlNetConfig | T2IAdapterConfig, string> = {
         id,
-        changes: { model },
+        changes: { model, shouldAutoConfig: true },
       };
 
       update.changes.processedControlImage = null;
 
-      if (cn.shouldAutoConfig) {
-        let processorType: ControlAdapterProcessorType | undefined = undefined;
+      let processorType: ControlAdapterProcessorType | undefined = undefined;
 
-        for (const modelSubstring in CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS) {
-          if (model.model_name.includes(modelSubstring)) {
-            processorType =
-              CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS[modelSubstring];
-            break;
-          }
+      for (const modelSubstring in CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS) {
+        if (model.model_name.includes(modelSubstring)) {
+          processorType =
+            CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS[modelSubstring];
+          break;
         }
+      }
 
-        if (processorType) {
-          update.changes.processorType = processorType;
-          update.changes.processorNode = CONTROLNET_PROCESSORS[processorType]
-            .default as RequiredControlAdapterProcessorNode;
-        } else {
-          update.changes.processorType = 'none';
-          update.changes.processorNode = CONTROLNET_PROCESSORS.none
-            .default as RequiredControlAdapterProcessorNode;
-        }
+      if (processorType) {
+        update.changes.processorType = processorType;
+        update.changes.processorNode = CONTROLNET_PROCESSORS[processorType]
+          .default as RequiredControlAdapterProcessorNode;
+      } else {
+        update.changes.processorType = 'none';
+        update.changes.processorNode = CONTROLNET_PROCESSORS.none
+          .default as RequiredControlAdapterProcessorNode;
       }
 
       caAdapter.updateOne(state, update);
@@ -429,7 +435,7 @@ export const controlAdaptersSlice = createSlice({
       caAdapter.updateOne(state, update);
     },
     controlAdaptersReset: () => {
-      return cloneDeep(initialControlAdapterState);
+      return cloneDeep(initialControlAdaptersState);
     },
     pendingControlImagesCleared: (state) => {
       state.pendingControlImages = [];
@@ -448,7 +454,7 @@ export const controlAdaptersSlice = createSlice({
       }
     });
 
-    builder.addCase(appSocketInvocationError, (state) => {
+    builder.addCase(socketInvocationError, (state) => {
       state.pendingControlImages = [];
     });
   },
@@ -484,3 +490,14 @@ export const isAnyControlAdapterAdded = isAnyOf(
   controlAdapterAddedFromImage,
   controlAdapterRecalled
 );
+
+export const selectControlAdaptersSlice = (state: RootState) =>
+  state.controlAdapters;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateControlAdaptersState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

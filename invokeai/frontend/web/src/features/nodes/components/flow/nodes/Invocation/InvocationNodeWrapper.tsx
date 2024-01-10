@@ -1,7 +1,7 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import InvocationNode from 'features/nodes/components/flow/nodes/Invocation/InvocationNode';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import type { InvocationNodeData } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 import type { NodeProps } from 'reactflow';
@@ -14,15 +14,15 @@ const InvocationNodeWrapper = (props: NodeProps<InvocationNodeData>) => {
 
   const hasTemplateSelector = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ nodeTemplates }) =>
+      createSelector(selectNodeTemplatesSlice, (nodeTemplates) =>
         Boolean(nodeTemplates.templates[type])
       ),
     [type]
   );
 
-  const nodeTemplate = useAppSelector(hasTemplateSelector);
+  const hasTemplate = useAppSelector(hasTemplateSelector);
 
-  if (!nodeTemplate) {
+  if (!hasTemplate) {
     return (
       <InvocationNodeUnknownFallback
         nodeId={nodeId}

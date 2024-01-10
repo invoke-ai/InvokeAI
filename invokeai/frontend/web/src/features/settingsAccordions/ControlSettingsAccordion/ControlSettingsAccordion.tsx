@@ -1,7 +1,6 @@
 import { Flex } from '@chakra-ui/layout';
 import { Divider } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
@@ -13,6 +12,7 @@ import {
   selectAllIPAdapters,
   selectAllT2IAdapters,
   selectControlAdapterIds,
+  selectControlAdaptersSlice,
   selectValidControlNets,
   selectValidIPAdapters,
   selectValidT2IAdapters,
@@ -20,11 +20,11 @@ import {
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { Fragment, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaPlus } from 'react-icons/fa';
+import { PiPlusBold } from 'react-icons/pi';
 
 const selector = createMemoizedSelector(
-  [stateSelector],
-  ({ controlAdapters }) => {
+  selectControlAdaptersSlice,
+  (controlAdapters) => {
     const badges: string[] = [];
     let isError = false;
 
@@ -61,8 +61,7 @@ const selector = createMemoizedSelector(
       isError = true;
     }
 
-    const controlAdapterIds =
-      selectControlAdapterIds(controlAdapters).map(String);
+    const controlAdapterIds = selectControlAdapterIds(controlAdapters);
 
     return {
       controlAdapterIds,
@@ -104,7 +103,7 @@ export const ControlSettingsAccordion: React.FC = memo(() => {
         >
           <InvButton
             tooltip={t('controlnet.addControlNet')}
-            leftIcon={<FaPlus />}
+            leftIcon={<PiPlusBold />}
             onClick={addControlNet}
             data-testid="add controlnet"
             flexGrow={1}
@@ -114,7 +113,7 @@ export const ControlSettingsAccordion: React.FC = memo(() => {
           </InvButton>
           <InvButton
             tooltip={t('controlnet.addIPAdapter')}
-            leftIcon={<FaPlus />}
+            leftIcon={<PiPlusBold />}
             onClick={addIPAdapter}
             data-testid="add ip adapter"
             flexGrow={1}
@@ -124,7 +123,7 @@ export const ControlSettingsAccordion: React.FC = memo(() => {
           </InvButton>
           <InvButton
             tooltip={t('controlnet.addT2IAdapter')}
-            leftIcon={<FaPlus />}
+            leftIcon={<PiPlusBold />}
             onClick={addT2IAdapter}
             data-testid="add t2i adapter"
             flexGrow={1}

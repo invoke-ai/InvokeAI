@@ -1,5 +1,4 @@
 import { Box, Flex } from '@chakra-ui/react';
-import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
@@ -21,7 +20,7 @@ import { isManualAddMode } from './AdvancedAddModels';
 
 const ScanAdvancedAddModels = () => {
   const advancedAddScanModel = useAppSelector(
-    (state: RootState) => state.modelmanager.advancedAddScanModel
+    (s) => s.modelmanager.advancedAddScanModel
   );
 
   const { t } = useTranslation();

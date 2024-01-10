@@ -12,7 +12,7 @@ import { useCallback } from 'react';
 const useCanvasDrag = () => {
   const dispatch = useAppDispatch();
   const isStaging = useAppSelector(isStagingSelector);
-  const tool = useAppSelector((state) => state.canvas.tool);
+  const tool = useAppSelector((s) => s.canvas.tool);
   const isMovingBoundingBox = useStore($isMovingBoundingBox);
   const handleDragStart = useCallback(() => {
     if (!((tool === 'move' || isStaging) && !isMovingBoundingBox)) {

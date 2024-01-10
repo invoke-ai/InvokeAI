@@ -13,7 +13,7 @@ import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
 const ParamInfillMethod = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const infillMethod = useAppSelector((state) => state.generation.infillMethod);
+  const infillMethod = useAppSelector((s) => s.generation.infillMethod);
   const { data: appConfigData } = useGetAppConfigQuery();
   const options = useMemo<InvSelectOption[]>(
     () =>

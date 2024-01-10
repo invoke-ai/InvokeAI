@@ -14,6 +14,7 @@ import type {
 } from 'reactflow';
 
 export type NodesState = {
+  _version: 1;
   nodes: AnyNode[];
   edges: InvocationNodeEdge[];
   connectionStartParams: OnConnectStartParams | null;
@@ -39,6 +40,7 @@ export type NodesState = {
 };
 
 export type WorkflowsState = Omit<WorkflowV2, 'nodes' | 'edges'> & {
+  _version: 1;
   isTouched: boolean;
 };
 

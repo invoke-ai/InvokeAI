@@ -4,6 +4,7 @@ import type {
   UnknownAction,
 } from '@reduxjs/toolkit';
 import { createEntityAdapter } from '@reduxjs/toolkit';
+import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
 import { $queueId } from 'app/store/nanostores/queueId';
 import { listParamsReset } from 'features/queue/store/queueSlice';
 import queryString from 'query-string';
@@ -59,6 +60,10 @@ export const queueItemsAdapter = createEntityAdapter<
     return 0;
   },
 });
+export const queueItemsAdapterSelectors = queueItemsAdapter.getSelectors(
+  undefined,
+  getSelectorsOptions
+);
 
 export const queueApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -308,7 +313,7 @@ export const queueApi = api.injectEndpoints({
       merge: (cache, response) => {
         queueItemsAdapter.addMany(
           cache,
-          queueItemsAdapter.getSelectors().selectAll(response)
+          queueItemsAdapterSelectors.selectAll(response)
         );
         cache.has_more = response.has_more;
       },

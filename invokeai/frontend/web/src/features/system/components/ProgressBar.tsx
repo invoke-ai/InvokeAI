@@ -1,25 +1,22 @@
 import { Progress } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
-const progressBarSelector = createMemoizedSelector(
-  stateSelector,
-  ({ system }) => {
-    return {
-      isConnected: system.isConnected,
-      hasSteps: Boolean(system.denoiseProgress),
-      value: (system.denoiseProgress?.percentage ?? 0) * 100,
-    };
-  }
+
+const selectProgressValue = createSelector(
+  selectSystemSlice,
+  (system) => (system.denoiseProgress?.percentage ?? 0) * 100
 );
 
 const ProgressBar = () => {
   const { t } = useTranslation();
   const { data: queueStatus } = useGetQueueStatusQuery();
-  const { hasSteps, value, isConnected } = useAppSelector(progressBarSelector);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
+  const hasSteps = useAppSelector((s) => Boolean(s.system.denoiseProgress));
+  const value = useAppSelector(selectProgressValue);
 
   return (
     <Progress
@@ -30,7 +27,7 @@ const ProgressBar = () => {
       }
       h={2}
       w="full"
-      colorScheme="blue"
+      colorScheme="invokeBlue"
     />
   );
 };

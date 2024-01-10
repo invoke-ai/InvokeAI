@@ -1,5 +1,4 @@
 import { Box, Flex } from '@chakra-ui/react';
-import type { RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
@@ -24,7 +23,7 @@ const overlayScrollbarsStyles: CSSProperties = {
 const ParametersPanel = () => {
   const activeTabName = useAppSelector(activeTabNameSelector);
   const isSDXL = useAppSelector(
-    (state: RootState) => state.generation.model?.base_model === 'sdxl'
+    (s) => s.generation.model?.base_model === 'sdxl'
   );
 
   return (
