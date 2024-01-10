@@ -1,4 +1,7 @@
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
 import type { WorkflowV2 } from 'features/nodes/types/workflow';
 import type { BuildWorkflowArg } from 'features/nodes/util/workflow/buildWorkflow';
 import { buildWorkflowFast } from 'features/nodes/util/workflow/buildWorkflow';
@@ -12,12 +15,14 @@ const debouncedBuildWorkflow = debounce((arg: BuildWorkflowArg) => {
   $builtWorkflow.set(buildWorkflowFast(arg));
 }, 300);
 
+const selectWorkflowSlices = createSelector(
+  selectNodesSlice,
+  selectWorkflowSlice,
+  (nodes, workflow) => ({ nodes: nodes.nodes, edges: nodes.edges, workflow })
+);
+
 export const useWorkflowWatcher = () => {
-  const buildWorkflowArg = useAppSelector(({ nodes, workflow }) => ({
-    nodes: nodes.nodes,
-    edges: nodes.edges,
-    workflow,
-  }));
+  const buildWorkflowArg = useAppSelector(selectWorkflowSlices);
 
   useEffect(() => {
     debouncedBuildWorkflow(buildWorkflowArg);
