@@ -7,7 +7,7 @@ import {
   InvMenuButton,
   InvMenuGroup,
 } from 'common/components/InvMenu/wrapper';
-import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
+import { useGlobalMenuClose } from 'common/hooks/useGlobalMenuClose';
 import HotkeysModal from 'features/system/components/HotkeysModal/HotkeysModal';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
@@ -23,7 +23,7 @@ import SettingsModal from './SettingsModal';
 const SettingsMenu = () => {
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  useGlobalMenuCloseTrigger(onClose);
+  useGlobalMenuClose(onClose);
 
   const isBugLinkEnabled = useFeatureStatus('bugLink').isFeatureEnabled;
   const isDiscordLinkEnabled = useFeatureStatus('discordLink').isFeatureEnabled;

@@ -3,6 +3,7 @@ import {
   MenuList as ChakraMenuList,
   Portal,
 } from '@chakra-ui/react';
+import { skipMouseEvent } from 'common/util/skipMouseEvent';
 import { memo } from 'react';
 
 import { menuListMotionProps } from './constants';
@@ -16,6 +17,7 @@ export const InvMenuList = memo(
           <ChakraMenuList
             ref={ref}
             motionProps={menuListMotionProps}
+            onContextMenu={skipMouseEvent}
             {...props}
           />
         </Portal>

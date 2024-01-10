@@ -6,7 +6,7 @@ import {
   InvMenuButton,
   InvMenuDivider,
 } from 'common/components/InvMenu/wrapper';
-import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
+import { useGlobalMenuClose } from 'common/hooks/useGlobalMenuClose';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import DownloadWorkflowMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/DownloadWorkflowMenuItem';
 import NewWorkflowMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/NewWorkflowMenuItem';
@@ -21,7 +21,7 @@ import { PiDotsThreeOutlineFill } from 'react-icons/pi';
 const WorkflowLibraryMenu = () => {
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  useGlobalMenuCloseTrigger(onClose);
+  useGlobalMenuClose(onClose);
 
   const isWorkflowLibraryEnabled =
     useFeatureStatus('workflowLibrary').isFeatureEnabled;
