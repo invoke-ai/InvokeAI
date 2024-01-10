@@ -1,5 +1,6 @@
 import type { ChakraProps } from '@chakra-ui/react';
 import { Box, Flex, Heading, Image } from '@chakra-ui/react';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InvText } from 'common/components/InvText/wrapper';
 import type { TypesafeDraggableData } from 'features/dnd/types';
 import { memo } from 'react';
@@ -34,6 +35,7 @@ const multiImageStyles: ChakraProps['sx'] = {
 
 const DragPreview = (props: OverlayDragImageProps) => {
   const { t } = useTranslation();
+  const selectionCount = useAppSelector((s) => s.gallery.selection.length);
   if (!props.dragData) {
     return null;
   }
@@ -79,10 +81,10 @@ const DragPreview = (props: OverlayDragImageProps) => {
     );
   }
 
-  if (props.dragData.payloadType === 'IMAGE_DTOS') {
+  if (props.dragData.payloadType === 'GALLERY_SELECTION') {
     return (
       <Flex sx={multiImageStyles}>
-        <Heading>{props.dragData.payload.imageDTOs.length}</Heading>
+        <Heading>{selectionCount}</Heading>
         <Heading size="sm">{t('parameters.images')}</Heading>
       </Flex>
     );
