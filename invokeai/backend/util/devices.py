@@ -34,7 +34,10 @@ def choose_precision(device: torch.device) -> str:
     if device.type == "cuda":
         device_name = torch.cuda.get_device_name(device)
         if not ("GeForce GTX 1660" in device_name or "GeForce GTX 1650" in device_name):
-            return "float16"
+            if config.precision == "bfloat16":
+                return "bfloat16"
+            else:
+                return "float16"
     elif device.type == "mps":
         return "float16"
     return "float32"
@@ -43,8 +46,10 @@ def choose_precision(device: torch.device) -> str:
 def torch_dtype(device: torch.device) -> torch.dtype:
     if config.full_precision:
         return torch.float32
-    if choose_precision(device) == "float16":
-        return torch.bfloat16 if device.type == "cuda" else torch.float16
+    if config(device) == "float16":
+        return torch.float16
+    if config(device) == "bfloat16":
+        return torch.bfloat16
     else:
         return torch.float32
 
