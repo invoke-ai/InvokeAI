@@ -3,7 +3,7 @@ import { Box, useToken } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
-import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
+import { useGlobalMenuClose } from 'common/hooks/useGlobalMenuClose';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import {
   nodeExclusivelySelected,
@@ -50,7 +50,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
   const dispatch = useAppDispatch();
 
   const opacity = useAppSelector((s) => s.nodes.nodeOpacity);
-  const { onCloseGlobal } = useGlobalMenuCloseTrigger();
+  const { onCloseGlobal } = useGlobalMenuClose();
 
   const handleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
