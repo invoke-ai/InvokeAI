@@ -9,10 +9,10 @@ import {
 } from 'features/nodes/store/nodesSlice';
 import type { WorkflowsState as WorkflowState } from 'features/nodes/store/types';
 import type { FieldIdentifier } from 'features/nodes/types/field';
+import type { WorkflowV2 } from 'features/nodes/types/workflow';
 import { cloneDeep, isEqual, uniqBy } from 'lodash-es';
 
-export const initialWorkflowState: WorkflowState = {
-  _version: 1,
+export const blankWorkflow: Omit<WorkflowV2, 'nodes' | 'edges'> = {
   name: '',
   author: '',
   description: '',
@@ -22,7 +22,12 @@ export const initialWorkflowState: WorkflowState = {
   notes: '',
   exposedFields: [],
   meta: { version: '2.0.0', category: 'user' },
+};
+
+export const initialWorkflowState: WorkflowState = {
+  _version: 1,
   isTouched: true,
+  ...blankWorkflow,
 };
 
 const workflowSlice = createSlice({

@@ -37,8 +37,10 @@ export const addModelSelectedListener = () => {
       const newModel = result.data;
 
       const { base_model } = newModel;
+      const didBaseModelChange =
+        state.generation.model?.base_model !== base_model;
 
-      if (state.generation.model?.base_model !== base_model) {
+      if (didBaseModelChange) {
         // we may need to reset some incompatible submodels
         let modelsCleared = 0;
 
@@ -81,7 +83,7 @@ export const addModelSelectedListener = () => {
         }
       }
 
-      dispatch(modelChanged(newModel));
+      dispatch(modelChanged(newModel, state.generation.model));
     },
   });
 };

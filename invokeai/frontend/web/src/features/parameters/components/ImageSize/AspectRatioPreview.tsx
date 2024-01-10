@@ -3,7 +3,7 @@ import { useSize } from '@chakra-ui/react-use-size';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useMemo, useRef } from 'react';
-import { FaImage } from 'react-icons/fa';
+import { PiFrameCorners } from 'react-icons/pi';
 
 import {
   BOX_SIZE_CSS_CALC,
@@ -76,7 +76,11 @@ export const AspectRatioPreview = () => {
               exit={MOTION_ICON_EXIT}
               style={ICON_CONTAINER_STYLES}
             >
-              <Icon as={FaImage} color="base.700" boxSize={BOX_SIZE_CSS_CALC} />
+              <Icon
+                as={PiFrameCorners}
+                color="base.700"
+                boxSize={BOX_SIZE_CSS_CALC}
+              />
             </Flex>
           )}
         </AnimatePresence>

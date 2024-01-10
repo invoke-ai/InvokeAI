@@ -1,6 +1,6 @@
 import { useToken } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
+import { useGlobalMenuClose } from 'common/hooks/useGlobalMenuClose';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
@@ -158,7 +158,7 @@ export const Flow = memo(() => {
     [dispatch]
   );
 
-  const { onCloseGlobal } = useGlobalMenuCloseTrigger();
+  const { onCloseGlobal } = useGlobalMenuClose();
   const handlePaneClick = useCallback(() => {
     onCloseGlobal();
   }, [onCloseGlobal]);

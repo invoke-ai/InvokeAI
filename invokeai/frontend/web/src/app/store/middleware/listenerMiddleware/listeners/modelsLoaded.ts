@@ -74,7 +74,7 @@ export const addModelsLoadedListener = () => {
         return;
       }
 
-      dispatch(modelChanged(result.data));
+      dispatch(modelChanged(result.data, currentModel));
     },
   });
   startAppListening({
@@ -149,7 +149,7 @@ export const addModelsLoadedListener = () => {
 
       if (!firstModel) {
         // No custom VAEs loaded at all; use the default
-        dispatch(modelChanged(null));
+        dispatch(vaeSelected(null));
         return;
       }
 
@@ -227,7 +227,7 @@ export const addModelsLoadedListener = () => {
       const log = logger('models');
       log.info(
         { models: action.payload.entities },
-        `ControlNet models loaded (${action.payload.ids.length})`
+        `T2I Adapter models loaded (${action.payload.ids.length})`
       );
 
       selectAllT2IAdapters(getState().controlAdapters).forEach((ca) => {

@@ -12,7 +12,6 @@ import type {
 } from 'features/dnd/types';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
-import { workflowExposedFieldAdded } from 'features/nodes/store/workflowSlice';
 import {
   initialImageChanged,
   selectOptimalDimension,
@@ -35,10 +34,10 @@ export const addImageDroppedListener = () => {
 
       if (activeData.payloadType === 'IMAGE_DTO') {
         log.debug({ activeData, overData }, 'Image dropped');
-      } else if (activeData.payloadType === 'IMAGE_DTOS') {
+      } else if (activeData.payloadType === 'GALLERY_SELECTION') {
         log.debug(
           { activeData, overData },
-          `Images (${activeData.payload.imageDTOs.length}) dropped`
+          `Images (${getState().gallery.selection.length}) dropped`
         );
       } else if (activeData.payloadType === 'NODE_FIELD') {
         log.debug(
@@ -47,19 +46,6 @@ export const addImageDroppedListener = () => {
         );
       } else {
         log.debug({ activeData, overData }, `Unknown payload dropped`);
-      }
-
-      if (
-        overData.actionType === 'ADD_FIELD_TO_LINEAR' &&
-        activeData.payloadType === 'NODE_FIELD'
-      ) {
-        const { nodeId, field } = activeData.payload;
-        dispatch(
-          workflowExposedFieldAdded({
-            nodeId,
-            fieldName: field.name,
-          })
-        );
       }
 
       /**
@@ -207,10 +193,9 @@ export const addImageDroppedListener = () => {
        */
       if (
         overData.actionType === 'ADD_TO_BOARD' &&
-        activeData.payloadType === 'IMAGE_DTOS' &&
-        activeData.payload.imageDTOs
+        activeData.payloadType === 'GALLERY_SELECTION'
       ) {
-        const { imageDTOs } = activeData.payload;
+        const imageDTOs = getState().gallery.selection;
         const { boardId } = overData.context;
         dispatch(
           imagesApi.endpoints.addImagesToBoard.initiate({
@@ -226,10 +211,9 @@ export const addImageDroppedListener = () => {
        */
       if (
         overData.actionType === 'REMOVE_FROM_BOARD' &&
-        activeData.payloadType === 'IMAGE_DTOS' &&
-        activeData.payload.imageDTOs
+        activeData.payloadType === 'GALLERY_SELECTION'
       ) {
-        const { imageDTOs } = activeData.payload;
+        const imageDTOs = getState().gallery.selection;
         dispatch(
           imagesApi.endpoints.removeImagesFromBoard.initiate({
             imageDTOs,

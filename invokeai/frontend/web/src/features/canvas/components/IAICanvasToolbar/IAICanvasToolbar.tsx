@@ -1,4 +1,5 @@
 import { Flex } from '@chakra-ui/react';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
 import { InvControl } from 'common/components/InvControl/InvControl';
@@ -14,17 +15,16 @@ import {
   canvasMerged,
   canvasSavedToGallery,
 } from 'features/canvas/store/actions';
+import { $canvasBaseLayer, $tool } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   resetCanvas,
   resetCanvasView,
   setIsMaskEnabled,
   setLayer,
-  setTool,
 } from 'features/canvas/store/canvasSlice';
 import type { CanvasLayer } from 'features/canvas/store/canvasTypes';
 import { LAYER_NAMES_DICT } from 'features/canvas/store/canvasTypes';
-import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { InvIconButton } from 'index';
 import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -50,9 +50,8 @@ const IAICanvasToolbar = () => {
   const dispatch = useAppDispatch();
   const isMaskEnabled = useAppSelector((s) => s.canvas.isMaskEnabled);
   const layer = useAppSelector((s) => s.canvas.layer);
-  const tool = useAppSelector((s) => s.canvas.tool);
+  const tool = useStore($tool);
   const isStaging = useAppSelector(isStagingSelector);
-  const canvasBaseLayer = getCanvasBaseLayer();
   const { t } = useTranslation();
   const { isClipboardAPIAvailable } = useCopyImageToClipboard();
 
@@ -81,7 +80,7 @@ const IAICanvasToolbar = () => {
       enabled: () => true,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    []
   );
 
   useHotkeys(
@@ -93,7 +92,7 @@ const IAICanvasToolbar = () => {
       enabled: () => !isStaging,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    []
   );
 
   useHotkeys(
@@ -105,7 +104,7 @@ const IAICanvasToolbar = () => {
       enabled: () => !isStaging,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    []
   );
 
   useHotkeys(
@@ -117,7 +116,7 @@ const IAICanvasToolbar = () => {
       enabled: () => !isStaging && isClipboardAPIAvailable,
       preventDefault: true,
     },
-    [canvasBaseLayer, isClipboardAPIAvailable]
+    [isClipboardAPIAvailable]
   );
 
   useHotkeys(
@@ -129,33 +128,42 @@ const IAICanvasToolbar = () => {
       enabled: () => !isStaging,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    []
   );
 
   const handleSelectMoveTool = useCallback(() => {
-    dispatch(setTool('move'));
-  }, [dispatch]);
+    $tool.set('move');
+  }, []);
 
-  const handleClickResetCanvasView = useSingleAndDoubleClick(
-    () => handleResetCanvasView(false),
-    () => handleResetCanvasView(true)
+  const handleResetCanvasView = useCallback(
+    (shouldScaleTo1 = false) => {
+      const canvasBaseLayer = $canvasBaseLayer.get();
+      if (!canvasBaseLayer) {
+        return;
+      }
+      const clientRect = canvasBaseLayer.getClientRect({
+        skipTransform: true,
+      });
+      dispatch(
+        resetCanvasView({
+          contentRect: clientRect,
+          shouldScaleTo1,
+        })
+      );
+    },
+    [dispatch]
   );
+  const onSingleClick = useCallback(() => {
+    handleResetCanvasView(false);
+  }, [handleResetCanvasView]);
+  const onDoubleClick = useCallback(() => {
+    handleResetCanvasView(true);
+  }, [handleResetCanvasView]);
 
-  const handleResetCanvasView = (shouldScaleTo1 = false) => {
-    const canvasBaseLayer = getCanvasBaseLayer();
-    if (!canvasBaseLayer) {
-      return;
-    }
-    const clientRect = canvasBaseLayer.getClientRect({
-      skipTransform: true,
-    });
-    dispatch(
-      resetCanvasView({
-        contentRect: clientRect,
-        shouldScaleTo1,
-      })
-    );
-  };
+  const handleClickResetCanvasView = useSingleAndDoubleClick({
+    onSingleClick,
+    onDoubleClick,
+  });
 
   const handleResetCanvas = useCallback(() => {
     dispatch(resetCanvas());

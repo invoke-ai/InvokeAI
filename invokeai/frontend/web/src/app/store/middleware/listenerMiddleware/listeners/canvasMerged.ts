@@ -1,8 +1,8 @@
 import { $logger } from 'app/logging/logger';
 import { canvasMerged } from 'features/canvas/store/actions';
+import { $canvasBaseLayer } from 'features/canvas/store/canvasNanostore';
 import { setMergedCanvas } from 'features/canvas/store/canvasSlice';
 import { getFullBaseLayerBlob } from 'features/canvas/util/getFullBaseLayerBlob';
-import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -30,7 +30,7 @@ export const addCanvasMergedListener = () => {
         return;
       }
 
-      const canvasBaseLayer = getCanvasBaseLayer();
+      const canvasBaseLayer = $canvasBaseLayer.get();
 
       if (!canvasBaseLayer) {
         moduleLog.error('Problem getting canvas base layer');

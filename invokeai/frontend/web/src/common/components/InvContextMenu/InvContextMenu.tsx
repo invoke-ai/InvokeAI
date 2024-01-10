@@ -1,16 +1,5 @@
 /**
- * This is a copy-paste of https://github.com/lukasbach/chakra-ui-contextmenu with a small change.
- *
- * The reactflow background element somehow prevents the chakra `useOutsideClick()` hook from working.
- * With a menu open, clicking on the reactflow background element doesn't close the menu.
- *
- * Reactflow does provide an `onPaneClick` to handle clicks on the background element, but it is not
- * straightforward to programatically close the menu.
- *
- * As a (hopefully temporary) workaround, we will use a dirty hack:
- * - create `globalContextMenuCloseTrigger: number` in `ui` slice
- * - increment it in `onPaneClick` (and wherever else we want to close the menu)
- * - `useEffect()` to close the menu when `globalContextMenuCloseTrigger` changes
+ * Adapted from https://github.com/lukasbach/chakra-ui-contextmenu
  */
 import type {
   ChakraProps,
@@ -18,9 +7,9 @@ import type {
   MenuProps,
   PortalProps,
 } from '@chakra-ui/react';
-import { Portal, useEventListener } from '@chakra-ui/react';
+import { Portal, useDisclosure, useEventListener } from '@chakra-ui/react';
 import { InvMenu, InvMenuButton } from 'common/components/InvMenu/wrapper';
-import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
+import { useGlobalMenuClose } from 'common/hooks/useGlobalMenuClose';
 import { typedMemo } from 'common/util/typedMemo';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -34,94 +23,89 @@ export interface InvContextMenuProps<T extends HTMLElement = HTMLDivElement> {
 
 export const InvContextMenu = typedMemo(
   <T extends HTMLElement = HTMLElement>(props: InvContextMenuProps<T>) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [isRendered, setIsRendered] = useState(false);
-    const [isDeferredOpen, setIsDeferredOpen] = useState(false);
-    const [position, setPosition] = useState<[number, number]>([0, 0]);
+    const { isOpen, onOpen, onClose } = useDisclosure();
+    const [position, setPosition] = useState([-1, -1]);
     const targetRef = useRef<T>(null);
+    const lastPositionRef = useRef([-1, -1]);
+    const timeoutRef = useRef(0);
 
-    useEffect(() => {
-      if (isOpen) {
-        setTimeout(() => {
-          setIsRendered(true);
-          setTimeout(() => {
-            setIsDeferredOpen(true);
-          });
-        });
-      } else {
-        setIsDeferredOpen(false);
-        const timeout = setTimeout(() => {
-          setIsRendered(isOpen);
-        }, 1000);
-        return () => clearTimeout(timeout);
-      }
-    }, [isOpen]);
+    useGlobalMenuClose(onClose);
 
-    const onClose = useCallback(() => {
-      setIsOpen(false);
-      setIsDeferredOpen(false);
-      setIsRendered(false);
-    }, []);
+    const onContextMenu = useCallback(
+      (e: MouseEvent) => {
+        if (e.shiftKey) {
+          onClose();
+          return;
+        }
+        if (
+          targetRef.current?.contains(e.target as HTMLElement) ||
+          e.target === targetRef.current
+        ) {
+          // clear pending delayed open
+          window.clearTimeout(timeoutRef.current);
+          e.preventDefault();
+          if (
+            lastPositionRef.current[0] !== e.pageX ||
+            lastPositionRef.current[1] !== e.pageY
+          ) {
+            // if the mouse moved, we need to close, wait for animation and reopen the menu at the new position
+            onClose();
+            timeoutRef.current = window.setTimeout(() => {
+              onOpen();
+              setPosition([e.pageX, e.pageY]);
+            }, 100);
+          } else {
+            // else we can just open the menu at the current position
+            onOpen();
+            setPosition([e.pageX, e.pageY]);
+          }
+        }
+        lastPositionRef.current = [e.pageX, e.pageY];
+      },
+      [onClose, onOpen]
+    );
 
-    // This is the change from the original chakra-ui-contextmenu
-    // Close all menus when the globalContextMenuCloseTrigger changes
-    useGlobalMenuCloseTrigger(onClose);
+    useEffect(
+      () => () => {
+        window.clearTimeout(timeoutRef.current);
+      },
+      []
+    );
 
-    useEventListener('contextmenu', (e) => {
-      if (
-        targetRef.current?.contains(e.target as HTMLElement) ||
-        e.target === targetRef.current
-      ) {
-        e.preventDefault();
-        setIsOpen(true);
-        setPosition([e.pageX, e.pageY]);
-      } else {
-        setIsOpen(false);
-      }
-    });
-
-    const onCloseHandler = useCallback(() => {
-      props.menuProps?.onClose?.();
-      setIsOpen(false);
-    }, [props.menuProps]);
+    useEventListener('contextmenu', onContextMenu);
 
     return (
       <>
         {props.children(targetRef)}
-        {isRendered && (
-          <Portal {...props.portalProps}>
-            <InvMenu
-              isLazy
-              isOpen={isDeferredOpen}
-              gutter={0}
-              onClose={onCloseHandler}
-              placement="auto-end"
-              {...props.menuProps}
-            >
-              <InvMenuButton
-                aria-hidden={true}
-                w={1}
-                h={1}
-                position="absolute"
-                left={position[0]}
-                top={position[1]}
-                cursor="default"
-                bg="transparent"
-                size="sm"
-                _hover={_hover}
-                {...props.menuButtonProps}
-              />
-              {props.renderMenu()}
-            </InvMenu>
-          </Portal>
-        )}
+        <Portal {...props.portalProps}>
+          <InvMenu
+            isLazy
+            isOpen={isOpen}
+            gutter={0}
+            placement="auto-end"
+            onClose={onClose}
+            {...props.menuProps}
+          >
+            <InvMenuButton
+              aria-hidden={true}
+              w={1}
+              h={1}
+              position="absolute"
+              left={position[0]}
+              top={position[1]}
+              cursor="default"
+              bg="transparent"
+              size="sm"
+              _hover={_hover}
+              pointerEvents="none"
+              {...props.menuButtonProps}
+            />
+            {props.renderMenu()}
+          </InvMenu>
+        </Portal>
       </>
     );
   }
 );
 
 const _hover: ChakraProps['_hover'] = { bg: 'transparent' };
-
-Object.assign(InvContextMenu, {
-  displayName: 'InvContextMenu',
-});

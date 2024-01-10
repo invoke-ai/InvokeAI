@@ -158,27 +158,51 @@ export const generationSlice = createSlice({
       const { image_name, width, height } = action.payload;
       state.initialImage = { imageName: image_name, width, height };
     },
-    modelChanged: (state, action: PayloadAction<ParameterModel | null>) => {
-      const newModel = action.payload;
-      state.model = newModel;
+    modelChanged: {
+      reducer: (
+        state,
+        action: PayloadAction<
+          ParameterModel | null,
+          string,
+          { previousModel?: ParameterModel | null }
+        >
+      ) => {
+        const newModel = action.payload;
+        state.model = newModel;
 
-      if (newModel === null) {
-        return;
-      }
+        if (newModel === null) {
+          return;
+        }
 
-      // Clamp ClipSkip Based On Selected Model
-      const { maxClip } = CLIP_SKIP_MAP[newModel.base_model];
-      state.clipSkip = clamp(state.clipSkip, 0, maxClip);
-      const optimalDimension = getOptimalDimension(newModel);
-      if (getIsSizeOptimal(state.width, state.height, optimalDimension)) {
-        return;
-      }
-      const { width, height } = calculateNewSize(
-        state.aspectRatio.value,
-        optimalDimension * optimalDimension
-      );
-      state.width = width;
-      state.height = height;
+        // Clamp ClipSkip Based On Selected Model
+        const { maxClip } = CLIP_SKIP_MAP[newModel.base_model];
+        state.clipSkip = clamp(state.clipSkip, 0, maxClip);
+
+        if (action.meta.previousModel?.base_model === newModel.base_model) {
+          // The base model hasn't changed, we don't need to optimize the size
+          return;
+        }
+
+        const optimalDimension = getOptimalDimension(newModel);
+        if (getIsSizeOptimal(state.width, state.height, optimalDimension)) {
+          return;
+        }
+        const { width, height } = calculateNewSize(
+          state.aspectRatio.value,
+          optimalDimension * optimalDimension
+        );
+        state.width = width;
+        state.height = height;
+      },
+      prepare: (
+        payload: ParameterModel | null,
+        previousModel?: ParameterModel | null
+      ) => ({
+        payload,
+        meta: {
+          previousModel,
+        },
+      }),
     },
     vaeSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
       // null is a valid VAE!

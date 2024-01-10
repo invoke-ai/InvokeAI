@@ -2,9 +2,10 @@ import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import type { NodesState, WorkflowsState } from 'features/nodes/store/types';
 import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
-import { type WorkflowV2, zWorkflowV2 } from 'features/nodes/types/workflow';
+import type { WorkflowV2 } from 'features/nodes/types/workflow';
+import { zWorkflowV2 } from 'features/nodes/types/workflow';
 import i18n from 'i18n';
-import { cloneDeep, omit } from 'lodash-es';
+import { cloneDeep, pick } from 'lodash-es';
 import { fromZodError } from 'zod-validation-error';
 
 export type BuildWorkflowArg = {
@@ -13,6 +14,18 @@ export type BuildWorkflowArg = {
   workflow: WorkflowsState;
 };
 
+const workflowKeys = [
+  'name',
+  'author',
+  'description',
+  'version',
+  'contact',
+  'tags',
+  'notes',
+  'exposedFields',
+  'meta',
+] satisfies (keyof WorkflowV2)[];
+
 export type BuildWorkflowFunction = (arg: BuildWorkflowArg) => WorkflowV2;
 
 export const buildWorkflowFast: BuildWorkflowFunction = ({
@@ -20,7 +33,7 @@ export const buildWorkflowFast: BuildWorkflowFunction = ({
   edges,
   workflow,
 }: BuildWorkflowArg): WorkflowV2 => {
-  const clonedWorkflow = omit(cloneDeep(workflow), 'isTouched');
+  const clonedWorkflow = pick(cloneDeep(workflow), workflowKeys);
 
   const newWorkflow: WorkflowV2 = {
     ...clonedWorkflow,
@@ -73,25 +86,23 @@ export const buildWorkflowFast: BuildWorkflowFunction = ({
   return newWorkflow;
 };
 
-export const buildWorkflowRight = ({
+export const buildWorkflowWithValidation = ({
   nodes,
   edges,
   workflow,
 }: BuildWorkflowArg): WorkflowV2 | null => {
-  const newWorkflowUnsafe = {
-    ...workflow,
-    nodes,
-    edges,
-  };
+  // builds what really, really should be a valid workflow
+  const workflowToValidate = buildWorkflowFast({ nodes, edges, workflow });
 
-  const result = zWorkflowV2.safeParse(newWorkflowUnsafe);
+  // but bc we are storing this in the DB, let's be extra sure
+  const result = zWorkflowV2.safeParse(workflowToValidate);
 
   if (!result.success) {
     const { message } = fromZodError(result.error, {
-      prefix: i18n.t('nodes.unableToParseNode'),
+      prefix: i18n.t('nodes.unableToValidateWorkflow'),
     });
 
-    logger('nodes').warn({ workflow: parseify(newWorkflowUnsafe) }, message);
+    logger('nodes').warn({ workflow: parseify(workflowToValidate) }, message);
     return null;
   }
 
