@@ -1,7 +1,8 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
-  setIsDrawing,
-  setIsMovingStage,
+  $isDrawing,
+  $isMovingStage,
+  $tool,
 } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { addLine } from 'features/canvas/store/canvasSlice';
@@ -15,7 +16,6 @@ import useColorPicker from './useColorUnderCursor';
 
 const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
   const dispatch = useAppDispatch();
-  const tool = useAppSelector((s) => s.canvas.tool);
   const isStaging = useAppSelector(isStagingSelector);
   const { commitColorUnderCursor } = useColorPicker();
 
@@ -26,9 +26,10 @@ const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
       }
 
       stageRef.current.container().focus();
+      const tool = $tool.get();
 
       if (tool === 'move' || isStaging) {
-        setIsMovingStage(true);
+        $isMovingStage.set(true);
         return;
       }
 
@@ -45,12 +46,17 @@ const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
 
       e.evt.preventDefault();
 
-      setIsDrawing(true);
+      $isDrawing.set(true);
 
       // Add a new line starting from the current cursor position.
-      dispatch(addLine([scaledCursorPosition.x, scaledCursorPosition.y]));
+      dispatch(
+        addLine({
+          points: [scaledCursorPosition.x, scaledCursorPosition.y],
+          tool,
+        })
+      );
     },
-    [stageRef, tool, isStaging, dispatch, commitColorUnderCursor]
+    [stageRef, isStaging, dispatch, commitColorUnderCursor]
   );
 };
 

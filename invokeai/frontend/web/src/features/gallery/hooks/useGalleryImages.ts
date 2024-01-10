@@ -11,12 +11,6 @@ import {
 import { useListImagesQuery } from 'services/api/endpoints/images';
 import type { ListImagesArgs } from 'services/api/types';
 
-export type UseGalleryImagesReturn = {
-  handleLoadMoreImages: () => void;
-  areMoreImagesAvailable: boolean;
-  queryResult: ReturnType<typeof useListImagesQuery>;
-};
-
 // The gallery is a singleton but multiple components need access to its query data.
 // If we don't define the query args outside of the hook, then each component will
 // have its own query args and trigger multiple requests. We use an atom to store
@@ -28,7 +22,7 @@ const $queryArgs = atom<ListImagesArgs | null>(null);
  *
  * This hook is a singleton.
  */
-export const useGalleryImages = (): UseGalleryImagesReturn => {
+export const useGalleryImages = () => {
   const galleryView = useAppSelector((s) => s.gallery.galleryView);
   const baseQueryArgs = useAppSelector(selectListImagesBaseQueryArgs);
   const queryArgs = useStore($queryArgs);

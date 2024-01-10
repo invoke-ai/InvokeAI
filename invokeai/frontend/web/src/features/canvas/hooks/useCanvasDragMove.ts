@@ -1,8 +1,8 @@
-import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   $isMovingBoundingBox,
-  setIsMovingStage,
+  $isMovingStage,
+  $tool,
 } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { setStageCoordinates } from 'features/canvas/store/canvasSlice';
@@ -12,18 +12,19 @@ import { useCallback } from 'react';
 const useCanvasDrag = () => {
   const dispatch = useAppDispatch();
   const isStaging = useAppSelector(isStagingSelector);
-  const tool = useAppSelector((s) => s.canvas.tool);
-  const isMovingBoundingBox = useStore($isMovingBoundingBox);
   const handleDragStart = useCallback(() => {
-    if (!((tool === 'move' || isStaging) && !isMovingBoundingBox)) {
+    if (
+      !(($tool.get() === 'move' || isStaging) && !$isMovingBoundingBox.get())
+    ) {
       return;
     }
-    setIsMovingStage(true);
-  }, [isMovingBoundingBox, isStaging, tool]);
+    $isMovingStage.set(true);
+  }, [isStaging]);
 
   const handleDragMove = useCallback(
     (e: KonvaEventObject<MouseEvent>) => {
-      if (!((tool === 'move' || isStaging) && !isMovingBoundingBox)) {
+      const tool = $tool.get();
+      if (!((tool === 'move' || isStaging) && !$isMovingBoundingBox.get())) {
         return;
       }
 
@@ -31,15 +32,17 @@ const useCanvasDrag = () => {
 
       dispatch(setStageCoordinates(newCoordinates));
     },
-    [dispatch, isMovingBoundingBox, isStaging, tool]
+    [dispatch, isStaging]
   );
 
   const handleDragEnd = useCallback(() => {
-    if (!((tool === 'move' || isStaging) && !isMovingBoundingBox)) {
+    if (
+      !(($tool.get() === 'move' || isStaging) && !$isMovingBoundingBox.get())
+    ) {
       return;
     }
-    setIsMovingStage(false);
-  }, [isMovingBoundingBox, isStaging, tool]);
+    $isMovingStage.set(false);
+  }, [isStaging]);
 
   return {
     handleDragStart,

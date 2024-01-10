@@ -69,7 +69,6 @@ import { addSessionRetrievalErrorEventListener } from './listeners/socketio/sock
 import { addSocketSubscribedEventListener as addSocketSubscribedListener } from './listeners/socketio/socketSubscribed';
 import { addSocketUnsubscribedEventListener as addSocketUnsubscribedListener } from './listeners/socketio/socketUnsubscribed';
 import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSaved';
-import { addTabChangedListener } from './listeners/tabChanged';
 import { addUpdateAllNodesRequestedListener } from './listeners/updateAllNodesRequested';
 import { addUpscaleRequestedListener } from './listeners/upscaleRequested';
 import { addWorkflowLoadRequestedListener } from './listeners/workflowLoadRequested';
@@ -195,9 +194,6 @@ addFirstListImagesListener();
 
 // Ad-hoc upscale workflwo
 addUpscaleRequestedListener();
-
-// Tab Change
-addTabChangedListener();
 
 // Dynamic prompts
 addDynamicPromptsListener();

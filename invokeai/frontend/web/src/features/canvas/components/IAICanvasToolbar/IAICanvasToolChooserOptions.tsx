@@ -1,4 +1,5 @@
 import { Box, Flex } from '@chakra-ui/react';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
@@ -10,14 +11,16 @@ import {
   InvPopoverTrigger,
 } from 'common/components/InvPopover/wrapper';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
-import { resetToolInteractionState } from 'features/canvas/store/canvasNanostore';
+import {
+  $tool,
+  resetToolInteractionState,
+} from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   addEraseRect,
   addFillRect,
   setBrushColor,
   setBrushSize,
-  setTool,
 } from 'features/canvas/store/canvasSlice';
 import { InvIconButton, InvPopover } from 'index';
 import { clamp } from 'lodash-es';
@@ -34,9 +37,11 @@ import {
   PiXBold,
 } from 'react-icons/pi';
 
+const marks = [1, 25, 50, 75, 100];
+
 const IAICanvasToolChooserOptions = () => {
   const dispatch = useAppDispatch();
-  const tool = useAppSelector((s) => s.canvas.tool);
+  const tool = useStore($tool);
   const brushColor = useAppSelector((s) => s.canvas.brushColor);
   const brushSize = useAppSelector((s) => s.canvas.brushSize);
   const isStaging = useAppSelector(isStagingSelector);
@@ -163,17 +168,17 @@ const IAICanvasToolChooserOptions = () => {
   );
 
   const handleSelectBrushTool = useCallback(() => {
-    dispatch(setTool('brush'));
+    $tool.set('brush');
     resetToolInteractionState();
-  }, [dispatch]);
+  }, []);
   const handleSelectEraserTool = useCallback(() => {
-    dispatch(setTool('eraser'));
+    $tool.set('eraser');
     resetToolInteractionState();
-  }, [dispatch]);
+  }, []);
   const handleSelectColorPickerTool = useCallback(() => {
-    dispatch(setTool('colorPicker'));
+    $tool.set('colorPicker');
     resetToolInteractionState();
-  }, [dispatch]);
+  }, []);
   const handleFillRect = useCallback(() => {
     dispatch(addFillRect());
   }, [dispatch]);
@@ -281,5 +286,3 @@ const IAICanvasToolChooserOptions = () => {
 };
 
 export default memo(IAICanvasToolChooserOptions);
-
-const marks = [1, 25, 50, 75, 100];

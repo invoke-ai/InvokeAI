@@ -1,6 +1,6 @@
 import { enqueueRequested } from 'app/store/actions';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
-import { buildWorkflowRight } from 'features/nodes/util/workflow/buildWorkflow';
+import { buildWorkflowWithValidation } from 'features/nodes/util/workflow/buildWorkflow';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig } from 'services/api/types';
 
@@ -15,7 +15,7 @@ export const addEnqueueRequestedNodes = () => {
       const { nodes, edges } = state.nodes;
       const workflow = state.workflow;
       const graph = buildNodesGraph(state.nodes);
-      const builtWorkflow = buildWorkflowRight({
+      const builtWorkflow = buildWorkflowWithValidation({
         nodes,
         edges,
         workflow,
