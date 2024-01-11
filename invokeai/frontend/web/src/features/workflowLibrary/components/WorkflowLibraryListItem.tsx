@@ -36,16 +36,31 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
   );
 
   return (
-    <Flex key={workflowDTO.workflow_id} w="full">
+    <Flex
+      key={workflowDTO.workflow_id}
+      w="full"
+      p={2}
+      borderRadius="base"
+      _hover={{ bg: 'base.750' }}
+    >
       <Flex w="full" alignItems="center" gap={2} h={12}>
         <Flex flexDir="column" flexGrow={1} h="full">
           <Flex alignItems="center" w="full" h="50%">
-            <Heading size="sm" variant={isOpen ? 'invokeBlue' : undefined}>
+            <Heading
+              size="sm"
+              noOfLines={1}
+              variant={isOpen ? 'invokeBlue' : undefined}
+            >
               {workflowDTO.name || t('workflows.unnamedWorkflow')}
             </Heading>
             <Spacer />
             {workflowDTO.category === 'user' && (
-              <InvText fontSize="sm" variant="subtext">
+              <InvText
+                fontSize="sm"
+                variant="subtext"
+                flexShrink={0}
+                noOfLines={1}
+              >
                 {t('common.updated')}:{' '}
                 {dateFormat(workflowDTO.updated_at, masks.shortDate)}{' '}
                 {dateFormat(workflowDTO.updated_at, masks.shortTime)}
@@ -69,7 +84,12 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
             )}
             <Spacer />
             {workflowDTO.category === 'user' && (
-              <InvText fontSize="sm" variant="subtext">
+              <InvText
+                fontSize="sm"
+                variant="subtext"
+                flexShrink={0}
+                noOfLines={1}
+              >
                 {t('common.created')}:{' '}
                 {dateFormat(workflowDTO.created_at, masks.shortDate)}{' '}
                 {dateFormat(workflowDTO.created_at, masks.shortTime)}
@@ -78,6 +98,7 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
           </Flex>
         </Flex>
         <InvButton
+          flexShrink={0}
           isDisabled={isOpen}
           onClick={handleGetAndLoadWorkflow}
           isLoading={getAndLoadWorkflowResult.isLoading}
@@ -87,6 +108,7 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
         </InvButton>
         {workflowDTO.category === 'user' && (
           <InvButton
+            flexShrink={0}
             colorScheme="error"
             isDisabled={isOpen}
             onClick={handleDeleteWorkflow}
