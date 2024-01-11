@@ -22,4 +22,6 @@ export type GalleryState = {
   selectedBoardId: BoardId;
   galleryView: GalleryView;
   boardSearchText: string;
+  offset: number;
+  limit: number;
 };

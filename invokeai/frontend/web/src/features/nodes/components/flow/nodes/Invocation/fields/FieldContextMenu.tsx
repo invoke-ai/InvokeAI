@@ -13,7 +13,7 @@ import {
   workflowExposedFieldAdded,
   workflowExposedFieldRemoved,
 } from 'features/nodes/store/workflowSlice';
-import type { MouseEvent, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaMinus, FaPlus } from 'react-icons/fa';
@@ -31,10 +31,6 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
   const fieldTemplateTitle = useFieldTemplateTitle(nodeId, fieldName, kind);
   const input = useFieldInputKind(nodeId, fieldName);
   const { t } = useTranslation();
-
-  const skipEvent = useCallback((e: MouseEvent<HTMLDivElement>) => {
-    e.preventDefault();
-  }, []);
 
   const selectIsExposed = useMemo(
     () =>
@@ -101,7 +97,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
   const renderMenuFunc = useCallback(
     () =>
       !menuItems.length ? null : (
-        <InvMenuList visibility="visible" onContextMenu={skipEvent}>
+        <InvMenuList visibility="visible">
           <InvMenuGroup
             title={label || fieldTemplateTitle || t('nodes.unknownField')}
           >
@@ -109,7 +105,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
           </InvMenuGroup>
         </InvMenuList>
       ),
-    [fieldTemplateTitle, label, menuItems, skipEvent, t]
+    [fieldTemplateTitle, label, menuItems, t]
   );
 
   return (

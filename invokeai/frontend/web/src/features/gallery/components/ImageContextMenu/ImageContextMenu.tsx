@@ -2,7 +2,6 @@ import { useAppSelector } from 'app/store/storeHooks';
 import type { InvContextMenuProps } from 'common/components/InvContextMenu/InvContextMenu';
 import { InvContextMenu } from 'common/components/InvContextMenu/InvContextMenu';
 import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
-import type { MouseEvent } from 'react';
 import { memo, useCallback } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
@@ -17,10 +16,6 @@ type Props = {
 const ImageContextMenu = ({ imageDTO, children }: Props) => {
   const selectionCount = useAppSelector((s) => s.gallery.selection.length);
 
-  const skipEvent = useCallback((e: MouseEvent<HTMLDivElement>) => {
-    e.preventDefault();
-  }, []);
-
   const renderMenuFunc = useCallback(() => {
     if (!imageDTO) {
       return null;
@@ -28,18 +23,18 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
 
     if (selectionCount > 1) {
       return (
-        <InvMenuList visibility="visible" onContextMenu={skipEvent}>
+        <InvMenuList visibility="visible">
           <MultipleSelectionMenuItems />
         </InvMenuList>
       );
     }
 
     return (
-      <InvMenuList visibility="visible" onContextMenu={skipEvent}>
+      <InvMenuList visibility="visible">
         <SingleSelectionMenuItems imageDTO={imageDTO} />
       </InvMenuList>
     );
-  }, [imageDTO, selectionCount, skipEvent]);
+  }, [imageDTO, selectionCount]);
 
   return (
     <InvContextMenu renderMenu={renderMenuFunc}>{children}</InvContextMenu>

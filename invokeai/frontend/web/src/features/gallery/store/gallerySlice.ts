@@ -7,6 +7,7 @@ import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
 import type { BoardId, GalleryState, GalleryView } from './types';
+import { IMAGE_LIMIT, INITIAL_IMAGE_LIMIT } from './types';
 
 export const initialGalleryState: GalleryState = {
   selection: [],
@@ -17,6 +18,8 @@ export const initialGalleryState: GalleryState = {
   selectedBoardId: 'none',
   galleryView: 'images',
   boardSearchText: '',
+  limit: INITIAL_IMAGE_LIMIT,
+  offset: 0,
 };
 
 export const gallerySlice = createSlice({
@@ -44,6 +47,8 @@ export const gallerySlice = createSlice({
     ) => {
       state.selectedBoardId = action.payload.boardId;
       state.galleryView = 'images';
+      state.offset = 0;
+      state.limit = INITIAL_IMAGE_LIMIT;
     },
     autoAddBoardIdChanged: (state, action: PayloadAction<BoardId>) => {
       if (!action.payload) {
@@ -54,9 +59,20 @@ export const gallerySlice = createSlice({
     },
     galleryViewChanged: (state, action: PayloadAction<GalleryView>) => {
       state.galleryView = action.payload;
+      state.offset = 0;
+      state.limit = INITIAL_IMAGE_LIMIT;
     },
     boardSearchTextChanged: (state, action: PayloadAction<string>) => {
       state.boardSearchText = action.payload;
+    },
+    moreImagesLoaded: (state) => {
+      if (state.offset === 0 && state.limit === INITIAL_IMAGE_LIMIT) {
+        state.offset = INITIAL_IMAGE_LIMIT;
+        state.limit = IMAGE_LIMIT;
+      } else {
+        state.offset += IMAGE_LIMIT;
+        state.limit += IMAGE_LIMIT;
+      }
     },
   },
   extraReducers: (builder) => {
@@ -96,6 +112,7 @@ export const {
   galleryViewChanged,
   selectionChanged,
   boardSearchTextChanged,
+  moreImagesLoaded,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;

@@ -11,6 +11,7 @@ export const workflowsApi = api.injectEndpoints({
       query: (workflow_id) => `workflows/i/${workflow_id}`,
       providesTags: (result, error, workflow_id) => [
         { type: 'Workflow', id: workflow_id },
+        'FetchOnReconnect',
       ],
       onQueryStarted: async (arg, api) => {
         const { dispatch, queryFulfilled } = api;
@@ -74,7 +75,7 @@ export const workflowsApi = api.injectEndpoints({
         url: 'workflows/',
         params,
       }),
-      providesTags: [{ type: 'Workflow', id: LIST_TAG }],
+      providesTags: ['FetchOnReconnect', { type: 'Workflow', id: LIST_TAG }],
     }),
   }),
 });

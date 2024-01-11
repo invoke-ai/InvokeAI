@@ -8,7 +8,7 @@ import {
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { isModalOpenChanged } from 'features/deleteImageModal/store/slice';
-import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { isImageFieldInputInstance } from 'features/nodes/types/field';
@@ -49,7 +49,7 @@ export const addRequestedSingleImageDeletionListener = () => {
       if (imageDTO && imageDTO?.image_name === lastSelectedImage) {
         const { image_name } = imageDTO;
 
-        const baseQueryArgs = selectListImagesBaseQueryArgs(state);
+        const baseQueryArgs = selectListImagesQueryArgs(state);
         const { data } =
           imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
 
@@ -180,9 +180,9 @@ export const addRequestedMultipleImageDeletionListener = () => {
           imagesApi.endpoints.deleteImages.initiate({ imageDTOs })
         ).unwrap();
         const state = getState();
-        const baseQueryArgs = selectListImagesBaseQueryArgs(state);
+        const queryArgs = selectListImagesQueryArgs(state);
         const { data } =
-          imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
+          imagesApi.endpoints.listImages.select(queryArgs)(state);
 
         const newSelectedImageDTO = data
           ? imagesSelectors.selectAll(data)[0]

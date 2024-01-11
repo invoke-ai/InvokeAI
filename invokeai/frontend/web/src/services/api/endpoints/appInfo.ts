@@ -29,7 +29,7 @@ export const appInfoApi = api.injectEndpoints({
         url: `app/invocation_cache/status`,
         method: 'GET',
       }),
-      providesTags: ['InvocationCacheStatus'],
+      providesTags: ['InvocationCacheStatus', 'FetchOnReconnect'],
     }),
     clearInvocationCache: build.mutation<void, void>({
       query: () => ({

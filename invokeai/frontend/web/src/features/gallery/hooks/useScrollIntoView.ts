@@ -19,12 +19,12 @@ import { useEffect, useRef } from 'react';
 export const useScrollIntoView = (
   isSelected: boolean,
   index: number,
-  selectionCount: number
+  areMultiplesSelected: boolean
 ) => {
   const imageContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!isSelected || selectionCount !== 1) {
+    if (!isSelected || areMultiplesSelected) {
       return;
     }
 
@@ -46,7 +46,7 @@ export const useScrollIntoView = (
         align: getScrollToIndexAlign(index, range),
       });
     }
-  }, [isSelected, index, selectionCount]);
+  }, [isSelected, index, areMultiplesSelected]);
 
   return imageContainerRef;
 };
