@@ -1,5 +1,3 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
@@ -7,24 +5,24 @@ import { maxPromptsChanged } from 'features/dynamicPrompts/store/dynamicPromptsS
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector(stateSelector, (state) => {
-  const { maxPrompts, combinatorial } = state.dynamicPrompts;
-  const { min, sliderMax, inputMax, initial } =
-    state.config.sd.dynamicPrompts.maxPrompts;
-
-  return {
-    maxPrompts,
-    min,
-    sliderMax,
-    inputMax,
-    initial,
-    isDisabled: !combinatorial,
-  };
-});
-
 const ParamDynamicPromptsMaxPrompts = () => {
-  const { maxPrompts, min, sliderMax, inputMax, initial, isDisabled } =
-    useAppSelector(selector);
+  const maxPrompts = useAppSelector((s) => s.dynamicPrompts.maxPrompts);
+  const sliderMin = useAppSelector(
+    (s) => s.config.sd.dynamicPrompts.maxPrompts.sliderMin
+  );
+  const sliderMax = useAppSelector(
+    (s) => s.config.sd.dynamicPrompts.maxPrompts.sliderMax
+  );
+  const numberInputMin = useAppSelector(
+    (s) => s.config.sd.dynamicPrompts.maxPrompts.numberInputMin
+  );
+  const numberInputMax = useAppSelector(
+    (s) => s.config.sd.dynamicPrompts.maxPrompts.numberInputMax
+  );
+  const initial = useAppSelector(
+    (s) => s.config.sd.dynamicPrompts.maxPrompts.initial
+  );
+  const isDisabled = useAppSelector((s) => !s.dynamicPrompts.combinatorial);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -43,14 +41,15 @@ const ParamDynamicPromptsMaxPrompts = () => {
       renderInfoPopoverInPortal={false}
     >
       <InvSlider
-        min={min}
+        min={sliderMin}
         max={sliderMax}
         value={maxPrompts}
         defaultValue={initial}
         onChange={handleChange}
         marks
         withNumberInput
-        numberInputMax={inputMax}
+        numberInputMin={numberInputMin}
+        numberInputMax={numberInputMax}
       />
     </InvControl>
   );

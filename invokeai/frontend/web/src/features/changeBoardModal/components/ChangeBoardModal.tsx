@@ -1,6 +1,5 @@
 import { Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvConfirmationAlertDialog } from 'common/components/InvConfirmationAlertDialog/InvConfirmationAlertDialog';
 import { InvControl } from 'common/components/InvControl/InvControl';
@@ -13,6 +12,7 @@ import { InvText } from 'common/components/InvText/wrapper';
 import {
   changeBoardReset,
   isModalOpenChanged,
+  selectChangeBoardModalSlice,
 } from 'features/changeBoardModal/store/slice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,23 +22,17 @@ import {
   useRemoveImagesFromBoardMutation,
 } from 'services/api/endpoints/images';
 
-const selector = createMemoizedSelector(
-  [stateSelector],
-  ({ changeBoardModal }) => {
-    const { isModalOpen, imagesToChange } = changeBoardModal;
-
-    return {
-      isModalOpen,
-      imagesToChange,
-    };
-  }
+const selectImagesToChange = createMemoizedSelector(
+  selectChangeBoardModalSlice,
+  (changeBoardModal) => changeBoardModal.imagesToChange
 );
 
 const ChangeBoardModal = () => {
   const dispatch = useAppDispatch();
   const [selectedBoard, setSelectedBoard] = useState<string | null>();
   const { data: boards, isFetching } = useListAllBoardsQuery();
-  const { imagesToChange, isModalOpen } = useAppSelector(selector);
+  const isModalOpen = useAppSelector((s) => s.changeBoardModal.isModalOpen);
+  const imagesToChange = useAppSelector(selectImagesToChange);
   const [addImagesToBoard] = useAddImagesToBoardMutation();
   const [removeImagesFromBoard] = useRemoveImagesFromBoardMutation();
   const { t } = useTranslation();

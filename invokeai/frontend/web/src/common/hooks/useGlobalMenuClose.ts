@@ -15,7 +15,7 @@ const $onCloseCallbacks = atom<CB[]>([]);
  * This hook provides a way to close all menus by calling `onCloseGlobal()`. Menus that want to be closed
  * in this way should register themselves by passing a callback to `useGlobalMenuCloseTrigger()`.
  */
-export const useGlobalMenuCloseTrigger = (onClose?: CB) => {
+export const useGlobalMenuClose = (onClose?: CB) => {
   useEffect(() => {
     if (!onClose) {
       return;

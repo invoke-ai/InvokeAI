@@ -117,6 +117,7 @@ export const isCanvasAnyLine = (
 ): obj is CanvasMaskLine | CanvasBaseLine => obj.kind === 'line';
 
 export interface CanvasState {
+  _version: 1;
   boundingBoxCoordinates: Vector2d;
   boundingBoxDimensions: Dimensions;
   boundingBoxPreviewFill: RgbaColor;
@@ -148,7 +149,6 @@ export interface CanvasState {
   stageCoordinates: Vector2d;
   stageDimensions: Dimensions;
   stageScale: number;
-  tool: CanvasTool;
   generationMode?: GenerationMode;
   batchIds: string[];
   aspectRatio: AspectRatioState;

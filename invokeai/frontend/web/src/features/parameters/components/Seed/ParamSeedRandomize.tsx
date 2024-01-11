@@ -1,4 +1,3 @@
-import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSwitch } from 'common/components/InvSwitch/wrapper';
@@ -12,7 +11,7 @@ export const ParamSeedRandomize = memo(() => {
   const { t } = useTranslation();
 
   const shouldRandomizeSeed = useAppSelector(
-    (state: RootState) => state.generation.shouldRandomizeSeed
+    (s) => s.generation.shouldRandomizeSeed
   );
 
   const handleChangeShouldRandomizeSeed = useCallback(

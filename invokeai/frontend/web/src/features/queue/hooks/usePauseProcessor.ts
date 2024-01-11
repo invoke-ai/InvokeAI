@@ -10,7 +10,7 @@ import {
 export const usePauseProcessor = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const isConnected = useAppSelector((state) => state.system.isConnected);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
   const { data: queueStatus } = useGetQueueStatusQuery();
   const [trigger, { isLoading }] = usePauseProcessorMutation({
     fixedCacheKey: 'pauseProcessor',

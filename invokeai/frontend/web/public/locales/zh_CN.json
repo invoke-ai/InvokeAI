@@ -121,7 +121,11 @@
         "nextPage": "下一页",
         "saveAs": "保存为",
         "unsaved": "未保存",
-        "ai": "ai"
+        "ai": "ai",
+        "preferencesLabel": "首选项",
+        "or": "或",
+        "advancedOptions": "高级选项",
+        "free": "自由"
     },
     "gallery": {
         "generations": "生成的图像",
@@ -164,18 +168,18 @@
         "starImage": "收藏图像"
     },
     "hotkeys": {
-        "keyboardShortcuts": "键盘快捷键",
-        "appHotkeys": "应用快捷键",
-        "generalHotkeys": "一般快捷键",
-        "galleryHotkeys": "图库快捷键",
-        "unifiedCanvasHotkeys": "统一画布快捷键",
+        "keyboardShortcuts": "快捷键",
+        "appHotkeys": "应用",
+        "generalHotkeys": "一般",
+        "galleryHotkeys": "图库",
+        "unifiedCanvasHotkeys": "统一画布",
         "invoke": {
             "title": "Invoke",
             "desc": "生成图像"
         },
         "cancel": {
             "title": "取消",
-            "desc": "取消图像生成"
+            "desc": "取消当前队列项目"
         },
         "focusPrompt": {
             "title": "打开提示词框",
@@ -361,11 +365,26 @@
             "title": "接受暂存图像",
             "desc": "接受当前暂存区中的图像"
         },
-        "nodesHotkeys": "节点快捷键",
+        "nodesHotkeys": "节点",
         "addNodes": {
             "title": "添加节点",
             "desc": "打开添加节点菜单"
-        }
+        },
+        "cancelAndClear": {
+            "desc": "取消当前队列项目并且清除所有待定项目",
+            "title": "取消和清除"
+        },
+        "resetOptionsAndGallery": {
+            "title": "重置选项和图库",
+            "desc": "重置选项和图库面板"
+        },
+        "searchHotkeys": "检索快捷键",
+        "noHotkeysFound": "未找到快捷键",
+        "toggleOptionsAndGallery": {
+            "desc": "打开和关闭选项和图库面板",
+            "title": "开关选项和图库"
+        },
+        "clearSearch": "清除检索项"
     },
     "modelManager": {
         "modelManager": "模型管理器",
@@ -563,8 +582,8 @@
         "info": "信息",
         "initialImage": "初始图像",
         "showOptionsPanel": "显示侧栏浮窗 (O 或 T)",
-        "seamlessYAxis": "Y 轴",
-        "seamlessXAxis": "X 轴",
+        "seamlessYAxis": "无缝平铺 Y 轴",
+        "seamlessXAxis": "无缝平铺 X 轴",
         "boundingBoxWidth": "边界框宽度",
         "boundingBoxHeight": "边界框高度",
         "denoisingStrength": "去噪强度",
@@ -611,7 +630,7 @@
             "readyToInvoke": "准备调用",
             "noControlImageForControlAdapter": "有 #{{number}} 个 Control Adapter 缺失控制图像",
             "noModelForControlAdapter": "有 #{{number}} 个 Control Adapter 没有选择模型。",
-            "incompatibleBaseModelForControlAdapter": "有 #{{number}} 个 Control Adapter 模型与主模型不匹配。"
+            "incompatibleBaseModelForControlAdapter": "有 #{{number}} 个 Control Adapter 模型与主模型不兼容。"
         },
         "patchmatchDownScaleSize": "缩小",
         "coherenceSteps": "步数",
@@ -642,7 +661,14 @@
         "unmasked": "取消遮罩",
         "cfgRescaleMultiplier": "CFG 重缩放倍数",
         "cfgRescale": "CFG 重缩放",
-        "useSize": "使用尺寸"
+        "useSize": "使用尺寸",
+        "setToOptimalSize": "优化模型大小",
+        "setToOptimalSizeTooSmall": "$t(parameters.setToOptimalSize) （可能过小）",
+        "imageSize": "图像尺寸",
+        "lockAspectRatio": "锁定纵横比",
+        "swapDimensions": "交换尺寸",
+        "aspect": "纵横",
+        "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) （可能过大）"
     },
     "settings": {
         "models": "模型",
@@ -1201,7 +1227,8 @@
         "openPose": "Openpose",
         "controlAdapter_other": "Control Adapters",
         "lineartAnime": "Lineart Anime",
-        "canny": "Canny"
+        "canny": "Canny",
+        "resizeSimple": "缩放（简单）"
     },
     "queue": {
         "status": "状态",
@@ -1248,7 +1275,7 @@
         "notReady": "无法排队",
         "batchFailedToQueue": "批次加入队列失败",
         "batchValues": "批次数",
-        "queueCountPrediction": "添加 {{predicted}} 到队列",
+        "queueCountPrediction": "{{promptsCount}} 提示词 × {{iterations}} 迭代次数 -> {{count}} 次生成",
         "batchQueued": "加入队列的批次",
         "queuedCount": "{{pending}} 待处理",
         "front": "前",
@@ -1262,7 +1289,8 @@
         "queueMaxExceeded": "超出最大值 {{max_queue_size}}，将跳过 {{skip}}",
         "graphFailedToQueue": "节点图加入队列失败",
         "batchFieldValues": "批处理值",
-        "time": "时间"
+        "time": "时间",
+        "openQueue": "打开队列"
     },
     "sdxl": {
         "refinerStart": "Refiner 开始作用时机",
@@ -1276,11 +1304,12 @@
         "denoisingStrength": "去噪强度",
         "refinermodel": "Refiner 模型",
         "posAestheticScore": "正向美学评分",
-        "concatPromptStyle": "连接提示词 & 样式",
+        "concatPromptStyle": "链接提示词 & 样式",
         "loading": "加载中...",
         "steps": "步数",
         "posStylePrompt": "正向样式提示词",
-        "refiner": "Refiner"
+        "refiner": "Refiner",
+        "freePromptStyle": "手动输入样式提示词"
     },
     "metadata": {
         "positivePrompt": "正向提示词",
@@ -1324,7 +1353,13 @@
         "noLoRAsInstalled": "无已安装的 LoRA",
         "esrganModel": "ESRGAN 模型",
         "addLora": "添加 LoRA",
-        "noLoRAsLoaded": "无已加载的 LoRA"
+        "noLoRAsLoaded": "无已加载的 LoRA",
+        "noMainModelSelected": "未选择主模型",
+        "lora": "LoRA",
+        "allLoRAsAdded": "已添加所有 LoRA",
+        "defaultVAE": "默认 VAE",
+        "incompatibleBaseModel": "不兼容基础模型",
+        "loraAlreadyAdded": "LoRA 已经被添加"
     },
     "boards": {
         "autoAddBoard": "自动添加面板",
@@ -1368,7 +1403,9 @@
         "maxPrompts": "最大提示词数",
         "dynamicPrompts": "动态提示词",
         "promptsWithCount_other": "{{count}} 个提示词",
-        "promptsPreview": "提示词预览"
+        "promptsPreview": "提示词预览",
+        "showDynamicPrompts": "显示动态提示词",
+        "loading": "生成动态提示词中..."
     },
     "popovers": {
         "compositingMaskAdjustments": {
@@ -1650,5 +1687,28 @@
     },
     "app": {
         "storeNotInitialized": "商店尚未初始化"
+    },
+    "accordions": {
+        "compositing": {
+            "infillTab": "内补",
+            "coherenceTab": "一致性层",
+            "title": "合成"
+        },
+        "control": {
+            "controlAdaptersTab": "Control Adapters",
+            "ipTab": "图像提示",
+            "title": "Control"
+        },
+        "generation": {
+            "title": "生成",
+            "conceptsTab": "概念",
+            "modelTab": "模型"
+        },
+        "advanced": {
+            "title": "高级"
+        },
+        "image": {
+            "title": "图像"
+        }
     }
 }

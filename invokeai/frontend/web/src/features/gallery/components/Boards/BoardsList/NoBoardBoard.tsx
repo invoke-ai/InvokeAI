@@ -1,8 +1,6 @@
 import { Box, Flex, Image } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import InvokeAILogoImage from 'assets/images/logo.png';
+import InvokeLogoSVG from 'assets/images/invoke-key-wht-lrg.svg';
 import IAIDroppable from 'common/components/IAIDroppable';
 import { InvText } from 'common/components/InvText/wrapper';
 import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
@@ -26,14 +24,12 @@ interface Props {
   isSelected: boolean;
 }
 
-const selector = createMemoizedSelector(stateSelector, ({ gallery }) => {
-  const { autoAddBoardId, autoAssignBoardOnClick } = gallery;
-  return { autoAddBoardId, autoAssignBoardOnClick };
-});
-
 const NoBoardBoard = memo(({ isSelected }: Props) => {
   const dispatch = useAppDispatch();
-  const { autoAddBoardId, autoAssignBoardOnClick } = useAppSelector(selector);
+  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
+  const autoAssignBoardOnClick = useAppSelector(
+    (s) => s.gallery.autoAssignBoardOnClick
+  );
   const boardName = useBoardName('none');
   const handleSelectBoard = useCallback(() => {
     dispatch(boardIdSelected({ boardId: 'none' }));
@@ -105,10 +101,10 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                   alignItems="center"
                 >
                   <Image
-                    src={InvokeAILogoImage}
+                    src={InvokeLogoSVG}
                     alt="invoke-ai-logo"
-                    opacity={0.4}
-                    filter="grayscale(1)"
+                    opacity={0.7}
+                    mixBlendMode="overlay"
                     mt={-6}
                     w={16}
                     h={16}
@@ -128,7 +124,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                   w="full"
                   maxW="full"
                   borderBottomRadius="base"
-                  bg={isSelected ? 'blue.500' : 'base.600'}
+                  bg={isSelected ? 'invokeBlue.500' : 'base.600'}
                   color={isSelected ? 'base.50' : 'base.100'}
                   lineHeight="short"
                   fontSize="xs"

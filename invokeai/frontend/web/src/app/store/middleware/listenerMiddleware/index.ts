@@ -5,6 +5,7 @@ import type {
   UnknownAction,
 } from '@reduxjs/toolkit';
 import { addListener, createListenerMiddleware } from '@reduxjs/toolkit';
+import { addGalleryImageClickedListener } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
 import type { AppDispatch, RootState } from 'app/store/store';
 
 import { addCommitStagingAreaImageListener } from './listeners/addCommitStagingAreaImageListener';
@@ -69,7 +70,6 @@ import { addSessionRetrievalErrorEventListener } from './listeners/socketio/sock
 import { addSocketSubscribedEventListener as addSocketSubscribedListener } from './listeners/socketio/socketSubscribed';
 import { addSocketUnsubscribedEventListener as addSocketUnsubscribedListener } from './listeners/socketio/socketUnsubscribed';
 import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSaved';
-import { addTabChangedListener } from './listeners/tabChanged';
 import { addUpdateAllNodesRequestedListener } from './listeners/updateAllNodesRequested';
 import { addUpscaleRequestedListener } from './listeners/upscaleRequested';
 import { addWorkflowLoadRequestedListener } from './listeners/workflowLoadRequested';
@@ -118,6 +118,9 @@ addImageToDeleteSelectedListener();
 addImagesStarredListener();
 addImagesUnstarredListener();
 
+// Gallery
+addGalleryImageClickedListener();
+
 // User Invoked
 addEnqueueRequestedCanvasListener();
 addEnqueueRequestedNodes();
@@ -136,19 +139,7 @@ addCanvasMergedListener();
 addStagingAreaImageSavedListener();
 addCommitStagingAreaImageListener();
 
-/**
- * Socket.IO Events - these handle SIO events directly and pass on internal application actions.
- * We don't handle SIO events in slices via `extraReducers` because some of these events shouldn't
- * actually be handled at all.
- *
- * For example, we don't want to respond to progress events for canceled sessions. To avoid
- * duplicating the logic to determine if an event should be responded to, we handle all of that
- * "is this session canceled?" logic in these listeners.
- *
- * The `socketGeneratorProgress` listener will then only dispatch the `appSocketGeneratorProgress`
- * action if it should be handled by the rest of the application. It is this `appSocketGeneratorProgress`
- * action that is handled by reducers in slices.
- */
+// Socket.IO
 addGeneratorProgressListener();
 addGraphExecutionStateCompleteListener();
 addInvocationCompleteListener();
@@ -195,9 +186,6 @@ addFirstListImagesListener();
 
 // Ad-hoc upscale workflwo
 addUpscaleRequestedListener();
-
-// Tab Change
-addTabChangedListener();
 
 // Dynamic prompts
 addDynamicPromptsListener();

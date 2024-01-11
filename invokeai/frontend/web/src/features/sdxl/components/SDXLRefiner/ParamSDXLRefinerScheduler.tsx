@@ -11,9 +11,7 @@ import { useTranslation } from 'react-i18next';
 const ParamSDXLRefinerScheduler = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const refinerScheduler = useAppSelector(
-    (state) => state.sdxl.refinerScheduler
-  );
+  const refinerScheduler = useAppSelector((s) => s.sdxl.refinerScheduler);
 
   const onChange = useCallback<InvSelectOnChange>(
     (v) => {

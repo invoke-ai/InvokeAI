@@ -1,11 +1,12 @@
-import { getCanvasBaseLayer } from './konvaInstanceProvider';
+import { $canvasBaseLayer } from 'features/canvas/store/canvasNanostore';
+
 import { konvaNodeToBlob } from './konvaNodeToBlob';
 
 /**
  * Gets the canvas base layer blob, without bounding box
  */
 export const getFullBaseLayerBlob = async () => {
-  const canvasBaseLayer = getCanvasBaseLayer();
+  const canvasBaseLayer = $canvasBaseLayer.get();
 
   if (!canvasBaseLayer) {
     return;

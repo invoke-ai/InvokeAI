@@ -1,6 +1,5 @@
 import { Flex } from '@chakra-ui/react';
 import { useForm } from '@mantine/form';
-import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { InvInput } from 'common/components/InvInput/InvInput';
@@ -23,9 +22,7 @@ function SearchFolderForm() {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const searchFolder = useAppSelector(
-    (state: RootState) => state.modelmanager.searchFolder
-  );
+  const searchFolder = useAppSelector((s) => s.modelmanager.searchFolder);
 
   const { refetch: refetchFoundModels } = useGetModelsInFolderQuery({
     search_path: searchFolder ? searchFolder : '',

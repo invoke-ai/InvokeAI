@@ -1,6 +1,7 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectPostprocessingSlice } from 'features/parameters/store/postprocessingSlice';
+import { selectConfigSlice } from 'features/system/store/configSlice';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ImageDTO } from 'services/api/types';
@@ -60,23 +61,27 @@ const getDetailTKey = (
 };
 
 export const createIsAllowedToUpscaleSelector = (imageDTO?: ImageDTO) =>
-  createMemoizedSelector(stateSelector, ({ postprocessing, config }) => {
-    const { esrganModelName } = postprocessing;
-    const { maxUpscalePixels } = config;
+  createMemoizedSelector(
+    selectPostprocessingSlice,
+    selectConfigSlice,
+    (postprocessing, config) => {
+      const { esrganModelName } = postprocessing;
+      const { maxUpscalePixels } = config;
 
-    const upscaledPixels = getUpscaledPixels(imageDTO, maxUpscalePixels);
-    const isAllowedToUpscale = getIsAllowedToUpscale(
-      upscaledPixels,
-      maxUpscalePixels
-    );
-    const scaleFactor = esrganModelName.includes('x2') ? 2 : 4;
-    const detailTKey = getDetailTKey(isAllowedToUpscale, scaleFactor);
-    return {
-      isAllowedToUpscale:
-        scaleFactor === 2 ? isAllowedToUpscale.x2 : isAllowedToUpscale.x4,
-      detailTKey,
-    };
-  });
+      const upscaledPixels = getUpscaledPixels(imageDTO, maxUpscalePixels);
+      const isAllowedToUpscale = getIsAllowedToUpscale(
+        upscaledPixels,
+        maxUpscalePixels
+      );
+      const scaleFactor = esrganModelName.includes('x2') ? 2 : 4;
+      const detailTKey = getDetailTKey(isAllowedToUpscale, scaleFactor);
+      return {
+        isAllowedToUpscale:
+          scaleFactor === 2 ? isAllowedToUpscale.x2 : isAllowedToUpscale.x4,
+        detailTKey,
+      };
+    }
+  );
 
 export const useIsAllowedToUpscale = (imageDTO?: ImageDTO) => {
   const { t } = useTranslation();

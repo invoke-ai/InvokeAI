@@ -1,6 +1,4 @@
 import { Flex } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvCheckbox } from 'common/components/InvCheckbox/wrapper';
 import { InvControl } from 'common/components/InvControl/InvControl';
@@ -21,27 +19,20 @@ import {
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaWrench } from 'react-icons/fa';
+import { RiSettings4Fill } from 'react-icons/ri';
 
 import BoardAutoAddSelect from './Boards/BoardAutoAddSelect';
-
-const selector = createMemoizedSelector([stateSelector], (state) => {
-  const { galleryImageMinimumWidth, shouldAutoSwitch, autoAssignBoardOnClick } =
-    state.gallery;
-
-  return {
-    galleryImageMinimumWidth,
-    shouldAutoSwitch,
-    autoAssignBoardOnClick,
-  };
-});
 
 const GallerySettingsPopover = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
-  const { galleryImageMinimumWidth, shouldAutoSwitch, autoAssignBoardOnClick } =
-    useAppSelector(selector);
+  const galleryImageMinimumWidth = useAppSelector(
+    (s) => s.gallery.galleryImageMinimumWidth
+  );
+  const shouldAutoSwitch = useAppSelector((s) => s.gallery.shouldAutoSwitch);
+  const autoAssignBoardOnClick = useAppSelector(
+    (s) => s.gallery.autoAssignBoardOnClick
+  );
 
   const handleChangeGalleryImageMinimumWidth = useCallback(
     (v: number) => {
@@ -70,7 +61,7 @@ const GallerySettingsPopover = () => {
           tooltip={t('gallery.gallerySettings')}
           aria-label={t('gallery.gallerySettings')}
           size="sm"
-          icon={<FaWrench />}
+          icon={<RiSettings4Fill />}
         />
       </InvPopoverTrigger>
       <InvPopoverContent>

@@ -1,4 +1,3 @@
-import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import type { InvLabelProps } from 'common/components/InvControl/types';
@@ -12,7 +11,7 @@ const ParamHrfToggle = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const hrfEnabled = useAppSelector((state: RootState) => state.hrf.hrfEnabled);
+  const hrfEnabled = useAppSelector((s) => s.hrf.hrfEnabled);
 
   const handleHrfEnabled = useCallback(
     (e: ChangeEvent<HTMLInputElement>) =>

@@ -1,11 +1,13 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import { uniqBy } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
 import type { BoardId, GalleryState, GalleryView } from './types';
+import { IMAGE_LIMIT, INITIAL_IMAGE_LIMIT } from './types';
 
 export const initialGalleryState: GalleryState = {
   selection: [],
@@ -16,6 +18,8 @@ export const initialGalleryState: GalleryState = {
   selectedBoardId: 'none',
   galleryView: 'images',
   boardSearchText: '',
+  limit: INITIAL_IMAGE_LIMIT,
+  offset: 0,
 };
 
 export const gallerySlice = createSlice({
@@ -43,6 +47,8 @@ export const gallerySlice = createSlice({
     ) => {
       state.selectedBoardId = action.payload.boardId;
       state.galleryView = 'images';
+      state.offset = 0;
+      state.limit = INITIAL_IMAGE_LIMIT;
     },
     autoAddBoardIdChanged: (state, action: PayloadAction<BoardId>) => {
       if (!action.payload) {
@@ -53,9 +59,20 @@ export const gallerySlice = createSlice({
     },
     galleryViewChanged: (state, action: PayloadAction<GalleryView>) => {
       state.galleryView = action.payload;
+      state.offset = 0;
+      state.limit = INITIAL_IMAGE_LIMIT;
     },
     boardSearchTextChanged: (state, action: PayloadAction<string>) => {
       state.boardSearchText = action.payload;
+    },
+    moreImagesLoaded: (state) => {
+      if (state.offset === 0 && state.limit === INITIAL_IMAGE_LIMIT) {
+        state.offset = INITIAL_IMAGE_LIMIT;
+        state.limit = IMAGE_LIMIT;
+      } else {
+        state.offset += IMAGE_LIMIT;
+        state.limit += IMAGE_LIMIT;
+      }
     },
   },
   extraReducers: (builder) => {
@@ -95,6 +112,7 @@ export const {
   galleryViewChanged,
   selectionChanged,
   boardSearchTextChanged,
+  moreImagesLoaded,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;
@@ -103,3 +121,13 @@ const isAnyBoardDeleted = isAnyOf(
   imagesApi.endpoints.deleteBoard.matchFulfilled,
   imagesApi.endpoints.deleteBoardAndImages.matchFulfilled
 );
+
+export const selectGallerySlice = (state: RootState) => state.gallery;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateGalleryState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

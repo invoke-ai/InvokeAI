@@ -6,18 +6,18 @@ import { useEffect, useState } from 'react';
 import { useDebounce } from 'react-use';
 
 export const useCanvasGenerationMode = () => {
-  const layerState = useAppSelector((state) => state.canvas.layerState);
+  const layerState = useAppSelector((s) => s.canvas.layerState);
 
   const boundingBoxCoordinates = useAppSelector(
-    (state) => state.canvas.boundingBoxCoordinates
+    (s) => s.canvas.boundingBoxCoordinates
   );
   const boundingBoxDimensions = useAppSelector(
-    (state) => state.canvas.boundingBoxDimensions
+    (s) => s.canvas.boundingBoxDimensions
   );
-  const isMaskEnabled = useAppSelector((state) => state.canvas.isMaskEnabled);
+  const isMaskEnabled = useAppSelector((s) => s.canvas.isMaskEnabled);
 
   const shouldPreserveMaskedArea = useAppSelector(
-    (state) => state.canvas.shouldPreserveMaskedArea
+    (s) => s.canvas.shouldPreserveMaskedArea
   );
   const [generationMode, setGenerationMode] = useState<
     GenerationMode | undefined

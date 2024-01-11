@@ -1,7 +1,8 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
+  $canvasStage,
+  $tool,
+  $toolStash,
   resetCanvasInteractionState,
   resetToolInteractionState,
 } from 'features/canvas/store/canvasNanostore';
@@ -11,54 +12,23 @@ import {
   setIsMaskEnabled,
   setShouldShowBoundingBox,
   setShouldSnapToGrid,
-  setTool,
 } from 'features/canvas/store/canvasSlice';
-import type { CanvasTool } from 'features/canvas/store/canvasTypes';
-import { getCanvasStage } from 'features/canvas/util/konvaInstanceProvider';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { useRef } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-
-const selector = createMemoizedSelector(
-  [stateSelector, activeTabNameSelector, isStagingSelector],
-  ({ canvas }, activeTabName, isStaging) => {
-    const {
-      shouldLockBoundingBox,
-      shouldShowBoundingBox,
-      tool,
-      isMaskEnabled,
-      shouldSnapToGrid,
-    } = canvas;
-
-    return {
-      activeTabName,
-      shouldLockBoundingBox,
-      shouldShowBoundingBox,
-      tool,
-      isStaging,
-      isMaskEnabled,
-      shouldSnapToGrid,
-    };
-  }
-);
 
 const useInpaintingCanvasHotkeys = () => {
   const dispatch = useAppDispatch();
-  const {
-    activeTabName,
-    shouldShowBoundingBox,
-    tool,
-    isStaging,
-    isMaskEnabled,
-    shouldSnapToGrid,
-  } = useAppSelector(selector);
-
-  const previousToolRef = useRef<CanvasTool | null>(null);
-
-  const canvasStage = getCanvasStage();
+  const activeTabName = useAppSelector(activeTabNameSelector);
+  const shouldShowBoundingBox = useAppSelector(
+    (s) => s.canvas.shouldShowBoundingBox
+  );
+  const isStaging = useAppSelector(isStagingSelector);
+  const isMaskEnabled = useAppSelector((s) => s.canvas.isMaskEnabled);
+  const shouldSnapToGrid = useAppSelector((s) => s.canvas.shouldSnapToGrid);
 
   // Beta Keys
-  const handleClearMask = () => dispatch(clearMask());
+  const handleClearMask = useCallback(() => dispatch(clearMask()), [dispatch]);
 
   useHotkeys(
     ['shift+c'],
@@ -123,37 +93,47 @@ const useInpaintingCanvasHotkeys = () => {
     [activeTabName, shouldShowBoundingBox]
   );
 
-  useHotkeys(
-    ['space'],
-    (e: KeyboardEvent) => {
-      if (e.repeat) {
-        return;
+  useEffect(() => {
+    window.addEventListener('keydown', (e) => {
+      if (e.key === ' ' && !e.repeat) {
+        console.log('spaceeee');
       }
+    });
+  }, []);
 
-      canvasStage?.container().focus();
+  const onKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.repeat || e.key !== ' ') {
+      return;
+    }
+    if ($toolStash.get() || $tool.get() === 'move') {
+      return;
+    }
+    $canvasStage.get()?.container().focus();
+    $toolStash.set($tool.get());
+    $tool.set('move');
+    resetToolInteractionState();
+  }, []);
+  const onKeyUp = useCallback((e: KeyboardEvent) => {
+    if (e.repeat || e.key !== ' ') {
+      return;
+    }
+    if (!$toolStash.get() || $tool.get() !== 'move') {
+      return;
+    }
+    $canvasStage.get()?.container().focus();
+    $tool.set($toolStash.get() ?? 'move');
+    $toolStash.set(null);
+  }, []);
 
-      if (tool !== 'move') {
-        previousToolRef.current = tool;
-        dispatch(setTool('move'));
-        resetToolInteractionState();
-      }
+  useEffect(() => {
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
 
-      if (
-        tool === 'move' &&
-        previousToolRef.current &&
-        previousToolRef.current !== 'move'
-      ) {
-        dispatch(setTool(previousToolRef.current));
-        previousToolRef.current = 'move';
-      }
-    },
-    {
-      keyup: true,
-      keydown: true,
-      preventDefault: true,
-    },
-    [tool, previousToolRef]
-  );
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, [onKeyDown, onKeyUp]);
 };
 
 export default useInpaintingCanvasHotkeys;

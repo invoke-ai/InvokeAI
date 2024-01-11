@@ -1,9 +1,8 @@
 import { Flex } from '@chakra-ui/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppToaster } from 'app/components/Toaster';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
@@ -13,12 +12,14 @@ import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteIm
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
 import { sentImageToImg2Img } from 'features/gallery/store/actions';
+import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
+import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import ParamUpscalePopover from 'features/parameters/components/Upscale/ParamUpscaleSettings';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { selectSystemSlice } from 'features/system/store/systemSlice';
 import {
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
@@ -28,56 +29,41 @@ import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
-  FaAsterisk,
-  FaCode,
-  FaHourglassHalf,
-  FaQuoteRight,
-  FaRulerVertical,
-  FaSeedling,
-} from 'react-icons/fa';
-import { FaCircleNodes, FaEllipsis } from 'react-icons/fa6';
+  PiAsteriskBold,
+  PiDotsThreeOutlineFill,
+  PiFlowArrowBold,
+  PiHourglassHighBold,
+  PiInfoBold,
+  PiPlantBold,
+  PiQuotesBold,
+  PiRulerBold,
+} from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 
-const currentImageButtonsSelector = createMemoizedSelector(
-  [stateSelector, activeTabNameSelector],
-  ({ gallery, system, ui, config }, activeTabName) => {
-    const { isConnected, shouldConfirmOnDelete, denoiseProgress } = system;
-
-    const {
-      shouldShowImageDetails,
-      shouldHidePreview,
-      shouldShowProgressInViewer,
-    } = ui;
-
-    const { shouldFetchMetadataFromApi } = config;
-
-    const lastSelectedImage = gallery.selection[gallery.selection.length - 1];
-
-    return {
-      shouldConfirmOnDelete,
-      isConnected,
-      shouldDisableToolbarButtons:
-        Boolean(denoiseProgress?.progress_image) || !lastSelectedImage,
-      shouldShowImageDetails,
-      activeTabName,
-      shouldHidePreview,
-      shouldShowProgressInViewer,
-      lastSelectedImage,
-      shouldFetchMetadataFromApi,
-    };
+const selectShouldDisableToolbarButtons = createSelector(
+  selectSystemSlice,
+  selectGallerySlice,
+  selectLastSelectedImage,
+  (system, gallery, lastSelectedImage) => {
+    const hasProgressImage = Boolean(system.denoiseProgress?.progress_image);
+    return hasProgressImage || !lastSelectedImage;
   }
 );
 
 const CurrentImageButtons = () => {
   const dispatch = useAppDispatch();
-  const {
-    isConnected,
-    shouldDisableToolbarButtons,
-    shouldShowImageDetails,
-    lastSelectedImage,
-    shouldShowProgressInViewer,
-  } = useAppSelector(currentImageButtonsSelector);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
+  const shouldShowImageDetails = useAppSelector(
+    (s) => s.ui.shouldShowImageDetails
+  );
+  const shouldShowProgressInViewer = useAppSelector(
+    (s) => s.ui.shouldShowProgressInViewer
+  );
+  const lastSelectedImage = useAppSelector(selectLastSelectedImage);
+  const shouldDisableToolbarButtons = useAppSelector(
+    selectShouldDisableToolbarButtons
+  );
 
   const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
   const isQueueMutationInProgress = useIsQueueMutationInProgress();
@@ -225,7 +211,7 @@ const CurrentImageButtons = () => {
               aria-label={t('parameters.imageActions')}
               tooltip={t('parameters.imageActions')}
               isDisabled={!imageDTO}
-              icon={<FaEllipsis />}
+              icon={<PiDotsThreeOutlineFill />}
             />
             <InvMenuList>
               {imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}
@@ -235,7 +221,7 @@ const CurrentImageButtons = () => {
 
         <InvButtonGroup isDisabled={shouldDisableToolbarButtons}>
           <InvIconButton
-            icon={<FaCircleNodes />}
+            icon={<PiFlowArrowBold />}
             tooltip={`${t('nodes.loadWorkflow')} (W)`}
             aria-label={`${t('nodes.loadWorkflow')} (W)`}
             isDisabled={!imageDTO?.has_workflow}
@@ -244,7 +230,7 @@ const CurrentImageButtons = () => {
           />
           <InvIconButton
             isLoading={isLoadingMetadata}
-            icon={<FaQuoteRight />}
+            icon={<PiQuotesBold />}
             tooltip={`${t('parameters.usePrompt')} (P)`}
             aria-label={`${t('parameters.usePrompt')} (P)`}
             isDisabled={!metadata?.positive_prompt}
@@ -252,7 +238,7 @@ const CurrentImageButtons = () => {
           />
           <InvIconButton
             isLoading={isLoadingMetadata}
-            icon={<FaSeedling />}
+            icon={<PiPlantBold />}
             tooltip={`${t('parameters.useSeed')} (S)`}
             aria-label={`${t('parameters.useSeed')} (S)`}
             isDisabled={metadata?.seed === null || metadata?.seed === undefined}
@@ -260,7 +246,7 @@ const CurrentImageButtons = () => {
           />
           <InvIconButton
             isLoading={isLoadingMetadata}
-            icon={<FaRulerVertical />}
+            icon={<PiRulerBold />}
             tooltip={`${t('parameters.useSize')} (D)`}
             aria-label={`${t('parameters.useSize')} (D)`}
             isDisabled={
@@ -273,7 +259,7 @@ const CurrentImageButtons = () => {
           />
           <InvIconButton
             isLoading={isLoadingMetadata}
-            icon={<FaAsterisk />}
+            icon={<PiAsteriskBold />}
             tooltip={`${t('parameters.useAll')} (A)`}
             aria-label={`${t('parameters.useAll')} (A)`}
             isDisabled={!metadata}
@@ -289,7 +275,7 @@ const CurrentImageButtons = () => {
 
         <InvButtonGroup>
           <InvIconButton
-            icon={<FaCode />}
+            icon={<PiInfoBold />}
             tooltip={`${t('parameters.info')} (I)`}
             aria-label={`${t('parameters.info')} (I)`}
             isChecked={shouldShowImageDetails}
@@ -301,7 +287,7 @@ const CurrentImageButtons = () => {
           <InvIconButton
             aria-label={t('settings.displayInProgress')}
             tooltip={t('settings.displayInProgress')}
-            icon={<FaHourglassHalf />}
+            icon={<PiHourglassHighBold />}
             isChecked={shouldShowProgressInViewer}
             onClick={handleClickProgressImagesToggle}
           />

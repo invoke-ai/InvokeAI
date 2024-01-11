@@ -1,4 +1,3 @@
-import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { GroupBase } from 'chakra-react-select';
 import { InvControl } from 'common/components/InvControl/InvControl';
@@ -52,7 +51,7 @@ const ParamESRGANModel = () => {
   const { t } = useTranslation();
 
   const esrganModelName = useAppSelector(
-    (state: RootState) => state.postprocessing.esrganModelName
+    (s) => s.postprocessing.esrganModelName
   );
 
   const dispatch = useAppDispatch();

@@ -1,31 +1,16 @@
 import { useStore } from '@nanostores/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   $isDrawing,
-  setIsDrawing,
-  setIsMovingStage,
+  $isMovingStage,
+  $tool,
 } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import {
-  // addPointToCurrentEraserLine,
-  addPointToCurrentLine,
-} from 'features/canvas/store/canvasSlice';
+import { addPointToCurrentLine } from 'features/canvas/store/canvasSlice';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 import type Konva from 'konva';
 import type { MutableRefObject } from 'react';
 import { useCallback } from 'react';
-
-const selector = createMemoizedSelector(
-  [stateSelector, isStagingSelector],
-  ({ canvas }, isStaging) => {
-    return {
-      tool: canvas.tool,
-      isStaging,
-    };
-  }
-);
 
 const useCanvasMouseUp = (
   stageRef: MutableRefObject<Konva.Stage | null>,
@@ -33,11 +18,11 @@ const useCanvasMouseUp = (
 ) => {
   const dispatch = useAppDispatch();
   const isDrawing = useStore($isDrawing);
-  const { tool, isStaging } = useAppSelector(selector);
+  const isStaging = useAppSelector(isStagingSelector);
 
   return useCallback(() => {
-    if (tool === 'move' || isStaging) {
-      setIsMovingStage(false);
+    if ($tool.get() === 'move' || isStaging) {
+      $isMovingStage.set(false);
       return;
     }
 
@@ -60,8 +45,8 @@ const useCanvasMouseUp = (
     } else {
       didMouseMoveRef.current = false;
     }
-    setIsDrawing(false);
-  }, [didMouseMoveRef, dispatch, isDrawing, isStaging, stageRef, tool]);
+    $isDrawing.set(false);
+  }, [didMouseMoveRef, dispatch, isDrawing, isStaging, stageRef]);
 };
 
 export default useCanvasMouseUp;

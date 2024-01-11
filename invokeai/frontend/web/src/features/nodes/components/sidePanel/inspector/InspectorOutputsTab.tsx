@@ -1,10 +1,11 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,8 +15,9 @@ import type { AnyResult } from 'services/events/types';
 import ImageOutputPreview from './outputs/ImageOutputPreview';
 
 const selector = createMemoizedSelector(
-  stateSelector,
-  ({ nodes, nodeTemplates }) => {
+  selectNodesSlice,
+  selectNodeTemplatesSlice,
+  (nodes, nodeTemplates) => {
     const lastSelectedNodeId =
       nodes.selectedNodes[nodes.selectedNodes.length - 1];
 

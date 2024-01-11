@@ -1,7 +1,7 @@
 import { Box, Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import roundToHundreth from 'features/canvas/util/roundToHundreth';
 import GenerationModeStatusText from 'features/parameters/components/Canvas/GenerationModeStatusText';
 import { memo } from 'react';
@@ -11,7 +11,7 @@ import IAICanvasStatusTextCursorPos from './IAICanvasStatusText/IAICanvasStatusT
 
 const warningColor = 'var(--invokeai-colors-warning-500)';
 
-const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
+const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
   const {
     stageDimensions: { width: stageWidth, height: stageHeight },
     stageCoordinates: { x: stageX, y: stageY },

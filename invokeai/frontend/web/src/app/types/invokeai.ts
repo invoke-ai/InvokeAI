@@ -43,6 +43,16 @@ export type SDFeature =
   | 'vae'
   | 'hrf';
 
+export type NumericalParameterConfig = {
+  initial: number;
+  sliderMin: number;
+  sliderMax: number;
+  numberInputMin: number;
+  numberInputMax: number;
+  fineStep: number;
+  coarseStep: number;
+};
+
 /**
  * Configuration options for the InvokeAI UI.
  * Distinct from system settings which may be changed inside the app.
@@ -66,69 +76,32 @@ export type AppConfig = {
     defaultModel?: string;
     disabledControlNetModels: string[];
     disabledControlNetProcessors: (keyof typeof CONTROLNET_PROCESSORS)[];
-    iterations: {
-      initial: number;
-      min: number;
-      sliderMax: number;
-      inputMax: number;
-      fineStep: number;
-      coarseStep: number;
-    };
-    width: {
-      initial: number;
-      min: number;
-      sliderMax: number;
-      inputMax: number;
-      fineStep: number;
-      coarseStep: number;
-    };
-    height: {
-      initial: number;
-      min: number;
-      sliderMax: number;
-      inputMax: number;
-      fineStep: number;
-      coarseStep: number;
-    };
-    steps: {
-      initial: number;
-      min: number;
-      sliderMax: number;
-      inputMax: number;
-      fineStep: number;
-      coarseStep: number;
-    };
-    guidance: {
-      initial: number;
-      min: number;
-      sliderMax: number;
-      inputMax: number;
-      fineStep: number;
-      coarseStep: number;
-    };
-    img2imgStrength: {
-      initial: number;
-      min: number;
-      sliderMax: number;
-      inputMax: number;
-      fineStep: number;
-      coarseStep: number;
-    };
-    hrfStrength: {
-      initial: number;
-      min: number;
-      sliderMax: number;
-      inputMax: number;
-      fineStep: number;
-      coarseStep: number;
-    };
+    // Core parameters
+    iterations: NumericalParameterConfig;
+    width: NumericalParameterConfig; // initial value comes from model
+    height: NumericalParameterConfig; // initial value comes from model
+    steps: NumericalParameterConfig;
+    guidance: NumericalParameterConfig;
+    cfgRescaleMultiplier: NumericalParameterConfig;
+    img2imgStrength: NumericalParameterConfig;
+    // Canvas
+    boundingBoxHeight: NumericalParameterConfig; // initial value comes from model
+    boundingBoxWidth: NumericalParameterConfig; // initial value comes from model
+    scaledBoundingBoxHeight: NumericalParameterConfig; // initial value comes from model
+    scaledBoundingBoxWidth: NumericalParameterConfig; // initial value comes from model
+    canvasCoherenceStrength: NumericalParameterConfig;
+    canvasCoherenceSteps: NumericalParameterConfig;
+    infillTileSize: NumericalParameterConfig;
+    infillPatchmatchDownscaleSize: NumericalParameterConfig;
+    // Misc advanced
+    clipSkip: NumericalParameterConfig; // slider and input max are ignored for this, because the values depend on the model
+    maskBlur: NumericalParameterConfig;
+    hrfStrength: NumericalParameterConfig;
     dynamicPrompts: {
-      maxPrompts: {
-        initial: number;
-        min: number;
-        sliderMax: number;
-        inputMax: number;
-      };
+      maxPrompts: NumericalParameterConfig;
+    };
+    ca: {
+      weight: NumericalParameterConfig;
     };
   };
 };

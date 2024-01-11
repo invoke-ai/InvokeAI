@@ -1,22 +1,15 @@
-import { CloseIcon } from '@chakra-ui/icons';
 import { Input, InputGroup, InputRightElement } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-
-const selector = createMemoizedSelector([stateSelector], ({ gallery }) => {
-  const { boardSearchText } = gallery;
-  return { boardSearchText };
-});
+import { PiXBold } from 'react-icons/pi';
 
 const BoardsSearch = () => {
   const dispatch = useAppDispatch();
-  const { boardSearchText } = useAppSelector(selector);
+  const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
   const inputRef = useRef<HTMLInputElement>(null);
   const { t } = useTranslation();
 
@@ -73,7 +66,7 @@ const BoardsSearch = () => {
             size="sm"
             variant="ghost"
             aria-label={t('boards.clearSearch')}
-            icon={<CloseIcon boxSize={3} />}
+            icon={<PiXBold />}
           />
         </InputRightElement>
       )}

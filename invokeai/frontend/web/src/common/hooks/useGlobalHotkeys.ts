@@ -57,7 +57,6 @@ export const useGlobalHotkeys = () => {
     {
       enabled: () => !isDisabledCancelQueueItem && !isLoadingCancelQueueItem,
       preventDefault: true,
-      enableOnFormTags: ['input', 'textarea', 'select'],
     },
     [cancelQueueItem, isDisabledCancelQueueItem, isLoadingCancelQueueItem]
   );
@@ -74,7 +73,6 @@ export const useGlobalHotkeys = () => {
     {
       enabled: () => !isDisabledClearQueue && !isLoadingClearQueue,
       preventDefault: true,
-      enableOnFormTags: ['input', 'textarea', 'select'],
     },
     [clearQueue, isDisabledClearQueue, isLoadingClearQueue]
   );

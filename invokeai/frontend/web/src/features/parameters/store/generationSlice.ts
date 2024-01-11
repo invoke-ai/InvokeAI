@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { isAnyControlAdapterAdded } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
@@ -28,13 +29,13 @@ import type { ImageDTO } from 'services/api/types';
 import type { GenerationState } from './types';
 
 export const initialGenerationState: GenerationState = {
+  _version: 1,
   cfgScale: 7.5,
   cfgRescaleMultiplier: 0,
   height: 512,
   img2imgStrength: 0.75,
   infillMethod: 'patchmatch',
   iterations: 1,
-  perlin: 0,
   positivePrompt: '',
   negativePrompt: '',
   scheduler: 'euler',
@@ -44,19 +45,12 @@ export const initialGenerationState: GenerationState = {
   canvasCoherenceSteps: 20,
   canvasCoherenceStrength: 0.3,
   seed: 0,
-  seedWeights: '',
   shouldFitToWidthHeight: true,
-  shouldGenerateVariations: false,
   shouldRandomizeSeed: true,
   steps: 50,
-  threshold: 0,
   infillTileSize: 32,
   infillPatchmatchDownscaleSize: 1,
-  variationAmount: 0.1,
   width: 512,
-  shouldUseSymmetry: false,
-  horizontalSymmetrySteps: 0,
-  verticalSymmetrySteps: 0,
   model: null,
   vae: null,
   vaePrecision: 'fp32',
@@ -84,18 +78,6 @@ export const generationSlice = createSlice({
     setSteps: (state, action: PayloadAction<number>) => {
       state.steps = action.payload;
     },
-    clampSymmetrySteps: (state) => {
-      state.horizontalSymmetrySteps = clamp(
-        state.horizontalSymmetrySteps,
-        0,
-        state.steps
-      );
-      state.verticalSymmetrySteps = clamp(
-        state.verticalSymmetrySteps,
-        0,
-        state.steps
-      );
-    },
     setCfgScale: (state, action: PayloadAction<ParameterCFGScale>) => {
       state.cfgScale = action.payload;
     },
@@ -104,12 +86,6 @@ export const generationSlice = createSlice({
       action: PayloadAction<ParameterCFGRescaleMultiplier>
     ) => {
       state.cfgRescaleMultiplier = action.payload;
-    },
-    setThreshold: (state, action: PayloadAction<number>) => {
-      state.threshold = action.payload;
-    },
-    setPerlin: (state, action: PayloadAction<number>) => {
-      state.perlin = action.payload;
     },
     setScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
       state.scheduler = action.payload;
@@ -132,17 +108,6 @@ export const generationSlice = createSlice({
     },
     resetSeed: (state) => {
       state.seed = -1;
-    },
-    setShouldGenerateVariations: (state, action: PayloadAction<boolean>) => {
-      state.shouldGenerateVariations = action.payload;
-    },
-    setVariationAmount: (state, action: PayloadAction<number>) => {
-      state.variationAmount = action.payload;
-    },
-    setSeedWeights: (state, action: PayloadAction<string>) => {
-      state.seedWeights = action.payload;
-      state.shouldGenerateVariations = true;
-      state.variationAmount = 0;
     },
     resetParametersState: (state) => {
       return {
@@ -189,40 +154,55 @@ export const generationSlice = createSlice({
     ) => {
       state.infillPatchmatchDownscaleSize = action.payload;
     },
-    setShouldUseSymmetry: (state, action: PayloadAction<boolean>) => {
-      state.shouldUseSymmetry = action.payload;
-    },
-    setHorizontalSymmetrySteps: (state, action: PayloadAction<number>) => {
-      state.horizontalSymmetrySteps = action.payload;
-    },
-    setVerticalSymmetrySteps: (state, action: PayloadAction<number>) => {
-      state.verticalSymmetrySteps = action.payload;
-    },
     initialImageChanged: (state, action: PayloadAction<ImageDTO>) => {
       const { image_name, width, height } = action.payload;
       state.initialImage = { imageName: image_name, width, height };
     },
-    modelChanged: (state, action: PayloadAction<ParameterModel | null>) => {
-      const newModel = action.payload;
-      state.model = newModel;
+    modelChanged: {
+      reducer: (
+        state,
+        action: PayloadAction<
+          ParameterModel | null,
+          string,
+          { previousModel?: ParameterModel | null }
+        >
+      ) => {
+        const newModel = action.payload;
+        state.model = newModel;
 
-      if (newModel === null) {
-        return;
-      }
+        if (newModel === null) {
+          return;
+        }
 
-      // Clamp ClipSkip Based On Selected Model
-      const { maxClip } = CLIP_SKIP_MAP[newModel.base_model];
-      state.clipSkip = clamp(state.clipSkip, 0, maxClip);
-      const optimalDimension = getOptimalDimension(newModel);
-      if (getIsSizeOptimal(state.width, state.height, optimalDimension)) {
-        return;
-      }
-      const { width, height } = calculateNewSize(
-        state.aspectRatio.value,
-        optimalDimension * optimalDimension
-      );
-      state.width = width;
-      state.height = height;
+        // Clamp ClipSkip Based On Selected Model
+        const { maxClip } = CLIP_SKIP_MAP[newModel.base_model];
+        state.clipSkip = clamp(state.clipSkip, 0, maxClip);
+
+        if (action.meta.previousModel?.base_model === newModel.base_model) {
+          // The base model hasn't changed, we don't need to optimize the size
+          return;
+        }
+
+        const optimalDimension = getOptimalDimension(newModel);
+        if (getIsSizeOptimal(state.width, state.height, optimalDimension)) {
+          return;
+        }
+        const { width, height } = calculateNewSize(
+          state.aspectRatio.value,
+          optimalDimension * optimalDimension
+        );
+        state.width = width;
+        state.height = height;
+      },
+      prepare: (
+        payload: ParameterModel | null,
+        previousModel?: ParameterModel | null
+      ) => ({
+        payload,
+        meta: {
+          previousModel,
+        },
+      }),
     },
     vaeSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
       // null is a valid VAE!
@@ -281,7 +261,6 @@ export const generationSlice = createSlice({
 });
 
 export const {
-  clampSymmetrySteps,
   clearInitialImage,
   resetParametersState,
   resetSeed,
@@ -290,7 +269,6 @@ export const {
   setImg2imgStrength,
   setInfillMethod,
   setIterations,
-  setPerlin,
   setPositivePrompt,
   setNegativePrompt,
   setScheduler,
@@ -300,18 +278,11 @@ export const {
   setCanvasCoherenceSteps,
   setCanvasCoherenceStrength,
   setSeed,
-  setSeedWeights,
   setShouldFitToWidthHeight,
-  setShouldGenerateVariations,
   setShouldRandomizeSeed,
   setSteps,
-  setThreshold,
   setInfillTileSize,
   setInfillPatchmatchDownscaleSize,
-  setVariationAmount,
-  setShouldUseSymmetry,
-  setHorizontalSymmetrySteps,
-  setVerticalSymmetrySteps,
   initialImageChanged,
   modelChanged,
   vaeSelected,
@@ -328,3 +299,14 @@ export const {
 export const { selectOptimalDimension } = generationSlice.selectors;
 
 export default generationSlice.reducer;
+
+export const selectGenerationSlice = (state: RootState) => state.generation;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateGenerationState = (state: any): GenerationState => {
+  if (!('_version' in state)) {
+    state._version = 1;
+    state.aspectRatio = initialAspectRatioState;
+  }
+  return state;
+};

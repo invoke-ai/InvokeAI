@@ -19,9 +19,7 @@ export const SHARED_NODE_PROPERTIES: Partial<Node> = {
 };
 
 export const useBuildNode = () => {
-  const nodeTemplates = useAppSelector(
-    (state) => state.nodeTemplates.templates
-  );
+  const nodeTemplates = useAppSelector((s) => s.nodeTemplates.templates);
 
   const flow = useReactFlow();
 

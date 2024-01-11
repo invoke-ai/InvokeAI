@@ -1,4 +1,3 @@
-import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
@@ -7,11 +6,20 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamMaskBlur = () => {
-  const dispatch = useAppDispatch();
-  const maskBlur = useAppSelector(
-    (state: RootState) => state.generation.maskBlur
-  );
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const maskBlur = useAppSelector((s) => s.generation.maskBlur);
+  const initial = useAppSelector((s) => s.config.sd.maskBlur.initial);
+  const sliderMin = useAppSelector((s) => s.config.sd.maskBlur.sliderMin);
+  const sliderMax = useAppSelector((s) => s.config.sd.maskBlur.sliderMax);
+  const numberInputMin = useAppSelector(
+    (s) => s.config.sd.maskBlur.numberInputMin
+  );
+  const numberInputMax = useAppSelector(
+    (s) => s.config.sd.maskBlur.numberInputMax
+  );
+  const coarseStep = useAppSelector((s) => s.config.sd.maskBlur.coarseStep);
+  const fineStep = useAppSelector((s) => s.config.sd.maskBlur.fineStep);
 
   const handleChange = useCallback(
     (v: number) => {
@@ -23,14 +31,17 @@ const ParamMaskBlur = () => {
   return (
     <InvControl label={t('parameters.maskBlur')} feature="compositingBlur">
       <InvSlider
-        min={0}
-        max={64}
+        min={sliderMin}
+        max={sliderMax}
         value={maskBlur}
-        defaultValue={16}
+        defaultValue={initial}
         onChange={handleChange}
         marks
         withNumberInput
-        numberInputMax={512}
+        numberInputMin={numberInputMin}
+        numberInputMax={numberInputMax}
+        step={coarseStep}
+        fineStep={fineStep}
       />
     </InvControl>
   );

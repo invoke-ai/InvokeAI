@@ -1,7 +1,6 @@
 import { Box, chakra, Flex } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import useCanvasDragMove from 'features/canvas/hooks/useCanvasDragMove';
 import useCanvasHotkeys from 'features/canvas/hooks/useCanvasHotkeys';
@@ -11,17 +10,19 @@ import useCanvasMouseOut from 'features/canvas/hooks/useCanvasMouseOut';
 import useCanvasMouseUp from 'features/canvas/hooks/useCanvasMouseUp';
 import useCanvasWheel from 'features/canvas/hooks/useCanvasZoom';
 import {
+  $canvasBaseLayer,
+  $canvasStage,
   $isModifyingBoundingBox,
   $isMouseOverBoundingBox,
   $isMovingStage,
   $isTransformingBoundingBox,
+  $tool,
 } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import { canvasResized } from 'features/canvas/store/canvasSlice';
 import {
-  setCanvasBaseLayer,
-  setCanvasStage,
-} from 'features/canvas/util/konvaInstanceProvider';
+  canvasResized,
+  selectCanvasSlice,
+} from 'features/canvas/store/canvasSlice';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
@@ -40,57 +41,33 @@ import IAICanvasStatusText from './IAICanvasStatusText';
 import IAICanvasBoundingBox from './IAICanvasToolbar/IAICanvasBoundingBox';
 import IAICanvasToolPreview from './IAICanvasToolPreview';
 
-const selector = createMemoizedSelector(
-  [stateSelector, isStagingSelector],
-  ({ canvas }, isStaging) => {
-    const {
-      isMaskEnabled,
-      stageScale,
-      shouldShowBoundingBox,
-      stageDimensions,
-      stageCoordinates,
-      tool,
-      shouldShowIntermediates,
-      shouldRestrictStrokesToBox,
-      shouldShowGrid,
-      shouldAntialias,
-    } = canvas;
-
-    return {
-      isMaskEnabled,
-      shouldShowBoundingBox,
-      shouldShowGrid,
-      stageCoordinates,
-      stageDimensions,
-      stageScale,
-      tool,
-      isStaging,
-      shouldShowIntermediates,
-      shouldAntialias,
-      shouldRestrictStrokesToBox,
-    };
-  }
-);
+const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
+  return {
+    stageCoordinates: canvas.stageCoordinates,
+    stageDimensions: canvas.stageDimensions,
+  };
+});
 
 const ChakraStage = chakra(Stage, {
   shouldForwardProp: (prop) => !['sx'].includes(prop),
 });
 
 const IAICanvas = () => {
-  const {
-    isMaskEnabled,
-    shouldShowBoundingBox,
-    shouldShowGrid,
-    stageCoordinates,
-    stageDimensions,
-    stageScale,
-    tool,
-    isStaging,
-    shouldShowIntermediates,
-    shouldAntialias,
-    shouldRestrictStrokesToBox,
-  } = useAppSelector(selector);
-  useCanvasHotkeys();
+  const isStaging = useAppSelector(isStagingSelector);
+  const isMaskEnabled = useAppSelector((s) => s.canvas.isMaskEnabled);
+  const shouldShowBoundingBox = useAppSelector(
+    (s) => s.canvas.shouldShowBoundingBox
+  );
+  const shouldShowGrid = useAppSelector((s) => s.canvas.shouldShowGrid);
+  const stageScale = useAppSelector((s) => s.canvas.stageScale);
+  const shouldShowIntermediates = useAppSelector(
+    (s) => s.canvas.shouldShowIntermediates
+  );
+  const shouldAntialias = useAppSelector((s) => s.canvas.shouldAntialias);
+  const shouldRestrictStrokesToBox = useAppSelector(
+    (s) => s.canvas.shouldRestrictStrokesToBox
+  );
+  const { stageCoordinates, stageDimensions } = useAppSelector(selector);
   const dispatch = useAppDispatch();
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage | null>(null);
@@ -99,9 +76,11 @@ const IAICanvas = () => {
   const isMovingStage = useStore($isMovingStage);
   const isTransformingBoundingBox = useStore($isTransformingBoundingBox);
   const isMouseOverBoundingBox = useStore($isMouseOverBoundingBox);
-  const canvasStageRefCallback = useCallback((el: Konva.Stage) => {
-    setCanvasStage(el as Konva.Stage);
-    stageRef.current = el;
+  const tool = useStore($tool);
+  useCanvasHotkeys();
+  const canvasStageRefCallback = useCallback((stageElement: Konva.Stage) => {
+    $canvasStage.set(stageElement);
+    stageRef.current = stageElement;
   }, []);
   const stageCursor = useMemo(() => {
     if (tool === 'move' || isStaging) {
@@ -124,10 +103,14 @@ const IAICanvas = () => {
     shouldRestrictStrokesToBox,
     tool,
   ]);
-  const canvasBaseLayerRefCallback = useCallback((el: Konva.Layer) => {
-    setCanvasBaseLayer(el as Konva.Layer);
-    canvasBaseLayerRef.current = el;
-  }, []);
+
+  const canvasBaseLayerRefCallback = useCallback(
+    (layerElement: Konva.Layer) => {
+      $canvasBaseLayer.set(layerElement);
+      canvasBaseLayerRef.current = layerElement;
+    },
+    []
+  );
 
   const lastCursorPositionRef = useRef<Vector2d>({ x: 0, y: 0 });
 

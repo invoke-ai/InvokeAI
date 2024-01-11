@@ -8,7 +8,7 @@ import {
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { isModalOpenChanged } from 'features/deleteImageModal/store/slice';
-import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { isImageFieldInputInstance } from 'features/nodes/types/field';
@@ -17,7 +17,7 @@ import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { clamp, forEach } from 'lodash-es';
 import { api } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
-import { imagesAdapter } from 'services/api/util';
+import { imagesSelectors } from 'services/api/util';
 
 import { startAppListening } from '..';
 
@@ -49,13 +49,11 @@ export const addRequestedSingleImageDeletionListener = () => {
       if (imageDTO && imageDTO?.image_name === lastSelectedImage) {
         const { image_name } = imageDTO;
 
-        const baseQueryArgs = selectListImagesBaseQueryArgs(state);
+        const baseQueryArgs = selectListImagesQueryArgs(state);
         const { data } =
           imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
 
-        const cachedImageDTOs = data
-          ? imagesAdapter.getSelectors().selectAll(data)
-          : [];
+        const cachedImageDTOs = data ? imagesSelectors.selectAll(data) : [];
 
         const deletedImageIndex = cachedImageDTOs.findIndex(
           (i) => i.image_name === image_name
@@ -182,12 +180,12 @@ export const addRequestedMultipleImageDeletionListener = () => {
           imagesApi.endpoints.deleteImages.initiate({ imageDTOs })
         ).unwrap();
         const state = getState();
-        const baseQueryArgs = selectListImagesBaseQueryArgs(state);
+        const queryArgs = selectListImagesQueryArgs(state);
         const { data } =
-          imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
+          imagesApi.endpoints.listImages.select(queryArgs)(state);
 
         const newSelectedImageDTO = data
-          ? imagesAdapter.getSelectors().selectAll(data)[0]
+          ? imagesSelectors.selectAll(data)[0]
           : undefined;
 
         if (newSelectedImageDTO) {

@@ -1,33 +1,29 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setRefinerCFGScale } from 'features/sdxl/store/sdxlSlice';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector([stateSelector], ({ config }) => {
-  const { min, inputMax, sliderMax, coarseStep, fineStep, initial } =
-    config.sd.guidance;
-
-  return {
-    marks: [min, Math.floor(sliderMax / 2), sliderMax],
-    min,
-    inputMax,
-    sliderMax,
-    coarseStep,
-    fineStep,
-    initial,
-  };
-});
-
 const ParamSDXLRefinerCFGScale = () => {
-  const refinerCFGScale = useAppSelector((state) => state.sdxl.refinerCFGScale);
-  const { marks, min, inputMax, sliderMax, coarseStep, fineStep, initial } =
-    useAppSelector(selector);
-  const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const refinerCFGScale = useAppSelector((s) => s.sdxl.refinerCFGScale);
+  const sliderMin = useAppSelector((s) => s.config.sd.guidance.sliderMin);
+  const sliderMax = useAppSelector((s) => s.config.sd.guidance.sliderMax);
+  const numberInputMin = useAppSelector(
+    (s) => s.config.sd.guidance.numberInputMin
+  );
+  const numberInputMax = useAppSelector(
+    (s) => s.config.sd.guidance.numberInputMax
+  );
+  const coarseStep = useAppSelector((s) => s.config.sd.guidance.coarseStep);
+  const fineStep = useAppSelector((s) => s.config.sd.guidance.fineStep);
+  const initial = useAppSelector((s) => s.config.sd.guidance.initial);
+  const marks = useMemo(
+    () => [sliderMin, Math.floor(sliderMax / 2), sliderMax],
+    [sliderMax, sliderMin]
+  );
 
   const onChange = useCallback(
     (v: number) => dispatch(setRefinerCFGScale(v)),
@@ -39,13 +35,14 @@ const ParamSDXLRefinerCFGScale = () => {
       <InvSlider
         value={refinerCFGScale}
         defaultValue={initial}
-        min={min}
+        min={sliderMin}
         max={sliderMax}
         step={coarseStep}
         fineStep={fineStep}
         onChange={onChange}
         withNumberInput
-        numberInputMax={inputMax}
+        numberInputMin={numberInputMin}
+        numberInputMax={numberInputMax}
         marks={marks}
       />
     </InvControl>

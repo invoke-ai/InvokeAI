@@ -1,5 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import {
   isAnyNodeOrEdgeMutation,
@@ -8,9 +9,10 @@ import {
 } from 'features/nodes/store/nodesSlice';
 import type { WorkflowsState as WorkflowState } from 'features/nodes/store/types';
 import type { FieldIdentifier } from 'features/nodes/types/field';
+import type { WorkflowV2 } from 'features/nodes/types/workflow';
 import { cloneDeep, isEqual, uniqBy } from 'lodash-es';
 
-export const initialWorkflowState: WorkflowState = {
+export const blankWorkflow: Omit<WorkflowV2, 'nodes' | 'edges'> = {
   name: '',
   author: '',
   description: '',
@@ -20,7 +22,13 @@ export const initialWorkflowState: WorkflowState = {
   notes: '',
   exposedFields: [],
   meta: { version: '2.0.0', category: 'user' },
+  id: undefined,
+};
+
+export const initialWorkflowState: WorkflowState = {
+  _version: 1,
   isTouched: true,
+  ...blankWorkflow,
 };
 
 const workflowSlice = createSlice({
@@ -85,7 +93,7 @@ const workflowSlice = createSlice({
   extraReducers: (builder) => {
     builder.addCase(workflowLoaded, (state, action) => {
       const { nodes: _nodes, edges: _edges, ...workflowExtra } = action.payload;
-      return { ...cloneDeep(workflowExtra), isTouched: true };
+      return { ...initialWorkflowState, ...cloneDeep(workflowExtra) };
     });
 
     builder.addCase(nodesDeleted, (state, action) => {
@@ -120,3 +128,13 @@ export const {
 } = workflowSlice.actions;
 
 export default workflowSlice.reducer;
+
+export const selectWorkflowSlice = (state: RootState) => state.workflow;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateWorkflowState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

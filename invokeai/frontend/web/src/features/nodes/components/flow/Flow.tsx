@@ -1,6 +1,6 @@
 import { useToken } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
+import { useGlobalMenuClose } from 'common/hooks/useGlobalMenuClose';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
@@ -71,13 +71,11 @@ const snapGrid: [number, number] = [25, 25];
 
 export const Flow = memo(() => {
   const dispatch = useAppDispatch();
-  const nodes = useAppSelector((state) => state.nodes.nodes);
-  const edges = useAppSelector((state) => state.nodes.edges);
-  const viewport = useAppSelector((state) => state.nodes.viewport);
-  const shouldSnapToGrid = useAppSelector(
-    (state) => state.nodes.shouldSnapToGrid
-  );
-  const selectionMode = useAppSelector((state) => state.nodes.selectionMode);
+  const nodes = useAppSelector((s) => s.nodes.nodes);
+  const edges = useAppSelector((s) => s.nodes.edges);
+  const viewport = useAppSelector((s) => s.nodes.viewport);
+  const shouldSnapToGrid = useAppSelector((s) => s.nodes.shouldSnapToGrid);
+  const selectionMode = useAppSelector((s) => s.nodes.selectionMode);
   const flowWrapper = useRef<HTMLDivElement>(null);
   const cursorPosition = useRef<XYPosition | null>(null);
   const isValidConnection = useIsValidConnection();
@@ -160,7 +158,7 @@ export const Flow = memo(() => {
     [dispatch]
   );
 
-  const { onCloseGlobal } = useGlobalMenuCloseTrigger();
+  const { onCloseGlobal } = useGlobalMenuClose();
   const handlePaneClick = useCallback(() => {
     onCloseGlobal();
   }, [onCloseGlobal]);

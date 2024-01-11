@@ -1,17 +1,20 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import type {
   ParameterHRFMethod,
   ParameterStrength,
 } from 'features/parameters/types/parameterSchemas';
 
 export interface HRFState {
+  _version: 1;
   hrfEnabled: boolean;
   hrfStrength: ParameterStrength;
   hrfMethod: ParameterHRFMethod;
 }
 
 export const initialHRFState: HRFState = {
+  _version: 1,
   hrfStrength: 0.45,
   hrfEnabled: false,
   hrfMethod: 'ESRGAN',
@@ -38,3 +41,13 @@ export const hrfSlice = createSlice({
 export const { setHrfEnabled, setHrfStrength, setHrfMethod } = hrfSlice.actions;
 
 export default hrfSlice.reducer;
+
+export const selectHrfSlice = (state: RootState) => state.hrf;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateHRFState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

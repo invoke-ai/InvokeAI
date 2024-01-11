@@ -17,9 +17,9 @@ import {
 import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
 import { forEach, some } from 'lodash-es';
 import {
-  mainModelsAdapter,
+  mainModelsAdapterSelectors,
   modelsApi,
-  vaeModelsAdapter,
+  vaeModelsAdapterSelectors,
 } from 'services/api/endpoints/models';
 import type { TypeGuardFor } from 'services/api/types';
 
@@ -43,7 +43,7 @@ export const addModelsLoadedListener = () => {
       );
 
       const currentModel = getState().generation.model;
-      const models = mainModelsAdapter.getSelectors().selectAll(action.payload);
+      const models = mainModelsAdapterSelectors.selectAll(action.payload);
 
       if (models.length === 0) {
         // No models loaded at all
@@ -74,7 +74,7 @@ export const addModelsLoadedListener = () => {
         return;
       }
 
-      dispatch(modelChanged(result.data));
+      dispatch(modelChanged(result.data, currentModel));
     },
   });
   startAppListening({
@@ -94,7 +94,7 @@ export const addModelsLoadedListener = () => {
       );
 
       const currentModel = getState().sdxl.refinerModel;
-      const models = mainModelsAdapter.getSelectors().selectAll(action.payload);
+      const models = mainModelsAdapterSelectors.selectAll(action.payload);
 
       if (models.length === 0) {
         // No models loaded at all
@@ -145,13 +145,11 @@ export const addModelsLoadedListener = () => {
         return;
       }
 
-      const firstModel = vaeModelsAdapter
-        .getSelectors()
-        .selectAll(action.payload)[0];
+      const firstModel = vaeModelsAdapterSelectors.selectAll(action.payload)[0];
 
       if (!firstModel) {
         // No custom VAEs loaded at all; use the default
-        dispatch(modelChanged(null));
+        dispatch(vaeSelected(null));
         return;
       }
 
@@ -229,7 +227,7 @@ export const addModelsLoadedListener = () => {
       const log = logger('models');
       log.info(
         { models: action.payload.entities },
-        `ControlNet models loaded (${action.payload.ids.length})`
+        `T2I Adapter models loaded (${action.payload.ids.length})`
       );
 
       selectAllT2IAdapters(getState().controlAdapters).forEach((ca) => {

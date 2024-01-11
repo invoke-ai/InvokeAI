@@ -1,16 +1,17 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { InvContextMenuProps } from 'common/components/InvContextMenu/InvContextMenu';
 import { InvContextMenu } from 'common/components/InvContextMenu/InvContextMenu';
 import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
 import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
 import { InvMenuGroup } from 'common/components/InvMenu/wrapper';
-import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
+import {
+  autoAddBoardIdChanged,
+  selectGallerySlice,
+} from 'features/gallery/store/gallerySlice';
 import type { BoardId } from 'features/gallery/store/types';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { addToast } from 'features/system/store/systemSlice';
-import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaDownload, FaPlus } from 'react-icons/fa';
@@ -35,18 +36,19 @@ const BoardContextMenu = ({
 }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-
-  const selector = useMemo(
+  const autoAssignBoardOnClick = useAppSelector(
+    (s) => s.gallery.autoAssignBoardOnClick
+  );
+  const selectIsSelectedForAutoAdd = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ gallery }) => {
-        const isAutoAdd = gallery.autoAddBoardId === board_id;
-        const autoAssignBoardOnClick = gallery.autoAssignBoardOnClick;
-        return { isAutoAdd, autoAssignBoardOnClick };
-      }),
-    [board_id]
+      createSelector(
+        selectGallerySlice,
+        (gallery) => board && board.board_id === gallery.autoAddBoardId
+      ),
+    [board]
   );
 
-  const { isAutoAdd, autoAssignBoardOnClick } = useAppSelector(selector);
+  const isSelectedForAutoAdd = useAppSelector(selectIsSelectedForAutoAdd);
   const boardName = useBoardName(board_id);
   const isBulkDownloadEnabled =
     useFeatureStatus('bulkDownload').isFeatureEnabled;
@@ -87,17 +89,13 @@ const BoardContextMenu = ({
     }
   }, [t, board_id, bulkDownload, dispatch]);
 
-  const skipEvent = useCallback((e: MouseEvent<HTMLDivElement>) => {
-    e.preventDefault();
-  }, []);
-
   const renderMenuFunc = useCallback(
     () => (
-      <InvMenuList visibility="visible" onContextMenu={skipEvent}>
+      <InvMenuList visibility="visible">
         <InvMenuGroup title={boardName}>
           <InvMenuItem
             icon={<FaPlus />}
-            isDisabled={isAutoAdd || autoAssignBoardOnClick}
+            isDisabled={isSelectedForAutoAdd || autoAssignBoardOnClick}
             onClick={handleSetAutoAdd}
           >
             {t('boards.menuItemAutoAdd')}
@@ -125,10 +123,9 @@ const BoardContextMenu = ({
       boardName,
       handleBulkDownload,
       handleSetAutoAdd,
-      isAutoAdd,
       isBulkDownloadEnabled,
+      isSelectedForAutoAdd,
       setBoardToDelete,
-      skipEvent,
       t,
     ]
   );

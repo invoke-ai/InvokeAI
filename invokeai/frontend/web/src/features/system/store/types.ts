@@ -43,7 +43,7 @@ export const isLanguage = (v: unknown): v is Language =>
   zLanguage.safeParse(v).success;
 
 export interface SystemState {
-  isInitialized: boolean;
+  _version: 1;
   isConnected: boolean;
   shouldConfirmOnDelete: boolean;
   enableImageDebugging: boolean;

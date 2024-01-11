@@ -30,7 +30,7 @@ export const useGroupedModelInvSelect = <T extends AnyModelConfigEntity>(
 ): UseGroupedModelInvSelectReturn => {
   const { t } = useTranslation();
   const base_model = useAppSelector(
-    (state) => state.generation.model?.base_model ?? 'sdxl'
+    (s) => s.generation.model?.base_model ?? 'sdxl'
   );
   const { modelEntities, selectedModel, getIsDisabled, onChange, isLoading } =
     arg;
