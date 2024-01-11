@@ -2,15 +2,15 @@ import type { SystemStyleObject } from '@chakra-ui/react';
 import { Box, Flex } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
 import { $shift } from 'common/hooks/useGlobalModifiers';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import type {
+  GallerySelectionDraggableData,
   ImageDraggableData,
-  ImageDTOsDraggableData,
   TypesafeDraggableData,
 } from 'features/dnd/types';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
@@ -42,8 +42,8 @@ const GalleryImage = (props: HoverableImageProps) => {
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName);
   const shift = useStore($shift);
   const { t } = useTranslation();
-
-  const { handleClick, isSelected, selection, selectionCount } =
+  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
+  const { handleClick, isSelected, areMultiplesSelected } =
     useMultiselect(imageDTO);
 
   const customStarUi = useStore($customStarUI);
@@ -51,7 +51,7 @@ const GalleryImage = (props: HoverableImageProps) => {
   const imageContainerRef = useScrollIntoView(
     isSelected,
     props.index,
-    selectionCount
+    areMultiplesSelected
   );
 
   const handleDelete = useCallback(
@@ -66,11 +66,11 @@ const GalleryImage = (props: HoverableImageProps) => {
   );
 
   const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
-    if (selectionCount > 1) {
-      const data: ImageDTOsDraggableData = {
+    if (areMultiplesSelected) {
+      const data: GallerySelectionDraggableData = {
         id: 'gallery-image',
-        payloadType: 'IMAGE_DTOS',
-        payload: { imageDTOs: selection },
+        payloadType: 'GALLERY_SELECTION',
+        payload: { boardId: selectedBoardId },
       };
       return data;
     }
@@ -83,7 +83,7 @@ const GalleryImage = (props: HoverableImageProps) => {
       };
       return data;
     }
-  }, [imageDTO, selection, selectionCount]);
+  }, [imageDTO, selectedBoardId, areMultiplesSelected]);
 
   const [starImages] = useStarImagesMutation();
   const [unstarImages] = useUnstarImagesMutation();

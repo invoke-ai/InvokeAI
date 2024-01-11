@@ -634,7 +634,8 @@
             "missingNodeTemplate": "Отсутствует шаблон узла",
             "readyToInvoke": "Готово к вызову",
             "missingFieldTemplate": "Отсутствует шаблон поля",
-            "addingImagesTo": "Добавление изображений в"
+            "addingImagesTo": "Добавление изображений в",
+            "invoke": "Создать"
         },
         "seamlessX&Y": "Бесшовный X & Y",
         "isAllowedToUpscale": {
@@ -662,7 +663,14 @@
         "useSize": "Использовать размер",
         "unmasked": "Без маски",
         "enableNoiseSettings": "Включить настройки шума",
-        "coherenceMode": "Режим"
+        "coherenceMode": "Режим",
+        "aspect": "Соотношение",
+        "imageSize": "Размер изображения",
+        "swapDimensions": "Поменять местами",
+        "setToOptimalSize": "Установить оптимальный для модели размер",
+        "setToOptimalSizeTooSmall": "$t(parameters.setToOptimalSize) (может быть слишком маленьким)",
+        "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (может быть слишком большим)",
+        "lockAspectRatio": "Заблокировать соотношение"
     },
     "settings": {
         "models": "Модели",
@@ -1250,7 +1258,9 @@
         "promptsWithCount_one": "{{count}} Запрос",
         "promptsWithCount_few": "{{count}} Запроса",
         "promptsWithCount_many": "{{count}} Запросов",
-        "dynamicPrompts": "Динамические запросы"
+        "dynamicPrompts": "Динамические запросы",
+        "loading": "Создание динамических запросов...",
+        "showDynamicPrompts": "Показать динамические запросы"
     },
     "popovers": {
         "noiseUseCPU": {
@@ -1513,7 +1523,7 @@
         "queueBack": "Добавить в очередь",
         "batchValues": "Пакетные значения",
         "cancelFailed": "Проблема с отменой элемента",
-        "queueCountPrediction": "Добавить {{predicted}} в очередь",
+        "queueCountPrediction": "{{promptsCount}} запросов × {{iterations}} изображений -> {{count}} генераций",
         "batchQueued": "Пакетная очередь",
         "pauseFailed": "Проблема с приостановкой рендеринга",
         "clearFailed": "Проблема с очисткой очереди",
@@ -1623,7 +1633,8 @@
         "workflows": "Рабочие процессы",
         "noDescription": "Без описания",
         "uploadWorkflow": "Загрузить рабочий процесс",
-        "userWorkflows": "Мои рабочие процессы"
+        "userWorkflows": "Мои рабочие процессы",
+        "newWorkflowCreated": "Создан новый рабочий процесс"
     },
     "embedding": {
         "noEmbeddingsLoaded": "встраивания не загружены",

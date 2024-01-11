@@ -12,7 +12,6 @@ import {
 import type { BoardId } from 'features/gallery/store/types';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { addToast } from 'features/system/store/systemSlice';
-import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaDownload, FaPlus } from 'react-icons/fa';
@@ -90,13 +89,9 @@ const BoardContextMenu = ({
     }
   }, [t, board_id, bulkDownload, dispatch]);
 
-  const skipEvent = useCallback((e: MouseEvent<HTMLDivElement>) => {
-    e.preventDefault();
-  }, []);
-
   const renderMenuFunc = useCallback(
     () => (
-      <InvMenuList visibility="visible" onContextMenu={skipEvent}>
+      <InvMenuList visibility="visible">
         <InvMenuGroup title={boardName}>
           <InvMenuItem
             icon={<FaPlus />}
@@ -131,7 +126,6 @@ const BoardContextMenu = ({
       isBulkDownloadEnabled,
       isSelectedForAutoAdd,
       setBoardToDelete,
-      skipEvent,
       t,
     ]
   );
