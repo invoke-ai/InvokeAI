@@ -22,6 +22,7 @@ export const blankWorkflow: Omit<WorkflowV2, 'nodes' | 'edges'> = {
   notes: '',
   exposedFields: [],
   meta: { version: '2.0.0', category: 'user' },
+  id: undefined,
 };
 
 export const initialWorkflowState: WorkflowState = {
