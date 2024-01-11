@@ -67,7 +67,7 @@ class InvocationStatsServiceBase(ABC):
         pass
 
     @abstractmethod
-    def log_stats(self):
+    def log_stats(self, graph_execution_state_id: str):
         """
         Write out the accumulated statistics to the log or somewhere else.
         """
