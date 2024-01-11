@@ -180,6 +180,7 @@ const WorkflowLibraryList = () => {
               label={t('common.orderBy')}
               isDisabled={isFetching}
               w={64}
+              minW={56}
             >
               <InvSelect
                 value={valueOrderBy}
@@ -191,6 +192,7 @@ const WorkflowLibraryList = () => {
               label={t('common.direction')}
               isDisabled={isFetching}
               w={64}
+              minW={56}
             >
               <InvSelect
                 value={valueDirection}
@@ -207,6 +209,7 @@ const WorkflowLibraryList = () => {
             onKeyDown={handleKeydownFilterText}
             onChange={handleChangeFilterText}
             data-testid="workflow-search-input"
+            minW={64}
           />
           {query.trim().length && (
             <InputRightElement>
@@ -229,7 +232,7 @@ const WorkflowLibraryList = () => {
         <IAINoContentFallback label={t('workflows.problemLoading')} />
       ) : data.items.length ? (
         <ScrollableContent>
-          <Flex w="full" h="full" gap={2} px={1} flexDir="column">
+          <Flex w="full" h="full" flexDir="column">
             {data.items.map((w) => (
               <WorkflowLibraryListItem key={w.workflow_id} workflowDTO={w} />
             ))}
