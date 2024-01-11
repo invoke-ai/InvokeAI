@@ -23,6 +23,7 @@ export const InvTextarea = memo(
           onPaste={stopPastePropagation}
           onKeyUp={onKeyUpDown}
           onKeyDown={onKeyUpDown}
+          minH={20}
           {...rest}
         />
       );
