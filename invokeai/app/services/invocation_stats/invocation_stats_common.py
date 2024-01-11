@@ -1,9 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
 
-# size of GIG in bytes
-GIG = 1073741824
-
 
 @dataclass
 class NodeExecutionStats:

@@ -10,7 +10,10 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.backend.model_management.model_cache import CacheStats
 
 from .invocation_stats_base import InvocationStatsServiceBase
-from .invocation_stats_common import GIG, GraphExecutionStats, NodeExecutionStats
+from .invocation_stats_common import GraphExecutionStats, NodeExecutionStats
+
+# Size of 1GB in bytes.
+GB = 2**30
 
 
 class InvocationStatsService(InvocationStatsServiceBase):
@@ -50,9 +53,9 @@ class InvocationStatsService(InvocationStatsServiceBase):
                 invocation_type=invocation.type,
                 start_time=start_time,
                 end_time=time.time(),
-                start_ram_gb=start_ram / GIG,
-                end_ram_gb=psutil.Process().memory_info().rss / GIG,
-                peak_vram_gb=torch.cuda.max_memory_allocated() / GIG if torch.cuda.is_available() else 0.0,
+                start_ram_gb=start_ram / GB,
+                end_ram_gb=psutil.Process().memory_info().rss / GB,
+                peak_vram_gb=torch.cuda.max_memory_allocated() / GB if torch.cuda.is_available() else 0.0,
             )
             self._stats[graph_execution_state_id].add_node_execution_stats(node_stats)
 
@@ -83,12 +86,12 @@ class InvocationStatsService(InvocationStatsServiceBase):
             log = graph_stats.get_pretty_log(graph_id)
 
             cache_stats = self._cache_stats[graph_id]
-            hwm = cache_stats.high_watermark / GIG
-            tot = cache_stats.cache_size / GIG
-            loaded = sum(list(cache_stats.loaded_model_sizes.values())) / GIG
+            hwm = cache_stats.high_watermark / GB
+            tot = cache_stats.cache_size / GB
+            loaded = sum(list(cache_stats.loaded_model_sizes.values())) / GB
             log += f"RAM used to load models: {loaded:4.2f}G\n"
             if torch.cuda.is_available():
-                log += f"VRAM in use: {(torch.cuda.memory_allocated() / GIG):4.3f}G\n"
+                log += f"VRAM in use: {(torch.cuda.memory_allocated() / GB):4.3f}G\n"
             log += "RAM cache statistics:\n"
             log += f"   Model cache hits: {cache_stats.hits}\n"
             log += f"   Model cache misses: {cache_stats.misses}\n"
