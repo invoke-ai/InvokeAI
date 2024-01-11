@@ -54,7 +54,7 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
           </Flex>
           <Flex alignItems="center" w="full" h="50%">
             {workflowDTO.description ? (
-              <InvText fontSize="sm" noOfLines={1}>
+              <InvText fontSize="sm" noOfLines={1} w="70%">
                 {workflowDTO.description}
               </InvText>
             ) : (
