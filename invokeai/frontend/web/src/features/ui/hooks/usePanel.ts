@@ -107,8 +107,11 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
       return;
     }
     const id = arg.panelGroupRef.current.getId();
-    const panelGroupElement = getPanelGroupElement(id);
-    const panelGroupHandleElements = getResizeHandleElementsForGroup(id);
+    const panelGroupElement = getPanelGroupElement(id, document);
+    const panelGroupHandleElements = getResizeHandleElementsForGroup(
+      id,
+      document
+    );
     if (!panelGroupElement) {
       return;
     }
@@ -244,7 +247,7 @@ const getSizeAsPercentage = (
     return 0;
   }
   const id = panelGroupHandleRef.current.getId();
-  const panelGroupElement = getPanelGroupElement(id);
+  const panelGroupElement = getPanelGroupElement(id, document);
   if (!panelGroupElement) {
     // No panel group element, size is 0
     return 0;
@@ -257,7 +260,7 @@ const getSizeAsPercentage = (
       : panelGroupElement.offsetHeight;
 
   // ...minus the width/height of the resize handles
-  getResizeHandleElementsForGroup(id).forEach((el) => {
+  getResizeHandleElementsForGroup(id, document).forEach((el) => {
     availableSpace -=
       panelGroupDirection === 'horizontal' ? el.offsetWidth : el.offsetHeight;
   });

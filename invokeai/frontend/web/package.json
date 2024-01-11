@@ -96,7 +96,7 @@
     "react-icons": "^4.12.0",
     "react-konva": "^18.2.10",
     "react-redux": "9.0.4",
-    "react-resizable-panels": "^1.0.7",
+    "react-resizable-panels": "^1.0.8",
     "react-select": "5.8.0",
     "react-textarea-autosize": "^8.5.3",
     "react-use": "^17.4.2",
