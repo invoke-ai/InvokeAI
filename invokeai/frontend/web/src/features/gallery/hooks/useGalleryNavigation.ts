@@ -29,13 +29,11 @@ import { imagesSelectors } from 'services/api/util';
  */
 const getImagesPerRow = (): number => {
   const widthOfGalleryImage =
-    document
-      .querySelector(`[data-testid="${imageItemContainerTestId}"]`)
+    document?.querySelector(`[data-testid="${imageItemContainerTestId}"]`)
       ?.getBoundingClientRect().width ?? 1;
 
   const widthOfGalleryGrid =
-    document
-      .querySelector(`[data-testid="${imageListContainerTestId}"]`)
+    document?.querySelector(`[data-testid="${imageListContainerTestId}"]`)
       ?.getBoundingClientRect().width ?? 0;
 
   const imagesPerRow = Math.round(widthOfGalleryGrid / widthOfGalleryImage);
@@ -59,7 +57,7 @@ const scrollToImage = (imageName: string, index: number) => {
     return;
   }
 
-  const imageElement = document.querySelector(
+  const imageElement = document?.querySelector(
     `[data-testid="${getGalleryImageDataTestId(imageName)}"]`
   );
   const itemRect = imageElement?.getBoundingClientRect();
