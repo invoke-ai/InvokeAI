@@ -44,13 +44,13 @@ def choose_precision(device: torch.device) -> str:
 
 
 def torch_dtype(device: torch.device) -> torch.dtype:
-    if config.full_precision:
-        return torch.float32
-    if config(device) == "float16":
+    precision = choose_precision(device)
+    if precision == "float16":
         return torch.float16
-    if config(device) == "bfloat16":
+    if precision == "bfloat16":
         return torch.bfloat16
     else:
+        # "auto", "autocast", "float32"
         return torch.float32
 
 
