@@ -59,10 +59,6 @@ class InvocationStatsService(InvocationStatsServiceBase):
             )
             self._stats[graph_execution_state_id].add_node_execution_stats(node_stats)
 
-    def reset_all_stats(self):
-        """Zero all statistics"""
-        self._stats = {}
-
     def reset_stats(self, graph_execution_id: str):
         try:
             self._stats.pop(graph_execution_id)
