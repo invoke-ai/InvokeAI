@@ -98,8 +98,12 @@ class InvocationStatsService(InvocationStatsServiceBase):
             logger.warning(f"Attempted to clear statistics for unknown graph {graph_execution_state_id}: {e}.")
 
     def log_stats(self, graph_execution_state_id: str):
-        graph_stats = self._stats[graph_execution_state_id]
-        cache_stats = self._cache_stats[graph_execution_state_id]
+        try:
+            graph_stats = self._stats[graph_execution_state_id]
+            cache_stats = self._cache_stats[graph_execution_state_id]
+        except KeyError as e:
+            logger.warning(f"Attempted to log statistics for unknown graph {graph_execution_state_id}: {e}.")
+            return
 
         log = graph_stats.get_pretty_log(graph_execution_state_id)
 
