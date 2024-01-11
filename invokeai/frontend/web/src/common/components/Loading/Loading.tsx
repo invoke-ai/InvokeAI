@@ -1,5 +1,5 @@
 import { Flex, Image, Spinner } from '@chakra-ui/react';
-import InvokeLogoWhite from 'assets/images/invoke-key-wht-lrg.svg';
+import InvokeLogoWhite from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { memo } from 'react';
 
 // This component loads before the theme so we cannot use theme tokens here
