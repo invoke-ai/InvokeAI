@@ -215,6 +215,7 @@ We thank them for all of their time and hard work.
 - Robert Bolender
 - Robin Rombach
 - Rohan Barar
+- rohinish404
 - rpagliuca
 - rromb
 - Rupesh Sreeraman
