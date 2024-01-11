@@ -23,8 +23,8 @@ const WorkflowLibraryModal = () => {
         h="80%"
         minW="unset"
         minH="unset"
-        maxW= "1200px"
-        maxH= "600px"
+        maxW="1200px"
+        maxH="664px"
       >
         <InvModalHeader>{t('workflows.workflowLibrary')}</InvModalHeader>
         <InvModalCloseButton />
