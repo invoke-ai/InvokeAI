@@ -30,22 +30,12 @@ writes to the system log is stored in InvocationServices.performance_statistics.
 
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
-from typing import Dict
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation
-from invokeai.backend.model_management.model_cache import CacheStats
-
-from .invocation_stats_common import NodeLog
 
 
 class InvocationStatsServiceBase(ABC):
     "Abstract base class for recording node memory/time performance statistics"
-
-    # {graph_id => NodeLog}
-    _stats: Dict[str, NodeLog]
-    _cache_stats: Dict[str, CacheStats]
-    ram_used: float
-    ram_changed: float
 
     @abstractmethod
     def __init__(self):
@@ -77,45 +67,8 @@ class InvocationStatsServiceBase(ABC):
         pass
 
     @abstractmethod
-    def reset_all_stats(self):
-        """Zero all statistics"""
-        pass
-
-    @abstractmethod
-    def update_invocation_stats(
-        self,
-        graph_id: str,
-        invocation_type: str,
-        time_used: float,
-        vram_used: float,
-    ):
-        """
-        Add timing information on execution of a node. Usually
-        used internally.
-        :param graph_id: ID of the graph that is currently executing
-        :param invocation_type: String literal type of the node
-        :param time_used: Time used by node's exection (sec)
-        :param vram_used: Maximum VRAM used during exection (GB)
-        """
-        pass
-
-    @abstractmethod
     def log_stats(self):
         """
         Write out the accumulated statistics to the log or somewhere else.
-        """
-        pass
-
-    @abstractmethod
-    def update_mem_stats(
-        self,
-        ram_used: float,
-        ram_changed: float,
-    ):
-        """
-        Update the collector with RAM memory usage info.
-
-        :param ram_used: How much RAM is currently in use.
-        :param ram_changed: How much RAM changed since last generation.
         """
         pass
