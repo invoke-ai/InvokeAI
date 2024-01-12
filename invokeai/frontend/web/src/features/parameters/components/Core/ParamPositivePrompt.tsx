@@ -12,6 +12,9 @@ import { memo, useCallback, useRef } from 'react';
 import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
+import { FaDice } from 'react-icons/fa';
+import { InvTooltip } from '../../../../common/components/InvTooltip/InvTooltip';
+import { InvIconButton } from '../../../../common/components/InvIconButton/InvIconButton';
 
 export const ParamPositivePrompt = memo(() => {
   const dispatch = useAppDispatch();
@@ -71,8 +74,18 @@ export const ParamPositivePrompt = memo(() => {
         />
         <PromptOverlayButtonWrapper>
           <AddEmbeddingButton isOpen={isOpen} onOpen={onOpen} />
-          {baseModel === 'sdxl' && <SDXLConcatButton />}
+          <SDXLConcatButton />
           <ShowDynamicPromptsPreviewButton />
+          <InvTooltip label={'Shuffle Prompt'}>
+            <InvIconButton
+              size="sm"
+              variant="promptOverlay"
+              // isDisabled={isOpen}
+              aria-label={t('dynamicPrompts.showDynamicPrompts')}
+              icon={<FaDice />}
+              // onClick={onOpen}
+            />
+          </InvTooltip>
         </PromptOverlayButtonWrapper>
       </Box>
     </EmbeddingPopover>

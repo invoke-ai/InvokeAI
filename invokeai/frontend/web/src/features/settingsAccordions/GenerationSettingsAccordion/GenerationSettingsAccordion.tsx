@@ -1,6 +1,6 @@
 import { Flex } from '@chakra-ui/layout';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
 import type { InvLabelProps } from 'common/components/InvControl/types';
 import { InvExpander } from 'common/components/InvExpander/InvExpander';
@@ -22,8 +22,9 @@ import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { size } from 'lodash-es';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { generationAdvancedOptionsExpanded } from '../../parameters/store/actions';
 
 const labelProps: InvLabelProps = {
   minW: '4rem',
@@ -47,6 +48,13 @@ const badgesSelector = createMemoizedSelector(
 export const GenerationSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const { loraTabBadges, accordionBadges } = useAppSelector(badgesSelector);
+  const dispatch = useAppDispatch();
+
+  const onToggleExpander = useCallback((isOpen?: boolean) => {
+    if (!isOpen) {
+      dispatch(generationAdvancedOptionsExpanded());
+    }
+  }, []);
 
   return (
     <InvSingleAccordion
@@ -67,7 +75,7 @@ export const GenerationSettingsAccordion = memo(() => {
               <ParamMainModelSelect />
               <SyncModelsIconButton />
             </Flex>
-            <InvExpander>
+            <InvExpander onClick={onToggleExpander}>
               <Flex gap={4} flexDir="column" pb={4}>
                 <InvControlGroup labelProps={labelProps}>
                   <ParamScheduler />

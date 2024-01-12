@@ -5,6 +5,8 @@ import type { InvExpanderProps } from 'common/components/InvExpander/types';
 import { InvText } from 'common/components/InvText/wrapper';
 import { t } from 'i18next';
 import { BiCollapseVertical, BiExpandVertical } from 'react-icons/bi';
+import { useAppDispatch } from '../../../app/store/storeHooks';
+import { useCallback } from 'react';
 
 const buttonStyles: SystemStyleObject = {
   color: 'base.400',
@@ -23,8 +25,14 @@ export const InvExpander = ({
   children,
   label = t('common.advancedOptions'),
   defaultIsOpen = false,
+  onClick,
 }: InvExpanderProps) => {
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen });
+
+  const onToggleExpander = useCallback(() => {
+    onClick && onClick(isOpen);
+    onToggle();
+  }, [onClick, onToggle, isOpen]);
 
   return (
     <Flex flexDir="column" w="full">
@@ -35,7 +43,7 @@ export const InvExpander = ({
         gap={3}
         py={4}
         px={2}
-        onClick={onToggle}
+        onClick={onToggleExpander}
         sx={buttonStyles}
       >
         <Divider w="unset" flexGrow={1} sx={buttonStyles} />

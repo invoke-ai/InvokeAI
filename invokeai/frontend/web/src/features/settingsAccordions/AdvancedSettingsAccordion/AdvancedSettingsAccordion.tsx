@@ -1,6 +1,6 @@
 import { Flex } from '@chakra-ui/layout';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
 import type { InvLabelProps } from 'common/components/InvControl/types';
 import { InvSingleAccordion } from 'common/components/InvSingleAccordion/InvSingleAccordion';
@@ -11,8 +11,9 @@ import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSea
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { advancedPanelExpanded } from '../../parameters/store/actions';
 
 const labelProps: InvLabelProps = {
   minW: '9.2rem',
@@ -51,9 +52,20 @@ const selectBadges = createMemoizedSelector(
 export const AdvancedSettingsAccordion = memo(() => {
   const badges = useAppSelector(selectBadges);
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+
+  const onAccordionClick = useCallback((isOpen?: boolean) => {
+    if (!isOpen) {
+      dispatch(advancedPanelExpanded());
+    }
+  }, []);
 
   return (
-    <InvSingleAccordion label={t('accordions.advanced.title')} badges={badges}>
+    <InvSingleAccordion
+      label={t('accordions.advanced.title')}
+      badges={badges}
+      onClick={onAccordionClick}
+    >
       <Flex gap={4} alignItems="center" p={4} flexDir="column">
         <Flex gap={4} w="full">
           <ParamVAEModelSelect />

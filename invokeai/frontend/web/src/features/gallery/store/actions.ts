@@ -15,3 +15,8 @@ export const requestedBoardImagesDeletion =
 export const sentImageToCanvas = createAction('gallery/sentImageToCanvas');
 
 export const sentImageToImg2Img = createAction('gallery/sentImageToImg2Img');
+
+export const imageUploaded = createAction<{ postUploadAction?: string }>('gallery/imageUploaded');
+export const boardCreated = createAction('gallery/boardCreated');
+
+export const bulkDownloadRequested = createAction<{ type: string }>('gallery/bulkDownloadRequested')

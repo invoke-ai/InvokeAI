@@ -8,6 +8,7 @@ import { queueApi } from 'services/api/endpoints/queue';
 import { theme, TOAST_OPTIONS } from 'theme/theme';
 
 import { startAppListening } from '..';
+import { batchEnqueued } from '../../../actions';
 
 const { toast } = createStandaloneToast({
   theme: theme,
@@ -19,6 +20,7 @@ export const addBatchEnqueuedListener = () => {
   startAppListening({
     matcher: queueApi.endpoints.enqueueBatch.matchFulfilled,
     effect: async (action) => {
+      console.log({ action })
       const response = action.payload;
       const arg = action.meta.arg.originalArgs;
       logger('queue').debug(

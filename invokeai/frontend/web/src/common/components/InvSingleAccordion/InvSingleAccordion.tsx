@@ -4,21 +4,35 @@ import {
   InvAccordionItem,
   InvAccordionPanel,
 } from 'common/components/InvAccordion/wrapper';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 
 import type { InvSingleAccordionProps } from './types';
 
 export const InvSingleAccordion = memo((props: InvSingleAccordionProps) => {
+  const handleAccordionClick = useCallback(
+    (isExpanded: boolean) => {
+      props.onClick && props.onClick(isExpanded);
+    },
+    [props.onClick]
+  );
+
   return (
     <InvAccordion
       allowToggle
       defaultIndex={props.defaultIsOpen ? 0 : undefined}
     >
       <InvAccordionItem>
-        <InvAccordionButton badges={props.badges}>
-          {props.label}
-        </InvAccordionButton>
-        <InvAccordionPanel>{props.children}</InvAccordionPanel>
+        {({ isExpanded }) => (
+          <>
+            <InvAccordionButton
+              badges={props.badges}
+              onClick={() => handleAccordionClick(isExpanded)}
+            >
+              {props.label}
+            </InvAccordionButton>
+            <InvAccordionPanel>{props.children}</InvAccordionPanel>
+          </>
+        )}
       </InvAccordionItem>
     </InvAccordion>
   );
