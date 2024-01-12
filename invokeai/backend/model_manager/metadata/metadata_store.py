@@ -123,8 +123,7 @@ class ModelMetadataStore:
         self._cursor.execute(
             """--sql
             select tag_text from tags;
-            """,
-            (),
+            """
         )
         return {x[0] for x in self._cursor.fetchall()}
 
