@@ -8,12 +8,14 @@ import {
   InvMenuGroup,
 } from 'common/components/InvMenu/wrapper';
 import { useGlobalMenuClose } from 'common/hooks/useGlobalMenuClose';
+import AboutModal from 'features/system/components/AboutModal/AboutModal';
 import HotkeysModal from 'features/system/components/HotkeysModal/HotkeysModal';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiBugBeetleBold,
+  PiInfoBold,
   PiKeyboardBold,
   PiToggleRightFill,
 } from 'react-icons/pi';
@@ -86,6 +88,13 @@ const SettingsMenu = () => {
               {t('common.settingsLabel')}
             </InvMenuItem>
           </SettingsModal>
+        </InvMenuGroup>
+        <InvMenuGroup title={t('accessibility.about')}>
+          <AboutModal>
+            <InvMenuItem as="button" icon={<PiInfoBold />}>
+              {t('accessibility.about')}
+            </InvMenuItem>
+          </AboutModal>
         </InvMenuGroup>
       </InvMenuList>
     </InvMenu>
