@@ -27,7 +27,7 @@ import {
 import { InvText } from 'common/components/InvText/wrapper';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { fromPairs, map, toPairs } from 'lodash-es';
-import InvokeLogoYellow from 'public/assets/images/invoke-symbol-ylw-lrg.svg';
+import InvokeLogoYellow from 'public/assets/images/invoke-tag-lrg.svg';
 import type { ReactElement } from 'react';
 import { cloneElement, memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -76,53 +76,53 @@ const AboutModal = ({ children }: AboutModalProps) => {
                         </Tr>
                       </Thead>
                       {appDeps_arr.map((deps, index) => (
-                        <Flex flexDir="column" key={index} gap={4}>
                           <Tbody key={index}>
                             {Object.entries(deps).map(([key, value]) => (
                               <Tr key={key} fontSize="sm" color="white">
-                                <Td>{key}</Td>
-                                <Td>{value ? value : 'Not Installed'}</Td>
+                                <Td py={2}>{key}</Td>
+                                <Td py={2}>{value ? value : 'Not Installed'}</Td>
                               </Tr>
                             ))}
                           </Tbody>
-                        </Flex>
                       ))}
                     </Table>
                   </TableContainer>
                 </GridItem>
-                <GridItem border="2px solid black">
-                  <Image
-                    ref={ref}
-                    src={InvokeLogoYellow}
-                    alt="invoke-logo"
-                    w="24px"
-                    h="24px"
-                    minW="24px"
-                    minH="24px"
-                    userSelect="none"
-                  />
-                  <InvText>v{appVersion?.version}</InvText>
-                  <Grid templateColumns="repeat(2, 1fr)" gap="3">
-                    <GridItem>
-                      <Link fontSize="sm" href={githubLink} isExternal>
-                        Github
-                        <ExternalLinkIcon mx="2px" />
+                <GridItem>
+                  <Flex flexDir="column" gap={3} mt="5rem" alignItems="center">
+                      <Image
+                        ref={ref}
+                        src={InvokeLogoYellow}
+                        alt="invoke-logo"
+                        w="120px"
+                        h="80px"
+                        minW="24px"
+                        minH="24px"
+                        userSelect="none"
+                      />
+                      <InvText>v{appVersion?.version}</InvText>
+                      <Grid templateColumns="repeat(2, 1fr)" gap="3">
+                        <GridItem>
+                          <Link fontSize="sm" href={githubLink} isExternal>
+                            Github
+                            <ExternalLinkIcon mx="2px" />
+                          </Link>
+                        </GridItem>
+                        <GridItem>
+                          <Link fontSize="sm" href={discordLink} isExternal>
+                            Discord
+                            <ExternalLinkIcon mx="2px" />
+                          </Link>
+                        </GridItem>
+                      </Grid>
+                      <InvHeading fontSize="large">Own Your Creative Power</InvHeading>
+                      <InvText fontSize="sm">
+                        Using Invoke for work? Check out:
+                      </InvText>
+                      <Link href={websiteLink} fontSize="sm">
+                        www.invoke.com
                       </Link>
-                    </GridItem>
-                    <GridItem>
-                      <Link fontSize="sm" href={discordLink} isExternal>
-                        Discord
-                        <ExternalLinkIcon mx="2px" />
-                      </Link>
-                    </GridItem>
-                  </Grid>
-                  <InvHeading fontSize="md">Own Your Creative Power</InvHeading>
-                  <InvText fontSize="sm">
-                    Using Invoke for work? Check out:
-                  </InvText>
-                  <Link href={websiteLink} fontSize="sm">
-                    www.invoke.com
-                  </Link>
+                  </Flex>
                 </GridItem>
               </Grid>
             </ScrollableContent>
