@@ -76,52 +76,54 @@ const AboutModal = ({ children }: AboutModalProps) => {
                         </Tr>
                       </Thead>
                       {appDeps_arr.map((deps, index) => (
-                          <Tbody key={index}>
-                            {Object.entries(deps).map(([key, value]) => (
-                              <Tr key={key} fontSize="sm" color="white">
-                                <Td py={2}>{key}</Td>
-                                <Td py={2}>{value ? value : 'Not Installed'}</Td>
-                              </Tr>
-                            ))}
-                          </Tbody>
+                        <Tbody key={index}>
+                          {Object.entries(deps).map(([key, value]) => (
+                            <Tr key={key} fontSize="sm" color="white">
+                              <Td py={2}>{key}</Td>
+                              <Td py={2}>{value ? value : 'Not Installed'}</Td>
+                            </Tr>
+                          ))}
+                        </Tbody>
                       ))}
                     </Table>
                   </TableContainer>
                 </GridItem>
                 <GridItem>
                   <Flex flexDir="column" gap={3} mt="5rem" alignItems="center">
-                      <Image
-                        ref={ref}
-                        src={InvokeLogoYellow}
-                        alt="invoke-logo"
-                        w="120px"
-                        h="80px"
-                        minW="24px"
-                        minH="24px"
-                        userSelect="none"
-                      />
-                      <InvText>v{appVersion?.version}</InvText>
-                      <Grid templateColumns="repeat(2, 1fr)" gap="3">
-                        <GridItem>
-                          <Link fontSize="sm" href={githubLink} isExternal>
-                            Github
-                            <ExternalLinkIcon mx="2px" />
-                          </Link>
-                        </GridItem>
-                        <GridItem> 
-                          <Link fontSize="sm" href={discordLink} isExternal>
-                            Discord
-                            <ExternalLinkIcon mx="2px" />
-                          </Link>
-                        </GridItem>
-                      </Grid>
-                      <InvHeading fontSize="large">Own Your Creative Power</InvHeading>
-                      <InvText fontSize="sm">
-                        Using Invoke for work? Check out:
-                      </InvText>
-                      <Link href={websiteLink} fontSize="sm">
-                        www.invoke.com
-                      </Link>
+                    <Image
+                      ref={ref}
+                      src={InvokeLogoYellow}
+                      alt="invoke-logo"
+                      w="120px"
+                      h="80px"
+                      minW="24px"
+                      minH="24px"
+                      userSelect="none"
+                    />
+                    <InvText>v{appVersion?.version}</InvText>
+                    <Grid templateColumns="repeat(2, 1fr)" gap="3">
+                      <GridItem>
+                        <Link fontSize="sm" href={githubLink} isExternal>
+                          Github
+                          <ExternalLinkIcon mx="2px" />
+                        </Link>
+                      </GridItem>
+                      <GridItem>
+                        <Link fontSize="sm" href={discordLink} isExternal>
+                          Discord
+                          <ExternalLinkIcon mx="2px" />
+                        </Link>
+                      </GridItem>
+                    </Grid>
+                    <InvHeading fontSize="large">
+                      Own Your Creative Power
+                    </InvHeading>
+                    <InvText fontSize="sm">
+                      Using Invoke for work? Check out:
+                    </InvText>
+                    <Link href={websiteLink} fontSize="sm">
+                      www.invoke.com
+                    </Link>
                   </Flex>
                 </GridItem>
               </Grid>
