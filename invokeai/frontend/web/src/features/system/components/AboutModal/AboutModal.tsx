@@ -65,9 +65,9 @@ const AboutModal = ({ children }: AboutModalProps) => {
           <InvModalBody display="flex" flexDir="column" gap={4}>
             <ScrollableContent>
               <Grid templateColumns="repeat(2, 1fr)">
-                <GridItem background="black" borderRadius="xl">
+                <GridItem backgroundColor="base.750" borderRadius="base">
                   <TableContainer>
-                    <Table variant="simple" w="50%">
+                    <Table variant="unstyled" w="50%">
                       <Thead>
                         <Tr>
                           <Th fontSize="medium" color="white">
@@ -108,7 +108,7 @@ const AboutModal = ({ children }: AboutModalProps) => {
                             <ExternalLinkIcon mx="2px" />
                           </Link>
                         </GridItem>
-                        <GridItem>
+                        <GridItem> 
                           <Link fontSize="sm" href={discordLink} isExternal>
                             Discord
                             <ExternalLinkIcon mx="2px" />
