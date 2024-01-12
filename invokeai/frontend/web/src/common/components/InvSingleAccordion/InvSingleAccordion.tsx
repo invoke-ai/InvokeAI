@@ -13,7 +13,7 @@ export const InvSingleAccordion = memo((props: InvSingleAccordionProps) => {
     (isExpanded: boolean) => {
       props.onClick && props.onClick(isExpanded);
     },
-    [props.onClick]
+    [props]
   );
 
   return (
@@ -26,7 +26,7 @@ export const InvSingleAccordion = memo((props: InvSingleAccordionProps) => {
           <>
             <InvAccordionButton
               badges={props.badges}
-              onClick={() => handleAccordionClick(isExpanded)}
+              onClick={handleAccordionClick.bind(null, isExpanded)}
             >
               {props.label}
             </InvAccordionButton>

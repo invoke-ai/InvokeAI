@@ -16,6 +16,7 @@ import ImageToImageStrength from 'features/parameters/components/ImageToImage/Im
 import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamSeedNumberInput';
 import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
 import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
+import { imageAdvancedOptionsExpanded } from 'features/parameters/store/actions';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
@@ -23,7 +24,6 @@ import { useTranslation } from 'react-i18next';
 
 import { ImageSizeCanvas } from './ImageSizeCanvas';
 import { ImageSizeLinear } from './ImageSizeLinear';
-import { imageAdvancedOptionsExpanded } from '../../parameters/store/actions';
 
 const selector = createMemoizedSelector(
   [
@@ -76,11 +76,14 @@ export const ImageSettingsAccordion = memo(() => {
   const { badges, activeTabName } = useAppSelector(selector);
   const dispatch = useAppDispatch();
 
-  const onToggleExpander = useCallback((isOpen?: boolean) => {
-    if (!isOpen) {
-      dispatch(imageAdvancedOptionsExpanded());
-    }
-  }, []);
+  const onToggleExpander = useCallback(
+    (isOpen?: boolean) => {
+      if (!isOpen) {
+        dispatch(imageAdvancedOptionsExpanded());
+      }
+    },
+    [dispatch]
+  );
 
   return (
     <InvSingleAccordion

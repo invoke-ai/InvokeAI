@@ -20,11 +20,11 @@ import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
+import { generationAdvancedOptionsExpanded } from 'features/parameters/store/actions';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { size } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { generationAdvancedOptionsExpanded } from '../../parameters/store/actions';
 
 const labelProps: InvLabelProps = {
   minW: '4rem',
@@ -50,11 +50,14 @@ export const GenerationSettingsAccordion = memo(() => {
   const { loraTabBadges, accordionBadges } = useAppSelector(badgesSelector);
   const dispatch = useAppDispatch();
 
-  const onToggleExpander = useCallback((isOpen?: boolean) => {
-    if (!isOpen) {
-      dispatch(generationAdvancedOptionsExpanded());
-    }
-  }, []);
+  const onToggleExpander = useCallback(
+    (isOpen?: boolean) => {
+      if (!isOpen) {
+        dispatch(generationAdvancedOptionsExpanded());
+      }
+    },
+    [dispatch]
+  );
 
   return (
     <InvSingleAccordion

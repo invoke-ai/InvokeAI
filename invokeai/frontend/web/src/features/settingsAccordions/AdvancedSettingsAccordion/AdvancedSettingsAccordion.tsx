@@ -10,10 +10,10 @@ import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSea
 import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSeamlessYAxis';
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
+import { advancedPanelExpanded } from 'features/parameters/store/actions';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { advancedPanelExpanded } from '../../parameters/store/actions';
 
 const labelProps: InvLabelProps = {
   minW: '9.2rem',
@@ -54,11 +54,14 @@ export const AdvancedSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
-  const onAccordionClick = useCallback((isOpen?: boolean) => {
-    if (!isOpen) {
-      dispatch(advancedPanelExpanded());
-    }
-  }, []);
+  const onAccordionClick = useCallback(
+    (isOpen?: boolean) => {
+      if (!isOpen) {
+        dispatch(advancedPanelExpanded());
+      }
+    },
+    [dispatch]
+  );
 
   return (
     <InvSingleAccordion

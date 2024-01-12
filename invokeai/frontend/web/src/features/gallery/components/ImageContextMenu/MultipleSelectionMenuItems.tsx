@@ -8,6 +8,7 @@ import {
   isModalOpenChanged,
 } from 'features/changeBoardModal/store/slice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import { bulkDownloadRequested } from 'features/gallery/store/actions';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { addToast } from 'features/system/store/systemSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -24,7 +25,6 @@ import {
   useStarImagesMutation,
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
-import { bulkDownloadRequested } from '../../store/actions';
 
 const MultipleSelectionMenuItems = () => {
   const { t } = useTranslation();

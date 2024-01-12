@@ -4,9 +4,8 @@ import { Collapse, Icon, useDisclosure } from '@chakra-ui/react';
 import type { InvExpanderProps } from 'common/components/InvExpander/types';
 import { InvText } from 'common/components/InvText/wrapper';
 import { t } from 'i18next';
-import { BiCollapseVertical, BiExpandVertical } from 'react-icons/bi';
-import { useAppDispatch } from '../../../app/store/storeHooks';
 import { useCallback } from 'react';
+import { BiCollapseVertical, BiExpandVertical } from 'react-icons/bi';
 
 const buttonStyles: SystemStyleObject = {
   color: 'base.400',
