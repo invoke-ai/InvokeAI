@@ -5,6 +5,7 @@ import { InvContextMenu } from 'common/components/InvContextMenu/InvContextMenu'
 import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
 import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
 import { InvMenuGroup } from 'common/components/InvMenu/wrapper';
+import { bulkDownloadRequested } from 'features/gallery/store/actions';
 import {
   autoAddBoardIdChanged,
   selectGallerySlice,
@@ -20,7 +21,6 @@ import { useBoardName } from 'services/api/hooks/useBoardName';
 import type { BoardDTO } from 'services/api/types';
 
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
-import { bulkDownloadRequested } from '../../store/actions';
 
 type Props = {
   board?: BoardDTO;

@@ -1,10 +1,10 @@
+import { useAppDispatch } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { boardCreated } from 'features/gallery/store/actions';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 import { useCreateBoardMutation } from 'services/api/endpoints/boards';
-import { useAppDispatch } from '../../../../../app/store/storeHooks';
-import { boardCreated } from '../../../store/actions';
 
 const AddBoardButton = () => {
   const { t } = useTranslation();
