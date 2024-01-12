@@ -62,17 +62,18 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
 
         _, name = id.split("/")
         return HuggingFaceMetadata(
-            id=model_info.modelId,
+            id=model_info.id,
             author=model_info.author,
             name=name,
-            last_modified=model_info.lastModified,
-            tag_dict=model_info.card_data.to_dict(),
+            last_modified=model_info.last_modified,
+            tag_dict=model_info.card_data.to_dict() if model_info.card_data else {},
             tags=model_info.tags,
             files=[
                 RemoteModelFile(
                     url=hf_hub_url(id, x.rfilename),
                     path=Path(name, x.rfilename),
                     size=x.size,
+                    sha256=x.lfs.get('sha256') if x.lfs else None,
                 )
                 for x in model_info.siblings
             ],

@@ -15,6 +15,7 @@ from typing_extensions import Annotated
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase
 from invokeai.app.services.events import EventServiceBase
+from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import ModelRecordServiceBase
 from invokeai.backend.model_manager import AnyModelConfig, ModelRepoVariant
 from invokeai.backend.model_manager.metadata import ModelMetadataStore
@@ -244,12 +245,14 @@ class ModelInstallServiceBase(ABC):
         :param event_bus: InvokeAI event bus for reporting events to.
         """
 
+    # make the invoker optional here because we don't need it and it
+    # makes the installer harder to use outside the web app
     @abstractmethod
-    def start(self, *args: Any, **kwarg: Any) -> None:
+    def start(self, invoker: Optional[Invoker]=None) -> None:
         """Start the installer service."""
 
     @abstractmethod
-    def stop(self, *args: Any, **kwarg: Any) -> None:
+    def stop(self, invoker: Optional[Invoker]=None) -> None:
         """Stop the model install service. After this the objection can be safely deleted."""
 
     @property

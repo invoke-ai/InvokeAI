@@ -43,6 +43,11 @@ def filter_files(
             paths.append(file)
         elif file.name.endswith(("learned_embeds.bin", "ip_adapter.bin", "lora_weights.safetensors")):
             paths.append(file)
+        # BRITTLENESS WARNING!!
+        # Diffusers models always seem to have "model" in their name, and the regex filter below is applied to avoid
+        # downloading random checkpoints that might also be in the repo. However there is no guarantee
+        # that a checkpoint doesn't contain "model" in its name, and no guarantee that future diffusers models
+        # will adhere to this naming convention, so this is an area of brittleness.
         elif re.search(r"model(\.[^.]+)?\.(safetensors|bin|onnx|xml|pth|pt|ckpt|msgpack)$", file.name):
             paths.append(file)
 

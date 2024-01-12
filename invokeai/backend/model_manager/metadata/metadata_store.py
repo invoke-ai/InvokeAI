@@ -25,7 +25,6 @@ class ModelMetadataStore:
         super().__init__()
         self._db = db
         self._cursor = self._db.conn.cursor()
-        self._enable_foreign_key_constraints()
 
     def add_metadata(self, model_key: str, metadata: AnyModelRepoMetadata) -> None:
         """
@@ -220,6 +219,3 @@ class ModelMetadataStore:
                 """,
                 (model_key, tag_id),
             )
-
-    def _enable_foreign_key_constraints(self) -> None:
-        self._cursor.execute("PRAGMA foreign_keys = ON;")

@@ -20,6 +20,7 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase, ModelRecordServiceSQL
+from invokeai.app.services.invoker import Invoker
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
@@ -112,7 +113,9 @@ class ModelInstallService(ModelInstallServiceBase):
     def event_bus(self) -> Optional[EventServiceBase]:  # noqa D102
         return self._event_bus
 
-    def start(self, *args: Any, **kwarg: Any) -> None:
+    # make the invoker optional here because we don't need it and it
+    # makes the installer harder to use outside the web app
+    def start(self, invoker: Optional[Invoker]=None) -> None:
         """Start the installer thread."""
         with self._lock:
             if self._running:
@@ -121,7 +124,7 @@ class ModelInstallService(ModelInstallServiceBase):
             self._remove_dangling_install_dirs()
             self.sync_to_config()
 
-    def stop(self, *args: Any, **kwarg: Any) -> None:
+    def stop(self, invoker: Optional[Invoker]=None) -> None:
         """Stop the installer thread; after this the object can be deleted and garbage collected."""
         with self._lock:
             if not self._running:

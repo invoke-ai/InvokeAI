@@ -62,7 +62,7 @@ class LicenseRestrictions(BaseModel):
 class RemoteModelFile(BaseModel):
     """Information about a downloadable file that forms part of a model."""
 
-    url: AnyHttpUrl = Field(description="The url to download this model file", default=None)
+    url: AnyHttpUrl = Field(description="The url to download this model file")
     path: Path = Field(description="The path to the file, relative to the model root")
     size: int = Field(description="The size of this file, in bytes")
     sha256: Optional[str] = Field(description="SHA256 hash of this model (not always available)", default=None)
