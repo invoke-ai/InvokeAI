@@ -44,7 +44,6 @@ export const isLanguage = (v: unknown): v is Language =>
 
 export interface SystemState {
   _version: 1;
-  isInitialized: boolean;
   isConnected: boolean;
   shouldConfirmOnDelete: boolean;
   enableImageDebugging: boolean;

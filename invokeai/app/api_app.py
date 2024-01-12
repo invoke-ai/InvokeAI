@@ -78,7 +78,7 @@ mimetypes.add_type("text/css", ".css")
 
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
-app = FastAPI(title="Invoke AI", docs_url=None, redoc_url=None, separate_input_output_schemas=False)
+app = FastAPI(title="Invoke - Community Edition", docs_url=None, redoc_url=None, separate_input_output_schemas=False)
 
 app.add_middleware(
     AuthenticationMiddleware,
@@ -215,8 +215,8 @@ app.openapi = custom_openapi  # type: ignore [method-assign] # this is a valid a
 def overridden_swagger() -> HTMLResponse:
     return get_swagger_ui_html(
         openapi_url=app.openapi_url,  # type: ignore [arg-type] # this is always a string
-        title=app.title,
-        swagger_favicon_url="/static/docs/favicon.ico",
+        title=f"{app.title} - Swagger UI",
+        swagger_favicon_url="static/docs/invoke-favicon-docs.svg",
     )
 
 
@@ -224,8 +224,8 @@ def overridden_swagger() -> HTMLResponse:
 def overridden_redoc() -> HTMLResponse:
     return get_redoc_html(
         openapi_url=app.openapi_url,  # type: ignore [arg-type] # this is always a string
-        title=app.title,
-        redoc_favicon_url="/static/docs/favicon.ico",
+        title=f"{app.title} - Redoc",
+        redoc_favicon_url="static/docs/invoke-favicon-docs.svg",
     )
 
 
@@ -239,7 +239,7 @@ if (web_root_path / "dist").exists():
     def get_index() -> FileResponse:
         return FileResponse(Path(web_root_path, "dist/index.html"), headers={"Cache-Control": "no-store"})
 
-    # # Must mount *after* the other routes else it borks em
+    # Must mount *after* the other routes else it borks em
     app.mount("/assets", StaticFiles(directory=Path(web_root_path, "dist/assets/")), name="assets")
     app.mount("/locales", StaticFiles(directory=Path(web_root_path, "dist/locales/")), name="locales")
 

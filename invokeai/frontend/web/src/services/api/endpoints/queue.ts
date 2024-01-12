@@ -164,7 +164,10 @@ export const queueApi = api.injectEndpoints({
         method: 'GET',
       }),
       providesTags: (result) => {
-        const tags: ApiTagDescription[] = ['CurrentSessionQueueItem'];
+        const tags: ApiTagDescription[] = [
+          'CurrentSessionQueueItem',
+          'FetchOnReconnect',
+        ];
         if (result) {
           tags.push({ type: 'SessionQueueItem', id: result.item_id });
         }
@@ -180,7 +183,10 @@ export const queueApi = api.injectEndpoints({
         method: 'GET',
       }),
       providesTags: (result) => {
-        const tags: ApiTagDescription[] = ['NextSessionQueueItem'];
+        const tags: ApiTagDescription[] = [
+          'NextSessionQueueItem',
+          'FetchOnReconnect',
+        ];
         if (result) {
           tags.push({ type: 'SessionQueueItem', id: result.item_id });
         }
@@ -195,7 +201,7 @@ export const queueApi = api.injectEndpoints({
         url: `queue/${$queueId.get()}/status`,
         method: 'GET',
       }),
-      providesTags: ['SessionQueueStatus'],
+      providesTags: ['SessionQueueStatus', 'FetchOnReconnect'],
     }),
     getBatchStatus: build.query<
       paths['/api/v1/queue/{queue_id}/b/{batch_id}/status']['get']['responses']['200']['content']['application/json'],
@@ -206,10 +212,11 @@ export const queueApi = api.injectEndpoints({
         method: 'GET',
       }),
       providesTags: (result) => {
-        if (!result) {
-          return [];
+        const tags: ApiTagDescription[] = ['FetchOnReconnect'];
+        if (result) {
+          tags.push({ type: 'BatchStatus', id: result.batch_id });
         }
-        return [{ type: 'BatchStatus', id: result.batch_id }];
+        return tags;
       },
     }),
     getQueueItem: build.query<
@@ -221,10 +228,11 @@ export const queueApi = api.injectEndpoints({
         method: 'GET',
       }),
       providesTags: (result) => {
-        if (!result) {
-          return [];
+        const tags: ApiTagDescription[] = ['FetchOnReconnect'];
+        if (result) {
+          tags.push({ type: 'SessionQueueItem', id: result.item_id });
         }
-        return [{ type: 'SessionQueueItem', id: result.item_id }];
+        return tags;
       },
     }),
     cancelQueueItem: build.mutation<
@@ -319,6 +327,7 @@ export const queueApi = api.injectEndpoints({
       },
       forceRefetch: ({ currentArg, previousArg }) => currentArg !== previousArg,
       keepUnusedDataFor: 60 * 5, // 5 minutes
+      providesTags: ['FetchOnReconnect'],
     }),
   }),
 });
@@ -338,6 +347,8 @@ export const {
   useCancelQueueItemMutation,
   useGetBatchStatusQuery,
 } = queueApi;
+
+export const selectQueueStatus = queueApi.endpoints.getQueueStatus.select();
 
 const resetListQueryData = (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

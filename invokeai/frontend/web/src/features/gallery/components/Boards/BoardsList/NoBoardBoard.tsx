@@ -1,6 +1,5 @@
 import { Box, Flex, Image } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import InvokeLogoSVG from 'assets/images/invoke-key-wht-lrg.svg';
 import IAIDroppable from 'common/components/IAIDroppable';
 import { InvText } from 'common/components/InvText/wrapper';
 import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
@@ -12,6 +11,7 @@ import {
   autoAddBoardIdChanged,
   boardIdSelected,
 } from 'features/gallery/store/gallerySlice';
+import InvokeLogoSVG from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {

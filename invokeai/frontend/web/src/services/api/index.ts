@@ -40,6 +40,9 @@ export const tagTypes = [
   'SDXLRefinerModel',
   'Workflow',
   'WorkflowsRecent',
+  // This is invalidated on reconnect. It should be used for queries that have changing data,
+  // especially related to the queue and generation.
+  'FetchOnReconnect',
 ] as const;
 export type ApiTagDescription = TagDescription<(typeof tagTypes)[number]>;
 export const LIST_TAG = 'LIST';
