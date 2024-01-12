@@ -1,3 +1,4 @@
+import cProfile
 import time
 import traceback
 from threading import BoundedSemaphore, Event, Thread
@@ -39,6 +40,9 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
             self.__threadLimit.acquire()
             queue_item: Optional[InvocationQueueItem] = None
 
+            profiler = None
+            last_gesid = None
+
             while not stop_event.is_set():
                 try:
                     queue_item = self.__invoker.services.queue.get()
@@ -49,6 +53,21 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     # do not hammer the queue
                     time.sleep(0.5)
                     continue
+
+                if last_gesid != queue_item.graph_execution_state_id:
+                    if profiler is not None:
+                        # I'm not sure what would cause us to get here, but if we do, we should restart the profiler for
+                        # the new graph_execution_state_id.
+                        profiler.disable()
+                        logger.info(f"Stopped profiler for {last_gesid}.")
+                        profiler = None
+                        last_gesid = None
+
+                    profiler = cProfile.Profile()
+                    profiler.enable()
+                    last_gesid = queue_item.graph_execution_state_id
+                    logger.info(f"Started profiling {last_gesid}.")
+
                 try:
                     graph_execution_state = self.__invoker.services.graph_execution_manager.get(
                         queue_item.graph_execution_state_id
@@ -201,6 +220,13 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         queue_id=queue_item.session_queue_id,
                         graph_execution_state_id=graph_execution_state.id,
                     )
+                    if profiler is not None:
+                        profiler.disable()
+                        dump_path = f"{last_gesid}.prof"
+                        profiler.dump_stats(dump_path)
+                        logger.info(f"Saved profile to {dump_path}.")
+                        profiler = None
+                        last_gesid = None
 
         except KeyboardInterrupt:
             pass  # Log something? KeyboardInterrupt is probably not going to be seen by the processor
