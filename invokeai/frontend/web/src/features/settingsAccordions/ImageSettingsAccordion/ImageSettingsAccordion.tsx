@@ -1,6 +1,6 @@
 import { Flex } from '@chakra-ui/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
 import type { InvLabelProps } from 'common/components/InvControl/types';
 import { InvExpander } from 'common/components/InvExpander/InvExpander';
@@ -18,11 +18,12 @@ import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSee
 import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ImageSizeCanvas } from './ImageSizeCanvas';
 import { ImageSizeLinear } from './ImageSizeLinear';
+import { imageAdvancedOptionsExpanded } from '../../parameters/store/actions';
 
 const selector = createMemoizedSelector(
   [
@@ -73,6 +74,13 @@ const scalingLabelProps: InvLabelProps = {
 export const ImageSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const { badges, activeTabName } = useAppSelector(selector);
+  const dispatch = useAppDispatch();
+
+  const onToggleExpander = useCallback((isOpen?: boolean) => {
+    if (!isOpen) {
+      dispatch(imageAdvancedOptionsExpanded());
+    }
+  }, []);
 
   return (
     <InvSingleAccordion
@@ -86,7 +94,7 @@ export const ImageSettingsAccordion = memo(() => {
         ) : (
           <ImageSizeLinear />
         )}
-        <InvExpander>
+        <InvExpander onClick={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">
             <Flex gap={4} alignItems="center">
               <ParamSeedNumberInput />

@@ -24,6 +24,7 @@ import {
   useStarImagesMutation,
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
+import { bulkDownloadRequested } from '../../store/actions';
 
 const MultipleSelectionMenuItems = () => {
   const { t } = useTranslation();
@@ -60,6 +61,8 @@ const MultipleSelectionMenuItems = () => {
       const response = await bulkDownload({
         image_names: selection.map((img) => img.image_name),
       }).unwrap();
+
+      dispatch(bulkDownloadRequested({ type: 'images' }));
 
       dispatch(
         addToast({

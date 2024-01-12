@@ -17,6 +17,7 @@ import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 
 import { startAppListening } from '..';
+import { imageUploaded } from '../../../../../features/gallery/store/actions';
 
 export const addImageUploadedFulfilledListener = () => {
   startAppListening({
@@ -39,6 +40,8 @@ export const addImageUploadedFulfilledListener = () => {
       ) {
         return;
       }
+
+      dispatch(imageUploaded({ postUploadAction: postUploadAction?.type }))
 
       const DEFAULT_UPLOADED_TOAST: UseToastOptions = {
         title: t('toast.imageUploaded'),

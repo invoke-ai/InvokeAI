@@ -20,6 +20,7 @@ import { useBoardName } from 'services/api/hooks/useBoardName';
 import type { BoardDTO } from 'services/api/types';
 
 import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
+import { bulkDownloadRequested } from '../../store/actions';
 
 type Props = {
   board?: BoardDTO;
@@ -65,6 +66,8 @@ const BoardContextMenu = ({
         image_names: [],
         board_id: board_id,
       }).unwrap();
+
+      dispatch(bulkDownloadRequested({ type: 'board' }));
 
       dispatch(
         addToast({

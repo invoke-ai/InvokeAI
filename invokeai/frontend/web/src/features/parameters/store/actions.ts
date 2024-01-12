@@ -8,3 +8,8 @@ export const initialImageSelected = createAction<ImageDTO | undefined>(
 export const modelSelected = createAction<MainModelField>(
   'generation/modelSelected'
 );
+
+export const imageAdvancedOptionsExpanded = createAction('parameters/imageAdvancedOptionsExpanded')
+export const generationAdvancedOptionsExpanded = createAction('parameters/generationAdvancedOptionsExpanded')
+
+export const advancedPanelExpanded = createAction('parameters/advancedPanelExpanded')
