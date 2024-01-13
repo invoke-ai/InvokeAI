@@ -21,7 +21,6 @@ from invokeai.app.services.invocation_processor.invocation_processor_default imp
 from invokeai.app.services.invocation_queue.invocation_queue_memory import MemoryInvocationQueue
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
-from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
 from invokeai.app.services.shared.graph import (
     CollectInvocation,
     Graph,
@@ -86,12 +85,7 @@ def invoke_next(g: GraphExecutionState, services: InvocationServices) -> tuple[B
     print(f"invoking {n.id}: {type(n)}")
     o = n.invoke(
         InvocationContext(
-            queue_batch_id="1",
-            queue_item_id=1,
-            queue_id=DEFAULT_QUEUE_ID,
-            services=services,
-            graph_execution_state_id="1",
-            workflow=None,
+            conditioning=None, config=None, data=None, images=None, latents=None, logger=None, models=None, util=None
         )
     )
     g.complete(n.id, o)
