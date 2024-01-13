@@ -7,7 +7,7 @@ from PIL import Image, PngImagePlugin
 from PIL.Image import Image as PILImageType
 from send2trash import send2trash
 
-from invokeai.app.invocations.baseinvocation import MetadataField
+from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail

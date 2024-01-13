@@ -25,10 +25,10 @@ from controlnet_aux.util import HWC3, ade_palette
 from PIL import Image
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, WithMetadata
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.backend.image_util.depth_anything import DepthAnythingDetector
 from invokeai.backend.image_util.dw_openpose import DWOpenposeDetector
 
@@ -36,11 +36,7 @@ from ...backend.model_management import BaseModelType
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    Input,
-    InputField,
     InvocationContext,
-    OutputField,
-    WithMetadata,
     invocation,
     invocation_output,
 )

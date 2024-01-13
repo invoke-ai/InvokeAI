@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional
 
-from invokeai.app.invocations.metadata import MetadataField
+from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 
 from .image_records_common import ImageCategory, ImageRecord, ImageRecordChanges, ResourceOrigin

@@ -4,17 +4,15 @@
 import torch
 from pydantic import field_validator
 
+from invokeai.app.invocations.fields import FieldDescriptions, InputField, OutputField
 from invokeai.app.invocations.latent import LatentsField
-from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.misc import SEED_MAX
 
 from ...backend.util.devices import choose_torch_device, torch_dtype
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    InputField,
     InvocationContext,
-    OutputField,
     invocation,
     invocation_output,
 )

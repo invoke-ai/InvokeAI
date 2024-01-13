@@ -8,7 +8,8 @@ from PIL import Image, ImageOps
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, WithMetadata, invocation
+from .baseinvocation import BaseInvocation, InvocationContext, invocation
+from .fields import InputField, WithMetadata
 
 
 @invocation("cv_inpaint", title="OpenCV Inpaint", tags=["opencv", "inpaint"], category="inpaint", version="1.2.0")
