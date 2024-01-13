@@ -229,29 +229,28 @@ clarity on the intent and common use cases we expect for utilizing them.
   currently being rendered by your browser into a merged copy of the image. This
   lowers the resource requirements and should improve performance.
 
-### Seam Correction
+### Compositing / Seam Correction
 
 When doing Inpainting or Outpainting, Invoke needs to merge the pixels generated
-by Stable Diffusion into your existing image. To do this, the area around the
-`seam` at the boundary between your image and the new generation is
+by Stable Diffusion into your existing image. This is achieved through compositing - the area around the the boundary between your image and the new generation is
 automatically blended to produce a seamless output. In a fully automatic
-process, a mask is generated to cover the seam, and then the area of the seam is
+process, a mask is generated to cover the boundary, and then the area of the boundary is
 Inpainted.
 
 Although the default options should work well most of the time, sometimes it can
-help to alter the parameters that control the seam Inpainting. A wider seam and
-a blur setting of about 1/3 of the seam have been noted as producing
-consistently strong results (e.g. 96 wide and 16 blur - adds up to 32 blur with
-both sides). Seam strength of 0.7 is best for reducing hard seams.
+help to alter the parameters that control the Compositing. A larger blur and
+a blur setting  have been noted as producing
+consistently strong results . Strength of 0.7 is best for reducing hard seams.
 
-- **Seam Size** - The size of the seam masked area. Set higher to make a larger
-  mask around the seam.
-- **Seam Blur** - The size of the blur that is applied on _each_ side of the
-  masked area.
-- **Seam Strength** - The Image To Image Strength parameter used for the
-  Inpainting generation that is applied to the seam area.
-- **Seam Steps** - The number of generation steps that should be used to Inpaint
-  the seam.
+- **Mode** - What part of the image will have the the Compositing applied to it.
+  - **Mask edge** will apply Compositing to the edge of the masked area
+  - **Mask** will apply Compositing to the entire masked area
+  - **Unmasked** will apply Compositing to the entire image
+- **Steps** - Number of generation steps that will occur during the Coherence Pass, similar to Denoising Steps. Higher step counts will generally have better results.
+- **Strength** - How much noise is added for the Coherence Pass, similar to Denoising Strength. A strength of 0 will result in an unchanged image, while a strength of 1 will result in an image with a completely new area as defined by the Mode setting.
+- **Blur** - Adjusts the pixel radius of the the mask. A larger blur radius will cause the mask to extend past the visibly masked area, while too small of a blur radius will result in a mask that is smaller than the visibly masked area.
+- **Blur Method** - The method of blur applied to the masked area. 
+
 
 ### Infill & Scaling
 

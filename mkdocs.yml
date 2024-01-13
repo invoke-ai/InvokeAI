@@ -14,6 +14,9 @@ edit_uri: edit/main/docs/
 # Copyright
 copyright: Copyright &copy; 2023 InvokeAI Team
 
+extra_css:
+    - stylesheets/extra.css
+
 # Configuration
 theme:
   name: material
@@ -21,17 +24,18 @@ theme:
     repo: fontawesome/brands/github
     edit: material/file-document-edit-outline
   palette:
-    - media: '(prefers-color-scheme: light)'
-      scheme: default
-      toggle:
-        icon: material/lightbulb
-        name: Switch to dark mode
+    # - media: '(prefers-color-scheme: light)'
+    #   scheme: default
+    #   primary: custom
+    #   toggle:
+    #     icon: material/lightbulb
+    #     name: Switch to dark mode
     - media: '(prefers-color-scheme: dark)'
       scheme: slate
-      primary: blue
-      toggle:
-        icon: material/lightbulb-outline
-        name: Switch to light mode
+      primary: custom
+      # toggle:
+      #   icon: material/lightbulb-outline
+      #   name: Switch to light mode
   features:
     - navigation.instant
     - navigation.tabs
@@ -42,6 +46,7 @@ theme:
     - search.highlight
     - search.suggest
     - toc.integrate
+
 
 # Extensions
 markdown_extensions:
@@ -130,14 +135,14 @@ nav:
         - Installing Invoke with pip: 'installation/deprecated_documentation/INSTALL_PCP.md'
         - Source Installer: 'installation/deprecated_documentation/INSTALL_SOURCE.md'
     - Workflows & Nodes:
-      - Community Nodes: 'nodes/communityNodes.md'
-      - Example Workflows: 'nodes/exampleWorkflows.md'
       - Nodes Overview: 'nodes/overview.md'
+      - Workflow Editor Basics: 'nodes/NODES.md'
       - List of Default Nodes: 'nodes/defaultNodes.md'
-      - Workflow Editor Usage: 'nodes/NODES.md'
+      - Example Workflows: 'nodes/exampleWorkflows.md'
       - ComfyUI to InvokeAI: 'nodes/comfyToInvoke.md'
       - Facetool Node: 'nodes/detailedNodes/faceTools.md'
       - Contributing Nodes: 'nodes/contributingNodes.md'
+    - Community Nodes: 'nodes/communityNodes.md'
     - Features:
       - Overview: 'features/index.md'
       - New to InvokeAI?: 'help/gettingStartedWithAI.md'
@@ -147,7 +152,7 @@ nav:
       - Controlling Logging: 'features/LOGGING.md'
       - LoRAs & LCM-LoRAs: 'features/LORAS.md'
       - Model Merging: 'features/MODEL_MERGING.md'
-      - Nodes & Workflows: 'nodes/overview.md'
+      - Workflows &  Nodes : 'nodes/overview'
       - NSFW Checker: 'features/WATERMARK+NSFW.md'
       - Postprocessing: 'features/POSTPROCESS.md'
       - Prompting Features: 'features/PROMPTS.md'
@@ -165,20 +170,20 @@ nav:
       - Development:
         - Overview: 'contributing/contribution_guides/development.md'
         - New Contributors: 'contributing/contribution_guides/newContributorChecklist.md'
-        - InvokeAI Architecture: 'contributing/ARCHITECTURE.md'
         - Model Manager v2: 'contributing/MODEL_MANAGER.md'
         - Frontend Documentation: 'contributing/contribution_guides/contributingToFrontend.md'
         - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
-        - Adding Tests: 'contributing/TESTS.md'
+        - Testing: 'contributing/TESTS.md'
       - Documentation: 'contributing/contribution_guides/documentation.md'
       - Nodes: 'contributing/INVOCATIONS.md'
       - Model Manager: 'contributing/MODEL_MANAGER.md'
       - Download Queue: 'contributing/DOWNLOAD_QUEUE.md'
       - Translation: 'contributing/contribution_guides/translation.md'
       - Tutorials: 'contributing/contribution_guides/tutorials.md'
-    - Changelog: 'CHANGELOG.md'
     - Deprecated:
+      - InvokeAI 2.3: 'deprecated/2to3.md'
       - Command Line Interface: 'deprecated/CLI.md'
+      - Changelog: 'CHANGELOG.md'
       - Variations: 'deprecated/VARIATIONS.md'
       - Translations: 'deprecated/TRANSLATION.md'
       - Embiggen: 'deprecated/EMBIGGEN.md'

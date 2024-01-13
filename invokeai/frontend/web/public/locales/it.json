@@ -116,7 +116,9 @@
         "unsaved": "Non salvato",
         "direction": "Direzione",
         "advancedOptions": "Opzioni avanzate",
-        "free": "Libero"
+        "free": "Libero",
+        "or": "o",
+        "preferencesLabel": "Preferenze"
     },
     "gallery": {
         "generations": "Generazioni",

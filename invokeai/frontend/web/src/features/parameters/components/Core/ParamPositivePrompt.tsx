@@ -1,6 +1,6 @@
 import { Box } from '@chakra-ui/layout';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvAutosizeTextarea } from 'common/components/InvAutosizeTextarea/InvAutosizeTextarea';
+import { InvTextarea } from 'common/components/InvTextarea/InvTextarea';
 import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/components/ShowDynamicPromptsPreviewButton';
 import { AddEmbeddingButton } from 'features/embedding/AddEmbeddingButton';
 import { EmbeddingPopover } from 'features/embedding/EmbeddingPopover';
@@ -58,16 +58,15 @@ export const ParamPositivePrompt = memo(() => {
       width={textareaRef.current?.clientWidth}
     >
       <Box pos="relative">
-        <InvAutosizeTextarea
+        <InvTextarea
           id="prompt"
           name="prompt"
           ref={textareaRef}
           value={prompt}
           placeholder={t('parameters.positivePromptPlaceholder')}
           onChange={onChange}
+          minH={28}
           onKeyDown={onKeyDown}
-          minRows={4}
-          maxRows={7}
           variant="darkFilled"
         />
         <PromptOverlayButtonWrapper>
