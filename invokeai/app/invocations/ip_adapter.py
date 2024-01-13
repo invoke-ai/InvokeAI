@@ -7,16 +7,13 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    Input,
-    InputField,
     InvocationContext,
-    OutputField,
     invocation,
     invocation_output,
 )
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
-from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.backend.model_management.models.base import BaseModelType, ModelType
 from invokeai.backend.model_management.models.ip_adapter import get_ip_adapter_image_encoder_model_id
 

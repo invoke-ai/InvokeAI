@@ -11,9 +11,17 @@ from diffusers.image_processor import VaeImageProcessor
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from tqdm import tqdm
 
+from invokeai.app.invocations.fields import (
+    FieldDescriptions,
+    Input,
+    InputField,
+    OutputField,
+    UIComponent,
+    UIType,
+    WithMetadata,
+)
 from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput, ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend import BaseModelType, ModelType, SubModelType
 
@@ -24,13 +32,7 @@ from ..util.ti_utils import extract_ti_triggers_from_prompt
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    Input,
-    InputField,
     InvocationContext,
-    OutputField,
-    UIComponent,
-    UIType,
-    WithMetadata,
     invocation,
     invocation_output,
 )

@@ -1,14 +1,10 @@
-from invokeai.app.shared.fields import FieldDescriptions
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
 
 from ...backend.model_management import ModelType, SubModelType
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    Input,
-    InputField,
     InvocationContext,
-    OutputField,
-    UIType,
     invocation,
     invocation_output,
 )

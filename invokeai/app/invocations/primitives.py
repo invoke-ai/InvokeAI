@@ -5,16 +5,12 @@ from typing import Optional, Tuple
 import torch
 from pydantic import BaseModel, Field
 
-from invokeai.app.shared.fields import FieldDescriptions
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIComponent
 
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    Input,
-    InputField,
     InvocationContext,
-    OutputField,
-    UIComponent,
     invocation,
     invocation_output,
 )

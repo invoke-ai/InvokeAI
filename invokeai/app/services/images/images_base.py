@@ -3,7 +3,7 @@ from typing import Callable, Optional
 
 from PIL.Image import Image as PILImageType
 
-from invokeai.app.invocations.baseinvocation import MetadataField
+from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageRecord,

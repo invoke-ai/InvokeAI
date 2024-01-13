@@ -5,10 +5,10 @@ from typing import Literal
 import numpy as np
 from pydantic import ValidationInfo, field_validator
 
+from invokeai.app.invocations.fields import FieldDescriptions, InputField
 from invokeai.app.invocations.primitives import FloatOutput, IntegerOutput
-from invokeai.app.shared.fields import FieldDescriptions
 
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
+from .baseinvocation import BaseInvocation, InvocationContext, invocation
 
 
 @invocation("add", title="Add Integers", tags=["math", "add"], category="math", version="1.0.0")
