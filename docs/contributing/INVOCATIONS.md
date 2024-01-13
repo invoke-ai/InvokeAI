@@ -9,11 +9,15 @@ complex functionality.
 
 ## Invocations Directory
 
-InvokeAI Nodes can be found in the `invokeai/app/invocations` directory. These can be used as examples to create your own nodes.
+InvokeAI Nodes can be found in the `invokeai/app/invocations` directory. These
+can be used as examples to create your own nodes.
 
-New nodes should be added to a subfolder in `nodes` direction found at the root level of the InvokeAI installation location. Nodes added to this folder will be able to be used upon application startup. 
+New nodes should be added to a subfolder in `nodes` direction found at the root
+level of the InvokeAI installation location. Nodes added to this folder will be
+able to be used upon application startup.
 
-Example `nodes`  subfolder structure:
+Example `nodes` subfolder structure:
+
 ```py
 ├── __init__.py # Invoke-managed custom node loader
 │
@@ -30,13 +34,13 @@ Example `nodes`  subfolder structure:
         └── fancy_node.py
 ```
 
-Each node folder must have an `__init__.py` file that imports its nodes. Only nodes imported in the `__init__.py` file are loaded.
- See the README in the nodes folder for more examples: 
+Each node folder must have an `__init__.py` file that imports its nodes. Only
+nodes imported in the `__init__.py` file are loaded. See the README in the nodes
+folder for more examples:
 
 ```py
 from .cool_node import CoolInvocation
 ```
-
 
 ## Creating A New Invocation
 
@@ -131,7 +135,6 @@ from invokeai.app.invocations.primitives import ImageField
 class ResizeInvocation(BaseInvocation):
     '''Resizes an image'''
 
-    # Inputs
     image: ImageField = InputField(description="The input image")
     width: int = InputField(default=512, ge=64, le=2048, description="Width of the new image")
     height: int = InputField(default=512, ge=64, le=2048, description="Height of the new image")
@@ -167,12 +170,11 @@ from invokeai.app.invocations.primitives import ImageField
 class ResizeInvocation(BaseInvocation):
     '''Resizes an image'''
 
-    # Inputs
     image: ImageField = InputField(description="The input image")
     width: int = InputField(default=512, ge=64, le=2048, description="Width of the new image")
     height: int = InputField(default=512, ge=64, le=2048, description="Height of the new image")
 
-    def invoke(self, context: InvocationContext):
+    def invoke(self, context):
         pass
 ```
 
@@ -197,12 +199,11 @@ from invokeai.app.invocations.image import ImageOutput
 class ResizeInvocation(BaseInvocation):
     '''Resizes an image'''
 
-    # Inputs
     image: ImageField = InputField(description="The input image")
     width: int = InputField(default=512, ge=64, le=2048, description="Width of the new image")
     height: int = InputField(default=512, ge=64, le=2048, description="Height of the new image")
 
-    def invoke(self, context: InvocationContext) -> ImageOutput:
+    def invoke(self, context) -> ImageOutput:
         pass
 ```
 
@@ -228,31 +229,18 @@ class ResizeInvocation(BaseInvocation):
     width: int = InputField(default=512, ge=64, le=2048, description="Width of the new image")
     height: int = InputField(default=512, ge=64, le=2048, description="Height of the new image")
 
-    def invoke(self, context: InvocationContext) -> ImageOutput:
-        # Load the image using InvokeAI's predefined Image Service. Returns the PIL image.
-        image = context.services.images.get_pil_image(self.image.image_name)
+    def invoke(self, context) -> ImageOutput:
+        # Load the input image as a PIL image
+        image = context.images.get_pil(self.image.image_name)
 
-        # Resizing the image
+        # Resize the image
         resized_image = image.resize((self.width, self.height))
 
-        # Save the image using InvokeAI's predefined Image Service. Returns the prepared PIL image.
-        output_image = context.services.images.create(
-            image=resized_image,
-            image_origin=ResourceOrigin.INTERNAL,
-            image_category=ImageCategory.GENERAL,
-            node_id=self.id,
-            session_id=context.graph_execution_state_id,
-            is_intermediate=self.is_intermediate,
-        )
+        # Save the image
+        image_dto = context.images.save(image=resized_image)
 
-        # Returning the Image
-        return ImageOutput(
-            image=ImageField(
-                image_name=output_image.image_name,
-            ),
-            width=output_image.width,
-            height=output_image.height,
-        )
+        # Return an ImageOutput
+        return ImageOutput.build(image_dto)
 ```
 
 **Note:** Do not be overwhelmed by the `ImageOutput` process. InvokeAI has a
@@ -343,27 +331,25 @@ class ImageColorStringOutput(BaseInvocationOutput):
 
 That's all there is to it.
 
-<!-- TODO: DANGER - we probably do not want people to create their own field types, because this requires a lot of work on the frontend to accomodate.
-
 ### Custom Input Fields
 
 Now that you know how to create your own Invocations, let us dive into slightly
 more advanced topics.
 
 While creating your own Invocations, you might run into a scenario where the
-existing input types in InvokeAI do not meet your requirements. In such cases,
-you can create your own input types.
+existing fields in InvokeAI do not meet your requirements. In such cases, you
+can create your own fields.
 
 Let us create one as an example. Let us say we want to create a color input
 field that represents a color code. But before we start on that here are some
 general good practices to keep in mind.
 
-**Good Practices**
+### Best Practices
 
 - There is no naming convention for input fields but we highly recommend that
   you name it something appropriate like `ColorField`.
 - It is not mandatory but it is heavily recommended to add a relevant
-  `docstring` to describe your input field.
+  `docstring` to describe your field.
 - Keep your field in the same file as the Invocation that it is made for or in
   another file where it is relevant.
 
@@ -378,10 +364,13 @@ class ColorField(BaseModel):
     pass
 ```
 
-Perfect. Now let us create our custom inputs for our field. This is exactly
-similar how you created input fields for your Invocation. All the same rules
-apply. Let us create four fields representing the _red(r)_, _blue(b)_,
-_green(g)_ and _alpha(a)_ channel of the color.
+Perfect. Now let us create the properties for our field. This is similar to how
+you created input fields for your Invocation. All the same rules apply. Let us
+create four fields representing the _red(r)_, _blue(b)_, _green(g)_ and
+_alpha(a)_ channel of the color.
+
+> Technically, the properties are _also_ called fields - but in this case, it
+> refers to a `pydantic` field.
 
 ```python
 class ColorField(BaseModel):
@@ -396,25 +385,11 @@ That's it. We now have a new input field type that we can use in our Invocations
 like this.
 
 ```python
-color: ColorField = Field(default=ColorField(r=0, g=0, b=0, a=0), description='Background color of an image')
+color: ColorField = InputField(default=ColorField(r=0, g=0, b=0, a=0), description='Background color of an image')
 ```
 
-### Custom Components For Frontend
+### Using the custom field
 
-Every backend input type should have a corresponding frontend component so the
-UI knows what to render when you use a particular field type.
+When you start the UI, your custom field will be automatically recognized.
 
-If you are using existing field types, we already have components for those. So
-you don't have to worry about creating anything new. But this might not always
-be the case. Sometimes you might want to create new field types and have the
-frontend UI deal with it in a different way.
-
-This is where we venture into the world of React and Javascript and create our
-own new components for our Invocations. Do not fear the world of JS. It's
-actually pretty straightforward.
-
-Let us create a new component for our custom color field we created above. When
-we use a color field, let us say we want the UI to display a color picker for
-the user to pick from rather than entering values. That is what we will build
-now.
--->
+Custom fields only support connection inputs in the Workflow Editor.
