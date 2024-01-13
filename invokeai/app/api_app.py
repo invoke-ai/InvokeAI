@@ -6,6 +6,7 @@ import sys
 from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 from invokeai.version.invokeai_version import __version__
 
+from .invocations.fields import InputFieldJSONSchemaExtra, OutputFieldJSONSchemaExtra
 from .services.config import InvokeAIAppConfig
 
 app_config = InvokeAIAppConfig.get_config()
@@ -57,8 +58,6 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     from .api.sockets import SocketIO
     from .invocations.baseinvocation import (
         BaseInvocation,
-        InputFieldJSONSchemaExtra,
-        OutputFieldJSONSchemaExtra,
         UIConfigBase,
     )
 
