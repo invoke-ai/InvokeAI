@@ -22,7 +22,6 @@ from invokeai.app.invocations.fields import (
     Input,
     InputFieldJSONSchemaExtra,
     MetadataField,
-    logger,
 )
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.shared.invocation_context import InvocationContext
