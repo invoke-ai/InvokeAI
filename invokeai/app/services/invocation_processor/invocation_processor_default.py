@@ -5,11 +5,11 @@ from threading import BoundedSemaphore, Event, Thread
 from typing import Optional
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.invocations.baseinvocation import InvocationContext
 from invokeai.app.services.invocation_queue.invocation_queue_common import InvocationQueueItem
 from invokeai.app.services.invocation_stats.invocation_stats_common import (
     GESStatsNotFoundError,
 )
+from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
 from invokeai.app.util.profiler import Profiler
 
 from ..invoker import Invoker
@@ -131,16 +131,20 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         # which handles a few things:
                         # - nodes that require a value, but get it only from a connection
                         # - referencing the invocation cache instead of executing the node
-                        outputs = invocation.invoke_internal(
-                            InvocationContext(
-                                services=self.__invoker.services,
-                                graph_execution_state_id=graph_execution_state.id,
-                                queue_item_id=queue_item.session_queue_item_id,
-                                queue_id=queue_item.session_queue_id,
-                                queue_batch_id=queue_item.session_queue_batch_id,
-                                workflow=queue_item.workflow,
-                            )
+                        context_data = InvocationContextData(
+                            invocation=invocation,
+                            session_id=graph_id,
+                            workflow=queue_item.workflow,
+                            source_node_id=source_node_id,
+                            queue_id=queue_item.session_queue_id,
+                            queue_item_id=queue_item.session_queue_item_id,
+                            batch_id=queue_item.session_queue_batch_id,
                         )
+                        context = build_invocation_context(
+                            services=self.__invoker.services,
+                            context_data=context_data,
+                        )
+                        outputs = invocation.invoke_internal(context=context, services=self.__invoker.services)
 
                         # Check queue to see if this is canceled, and skip if so
                         if self.__invoker.services.queue.is_canceled(graph_execution_state.id):

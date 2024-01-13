@@ -1,12 +1,18 @@
-from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import TYPE_CHECKING, List, Optional, Union
 
 import torch
 from compel import Compel, ReturnedEmbeddingsType
 from compel.prompt_parser import Blend, Conjunction, CrossAttentionControlSubstitute, FlattenedPrompt, Fragment
 
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIComponent
-from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput
+from invokeai.app.invocations.fields import (
+    ConditioningFieldData,
+    FieldDescriptions,
+    Input,
+    InputField,
+    OutputField,
+    UIComponent,
+)
+from invokeai.app.invocations.primitives import ConditioningOutput
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     ExtraConditioningInfo,
@@ -20,16 +26,14 @@ from ..util.ti_utils import extract_ti_triggers_from_prompt
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    InvocationContext,
     invocation,
     invocation_output,
 )
 from .model import ClipField
 
+if TYPE_CHECKING:
+    from invokeai.app.services.shared.invocation_context import InvocationContext
 
-@dataclass
-class ConditioningFieldData:
-    conditionings: List[BasicConditioningInfo]
     # unconditioned: Optional[torch.Tensor]
 
 
@@ -44,7 +48,7 @@ class ConditioningFieldData:
     title="Prompt",
     tags=["prompt", "compel"],
     category="conditioning",
-    version="1.0.0",
+    version="1.0.1",
 )
 class CompelInvocation(BaseInvocation):
     """Parse prompt using compel package to conditioning."""
@@ -61,26 +65,18 @@ class CompelInvocation(BaseInvocation):
     )
 
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        tokenizer_info = context.services.model_manager.get_model(
-            **self.clip.tokenizer.model_dump(),
-            context=context,
-        )
-        text_encoder_info = context.services.model_manager.get_model(
-            **self.clip.text_encoder.model_dump(),
-            context=context,
-        )
+    def invoke(self, context) -> ConditioningOutput:
+        tokenizer_info = context.models.load(**self.clip.tokenizer.model_dump())
+        text_encoder_info = context.models.load(**self.clip.text_encoder.model_dump())
 
         def _lora_loader():
             for lora in self.clip.loras:
-                lora_info = context.services.model_manager.get_model(
-                    **lora.model_dump(exclude={"weight"}), context=context
-                )
+                lora_info = context.models.load(**lora.model_dump(exclude={"weight"}))
                 yield (lora_info.context.model, lora.weight)
                 del lora_info
             return
 
-        # loras = [(context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
+        # loras = [(context.models.get(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
 
         ti_list = []
         for trigger in extract_ti_triggers_from_prompt(self.prompt):
@@ -89,11 +85,10 @@ class CompelInvocation(BaseInvocation):
                 ti_list.append(
                     (
                         name,
-                        context.services.model_manager.get_model(
+                        context.models.load(
                             model_name=name,
                             base_model=self.clip.text_encoder.base_model,
                             model_type=ModelType.TextualInversion,
-                            context=context,
                         ).context.model,
                     )
                 )
@@ -124,7 +119,7 @@ class CompelInvocation(BaseInvocation):
 
             conjunction = Compel.parse_prompt_string(self.prompt)
 
-            if context.services.configuration.log_tokenization:
+            if context.config.get().log_tokenization:
                 log_tokenization_for_conjunction(conjunction, tokenizer)
 
             c, options = compel.build_conditioning_tensor_for_conjunction(conjunction)
@@ -145,34 +140,23 @@ class CompelInvocation(BaseInvocation):
             ]
         )
 
-        conditioning_name = f"{context.graph_execution_state_id}_{self.id}_conditioning"
-        context.services.latents.save(conditioning_name, conditioning_data)
+        conditioning_name = context.conditioning.save(conditioning_data)
 
-        return ConditioningOutput(
-            conditioning=ConditioningField(
-                conditioning_name=conditioning_name,
-            ),
-        )
+        return ConditioningOutput.build(conditioning_name)
 
 
 class SDXLPromptInvocationBase:
     def run_clip_compel(
         self,
-        context: InvocationContext,
+        context: "InvocationContext",
         clip_field: ClipField,
         prompt: str,
         get_pooled: bool,
         lora_prefix: str,
         zero_on_empty: bool,
     ):
-        tokenizer_info = context.services.model_manager.get_model(
-            **clip_field.tokenizer.model_dump(),
-            context=context,
-        )
-        text_encoder_info = context.services.model_manager.get_model(
-            **clip_field.text_encoder.model_dump(),
-            context=context,
-        )
+        tokenizer_info = context.models.load(**clip_field.tokenizer.model_dump())
+        text_encoder_info = context.models.load(**clip_field.text_encoder.model_dump())
 
         # return zero on empty
         if prompt == "" and zero_on_empty:
@@ -196,14 +180,12 @@ class SDXLPromptInvocationBase:
 
         def _lora_loader():
             for lora in clip_field.loras:
-                lora_info = context.services.model_manager.get_model(
-                    **lora.model_dump(exclude={"weight"}), context=context
-                )
+                lora_info = context.models.load(**lora.model_dump(exclude={"weight"}))
                 yield (lora_info.context.model, lora.weight)
                 del lora_info
             return
 
-        # loras = [(context.services.model_manager.get_model(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
+        # loras = [(context.models.get(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
 
         ti_list = []
         for trigger in extract_ti_triggers_from_prompt(prompt):
@@ -212,11 +194,10 @@ class SDXLPromptInvocationBase:
                 ti_list.append(
                     (
                         name,
-                        context.services.model_manager.get_model(
+                        context.models.load(
                             model_name=name,
                             base_model=clip_field.text_encoder.base_model,
                             model_type=ModelType.TextualInversion,
-                            context=context,
                         ).context.model,
                     )
                 )
@@ -249,7 +230,7 @@ class SDXLPromptInvocationBase:
 
             conjunction = Compel.parse_prompt_string(prompt)
 
-            if context.services.configuration.log_tokenization:
+            if context.config.get().log_tokenization:
                 # TODO: better logging for and syntax
                 log_tokenization_for_conjunction(conjunction, tokenizer)
 
@@ -282,7 +263,7 @@ class SDXLPromptInvocationBase:
     title="SDXL Prompt",
     tags=["sdxl", "compel", "prompt"],
     category="conditioning",
-    version="1.0.0",
+    version="1.0.1",
 )
 class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     """Parse prompt using compel package to conditioning."""
@@ -307,7 +288,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     clip2: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 2")
 
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> ConditioningOutput:
+    def invoke(self, context) -> ConditioningOutput:
         c1, c1_pooled, ec1 = self.run_clip_compel(
             context, self.clip, self.prompt, False, "lora_te1_", zero_on_empty=True
         )
@@ -364,14 +345,9 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
             ]
         )
 
-        conditioning_name = f"{context.graph_execution_state_id}_{self.id}_conditioning"
-        context.services.latents.save(conditioning_name, conditioning_data)
+        conditioning_name = context.conditioning.save(conditioning_data)
 
-        return ConditioningOutput(
-            conditioning=ConditioningField(
-                conditioning_name=conditioning_name,
-            ),
-        )
+        return ConditioningOutput.build(conditioning_name)
 
 
 @invocation(
@@ -379,7 +355,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     title="SDXL Refiner Prompt",
     tags=["sdxl", "compel", "prompt"],
     category="conditioning",
-    version="1.0.0",
+    version="1.0.1",
 )
 class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     """Parse prompt using compel package to conditioning."""
@@ -397,7 +373,7 @@ class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase
     clip2: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
 
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> ConditioningOutput:
+    def invoke(self, context) -> ConditioningOutput:
         # TODO: if there will appear lora for refiner - write proper prefix
         c2, c2_pooled, ec2 = self.run_clip_compel(context, self.clip2, self.style, True, "<NONE>", zero_on_empty=False)
 
@@ -417,14 +393,9 @@ class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase
             ]
         )
 
-        conditioning_name = f"{context.graph_execution_state_id}_{self.id}_conditioning"
-        context.services.latents.save(conditioning_name, conditioning_data)
+        conditioning_name = context.conditioning.save(conditioning_data)
 
-        return ConditioningOutput(
-            conditioning=ConditioningField(
-                conditioning_name=conditioning_name,
-            ),
-        )
+        return ConditioningOutput.build(conditioning_name)
 
 
 @invocation_output("clip_skip_output")
@@ -447,7 +418,7 @@ class ClipSkipInvocation(BaseInvocation):
     clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP")
     skipped_layers: int = InputField(default=0, description=FieldDescriptions.skipped_layers)
 
-    def invoke(self, context: InvocationContext) -> ClipSkipInvocationOutput:
+    def invoke(self, context) -> ClipSkipInvocationOutput:
         self.clip.skipped_layers += self.skipped_layers
         return ClipSkipInvocationOutput(
             clip=self.clip,

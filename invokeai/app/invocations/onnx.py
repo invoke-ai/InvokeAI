@@ -37,7 +37,7 @@ from .baseinvocation import (
     invocation_output,
 )
 from .controlnet_image_processors import ControlField
-from .latent import SAMPLER_NAME_VALUES, LatentsField, LatentsOutput, build_latents_output, get_scheduler
+from .latent import SAMPLER_NAME_VALUES, LatentsField, LatentsOutput, get_scheduler
 from .model import ClipField, ModelInfo, UNetField, VaeField
 
 ORT_TO_NP_TYPE = {
@@ -63,7 +63,7 @@ class ONNXPromptInvocation(BaseInvocation):
     prompt: str = InputField(default="", description=FieldDescriptions.raw_prompt, ui_component=UIComponent.Textarea)
     clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
 
-    def invoke(self, context: InvocationContext) -> ConditioningOutput:
+    def invoke(self, context) -> ConditioningOutput:
         tokenizer_info = context.services.model_manager.get_model(
             **self.clip.tokenizer.model_dump(),
         )
@@ -201,7 +201,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
 
     # based on
     # https://github.com/huggingface/diffusers/blob/3ebbaf7c96801271f9e6c21400033b6aa5ffcf29/src/diffusers/pipelines/stable_diffusion/pipeline_onnx_stable_diffusion.py#L375
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context) -> LatentsOutput:
         c, _ = context.services.latents.get(self.positive_conditioning.conditioning_name)
         uc, _ = context.services.latents.get(self.negative_conditioning.conditioning_name)
         graph_execution_state = context.services.graph_execution_manager.get(context.graph_execution_state_id)
@@ -342,7 +342,7 @@ class ONNXLatentsToImageInvocation(BaseInvocation, WithMetadata):
     )
     # tiled: bool = InputField(default=False, description="Decode latents by overlaping tiles(less memory consumption)")
 
-    def invoke(self, context: InvocationContext) -> ImageOutput:
+    def invoke(self, context) -> ImageOutput:
         latents = context.services.latents.get(self.latents.latents_name)
 
         if self.vae.vae.submodel != SubModelType.VaeDecoder:
@@ -417,7 +417,7 @@ class OnnxModelLoaderInvocation(BaseInvocation):
         description=FieldDescriptions.onnx_main_model, input=Input.Direct, ui_type=UIType.ONNXModel
     )
 
-    def invoke(self, context: InvocationContext) -> ONNXModelLoaderOutput:
+    def invoke(self, context) -> ONNXModelLoaderOutput:
         base_model = self.model.base_model
         model_name = self.model.model_name
         model_type = ModelType.ONNX
