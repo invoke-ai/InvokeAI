@@ -6,8 +6,7 @@ from PIL.Image import Image
 from pydantic import ConfigDict
 from torch import Tensor
 
-from invokeai.app.invocations.compel import ConditioningFieldData
-from invokeai.app.invocations.fields import MetadataField, WithMetadata
+from invokeai.app.invocations.fields import ConditioningFieldData, MetadataField, WithMetadata
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordChanges, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO
@@ -245,13 +244,15 @@ class ConditioningInterface:
             )
             return name
 
-        def get(conditioning_name: str) -> Tensor:
+        def get(conditioning_name: str) -> ConditioningFieldData:
             """
             Gets conditioning data by name.
 
             :param conditioning_name: The name of the conditioning data to get.
             """
-            return services.latents.get(conditioning_name)
+            # TODO(sm): We are (ab)using the latents storage service as a general pickle storage
+            # service, but it is typed as returning tensors, so we need to ignore the type here.
+            return services.latents.get(conditioning_name) # type: ignore [return-value]
 
         self.save = save
         self.get = get

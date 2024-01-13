@@ -5,23 +5,23 @@ import cv2 as cv
 import numpy
 from PIL import Image, ImageOps
 
-from invokeai.app.invocations.primitives import ImageField, ImageOutput
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.invocations.fields import ImageField
+from invokeai.app.invocations.primitives import ImageOutput
 
-from .baseinvocation import BaseInvocation, InvocationContext, invocation
+from .baseinvocation import BaseInvocation, invocation
 from .fields import InputField, WithMetadata
 
 
-@invocation("cv_inpaint", title="OpenCV Inpaint", tags=["opencv", "inpaint"], category="inpaint", version="1.2.0")
+@invocation("cv_inpaint", title="OpenCV Inpaint", tags=["opencv", "inpaint"], category="inpaint", version="1.2.1")
 class CvInpaintInvocation(BaseInvocation, WithMetadata):
     """Simple inpaint using opencv."""
 
     image: ImageField = InputField(description="The image to inpaint")
     mask: ImageField = InputField(description="The mask to use when inpainting")
 
-    def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(self.image.image_name)
-        mask = context.services.images.get_pil_image(self.mask.image_name)
+    def invoke(self, context) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name)
+        mask = context.images.get_pil(self.mask.image_name)
 
         # Convert to cv image/mask
         # TODO: consider making these utility functions
@@ -35,18 +35,6 @@ class CvInpaintInvocation(BaseInvocation, WithMetadata):
         # TODO: consider making a utility function
         image_inpainted = Image.fromarray(cv.cvtColor(cv_inpainted, cv.COLOR_BGR2RGB))
 
-        image_dto = context.services.images.create(
-            image=image_inpainted,
-            image_origin=ResourceOrigin.INTERNAL,
-            image_category=ImageCategory.GENERAL,
-            node_id=self.id,
-            session_id=context.graph_execution_state_id,
-            is_intermediate=self.is_intermediate,
-            workflow=context.workflow,
-        )
+        image_dto = context.images.save(image=image_inpainted)
 
-        return ImageOutput(
-            image=ImageField(image_name=image_dto.image_name),
-            width=image_dto.width,
-            height=image_dto.height,
-        )
+        return ImageOutput.build(image_dto)
