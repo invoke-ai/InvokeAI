@@ -318,7 +318,7 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
 
         name = f"{context.graph_execution_state_id}__{self.id}"
         context.services.latents.save(name, latents)
-        return build_latents_output(latents_name=name, latents=torch.from_numpy(latents))
+        # return build_latents_output(latents_name=name, latents=torch.from_numpy(latents))
 
 
 # Latent to image
