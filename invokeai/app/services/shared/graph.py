@@ -13,14 +13,11 @@ from invokeai.app.invocations import *  # noqa: F401 F403
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    Input,
-    InputField,
     InvocationContext,
-    OutputField,
-    UIType,
     invocation,
     invocation_output,
 )
+from invokeai.app.invocations.fields import Input, InputField, OutputField, UIType
 from invokeai.app.util.misc import uuid_string
 
 # in 3.10 this would be "from types import NoneType"

@@ -3,17 +3,14 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from invokeai.app.shared.fields import FieldDescriptions
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField
 from invokeai.app.shared.models import FreeUConfig
 
 from ...backend.model_management import BaseModelType, ModelType, SubModelType
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    Input,
-    InputField,
     InvocationContext,
-    OutputField,
     invocation,
     invocation_output,
 )

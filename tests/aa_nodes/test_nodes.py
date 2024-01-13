@@ -3,12 +3,11 @@ from typing import Any, Callable, Union
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    InputField,
     InvocationContext,
-    OutputField,
     invocation,
     invocation_output,
 )
+from invokeai.app.invocations.fields import InputField, OutputField
 from invokeai.app.invocations.image import ImageField
 
 

@@ -41,7 +41,8 @@ from matplotlib.ticker import MaxNLocator
 
 from invokeai.app.invocations.primitives import FloatCollectionOutput
 
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
+from .baseinvocation import BaseInvocation, InvocationContext, invocation
+from .fields import InputField
 
 
 @invocation(
