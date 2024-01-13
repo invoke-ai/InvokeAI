@@ -71,7 +71,7 @@ const AboutModal = ({ children }: AboutModalProps) => {
                       <Thead>
                         <Tr>
                           <Th fontSize="medium" color="white">
-                            Local System
+                            {t('common.localSystem')}
                           </Th>
                         </Tr>
                       </Thead>
@@ -100,29 +100,30 @@ const AboutModal = ({ children }: AboutModalProps) => {
                       minH="24px"
                       userSelect="none"
                     />
-                    <InvText>v{appVersion?.version}</InvText>
+                    <InvText>
+                      {t('common.v')}
+                      {appVersion?.version}
+                    </InvText>
                     <Grid templateColumns="repeat(2, 1fr)" gap="3">
                       <GridItem>
                         <Link fontSize="sm" href={githubLink} isExternal>
-                          Github
+                          {t('common.githubLabel')}
                           <ExternalLinkIcon mx="2px" />
                         </Link>
                       </GridItem>
                       <GridItem>
                         <Link fontSize="sm" href={discordLink} isExternal>
-                          Discord
+                          {t('common.discordLabel')}
                           <ExternalLinkIcon mx="2px" />
                         </Link>
                       </GridItem>
                     </Grid>
                     <InvHeading fontSize="large">
-                      Own Your Creative Power
+                      {t('common.aboutHeading')}
                     </InvHeading>
-                    <InvText fontSize="sm">
-                      Using Invoke for work? Check out:
-                    </InvText>
+                    <InvText fontSize="sm">{t('common.aboutDesc')}</InvText>
                     <Link href={websiteLink} fontSize="sm">
-                      www.invoke.com
+                      {t('common.websiteLink')}
                     </Link>
                   </Flex>
                 </GridItem>

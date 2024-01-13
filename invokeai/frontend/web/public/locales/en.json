@@ -76,6 +76,8 @@
         }
     },
     "common": {
+        "aboutDesc": "Using Invoke for work? Check out:",
+        "aboutHeading": "Own Your Creative Power",
         "accept": "Accept",
         "advanced": "Advanced",
         "advancedOptions": "Advanced Options",
@@ -138,6 +140,7 @@
         "load": "Load",
         "loading": "Loading",
         "loadingInvokeAI": "Loading Invoke AI",
+        "localSystem": "Local System",
         "learnMore": "Learn More",
         "modelManager": "Model Manager",
         "nodeEditor": "Node Editor",
@@ -201,7 +204,9 @@
         "prevPage": "Previous Page",
         "nextPage": "Next Page",
         "unknownError": "Unknown Error",
-        "unsaved": "Unsaved"
+        "unsaved": "Unsaved",
+        "v": "v",
+        "websiteLink": "www.invoke.com"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
