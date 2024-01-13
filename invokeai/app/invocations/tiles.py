@@ -8,13 +8,12 @@ from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
     Classification,
-    InvocationContext,
+    WithMetadata,
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import Input, InputField, OutputField, WithMetadata
-from invokeai.app.invocations.primitives import ImageField, ImageOutput
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.invocations.fields import ImageField, Input, InputField, OutputField
+from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.backend.tiles.tiles import (
     calc_tiles_even_split,
     calc_tiles_min_overlap,
@@ -58,7 +57,7 @@ class CalculateImageTilesInvocation(BaseInvocation):
         description="The target overlap, in pixels, between adjacent tiles. Adjacent tiles will overlap by at least this amount",
     )
 
-    def invoke(self, context: InvocationContext) -> CalculateImageTilesOutput:
+    def invoke(self, context) -> CalculateImageTilesOutput:
         tiles = calc_tiles_with_overlap(
             image_height=self.image_height,
             image_width=self.image_width,
@@ -101,7 +100,7 @@ class CalculateImageTilesEvenSplitInvocation(BaseInvocation):
         description="The overlap, in pixels, between adjacent tiles.",
     )
 
-    def invoke(self, context: InvocationContext) -> CalculateImageTilesOutput:
+    def invoke(self, context) -> CalculateImageTilesOutput:
         tiles = calc_tiles_even_split(
             image_height=self.image_height,
             image_width=self.image_width,
@@ -131,7 +130,7 @@ class CalculateImageTilesMinimumOverlapInvocation(BaseInvocation):
     tile_height: int = InputField(ge=1, default=576, description="The tile height, in pixels.")
     min_overlap: int = InputField(default=128, ge=0, description="Minimum overlap between adjacent tiles, in pixels.")
 
-    def invoke(self, context: InvocationContext) -> CalculateImageTilesOutput:
+    def invoke(self, context) -> CalculateImageTilesOutput:
         tiles = calc_tiles_min_overlap(
             image_height=self.image_height,
             image_width=self.image_width,
@@ -176,7 +175,7 @@ class TileToPropertiesInvocation(BaseInvocation):
 
     tile: Tile = InputField(description="The tile to split into properties.")
 
-    def invoke(self, context: InvocationContext) -> TileToPropertiesOutput:
+    def invoke(self, context) -> TileToPropertiesOutput:
         return TileToPropertiesOutput(
             coords_left=self.tile.coords.left,
             coords_right=self.tile.coords.right,
@@ -213,7 +212,7 @@ class PairTileImageInvocation(BaseInvocation):
     image: ImageField = InputField(description="The tile image.")
     tile: Tile = InputField(description="The tile properties.")
 
-    def invoke(self, context: InvocationContext) -> PairTileImageOutput:
+    def invoke(self, context) -> PairTileImageOutput:
         return PairTileImageOutput(
             tile_with_image=TileWithImage(
                 tile=self.tile,
@@ -249,7 +248,7 @@ class MergeTilesToImageInvocation(BaseInvocation, WithMetadata):
         description="The amount to blend adjacent tiles in pixels. Must be <= the amount of overlap between adjacent tiles.",
     )
 
-    def invoke(self, context: InvocationContext) -> ImageOutput:
+    def invoke(self, context) -> ImageOutput:
         images = [twi.image for twi in self.tiles_with_images]
         tiles = [twi.tile for twi in self.tiles_with_images]
 
@@ -265,7 +264,7 @@ class MergeTilesToImageInvocation(BaseInvocation, WithMetadata):
         # existed in memory at an earlier point in the graph.
         tile_np_images: list[np.ndarray] = []
         for image in images:
-            pil_image = context.services.images.get_pil_image(image.image_name)
+            pil_image = context.images.get_pil(image.image_name)
             pil_image = pil_image.convert("RGB")
             tile_np_images.append(np.array(pil_image))
 
@@ -288,18 +287,5 @@ class MergeTilesToImageInvocation(BaseInvocation, WithMetadata):
         # Convert into a PIL image and save
         pil_image = Image.fromarray(np_image)
 
-        image_dto = context.services.images.create(
-            image=pil_image,
-            image_origin=ResourceOrigin.INTERNAL,
-            image_category=ImageCategory.GENERAL,
-            node_id=self.id,
-            session_id=context.graph_execution_state_id,
-            is_intermediate=self.is_intermediate,
-            metadata=self.metadata,
-            workflow=context.workflow,
-        )
-        return ImageOutput(
-            image=ImageField(image_name=image_dto.image_name),
-            width=image_dto.width,
-            height=image_dto.height,
-        )
+        image_dto = context.images.save(image=pil_image)
+        return ImageOutput.build(image_dto)

@@ -7,7 +7,7 @@ from pydantic import field_validator
 
 from invokeai.app.invocations.primitives import StringCollectionOutput
 
-from .baseinvocation import BaseInvocation, InvocationContext, invocation
+from .baseinvocation import BaseInvocation, invocation
 from .fields import InputField, UIComponent
 
 
@@ -29,7 +29,7 @@ class DynamicPromptInvocation(BaseInvocation):
     max_prompts: int = InputField(default=1, description="The number of prompts to generate")
     combinatorial: bool = InputField(default=False, description="Whether to use the combinatorial generator")
 
-    def invoke(self, context: InvocationContext) -> StringCollectionOutput:
+    def invoke(self, context) -> StringCollectionOutput:
         if self.combinatorial:
             generator = CombinatorialPromptGenerator()
             prompts = generator.generate(self.prompt, max_prompts=self.max_prompts)
@@ -91,7 +91,7 @@ class PromptsFromFileInvocation(BaseInvocation):
                     break
         return prompts
 
-    def invoke(self, context: InvocationContext) -> StringCollectionOutput:
+    def invoke(self, context) -> StringCollectionOutput:
         prompts = self.promptsFromFile(
             self.file_path,
             self.pre_prompt,

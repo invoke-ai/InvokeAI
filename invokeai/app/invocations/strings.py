@@ -5,7 +5,6 @@ import re
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    InvocationContext,
     invocation,
     invocation_output,
 )
@@ -33,7 +32,7 @@ class StringSplitNegInvocation(BaseInvocation):
 
     string: str = InputField(default="", description="String to split", ui_component=UIComponent.Textarea)
 
-    def invoke(self, context: InvocationContext) -> StringPosNegOutput:
+    def invoke(self, context) -> StringPosNegOutput:
         p_string = ""
         n_string = ""
         brackets_depth = 0
@@ -77,7 +76,7 @@ class StringSplitInvocation(BaseInvocation):
         default="", description="Delimiter to spilt with. blank will split on the first whitespace"
     )
 
-    def invoke(self, context: InvocationContext) -> String2Output:
+    def invoke(self, context) -> String2Output:
         result = self.string.split(self.delimiter, 1)
         if len(result) == 2:
             part1, part2 = result
@@ -95,7 +94,7 @@ class StringJoinInvocation(BaseInvocation):
     string_left: str = InputField(default="", description="String Left", ui_component=UIComponent.Textarea)
     string_right: str = InputField(default="", description="String Right", ui_component=UIComponent.Textarea)
 
-    def invoke(self, context: InvocationContext) -> StringOutput:
+    def invoke(self, context) -> StringOutput:
         return StringOutput(value=((self.string_left or "") + (self.string_right or "")))
 
 
@@ -107,7 +106,7 @@ class StringJoinThreeInvocation(BaseInvocation):
     string_middle: str = InputField(default="", description="String Middle", ui_component=UIComponent.Textarea)
     string_right: str = InputField(default="", description="String Right", ui_component=UIComponent.Textarea)
 
-    def invoke(self, context: InvocationContext) -> StringOutput:
+    def invoke(self, context) -> StringOutput:
         return StringOutput(value=((self.string_left or "") + (self.string_middle or "") + (self.string_right or "")))
 
 
@@ -126,7 +125,7 @@ class StringReplaceInvocation(BaseInvocation):
         default=False, description="Use search string as a regex expression (non regex is case insensitive)"
     )
 
-    def invoke(self, context: InvocationContext) -> StringOutput:
+    def invoke(self, context) -> StringOutput:
         pattern = self.search_string or ""
         new_string = self.string or ""
         if len(pattern) > 0:

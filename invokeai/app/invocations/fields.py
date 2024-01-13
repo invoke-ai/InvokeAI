@@ -1,11 +1,13 @@
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any, Callable, List, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel, TypeAdapter
 from pydantic.fields import _Unset
 from pydantic_core import PydanticUndefined
 
 from invokeai.app.util.metaenum import MetaEnum
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import BasicConditioningInfo
 from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger()
@@ -255,6 +257,10 @@ class InputFieldJSONSchemaExtra(BaseModel):
 
 
 class WithMetadata(BaseModel):
+    """
+    Inherit from this class if your node needs a metadata input field.
+    """
+
     metadata: Optional[MetadataField] = Field(
         default=None,
         description=FieldDescriptions.metadata,
@@ -498,4 +504,53 @@ def OutputField(
             field_kind=FieldKind.Output,
         ).model_dump(exclude_none=True),
     )
+
+
+class ImageField(BaseModel):
+    """An image primitive field"""
+
+    image_name: str = Field(description="The name of the image")
+
+
+class BoardField(BaseModel):
+    """A board primitive field"""
+
+    board_id: str = Field(description="The id of the board")
+
+
+class DenoiseMaskField(BaseModel):
+    """An inpaint mask field"""
+
+    mask_name: str = Field(description="The name of the mask image")
+    masked_latents_name: Optional[str] = Field(default=None, description="The name of the masked image latents")
+
+
+class LatentsField(BaseModel):
+    """A latents tensor primitive field"""
+
+    latents_name: str = Field(description="The name of the latents")
+    seed: Optional[int] = Field(default=None, description="Seed used to generate this latents")
+
+
+class ColorField(BaseModel):
+    """A color primitive field"""
+
+    r: int = Field(ge=0, le=255, description="The red component")
+    g: int = Field(ge=0, le=255, description="The green component")
+    b: int = Field(ge=0, le=255, description="The blue component")
+    a: int = Field(ge=0, le=255, description="The alpha component")
+
+    def tuple(self) -> Tuple[int, int, int, int]:
+        return (self.r, self.g, self.b, self.a)
+
+
+@dataclass
+class ConditioningFieldData:
+    conditionings: List[BasicConditioningInfo]
+
+
+class ConditioningField(BaseModel):
+    """A conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
     # endregion

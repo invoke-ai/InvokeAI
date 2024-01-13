@@ -7,7 +7,7 @@ from pydantic import ValidationInfo, field_validator
 from invokeai.app.invocations.primitives import IntegerCollectionOutput
 from invokeai.app.util.misc import SEED_MAX
 
-from .baseinvocation import BaseInvocation, InvocationContext, invocation
+from .baseinvocation import BaseInvocation, invocation
 from .fields import InputField
 
 
@@ -27,7 +27,7 @@ class RangeInvocation(BaseInvocation):
             raise ValueError("stop must be greater than start")
         return v
 
-    def invoke(self, context: InvocationContext) -> IntegerCollectionOutput:
+    def invoke(self, context) -> IntegerCollectionOutput:
         return IntegerCollectionOutput(collection=list(range(self.start, self.stop, self.step)))
 
 
@@ -45,7 +45,7 @@ class RangeOfSizeInvocation(BaseInvocation):
     size: int = InputField(default=1, gt=0, description="The number of values")
     step: int = InputField(default=1, description="The step of the range")
 
-    def invoke(self, context: InvocationContext) -> IntegerCollectionOutput:
+    def invoke(self, context) -> IntegerCollectionOutput:
         return IntegerCollectionOutput(
             collection=list(range(self.start, self.start + (self.step * self.size), self.step))
         )
@@ -72,6 +72,6 @@ class RandomRangeInvocation(BaseInvocation):
         description="The seed for the RNG (omit for random)",
     )
 
-    def invoke(self, context: InvocationContext) -> IntegerCollectionOutput:
+    def invoke(self, context) -> IntegerCollectionOutput:
         rng = np.random.default_rng(self.seed)
         return IntegerCollectionOutput(collection=list(rng.integers(low=self.low, high=self.high, size=self.size)))
