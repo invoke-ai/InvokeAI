@@ -7,7 +7,8 @@ from pydantic import field_validator
 
 from invokeai.app.invocations.primitives import StringCollectionOutput
 
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, UIComponent, invocation
+from .baseinvocation import BaseInvocation, InvocationContext, invocation
+from .fields import InputField, UIComponent
 
 
 @invocation(

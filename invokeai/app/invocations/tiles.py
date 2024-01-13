@@ -8,14 +8,11 @@ from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
     Classification,
-    Input,
-    InputField,
     InvocationContext,
-    OutputField,
-    WithMetadata,
     invocation,
     invocation_output,
 )
+from invokeai.app.invocations.fields import Input, InputField, OutputField, WithMetadata
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.backend.tiles.tiles import (

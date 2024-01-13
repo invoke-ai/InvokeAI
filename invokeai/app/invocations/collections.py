@@ -7,7 +7,8 @@ from pydantic import ValidationInfo, field_validator
 from invokeai.app.invocations.primitives import IntegerCollectionOutput
 from invokeai.app.util.misc import SEED_MAX
 
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, invocation
+from .baseinvocation import BaseInvocation, InvocationContext, invocation
+from .fields import InputField
 
 
 @invocation(

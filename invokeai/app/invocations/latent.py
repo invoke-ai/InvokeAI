@@ -23,6 +23,7 @@ from diffusers.schedulers import SchedulerMixin as Scheduler
 from pydantic import field_validator
 from torchvision.transforms.functional import resize as tv_resize
 
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType, WithMetadata
 from invokeai.app.invocations.ip_adapter import IPAdapterField
 from invokeai.app.invocations.primitives import (
     DenoiseMaskField,
@@ -35,7 +36,6 @@ from invokeai.app.invocations.primitives import (
 )
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
@@ -59,12 +59,7 @@ from ...backend.util.devices import choose_precision, choose_torch_device
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    Input,
-    InputField,
     InvocationContext,
-    OutputField,
-    UIType,
-    WithMetadata,
     invocation,
     invocation_output,
 )

@@ -3,7 +3,7 @@ import threading
 from datetime import datetime
 from typing import Optional, Union, cast
 
-from invokeai.app.invocations.baseinvocation import MetadataField, MetadataFieldValidator
+from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 

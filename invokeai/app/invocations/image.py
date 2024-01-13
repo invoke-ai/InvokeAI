@@ -7,19 +7,16 @@ import cv2
 import numpy
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, WithMetadata
 from invokeai.app.invocations.primitives import BoardField, ColorField, ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordChanges, ResourceOrigin
-from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
 
 from .baseinvocation import (
     BaseInvocation,
     Classification,
-    Input,
-    InputField,
     InvocationContext,
-    WithMetadata,
     invocation,
 )
 

@@ -5,8 +5,8 @@ import torch
 from compel import Compel, ReturnedEmbeddingsType
 from compel.prompt_parser import Blend, Conjunction, CrossAttentionControlSubstitute, FlattenedPrompt, Fragment
 
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIComponent
 from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput
-from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     ExtraConditioningInfo,
@@ -20,11 +20,7 @@ from ..util.ti_utils import extract_ti_triggers_from_prompt
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    Input,
-    InputField,
     InvocationContext,
-    OutputField,
-    UIComponent,
     invocation,
     invocation_output,
 )
