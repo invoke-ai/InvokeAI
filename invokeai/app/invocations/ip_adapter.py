@@ -7,7 +7,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    InvocationContext,
     invocation,
     invocation_output,
 )
@@ -62,7 +61,7 @@ class IPAdapterOutput(BaseInvocationOutput):
     ip_adapter: IPAdapterField = OutputField(description=FieldDescriptions.ip_adapter, title="IP-Adapter")
 
 
-@invocation("ip_adapter", title="IP-Adapter", tags=["ip_adapter", "control"], category="ip_adapter", version="1.1.1")
+@invocation("ip_adapter", title="IP-Adapter", tags=["ip_adapter", "control"], category="ip_adapter", version="1.1.2")
 class IPAdapterInvocation(BaseInvocation):
     """Collects IP-Adapter info to pass to other nodes."""
 
@@ -93,9 +92,9 @@ class IPAdapterInvocation(BaseInvocation):
         validate_begin_end_step(self.begin_step_percent, self.end_step_percent)
         return self
 
-    def invoke(self, context: InvocationContext) -> IPAdapterOutput:
+    def invoke(self, context) -> IPAdapterOutput:
         # Lookup the CLIP Vision encoder that is intended to be used with the IP-Adapter model.
-        ip_adapter_info = context.services.model_manager.model_info(
+        ip_adapter_info = context.models.get_info(
             self.ip_adapter_model.model_name, self.ip_adapter_model.base_model, ModelType.IPAdapter
         )
         # HACK(ryand): This is bad for a couple of reasons: 1) we are bypassing the model manager to read the model
@@ -104,7 +103,7 @@ class IPAdapterInvocation(BaseInvocation):
         # is currently messy due to differences between how the model info is generated when installing a model from
         # disk vs. downloading the model.
         image_encoder_model_id = get_ip_adapter_image_encoder_model_id(
-            os.path.join(context.services.configuration.get_config().models_path, ip_adapter_info["path"])
+            os.path.join(context.config.get().models_path, ip_adapter_info["path"])
         )
         image_encoder_model_name = image_encoder_model_id.split("/")[-1].strip()
         image_encoder_model = CLIPVisionModelField(

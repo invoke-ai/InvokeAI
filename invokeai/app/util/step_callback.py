@@ -1,25 +1,18 @@
-from typing import Protocol
+from typing import TYPE_CHECKING
 
 import torch
 from PIL import Image
 
-from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invocation_processor.invocation_processor_common import CanceledException, ProgressImage
-from invokeai.app.services.invocation_queue.invocation_queue_base import InvocationQueueABC
-from invokeai.app.services.shared.invocation_context import InvocationContextData
 
 from ...backend.model_management.models import BaseModelType
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.util.util import image_to_dataURL
 
-
-class StepCallback(Protocol):
-    def __call__(
-        self,
-        intermediate_state: PipelineIntermediateState,
-        base_model: BaseModelType,
-    ) -> None:
-        ...
+if TYPE_CHECKING:
+    from invokeai.app.services.events.events_base import EventServiceBase
+    from invokeai.app.services.invocation_queue.invocation_queue_base import InvocationQueueABC
+    from invokeai.app.services.shared.invocation_context import InvocationContextData
 
 
 def sample_to_lowres_estimated_image(samples, latent_rgb_factors, smooth_matrix=None):
@@ -38,11 +31,11 @@ def sample_to_lowres_estimated_image(samples, latent_rgb_factors, smooth_matrix=
 
 
 def stable_diffusion_step_callback(
-    context_data: InvocationContextData,
+    context_data: "InvocationContextData",
     intermediate_state: PipelineIntermediateState,
     base_model: BaseModelType,
-    invocation_queue: InvocationQueueABC,
-    events: EventServiceBase,
+    invocation_queue: "InvocationQueueABC",
+    events: "EventServiceBase",
 ) -> None:
     if invocation_queue.is_canceled(context_data.session_id):
         raise CanceledException

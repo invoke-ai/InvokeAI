@@ -8,7 +8,7 @@ from pydantic import ValidationInfo, field_validator
 from invokeai.app.invocations.fields import FieldDescriptions, InputField
 from invokeai.app.invocations.primitives import FloatOutput, IntegerOutput
 
-from .baseinvocation import BaseInvocation, InvocationContext, invocation
+from .baseinvocation import BaseInvocation, invocation
 
 
 @invocation("add", title="Add Integers", tags=["math", "add"], category="math", version="1.0.0")
@@ -18,7 +18,7 @@ class AddInvocation(BaseInvocation):
     a: int = InputField(default=0, description=FieldDescriptions.num_1)
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
-    def invoke(self, context: InvocationContext) -> IntegerOutput:
+    def invoke(self, context) -> IntegerOutput:
         return IntegerOutput(value=self.a + self.b)
 
 
@@ -29,7 +29,7 @@ class SubtractInvocation(BaseInvocation):
     a: int = InputField(default=0, description=FieldDescriptions.num_1)
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
-    def invoke(self, context: InvocationContext) -> IntegerOutput:
+    def invoke(self, context) -> IntegerOutput:
         return IntegerOutput(value=self.a - self.b)
 
 
@@ -40,7 +40,7 @@ class MultiplyInvocation(BaseInvocation):
     a: int = InputField(default=0, description=FieldDescriptions.num_1)
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
-    def invoke(self, context: InvocationContext) -> IntegerOutput:
+    def invoke(self, context) -> IntegerOutput:
         return IntegerOutput(value=self.a * self.b)
 
 
@@ -51,7 +51,7 @@ class DivideInvocation(BaseInvocation):
     a: int = InputField(default=0, description=FieldDescriptions.num_1)
     b: int = InputField(default=0, description=FieldDescriptions.num_2)
 
-    def invoke(self, context: InvocationContext) -> IntegerOutput:
+    def invoke(self, context) -> IntegerOutput:
         return IntegerOutput(value=int(self.a / self.b))
 
 
@@ -69,7 +69,7 @@ class RandomIntInvocation(BaseInvocation):
     low: int = InputField(default=0, description=FieldDescriptions.inclusive_low)
     high: int = InputField(default=np.iinfo(np.int32).max, description=FieldDescriptions.exclusive_high)
 
-    def invoke(self, context: InvocationContext) -> IntegerOutput:
+    def invoke(self, context) -> IntegerOutput:
         return IntegerOutput(value=np.random.randint(self.low, self.high))
 
 
@@ -88,7 +88,7 @@ class RandomFloatInvocation(BaseInvocation):
     high: float = InputField(default=1.0, description=FieldDescriptions.exclusive_high)
     decimals: int = InputField(default=2, description=FieldDescriptions.decimal_places)
 
-    def invoke(self, context: InvocationContext) -> FloatOutput:
+    def invoke(self, context) -> FloatOutput:
         random_float = np.random.uniform(self.low, self.high)
         rounded_float = round(random_float, self.decimals)
         return FloatOutput(value=rounded_float)
@@ -110,7 +110,7 @@ class FloatToIntegerInvocation(BaseInvocation):
         default="Nearest", description="The method to use for rounding"
     )
 
-    def invoke(self, context: InvocationContext) -> IntegerOutput:
+    def invoke(self, context) -> IntegerOutput:
         if self.method == "Nearest":
             return IntegerOutput(value=round(self.value / self.multiple) * self.multiple)
         elif self.method == "Floor":
@@ -128,7 +128,7 @@ class RoundInvocation(BaseInvocation):
     value: float = InputField(default=0, description="The float value")
     decimals: int = InputField(default=0, description="The number of decimal places")
 
-    def invoke(self, context: InvocationContext) -> FloatOutput:
+    def invoke(self, context) -> FloatOutput:
         return FloatOutput(value=round(self.value, self.decimals))
 
 
@@ -196,7 +196,7 @@ class IntegerMathInvocation(BaseInvocation):
             raise ValueError("Result of exponentiation is not an integer")
         return v
 
-    def invoke(self, context: InvocationContext) -> IntegerOutput:
+    def invoke(self, context) -> IntegerOutput:
         # Python doesn't support switch statements until 3.10, but InvokeAI supports back to 3.9
         if self.operation == "ADD":
             return IntegerOutput(value=self.a + self.b)
@@ -270,7 +270,7 @@ class FloatMathInvocation(BaseInvocation):
             raise ValueError("Root operation resulted in a complex number")
         return v
 
-    def invoke(self, context: InvocationContext) -> FloatOutput:
+    def invoke(self, context) -> FloatOutput:
         # Python doesn't support switch statements until 3.10, but InvokeAI supports back to 3.9
         if self.operation == "ADD":
             return FloatOutput(value=self.a + self.b)
