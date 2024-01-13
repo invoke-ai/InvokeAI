@@ -13,7 +13,6 @@ from invokeai.app.invocations import *  # noqa: F401 F403
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    InvocationContext,
     invocation,
     invocation_output,
 )
@@ -202,7 +201,7 @@ class GraphInvocation(BaseInvocation):
     # TODO: figure out how to create a default here
     graph: "Graph" = InputField(description="The graph to run", default=None)
 
-    def invoke(self, context: InvocationContext) -> GraphInvocationOutput:
+    def invoke(self, context) -> GraphInvocationOutput:
         """Invoke with provided services and return outputs."""
         return GraphInvocationOutput()
 
@@ -228,7 +227,7 @@ class IterateInvocation(BaseInvocation):
     )
     index: int = InputField(description="The index, will be provided on executed iterators", default=0, ui_hidden=True)
 
-    def invoke(self, context: InvocationContext) -> IterateInvocationOutput:
+    def invoke(self, context) -> IterateInvocationOutput:
         """Produces the outputs as values"""
         return IterateInvocationOutput(item=self.collection[self.index], index=self.index, total=len(self.collection))
 
@@ -255,7 +254,7 @@ class CollectInvocation(BaseInvocation):
         description="The collection, will be provided on execution", default=[], ui_hidden=True
     )
 
-    def invoke(self, context: InvocationContext) -> CollectInvocationOutput:
+    def invoke(self, context) -> CollectInvocationOutput:
         """Invoke with provided services and return outputs."""
         return CollectInvocationOutput(collection=copy.copy(self.collection))
 

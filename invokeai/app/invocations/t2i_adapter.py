@@ -5,13 +5,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    InvocationContext,
     invocation,
     invocation_output,
 )
 from invokeai.app.invocations.controlnet_image_processors import CONTROLNET_RESIZE_VALUES
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField
-from invokeai.app.invocations.primitives import ImageField
+from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, OutputField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.backend.model_management.models.base import BaseModelType
 
@@ -91,7 +89,7 @@ class T2IAdapterInvocation(BaseInvocation):
         validate_begin_end_step(self.begin_step_percent, self.end_step_percent)
         return self
 
-    def invoke(self, context: InvocationContext) -> T2IAdapterOutput:
+    def invoke(self, context) -> T2IAdapterOutput:
         return T2IAdapterOutput(
             t2i_adapter=T2IAdapterField(
                 image=self.image,

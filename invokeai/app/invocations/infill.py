@@ -6,15 +6,15 @@ from typing import Literal, Optional, get_args
 import numpy as np
 from PIL import Image, ImageOps
 
-from invokeai.app.invocations.primitives import ColorField, ImageField, ImageOutput
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.invocations.fields import ColorField, ImageField
+from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.util.misc import SEED_MAX
 from invokeai.backend.image_util.cv2_inpaint import cv2_inpaint
 from invokeai.backend.image_util.lama import LaMA
 from invokeai.backend.image_util.patchmatch import PatchMatch
 
-from .baseinvocation import BaseInvocation, InvocationContext, invocation
-from .fields import InputField, WithMetadata
+from .baseinvocation import BaseInvocation, WithMetadata, invocation
+from .fields import InputField
 from .image import PIL_RESAMPLING_MAP, PIL_RESAMPLING_MODES
 
 
@@ -119,7 +119,7 @@ def tile_fill_missing(im: Image.Image, tile_size: int = 16, seed: Optional[int] 
     return si
 
 
-@invocation("infill_rgba", title="Solid Color Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.0")
+@invocation("infill_rgba", title="Solid Color Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.1")
 class InfillColorInvocation(BaseInvocation, WithMetadata):
     """Infills transparent areas of an image with a solid color"""
 
@@ -129,33 +129,20 @@ class InfillColorInvocation(BaseInvocation, WithMetadata):
         description="The color to use to infill",
     )
 
-    def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(self.image.image_name)
+    def invoke(self, context) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name)
 
         solid_bg = Image.new("RGBA", image.size, self.color.tuple())
         infilled = Image.alpha_composite(solid_bg, image.convert("RGBA"))
 
         infilled.paste(image, (0, 0), image.split()[-1])
 
-        image_dto = context.services.images.create(
-            image=infilled,
-            image_origin=ResourceOrigin.INTERNAL,
-            image_category=ImageCategory.GENERAL,
-            node_id=self.id,
-            session_id=context.graph_execution_state_id,
-            is_intermediate=self.is_intermediate,
-            metadata=self.metadata,
-            workflow=context.workflow,
-        )
+        image_dto = context.images.save(image=infilled)
 
-        return ImageOutput(
-            image=ImageField(image_name=image_dto.image_name),
-            width=image_dto.width,
-            height=image_dto.height,
-        )
+        return ImageOutput.build(image_dto)
 
 
-@invocation("infill_tile", title="Tile Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.1")
+@invocation("infill_tile", title="Tile Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.2")
 class InfillTileInvocation(BaseInvocation, WithMetadata):
     """Infills transparent areas of an image with tiles of the image"""
 
@@ -168,32 +155,19 @@ class InfillTileInvocation(BaseInvocation, WithMetadata):
         description="The seed to use for tile generation (omit for random)",
     )
 
-    def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(self.image.image_name)
+    def invoke(self, context) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name)
 
         infilled = tile_fill_missing(image.copy(), seed=self.seed, tile_size=self.tile_size)
         infilled.paste(image, (0, 0), image.split()[-1])
 
-        image_dto = context.services.images.create(
-            image=infilled,
-            image_origin=ResourceOrigin.INTERNAL,
-            image_category=ImageCategory.GENERAL,
-            node_id=self.id,
-            session_id=context.graph_execution_state_id,
-            is_intermediate=self.is_intermediate,
-            metadata=self.metadata,
-            workflow=context.workflow,
-        )
+        image_dto = context.images.save(image=infilled)
 
-        return ImageOutput(
-            image=ImageField(image_name=image_dto.image_name),
-            width=image_dto.width,
-            height=image_dto.height,
-        )
+        return ImageOutput.build(image_dto)
 
 
 @invocation(
-    "infill_patchmatch", title="PatchMatch Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.0"
+    "infill_patchmatch", title="PatchMatch Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.1"
 )
 class InfillPatchMatchInvocation(BaseInvocation, WithMetadata):
     """Infills transparent areas of an image using the PatchMatch algorithm"""
@@ -202,8 +176,8 @@ class InfillPatchMatchInvocation(BaseInvocation, WithMetadata):
     downscale: float = InputField(default=2.0, gt=0, description="Run patchmatch on downscaled image to speedup infill")
     resample_mode: PIL_RESAMPLING_MODES = InputField(default="bicubic", description="The resampling mode")
 
-    def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(self.image.image_name).convert("RGBA")
+    def invoke(self, context) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name).convert("RGBA")
 
         resample_mode = PIL_RESAMPLING_MAP[self.resample_mode]
 
@@ -228,77 +202,38 @@ class InfillPatchMatchInvocation(BaseInvocation, WithMetadata):
         infilled.paste(image, (0, 0), mask=image.split()[-1])
         # image.paste(infilled, (0, 0), mask=image.split()[-1])
 
-        image_dto = context.services.images.create(
-            image=infilled,
-            image_origin=ResourceOrigin.INTERNAL,
-            image_category=ImageCategory.GENERAL,
-            node_id=self.id,
-            session_id=context.graph_execution_state_id,
-            is_intermediate=self.is_intermediate,
-            metadata=self.metadata,
-            workflow=context.workflow,
-        )
+        image_dto = context.images.save(image=infilled)
 
-        return ImageOutput(
-            image=ImageField(image_name=image_dto.image_name),
-            width=image_dto.width,
-            height=image_dto.height,
-        )
+        return ImageOutput.build(image_dto)
 
 
-@invocation("infill_lama", title="LaMa Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.0")
+@invocation("infill_lama", title="LaMa Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.1")
 class LaMaInfillInvocation(BaseInvocation, WithMetadata):
     """Infills transparent areas of an image using the LaMa model"""
 
     image: ImageField = InputField(description="The image to infill")
 
-    def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(self.image.image_name)
+    def invoke(self, context) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name)
 
         infilled = infill_lama(image.copy())
 
-        image_dto = context.services.images.create(
-            image=infilled,
-            image_origin=ResourceOrigin.INTERNAL,
-            image_category=ImageCategory.GENERAL,
-            node_id=self.id,
-            session_id=context.graph_execution_state_id,
-            is_intermediate=self.is_intermediate,
-            metadata=self.metadata,
-            workflow=context.workflow,
-        )
+        image_dto = context.images.save(image=infilled)
 
-        return ImageOutput(
-            image=ImageField(image_name=image_dto.image_name),
-            width=image_dto.width,
-            height=image_dto.height,
-        )
+        return ImageOutput.build(image_dto)
 
 
-@invocation("infill_cv2", title="CV2 Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.0")
+@invocation("infill_cv2", title="CV2 Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.1")
 class CV2InfillInvocation(BaseInvocation, WithMetadata):
     """Infills transparent areas of an image using OpenCV Inpainting"""
 
     image: ImageField = InputField(description="The image to infill")
 
-    def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(self.image.image_name)
+    def invoke(self, context) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name)
 
         infilled = infill_cv2(image.copy())
 
-        image_dto = context.services.images.create(
-            image=infilled,
-            image_origin=ResourceOrigin.INTERNAL,
-            image_category=ImageCategory.GENERAL,
-            node_id=self.id,
-            session_id=context.graph_execution_state_id,
-            is_intermediate=self.is_intermediate,
-            metadata=self.metadata,
-            workflow=context.workflow,
-        )
+        image_dto = context.images.save(image=infilled)
 
-        return ImageOutput(
-            image=ImageField(image_name=image_dto.image_name),
-            width=image_dto.width,
-            height=image_dto.height,
-        )
+        return ImageOutput.build(image_dto)

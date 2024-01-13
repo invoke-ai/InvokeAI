@@ -5,11 +5,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from logging import Logger
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, List, Literal, Optional, Tuple, Union
+from typing import Callable, List, Literal, Optional, Tuple, Union
 
 from pydantic import Field
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.shared.invocation_context import InvocationContextData
 from invokeai.backend.model_management import (
     AddModelResult,
     BaseModelType,
@@ -20,9 +21,6 @@ from invokeai.backend.model_management import (
     SubModelType,
 )
 from invokeai.backend.model_management.model_cache import CacheStats
-
-if TYPE_CHECKING:
-    from invokeai.app.invocations.baseinvocation import BaseInvocation, InvocationContext
 
 
 class ModelManagerServiceBase(ABC):
@@ -49,8 +47,7 @@ class ModelManagerServiceBase(ABC):
         base_model: BaseModelType,
         model_type: ModelType,
         submodel: Optional[SubModelType] = None,
-        node: Optional[BaseInvocation] = None,
-        context: Optional[InvocationContext] = None,
+        context_data: Optional[InvocationContextData] = None,
     ) -> ModelInfo:
         """Retrieve the indicated model with name and type.
         submodel can be used to get a part (such as the vae)

@@ -4,15 +4,13 @@
 import torch
 from pydantic import field_validator
 
-from invokeai.app.invocations.fields import FieldDescriptions, InputField, OutputField
-from invokeai.app.invocations.latent import LatentsField
+from invokeai.app.invocations.fields import FieldDescriptions, InputField, LatentsField, OutputField
 from invokeai.app.util.misc import SEED_MAX
 
 from ...backend.util.devices import choose_torch_device, torch_dtype
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    InvocationContext,
     invocation,
     invocation_output,
 )
@@ -67,13 +65,13 @@ class NoiseOutput(BaseInvocationOutput):
     width: int = OutputField(description=FieldDescriptions.width)
     height: int = OutputField(description=FieldDescriptions.height)
 
-
-def build_noise_output(latents_name: str, latents: torch.Tensor, seed: int):
-    return NoiseOutput(
-        noise=LatentsField(latents_name=latents_name, seed=seed),
-        width=latents.size()[3] * 8,
-        height=latents.size()[2] * 8,
-    )
+    @classmethod
+    def build(cls, latents_name: str, latents: torch.Tensor, seed: int) -> "NoiseOutput":
+        return cls(
+            noise=LatentsField(latents_name=latents_name, seed=seed),
+            width=latents.size()[3] * 8,
+            height=latents.size()[2] * 8,
+        )
 
 
 @invocation(
@@ -114,7 +112,7 @@ class NoiseInvocation(BaseInvocation):
         """Returns the seed modulo (SEED_MAX + 1) to ensure it is within the valid range."""
         return v % (SEED_MAX + 1)
 
-    def invoke(self, context: InvocationContext) -> NoiseOutput:
+    def invoke(self, context) -> NoiseOutput:
         noise = get_noise(
             width=self.width,
             height=self.height,
@@ -122,6 +120,5 @@ class NoiseInvocation(BaseInvocation):
             seed=self.seed,
             use_cpu=self.use_cpu,
         )
-        name = f"{context.graph_execution_state_id}__{self.id}"
-        context.services.latents.save(name, noise)
-        return build_noise_output(latents_name=name, latents=noise, seed=self.seed)
+        name = context.latents.save(tensor=noise)
+        return NoiseOutput.build(latents_name=name, latents=noise, seed=self.seed)
