@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
+from deprecated import deprecated
 from PIL.Image import Image
 from pydantic import ConfigDict
 from torch import Tensor
@@ -365,7 +366,7 @@ class UtilInterface:
             The step callback emits a progress event with the current step, the total number of
             steps, a preview image, and some other internal metadata.
 
-            This should be called after each step of the diffusion process.
+            This should be called after each denoising step.
 
             :param intermediate_state: The intermediate state of the diffusion pipeline.
             :param base_model: The base model for the current denoising step.
@@ -387,6 +388,30 @@ class UtilInterface:
         self.sd_step_callback = sd_step_callback
 
 
+deprecation_version = "3.7.0"
+removed_version = "3.8.0"
+
+
+def get_deprecation_reason(property_name: str, alternative: Optional[str] = None) -> str:
+    msg = f"{property_name} is deprecated as of v{deprecation_version}. It will be removed in v{removed_version}."
+    if alternative is not None:
+        msg += f" Use {alternative} instead."
+    msg += " See PLACEHOLDER_URL for details."
+    return msg
+
+
+# Deprecation docstrings template. I don't think we can implement these programmatically with
+# __doc__ because the IDE won't see them.
+
+"""
+**DEPRECATED as of v3.7.0**
+
+PROPERTY_NAME will be removed in v3.8.0. Use ALTERNATIVE instead. See PLACEHOLDER_URL for details.
+
+OG_DOCSTRING
+"""
+
+
 class InvocationContext:
     """
     The `InvocationContext` provides access to various services and data for the current invocation.
@@ -402,6 +427,7 @@ class InvocationContext:
         config: ConfigInterface,
         util: UtilInterface,
         data: InvocationContextData,
+        services: InvocationServices,
     ) -> None:
         self.images = images
         """Provides methods to save, get and update images and their metadata."""
@@ -419,6 +445,94 @@ class InvocationContext:
         """Provides utility methods."""
         self.data = data
         """Provides data about the current queue item and invocation."""
+        self.__services = services
+
+    @property
+    @deprecated(version=deprecation_version, reason=get_deprecation_reason("`context.services`"))
+    def services(self) -> InvocationServices:
+        """
+        **DEPRECATED as of v3.7.0**
+
+        `context.services` will be removed in v3.8.0. See PLACEHOLDER_URL for details.
+
+        The invocation services.
+        """
+        return self.__services
+
+    @property
+    @deprecated(
+        version=deprecation_version,
+        reason=get_deprecation_reason("`context.graph_execution_state_api`", "`context.data.session_id`"),
+    )
+    def graph_execution_state_id(self) -> str:
+        """
+        **DEPRECATED as of v3.7.0**
+
+        `context.graph_execution_state_api` will be removed in v3.8.0. Use `context.data.session_id` instead. See PLACEHOLDER_URL for details.
+
+        The ID of the session (aka graph execution state).
+        """
+        return self.data.session_id
+
+    @property
+    @deprecated(
+        version=deprecation_version,
+        reason=get_deprecation_reason("`context.queue_id`", "`context.data.queue_id`"),
+    )
+    def queue_id(self) -> str:
+        """
+        **DEPRECATED as of v3.7.0**
+
+        `context.queue_id` will be removed in v3.8.0. Use `context.data.queue_id` instead. See PLACEHOLDER_URL for details.
+
+        The ID of the queue.
+        """
+        return self.data.queue_id
+
+    @property
+    @deprecated(
+        version=deprecation_version,
+        reason=get_deprecation_reason("`context.queue_item_id`", "`context.data.queue_item_id`"),
+    )
+    def queue_item_id(self) -> int:
+        """
+        **DEPRECATED as of v3.7.0**
+
+        `context.queue_item_id` will be removed in v3.8.0. Use `context.data.queue_item_id` instead. See PLACEHOLDER_URL for details.
+
+        The ID of the queue item.
+        """
+        return self.data.queue_item_id
+
+    @property
+    @deprecated(
+        version=deprecation_version,
+        reason=get_deprecation_reason("`context.queue_batch_id`", "`context.data.batch_id`"),
+    )
+    def queue_batch_id(self) -> str:
+        """
+        **DEPRECATED as of v3.7.0**
+
+        `context.queue_batch_id` will be removed in v3.8.0. Use `context.data.batch_id` instead. See PLACEHOLDER_URL for details.
+
+        The ID of the batch.
+        """
+        return self.data.batch_id
+
+    @property
+    @deprecated(
+        version=deprecation_version,
+        reason=get_deprecation_reason("`context.workflow`", "`context.data.workflow`"),
+    )
+    def workflow(self) -> Optional[WorkflowWithoutID]:
+        """
+        **DEPRECATED as of v3.7.0**
+
+        `context.workflow` will be removed in v3.8.0. Use `context.data.workflow` instead. See PLACEHOLDER_URL for details.
+
+        The workflow associated with this queue item, if any.
+        """
+        return self.data.workflow
 
 
 def build_invocation_context(
@@ -449,6 +563,7 @@ def build_invocation_context(
         data=context_data,
         util=util,
         conditioning=conditioning,
+        services=services,
     )
 
     return ctx
