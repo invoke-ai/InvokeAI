@@ -70,14 +70,14 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
         indicated, the default model version is returned. Otherwise, the requested version
         is returned.
         """
-        if match := re.match(CIVITAI_VERSION_PAGE_RE, str(url)):
+        if match := re.match(CIVITAI_VERSION_PAGE_RE, str(url), re.IGNORECASE):
             model_id = match.group(1)
             version_id = match.group(2)
             return self.from_civitai_versionid(int(version_id), int(model_id))
-        elif match := re.match(CIVITAI_MODEL_PAGE_RE, str(url)):
+        elif match := re.match(CIVITAI_MODEL_PAGE_RE, str(url), re.IGNORECASE):
             model_id = match.group(1)
             return self.from_civitai_modelid(int(model_id))
-        elif match := re.match(CIVITAI_DOWNLOAD_RE, str(url)):
+        elif match := re.match(CIVITAI_DOWNLOAD_RE, str(url), re.IGNORECASE):
             version_id = match.group(1)
             return self.from_civitai_versionid(int(version_id))
         raise UnknownMetadataException("The url '{url}' does not match any known Civitai URL patterns")

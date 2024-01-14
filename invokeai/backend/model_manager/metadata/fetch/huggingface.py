@@ -73,7 +73,7 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
                     url=hf_hub_url(id, x.rfilename),
                     path=Path(name, x.rfilename),
                     size=x.size,
-                    sha256=x.lfs.get('sha256') if x.lfs else None,
+                    sha256=x.lfs.get("sha256") if x.lfs else None,
                 )
                 for x in model_info.siblings
             ],
@@ -85,7 +85,7 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
 
         In the case of an invalid or missing URL, raises a ModelNotFound exception.
         """
-        if match := re.match(HF_MODEL_RE, str(url)):
+        if match := re.match(HF_MODEL_RE, str(url), re.IGNORECASE):
             repo_id = match.group(1)
             return self.from_id(repo_id)
         else:

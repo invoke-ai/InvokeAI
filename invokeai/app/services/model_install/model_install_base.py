@@ -18,7 +18,7 @@ from invokeai.app.services.events import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import ModelRecordServiceBase
 from invokeai.backend.model_manager import AnyModelConfig, ModelRepoVariant
-from invokeai.backend.model_manager.metadata import ModelMetadataStore
+from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore
 
 
 class InstallStatus(str, Enum):
@@ -171,6 +171,9 @@ class ModelInstallJob(BaseModel):
         default=None, description="For a remote model, the number of bytes downloaded so far (may not be available)"
     )
     total_bytes: int = Field(default=0, description="Total size of the model to be installed")
+    source_metadata: Optional[AnyModelRepoMetadata] = Field(
+        default=None, description="Metadata provided by the model source"
+    )
     download_parts: Set[DownloadJob] = Field(
         default_factory=set, description="Download jobs contributing to this install"
     )
@@ -248,11 +251,11 @@ class ModelInstallServiceBase(ABC):
     # make the invoker optional here because we don't need it and it
     # makes the installer harder to use outside the web app
     @abstractmethod
-    def start(self, invoker: Optional[Invoker]=None) -> None:
+    def start(self, invoker: Optional[Invoker] = None) -> None:
         """Start the installer service."""
 
     @abstractmethod
-    def stop(self, invoker: Optional[Invoker]=None) -> None:
+    def stop(self, invoker: Optional[Invoker] = None) -> None:
         """Stop the model install service. After this the objection can be safely deleted."""
 
     @property

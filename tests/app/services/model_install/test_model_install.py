@@ -77,7 +77,7 @@ def test_install(
     "fixture_name,size,destination",
     [
         ("embedding_file", 15440, "sd-1/embedding/test_embedding.safetensors"),
-        ("diffusers_dir", 7942, "sdxl/main/test-diffusers-main"),
+        ("diffusers_dir", 7907, "sdxl/main/test-diffusers-main"),
     ],
 )
 def test_background_install(
@@ -104,8 +104,9 @@ def test_background_install(
     assert len(jobs) > 0
     my_job = [x for x in jobs if x.source == source]
     assert len(my_job) == 1
-    assert my_job[0].status == InstallStatus.COMPLETED
-    assert my_job[0].total_bytes == size
+    assert job == my_job[0]
+    assert job.status == InstallStatus.COMPLETED
+    assert job.total_bytes == size
 
     # test that the expected events were issued
     bus = mm2_installer.event_bus
@@ -114,6 +115,7 @@ def test_background_install(
 
     assert len(bus.events) == 2
     event_names = [x.event_name for x in bus.events]
+    print(event_names)
     assert "model_install_running" in event_names
     assert "model_install_completed" in event_names
     assert Path(bus.events[0].payload["source"]) == source
@@ -133,6 +135,29 @@ def test_background_install(
     # see if prune works properly
     mm2_installer.prune_jobs()
     assert not mm2_installer.get_job_by_source(source)
+
+
+def test_not_inplace_install(
+    mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    source = LocalModelSource(path=embedding_file, inplace=False)
+    job = mm2_installer.import_model(source)
+    mm2_installer.wait_for_installs()
+    assert job is not None
+    assert job.config_out is not None
+    assert Path(job.config_out.path) != embedding_file
+    assert Path(mm2_app_config.models_dir / job.config_out.path).exists()
+
+
+def test_inplace_install(
+    mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    source = LocalModelSource(path=embedding_file, inplace=True)
+    job = mm2_installer.import_model(source)
+    mm2_installer.wait_for_installs()
+    assert job is not None
+    assert job.config_out is not None
+    assert Path(job.config_out.path) == embedding_file
 
 
 def test_delete_install(

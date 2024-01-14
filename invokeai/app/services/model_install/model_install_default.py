@@ -19,8 +19,8 @@ from requests import Session
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase
 from invokeai.app.services.events.events_base import EventServiceBase
-from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase, ModelRecordServiceSQL
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase, ModelRecordServiceSQL
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
@@ -87,7 +87,6 @@ class ModelInstallService(ModelInstallServiceBase):
         self._stop_event = threading.Event()
         self._downloads_changed_event = threading.Event()
         self._download_queue = download_queue
-        self._metadata_cache: Dict[ModelSource, Optional[AnyModelRepoMetadata]] = {}
         self._download_cache: Dict[AnyHttpUrl, ModelInstallJob] = {}
         self._running = False
         self._session = session
@@ -115,7 +114,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
     # make the invoker optional here because we don't need it and it
     # makes the installer harder to use outside the web app
-    def start(self, invoker: Optional[Invoker]=None) -> None:
+    def start(self, invoker: Optional[Invoker] = None) -> None:
         """Start the installer thread."""
         with self._lock:
             if self._running:
@@ -124,7 +123,7 @@ class ModelInstallService(ModelInstallServiceBase):
             self._remove_dangling_install_dirs()
             self.sync_to_config()
 
-    def stop(self, invoker: Optional[Invoker]=None) -> None:
+    def stop(self, invoker: Optional[Invoker] = None) -> None:
         """Stop the installer thread; after this the object can be deleted and garbage collected."""
         with self._lock:
             if not self._running:
@@ -137,7 +136,6 @@ class ModelInstallService(ModelInstallServiceBase):
                 self._logger.warning("Waiting for active install job to complete")
             self.wait_for_installs()
             self._download_cache.clear()
-            self._metadata_cache.clear()
             self._running = False
 
     def register_path(
@@ -179,19 +177,18 @@ class ModelInstallService(ModelInstallServiceBase):
             info,
         )
 
-    def import_model(
-        self,
-        source: ModelSource,
-        config: Optional[Dict[str, Any]] = None,
-    ) -> ModelInstallJob:  # noqa D102
-        # Installing a local path
-        if isinstance(source, LocalModelSource) and Path(source.path).exists():  # a path that is already on disk
+    def import_model(self, source: ModelSource, config: Optional[Dict[str, Any]] = None) -> ModelInstallJob:  # noqa D102
+        if isinstance(source, LocalModelSource):
             install_job = self._import_local_model(source, config)
-            self._install_queue.put(install_job)
-
-        # Installing a remote model
+            self._install_queue.put(install_job)  # synchronously install
+        elif isinstance(source, CivitaiModelSource):
+            install_job = self._import_from_civitai(source, config)
+        elif isinstance(source, HFModelSource):
+            install_job = self._import_from_hf(source, config)
+        elif isinstance(source, URLModelSource):
+            install_job = self._import_from_url(source, config)
         else:
-            install_job = self._import_remote_model(source, config)
+            raise ValueError(f"Unsupported model source: '{type(source)}'")
 
         self._install_jobs.append(install_job)
         return install_job
@@ -245,7 +242,7 @@ class ModelInstallService(ModelInstallServiceBase):
         self._cached_model_paths = {Path(x.path) for x in self.record_store.all_models()}
         callback = self._scan_install if install else self._scan_register
         search = ModelSearch(on_model_found=callback)
-        self._models_installed: Set[str] = set()
+        self._models_installed.clear()
         search.search(scan_dir)
         return list(self._models_installed)
 
@@ -310,8 +307,8 @@ class ModelInstallService(ModelInstallServiceBase):
                     job.config_out = self.record_store.get_model(key)
 
                     # enter the metadata, if there is any
-                    if metadata := self._metadata_cache.get(job.source):
-                        self._metadata_store.add_metadata(key, metadata)
+                    if job.source_metadata:
+                        self._metadata_store.add_metadata(key, job.source_metadata)
                     self._signal_job_completed(job)
 
             except InvalidModelConfigException as excp:
@@ -333,7 +330,6 @@ class ModelInstallService(ModelInstallServiceBase):
                 # if this is an install of a remote file, then clean up the temporary directory
                 if job._install_tmpdir is not None:
                     rmtree(job._install_tmpdir)
-                self._metadata_cache.pop(job.source, None)
                 self._install_queue.task_done()
 
         self._logger.info("Install thread exiting")
@@ -486,62 +482,17 @@ class ModelInstallService(ModelInstallServiceBase):
         self.record_store.add_model(key, info)
         return key
 
-    # ----------------------------------------------------------------------
-    # Methods for returning a list of URLs to download and their local paths
-    # from models that contain multiple files (currently only HuggingFace)
-    # ----------------------------------------------------------------------
-    def _get_metadata(self, source: ModelSource) -> Optional[AnyModelRepoMetadata]:
-        url_patterns = {
-            r"https?://civitai.com/": CivitaiMetadataFetch,
-            r"https?://huggingface.co/": HuggingFaceMetadataFetch,
-        }
-
-        if isinstance(source, URLModelSource):
-            for pattern, fetcher in url_patterns.items():
-                if re.match(pattern, str(source.url)):
-                    return fetcher(self._session).from_url(source.url)
-            return None
-
-        elif isinstance(source, HFModelSource):
-            return HuggingFaceMetadataFetch(self._session).from_id(source.repo_id)
-
-        elif isinstance(source, CivitaiModelSource):
-            return CivitaiMetadataFetch(self._session).from_id(str(source.version_id))
-
-        else:
-            raise NotImplementedError(f"Do not know to do with a model source of type {type(source)}")
-
-    def _get_download_urls(
-        self,
-        source: ModelSource,
-        metadata: Optional[AnyModelRepoMetadata] = None,
-    ) -> List[RemoteModelFile]:
-        """Return the remote urls and paths needed to download the files that make this model."""
-        # If we have the right kind of metadata, then we use that to determine which files to download.
-        if metadata and isinstance(metadata, ModelMetadataWithFiles):
-            return metadata.download_urls(
-                variant=getattr(source, "variant", self._guess_variant()),
-                subfolder=getattr(source, "subfolder", None),
-                session=self._session,
-            )
-
-        elif hasattr(source, "url"):
-            # just download the requested URL into the temporary directory
-            return [RemoteModelFile(url=source.url, path=Path("."), size=0)]
-
-        else:
-            raise NotImplementedError(f"Sources of type {type(source)} are not yet handled")
-
-    @staticmethod
-    def _guess_variant() -> ModelRepoVariant:
-        precision = choose_precision(choose_torch_device())
-        return ModelRepoVariant.FP16 if precision == "float16" else ModelRepoVariant.DEFAULT
-
     def _next_id(self) -> int:
         with self._lock:
             id = self._next_job_id
             self._next_job_id += 1
         return id
+
+    @staticmethod
+    def _guess_variant() -> ModelRepoVariant:
+        """Guess the best HuggingFace variant type to download."""
+        precision = choose_precision(choose_torch_device())
+        return ModelRepoVariant.FP16 if precision == "float16" else ModelRepoVariant.DEFAULT
 
     def _import_local_model(self, source: LocalModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
         return ModelInstallJob(
@@ -549,9 +500,68 @@ class ModelInstallService(ModelInstallServiceBase):
             source=source,
             config_in=config or {},
             local_path=Path(source.path),
+            inplace=source.inplace,
         )
 
-    def _import_remote_model(self, source: ModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
+    def _import_from_civitai(self, source: CivitaiModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
+        if not source.access_token:
+            self._logger.info("No Civitai access token provided; some models may not be downloadable.")
+        metadata = CivitaiMetadataFetch(self._session).from_id(str(source.version_id))
+        assert isinstance(metadata, ModelMetadataWithFiles)
+        remote_files = metadata.download_urls(session=self._session)
+        return self._import_remote_model(source=source, config=config, metadata=metadata, remote_files=remote_files)
+
+    def _import_from_hf(self, source: HFModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
+        # Add user's cached access token to HuggingFace requests
+        source.access_token = source.access_token or HfFolder.get_token()
+        if not source.access_token:
+            self._logger.info("No HuggingFace access token present; some models may not be downloadable.")
+
+        metadata = HuggingFaceMetadataFetch(self._session).from_id(source.repo_id)
+        assert isinstance(metadata, ModelMetadataWithFiles)
+        remote_files = metadata.download_urls(
+            variant=source.variant or self._guess_variant(),
+            subfolder=source.subfolder,
+            session=self._session,
+        )
+
+        return self._import_remote_model(
+            source=source,
+            config=config,
+            remote_files=remote_files,
+            metadata=metadata,
+        )
+
+    def _import_from_url(self, source: URLModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
+        # URLs from Civitai or HuggingFace will be handled specially
+        url_patterns = {
+            r"https?://civitai.com/": CivitaiMetadataFetch,
+            r"https?://huggingface.co/": HuggingFaceMetadataFetch,
+        }
+        metadata = None
+        for pattern, fetcher in url_patterns.items():
+            if re.match(pattern, str(source.url), re.IGNORECASE):
+                metadata = fetcher(self._session).from_url(source.url)
+                break
+        if metadata and isinstance(metadata, ModelMetadataWithFiles):
+            remote_files = metadata.download_urls(session=self._session)
+        else:
+            remote_files = [RemoteModelFile(url=source.url, path=Path("."), size=0)]
+
+        return self._import_remote_model(
+            source=source,
+            config=config,
+            metadata=metadata,
+            remote_files=remote_files,
+        )
+
+    def _import_remote_model(
+        self,
+        source: ModelSource,
+        remote_files: List[RemoteModelFile],
+        metadata: Optional[AnyModelRepoMetadata],
+        config: Optional[Dict[str, Any]],
+    ) -> ModelInstallJob:
         # In general, we can't rely on the tmpdir being finalized and removed,
         # and there is no easy way to use it as a context manager. So we
         # handle its destruction manually.
@@ -565,6 +575,7 @@ class ModelInstallService(ModelInstallServiceBase):
             id=self._next_id(),
             source=source,
             config_in=config or {},
+            source_metadata=metadata,
             local_path=tmpdir,  # local path may change once the download has started due to content-disposition handling
             bytes=0,
             total_bytes=0,
@@ -574,20 +585,8 @@ class ModelInstallService(ModelInstallServiceBase):
         install_job._install_tmpdir = tmpdir
         assert install_job.total_bytes is not None  # to avoid type checking complaints in the loop below
 
-        metadata = self._get_metadata(source)  # may return None
-        url_and_paths = self._get_download_urls(source, metadata)
-        self._metadata_cache[source] = metadata  # save for installation time
-
-        # Add the user's access token to HuggingFace requests
-        if isinstance(source, HFModelSource) and not source.access_token:
-            if token := HfFolder.get_token():
-                self._logger.info("Using saved HuggingFace access token.")
-                source.access_token = token
-            else:
-                self._logger.info("No HuggingFace access token present; some models may not be downloadable.")
-
         self._logger.info(f"Queuing {source} for downloading")
-        for model_file in url_and_paths:
+        for model_file in remote_files:
             url = model_file.url
             path = model_file.path
             self._logger.info(f"Downloading {url} => {path}")
@@ -618,15 +617,15 @@ class ModelInstallService(ModelInstallServiceBase):
         if path.is_file():
             size = path.stat().st_size
         elif path.is_dir():
-            for root, dirs, files in os.walk(path):
+            for root, _, files in os.walk(path):
                 size += sum(self._stat_size(Path(root, x)) for x in files)
-                size += sum(Path(root, x).stat().st_size for x in dirs)
         return size
 
     # ------------------------------------------------------------------
     # Callbacks are executed by the download queue in a separate thread
     # ------------------------------------------------------------------
     def _download_started_callback(self, download_job: DownloadJob) -> None:
+        self._logger.info(f"{download_job.source}: model download started")
         with self._lock:
             install_job = self._download_cache[download_job.source]
             install_job.status = InstallStatus.DOWNLOADING
@@ -714,7 +713,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _signal_job_downloading(self, job: ModelInstallJob) -> None:
         if self._event_bus:
-            parts = [
+            parts: List[Dict[str, str | int]] = [
                 {
                     "url": str(x.source),
                     "local_path": str(x.download_path),
