@@ -24,6 +24,7 @@ from tests.backend.model_manager_2.model_manager_2_fixtures import *  # noqa F40
 
 OS = platform.uname().system
 
+
 def test_registration(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
     store = mm2_installer.record_store
     matches = store.search_by_attr(model_name="test_embedding")
@@ -79,7 +80,7 @@ def test_install(
     "fixture_name,size,destination",
     [
         ("embedding_file", 15440, "sd-1/embedding/test_embedding.safetensors"),
-        ("diffusers_dir", 8241 if OS=="Windows" else 7907, "sdxl/main/test-diffusers-main"),  # EOL chars
+        ("diffusers_dir", 8241 if OS == "Windows" else 7907, "sdxl/main/test-diffusers-main"),  # EOL chars
     ],
 )
 def test_background_install(
