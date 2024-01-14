@@ -66,6 +66,7 @@ dependencies = [
   "albumentations",
   "click",
   "datasets",
+  "Deprecated",
   "dnspython~=2.4.0",
   "dynamicprompts",
   "easing-functions",
