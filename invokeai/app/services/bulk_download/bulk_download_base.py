@@ -31,11 +31,11 @@ class BulkDownloadBase(ABC):
         """
 
     @abstractmethod
-    def get_path(self, bulk_download_item_id: str) -> str:
+    def get_path(self, bulk_download_item_name: str) -> str:
         """
         Get the path to the bulk download file.
 
-        :param bulk_download_item_id: The ID of the bulk download item.
+        :param bulk_download_item_name: The name of the bulk download item.
         :return: The path to the bulk download file.
         """
 
