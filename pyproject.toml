@@ -170,6 +170,7 @@ version = { attr = "invokeai.version.__version__" }
   "invokeai.frontend.web.static*",
   "invokeai.configs*",
   "invokeai.app*",
+  "invokeai.invocation_api*",
 ]
 
 [tool.setuptools.package-data]

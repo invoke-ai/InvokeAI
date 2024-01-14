@@ -8,11 +8,10 @@ from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
     Classification,
-    WithMetadata,
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import ImageField, Input, InputField, OutputField
+from invokeai.app.invocations.fields import ImageField, Input, InputField, OutputField, WithMetadata
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.backend.tiles.tiles import (
     calc_tiles_even_split,

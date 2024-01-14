@@ -7,7 +7,6 @@ import cv2
 import numpy
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
-from invokeai.app.invocations.baseinvocation import WithMetadata
 from invokeai.app.invocations.fields import (
     BoardField,
     ColorField,
@@ -15,6 +14,7 @@ from invokeai.app.invocations.fields import (
     ImageField,
     Input,
     InputField,
+    WithMetadata,
 )
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory
