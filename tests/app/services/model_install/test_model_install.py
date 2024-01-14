@@ -245,3 +245,15 @@ def test_huggingface_download(mm2_installer: ModelInstallServiceBase, mm2_app_co
     assert len(bus.events) >= 3
     event_names = {x.event_name for x in bus.events}
     assert event_names == {"model_install_downloading", "model_install_running", "model_install_completed"}
+
+
+def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig) -> None:
+    source = URLModelSource(url=Url("https://test.com/missing_model.safetensors"))
+    job = mm2_installer.import_model(source)
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.status == InstallStatus.ERROR
+    assert job.errored
+    assert job.error_type == "HTTPError"
+    assert job.error
+    assert "NOT FOUND" in job.error
+    assert "Traceback" in job.error

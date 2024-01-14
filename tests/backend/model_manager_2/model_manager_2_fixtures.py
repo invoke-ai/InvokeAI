@@ -162,6 +162,13 @@ def mm2_session(embedding_file: Path, diffusers_dir: Path) -> Session:
     """This fixtures defines a series of mock URLs for testing download and installation."""
     sess = TestSession()
     sess.mount(
+        "https://test.com/missing_model.safetensors",
+        TestAdapter(
+            b"missing",
+            status=404,
+        ),
+    )
+    sess.mount(
         "https://huggingface.co/api/models/stabilityai/sdxl-turbo",
         TestAdapter(
             RepoHFMetadata1,
