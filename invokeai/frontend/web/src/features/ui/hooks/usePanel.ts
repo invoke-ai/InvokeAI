@@ -107,11 +107,8 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
       return;
     }
     const id = arg.panelGroupRef.current.getId();
-    const panelGroupElement = getPanelGroupElement(id, document);
-    const panelGroupHandleElements = getResizeHandleElementsForGroup(
-      id,
-      document
-    );
+    const panelGroupElement = getPanelGroupElement(id);
+    const panelGroupHandleElements = getResizeHandleElementsForGroup(id);
     if (!panelGroupElement) {
       return;
     }
@@ -128,13 +125,15 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
 
       _setMinSize(minSizePct);
 
-      const currentSize = panelHandleRef.current.getSize();
-
-      // If currentSize is 0, the panel is collapsed, so we don't want to resize it
-      // If it's not 0, but less than the minSize, resize it
-      if (currentSize > 0 && currentSize < minSizePct) {
-        panelHandleRef.current.resize(minSizePct);
-      }
+      /**
+       * TODO(psyche): Ideally, we only resize the panel if there is not enough room for it in the
+       * panel group. This is a bit tricky, though. We'd need to track the last known panel size
+       * and compare it to the new size before resizing. This introduces some complexity that I'd
+       * rather not need to maintain.
+       *
+       * For now, we'll just resize the panel to the min size every time the panel group is resized.
+       */
+      panelHandleRef.current.resize(minSizePct);
     });
 
     resizeObserver.observe(panelGroupElement);
@@ -247,7 +246,7 @@ const getSizeAsPercentage = (
     return 0;
   }
   const id = panelGroupHandleRef.current.getId();
-  const panelGroupElement = getPanelGroupElement(id, document);
+  const panelGroupElement = getPanelGroupElement(id);
   if (!panelGroupElement) {
     // No panel group element, size is 0
     return 0;
@@ -260,7 +259,7 @@ const getSizeAsPercentage = (
       : panelGroupElement.offsetHeight;
 
   // ...minus the width/height of the resize handles
-  getResizeHandleElementsForGroup(id, document).forEach((el) => {
+  getResizeHandleElementsForGroup(id).forEach((el) => {
     availableSpace -=
       panelGroupDirection === 'horizontal' ? el.offsetWidth : el.offsetHeight;
   });
