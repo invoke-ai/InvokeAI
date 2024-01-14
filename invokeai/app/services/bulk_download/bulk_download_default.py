@@ -10,7 +10,7 @@ from invokeai.app.services.bulk_download.bulk_download_common import (
     BulkDownloadTargetException,
 )
 from invokeai.app.services.events.events_base import EventServiceBase
-from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordNotFoundException
 from invokeai.app.services.invoker import Invoker
 
 from .bulk_download_base import BulkDownloadBase
@@ -67,7 +67,17 @@ class BulkDownloadService(BulkDownloadBase):
         try:
             board_name: str = ""
             if board_id:
-                image_names = invoker.services.board_image_records.get_all_board_image_names_for_board(board_id)
+                # -1 is the default value for limit, which means no limit, is_intermediate only gives us completed images
+                image_names = [
+                    img.image_name
+                    for img in invoker.services.images.get_many(
+                        offset=0,
+                        limit=-1,
+                        board_id=board_id,
+                        is_intermediate=False,
+                        categories=[ImageCategory.GENERAL],
+                    ).items
+                ]
                 if board_id == "none":
                     board_id = "Uncategorized"
                     board_name = "Uncategorized"
