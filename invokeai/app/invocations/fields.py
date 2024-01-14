@@ -1,13 +1,11 @@
-from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel, TypeAdapter
 from pydantic.fields import _Unset
 from pydantic_core import PydanticUndefined
 
 from invokeai.app.util.metaenum import MetaEnum
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import BasicConditioningInfo
 from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger()
@@ -542,11 +540,6 @@ class ColorField(BaseModel):
 
     def tuple(self) -> Tuple[int, int, int, int]:
         return (self.r, self.g, self.b, self.a)
-
-
-@dataclass
-class ConditioningFieldData:
-    conditionings: List[BasicConditioningInfo]
 
 
 class ConditioningField(BaseModel):

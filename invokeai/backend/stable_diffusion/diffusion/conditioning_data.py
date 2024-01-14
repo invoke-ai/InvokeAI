@@ -33,6 +33,11 @@ class BasicConditioningInfo:
 
 
 @dataclass
+class ConditioningFieldData:
+    conditionings: List[BasicConditioningInfo]
+
+
+@dataclass
 class SDXLConditioningInfo(BasicConditioningInfo):
     pooled_embeds: torch.Tensor
     add_time_ids: torch.Tensor
