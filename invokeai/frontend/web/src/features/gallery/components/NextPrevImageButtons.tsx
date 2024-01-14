@@ -30,7 +30,7 @@ const NextPrevImageButtons = () => {
         pos="absolute"
         top="50%"
         transform="translate(0, -50%)"
-        insetInlineStart={0}
+        insetInlineStart={1}
       >
         {!isOnFirstImage && (
           <InvIconButton
@@ -47,7 +47,7 @@ const NextPrevImageButtons = () => {
         pos="absolute"
         top="50%"
         transform="translate(0, -50%)"
-        insetInlineEnd={0}
+        insetInlineEnd={6}
       >
         {!isOnLastImage && (
           <InvIconButton
