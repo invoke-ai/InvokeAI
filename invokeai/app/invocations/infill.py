@@ -13,8 +13,8 @@ from invokeai.backend.image_util.cv2_inpaint import cv2_inpaint
 from invokeai.backend.image_util.lama import LaMA
 from invokeai.backend.image_util.patchmatch import PatchMatch
 
-from .baseinvocation import BaseInvocation, WithMetadata, invocation
-from .fields import InputField
+from .baseinvocation import BaseInvocation, invocation
+from .fields import InputField, WithMetadata
 from .image import PIL_RESAMPLING_MAP, PIL_RESAMPLING_MODES
 
 
