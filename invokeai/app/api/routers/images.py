@@ -391,9 +391,7 @@ async def download_images_from_list(
 ) -> ImagesDownloaded:
     if (image_names is None or len(image_names) == 0) and board_id is None:
         raise HTTPException(status_code=400, detail="No images or board id specified.")
-    background_tasks.add_task(
-        ApiDependencies.invoker.services.bulk_download.handler, ApiDependencies.invoker, image_names, board_id
-    )
+    background_tasks.add_task(ApiDependencies.invoker.services.bulk_download.handler, image_names, board_id)
     return ImagesDownloaded(response="Your images are preparing to be downloaded")
 
 
