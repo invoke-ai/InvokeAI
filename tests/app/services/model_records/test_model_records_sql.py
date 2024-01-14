@@ -10,6 +10,7 @@ import pytest
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.model_records import (
     DuplicateModelException,
+    ModelRecordOrderBy,
     ModelRecordServiceBase,
     ModelRecordServiceSQL,
     UnknownModelException,
@@ -22,14 +23,16 @@ from invokeai.backend.model_manager.config import (
     TextualInversionConfig,
     VaeDiffusersConfig,
 )
+from invokeai.backend.model_manager.metadata import BaseMetadata
 from invokeai.backend.util.logging import InvokeAILogger
+from tests.backend.model_manager_2.model_manager_2_fixtures import *  # noqa F403
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 
 @pytest.fixture
 def store(
     datadir: Any,
-) -> ModelRecordServiceBase:
+) -> ModelRecordServiceSQL:
     config = InvokeAIAppConfig(root=datadir)
     logger = InvokeAILogger.get_logger(config=config)
     db = create_mock_sqlite_database(config, logger)
@@ -268,3 +271,50 @@ def test_filter_2(store: ModelRecordServiceBase):
         model_name="dup_name1",
     )
     assert len(matches) == 1
+
+
+def test_summary(mm2_record_store: ModelRecordServiceSQL) -> None:
+    # The fixture provides us with five configs.
+    for x in range(1, 5):
+        key = f"test_config_{x}"
+        name = f"name_{x}"
+        author = f"author_{x}"
+        tags = {f"tag{y}" for y in range(1, x)}
+        mm2_record_store.metadata_store.add_metadata(
+            model_key=key, metadata=BaseMetadata(name=name, author=author, tags=tags)
+        )
+    # sanity check that the tags sent in all right
+    assert mm2_record_store.get_metadata("test_config_3").tags == {"tag1", "tag2"}
+    assert mm2_record_store.get_metadata("test_config_4").tags == {"tag1", "tag2", "tag3"}
+
+    # get summary
+    summary1 = mm2_record_store.list_models(page=0, per_page=100)
+    assert summary1.page == 0
+    assert summary1.pages == 1
+    assert summary1.per_page == 100
+    assert summary1.total == 5
+    assert len(summary1.items) == 5
+    assert summary1.items[0].name == "test5"  # lora / sd-1 / diffusers / test5
+
+    # find test_config_3
+    config3 = [x for x in summary1.items if x.key == "test_config_3"][0]
+    assert config3.description == "This is test 3"
+    assert config3.tags == {"tag1", "tag2"}
+
+    # find test_config_5
+    config5 = [x for x in summary1.items if x.key == "test_config_5"][0]
+    assert config5.tags == set()
+    assert config5.description == ""
+
+    # test paging
+    summary2 = mm2_record_store.list_models(page=1, per_page=2)
+    assert summary2.page == 1
+    assert summary2.per_page == 2
+    assert summary2.pages == 3
+    assert summary1.items[2].name == summary2.items[0].name
+
+    # test sorting
+    summary = mm2_record_store.list_models(page=0, per_page=100, order_by=ModelRecordOrderBy.Name)
+    print(summary.items)
+    assert summary.items[0].name == "model1"
+    assert summary.items[-1].name == "test5"
