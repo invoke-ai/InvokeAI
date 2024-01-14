@@ -2,6 +2,7 @@
 Test the model installer
 """
 
+import platform
 from pathlib import Path
 
 import pytest
@@ -21,6 +22,7 @@ from invokeai.app.services.model_records import UnknownModelException
 from invokeai.backend.model_manager.config import BaseModelType, ModelFormat, ModelType
 from tests.backend.model_manager_2.model_manager_2_fixtures import *  # noqa F403
 
+OS = platform.uname().system
 
 def test_registration(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
     store = mm2_installer.record_store
@@ -77,7 +79,7 @@ def test_install(
     "fixture_name,size,destination",
     [
         ("embedding_file", 15440, "sd-1/embedding/test_embedding.safetensors"),
-        ("diffusers_dir", 7907, "sdxl/main/test-diffusers-main"),
+        ("diffusers_dir", 8241 if OS=="Windows" else 7907, "sdxl/main/test-diffusers-main"),  # EOL chars
     ],
 )
 def test_background_install(
