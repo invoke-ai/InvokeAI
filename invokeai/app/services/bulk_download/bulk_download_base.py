@@ -29,3 +29,28 @@ class BulkDownloadBase(ABC):
         :param image_names: A list of image names to include in the zip file.
         :param board_id: The ID of the board. If provided, all images associated with the board will be included in the zip file.
         """
+
+    @abstractmethod
+    def get_path(self, bulk_download_item_id: str) -> str:
+        """
+        Get the path to the bulk download file.
+
+        :param bulk_download_item_id: The ID of the bulk download item.
+        :return: The path to the bulk download file.
+        """
+
+    @abstractmethod
+    def stop(self, *args, **kwargs) -> None:
+        """
+        Stops the BulkDownloadService and cleans up all the remnants.
+
+        This method is responsible for stopping the BulkDownloadService and performing any necessary cleanup
+        operations to remove any remnants or resources associated with the service.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            None
+        """

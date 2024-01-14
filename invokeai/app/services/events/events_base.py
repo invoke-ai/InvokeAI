@@ -440,23 +440,36 @@ class EventServiceBase:
             },
         )
 
-    def emit_bulk_download_started(self, bulk_download_id: str) -> None:
+    def emit_bulk_download_started(self, bulk_download_id: str, bulk_download_item_id: str) -> None:
         """Emitted when a bulk download starts"""
         self._emit_bulk_download_event(
             event_name="bulk_download_started",
             payload={
                 "bulk_download_id": bulk_download_id,
+                "bulk_download_item_id": bulk_download_item_id,
             },
         )
 
-    def emit_bulk_download_completed(self, bulk_download_id: str, file_path: str) -> None:
+    def emit_bulk_download_completed(
+        self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+    ) -> None:
         """Emitted when a bulk download completes"""
         self._emit_bulk_download_event(
-            event_name="bulk_download_completed", payload={"bulk_download_id": bulk_download_id, "file_path": file_path}
+            event_name="bulk_download_completed",
+            payload={
+                "bulk_download_id": bulk_download_id,
+                "bulk_download_item_id": bulk_download_item_id,
+                "bulk_download_item_name": bulk_download_item_name,
+            },
         )
 
-    def emit_bulk_download_failed(self, bulk_download_id: str, error: str) -> None:
+    def emit_bulk_download_failed(self, bulk_download_id: str, bulk_download_item_id: str, error: str) -> None:
         """Emitted when a bulk download fails"""
         self._emit_bulk_download_event(
-            event_name="bulk_download_failed", payload={"bulk_download_id": bulk_download_id, "error": error}
+            event_name="bulk_download_failed",
+            payload={
+                "bulk_download_id": bulk_download_id,
+                "bulk_download_item_id": bulk_download_item_id,
+                "error": error,
+            },
         )

@@ -15,7 +15,7 @@ from ..services.board_image_records.board_image_records_sqlite import SqliteBoar
 from ..services.board_images.board_images_default import BoardImagesService
 from ..services.board_records.board_records_sqlite import SqliteBoardRecordStorage
 from ..services.boards.boards_default import BoardService
-from ..services.bulk_download.bulk_download_defauilt import BulkDownloadService
+from ..services.bulk_download.bulk_download_default import BulkDownloadService
 from ..services.config import InvokeAIAppConfig
 from ..services.download import DownloadQueueService
 from ..services.image_files.image_files_disk import DiskImageFileStorage
