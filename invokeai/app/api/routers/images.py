@@ -395,3 +395,36 @@ async def download_images_from_list(
         ApiDependencies.invoker.services.bulk_download.handler, ApiDependencies.invoker, image_names, board_id
     )
     return ImagesDownloaded(response="Your images are preparing to be downloaded")
+
+
+@images_router.api_route(
+    "/download/{bulk_download_item_name}",
+    methods=["GET"],
+    operation_id="get_bulk_download_item",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "Return the complete bulk download item",
+            "content": {"application/zip": {}},
+        },
+        404: {"description": "Image not found"},
+    },
+)
+async def get_bulk_download_item(
+    bulk_download_item_name: str = Path(description="The bulk_download_item_id of the bulk download item to get"),
+) -> FileResponse:
+    """Gets a bulk download zip file"""
+
+    try:
+        path = ApiDependencies.invoker.services.bulk_download.get_path(bulk_download_item_name)
+
+        response = FileResponse(
+            path,
+            media_type="application/zip",
+            filename=bulk_download_item_name,
+            content_disposition_type="inline",
+        )
+        response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
+        return response
+    except Exception:
+        raise HTTPException(status_code=404)

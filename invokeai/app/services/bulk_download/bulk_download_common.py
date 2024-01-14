@@ -1,3 +1,6 @@
+DEFAULT_BULK_DOWNLOAD_ID = "default"
+
+
 class BulkDownloadException(Exception):
     """Exception raised when a bulk download fails."""
 
