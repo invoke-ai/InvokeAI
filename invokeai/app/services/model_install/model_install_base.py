@@ -165,8 +165,6 @@ class ModelInstallJob(BaseModel):
     )
     source: ModelSource = Field(description="Source (URL, repo_id, or local path) of model")
     local_path: Path = Field(description="Path to locally-downloaded model; may be the same as the source")
-    error_type: Optional[str] = Field(default=None, description="Class name of the exception that led to status==ERROR")
-    error: Optional[str] = Field(default=None, description="Error traceback")  # noqa #501
     bytes: Optional[int] = Field(
         default=None, description="For a remote model, the number of bytes downloaded so far (may not be available)"
     )
@@ -184,13 +182,21 @@ class ModelInstallJob(BaseModel):
     def set_error(self, e: Exception) -> None:
         """Record the error and traceback from an exception."""
         self._exception = e
-        self.error_type = e.__class__.__name__
-        self.error = "".join(traceback.format_exception(e))
         self.status = InstallStatus.ERROR
 
     def cancel(self) -> None:
         """Call to cancel the job."""
         self.status = InstallStatus.CANCELLED
+
+    @property
+    def error_type(self) -> Optional[str]:
+        """Class name of the exception that led to status==ERROR."""
+        return self._exception.__class__.__name__ if self._exception else None
+
+    @property
+    def error(self) -> Optional[str]:
+        """Error traceback."""
+        return "".join(traceback.format_exception(self._exception)) if self._exception else None
 
     @property
     def cancelled(self) -> bool:

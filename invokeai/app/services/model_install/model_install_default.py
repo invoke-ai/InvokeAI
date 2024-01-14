@@ -562,9 +562,9 @@ class ModelInstallService(ModelInstallServiceBase):
         metadata: Optional[AnyModelRepoMetadata],
         config: Optional[Dict[str, Any]],
     ) -> ModelInstallJob:
-        # In general, we can't rely on the tmpdir being finalized and removed,
-        # and there is no easy way to use it as a context manager. So we
-        # handle its destruction manually.
+        # TODO: Replace with tempfile.tmpdir() when multithreading is cleaned up.
+        # Currently the tmpdir isn't automatically removed at exit because it is
+        # being held in a daemon thread.
         tmpdir = Path(
             mkdtemp(
                 dir=self._app_config.models_path,

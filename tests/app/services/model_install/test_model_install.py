@@ -118,7 +118,6 @@ def test_background_install(
 
     assert len(bus.events) == 2
     event_names = [x.event_name for x in bus.events]
-    print(event_names)
     assert "model_install_running" in event_names
     assert "model_install_completed" in event_names
     assert Path(bus.events[0].payload["source"]) == source
@@ -134,6 +133,9 @@ def test_background_install(
 
     # see if metadata was properly passed through
     assert model_record.description == description
+
+    # see if job filtering works
+    assert mm2_installer.get_job_by_source(source)[0] == job
 
     # see if prune works properly
     mm2_installer.prune_jobs()
