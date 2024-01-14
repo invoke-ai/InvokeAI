@@ -204,9 +204,7 @@
         "prevPage": "Previous Page",
         "nextPage": "Next Page",
         "unknownError": "Unknown Error",
-        "unsaved": "Unsaved",
-        "v": "v",
-        "websiteLink": "www.invoke.com"
+        "unsaved": "Unsaved"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",

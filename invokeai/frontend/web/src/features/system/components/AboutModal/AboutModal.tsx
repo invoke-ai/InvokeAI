@@ -26,10 +26,15 @@ import {
 } from 'common/components/InvModal/wrapper';
 import { InvText } from 'common/components/InvText/wrapper';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import {
+  discordLink,
+  githubLink,
+  websiteLink,
+} from 'features/system/store/constants';
 import { fromPairs, map, toPairs } from 'lodash-es';
 import InvokeLogoYellow from 'public/assets/images/invoke-tag-lrg.svg';
 import type { ReactElement } from 'react';
-import { cloneElement, memo, useRef } from 'react';
+import { cloneElement, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useGetAppDepsQuery,
@@ -47,10 +52,6 @@ const AboutModal = ({ children }: AboutModalProps) => {
   const { data: appDeps } = useGetAppDepsQuery();
   const { data: appVersion } = useGetAppVersionQuery();
   const appDeps_arr = map(toPairs(appDeps), (d) => fromPairs([d]));
-  const ref = useRef(null);
-  const githubLink = 'http://github.com/invoke-ai/InvokeAI';
-  const discordLink = 'https://discord.gg/ZmtBAhwWhy';
-  const websiteLink = 'https://www.invoke.com/';
 
   return (
     <>
@@ -90,20 +91,10 @@ const AboutModal = ({ children }: AboutModalProps) => {
                 </GridItem>
                 <GridItem>
                   <Flex flexDir="column" gap={3} mt="5rem" alignItems="center">
-                    <Image
-                      ref={ref}
-                      src={InvokeLogoYellow}
-                      alt="invoke-logo"
-                      w="120px"
-                      h="80px"
-                      minW="24px"
-                      minH="24px"
-                      userSelect="none"
-                    />
-                    <InvText>
-                      {t('common.v')}
-                      {appVersion?.version}
-                    </InvText>
+                    <Image src={InvokeLogoYellow} alt="invoke-logo" w="120px" />
+                    {appVersion && (
+                      <InvText>{`v${appVersion?.version}`}</InvText>
+                    )}
                     <Grid templateColumns="repeat(2, 1fr)" gap="3">
                       <GridItem>
                         <Link fontSize="sm" href={githubLink} isExternal>
@@ -123,7 +114,7 @@ const AboutModal = ({ children }: AboutModalProps) => {
                     </InvHeading>
                     <InvText fontSize="sm">{t('common.aboutDesc')}</InvText>
                     <Link href={websiteLink} fontSize="sm">
-                      {t('common.websiteLink')}
+                      {websiteLink}
                     </Link>
                   </Flex>
                 </GridItem>
