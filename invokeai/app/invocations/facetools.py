@@ -13,11 +13,10 @@ from pydantic import field_validator
 import invokeai.assets.fonts as font_assets
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
-    WithMetadata,
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import ImageField, InputField, OutputField
+from invokeai.app.invocations.fields import ImageField, InputField, OutputField, WithMetadata
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 
