@@ -6,7 +6,7 @@ from PIL.Image import Image
 from pydantic import ConfigDict
 from torch import Tensor
 
-from invokeai.app.invocations.fields import ConditioningFieldData, MetadataField, WithMetadata
+from invokeai.app.invocations.fields import MetadataField, WithMetadata
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordChanges, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO
@@ -17,6 +17,7 @@ from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_management.model_manager import ModelInfo
 from invokeai.backend.model_management.models.base import BaseModelType, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation

@@ -5,7 +5,6 @@ from compel import Compel, ReturnedEmbeddingsType
 from compel.prompt_parser import Blend, Conjunction, CrossAttentionControlSubstitute, FlattenedPrompt, Fragment
 
 from invokeai.app.invocations.fields import (
-    ConditioningFieldData,
     FieldDescriptions,
     Input,
     InputField,
@@ -15,6 +14,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.primitives import ConditioningOutput
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
+    ConditioningFieldData,
     ExtraConditioningInfo,
     SDXLConditioningInfo,
 )
