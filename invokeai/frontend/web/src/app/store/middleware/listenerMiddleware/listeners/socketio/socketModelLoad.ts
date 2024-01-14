@@ -1,18 +1,17 @@
 import { logger } from 'app/logging/logger';
 import {
-  appSocketModelLoadCompleted,
-  appSocketModelLoadStarted,
   socketModelLoadCompleted,
   socketModelLoadStarted,
 } from 'services/events/actions';
 
 import { startAppListening } from '../..';
 
+const log = logger('socketio');
+
 export const addModelLoadEventListener = () => {
   startAppListening({
     actionCreator: socketModelLoadStarted,
-    effect: (action, { dispatch }) => {
-      const log = logger('socketio');
+    effect: (action) => {
       const { base_model, model_name, model_type, submodel } =
         action.payload.data;
 
@@ -23,16 +22,12 @@ export const addModelLoadEventListener = () => {
       }
 
       log.debug(action.payload, message);
-
-      // pass along the socket event as an application action
-      dispatch(appSocketModelLoadStarted(action.payload));
     },
   });
 
   startAppListening({
     actionCreator: socketModelLoadCompleted,
-    effect: (action, { dispatch }) => {
-      const log = logger('socketio');
+    effect: (action) => {
       const { base_model, model_name, model_type, submodel } =
         action.payload.data;
 
@@ -43,8 +38,6 @@ export const addModelLoadEventListener = () => {
       }
 
       log.debug(action.payload, message);
-      // pass along the socket event as an application action
-      dispatch(appSocketModelLoadCompleted(action.payload));
     },
   });
 };

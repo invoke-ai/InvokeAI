@@ -9,15 +9,20 @@ const ParamSDXLRefinerCFGScale = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const refinerCFGScale = useAppSelector((s) => s.sdxl.refinerCFGScale);
-  const min = useAppSelector((s) => s.config.sd.guidance.min);
-  const inputMax = useAppSelector((s) => s.config.sd.guidance.inputMax);
+  const sliderMin = useAppSelector((s) => s.config.sd.guidance.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.guidance.sliderMax);
+  const numberInputMin = useAppSelector(
+    (s) => s.config.sd.guidance.numberInputMin
+  );
+  const numberInputMax = useAppSelector(
+    (s) => s.config.sd.guidance.numberInputMax
+  );
   const coarseStep = useAppSelector((s) => s.config.sd.guidance.coarseStep);
   const fineStep = useAppSelector((s) => s.config.sd.guidance.fineStep);
   const initial = useAppSelector((s) => s.config.sd.guidance.initial);
   const marks = useMemo(
-    () => [min, Math.floor(sliderMax / 2), sliderMax],
-    [sliderMax, min]
+    () => [sliderMin, Math.floor(sliderMax / 2), sliderMax],
+    [sliderMax, sliderMin]
   );
 
   const onChange = useCallback(
@@ -30,13 +35,14 @@ const ParamSDXLRefinerCFGScale = () => {
       <InvSlider
         value={refinerCFGScale}
         defaultValue={initial}
-        min={min}
+        min={sliderMin}
         max={sliderMax}
         step={coarseStep}
         fineStep={fineStep}
         onChange={onChange}
         withNumberInput
-        numberInputMax={inputMax}
+        numberInputMin={numberInputMin}
+        numberInputMax={numberInputMax}
         marks={marks}
       />
     </InvControl>

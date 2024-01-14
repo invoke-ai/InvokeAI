@@ -1,4 +1,5 @@
 import { Flex } from '@chakra-ui/react';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
 import { InvControl } from 'common/components/InvControl/InvControl';
@@ -14,31 +15,30 @@ import {
   canvasMerged,
   canvasSavedToGallery,
 } from 'features/canvas/store/actions';
+import { $canvasBaseLayer, $tool } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   resetCanvas,
   resetCanvasView,
   setIsMaskEnabled,
   setLayer,
-  setTool,
 } from 'features/canvas/store/canvasSlice';
 import type { CanvasLayer } from 'features/canvas/store/canvasTypes';
 import { LAYER_NAMES_DICT } from 'features/canvas/store/canvasTypes';
-import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { InvIconButton } from 'index';
 import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
-  FaArrowsAlt,
-  FaCopy,
-  FaCrosshairs,
-  FaDownload,
-  FaLayerGroup,
-  FaSave,
-  FaTrash,
-  FaUpload,
-} from 'react-icons/fa';
+  PiCopyBold,
+  PiCrosshairSimpleBold,
+  PiDownloadSimpleBold,
+  PiFloppyDiskBold,
+  PiHandGrabbingBold,
+  PiStackBold,
+  PiTrashSimpleBold,
+  PiUploadSimpleBold,
+} from 'react-icons/pi';
 
 import IAICanvasMaskOptions from './IAICanvasMaskOptions';
 import IAICanvasRedoButton from './IAICanvasRedoButton';
@@ -50,9 +50,8 @@ const IAICanvasToolbar = () => {
   const dispatch = useAppDispatch();
   const isMaskEnabled = useAppSelector((s) => s.canvas.isMaskEnabled);
   const layer = useAppSelector((s) => s.canvas.layer);
-  const tool = useAppSelector((s) => s.canvas.tool);
+  const tool = useStore($tool);
   const isStaging = useAppSelector(isStagingSelector);
-  const canvasBaseLayer = getCanvasBaseLayer();
   const { t } = useTranslation();
   const { isClipboardAPIAvailable } = useCopyImageToClipboard();
 
@@ -81,7 +80,7 @@ const IAICanvasToolbar = () => {
       enabled: () => true,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    []
   );
 
   useHotkeys(
@@ -93,7 +92,7 @@ const IAICanvasToolbar = () => {
       enabled: () => !isStaging,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    []
   );
 
   useHotkeys(
@@ -105,7 +104,7 @@ const IAICanvasToolbar = () => {
       enabled: () => !isStaging,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    []
   );
 
   useHotkeys(
@@ -117,7 +116,7 @@ const IAICanvasToolbar = () => {
       enabled: () => !isStaging && isClipboardAPIAvailable,
       preventDefault: true,
     },
-    [canvasBaseLayer, isClipboardAPIAvailable]
+    [isClipboardAPIAvailable]
   );
 
   useHotkeys(
@@ -129,33 +128,42 @@ const IAICanvasToolbar = () => {
       enabled: () => !isStaging,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    []
   );
 
   const handleSelectMoveTool = useCallback(() => {
-    dispatch(setTool('move'));
-  }, [dispatch]);
+    $tool.set('move');
+  }, []);
 
-  const handleClickResetCanvasView = useSingleAndDoubleClick(
-    () => handleResetCanvasView(false),
-    () => handleResetCanvasView(true)
+  const handleResetCanvasView = useCallback(
+    (shouldScaleTo1 = false) => {
+      const canvasBaseLayer = $canvasBaseLayer.get();
+      if (!canvasBaseLayer) {
+        return;
+      }
+      const clientRect = canvasBaseLayer.getClientRect({
+        skipTransform: true,
+      });
+      dispatch(
+        resetCanvasView({
+          contentRect: clientRect,
+          shouldScaleTo1,
+        })
+      );
+    },
+    [dispatch]
   );
+  const onSingleClick = useCallback(() => {
+    handleResetCanvasView(false);
+  }, [handleResetCanvasView]);
+  const onDoubleClick = useCallback(() => {
+    handleResetCanvasView(true);
+  }, [handleResetCanvasView]);
 
-  const handleResetCanvasView = (shouldScaleTo1 = false) => {
-    const canvasBaseLayer = getCanvasBaseLayer();
-    if (!canvasBaseLayer) {
-      return;
-    }
-    const clientRect = canvasBaseLayer.getClientRect({
-      skipTransform: true,
-    });
-    dispatch(
-      resetCanvasView({
-        contentRect: clientRect,
-        shouldScaleTo1,
-      })
-    );
-  };
+  const handleClickResetCanvasView = useSingleAndDoubleClick({
+    onSingleClick,
+    onDoubleClick,
+  });
 
   const handleResetCanvas = useCallback(() => {
     dispatch(resetCanvas());
@@ -217,14 +225,14 @@ const IAICanvasToolbar = () => {
         <InvIconButton
           aria-label={`${t('unifiedCanvas.move')} (V)`}
           tooltip={`${t('unifiedCanvas.move')} (V)`}
-          icon={<FaArrowsAlt />}
+          icon={<PiHandGrabbingBold />}
           isChecked={tool === 'move' || isStaging}
           onClick={handleSelectMoveTool}
         />
         <InvIconButton
           aria-label={`${t('unifiedCanvas.resetView')} (R)`}
           tooltip={`${t('unifiedCanvas.resetView')} (R)`}
-          icon={<FaCrosshairs />}
+          icon={<PiCrosshairSimpleBold />}
           onClick={handleClickResetCanvasView}
         />
       </InvButtonGroup>
@@ -233,14 +241,14 @@ const IAICanvasToolbar = () => {
         <InvIconButton
           aria-label={`${t('unifiedCanvas.mergeVisible')} (Shift+M)`}
           tooltip={`${t('unifiedCanvas.mergeVisible')} (Shift+M)`}
-          icon={<FaLayerGroup />}
+          icon={<PiStackBold />}
           onClick={handleMergeVisible}
           isDisabled={isStaging}
         />
         <InvIconButton
           aria-label={`${t('unifiedCanvas.saveToGallery')} (Shift+S)`}
           tooltip={`${t('unifiedCanvas.saveToGallery')} (Shift+S)`}
-          icon={<FaSave />}
+          icon={<PiFloppyDiskBold />}
           onClick={handleSaveToGallery}
           isDisabled={isStaging}
         />
@@ -248,7 +256,7 @@ const IAICanvasToolbar = () => {
           <InvIconButton
             aria-label={`${t('unifiedCanvas.copyToClipboard')} (Cmd/Ctrl+C)`}
             tooltip={`${t('unifiedCanvas.copyToClipboard')} (Cmd/Ctrl+C)`}
-            icon={<FaCopy />}
+            icon={<PiCopyBold />}
             onClick={handleCopyImageToClipboard}
             isDisabled={isStaging}
           />
@@ -256,7 +264,7 @@ const IAICanvasToolbar = () => {
         <InvIconButton
           aria-label={`${t('unifiedCanvas.downloadAsImage')} (Shift+D)`}
           tooltip={`${t('unifiedCanvas.downloadAsImage')} (Shift+D)`}
-          icon={<FaDownload />}
+          icon={<PiDownloadSimpleBold />}
           onClick={handleDownloadAsImage}
           isDisabled={isStaging}
         />
@@ -270,7 +278,7 @@ const IAICanvasToolbar = () => {
         <InvIconButton
           aria-label={`${t('common.upload')}`}
           tooltip={`${t('common.upload')}`}
-          icon={<FaUpload />}
+          icon={<PiUploadSimpleBold />}
           isDisabled={isStaging}
           {...getUploadButtonProps()}
         />
@@ -278,7 +286,7 @@ const IAICanvasToolbar = () => {
         <InvIconButton
           aria-label={`${t('unifiedCanvas.clearCanvas')}`}
           tooltip={`${t('unifiedCanvas.clearCanvas')}`}
-          icon={<FaTrash />}
+          icon={<PiTrashSimpleBold />}
           onClick={handleResetCanvas}
           colorScheme="error"
           isDisabled={isStaging}

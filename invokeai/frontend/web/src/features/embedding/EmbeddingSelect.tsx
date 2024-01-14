@@ -2,7 +2,6 @@ import type { ChakraProps } from '@chakra-ui/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { InvSelectFallback } from 'common/components/InvSelect/InvSelectFallback';
 import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
 import type { EmbeddingSelectProps } from 'features/embedding/types';
 import { t } from 'i18next';
@@ -47,23 +46,16 @@ export const EmbeddingSelect = memo(
       onChange: _onChange,
     });
 
-    if (isLoading) {
-      return <InvSelectFallback label={t('common.loading')} />;
-    }
-
-    if (options.length === 0) {
-      return <InvSelectFallback label={t('embedding.noEmbeddingsLoaded')} />;
-    }
-
     return (
-      <InvControl isDisabled={!options.length}>
+      <InvControl>
         <InvSelect
-          placeholder={t('embedding.addEmbedding')}
+          placeholder={
+            isLoading ? t('common.loading') : t('embedding.addEmbedding')
+          }
           defaultMenuIsOpen
           autoFocus
           value={null}
           options={options}
-          isDisabled={!options.length}
           noOptionsMessage={noOptionsMessage}
           onChange={onChange}
           onMenuClose={onClose}

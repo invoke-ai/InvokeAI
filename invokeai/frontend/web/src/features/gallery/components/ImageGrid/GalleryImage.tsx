@@ -2,25 +2,24 @@ import type { SystemStyleObject } from '@chakra-ui/react';
 import { Box, Flex } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
 import { $shift } from 'common/hooks/useGlobalModifiers';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import type {
+  GallerySelectionDraggableData,
   ImageDraggableData,
-  ImageDTOsDraggableData,
   TypesafeDraggableData,
 } from 'features/dnd/types';
-import type { VirtuosoGalleryContext } from 'features/gallery/components/ImageGrid/types';
+import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
 import { useMultiselect } from 'features/gallery/hooks/useMultiselect';
-import { useScrollToVisible } from 'features/gallery/hooks/useScrollToVisible';
+import { useScrollIntoView } from 'features/gallery/hooks/useScrollIntoView';
 import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaTrash } from 'react-icons/fa';
-import { MdStar, MdStarBorder } from 'react-icons/md';
+import { PiStarBold, PiStarFill, PiTrashSimpleFill } from 'react-icons/pi';
 import {
   useGetImageDTOQuery,
   useStarImagesMutation,
@@ -35,26 +34,24 @@ const imageIconStyleOverrides: SystemStyleObject = {
 interface HoverableImageProps {
   imageName: string;
   index: number;
-  virtuosoContext: VirtuosoGalleryContext;
 }
 
 const GalleryImage = (props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
-  const { imageName, virtuosoContext } = props;
+  const { imageName } = props;
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName);
   const shift = useStore($shift);
   const { t } = useTranslation();
-
-  const { handleClick, isSelected, selection, selectionCount } =
+  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
+  const { handleClick, isSelected, areMultiplesSelected } =
     useMultiselect(imageDTO);
 
   const customStarUi = useStore($customStarUI);
 
-  const imageContainerRef = useScrollToVisible(
+  const imageContainerRef = useScrollIntoView(
     isSelected,
     props.index,
-    selectionCount,
-    virtuosoContext
+    areMultiplesSelected
   );
 
   const handleDelete = useCallback(
@@ -69,11 +66,11 @@ const GalleryImage = (props: HoverableImageProps) => {
   );
 
   const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
-    if (selectionCount > 1) {
-      const data: ImageDTOsDraggableData = {
+    if (areMultiplesSelected) {
+      const data: GallerySelectionDraggableData = {
         id: 'gallery-image',
-        payloadType: 'IMAGE_DTOS',
-        payload: { imageDTOs: selection },
+        payloadType: 'GALLERY_SELECTION',
+        payload: { boardId: selectedBoardId },
       };
       return data;
     }
@@ -86,7 +83,7 @@ const GalleryImage = (props: HoverableImageProps) => {
       };
       return data;
     }
-  }, [imageDTO, selection, selectionCount]);
+  }, [imageDTO, selectedBoardId, areMultiplesSelected]);
 
   const [starImages] = useStarImagesMutation();
   const [unstarImages] = useUnstarImagesMutation();
@@ -114,10 +111,10 @@ const GalleryImage = (props: HoverableImageProps) => {
 
   const starIcon = useMemo(() => {
     if (imageDTO?.starred) {
-      return customStarUi ? customStarUi.on.icon : <MdStar size="20" />;
+      return customStarUi ? customStarUi.on.icon : <PiStarFill size="20" />;
     }
     if (!imageDTO?.starred && isHovered) {
-      return customStarUi ? customStarUi.off.icon : <MdStarBorder size="20" />;
+      return customStarUi ? customStarUi.off.icon : <PiStarBold size="20" />;
     }
   }, [imageDTO?.starred, isHovered, customStarUi]);
 
@@ -131,12 +128,22 @@ const GalleryImage = (props: HoverableImageProps) => {
     return '';
   }, [imageDTO?.starred, customStarUi]);
 
+  const dataTestId = useMemo(
+    () => getGalleryImageDataTestId(imageDTO?.image_name),
+    [imageDTO?.image_name]
+  );
+
   if (!imageDTO) {
     return <IAIFillSkeleton />;
   }
 
   return (
-    <Box w="full" h="full" data-testid={`image-${imageDTO.image_name}`}>
+    <Box
+      w="full"
+      h="full"
+      className="gallerygrid-image"
+      data-testid={dataTestId}
+    >
       <Flex
         ref={imageContainerRef}
         userSelect="none"
@@ -169,7 +176,7 @@ const GalleryImage = (props: HoverableImageProps) => {
             {isHovered && shift && (
               <IAIDndImageIcon
                 onClick={handleDelete}
-                icon={<FaTrash />}
+                icon={<PiTrashSimpleFill size="16px" />}
                 tooltip={t('gallery.deleteImage')}
                 styleOverrides={imageIconStyleOverrides}
               />

@@ -3,7 +3,7 @@ import type { InvButtonProps } from 'common/components/InvButton/types';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaSync } from 'react-icons/fa';
+import { PiArrowsClockwiseBold } from 'react-icons/pi';
 
 import { useSyncModels } from './useSyncModels';
 
@@ -21,7 +21,7 @@ export const SyncModelsButton = memo(
       <InvButton
         isLoading={isLoading}
         onClick={syncModels}
-        leftIcon={<FaSync />}
+        leftIcon={<PiArrowsClockwiseBold />}
         minW="max-content"
         {...props}
       >

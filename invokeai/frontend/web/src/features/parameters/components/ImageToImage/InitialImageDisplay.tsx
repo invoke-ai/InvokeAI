@@ -12,7 +12,11 @@ import {
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { FaRulerVertical, FaUndo, FaUpload } from 'react-icons/fa';
+import {
+  PiArrowCounterClockwiseBold,
+  PiRulerBold,
+  PiUploadSimpleBold,
+} from 'react-icons/pi';
 import type { PostUploadAction } from 'services/api/types';
 
 import InitialImage from './InitialImage';
@@ -80,20 +84,20 @@ const InitialImageDisplay = () => {
         <InvIconButton
           tooltip="Upload Initial Image"
           aria-label="Upload Initial Image"
-          icon={<FaUpload />}
+          icon={<PiUploadSimpleBold />}
           {...getUploadButtonProps()}
         />
         <InvIconButton
           tooltip={`${t('parameters.useSize')} (Shift+D)`}
           aria-label={`${t('parameters.useSize')} (Shift+D)`}
-          icon={<FaRulerVertical />}
+          icon={<PiRulerBold />}
           onClick={handleUseSizeInitialImage}
           isDisabled={!initialImage}
         />
         <InvIconButton
           tooltip="Reset Initial Image"
           aria-label="Reset Initial Image"
-          icon={<FaUndo />}
+          icon={<PiArrowCounterClockwiseBold />}
           onClick={handleReset}
           isDisabled={!initialImage}
         />

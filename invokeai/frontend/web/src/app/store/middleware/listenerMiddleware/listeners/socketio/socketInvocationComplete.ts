@@ -15,21 +15,19 @@ import {
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import { imagesAdapter } from 'services/api/util';
-import {
-  appSocketInvocationComplete,
-  socketInvocationComplete,
-} from 'services/events/actions';
+import { socketInvocationComplete } from 'services/events/actions';
 
 import { startAppListening } from '../..';
 
 // These nodes output an image, but do not actually *save* an image, so we don't want to handle the gallery logic on them
 const nodeTypeDenylist = ['load_image', 'image'];
 
+const log = logger('socketio');
+
 export const addInvocationCompleteEventListener = () => {
   startAppListening({
     actionCreator: socketInvocationComplete,
     effect: async (action, { dispatch, getState }) => {
-      const log = logger('socketio');
       const { data } = action.payload;
       log.debug(
         { data: parseify(data) },
@@ -136,8 +134,6 @@ export const addInvocationCompleteEventListener = () => {
           }
         }
       }
-      // pass along the socket event as an application action
-      dispatch(appSocketInvocationComplete(action.payload));
     },
   });
 };

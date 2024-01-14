@@ -1,6 +1,6 @@
 import { Box } from '@chakra-ui/layout';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvAutosizeTextarea } from 'common/components/InvAutosizeTextarea/InvAutosizeTextarea';
+import { InvTextarea } from 'common/components/InvTextarea/InvTextarea';
 import { AddEmbeddingButton } from 'features/embedding/AddEmbeddingButton';
 import { EmbeddingPopover } from 'features/embedding/EmbeddingPopover';
 import { usePrompt } from 'features/embedding/usePrompt';
@@ -35,7 +35,7 @@ export const ParamNegativePrompt = memo(() => {
       width={textareaRef.current?.clientWidth}
     >
       <Box pos="relative">
-        <InvAutosizeTextarea
+        <InvTextarea
           id="negativePrompt"
           name="negativePrompt"
           ref={textareaRef}
@@ -43,10 +43,7 @@ export const ParamNegativePrompt = memo(() => {
           placeholder={t('parameters.negativePromptPlaceholder')}
           onChange={onChange}
           onKeyDown={onKeyDown}
-          minH="unset"
           fontSize="sm"
-          minRows={2}
-          maxRows={5}
           variant="darkFilled"
         />
         <PromptOverlayButtonWrapper>

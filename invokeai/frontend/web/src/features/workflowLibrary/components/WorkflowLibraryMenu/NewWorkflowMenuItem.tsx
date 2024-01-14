@@ -8,7 +8,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaCircleNodes } from 'react-icons/fa6';
+import { PiFlowArrowBold } from 'react-icons/pi';
 
 const NewWorkflowMenuItem = () => {
   const { t } = useTranslation();
@@ -41,7 +41,7 @@ const NewWorkflowMenuItem = () => {
 
   return (
     <>
-      <InvMenuItem as="button" icon={<FaCircleNodes />} onClick={onClick}>
+      <InvMenuItem as="button" icon={<PiFlowArrowBold />} onClick={onClick}>
         {t('nodes.newWorkflow')}
       </InvMenuItem>
 

@@ -2,8 +2,8 @@ import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   $isDrawing,
-  setIsDrawing,
-  setIsMovingStage,
+  $isMovingStage,
+  $tool,
 } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { addPointToCurrentLine } from 'features/canvas/store/canvasSlice';
@@ -18,12 +18,11 @@ const useCanvasMouseUp = (
 ) => {
   const dispatch = useAppDispatch();
   const isDrawing = useStore($isDrawing);
-  const tool = useAppSelector((s) => s.canvas.tool);
   const isStaging = useAppSelector(isStagingSelector);
 
   return useCallback(() => {
-    if (tool === 'move' || isStaging) {
-      setIsMovingStage(false);
+    if ($tool.get() === 'move' || isStaging) {
+      $isMovingStage.set(false);
       return;
     }
 
@@ -46,8 +45,8 @@ const useCanvasMouseUp = (
     } else {
       didMouseMoveRef.current = false;
     }
-    setIsDrawing(false);
-  }, [didMouseMoveRef, dispatch, isDrawing, isStaging, stageRef, tool]);
+    $isDrawing.set(false);
+  }, [didMouseMoveRef, dispatch, isDrawing, isStaging, stageRef]);
 };
 
 export default useCanvasMouseUp;

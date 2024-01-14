@@ -63,7 +63,7 @@ export const GenerationSettingsAccordion = memo(() => {
         </InvTabList>
         <InvTabPanels>
           <InvTabPanel overflow="visible" px={4} pt={4}>
-            <Flex gap={4}>
+            <Flex gap={4} alignItems="center">
               <ParamMainModelSelect />
               <SyncModelsIconButton />
             </Flex>

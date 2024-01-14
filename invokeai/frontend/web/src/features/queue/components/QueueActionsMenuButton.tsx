@@ -17,8 +17,8 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaPause, FaPlay, FaTimes } from 'react-icons/fa';
-import { FaList } from 'react-icons/fa6';
+import { PiPauseFill, PiPlayFill, PiXBold } from 'react-icons/pi';
+import { RiListCheck, RiPlayList2Fill } from 'react-icons/ri';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
 export const QueueActionsMenuButton = memo(() => {
@@ -64,12 +64,12 @@ export const QueueActionsMenuButton = memo(() => {
         <InvMenuButton
           as={InvIconButton}
           aria-label="Queue Actions Menu"
-          icon={<FaList />}
+          icon={<RiListCheck />}
         />
         <InvMenuList>
           <InvMenuItem
             isDestructive
-            icon={<FaTimes size="16px" />}
+            icon={<PiXBold size="16px" />}
             onClick={cancelQueueItem}
             isLoading={isLoadingCancelQueueItem}
             isDisabled={isDisabledCancelQueueItem}
@@ -78,7 +78,7 @@ export const QueueActionsMenuButton = memo(() => {
           </InvMenuItem>
           {isResumeEnabled && (
             <InvMenuItem
-              icon={<FaPlay size="14px" />}
+              icon={<PiPlayFill size="14px" />}
               onClick={resumeProcessor}
               isLoading={isLoadingResumeProcessor}
               isDisabled={isDisabledResumeProcessor}
@@ -88,7 +88,7 @@ export const QueueActionsMenuButton = memo(() => {
           )}
           {isPauseEnabled && (
             <InvMenuItem
-              icon={<FaPause size="14px" />}
+              icon={<PiPauseFill size="14px" />}
               onClick={pauseProcessor}
               isLoading={isLoadingPauseProcessor}
               isDisabled={isDisabledPauseProcessor}
@@ -97,7 +97,9 @@ export const QueueActionsMenuButton = memo(() => {
             </InvMenuItem>
           )}
           <InvMenuDivider />
-          <InvMenuItem onClick={openQueue}>{t('queue.openQueue')}</InvMenuItem>
+          <InvMenuItem icon={<RiPlayList2Fill />} onClick={openQueue}>
+            {t('queue.openQueue')}
+          </InvMenuItem>
         </InvMenuList>
       </InvMenu>
       {queueSize > 0 && (

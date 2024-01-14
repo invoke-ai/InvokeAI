@@ -5,7 +5,7 @@ import randomInt from 'common/util/randomInt';
 import { setSeed } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaShuffle } from 'react-icons/fa6';
+import { PiShuffleBold } from 'react-icons/pi';
 
 export const ParamSeedShuffle = memo(() => {
   const dispatch = useAppDispatch();
@@ -24,7 +24,7 @@ export const ParamSeedShuffle = memo(() => {
       size="sm"
       isDisabled={shouldRandomizeSeed}
       onClick={handleClickRandomizeSeed}
-      leftIcon={<FaShuffle />}
+      leftIcon={<PiShuffleBold />}
       flexShrink={0}
     >
       {t('parameters.shuffle')}

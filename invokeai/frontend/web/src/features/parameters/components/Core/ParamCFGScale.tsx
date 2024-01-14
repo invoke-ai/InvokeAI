@@ -7,17 +7,22 @@ import { useTranslation } from 'react-i18next';
 
 const ParamCFGScale = () => {
   const cfgScale = useAppSelector((s) => s.generation.cfgScale);
-  const min = useAppSelector((s) => s.config.sd.guidance.min);
-  const inputMax = useAppSelector((s) => s.config.sd.guidance.inputMax);
+  const sliderMin = useAppSelector((s) => s.config.sd.guidance.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.guidance.sliderMax);
+  const numberInputMin = useAppSelector(
+    (s) => s.config.sd.guidance.numberInputMin
+  );
+  const numberInputMax = useAppSelector(
+    (s) => s.config.sd.guidance.numberInputMax
+  );
   const coarseStep = useAppSelector((s) => s.config.sd.guidance.coarseStep);
   const fineStep = useAppSelector((s) => s.config.sd.guidance.fineStep);
   const initial = useAppSelector((s) => s.config.sd.guidance.initial);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const marks = useMemo(
-    () => [min, Math.floor(sliderMax / 2), sliderMax],
-    [sliderMax, min]
+    () => [sliderMin, Math.floor(sliderMax / 2), sliderMax],
+    [sliderMax, sliderMin]
   );
   const onChange = useCallback(
     (v: number) => dispatch(setCfgScale(v)),
@@ -29,14 +34,15 @@ const ParamCFGScale = () => {
       <InvSlider
         value={cfgScale}
         defaultValue={initial}
-        min={min}
+        min={sliderMin}
         max={sliderMax}
         step={coarseStep}
         fineStep={fineStep}
         onChange={onChange}
         withNumberInput
         marks={marks}
-        numberInputMax={inputMax}
+        numberInputMin={numberInputMin}
+        numberInputMax={numberInputMax}
       />
     </InvControl>
   );

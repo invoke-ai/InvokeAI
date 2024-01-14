@@ -10,6 +10,28 @@ const ParamCanvasCoherenceSteps = () => {
   const canvasCoherenceSteps = useAppSelector(
     (s) => s.generation.canvasCoherenceSteps
   );
+  const initial = useAppSelector(
+    (s) => s.config.sd.canvasCoherenceSteps.initial
+  );
+  const sliderMin = useAppSelector(
+    (s) => s.config.sd.canvasCoherenceSteps.sliderMin
+  );
+  const sliderMax = useAppSelector(
+    (s) => s.config.sd.canvasCoherenceSteps.sliderMax
+  );
+  const numberInputMin = useAppSelector(
+    (s) => s.config.sd.canvasCoherenceSteps.numberInputMin
+  );
+  const numberInputMax = useAppSelector(
+    (s) => s.config.sd.canvasCoherenceSteps.numberInputMax
+  );
+  const coarseStep = useAppSelector(
+    (s) => s.config.sd.canvasCoherenceSteps.coarseStep
+  );
+  const fineStep = useAppSelector(
+    (s) => s.config.sd.canvasCoherenceSteps.fineStep
+  );
+
   const { t } = useTranslation();
 
   const handleChange = useCallback(
@@ -25,14 +47,16 @@ const ParamCanvasCoherenceSteps = () => {
       feature="compositingCoherenceSteps"
     >
       <InvSlider
-        min={1}
-        max={100}
-        step={1}
+        min={sliderMin}
+        max={sliderMax}
+        step={coarseStep}
+        fineStep={fineStep}
         value={canvasCoherenceSteps}
-        defaultValue={20}
+        defaultValue={initial}
         onChange={handleChange}
         withNumberInput
-        numberInputMax={999}
+        numberInputMin={numberInputMin}
+        numberInputMax={numberInputMax}
         marks
       />
     </InvControl>

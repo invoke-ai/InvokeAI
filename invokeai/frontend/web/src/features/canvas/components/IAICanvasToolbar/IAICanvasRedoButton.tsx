@@ -5,7 +5,7 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { FaRedo } from 'react-icons/fa';
+import { PiArrowClockwiseBold } from 'react-icons/pi';
 
 const IAICanvasRedoButton = () => {
   const dispatch = useAppDispatch();
@@ -34,7 +34,7 @@ const IAICanvasRedoButton = () => {
     <InvIconButton
       aria-label={`${t('unifiedCanvas.redo')} (Ctrl+Shift+Z)`}
       tooltip={`${t('unifiedCanvas.redo')} (Ctrl+Shift+Z)`}
-      icon={<FaRedo />}
+      icon={<PiArrowClockwiseBold />}
       onClick={handleRedo}
       isDisabled={!canRedo}
     />

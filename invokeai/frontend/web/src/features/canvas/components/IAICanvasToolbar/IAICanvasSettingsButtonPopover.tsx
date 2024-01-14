@@ -24,7 +24,7 @@ import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { FaWrench } from 'react-icons/fa';
+import { PiGearSixBold } from 'react-icons/pi';
 
 const IAICanvasSettingsButtonPopover = () => {
   const dispatch = useAppDispatch();
@@ -114,7 +114,7 @@ const IAICanvasSettingsButtonPopover = () => {
         <InvIconButton
           tooltip={t('unifiedCanvas.canvasSettings')}
           aria-label={t('unifiedCanvas.canvasSettings')}
-          icon={<FaWrench />}
+          icon={<PiGearSixBold />}
         />
       </InvPopoverTrigger>
       <InvPopoverContent>

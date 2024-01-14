@@ -5,7 +5,7 @@ import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import type { UsePanelReturn } from 'features/ui/hooks/usePanel';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MdPhotoLibrary } from 'react-icons/md';
+import { PiImagesSquareBold } from 'react-icons/pi';
 
 type Props = {
   panelApi: UsePanelReturn;
@@ -34,7 +34,7 @@ const FloatingGalleryButton = (props: Props) => {
           <InvIconButton
             aria-label={t('accessibility.showGalleryPanel')}
             onClick={props.panelApi.expand}
-            icon={<MdPhotoLibrary />}
+            icon={<PiImagesSquareBold size="20px" />}
             p={0}
             h={48}
             borderEndRadius={0}

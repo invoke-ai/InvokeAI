@@ -10,20 +10,19 @@ import useCanvasMouseOut from 'features/canvas/hooks/useCanvasMouseOut';
 import useCanvasMouseUp from 'features/canvas/hooks/useCanvasMouseUp';
 import useCanvasWheel from 'features/canvas/hooks/useCanvasZoom';
 import {
+  $canvasBaseLayer,
+  $canvasStage,
   $isModifyingBoundingBox,
   $isMouseOverBoundingBox,
   $isMovingStage,
   $isTransformingBoundingBox,
+  $tool,
 } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   canvasResized,
   selectCanvasSlice,
 } from 'features/canvas/store/canvasSlice';
-import {
-  setCanvasBaseLayer,
-  setCanvasStage,
-} from 'features/canvas/util/konvaInstanceProvider';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
@@ -61,7 +60,6 @@ const IAICanvas = () => {
   );
   const shouldShowGrid = useAppSelector((s) => s.canvas.shouldShowGrid);
   const stageScale = useAppSelector((s) => s.canvas.stageScale);
-  const tool = useAppSelector((s) => s.canvas.tool);
   const shouldShowIntermediates = useAppSelector(
     (s) => s.canvas.shouldShowIntermediates
   );
@@ -78,10 +76,11 @@ const IAICanvas = () => {
   const isMovingStage = useStore($isMovingStage);
   const isTransformingBoundingBox = useStore($isTransformingBoundingBox);
   const isMouseOverBoundingBox = useStore($isMouseOverBoundingBox);
+  const tool = useStore($tool);
   useCanvasHotkeys();
-  const canvasStageRefCallback = useCallback((el: Konva.Stage) => {
-    setCanvasStage(el as Konva.Stage);
-    stageRef.current = el;
+  const canvasStageRefCallback = useCallback((stageElement: Konva.Stage) => {
+    $canvasStage.set(stageElement);
+    stageRef.current = stageElement;
   }, []);
   const stageCursor = useMemo(() => {
     if (tool === 'move' || isStaging) {
@@ -104,10 +103,14 @@ const IAICanvas = () => {
     shouldRestrictStrokesToBox,
     tool,
   ]);
-  const canvasBaseLayerRefCallback = useCallback((el: Konva.Layer) => {
-    setCanvasBaseLayer(el as Konva.Layer);
-    canvasBaseLayerRef.current = el;
-  }, []);
+
+  const canvasBaseLayerRefCallback = useCallback(
+    (layerElement: Konva.Layer) => {
+      $canvasBaseLayer.set(layerElement);
+      canvasBaseLayerRef.current = layerElement;
+    },
+    []
+  );
 
   const lastCursorPositionRef = useRef<Vector2d>({ x: 0, y: 0 });
 

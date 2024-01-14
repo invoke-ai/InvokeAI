@@ -4,13 +4,12 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { InvButton } from 'common/components/InvButton/InvButton';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import type { VirtuosoGalleryContext } from 'features/gallery/components/ImageGrid/types';
-import { $useNextPrevImageState } from 'features/gallery/hooks/useNextPrevImage';
-import { selectListImagesBaseQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { IMAGE_LIMIT } from 'features/gallery/store/types';
+import { virtuosoGridRefs } from 'features/gallery/components/ImageGrid/types';
+import { useGalleryHotkeys } from 'features/gallery/hooks/useGalleryHotkeys';
+import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaExclamationCircle, FaImage } from 'react-icons/fa';
 import type {
@@ -20,10 +19,6 @@ import type {
   VirtuosoGridHandle,
 } from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
-import {
-  useLazyListImagesQuery,
-  useListImagesQuery,
-} from 'services/api/endpoints/images';
 import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 
 import GalleryImage from './GalleryImage';
@@ -46,56 +41,24 @@ const GalleryImageGrid = () => {
   );
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const { currentViewTotal } = useBoardTotal(selectedBoardId);
-  const queryArgs = useAppSelector(selectListImagesBaseQueryArgs);
-
   const virtuosoRangeRef = useRef<ListRange | null>(null);
-
   const virtuosoRef = useRef<VirtuosoGridHandle>(null);
-
-  const { currentData, isFetching, isSuccess, isError } =
-    useListImagesQuery(queryArgs);
-
-  const [listImages] = useLazyListImagesQuery();
-
-  const areMoreAvailable = useMemo(() => {
-    if (!currentData || !currentViewTotal) {
-      return false;
-    }
-    return currentData.ids.length < currentViewTotal;
-  }, [currentData, currentViewTotal]);
-
-  const handleLoadMoreImages = useCallback(() => {
-    if (!areMoreAvailable) {
-      return;
-    }
-
-    listImages({
-      ...queryArgs,
-      offset: currentData?.ids.length ?? 0,
-      limit: IMAGE_LIMIT,
-    });
-  }, [areMoreAvailable, listImages, queryArgs, currentData?.ids.length]);
-
-  const virtuosoContext = useMemo<VirtuosoGalleryContext>(() => {
-    return {
-      virtuosoRef,
-      rootRef,
-      virtuosoRangeRef,
-    };
-  }, []);
-
-  const itemContentFunc: ItemContent<EntityId, VirtuosoGalleryContext> =
-    useCallback(
-      (index, imageName, virtuosoContext) => (
-        <GalleryImage
-          key={imageName}
-          index={index}
-          imageName={imageName as string}
-          virtuosoContext={virtuosoContext}
-        />
-      ),
-      []
-    );
+  const {
+    areMoreImagesAvailable,
+    handleLoadMoreImages,
+    queryResult: { currentData, isFetching, isSuccess, isError },
+  } = useGalleryImages();
+  useGalleryHotkeys();
+  const itemContentFunc: ItemContent<EntityId, void> = useCallback(
+    (index, imageName) => (
+      <GalleryImage
+        key={imageName}
+        index={index}
+        imageName={imageName as string}
+      />
+    ),
+    []
+  );
 
   useEffect(() => {
     // Initialize the gallery's custom scrollbar
@@ -116,8 +79,10 @@ const GalleryImageGrid = () => {
   }, []);
 
   useEffect(() => {
-    $useNextPrevImageState.setKey('virtuosoRef', virtuosoRef);
-    $useNextPrevImageState.setKey('virtuosoRangeRef', virtuosoRangeRef);
+    virtuosoGridRefs.set({ rootRef, virtuosoRangeRef, virtuosoRef });
+    return () => {
+      virtuosoGridRefs.set({});
+    };
   }, []);
 
   if (!currentData) {
@@ -142,7 +107,7 @@ const GalleryImageGrid = () => {
   if (isSuccess && currentData) {
     return (
       <>
-        <Box ref={rootRef} data-overlayscrollbars="" h="100%">
+        <Box ref={rootRef} data-overlayscrollbars="" h="100%" id="gallery-grid">
           <VirtuosoGrid
             style={virtuosoStyles}
             data={currentData.ids}
@@ -152,13 +117,12 @@ const GalleryImageGrid = () => {
             itemContent={itemContentFunc}
             ref={virtuosoRef}
             rangeChanged={onRangeChanged}
-            context={virtuosoContext}
             overscan={10}
           />
         </Box>
         <InvButton
           onClick={handleLoadMoreImages}
-          isDisabled={!areMoreAvailable}
+          isDisabled={!areMoreImagesAvailable}
           isLoading={isFetching}
           loadingText={t('gallery.loading')}
           flexShrink={0}

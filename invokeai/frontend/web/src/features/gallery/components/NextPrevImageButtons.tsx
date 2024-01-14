@@ -1,7 +1,8 @@
 import type { ChakraProps } from '@chakra-ui/react';
 import { Box, Flex, Spinner } from '@chakra-ui/react';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { useNextPrevImage } from 'features/gallery/hooks/useNextPrevImage';
+import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
+import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaAngleDoubleRight, FaAngleLeft, FaAngleRight } from 'react-icons/fa';
@@ -14,15 +15,14 @@ const nextPrevButtonStyles: ChakraProps['sx'] = {
 const NextPrevImageButtons = () => {
   const { t } = useTranslation();
 
+  const { handleLeftImage, handleRightImage, isOnFirstImage, isOnLastImage } =
+    useGalleryNavigation();
+
   const {
-    handlePrevImage,
-    handleNextImage,
-    isOnFirstImage,
-    isOnLastImage,
-    handleLoadMoreImages,
     areMoreImagesAvailable,
-    isFetching,
-  } = useNextPrevImage();
+    handleLoadMoreImages,
+    queryResult: { isFetching },
+  } = useGalleryImages();
 
   return (
     <Box pos="relative" h="full" w="full">
@@ -30,14 +30,14 @@ const NextPrevImageButtons = () => {
         pos="absolute"
         top="50%"
         transform="translate(0, -50%)"
-        insetInlineStart={0}
+        insetInlineStart={1}
       >
         {!isOnFirstImage && (
           <InvIconButton
             aria-label={t('accessibility.previousImage')}
             icon={<FaAngleLeft size={64} />}
             variant="unstyled"
-            onClick={handlePrevImage}
+            onClick={handleLeftImage}
             boxSize={16}
             sx={nextPrevButtonStyles}
           />
@@ -47,14 +47,14 @@ const NextPrevImageButtons = () => {
         pos="absolute"
         top="50%"
         transform="translate(0, -50%)"
-        insetInlineEnd={0}
+        insetInlineEnd={6}
       >
         {!isOnLastImage && (
           <InvIconButton
             aria-label={t('accessibility.nextImage')}
             icon={<FaAngleRight size={64} />}
             variant="unstyled"
-            onClick={handleNextImage}
+            onClick={handleRightImage}
             boxSize={16}
             sx={nextPrevButtonStyles}
           />

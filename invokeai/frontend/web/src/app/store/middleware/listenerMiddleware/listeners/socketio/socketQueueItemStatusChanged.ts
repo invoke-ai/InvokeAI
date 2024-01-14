@@ -1,18 +1,15 @@
 import { logger } from 'app/logging/logger';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
-import {
-  appSocketQueueItemStatusChanged,
-  socketQueueItemStatusChanged,
-} from 'services/events/actions';
+import { socketQueueItemStatusChanged } from 'services/events/actions';
 
 import { startAppListening } from '../..';
+
+const log = logger('socketio');
 
 export const addSocketQueueItemStatusChangedEventListener = () => {
   startAppListening({
     actionCreator: socketQueueItemStatusChanged,
     effect: async (action, { dispatch }) => {
-      const log = logger('socketio');
-
       // we've got new status for the queue item, batch and queue
       const { queue_item, batch_status, queue_status } = action.payload.data;
 
@@ -73,9 +70,6 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
           'InvocationCacheStatus',
         ])
       );
-
-      // Pass the event along
-      dispatch(appSocketQueueItemStatusChanged(action.payload));
     },
   });
 };

@@ -8,24 +8,24 @@ import { t } from 'i18next';
 import { startCase } from 'lodash-es';
 import type { LogLevelName } from 'roarr';
 import {
-  appSocketConnected,
-  appSocketDisconnected,
-  appSocketGeneratorProgress,
-  appSocketGraphExecutionStateComplete,
-  appSocketInvocationComplete,
-  appSocketInvocationError,
-  appSocketInvocationRetrievalError,
-  appSocketInvocationStarted,
-  appSocketModelLoadCompleted,
-  appSocketModelLoadStarted,
-  appSocketQueueItemStatusChanged,
-  appSocketSessionRetrievalError,
+  socketConnected,
+  socketDisconnected,
+  socketGeneratorProgress,
+  socketGraphExecutionStateComplete,
+  socketInvocationComplete,
+  socketInvocationError,
+  socketInvocationRetrievalError,
+  socketInvocationStarted,
+  socketModelLoadCompleted,
+  socketModelLoadStarted,
+  socketQueueItemStatusChanged,
+  socketSessionRetrievalError,
 } from 'services/events/actions';
 
 import type { Language, SystemState } from './types';
 
 export const initialSystemState: SystemState = {
-  isInitialized: false,
+  _version: 1,
   isConnected: false,
   shouldConfirmOnDelete: true,
   enableImageDebugging: false,
@@ -84,15 +84,12 @@ export const systemSlice = createSlice({
     ) {
       state.shouldEnableInformationalPopovers = action.payload;
     },
-    isInitializedChanged(state, action: PayloadAction<boolean>) {
-      state.isInitialized = action.payload;
-    },
   },
   extraReducers(builder) {
     /**
      * Socket Connected
      */
-    builder.addCase(appSocketConnected, (state) => {
+    builder.addCase(socketConnected, (state) => {
       state.isConnected = true;
       state.denoiseProgress = null;
       state.status = 'CONNECTED';
@@ -101,7 +98,7 @@ export const systemSlice = createSlice({
     /**
      * Socket Disconnected
      */
-    builder.addCase(appSocketDisconnected, (state) => {
+    builder.addCase(socketDisconnected, (state) => {
       state.isConnected = false;
       state.denoiseProgress = null;
       state.status = 'DISCONNECTED';
@@ -110,7 +107,7 @@ export const systemSlice = createSlice({
     /**
      * Invocation Started
      */
-    builder.addCase(appSocketInvocationStarted, (state) => {
+    builder.addCase(socketInvocationStarted, (state) => {
       state.denoiseProgress = null;
       state.status = 'PROCESSING';
     });
@@ -118,7 +115,7 @@ export const systemSlice = createSlice({
     /**
      * Generator Progress
      */
-    builder.addCase(appSocketGeneratorProgress, (state, action) => {
+    builder.addCase(socketGeneratorProgress, (state, action) => {
       const {
         step,
         total_steps,
@@ -144,7 +141,7 @@ export const systemSlice = createSlice({
     /**
      * Invocation Complete
      */
-    builder.addCase(appSocketInvocationComplete, (state) => {
+    builder.addCase(socketInvocationComplete, (state) => {
       state.denoiseProgress = null;
       state.status = 'CONNECTED';
     });
@@ -152,20 +149,20 @@ export const systemSlice = createSlice({
     /**
      * Graph Execution State Complete
      */
-    builder.addCase(appSocketGraphExecutionStateComplete, (state) => {
+    builder.addCase(socketGraphExecutionStateComplete, (state) => {
       state.denoiseProgress = null;
       state.status = 'CONNECTED';
     });
 
-    builder.addCase(appSocketModelLoadStarted, (state) => {
+    builder.addCase(socketModelLoadStarted, (state) => {
       state.status = 'LOADING_MODEL';
     });
 
-    builder.addCase(appSocketModelLoadCompleted, (state) => {
+    builder.addCase(socketModelLoadCompleted, (state) => {
       state.status = 'CONNECTED';
     });
 
-    builder.addCase(appSocketQueueItemStatusChanged, (state, action) => {
+    builder.addCase(socketQueueItemStatusChanged, (state, action) => {
       if (
         ['completed', 'canceled', 'failed'].includes(
           action.payload.data.queue_item.status
@@ -205,15 +202,22 @@ export const {
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
   setShouldEnableInformationalPopovers,
-  isInitializedChanged,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;
 
 const isAnyServerError = isAnyOf(
-  appSocketInvocationError,
-  appSocketSessionRetrievalError,
-  appSocketInvocationRetrievalError
+  socketInvocationError,
+  socketSessionRetrievalError,
+  socketInvocationRetrievalError
 );
 
 export const selectSystemSlice = (state: RootState) => state.system;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateSystemState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

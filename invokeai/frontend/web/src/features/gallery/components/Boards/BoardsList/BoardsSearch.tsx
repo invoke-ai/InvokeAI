@@ -1,16 +1,15 @@
-import { CloseIcon } from '@chakra-ui/icons';
 import { Input, InputGroup, InputRightElement } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import type { ChangeEvent, KeyboardEvent } from 'react';
-import { memo, useCallback, useEffect, useRef } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiXBold } from 'react-icons/pi';
 
 const BoardsSearch = () => {
   const dispatch = useAppDispatch();
   const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
-  const inputRef = useRef<HTMLInputElement>(null);
   const { t } = useTranslation();
 
   const handleBoardSearch = useCallback(
@@ -41,18 +40,9 @@ const BoardsSearch = () => {
     [handleBoardSearch]
   );
 
-  useEffect(() => {
-    // focus the search box on mount
-    if (!inputRef.current) {
-      return;
-    }
-    inputRef.current.focus();
-  }, []);
-
   return (
     <InputGroup>
       <Input
-        ref={inputRef}
         placeholder={t('boards.searchBoard')}
         value={boardSearchText}
         onKeyDown={handleKeydown}
@@ -66,7 +56,7 @@ const BoardsSearch = () => {
             size="sm"
             variant="ghost"
             aria-label={t('boards.clearSearch')}
-            icon={<CloseIcon boxSize={3} />}
+            icon={<PiXBold />}
           />
         </InputRightElement>
       )}
