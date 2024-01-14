@@ -85,7 +85,15 @@ def invoke_next(g: GraphExecutionState, services: InvocationServices) -> tuple[B
     print(f"invoking {n.id}: {type(n)}")
     o = n.invoke(
         InvocationContext(
-            conditioning=None, config=None, data=None, images=None, latents=None, logger=None, models=None, util=None
+            conditioning=None,
+            config=None,
+            data=None,
+            images=None,
+            latents=None,
+            logger=None,
+            models=None,
+            util=None,
+            services=None,
         )
     )
     g.complete(n.id, o)
