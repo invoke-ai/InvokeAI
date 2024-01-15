@@ -29,6 +29,6 @@ class DummyEventService(EventServiceBase):
 
 
 @pytest.fixture
-def mock_event_service() -> EventServiceBase:
+def mock_event_service() -> DummyEventService:
     """Create a dummy event service."""
     return DummyEventService()
