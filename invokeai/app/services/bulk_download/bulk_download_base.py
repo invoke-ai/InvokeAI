@@ -59,3 +59,11 @@ class BulkDownloadBase(ABC):
         Returns:
             None
         """
+
+    @abstractmethod
+    def delete(self, bulk_download_item_name: str) -> None:
+        """
+        Delete the bulk download file.
+
+        :param bulk_download_item_name: The name of the bulk download item.
+        """
