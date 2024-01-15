@@ -293,7 +293,7 @@ def test_handler_on_generic_exception(
 
     monkeypatch.setattr(mock_invoker.services.images, "get_dto", mock_get_board_name)
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception): # noqa: B017
         execute_handler_test_on_error(tmp_path, monkeypatch, mock_image_dto, mock_invoker, exception)
 
     event_bus: DummyEventService = mock_invoker.services.events
@@ -317,3 +317,17 @@ def execute_handler_test_on_error(
     assert event_bus.events[0].event_name == "bulk_download_started"
     assert event_bus.events[1].event_name == "bulk_download_failed"
     assert event_bus.events[1].payload["error"] == error.__str__()
+
+
+def test_delete(tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker):
+    """Test that the delete method removes the bulk download file."""
+
+    bulk_download_service = BulkDownloadService(tmp_path)
+
+    mock_file: Path = tmp_path / "bulk_downloads" / "test.zip"
+    mock_file.write_text("contents")
+
+    bulk_download_service.delete("test.zip")
+
+    assert (tmp_path / "bulk_downloads").exists()
+    assert len(os.listdir(tmp_path / "bulk_downloads")) == 0
