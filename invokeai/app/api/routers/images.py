@@ -409,10 +409,10 @@ async def download_images_from_list(
     },
 )
 async def get_bulk_download_item(
+    background_tasks: BackgroundTasks,
     bulk_download_item_name: str = Path(description="The bulk_download_item_id of the bulk download item to get"),
 ) -> FileResponse:
     """Gets a bulk download zip file"""
-
     try:
         path = ApiDependencies.invoker.services.bulk_download.get_path(bulk_download_item_name)
 
@@ -423,6 +423,7 @@ async def get_bulk_download_item(
             content_disposition_type="inline",
         )
         response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
+        background_tasks.add_task(ApiDependencies.invoker.services.bulk_download.delete, bulk_download_item_name)
         return response
     except Exception:
         raise HTTPException(status_code=404)

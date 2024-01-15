@@ -38,23 +38,6 @@ class BulkDownloadService(BulkDownloadBase):
         self.__bulk_downloads_folder = self.__output_folder / "bulk_downloads"
         self.__bulk_downloads_folder.mkdir(parents=True, exist_ok=True)
 
-    def get_path(self, bulk_download_item_name: str) -> str:
-        """
-        Get the path to the bulk download file.
-
-        :param bulk_download_item_name: The name of the bulk download item.
-        :return: The path to the bulk download file.
-        """
-        path = str(self.__bulk_downloads_folder / bulk_download_item_name)
-        if not self.validate_path(path):
-            raise BulkDownloadTargetException()
-        return path
-
-    def validate_path(self, path: Union[str, Path]) -> bool:
-        """Validates the path given for a bulk download."""
-        path = path if isinstance(path, Path) else Path(path)
-        return path.exists()
-
     def handler(self, image_names: list[str], board_id: Optional[str]) -> None:
         """
         Create a zip file containing the images specified by the given image names or board id.
@@ -166,3 +149,29 @@ class BulkDownloadService(BulkDownloadBase):
         # Delete all the files
         for file in files:
             file.unlink()
+
+    def delete(self, bulk_download_item_name: str) -> None:
+        """
+        Delete the bulk download file.
+
+        :param bulk_download_item_name: The name of the bulk download item.
+        """
+        path = self.get_path(bulk_download_item_name)
+        Path(path).unlink()
+
+    def get_path(self, bulk_download_item_name: str) -> str:
+        """
+        Get the path to the bulk download file.
+
+        :param bulk_download_item_name: The name of the bulk download item.
+        :return: The path to the bulk download file.
+        """
+        path = str(self.__bulk_downloads_folder / bulk_download_item_name)
+        if not self.validate_path(path):
+            raise BulkDownloadTargetException()
+        return path
+
+    def validate_path(self, path: Union[str, Path]) -> bool:
+        """Validates the path given for a bulk download."""
+        path = path if isinstance(path, Path) else Path(path)
+        return path.exists()
