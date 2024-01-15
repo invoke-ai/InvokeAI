@@ -50,6 +50,7 @@ def mock_services() -> InvocationServices:
         board_images=None,  # type: ignore
         board_records=None,  # type: ignore
         boards=None,  # type: ignore
+        bulk_download=None,  # type: ignore
         configuration=configuration,
         events=TestEventService(),
         image_files=None,  # type: ignore
