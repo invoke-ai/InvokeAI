@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional, Union
 
-from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 
 
@@ -19,16 +18,11 @@ class BulkDownloadBase(ABC):
         """
 
     @abstractmethod
-    def __init__(
-        self,
-        output_folder: Union[str, Path],
-        event_bus: Optional["EventServiceBase"] = None,
-    ):
+    def __init__(self, output_folder: Union[str, Path]):
         """
         Create BulkDownloadBase object.
 
         :param output_folder: The path to the output folder where the bulk download files can be temporarily stored.
-        :param event_bus: InvokeAI event bus for reporting events to.
         """
 
     @abstractmethod
