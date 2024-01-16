@@ -25,7 +25,6 @@ To use a community workflow, download the the `.json` node graph file and load i
     + [GPT2RandomPromptMaker](#gpt2randompromptmaker)
     + [Grid to Gif](#grid-to-gif)
     + [Halftone](#halftone)
-    + [Ideal Size](#ideal-size)
     + [Image and Mask Composition Pack](#image-and-mask-composition-pack)
     + [Image Dominant Color](#image-dominant-color)
     + [Image to Character Art Image Nodes](#image-to-character-art-image-nodes)
@@ -195,13 +194,6 @@ Halftone Output:
 CMYK Halftone Output:
 
 <img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/c59c578f-db8e-4d66-8c66-2851752d75ea" width="300" />
-
---------------------------------
-### Ideal Size
-
-**Description:** This node calculates an ideal image size for a first pass of a multi-pass upscaling. The aim is to avoid duplication that results from choosing a size larger than the model is capable of.
-
-**Node Link:** https://github.com/JPPhoto/ideal-size-node
 
 --------------------------------
 ### Image and Mask Composition Pack
