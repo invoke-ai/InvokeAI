@@ -293,7 +293,7 @@ def test_handler_on_generic_exception(
 
     monkeypatch.setattr(mock_invoker.services.images, "get_dto", mock_get_board_name)
 
-    with pytest.raises(Exception): # noqa: B017
+    with pytest.raises(Exception):  # noqa: B017
         execute_handler_test_on_error(tmp_path, monkeypatch, mock_image_dto, mock_invoker, exception)
 
     event_bus: DummyEventService = mock_invoker.services.events
