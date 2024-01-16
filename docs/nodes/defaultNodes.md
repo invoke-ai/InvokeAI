@@ -36,6 +36,7 @@ their descriptions.
 | Integer Math                                                  | Perform basic math operations on two integers                                                                                                        |
 | Convert Image Mode                                            | Converts an image to a different mode.                                                                                                               |
 | Crop Image                                                    | Crops an image to a specified box. The box can be outside of the image.                                                                              |
+| Ideal Size                                                    | Calculates an ideal image size for latents for a first pass of a multi-pass upscaling to avoid duplication and other artifacts                       |
 | Image Hue Adjustment                                          | Adjusts the Hue of an image.                                                                                                                         |
 | Inverse Lerp Image                                            | Inverse linear interpolation of all pixels of an image                                                                                               |
 | Image Primitive                                               | An image primitive value                                                                                                                             |
