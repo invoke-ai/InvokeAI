@@ -119,6 +119,7 @@ dependencies = [
   "pytest-cov",
   "pytest-datadir",
   "requests_testadapter",
+  "httpx",
 ]
 
 [project.scripts]
