@@ -11,6 +11,7 @@ import { useGlobalMenuClose } from 'common/hooks/useGlobalMenuClose';
 import AboutModal from 'features/system/components/AboutModal/AboutModal';
 import HotkeysModal from 'features/system/components/HotkeysModal/HotkeysModal';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { discordLink, githubLink } from 'features/system/store/constants';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -30,9 +31,6 @@ const SettingsMenu = () => {
   const isBugLinkEnabled = useFeatureStatus('bugLink').isFeatureEnabled;
   const isDiscordLinkEnabled = useFeatureStatus('discordLink').isFeatureEnabled;
   const isGithubLinkEnabled = useFeatureStatus('githubLink').isFeatureEnabled;
-
-  const githubLink = 'http://github.com/invoke-ai/InvokeAI';
-  const discordLink = 'https://discord.gg/ZmtBAhwWhy';
 
   return (
     <InvMenu isOpen={isOpen} onOpen={onOpen} onClose={onClose}>
