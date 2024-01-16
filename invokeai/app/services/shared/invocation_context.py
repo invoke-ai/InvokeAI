@@ -45,7 +45,7 @@ Note: The docstrings are in weird places, but that's where they must be to get I
 """
 
 
-@dataclass(frozen=True)
+@dataclass
 class InvocationContextData:
     invocation: "BaseInvocation"
     """The invocation that is being executed."""
