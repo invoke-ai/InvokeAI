@@ -284,17 +284,36 @@ module = [
 #=== End: MyPy
 
 [tool.pyright]
-include = [
-  "invokeai/app/invocations/"
-]
-exclude = [
-  "**/node_modules",
-  "**/__pycache__",
-  "invokeai/app/invocations/onnx.py",
-  "invokeai/app/api/routers/models.py",
-  "invokeai/app/services/invocation_stats/invocation_stats_default.py",
-  "invokeai/app/services/model_manager/model_manager_base.py",
-  "invokeai/app/services/model_manager/model_manager_default.py",
-  "invokeai/app/services/model_records/model_records_sql.py",
-  "invokeai/app/util/controlnet_utils.py",
-]
+# Start from strict mode
+typeCheckingMode = "strict"
+# This errors whenever an import is missing a type stub file - way too noisy
+reportMissingTypeStubs = "none"
+# These are the rest of the rules enabled by strict mode - enable them @ warning
+reportConstantRedefinition = "warning"
+reportDeprecated = "warning"
+reportDuplicateImport = "warning"
+reportIncompleteStub = "warning"
+reportInconsistentConstructor = "warning"
+reportInvalidStubStatement = "warning"
+reportMatchNotExhaustive = "warning"
+reportMissingParameterType = "warning"
+reportMissingTypeArgument = "warning"
+reportPrivateUsage = "warning"
+reportTypeCommentUsage = "warning"
+reportUnknownArgumentType = "warning"
+reportUnknownLambdaType = "warning"
+reportUnknownMemberType = "warning"
+reportUnknownParameterType = "warning"
+reportUnknownVariableType = "warning"
+reportUnnecessaryCast = "warning"
+reportUnnecessaryComparison = "warning"
+reportUnnecessaryContains = "warning"
+reportUnnecessaryIsInstance = "warning"
+reportUnusedClass = "warning"
+reportUnusedImport = "warning"
+reportUnusedFunction = "warning"
+reportUnusedVariable = "warning"
+reportUntypedBaseClass = "warning"
+reportUntypedClassDecorator = "warning"
+reportUntypedFunctionDecorator = "warning"
+reportUntypedNamedTuple = "warning"
