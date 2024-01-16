@@ -1,13 +1,12 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { controlAdapterAdded } from 'features/controlAdapters/store/controlAdaptersSlice';
+import type { ControlAdapterType } from 'features/controlAdapters/store/types';
 import { useCallback, useMemo } from 'react';
-import { ControlAdapterType } from 'features/controlAdapters/store/types';
+
 import { useControlAdapterModels } from './useControlAdapterModels';
 
 export const useAddControlAdapter = (type: ControlAdapterType) => {
-  const baseModel = useAppSelector(
-    (state) => state.generation.model?.base_model
-  );
+  const baseModel = useAppSelector((s) => s.generation.model?.base_model);
   const dispatch = useAppDispatch();
 
   const models = useControlAdapterModels(type);

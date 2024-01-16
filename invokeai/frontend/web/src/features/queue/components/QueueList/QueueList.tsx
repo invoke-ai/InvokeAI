@@ -1,54 +1,29 @@
 import { Flex, Heading } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
+import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import {
   listCursorChanged,
   listPriorityChanged,
 } from 'features/queue/store/queueSlice';
-import {
-  UseOverlayScrollbarsParams,
-  useOverlayScrollbars,
-} from 'overlayscrollbars-react';
+import { useOverlayScrollbars } from 'overlayscrollbars-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Components, ItemContent, Virtuoso } from 'react-virtuoso';
+import type { Components, ItemContent } from 'react-virtuoso';
+import { Virtuoso } from 'react-virtuoso';
 import {
-  queueItemsAdapter,
+  queueItemsAdapterSelectors,
   useListQueueItemsQuery,
 } from 'services/api/endpoints/queue';
-import { SessionQueueItemDTO } from 'services/api/types';
+import type { SessionQueueItemDTO } from 'services/api/types';
+
 import QueueItemComponent from './QueueItemComponent';
 import QueueListComponent from './QueueListComponent';
 import QueueListHeader from './QueueListHeader';
-import { ListContext } from './types';
+import type { ListContext } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TableVirtuosoScrollerRef = (ref: HTMLElement | Window | null) => any;
-
-const overlayScrollbarsConfig: UseOverlayScrollbarsParams = {
-  defer: true,
-  options: {
-    scrollbars: {
-      visibility: 'auto',
-      autoHide: 'scroll',
-      autoHideDelay: 1300,
-      theme: 'os-theme-dark',
-    },
-    overflow: { x: 'hidden' },
-  },
-};
-
-const selector = createSelector(
-  stateSelector,
-  ({ queue }) => {
-    const { listCursor, listPriority } = queue;
-    return { listCursor, listPriority };
-  },
-  defaultSelectorOptions
-);
 
 const computeItemKey = (index: number, item: SessionQueueItemDTO): number =>
   item.item_id;
@@ -64,12 +39,13 @@ const itemContent: ItemContent<SessionQueueItemDTO, ListContext> = (
 ) => <QueueItemComponent index={index} item={item} context={context} />;
 
 const QueueList = () => {
-  const { listCursor, listPriority } = useAppSelector(selector);
+  const listCursor = useAppSelector((s) => s.queue.listCursor);
+  const listPriority = useAppSelector((s) => s.queue.listPriority);
   const dispatch = useAppDispatch();
   const rootRef = useRef<HTMLDivElement>(null);
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
   const [initialize, osInstance] = useOverlayScrollbars(
-    overlayScrollbarsConfig
+    overlayScrollbarsParams
   );
   const { t } = useTranslation();
 
@@ -95,7 +71,7 @@ const QueueList = () => {
     if (!listQueueItemsData) {
       return [];
     }
-    return queueItemsAdapter.getSelectors().selectAll(listQueueItemsData);
+    return queueItemsAdapterSelectors.selectAll(listQueueItemsData);
   }, [listQueueItemsData]);
 
   const handleLoadMore = useCallback(() => {
@@ -133,9 +109,7 @@ const QueueList = () => {
   if (!queueItems.length) {
     return (
       <Flex w="full" h="full" alignItems="center" justifyContent="center">
-        <Heading color="base.400" _dark={{ color: 'base.500' }}>
-          {t('queue.queueEmpty')}
-        </Heading>
+        <Heading color="base.500">{t('queue.queueEmpty')}</Heading>
       </Flex>
     );
   }

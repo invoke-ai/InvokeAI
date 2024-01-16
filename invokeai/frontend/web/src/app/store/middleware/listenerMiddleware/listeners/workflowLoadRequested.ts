@@ -1,7 +1,9 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
-import { workflowLoadRequested } from 'features/nodes/store/actions';
-import { workflowLoaded } from 'features/nodes/store/nodesSlice';
+import {
+  workflowLoaded,
+  workflowLoadRequested,
+} from 'features/nodes/store/actions';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
 import {
   WorkflowMigrationError,
@@ -14,6 +16,7 @@ import { setActiveTab } from 'features/ui/store/uiSlice';
 import { t } from 'i18next';
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
+
 import { startAppListening } from '..';
 
 export const addWorkflowLoadRequestedListener = () => {
@@ -21,14 +24,20 @@ export const addWorkflowLoadRequestedListener = () => {
     actionCreator: workflowLoadRequested,
     effect: (action, { dispatch, getState }) => {
       const log = logger('nodes');
-      const workflow = action.payload;
-      const nodeTemplates = getState().nodes.nodeTemplates;
+      const { workflow, asCopy } = action.payload;
+      const nodeTemplates = getState().nodeTemplates.templates;
 
       try {
         const { workflow: validatedWorkflow, warnings } = validateWorkflow(
           workflow,
           nodeTemplates
         );
+
+        if (asCopy) {
+          // If we're loading a copy, we need to remove the ID so that the backend will create a new workflow
+          delete validatedWorkflow.id;
+        }
+
         dispatch(workflowLoaded(validatedWorkflow));
         if (!warnings.length) {
           dispatch(
@@ -99,7 +108,6 @@ export const addWorkflowLoadRequestedListener = () => {
           );
         } else {
           // Some other error occurred
-          console.log(e);
           log.error(
             { error: parseify(e) },
             t('nodes.unknownErrorValidatingWorkflow')

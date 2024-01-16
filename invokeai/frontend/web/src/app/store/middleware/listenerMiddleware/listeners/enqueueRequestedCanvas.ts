@@ -14,7 +14,8 @@ import { buildCanvasGraph } from 'features/nodes/util/graph/buildCanvasGraph';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { imagesApi } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
-import { ImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
+
 import { startAppListening } from '..';
 
 /**

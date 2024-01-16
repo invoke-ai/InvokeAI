@@ -1,41 +1,15 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { cloneDeep, forEach, isEqual, uniqBy } from 'lodash-es';
-import {
-  addEdge,
-  applyEdgeChanges,
-  applyNodeChanges,
-  Connection,
-  Edge,
-  EdgeChange,
-  EdgeRemoveChange,
-  getConnectedEdges,
-  getIncomers,
-  getOutgoers,
-  Node,
-  NodeChange,
-  OnConnectStartParams,
-  SelectionMode,
-  updateEdge,
-  Viewport,
-  XYPosition,
-} from 'reactflow';
-import { receivedOpenAPISchema } from 'services/api/thunks/schema';
-import {
-  appSocketGeneratorProgress,
-  appSocketInvocationComplete,
-  appSocketInvocationError,
-  appSocketInvocationStarted,
-  appSocketQueueItemStatusChanged,
-} from 'services/events/actions';
-import { v4 as uuidv4 } from 'uuid';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
+import { workflowLoaded } from 'features/nodes/store/actions';
+import { nodeTemplatesBuilt } from 'features/nodes/store/nodeTemplatesSlice';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
-import {
+import type {
   BoardFieldValue,
   BooleanFieldValue,
   ColorFieldValue,
   ControlNetModelFieldValue,
   EnumFieldValue,
-  FieldIdentifier,
   FieldValue,
   FloatFieldValue,
   ImageFieldValue,
@@ -50,15 +24,66 @@ import {
   VAEModelFieldValue,
 } from 'features/nodes/types/field';
 import {
+  zBoardFieldValue,
+  zBooleanFieldValue,
+  zColorFieldValue,
+  zControlNetModelFieldValue,
+  zEnumFieldValue,
+  zFloatFieldValue,
+  zImageFieldValue,
+  zIntegerFieldValue,
+  zIPAdapterModelFieldValue,
+  zLoRAModelFieldValue,
+  zMainModelFieldValue,
+  zSchedulerFieldValue,
+  zSDXLRefinerModelFieldValue,
+  zStringFieldValue,
+  zT2IAdapterModelFieldValue,
+  zVAEModelFieldValue,
+} from 'features/nodes/types/field';
+import type {
   AnyNode,
-  InvocationTemplate,
+  NodeExecutionState,
+} from 'features/nodes/types/invocation';
+import {
   isInvocationNode,
   isNotesNode,
-  NodeExecutionState,
   zNodeStatus,
 } from 'features/nodes/types/invocation';
-import { WorkflowV2 } from 'features/nodes/types/workflow';
-import { NodesState } from './types';
+import { cloneDeep, forEach } from 'lodash-es';
+import type {
+  Connection,
+  Edge,
+  EdgeChange,
+  EdgeRemoveChange,
+  Node,
+  NodeChange,
+  OnConnectStartParams,
+  Viewport,
+  XYPosition,
+} from 'reactflow';
+import {
+  addEdge,
+  applyEdgeChanges,
+  applyNodeChanges,
+  getConnectedEdges,
+  getIncomers,
+  getOutgoers,
+  SelectionMode,
+  updateEdge,
+} from 'reactflow';
+import { receivedOpenAPISchema } from 'services/api/thunks/schema';
+import {
+  socketGeneratorProgress,
+  socketInvocationComplete,
+  socketInvocationError,
+  socketInvocationStarted,
+  socketQueueItemStatusChanged,
+} from 'services/events/actions';
+import { v4 as uuidv4 } from 'uuid';
+import type { z } from 'zod';
+
+import type { NodesState } from './types';
 import { findConnectionToValidHandle } from './util/findConnectionToValidHandle';
 import { findUnoccupiedPosition } from './util/findUnoccupiedPosition';
 
@@ -70,24 +95,10 @@ const initialNodeExecutionState: Omit<NodeExecutionState, 'nodeId'> = {
   outputs: [],
 };
 
-const INITIAL_WORKFLOW: WorkflowV2 = {
-  name: '',
-  author: '',
-  description: '',
-  version: '',
-  contact: '',
-  tags: '',
-  notes: '',
-  nodes: [],
-  edges: [],
-  exposedFields: [],
-  meta: { version: '2.0.0' },
-};
-
 export const initialNodesState: NodesState = {
+  _version: 1,
   nodes: [],
   edges: [],
-  nodeTemplates: {},
   isReady: false,
   connectionStartParams: null,
   connectionStartFieldType: null,
@@ -103,11 +114,8 @@ export const initialNodesState: NodesState = {
   nodeOpacity: 1,
   selectedNodes: [],
   selectedEdges: [],
-  workflow: INITIAL_WORKFLOW,
   nodeExecutionStates: {},
   viewport: { x: 0, y: 0, zoom: 1 },
-  mouseOverField: null,
-  mouseOverNode: null,
   nodesToCopy: [],
   edgesToCopy: [],
   selectionMode: SelectionMode.Partial,
@@ -121,7 +129,8 @@ type FieldValueAction<T extends FieldValue> = PayloadAction<{
 
 const fieldValueReducer = <T extends FieldValue>(
   state: NodesState,
-  action: FieldValueAction<T>
+  action: FieldValueAction<T>,
+  schema: z.ZodTypeAny
 ) => {
   const { nodeId, fieldName, value } = action.payload;
   const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
@@ -130,12 +139,11 @@ const fieldValueReducer = <T extends FieldValue>(
     return;
   }
   const input = node.data?.inputs[fieldName];
-  if (!input) {
+  const result = schema.safeParse(value);
+  if (!input || nodeIndex < 0 || !result.success) {
     return;
   }
-  if (nodeIndex > -1) {
-    input.value = value;
-  }
+  input.value = result.data;
 };
 
 const nodesSlice = createSlice({
@@ -263,11 +271,18 @@ const nodesSlice = createSlice({
 
       state.connectionMade = true;
     },
-    connectionEnded: (state, action) => {
+    connectionEnded: (
+      state,
+      action: PayloadAction<{
+        cursorPosition: XYPosition;
+        mouseOverNodeId: string | null;
+      }>
+    ) => {
+      const { cursorPosition, mouseOverNodeId } = action.payload;
       if (!state.connectionMade) {
-        if (state.mouseOverNode) {
+        if (mouseOverNodeId) {
           const nodeIndex = state.nodes.findIndex(
-            (n) => n.id === state.mouseOverNode
+            (n) => n.id === mouseOverNodeId
           );
           const mouseOverNode = state.nodes?.[nodeIndex];
           if (mouseOverNode && state.connectionStartParams) {
@@ -299,7 +314,7 @@ const nodesSlice = createSlice({
           state.connectionStartParams = null;
           state.connectionStartFieldType = null;
         } else {
-          state.addNewNodePosition = action.payload.cursorPosition;
+          state.addNewNodePosition = cursorPosition;
           state.isAddNodePopoverOpen = true;
         }
       } else {
@@ -307,23 +322,6 @@ const nodesSlice = createSlice({
         state.connectionStartFieldType = null;
       }
       state.modifyingEdge = false;
-    },
-    workflowExposedFieldAdded: (
-      state,
-      action: PayloadAction<FieldIdentifier>
-    ) => {
-      state.workflow.exposedFields = uniqBy(
-        state.workflow.exposedFields.concat(action.payload),
-        (field) => `${field.nodeId}-${field.fieldName}`
-      );
-    },
-    workflowExposedFieldRemoved: (
-      state,
-      action: PayloadAction<FieldIdentifier>
-    ) => {
-      state.workflow.exposedFields = state.workflow.exposedFields.filter(
-        (field) => !isEqual(field, action.payload)
-      );
     },
     fieldLabelChanged: (
       state,
@@ -343,20 +341,6 @@ const nodesSlice = createSlice({
         return;
       }
       field.label = label;
-    },
-    nodeEmbedWorkflowChanged: (
-      state,
-      action: PayloadAction<{ nodeId: string; embedWorkflow: boolean }>
-    ) => {
-      const { nodeId, embedWorkflow } = action.payload;
-      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
-
-      const node = state.nodes?.[nodeIndex];
-
-      if (!isInvocationNode(node)) {
-        return;
-      }
-      node.data.embedWorkflow = embedWorkflow;
     },
     nodeUseCacheChanged: (
       state,
@@ -522,9 +506,6 @@ const nodesSlice = createSlice({
     },
     nodesDeleted: (state, action: PayloadAction<AnyNode[]>) => {
       action.payload.forEach((node) => {
-        state.workflow.exposedFields = state.workflow.exposedFields.filter(
-          (f) => f.nodeId !== node.id
-        );
         if (!isInvocationNode(node)) {
           return;
         }
@@ -576,91 +557,91 @@ const nodesSlice = createSlice({
       state,
       action: FieldValueAction<StringFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zStringFieldValue);
     },
     fieldNumberValueChanged: (
       state,
       action: FieldValueAction<IntegerFieldValue | FloatFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zIntegerFieldValue.or(zFloatFieldValue));
     },
     fieldBooleanValueChanged: (
       state,
       action: FieldValueAction<BooleanFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zBooleanFieldValue);
     },
     fieldBoardValueChanged: (
       state,
       action: FieldValueAction<BoardFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zBoardFieldValue);
     },
     fieldImageValueChanged: (
       state,
       action: FieldValueAction<ImageFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zImageFieldValue);
     },
     fieldColorValueChanged: (
       state,
       action: FieldValueAction<ColorFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zColorFieldValue);
     },
     fieldMainModelValueChanged: (
       state,
       action: FieldValueAction<MainModelFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zMainModelFieldValue);
     },
     fieldRefinerModelValueChanged: (
       state,
       action: FieldValueAction<SDXLRefinerModelFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zSDXLRefinerModelFieldValue);
     },
     fieldVaeModelValueChanged: (
       state,
       action: FieldValueAction<VAEModelFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zVAEModelFieldValue);
     },
     fieldLoRAModelValueChanged: (
       state,
       action: FieldValueAction<LoRAModelFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zLoRAModelFieldValue);
     },
     fieldControlNetModelValueChanged: (
       state,
       action: FieldValueAction<ControlNetModelFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zControlNetModelFieldValue);
     },
     fieldIPAdapterModelValueChanged: (
       state,
       action: FieldValueAction<IPAdapterModelFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zIPAdapterModelFieldValue);
     },
     fieldT2IAdapterModelValueChanged: (
       state,
       action: FieldValueAction<T2IAdapterModelFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zT2IAdapterModelFieldValue);
     },
     fieldEnumModelValueChanged: (
       state,
       action: FieldValueAction<EnumFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zEnumFieldValue);
     },
     fieldSchedulerValueChanged: (
       state,
       action: FieldValueAction<SchedulerFieldValue>
     ) => {
-      fieldValueReducer(state, action);
+      fieldValueReducer(state, action, zSchedulerFieldValue);
     },
     notesNodeValueChanged: (
       state,
@@ -677,17 +658,9 @@ const nodesSlice = createSlice({
     shouldShowMinimapPanelChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowMinimapPanel = action.payload;
     },
-    nodeTemplatesBuilt: (
-      state,
-      action: PayloadAction<Record<string, InvocationTemplate>>
-    ) => {
-      state.nodeTemplates = action.payload;
-      state.isReady = true;
-    },
     nodeEditorReset: (state) => {
       state.nodes = [];
       state.edges = [];
-      state.workflow = cloneDeep(INITIAL_WORKFLOW);
     },
     shouldValidateGraphChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldValidateGraph = action.payload;
@@ -704,67 +677,8 @@ const nodesSlice = createSlice({
     nodeOpacityChanged: (state, action: PayloadAction<number>) => {
       state.nodeOpacity = action.payload;
     },
-    workflowNameChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.name = action.payload;
-    },
-    workflowDescriptionChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.description = action.payload;
-    },
-    workflowTagsChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.tags = action.payload;
-    },
-    workflowAuthorChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.author = action.payload;
-    },
-    workflowNotesChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.notes = action.payload;
-    },
-    workflowVersionChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.version = action.payload;
-    },
-    workflowContactChanged: (state, action: PayloadAction<string>) => {
-      state.workflow.contact = action.payload;
-    },
-    workflowLoaded: (state, action: PayloadAction<WorkflowV2>) => {
-      const { nodes, edges, ...workflow } = action.payload;
-      state.workflow = workflow;
-
-      state.nodes = applyNodeChanges(
-        nodes.map((node) => ({
-          item: { ...node, ...SHARED_NODE_PROPERTIES },
-          type: 'add',
-        })),
-        []
-      );
-      state.edges = applyEdgeChanges(
-        edges.map((edge) => ({ item: edge, type: 'add' })),
-        []
-      );
-
-      state.nodeExecutionStates = nodes.reduce<
-        Record<string, NodeExecutionState>
-      >((acc, node) => {
-        acc[node.id] = {
-          nodeId: node.id,
-          ...initialNodeExecutionState,
-        };
-        return acc;
-      }, {});
-    },
-    workflowReset: (state) => {
-      state.workflow = cloneDeep(INITIAL_WORKFLOW);
-    },
     viewportChanged: (state, action: PayloadAction<Viewport>) => {
       state.viewport = action.payload;
-    },
-    mouseOverFieldChanged: (
-      state,
-      action: PayloadAction<FieldIdentifier | null>
-    ) => {
-      state.mouseOverField = action.payload;
-    },
-    mouseOverNodeChanged: (state, action: PayloadAction<string | null>) => {
-      state.mouseOverNode = action.payload;
     },
     selectedAll: (state) => {
       state.nodes = applyNodeChanges(
@@ -899,14 +813,40 @@ const nodesSlice = createSlice({
     builder.addCase(receivedOpenAPISchema.pending, (state) => {
       state.isReady = false;
     });
-    builder.addCase(appSocketInvocationStarted, (state, action) => {
+
+    builder.addCase(workflowLoaded, (state, action) => {
+      const { nodes, edges } = action.payload;
+      state.nodes = applyNodeChanges(
+        nodes.map((node) => ({
+          item: { ...node, ...SHARED_NODE_PROPERTIES },
+          type: 'add',
+        })),
+        []
+      );
+      state.edges = applyEdgeChanges(
+        edges.map((edge) => ({ item: edge, type: 'add' })),
+        []
+      );
+
+      state.nodeExecutionStates = nodes.reduce<
+        Record<string, NodeExecutionState>
+      >((acc, node) => {
+        acc[node.id] = {
+          nodeId: node.id,
+          ...initialNodeExecutionState,
+        };
+        return acc;
+      }, {});
+    });
+
+    builder.addCase(socketInvocationStarted, (state, action) => {
       const { source_node_id } = action.payload.data;
       const node = state.nodeExecutionStates[source_node_id];
       if (node) {
         node.status = zNodeStatus.enum.IN_PROGRESS;
       }
     });
-    builder.addCase(appSocketInvocationComplete, (state, action) => {
+    builder.addCase(socketInvocationComplete, (state, action) => {
       const { source_node_id, result } = action.payload.data;
       const nes = state.nodeExecutionStates[source_node_id];
       if (nes) {
@@ -917,7 +857,7 @@ const nodesSlice = createSlice({
         nes.outputs.push(result);
       }
     });
-    builder.addCase(appSocketInvocationError, (state, action) => {
+    builder.addCase(socketInvocationError, (state, action) => {
       const { source_node_id } = action.payload.data;
       const node = state.nodeExecutionStates[source_node_id];
       if (node) {
@@ -927,7 +867,7 @@ const nodesSlice = createSlice({
         node.progressImage = null;
       }
     });
-    builder.addCase(appSocketGeneratorProgress, (state, action) => {
+    builder.addCase(socketGeneratorProgress, (state, action) => {
       const { source_node_id, step, total_steps, progress_image } =
         action.payload.data;
       const node = state.nodeExecutionStates[source_node_id];
@@ -937,7 +877,7 @@ const nodesSlice = createSlice({
         node.progressImage = progress_image ?? null;
       }
     });
-    builder.addCase(appSocketQueueItemStatusChanged, (state, action) => {
+    builder.addCase(socketQueueItemStatusChanged, (state, action) => {
       if (['in_progress'].includes(action.payload.data.queue_item.status)) {
         forEach(state.nodeExecutionStates, (nes) => {
           nes.status = zNodeStatus.enum.PENDING;
@@ -947,6 +887,9 @@ const nodesSlice = createSlice({
           nes.outputs = [];
         });
       }
+    });
+    builder.addCase(nodeTemplatesBuilt, (state) => {
+      state.isReady = true;
     });
   },
 });
@@ -979,12 +922,9 @@ export const {
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
   fieldVaeModelValueChanged,
-  mouseOverFieldChanged,
-  mouseOverNodeChanged,
   nodeAdded,
   nodeReplaced,
   nodeEditorReset,
-  nodeEmbedWorkflowChanged,
   nodeExclusivelySelected,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
@@ -993,7 +933,6 @@ export const {
   nodeOpacityChanged,
   nodesChanged,
   nodesDeleted,
-  nodeTemplatesBuilt,
   nodeUseCacheChanged,
   notesNodeValueChanged,
   selectedAll,
@@ -1008,17 +947,55 @@ export const {
   shouldSnapToGridChanged,
   shouldValidateGraphChanged,
   viewportChanged,
-  workflowAuthorChanged,
-  workflowContactChanged,
-  workflowDescriptionChanged,
-  workflowExposedFieldAdded,
-  workflowExposedFieldRemoved,
-  workflowLoaded,
-  workflowNameChanged,
-  workflowNotesChanged,
-  workflowTagsChanged,
-  workflowVersionChanged,
   edgeAdded,
 } = nodesSlice.actions;
 
+// This is used for tracking `state.workflow.isTouched`
+export const isAnyNodeOrEdgeMutation = isAnyOf(
+  connectionEnded,
+  connectionMade,
+  edgeDeleted,
+  edgesChanged,
+  edgesDeleted,
+  edgeUpdated,
+  fieldBoardValueChanged,
+  fieldBooleanValueChanged,
+  fieldColorValueChanged,
+  fieldControlNetModelValueChanged,
+  fieldEnumModelValueChanged,
+  fieldImageValueChanged,
+  fieldIPAdapterModelValueChanged,
+  fieldT2IAdapterModelValueChanged,
+  fieldLabelChanged,
+  fieldLoRAModelValueChanged,
+  fieldMainModelValueChanged,
+  fieldNumberValueChanged,
+  fieldRefinerModelValueChanged,
+  fieldSchedulerValueChanged,
+  fieldStringValueChanged,
+  fieldVaeModelValueChanged,
+  nodeAdded,
+  nodeReplaced,
+  nodeIsIntermediateChanged,
+  nodeIsOpenChanged,
+  nodeLabelChanged,
+  nodeNotesChanged,
+  nodesChanged,
+  nodesDeleted,
+  nodeUseCacheChanged,
+  notesNodeValueChanged,
+  selectionPasted,
+  edgeAdded
+);
+
 export default nodesSlice.reducer;
+
+export const selectNodesSlice = (state: RootState) => state.nodes;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateNodesState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

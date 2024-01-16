@@ -1,18 +1,10 @@
-import {
-  ChakraProps,
-  Stat,
-  StatLabel,
-  StatNumber,
-  StatProps,
-} from '@chakra-ui/react';
+import type { ChakraProps, StatProps } from '@chakra-ui/react';
+import { Stat, StatLabel, StatNumber } from '@chakra-ui/react';
 import { memo } from 'react';
 
 const sx: ChakraProps['sx'] = {
   '&[aria-disabled="true"]': {
-    color: 'base.400',
-    _dark: {
-      color: 'base.500',
-    },
+    color: 'base.500',
   },
 };
 

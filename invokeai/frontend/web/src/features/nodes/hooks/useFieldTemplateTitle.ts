@@ -1,10 +1,10 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { useMemo } from 'react';
-import { isInvocationNode } from 'features/nodes/types/invocation';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { KIND_MAP } from 'features/nodes/types/constants';
+import { isInvocationNode } from 'features/nodes/types/invocation';
+import { useMemo } from 'react';
 
 export const useFieldTemplateTitle = (
   nodeId: string,
@@ -14,21 +14,21 @@ export const useFieldTemplateTitle = (
   const selector = useMemo(
     () =>
       createSelector(
-        stateSelector,
-        ({ nodes }) => {
+        selectNodesSlice,
+        selectNodeTemplatesSlice,
+        (nodes, nodeTemplates) => {
           const node = nodes.nodes.find((node) => node.id === nodeId);
           if (!isInvocationNode(node)) {
             return;
           }
-          const nodeTemplate = nodes.nodeTemplates[node?.data.type ?? ''];
+          const nodeTemplate = nodeTemplates.templates[node?.data.type ?? ''];
           return nodeTemplate?.[KIND_MAP[kind]][fieldName]?.title;
-        },
-        defaultSelectorOptions
+        }
       ),
     [fieldName, kind, nodeId]
   );
 
-  const fieldTemplate = useAppSelector(selector);
+  const fieldTemplateTitle = useAppSelector(selector);
 
-  return fieldTemplate;
+  return fieldTemplateTitle;
 };

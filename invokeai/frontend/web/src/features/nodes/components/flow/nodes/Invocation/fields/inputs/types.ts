@@ -1,4 +1,4 @@
-import {
+import type {
   FieldInputInstance,
   FieldInputTemplate,
 } from 'features/nodes/types/field';

@@ -1,10 +1,11 @@
 import { logger } from 'app/logging/logger';
-import { RootState } from 'app/store/store';
-import {
+import type { RootState } from 'app/store/store';
+import type {
   ImageDTO,
   ImageToLatentsInvocation,
   NonNullableGraph,
 } from 'services/api/types';
+
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLinearUIOutputNode } from './addLinearUIOutputNode';
@@ -144,6 +145,7 @@ export const buildCanvasImageToImageGraph = (
         type: 'l2i',
         id: CANVAS_OUTPUT,
         is_intermediate,
+        use_cache: false,
       },
     },
     edges: [
@@ -255,6 +257,7 @@ export const buildCanvasImageToImageGraph = (
       is_intermediate,
       width: width,
       height: height,
+      use_cache: false,
     };
 
     graph.edges.push(
@@ -295,6 +298,7 @@ export const buildCanvasImageToImageGraph = (
       id: CANVAS_OUTPUT,
       is_intermediate,
       fp32,
+      use_cache: false,
     };
 
     (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image =

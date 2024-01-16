@@ -1,10 +1,7 @@
 import { logger } from 'app/logging/logger';
-import { RootState } from 'app/store/store';
-import {
-  DenoiseLatentsInvocation,
-  NonNullableGraph,
-  ONNXTextToLatentsInvocation,
-} from 'services/api/types';
+import type { RootState } from 'app/store/store';
+import type { NonNullableGraph } from 'services/api/types';
+
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addHrfToGraph } from './addHrfToGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
@@ -22,7 +19,6 @@ import {
   MAIN_MODEL_LOADER,
   NEGATIVE_CONDITIONING,
   NOISE,
-  ONNX_MODEL_LOADER,
   POSITIVE_CONDITIONING,
   SEAMLESS,
   TEXT_TO_IMAGE_GRAPH,
@@ -60,37 +56,8 @@ export const buildLinearTextToImageGraph = (
 
   const fp32 = vaePrecision === 'fp32';
   const is_intermediate = true;
-  const isUsingOnnxModel = model.model_type === 'onnx';
 
-  let modelLoaderNodeId = isUsingOnnxModel
-    ? ONNX_MODEL_LOADER
-    : MAIN_MODEL_LOADER;
-
-  const modelLoaderNodeType = isUsingOnnxModel
-    ? 'onnx_model_loader'
-    : 'main_model_loader';
-
-  const t2lNode: DenoiseLatentsInvocation | ONNXTextToLatentsInvocation =
-    isUsingOnnxModel
-      ? {
-          type: 't2l_onnx',
-          id: DENOISE_LATENTS,
-          is_intermediate,
-          cfg_scale,
-          scheduler,
-          steps,
-        }
-      : {
-          type: 'denoise_latents',
-          id: DENOISE_LATENTS,
-          is_intermediate,
-          cfg_scale,
-          cfg_rescale_multiplier,
-          scheduler,
-          steps,
-          denoising_start: 0,
-          denoising_end: 1,
-        };
+  let modelLoaderNodeId = MAIN_MODEL_LOADER;
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -103,12 +70,11 @@ export const buildLinearTextToImageGraph = (
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
 
-  // TODO: Actually create the graph correctly for ONNX
   const graph: NonNullableGraph = {
     id: TEXT_TO_IMAGE_GRAPH,
     nodes: {
       [modelLoaderNodeId]: {
-        type: modelLoaderNodeType,
+        type: 'main_model_loader',
         id: modelLoaderNodeId,
         is_intermediate,
         model,
@@ -120,13 +86,13 @@ export const buildLinearTextToImageGraph = (
         is_intermediate,
       },
       [POSITIVE_CONDITIONING]: {
-        type: isUsingOnnxModel ? 'prompt_onnx' : 'compel',
+        type: 'compel',
         id: POSITIVE_CONDITIONING,
         prompt: positivePrompt,
         is_intermediate,
       },
       [NEGATIVE_CONDITIONING]: {
-        type: isUsingOnnxModel ? 'prompt_onnx' : 'compel',
+        type: 'compel',
         id: NEGATIVE_CONDITIONING,
         prompt: negativePrompt,
         is_intermediate,
@@ -140,12 +106,23 @@ export const buildLinearTextToImageGraph = (
         use_cpu,
         is_intermediate,
       },
-      [t2lNode.id]: t2lNode,
+      [DENOISE_LATENTS]: {
+        type: 'denoise_latents',
+        id: DENOISE_LATENTS,
+        is_intermediate,
+        cfg_scale,
+        cfg_rescale_multiplier,
+        scheduler,
+        steps,
+        denoising_start: 0,
+        denoising_end: 1,
+      },
       [LATENTS_TO_IMAGE]: {
-        type: isUsingOnnxModel ? 'l2i_onnx' : 'l2i',
+        type: 'l2i',
         id: LATENTS_TO_IMAGE,
         fp32,
         is_intermediate,
+        use_cache: false,
       },
     },
     edges: [
@@ -277,8 +254,7 @@ export const buildLinearTextToImageGraph = (
   addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // High resolution fix.
-  // NOTE: Not supported for onnx models.
-  if (state.generation.hrfEnabled && !isUsingOnnxModel) {
+  if (state.hrf.hrfEnabled) {
     addHrfToGraph(state, graph);
   }
 

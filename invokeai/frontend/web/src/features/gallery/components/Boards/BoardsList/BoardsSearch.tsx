@@ -1,38 +1,15 @@
-import { CloseIcon } from '@chakra-ui/icons';
-import {
-  IconButton,
-  Input,
-  InputGroup,
-  InputRightElement,
-} from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
+import { Input, InputGroup, InputRightElement } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
-import {
-  ChangeEvent,
-  KeyboardEvent,
-  memo,
-  useCallback,
-  useEffect,
-  useRef,
-} from 'react';
+import type { ChangeEvent, KeyboardEvent } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-
-const selector = createSelector(
-  [stateSelector],
-  ({ gallery }) => {
-    const { boardSearchText } = gallery;
-    return { boardSearchText };
-  },
-  defaultSelectorOptions
-);
+import { PiXBold } from 'react-icons/pi';
 
 const BoardsSearch = () => {
   const dispatch = useAppDispatch();
-  const { boardSearchText } = useAppSelector(selector);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
   const { t } = useTranslation();
 
   const handleBoardSearch = useCallback(
@@ -63,18 +40,9 @@ const BoardsSearch = () => {
     [handleBoardSearch]
   );
 
-  useEffect(() => {
-    // focus the search box on mount
-    if (!inputRef.current) {
-      return;
-    }
-    inputRef.current.focus();
-  }, []);
-
   return (
     <InputGroup>
       <Input
-        ref={inputRef}
         placeholder={t('boards.searchBoard')}
         value={boardSearchText}
         onKeyDown={handleKeydown}
@@ -82,14 +50,13 @@ const BoardsSearch = () => {
         data-testid="board-search-input"
       />
       {boardSearchText && boardSearchText.length && (
-        <InputRightElement>
-          <IconButton
+        <InputRightElement h="full" pe={2}>
+          <InvIconButton
             onClick={clearBoardSearch}
-            size="xs"
+            size="sm"
             variant="ghost"
             aria-label={t('boards.clearSearch')}
-            opacity={0.5}
-            icon={<CloseIcon boxSize={2} />}
+            icon={<PiXBold />}
           />
         </InputRightElement>
       )}

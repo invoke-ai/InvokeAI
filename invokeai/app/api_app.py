@@ -45,6 +45,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         app_info,
         board_images,
         boards,
+        download_queue,
         images,
         model_records,
         models,
@@ -75,7 +76,7 @@ mimetypes.add_type("text/css", ".css")
 
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
-app = FastAPI(title="Invoke AI", docs_url=None, redoc_url=None, separate_input_output_schemas=False)
+app = FastAPI(title="Invoke - Community Edition", docs_url=None, redoc_url=None, separate_input_output_schemas=False)
 
 # Add event handler
 event_handler_id: int = id(app)
@@ -116,6 +117,7 @@ app.include_router(sessions.session_router, prefix="/api")
 app.include_router(utilities.utilities_router, prefix="/api")
 app.include_router(models.models_router, prefix="/api")
 app.include_router(model_records.model_records_router, prefix="/api")
+app.include_router(download_queue.download_queue_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
 app.include_router(boards.boards_router, prefix="/api")
 app.include_router(board_images.board_images_router, prefix="/api")
@@ -203,8 +205,8 @@ app.openapi = custom_openapi  # type: ignore [method-assign] # this is a valid a
 def overridden_swagger() -> HTMLResponse:
     return get_swagger_ui_html(
         openapi_url=app.openapi_url,  # type: ignore [arg-type] # this is always a string
-        title=app.title,
-        swagger_favicon_url="/static/docs/favicon.ico",
+        title=f"{app.title} - Swagger UI",
+        swagger_favicon_url="static/docs/invoke-favicon-docs.svg",
     )
 
 
@@ -212,25 +214,26 @@ def overridden_swagger() -> HTMLResponse:
 def overridden_redoc() -> HTMLResponse:
     return get_redoc_html(
         openapi_url=app.openapi_url,  # type: ignore [arg-type] # this is always a string
-        title=app.title,
-        redoc_favicon_url="/static/docs/favicon.ico",
+        title=f"{app.title} - Redoc",
+        redoc_favicon_url="static/docs/invoke-favicon-docs.svg",
     )
 
 
 web_root_path = Path(list(web_dir.__path__)[0])
 
+# Only serve the UI if we it has a build
+if (web_root_path / "dist").exists():
+    # Cannot add headers to StaticFiles, so we must serve index.html with a custom route
+    # Add cache-control: no-store header to prevent caching of index.html, which leads to broken UIs at release
+    @app.get("/", include_in_schema=False, name="ui_root")
+    def get_index() -> FileResponse:
+        return FileResponse(Path(web_root_path, "dist/index.html"), headers={"Cache-Control": "no-store"})
 
-# Cannot add headers to StaticFiles, so we must serve index.html with a custom route
-# Add cache-control: no-store header to prevent caching of index.html, which leads to broken UIs at release
-@app.get("/", include_in_schema=False, name="ui_root")
-def get_index() -> FileResponse:
-    return FileResponse(Path(web_root_path, "dist/index.html"), headers={"Cache-Control": "no-store"})
+    # Must mount *after* the other routes else it borks em
+    app.mount("/assets", StaticFiles(directory=Path(web_root_path, "dist/assets/")), name="assets")
+    app.mount("/locales", StaticFiles(directory=Path(web_root_path, "dist/locales/")), name="locales")
 
-
-# # Must mount *after* the other routes else it borks em
 app.mount("/static", StaticFiles(directory=Path(web_root_path, "static/")), name="static")  # docs favicon is in here
-app.mount("/assets", StaticFiles(directory=Path(web_root_path, "dist/assets/")), name="assets")
-app.mount("/locales", StaticFiles(directory=Path(web_root_path, "dist/locales/")), name="locales")
 
 
 def invoke_api() -> None:
@@ -271,6 +274,8 @@ def invoke_api() -> None:
         port=port,
         loop="asyncio",
         log_level=app_config.log_level,
+        ssl_certfile=app_config.ssl_certfile,
+        ssl_keyfile=app_config.ssl_keyfile,
     )
     server = uvicorn.Server(config)
 

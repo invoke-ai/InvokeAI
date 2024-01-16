@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
-import { RootState } from 'app/store/store';
-import {
+import type { RootState } from 'app/store/store';
+import type {
   CreateDenoiseMaskInvocation,
   ImageBlurInvocation,
   ImageDTO,
@@ -9,6 +9,7 @@ import {
   NoiseInvocation,
   NonNullableGraph,
 } from 'services/api/types';
+
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
 import { addLinearUIOutputNode } from './addLinearUIOutputNode';
@@ -191,6 +192,7 @@ export const buildCanvasInpaintGraph = (
         id: CANVAS_OUTPUT,
         is_intermediate,
         reference: canvasInitImage,
+        use_cache: false,
       },
     },
     edges: [

@@ -2,15 +2,17 @@ import {
   ASSETS_CATEGORIES,
   IMAGE_CATEGORIES,
 } from 'features/gallery/store/types';
-import {
+import type {
   BoardDTO,
   ListBoardsArg,
   OffsetPaginatedResults_BoardDTO_,
   OffsetPaginatedResults_ImageDTO_,
   UpdateBoardArg,
 } from 'services/api/types';
-import { ApiTagDescription, LIST_TAG, api } from '..';
 import { getListImagesUrl } from 'services/api/util';
+
+import type { ApiTagDescription } from '..';
+import { api, LIST_TAG } from '..';
 
 export const boardsApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -21,7 +23,10 @@ export const boardsApi = api.injectEndpoints({
       query: (arg) => ({ url: 'boards/', params: arg }),
       providesTags: (result) => {
         // any list of boards
-        const tags: ApiTagDescription[] = [{ type: 'Board', id: LIST_TAG }];
+        const tags: ApiTagDescription[] = [
+          { type: 'Board', id: LIST_TAG },
+          'FetchOnReconnect',
+        ];
 
         if (result) {
           // and individual tags for each board
@@ -44,7 +49,10 @@ export const boardsApi = api.injectEndpoints({
       }),
       providesTags: (result) => {
         // any list of boards
-        const tags: ApiTagDescription[] = [{ type: 'Board', id: LIST_TAG }];
+        const tags: ApiTagDescription[] = [
+          { type: 'Board', id: LIST_TAG },
+          'FetchOnReconnect',
+        ];
 
         if (result) {
           // and individual tags for each board
@@ -66,6 +74,7 @@ export const boardsApi = api.injectEndpoints({
       }),
       providesTags: (result, error, arg) => [
         { type: 'ImageNameList', id: arg },
+        'FetchOnReconnect',
       ],
       keepUnusedDataFor: 0,
     }),
@@ -83,6 +92,7 @@ export const boardsApi = api.injectEndpoints({
       }),
       providesTags: (result, error, arg) => [
         { type: 'BoardImagesTotal', id: arg ?? 'none' },
+        'FetchOnReconnect',
       ],
       transformResponse: (response: OffsetPaginatedResults_ImageDTO_) => {
         return { total: response.total };
@@ -102,6 +112,7 @@ export const boardsApi = api.injectEndpoints({
       }),
       providesTags: (result, error, arg) => [
         { type: 'BoardAssetsTotal', id: arg ?? 'none' },
+        'FetchOnReconnect',
       ],
       transformResponse: (response: OffsetPaginatedResults_ImageDTO_) => {
         return { total: response.total };

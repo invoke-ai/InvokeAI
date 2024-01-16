@@ -173,7 +173,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import ClassVar, Dict, List, Literal, Optional, Union, get_type_hints
+from typing import Any, ClassVar, Dict, List, Literal, Optional, Union, get_type_hints
 
 from omegaconf import DictConfig, OmegaConf
 from pydantic import Field, TypeAdapter
@@ -209,7 +209,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     """Configuration object for InvokeAI App."""
 
     singleton_config: ClassVar[Optional[InvokeAIAppConfig]] = None
-    singleton_init: ClassVar[Optional[Dict]] = None
+    singleton_init: ClassVar[Optional[Dict[str, Any]]] = None
 
     # fmt: off
     type: Literal["InvokeAI"] = "InvokeAI"
@@ -221,6 +221,9 @@ class InvokeAIAppConfig(InvokeAISettings):
     allow_credentials   : bool = Field(default=True, description="Allow CORS credentials", json_schema_extra=Categories.WebServer)
     allow_methods       : List[str] = Field(default=["*"], description="Methods allowed for CORS", json_schema_extra=Categories.WebServer)
     allow_headers       : List[str] = Field(default=["*"], description="Headers allowed for CORS", json_schema_extra=Categories.WebServer)
+    # SSL options correspond to https://www.uvicorn.org/settings/#https
+    ssl_certfile        : Optional[Path] = Field(default=None, description="SSL certificate file (for HTTPS)", json_schema_extra=Categories.WebServer)
+    ssl_keyfile         : Optional[Path] = Field(default=None, description="SSL key file", json_schema_extra=Categories.WebServer)
 
     # FEATURES
     esrgan              : bool = Field(default=True, description="Enable/disable upscaling code", json_schema_extra=Categories.Features)
@@ -260,7 +263,7 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     # DEVICE
     device              : Literal["auto", "cpu", "cuda", "cuda:1", "mps"] = Field(default="auto", description="Generation device", json_schema_extra=Categories.Device)
-    precision           : Literal["auto", "float16", "float32", "autocast"] = Field(default="auto", description="Floating point precision", json_schema_extra=Categories.Device)
+    precision           : Literal["auto", "float16", "bfloat16", "float32", "autocast"] = Field(default="auto", description="Floating point precision", json_schema_extra=Categories.Device)
 
     # GENERATION
     sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements", json_schema_extra=Categories.Generation)
@@ -298,8 +301,8 @@ class InvokeAIAppConfig(InvokeAISettings):
         self,
         argv: Optional[list[str]] = None,
         conf: Optional[DictConfig] = None,
-        clobber=False,
-    ):
+        clobber: Optional[bool] = False,
+    ) -> None:
         """
         Update settings with contents of init file, environment, and command-line settings.
 
@@ -334,7 +337,7 @@ class InvokeAIAppConfig(InvokeAISettings):
                 )
 
     @classmethod
-    def get_config(cls, **kwargs) -> InvokeAIAppConfig:
+    def get_config(cls, **kwargs: Any) -> InvokeAIAppConfig:
         """Return a singleton InvokeAIAppConfig configuration object."""
         if (
             cls.singleton_config is None
@@ -353,7 +356,7 @@ class InvokeAIAppConfig(InvokeAISettings):
         else:
             root = self.find_root().expanduser().absolute()
         self.root = root  # insulate ourselves from relative paths that may change
-        return root
+        return root.resolve()
 
     @property
     def root_dir(self) -> Path:
@@ -383,17 +386,17 @@ class InvokeAIAppConfig(InvokeAISettings):
         return db_dir / DB_FILE
 
     @property
-    def model_conf_path(self) -> Optional[Path]:
+    def model_conf_path(self) -> Path:
         """Path to models configuration file."""
         return self._resolve(self.conf_path)
 
     @property
-    def legacy_conf_path(self) -> Optional[Path]:
+    def legacy_conf_path(self) -> Path:
         """Path to directory of legacy configuration files (e.g. v1-inference.yaml)."""
         return self._resolve(self.legacy_conf_dir)
 
     @property
-    def models_path(self) -> Optional[Path]:
+    def models_path(self) -> Path:
         """Path to the models directory."""
         return self._resolve(self.models_dir)
 
@@ -452,7 +455,7 @@ class InvokeAIAppConfig(InvokeAISettings):
         return _find_root()
 
 
-def get_invokeai_config(**kwargs) -> InvokeAIAppConfig:
+def get_invokeai_config(**kwargs: Any) -> InvokeAIAppConfig:
     """Legacy function which returns InvokeAIAppConfig.get_config()."""
     return InvokeAIAppConfig.get_config(**kwargs)
 

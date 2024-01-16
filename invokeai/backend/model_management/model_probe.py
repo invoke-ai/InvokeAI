@@ -32,6 +32,8 @@ class ModelProbeInfo(object):
     upcast_attention: bool
     format: Literal["diffusers", "checkpoint", "lycoris", "olive", "onnx"]
     image_size: int
+    name: Optional[str] = None
+    description: Optional[str] = None
 
 
 class ProbeBase(object):
@@ -113,12 +115,16 @@ class ModelProbe(object):
             base_type = probe.get_base_type()
             variant_type = probe.get_variant_type()
             prediction_type = probe.get_scheduler_prediction_type()
+            name = cls.get_model_name(model_path)
+            description = f"{base_type.value} {model_type.value} model {name}"
             format = probe.get_format()
             model_info = ModelProbeInfo(
                 model_type=model_type,
                 base_type=base_type,
                 variant_type=variant_type,
                 prediction_type=prediction_type,
+                name=name,
+                description=description,
                 upcast_attention=(
                     base_type == BaseModelType.StableDiffusion2
                     and prediction_type == SchedulerPredictionType.VPrediction
@@ -141,6 +147,13 @@ class ModelProbe(object):
             raise
 
         return model_info
+
+    @classmethod
+    def get_model_name(cls, model_path: Path) -> str:
+        if model_path.suffix in {".safetensors", ".bin", ".pt", ".ckpt"}:
+            return model_path.stem
+        else:
+            return model_path.name
 
     @classmethod
     def get_model_type_from_checkpoint(cls, model_path: Path, checkpoint: dict) -> ModelType:
@@ -357,6 +370,8 @@ class LoRACheckpointProbe(CheckpointProbeBase):
             return BaseModelType.StableDiffusion1
         elif token_vector_length == 1024:
             return BaseModelType.StableDiffusion2
+        elif token_vector_length == 1280:
+            return BaseModelType.StableDiffusionXL  # recognizes format at https://civitai.com/models/224641
         elif token_vector_length == 2048:
             return BaseModelType.StableDiffusionXL
         else:
@@ -376,7 +391,7 @@ class TextualInversionCheckpointProbe(CheckpointProbeBase):
         elif "clip_g" in checkpoint:
             token_dim = checkpoint["clip_g"].shape[-1]
         else:
-            token_dim = list(checkpoint.values())[0].shape[0]
+            token_dim = list(checkpoint.values())[0].shape[-1]
         if token_dim == 768:
             return BaseModelType.StableDiffusion1
         elif token_dim == 1024:

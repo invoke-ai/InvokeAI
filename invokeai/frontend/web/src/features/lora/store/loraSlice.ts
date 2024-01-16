@@ -1,6 +1,8 @@
-import { PayloadAction, createSlice } from '@reduxjs/toolkit';
-import { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
-import { LoRAModelConfigEntity } from 'services/api/endpoints/models';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
+import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
+import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
 
 export type LoRA = ParameterLoRAModel & {
   id: string;
@@ -12,16 +14,18 @@ export const defaultLoRAConfig = {
 };
 
 export type LoraState = {
+  _version: 1;
   loras: Record<string, LoRA>;
 };
 
-export const intialLoraState: LoraState = {
+export const initialLoraState: LoraState = {
+  _version: 1,
   loras: {},
 };
 
 export const loraSlice = createSlice({
   name: 'lora',
-  initialState: intialLoraState,
+  initialState: initialLoraState,
   reducers: {
     loraAdded: (state, action: PayloadAction<LoRAModelConfigEntity>) => {
       const { model_name, id, base_model } = action.payload;
@@ -73,3 +77,13 @@ export const {
 } = loraSlice.actions;
 
 export default loraSlice.reducer;
+
+export const selectLoraSlice = (state: RootState) => state.lora;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateLoRAState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

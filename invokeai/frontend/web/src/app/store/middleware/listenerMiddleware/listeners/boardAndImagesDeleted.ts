@@ -4,6 +4,7 @@ import { getImageUsage } from 'features/deleteImageModal/store/selectors';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { clearInitialImage } from 'features/parameters/store/generationSlice';
 import { imagesApi } from 'services/api/endpoints/images';
+
 import { startAppListening } from '..';
 
 export const addDeleteBoardAndImagesFulfilledListener = () => {
@@ -19,9 +20,15 @@ export const addDeleteBoardAndImagesFulfilledListener = () => {
       let wasNodeEditorReset = false;
       let wereControlAdaptersReset = false;
 
-      const state = getState();
+      const { generation, canvas, nodes, controlAdapters } = getState();
       deleted_images.forEach((image_name) => {
-        const imageUsage = getImageUsage(state, image_name);
+        const imageUsage = getImageUsage(
+          generation,
+          canvas,
+          nodes,
+          controlAdapters,
+          image_name
+        );
 
         if (imageUsage.isInitialImage && !wasInitialImageReset) {
           dispatch(clearInitialImage());

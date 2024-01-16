@@ -1,50 +1,39 @@
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { isEqual } from 'lodash-es';
-
-import { Group, Rect } from 'react-konva';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
+import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import { memo } from 'react';
+import { Group, Rect } from 'react-konva';
 
-const selector = createSelector(
-  canvasSelector,
-  (canvas) => {
-    const {
-      boundingBoxCoordinates,
-      boundingBoxDimensions,
-      stageDimensions,
-      stageScale,
-      shouldDarkenOutsideBoundingBox,
-      stageCoordinates,
-    } = canvas;
+const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
+  const {
+    boundingBoxCoordinates,
+    boundingBoxDimensions,
+    stageDimensions,
+    stageCoordinates,
+  } = canvas;
 
-    return {
-      boundingBoxCoordinates,
-      boundingBoxDimensions,
-      shouldDarkenOutsideBoundingBox,
-      stageCoordinates,
-      stageDimensions,
-      stageScale,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
+  return {
+    boundingBoxCoordinates,
+    boundingBoxDimensions,
+    stageCoordinates,
+    stageDimensions,
+  };
+});
+
 const IAICanvasBoundingBoxOverlay = () => {
   const {
     boundingBoxCoordinates,
     boundingBoxDimensions,
-    shouldDarkenOutsideBoundingBox,
     stageCoordinates,
     stageDimensions,
-    stageScale,
   } = useAppSelector(selector);
+  const shouldDarkenOutsideBoundingBox = useAppSelector(
+    (s) => s.canvas.shouldDarkenOutsideBoundingBox
+  );
+  const stageScale = useAppSelector((s) => s.canvas.stageScale);
 
   return (
-    <Group>
+    <Group listening={false}>
       <Rect
         offsetX={stageCoordinates.x / stageScale}
         offsetY={stageCoordinates.y / stageScale}

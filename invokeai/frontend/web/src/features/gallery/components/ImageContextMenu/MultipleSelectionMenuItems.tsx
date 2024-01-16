@@ -1,28 +1,34 @@
-import { MenuItem } from '@chakra-ui/react';
 import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
+import { InvMenuDivider } from 'common/components/InvMenu/wrapper';
 import {
   imagesToChangeSelected,
   isModalOpenChanged,
 } from 'features/changeBoardModal/store/slice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { addToast } from 'features/system/store/systemSlice';
 import { memo, useCallback, useMemo } from 'react';
-import { FaDownload, FaFolder, FaTrash } from 'react-icons/fa';
-import { MdStar, MdStarBorder } from 'react-icons/md';
+import { useTranslation } from 'react-i18next';
+import {
+  PiDownloadSimpleBold,
+  PiFoldersBold,
+  PiStarBold,
+  PiStarFill,
+  PiTrashSimpleBold,
+} from 'react-icons/pi';
 import {
   useBulkDownloadImagesMutation,
   useStarImagesMutation,
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { addToast } from 'features/system/store/systemSlice';
-import { useTranslation } from 'react-i18next';
 
 const MultipleSelectionMenuItems = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const selection = useAppSelector((state) => state.gallery.selection);
+  const selection = useAppSelector((s) => s.gallery.selection);
   const customStarUi = useStore($customStarUI);
 
   const isBulkDownloadEnabled =
@@ -89,36 +95,40 @@ const MultipleSelectionMenuItems = () => {
   return (
     <>
       {areAllStarred && (
-        <MenuItem
-          icon={customStarUi ? customStarUi.on.icon : <MdStarBorder />}
+        <InvMenuItem
+          icon={customStarUi ? customStarUi.on.icon : <PiStarBold />}
           onClickCapture={handleUnstarSelection}
         >
           {customStarUi ? customStarUi.off.text : `Unstar All`}
-        </MenuItem>
+        </InvMenuItem>
       )}
       {(areAllUnstarred || (!areAllStarred && !areAllUnstarred)) && (
-        <MenuItem
-          icon={customStarUi ? customStarUi.on.icon : <MdStar />}
+        <InvMenuItem
+          icon={customStarUi ? customStarUi.on.icon : <PiStarFill />}
           onClickCapture={handleStarSelection}
         >
           {customStarUi ? customStarUi.on.text : `Star All`}
-        </MenuItem>
+        </InvMenuItem>
       )}
       {isBulkDownloadEnabled && (
-        <MenuItem icon={<FaDownload />} onClickCapture={handleBulkDownload}>
+        <InvMenuItem
+          icon={<PiDownloadSimpleBold />}
+          onClickCapture={handleBulkDownload}
+        >
           {t('gallery.downloadSelection')}
-        </MenuItem>
+        </InvMenuItem>
       )}
-      <MenuItem icon={<FaFolder />} onClickCapture={handleChangeBoard}>
+      <InvMenuItem icon={<PiFoldersBold />} onClickCapture={handleChangeBoard}>
         {t('boards.changeBoard')}
-      </MenuItem>
-      <MenuItem
-        sx={{ color: 'error.600', _dark: { color: 'error.300' } }}
-        icon={<FaTrash />}
+      </InvMenuItem>
+      <InvMenuDivider />
+      <InvMenuItem
+        color="error.300"
+        icon={<PiTrashSimpleBold />}
         onClickCapture={handleDeleteSelection}
       >
         {t('gallery.deleteSelection')}
-      </MenuItem>
+      </InvMenuItem>
     </>
   );
 };

@@ -1,5 +1,4 @@
 import { logger } from 'app/logging/logger';
-import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import {
   controlAdapterIsEnabledChanged,
   selectControlAdapterAll,
@@ -8,16 +7,15 @@ import { loraRemoved } from 'features/lora/store/loraSlice';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
   modelChanged,
-  setHeight,
-  setWidth,
   vaeSelected,
 } from 'features/parameters/store/generationSlice';
+import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
 import { forEach } from 'lodash-es';
+
 import { startAppListening } from '..';
-import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 
 export const addModelSelectedListener = () => {
   startAppListening({
@@ -39,8 +37,10 @@ export const addModelSelectedListener = () => {
       const newModel = result.data;
 
       const { base_model } = newModel;
+      const didBaseModelChange =
+        state.generation.model?.base_model !== base_model;
 
-      if (state.generation.model?.base_model !== base_model) {
+      if (didBaseModelChange) {
         // we may need to reset some incompatible submodels
         let modelsCleared = 0;
 
@@ -83,23 +83,7 @@ export const addModelSelectedListener = () => {
         }
       }
 
-      // Update Width / Height / Bounding Box Dimensions on Model Change
-      if (
-        state.generation.model?.base_model !== newModel.base_model &&
-        state.ui.shouldAutoChangeDimensions
-      ) {
-        if (['sdxl', 'sdxl-refiner'].includes(newModel.base_model)) {
-          dispatch(setWidth(1024));
-          dispatch(setHeight(1024));
-          dispatch(setBoundingBoxDimensions({ width: 1024, height: 1024 }));
-        } else {
-          dispatch(setWidth(512));
-          dispatch(setHeight(512));
-          dispatch(setBoundingBoxDimensions({ width: 512, height: 512 }));
-        }
-      }
-
-      dispatch(modelChanged(newModel));
+      dispatch(modelChanged(newModel, state.generation.model));
     },
   });
 };

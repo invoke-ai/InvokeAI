@@ -13,7 +13,12 @@ If you'd prefer, you can also just download the whole node folder from the linke
 To use a community workflow, download the the `.json` node graph file and load it into Invoke AI via the **Load Workflow** button in the Workflow Editor. 
 
 - Community Nodes
+    + [Adapters-Linked](#adapters-linked-nodes)
     + [Average Images](#average-images)
+    + [Clean Image Artifacts After Cut](#clean-image-artifacts-after-cut)
+    + [Close Color Mask](#close-color-mask) 
+    + [Clothing Mask](#clothing-mask)
+    + [Contrast Limited Adaptive Histogram Equalization](#contrast-limited-adaptive-histogram-equalization)
     + [Depth Map from Wavefront OBJ](#depth-map-from-wavefront-obj)
     + [Film Grain](#film-grain)
     + [Generative Grammar-Based Prompt Nodes](#generative-grammar-based-prompt-nodes)
@@ -22,16 +27,24 @@ To use a community workflow, download the the `.json` node graph file and load i
     + [Halftone](#halftone)
     + [Ideal Size](#ideal-size)
     + [Image and Mask Composition Pack](#image-and-mask-composition-pack)
+    + [Image Dominant Color](#image-dominant-color)
     + [Image to Character Art Image Nodes](#image-to-character-art-image-nodes)
     + [Image Picker](#image-picker)
+    + [Image Resize Plus](#image-resize-plus)
     + [Load Video Frame](#load-video-frame)
     + [Make 3D](#make-3d)
+    + [Mask Operations](#mask-operations)
     + [Match Histogram](#match-histogram)
+    + [Metadata-Linked](#metadata-linked-nodes)
+    + [Negative Image](#negative-image)
+    + [Nightmare Promptgen](#nightmare-promptgen)    
     + [Oobabooga](#oobabooga)
     + [Prompt Tools](#prompt-tools)
     + [Remote Image](#remote-image)
+    + [Remove Background](#remove-background)    
     + [Retroize](#retroize)
     + [Size Stepper Nodes](#size-stepper-nodes)
+    + [Simple Skin Detection](#simple-skin-detection)
     + [Text font to Image](#text-font-to-image)
     + [Thresholding](#thresholding)
     + [Unsharp Mask](#unsharp-mask)
@@ -42,11 +55,64 @@ To use a community workflow, download the the `.json` node graph file and load i
 
 
 --------------------------------
+### Adapters Linked Nodes
+
+**Description:** A set of nodes for linked adapters (ControlNet, IP-Adaptor & T2I-Adapter). This allows multiple adapters to be chained together without using a `collect` node which means it can be used inside an `iterate` node without any collecting on every iteration issues.
+
+- `ControlNet-Linked` - Collects ControlNet info to pass to other nodes.
+- `IP-Adapter-Linked` - Collects IP-Adapter info to pass to other nodes.
+- `T2I-Adapter-Linked` - Collects T2I-Adapter info to pass to other nodes.
+
+Note: These are inherited from the core nodes so any update to the core nodes should be reflected in these. 
+
+**Node Link:** https://github.com/skunkworxdark/adapters-linked-nodes
+
+--------------------------------
 ### Average Images
 
 **Description:** This node takes in a collection of images of the same size and averages them as output. It converts everything to RGB mode first.
 
 **Node Link:** https://github.com/JPPhoto/average-images-node
+
+--------------------------------
+### Clean Image Artifacts After Cut
+
+Description: Removes residual artifacts after an image is separated from its background.
+
+Node Link: https://github.com/VeyDlin/clean-artifact-after-cut-node
+
+View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/clean-artifact-after-cut-node/master/.readme/node.png" width="500" />
+
+--------------------------------
+### Close Color Mask
+
+Description: Generates a mask for images based on a closely matching color, useful for color-based selections.
+
+Node Link: https://github.com/VeyDlin/close-color-mask-node
+
+View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/close-color-mask-node/master/.readme/node.png" width="500" />
+
+--------------------------------
+### Clothing Mask
+
+Description: Employs a U2NET neural network trained for the segmentation of clothing items in images.
+
+Node Link: https://github.com/VeyDlin/clothing-mask-node
+
+View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/clothing-mask-node/master/.readme/node.png" width="500" />
+
+--------------------------------
+### Contrast Limited Adaptive Histogram Equalization
+
+Description: Enhances local image contrast using adaptive histogram equalization with contrast limiting.
+
+Node Link: https://github.com/VeyDlin/clahe-node
+
+View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/clahe-node/master/.readme/node.png" width="500" />
 
 --------------------------------
 ### Depth Map from Wavefront OBJ
@@ -165,6 +231,16 @@ This includes 15 Nodes:
 </br><img src="https://raw.githubusercontent.com/dwringer/composition-nodes/main/composition_pack_overview.jpg" width="500" />
 
 --------------------------------
+### Image Dominant Color
+
+Description: Identifies and extracts the dominant color from an image using k-means clustering.
+
+Node Link: https://github.com/VeyDlin/image-dominant-color-node
+
+View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/image-dominant-color-node/master/.readme/node.png" width="500" />
+
+--------------------------------
 ### Image to Character Art Image Nodes
 
 **Description:** Group of nodes to convert an input image into ascii/unicode art Image
@@ -184,6 +260,17 @@ This includes 15 Nodes:
 **Description:** This InvokeAI node takes in a collection of images and randomly chooses one. This can be useful when you have a number of poses to choose from for a ControlNet node, or a number of input images for another purpose.
 
 **Node Link:** https://github.com/JPPhoto/image-picker-node
+
+--------------------------------
+### Image Resize Plus
+
+Description: Provides various image resizing options such as fill, stretch, fit, center, and crop.
+
+Node Link: https://github.com/VeyDlin/image-resize-plus-node
+
+View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/image-resize-plus-node/master/.readme/node.png" width="500" />
+
 
 --------------------------------
 ### Load Video Frame
@@ -210,6 +297,16 @@ This includes 15 Nodes:
 <img src="https://gitlab.com/srcrr/shift3d/-/raw/main/example-2.png" width="300" />
 
 --------------------------------
+### Mask Operations
+
+Description: Offers logical operations (OR, SUB, AND) for combining and manipulating image masks.
+
+Node Link: https://github.com/VeyDlin/mask-operations-node
+
+View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/mask-operations-node/master/.readme/node.png" width="500" />
+
+--------------------------------
 ### Match Histogram
 
 **Description:** An InvokeAI node to match a histogram from one image to another.  This is a bit like the `color correct` node in the main InvokeAI but this works in the YCbCr colourspace and can handle images of different sizes. Also does not require a mask input.
@@ -225,6 +322,37 @@ See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/mai
 **Output Examples** 
 
 <img src="https://github.com/skunkworxdark/match_histogram/assets/21961335/ed12f329-a0ef-444a-9bae-129ed60d6097" width="300" />
+
+--------------------------------
+### Metadata Linked Nodes
+
+**Description:** A set of nodes for Metadata. Collect Metadata from within an `iterate` node & extract metadata from an image.
+
+- `Metadata Item Linked` - Allows collecting of metadata while within an iterate node with no need for a collect node or conversion to metadata node.
+- `Metadata From Image` - Provides Metadata from an image.
+- `Metadata To String` - Extracts a String value of a label from metadata.
+- `Metadata To Integer` - Extracts an Integer value of a label from metadata.
+- `Metadata To Float` - Extracts a Float value of a label from metadata.
+- `Metadata To Scheduler` - Extracts a Scheduler value of a label from metadata.
+
+**Node Link:** https://github.com/skunkworxdark/metadata-linked-nodes
+
+--------------------------------
+### Negative Image
+
+Description: Creates a negative version of an image, effective for visual effects and mask inversion.
+
+Node Link: https://github.com/VeyDlin/negative-image-node
+
+View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/negative-image-node/master/.readme/node.png" width="500" />
+
+--------------------------------
+### Nightmare Promptgen
+
+**Description:** Nightmare Prompt Generator - Uses a local text generation model to create unique imaginative (but usually nightmarish) prompts for InvokeAI. By default, it allows you to choose from some gpt-neo models I finetuned on over 2500 of my own InvokeAI prompts in Compel format, but you're able to add your own, as well. Offers support for replacing any troublesome words with a random choice from list you can also define.
+
+**Node Link:** [https://github.com/gogurtenjoyer/nightmare-promptgen](https://github.com/gogurtenjoyer/nightmare-promptgen)
 
 --------------------------------
 ### Oobabooga
@@ -289,6 +417,15 @@ See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/mai
 
 **Node Link:** https://github.com/fieldOfView/InvokeAI-remote_image
 
+--------------------------------
+### Remove Background
+
+Description: An integration of the rembg package to remove backgrounds from images using multiple U2NET models.
+
+Node Link: https://github.com/VeyDlin/remove-background-node
+
+View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/remove-background-node/master/.readme/node.png" width="500" />
 
 --------------------------------
 ### Retroize
@@ -300,6 +437,17 @@ See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/mai
 **Retroize Output Examples**
 
 <img src="https://github.com/Ar7ific1al/InvokeAI_nodes_retroize/assets/2306586/de8b4fa6-324c-4c2d-b36c-297600c73974" width="500" />
+
+--------------------------------
+### Simple Skin Detection
+
+Description: Detects skin in images based on predefined color thresholds.
+
+Node Link: https://github.com/VeyDlin/simple-skin-detection-node
+
+View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/simple-skin-detection-node/master/.readme/node.png" width="500" />
+
 
 --------------------------------
 ### Size Stepper Nodes
@@ -385,6 +533,7 @@ See full docs here: https://github.com/skunkworxdark/XYGrid_nodes/edit/main/READ
 **Output Examples** 
 
 <img src="https://github.com/skunkworxdark/XYGrid_nodes/blob/main/images/collage.png" width="300" />
+
 
 --------------------------------
 ### Example Node Template

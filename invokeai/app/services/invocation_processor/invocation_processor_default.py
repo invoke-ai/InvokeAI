@@ -108,6 +108,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                                 queue_item_id=queue_item.session_queue_item_id,
                                 queue_id=queue_item.session_queue_id,
                                 queue_batch_id=queue_item.session_queue_batch_id,
+                                workflow=queue_item.workflow,
                             )
                         )
 
@@ -131,7 +132,6 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                             source_node_id=source_node_id,
                             result=outputs.model_dump(),
                         )
-                    self.__invoker.services.performance_statistics.log_stats()
 
                 except KeyboardInterrupt:
                     pass
@@ -178,6 +178,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                             session_queue_item_id=queue_item.session_queue_item_id,
                             session_queue_id=queue_item.session_queue_id,
                             graph_execution_state=graph_execution_state,
+                            workflow=queue_item.workflow,
                             invoke_all=True,
                         )
                     except Exception as e:
@@ -193,6 +194,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                             error=traceback.format_exc(),
                         )
                 elif is_complete:
+                    self.__invoker.services.performance_statistics.log_stats(graph_execution_state.id)
                     self.__invoker.services.events.emit_graph_execution_complete(
                         queue_batch_id=queue_item.session_queue_batch_id,
                         queue_item_id=queue_item.session_queue_item_id,

@@ -17,7 +17,6 @@ from invokeai.app.invocations.baseinvocation import (
     InvocationContext,
     OutputField,
     WithMetadata,
-    WithWorkflow,
     invocation,
     invocation_output,
 )
@@ -438,8 +437,8 @@ def get_faces_list(
     return all_faces
 
 
-@invocation("face_off", title="FaceOff", tags=["image", "faceoff", "face", "mask"], category="image", version="1.1.0")
-class FaceOffInvocation(BaseInvocation, WithWorkflow, WithMetadata):
+@invocation("face_off", title="FaceOff", tags=["image", "faceoff", "face", "mask"], category="image", version="1.2.0")
+class FaceOffInvocation(BaseInvocation, WithMetadata):
     """Bound, extract, and mask a face from an image using MediaPipe detection"""
 
     image: ImageField = InputField(description="Image for face detection")
@@ -508,7 +507,7 @@ class FaceOffInvocation(BaseInvocation, WithWorkflow, WithMetadata):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
-            workflow=self.workflow,
+            workflow=context.workflow,
         )
 
         mask_dto = context.services.images.create(
@@ -532,8 +531,8 @@ class FaceOffInvocation(BaseInvocation, WithWorkflow, WithMetadata):
         return output
 
 
-@invocation("face_mask_detection", title="FaceMask", tags=["image", "face", "mask"], category="image", version="1.1.0")
-class FaceMaskInvocation(BaseInvocation, WithWorkflow, WithMetadata):
+@invocation("face_mask_detection", title="FaceMask", tags=["image", "face", "mask"], category="image", version="1.2.0")
+class FaceMaskInvocation(BaseInvocation, WithMetadata):
     """Face mask creation using mediapipe face detection"""
 
     image: ImageField = InputField(description="Image to face detect")
@@ -627,7 +626,7 @@ class FaceMaskInvocation(BaseInvocation, WithWorkflow, WithMetadata):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
-            workflow=self.workflow,
+            workflow=context.workflow,
         )
 
         mask_dto = context.services.images.create(
@@ -650,9 +649,9 @@ class FaceMaskInvocation(BaseInvocation, WithWorkflow, WithMetadata):
 
 
 @invocation(
-    "face_identifier", title="FaceIdentifier", tags=["image", "face", "identifier"], category="image", version="1.1.0"
+    "face_identifier", title="FaceIdentifier", tags=["image", "face", "identifier"], category="image", version="1.2.0"
 )
-class FaceIdentifierInvocation(BaseInvocation, WithWorkflow, WithMetadata):
+class FaceIdentifierInvocation(BaseInvocation, WithMetadata):
     """Outputs an image with detected face IDs printed on each face. For use with other FaceTools."""
 
     image: ImageField = InputField(description="Image to face detect")
@@ -716,7 +715,7 @@ class FaceIdentifierInvocation(BaseInvocation, WithWorkflow, WithMetadata):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
-            workflow=self.workflow,
+            workflow=context.workflow,
         )
 
         return ImageOutput(

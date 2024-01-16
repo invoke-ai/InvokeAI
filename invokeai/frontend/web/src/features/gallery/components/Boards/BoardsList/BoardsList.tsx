@@ -1,26 +1,22 @@
 import { Collapse, Flex, Grid, GridItem } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
+import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
+import type { CSSProperties } from 'react';
 import { memo, useState } from 'react';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
-import { BoardDTO } from 'services/api/types';
-import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
+import type { BoardDTO } from 'services/api/types';
+
 import AddBoardButton from './AddBoardButton';
 import BoardsSearch from './BoardsSearch';
 import GalleryBoard from './GalleryBoard';
 import NoBoardBoard from './NoBoardBoard';
 
-const selector = createSelector(
-  [stateSelector],
-  ({ gallery }) => {
-    const { selectedBoardId, boardSearchText } = gallery;
-    return { selectedBoardId, boardSearchText };
-  },
-  defaultSelectorOptions
-);
+const overlayScrollbarsStyles: CSSProperties = {
+  height: '100%',
+  width: '100%',
+};
 
 type Props = {
   isOpen: boolean;
@@ -28,7 +24,8 @@ type Props = {
 
 const BoardsList = (props: Props) => {
   const { isOpen } = props;
-  const { selectedBoardId, boardSearchText } = useAppSelector(selector);
+  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
+  const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
   const { data: boards } = useListAllBoardsQuery();
   const filteredBoards = boardSearchText
     ? boards?.filter((board) =>
@@ -42,46 +39,35 @@ const BoardsList = (props: Props) => {
       <Collapse in={isOpen} animateOpacity>
         <Flex
           layerStyle="first"
-          sx={{
-            flexDir: 'column',
-            gap: 2,
-            p: 2,
-            mt: 2,
-            borderRadius: 'base',
-          }}
+          flexDir="column"
+          gap={2}
+          p={2}
+          mt={2}
+          borderRadius="base"
         >
-          <Flex sx={{ gap: 2, alignItems: 'center' }}>
+          <Flex gap={2} alignItems="center">
             <BoardsSearch />
             <AddBoardButton />
           </Flex>
           <OverlayScrollbarsComponent
             defer
-            style={{ height: '100%', width: '100%' }}
-            options={{
-              scrollbars: {
-                visibility: 'auto',
-                autoHide: 'move',
-                autoHideDelay: 1300,
-                theme: 'os-theme-dark',
-              },
-            }}
+            style={overlayScrollbarsStyles}
+            options={overlayScrollbarsParams.options}
           >
             <Grid
               className="list-container"
               data-testid="boards-list"
-              sx={{
-                gridTemplateColumns: `repeat(auto-fill, minmax(108px, 1fr));`,
-                maxH: 346,
-              }}
+              gridTemplateColumns="repeat(auto-fill, minmax(90px, 1fr))"
+              maxH={346}
             >
-              <GridItem sx={{ p: 1.5 }} data-testid="no-board">
+              <GridItem p={1.5} data-testid="no-board">
                 <NoBoardBoard isSelected={selectedBoardId === 'none'} />
               </GridItem>
               {filteredBoards &&
                 filteredBoards.map((board, index) => (
                   <GridItem
                     key={board.board_id}
-                    sx={{ p: 1.5 }}
+                    p={1.5}
                     data-testid={`board-${index}`}
                   >
                     <GalleryBoard

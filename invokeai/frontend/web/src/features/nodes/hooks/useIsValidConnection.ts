@@ -1,10 +1,11 @@
 // TODO: enable this at some point
 import { useAppSelector } from 'app/store/storeHooks';
-import { useCallback } from 'react';
-import { Connection, Node, useReactFlow } from 'reactflow';
-import { validateSourceAndTargetTypes } from 'features/nodes/store/util/validateSourceAndTargetTypes';
 import { getIsGraphAcyclic } from 'features/nodes/store/util/getIsGraphAcyclic';
-import { InvocationNodeData } from 'features/nodes/types/invocation';
+import { validateSourceAndTargetTypes } from 'features/nodes/store/util/validateSourceAndTargetTypes';
+import type { InvocationNodeData } from 'features/nodes/types/invocation';
+import { useCallback } from 'react';
+import type { Connection, Node } from 'reactflow';
+import { useReactFlow } from 'reactflow';
 
 /**
  * NOTE: The logic here must be duplicated in `invokeai/frontend/web/src/features/nodes/store/util/makeIsConnectionValidSelector.ts`
@@ -14,7 +15,7 @@ import { InvocationNodeData } from 'features/nodes/types/invocation';
 export const useIsValidConnection = () => {
   const flow = useReactFlow();
   const shouldValidateGraph = useAppSelector(
-    (state) => state.nodes.shouldValidateGraph
+    (s) => s.nodes.shouldValidateGraph
   );
   const isValidConnection = useCallback(
     ({ source, sourceHandle, target, targetHandle }: Connection): boolean => {

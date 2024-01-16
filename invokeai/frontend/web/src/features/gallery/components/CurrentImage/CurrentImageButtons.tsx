@@ -1,95 +1,69 @@
+import { Flex } from '@chakra-ui/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { isEqual } from 'lodash-es';
-
-import {
-  ButtonGroup,
-  Flex,
-  Menu,
-  MenuButton,
-  MenuList,
-} from '@chakra-ui/react';
-import { skipToken } from '@reduxjs/toolkit/dist/query';
+import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppToaster } from 'app/components/Toaster';
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
+import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
+import { InvMenu, InvMenuButton } from 'common/components/InvMenu/wrapper';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
-import { workflowLoadRequested } from 'features/nodes/store/actions';
-import ParamUpscalePopover from 'features/parameters/components/Parameters/Upscale/ParamUpscaleSettings';
+import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
+import { sentImageToImg2Img } from 'features/gallery/store/actions';
+import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
+import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
+import ParamUpscalePopover from 'features/parameters/components/Upscale/ParamUpscaleSettings';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { selectSystemSlice } from 'features/system/store/systemSlice';
 import {
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
 } from 'features/ui/store/uiSlice';
+import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
-  FaAsterisk,
-  FaCode,
-  FaHourglassHalf,
-  FaQuoteRight,
-  FaRulerVertical,
-  FaSeedling,
-} from 'react-icons/fa';
-import { FaCircleNodes, FaEllipsis } from 'react-icons/fa6';
+  PiAsteriskBold,
+  PiDotsThreeOutlineFill,
+  PiFlowArrowBold,
+  PiHourglassHighBold,
+  PiInfoBold,
+  PiPlantBold,
+  PiQuotesBold,
+  PiRulerBold,
+} from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
-import { useDebouncedWorkflow } from 'services/api/hooks/useDebouncedWorkflow';
-import { menuListMotionProps } from 'theme/components/menu';
-import { sentImageToImg2Img } from 'features/gallery/store/actions';
-import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
 
-const currentImageButtonsSelector = createSelector(
-  [stateSelector, activeTabNameSelector],
-  ({ gallery, system, ui, config }, activeTabName) => {
-    const { isConnected, shouldConfirmOnDelete, denoiseProgress } = system;
-
-    const {
-      shouldShowImageDetails,
-      shouldHidePreview,
-      shouldShowProgressInViewer,
-    } = ui;
-
-    const { shouldFetchMetadataFromApi } = config;
-
-    const lastSelectedImage = gallery.selection[gallery.selection.length - 1];
-
-    return {
-      shouldConfirmOnDelete,
-      isConnected,
-      shouldDisableToolbarButtons:
-        Boolean(denoiseProgress?.progress_image) || !lastSelectedImage,
-      shouldShowImageDetails,
-      activeTabName,
-      shouldHidePreview,
-      shouldShowProgressInViewer,
-      lastSelectedImage,
-      shouldFetchMetadataFromApi,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
+const selectShouldDisableToolbarButtons = createSelector(
+  selectSystemSlice,
+  selectGallerySlice,
+  selectLastSelectedImage,
+  (system, gallery, lastSelectedImage) => {
+    const hasProgressImage = Boolean(system.denoiseProgress?.progress_image);
+    return hasProgressImage || !lastSelectedImage;
   }
 );
 
 const CurrentImageButtons = () => {
   const dispatch = useAppDispatch();
-  const {
-    isConnected,
-    shouldDisableToolbarButtons,
-    shouldShowImageDetails,
-    lastSelectedImage,
-    shouldShowProgressInViewer,
-  } = useAppSelector(currentImageButtonsSelector);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
+  const shouldShowImageDetails = useAppSelector(
+    (s) => s.ui.shouldShowImageDetails
+  );
+  const shouldShowProgressInViewer = useAppSelector(
+    (s) => s.ui.shouldShowProgressInViewer
+  );
+  const lastSelectedImage = useAppSelector(selectLastSelectedImage);
+  const shouldDisableToolbarButtons = useAppSelector(
+    selectShouldDisableToolbarButtons
+  );
 
   const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
   const isQueueMutationInProgress = useIsQueueMutationInProgress();
@@ -111,18 +85,17 @@ const CurrentImageButtons = () => {
     lastSelectedImage?.image_name
   );
 
-  const { workflow, isLoading: isLoadingWorkflow } = useDebouncedWorkflow(
-    lastSelectedImage?.workflow_id
-  );
+  const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } =
+    useGetAndLoadEmbeddedWorkflow({});
 
   const handleLoadWorkflow = useCallback(() => {
-    if (!workflow) {
+    if (!lastSelectedImage || !lastSelectedImage.has_workflow) {
       return;
     }
-    dispatch(workflowLoadRequested(workflow));
-  }, [dispatch, workflow]);
+    getAndLoadEmbeddedWorkflow(lastSelectedImage.image_name);
+  }, [getAndLoadEmbeddedWorkflow, lastSelectedImage]);
 
-  useHotkeys('w', handleLoadWorkflow, [workflow]);
+  useHotkeys('w', handleLoadWorkflow, [lastSelectedImage]);
 
   const handleClickUseAllParameters = useCallback(() => {
     recallAllParameters(metadata);
@@ -230,57 +203,50 @@ const CurrentImageButtons = () => {
 
   return (
     <>
-      <Flex
-        sx={{
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-          alignItems: 'center',
-          gap: 2,
-        }}
-      >
-        <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
-          <Menu isLazy>
-            <MenuButton
-              as={IAIIconButton}
+      <Flex flexWrap="wrap" justifyContent="center" alignItems="center" gap={2}>
+        <InvButtonGroup isDisabled={shouldDisableToolbarButtons}>
+          <InvMenu isLazy>
+            <InvMenuButton
+              as={InvIconButton}
               aria-label={t('parameters.imageActions')}
               tooltip={t('parameters.imageActions')}
               isDisabled={!imageDTO}
-              icon={<FaEllipsis />}
+              icon={<PiDotsThreeOutlineFill />}
             />
-            <MenuList motionProps={menuListMotionProps}>
+            <InvMenuList>
               {imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}
-            </MenuList>
-          </Menu>
-        </ButtonGroup>
+            </InvMenuList>
+          </InvMenu>
+        </InvButtonGroup>
 
-        <ButtonGroup isAttached={true} isDisabled={shouldDisableToolbarButtons}>
-          <IAIIconButton
-            isLoading={isLoadingWorkflow}
-            icon={<FaCircleNodes />}
+        <InvButtonGroup isDisabled={shouldDisableToolbarButtons}>
+          <InvIconButton
+            icon={<PiFlowArrowBold />}
             tooltip={`${t('nodes.loadWorkflow')} (W)`}
             aria-label={`${t('nodes.loadWorkflow')} (W)`}
-            isDisabled={!workflow}
+            isDisabled={!imageDTO?.has_workflow}
             onClick={handleLoadWorkflow}
+            isLoading={getAndLoadEmbeddedWorkflowResult.isLoading}
           />
-          <IAIIconButton
+          <InvIconButton
             isLoading={isLoadingMetadata}
-            icon={<FaQuoteRight />}
+            icon={<PiQuotesBold />}
             tooltip={`${t('parameters.usePrompt')} (P)`}
             aria-label={`${t('parameters.usePrompt')} (P)`}
             isDisabled={!metadata?.positive_prompt}
             onClick={handleUsePrompt}
           />
-          <IAIIconButton
+          <InvIconButton
             isLoading={isLoadingMetadata}
-            icon={<FaSeedling />}
+            icon={<PiPlantBold />}
             tooltip={`${t('parameters.useSeed')} (S)`}
             aria-label={`${t('parameters.useSeed')} (S)`}
             isDisabled={metadata?.seed === null || metadata?.seed === undefined}
             onClick={handleUseSeed}
           />
-          <IAIIconButton
+          <InvIconButton
             isLoading={isLoadingMetadata}
-            icon={<FaRulerVertical />}
+            icon={<PiRulerBold />}
             tooltip={`${t('parameters.useSize')} (D)`}
             aria-label={`${t('parameters.useSize')} (D)`}
             isDisabled={
@@ -291,45 +257,45 @@ const CurrentImageButtons = () => {
             }
             onClick={handleUseSize}
           />
-          <IAIIconButton
+          <InvIconButton
             isLoading={isLoadingMetadata}
-            icon={<FaAsterisk />}
+            icon={<PiAsteriskBold />}
             tooltip={`${t('parameters.useAll')} (A)`}
             aria-label={`${t('parameters.useAll')} (A)`}
             isDisabled={!metadata}
             onClick={handleClickUseAllParameters}
           />
-        </ButtonGroup>
+        </InvButtonGroup>
 
         {isUpscalingEnabled && (
-          <ButtonGroup isAttached={true} isDisabled={isQueueMutationInProgress}>
+          <InvButtonGroup isDisabled={isQueueMutationInProgress}>
             {isUpscalingEnabled && <ParamUpscalePopover imageDTO={imageDTO} />}
-          </ButtonGroup>
+          </InvButtonGroup>
         )}
 
-        <ButtonGroup isAttached={true}>
-          <IAIIconButton
-            icon={<FaCode />}
+        <InvButtonGroup>
+          <InvIconButton
+            icon={<PiInfoBold />}
             tooltip={`${t('parameters.info')} (I)`}
             aria-label={`${t('parameters.info')} (I)`}
             isChecked={shouldShowImageDetails}
             onClick={handleClickShowImageDetails}
           />
-        </ButtonGroup>
+        </InvButtonGroup>
 
-        <ButtonGroup isAttached={true}>
-          <IAIIconButton
+        <InvButtonGroup>
+          <InvIconButton
             aria-label={t('settings.displayInProgress')}
             tooltip={t('settings.displayInProgress')}
-            icon={<FaHourglassHalf />}
+            icon={<PiHourglassHighBold />}
             isChecked={shouldShowProgressInViewer}
             onClick={handleClickProgressImagesToggle}
           />
-        </ButtonGroup>
+        </InvButtonGroup>
 
-        <ButtonGroup isAttached={true}>
+        <InvButtonGroup>
           <DeleteImageButton onClick={handleDelete} />
-        </ButtonGroup>
+        </InvButtonGroup>
       </Flex>
     </>
   );

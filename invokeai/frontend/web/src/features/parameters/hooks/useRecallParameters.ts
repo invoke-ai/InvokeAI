@@ -1,14 +1,12 @@
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppToaster } from 'app/components/Toaster';
-import { stateSelector } from 'app/store/store';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import {
   controlAdapterRecalled,
   controlAdaptersReset,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
-import {
+import type {
   ControlNetConfig,
   IPAdapterConfig,
   T2IAdapterConfig,
@@ -19,12 +17,61 @@ import {
   initialT2IAdapter,
 } from 'features/controlAdapters/util/buildControlAdapter';
 import {
+  setHrfEnabled,
+  setHrfMethod,
+  setHrfStrength,
+} from 'features/hrf/store/hrfSlice';
+import { loraRecalled, lorasCleared } from 'features/lora/store/loraSlice';
+import type {
   ControlNetMetadataItem,
   CoreMetadata,
   IPAdapterMetadataItem,
   LoRAMetadataItem,
   T2IAdapterMetadataItem,
 } from 'features/nodes/types/metadata';
+import {
+  initialImageSelected,
+  modelSelected,
+} from 'features/parameters/store/actions';
+import {
+  heightChanged,
+  selectGenerationSlice,
+  setCfgRescaleMultiplier,
+  setCfgScale,
+  setImg2imgStrength,
+  setNegativePrompt,
+  setPositivePrompt,
+  setScheduler,
+  setSeed,
+  setSteps,
+  vaeSelected,
+  widthChanged,
+} from 'features/parameters/store/generationSlice';
+import {
+  isParameterCFGRescaleMultiplier,
+  isParameterCFGScale,
+  isParameterControlNetModel,
+  isParameterHeight,
+  isParameterHRFEnabled,
+  isParameterHRFMethod,
+  isParameterIPAdapterModel,
+  isParameterLoRAModel,
+  isParameterModel,
+  isParameterNegativePrompt,
+  isParameterNegativeStylePromptSDXL,
+  isParameterPositivePrompt,
+  isParameterPositiveStylePromptSDXL,
+  isParameterScheduler,
+  isParameterSDXLRefinerModel,
+  isParameterSDXLRefinerNegativeAestheticScore,
+  isParameterSDXLRefinerPositiveAestheticScore,
+  isParameterSDXLRefinerStart,
+  isParameterSeed,
+  isParameterSteps,
+  isParameterStrength,
+  isParameterVAEModel,
+  isParameterWidth,
+} from 'features/parameters/types/parameterSchemas';
 import {
   refinerModelChanged,
   setNegativeStylePromptSDXL,
@@ -39,76 +86,29 @@ import {
 import { isNil } from 'lodash-es';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ImageDTO } from 'services/api/types';
-import { v4 as uuidv4 } from 'uuid';
 import {
-  controlNetModelsAdapter,
-  ipAdapterModelsAdapter,
-  loraModelsAdapter,
-  t2iAdapterModelsAdapter,
+  controlNetModelsAdapterSelectors,
+  ipAdapterModelsAdapterSelectors,
+  loraModelsAdapterSelectors,
+  t2iAdapterModelsAdapterSelectors,
   useGetControlNetModelsQuery,
   useGetIPAdapterModelsQuery,
   useGetLoRAModelsQuery,
   useGetT2IAdapterModelsQuery,
 } from 'services/api/endpoints/models';
-import { loraRecalled, lorasCleared } from 'features/lora/store/loraSlice';
-import {
-  initialImageSelected,
-  modelSelected,
-} from 'features/parameters/store/actions';
-import {
-  setCfgRescaleMultiplier,
-  setCfgScale,
-  setHeight,
-  setHrfEnabled,
-  setHrfMethod,
-  setHrfStrength,
-  setImg2imgStrength,
-  setNegativePrompt,
-  setPositivePrompt,
-  setScheduler,
-  setSeed,
-  setSteps,
-  setWidth,
-  vaeSelected,
-} from 'features/parameters/store/generationSlice';
-import {
-  isParameterHRFEnabled,
-  isParameterCFGScale,
-  isParameterControlNetModel,
-  isParameterHeight,
-  isParameterHRFMethod,
-  isParameterIPAdapterModel,
-  isParameterLoRAModel,
-  isParameterModel,
-  isParameterNegativePrompt,
-  isParameterPositivePrompt,
-  isParameterNegativeStylePromptSDXL,
-  isParameterPositiveStylePromptSDXL,
-  isParameterSDXLRefinerModel,
-  isParameterSDXLRefinerNegativeAestheticScore,
-  isParameterSDXLRefinerPositiveAestheticScore,
-  isParameterSDXLRefinerStart,
-  isParameterScheduler,
-  isParameterSeed,
-  isParameterSteps,
-  isParameterStrength,
-  isParameterVAEModel,
-  isParameterWidth,
-  isParameterCFGRescaleMultiplier,
-} from 'features/parameters/types/parameterSchemas';
+import type { ImageDTO } from 'services/api/types';
+import { v4 as uuidv4 } from 'uuid';
 
-const selector = createSelector(
-  stateSelector,
-  ({ generation }) => generation.model,
-  defaultSelectorOptions
+const selectModel = createMemoizedSelector(
+  selectGenerationSlice,
+  (generation) => generation.model
 );
 
 export const useRecallParameters = () => {
   const dispatch = useAppDispatch();
   const toaster = useAppToaster();
   const { t } = useTranslation();
-  const model = useAppSelector(selector);
+  const model = useAppSelector(selectModel);
 
   const parameterSetToast = useCallback(() => {
     toaster({
@@ -372,7 +372,7 @@ export const useRecallParameters = () => {
         parameterNotSetToast();
         return;
       }
-      dispatch(setWidth(width));
+      dispatch(widthChanged(width));
       parameterSetToast();
     },
     [dispatch, parameterSetToast, parameterNotSetToast]
@@ -387,7 +387,7 @@ export const useRecallParameters = () => {
         parameterNotSetToast();
         return;
       }
-      dispatch(setHeight(height));
+      dispatch(heightChanged(height));
       parameterSetToast();
     },
     [dispatch, parameterSetToast, parameterNotSetToast]
@@ -406,8 +406,8 @@ export const useRecallParameters = () => {
         allParameterNotSetToast();
         return;
       }
-      dispatch(setHeight(height));
-      dispatch(setWidth(width));
+      dispatch(heightChanged(height));
+      dispatch(widthChanged(width));
       allParameterSetToast();
     },
     [dispatch, allParameterSetToast, allParameterNotSetToast]
@@ -488,9 +488,10 @@ export const useRecallParameters = () => {
       const { base_model, model_name } = loraMetadataItem.lora;
 
       const matchingLoRA = loraModels
-        ? loraModelsAdapter
-            .getSelectors()
-            .selectById(loraModels, `${base_model}/lora/${model_name}`)
+        ? loraModelsAdapterSelectors.selectById(
+            loraModels,
+            `${base_model}/lora/${model_name}`
+          )
         : undefined;
 
       if (!matchingLoRA) {
@@ -553,12 +554,10 @@ export const useRecallParameters = () => {
       } = controlnetMetadataItem;
 
       const matchingControlNetModel = controlNetModels
-        ? controlNetModelsAdapter
-            .getSelectors()
-            .selectById(
-              controlNetModels,
-              `${control_model.base_model}/controlnet/${control_model.model_name}`
-            )
+        ? controlNetModelsAdapterSelectors.selectById(
+            controlNetModels,
+            `${control_model.base_model}/controlnet/${control_model.model_name}`
+          )
         : undefined;
 
       if (!matchingControlNetModel) {
@@ -649,12 +648,10 @@ export const useRecallParameters = () => {
       } = t2iAdapterMetadataItem;
 
       const matchingT2IAdapterModel = t2iAdapterModels
-        ? t2iAdapterModelsAdapter
-            .getSelectors()
-            .selectById(
-              t2iAdapterModels,
-              `${t2i_adapter_model.base_model}/t2i_adapter/${t2i_adapter_model.model_name}`
-            )
+        ? t2iAdapterModelsAdapterSelectors.selectById(
+            t2iAdapterModels,
+            `${t2i_adapter_model.base_model}/t2i_adapter/${t2i_adapter_model.model_name}`
+          )
         : undefined;
 
       if (!matchingT2IAdapterModel) {
@@ -738,12 +735,10 @@ export const useRecallParameters = () => {
       } = ipAdapterMetadataItem;
 
       const matchingIPAdapterModel = ipAdapterModels
-        ? ipAdapterModelsAdapter
-            .getSelectors()
-            .selectById(
-              ipAdapterModels,
-              `${ip_adapter_model.base_model}/ip_adapter/${ip_adapter_model.model_name}`
-            )
+        ? ipAdapterModelsAdapterSelectors.selectById(
+            ipAdapterModels,
+            `${ip_adapter_model.base_model}/ip_adapter/${ip_adapter_model.model_name}`
+          )
         : undefined;
 
       if (!matchingIPAdapterModel) {
@@ -885,11 +880,11 @@ export const useRecallParameters = () => {
       }
 
       if (isParameterWidth(width)) {
-        dispatch(setWidth(width));
+        dispatch(widthChanged(width));
       }
 
       if (isParameterHeight(height)) {
-        dispatch(setHeight(height));
+        dispatch(heightChanged(height));
       }
 
       if (isParameterStrength(strength)) {

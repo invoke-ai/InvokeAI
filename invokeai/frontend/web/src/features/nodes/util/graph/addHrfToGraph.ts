@@ -1,14 +1,16 @@
 import { logger } from 'app/logging/logger';
-import { RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
-import {
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import type {
   DenoiseLatentsInvocation,
-  ESRGANInvocation,
   Edge,
+  ESRGANInvocation,
   LatentsToImageInvocation,
   NoiseInvocation,
   NonNullableGraph,
 } from 'services/api/types';
+
 import {
   DENOISE_LATENTS,
   DENOISE_LATENTS_HRF,
@@ -65,26 +67,20 @@ function copyConnectionsToDenoiseLatentsHrf(graph: NonNullableGraph): void {
  * Adjusts the width and height to maintain the aspect ratio and constrains them by the model's dimension limits,
  * rounding down to the nearest multiple of 8.
  *
- * @param {string} baseModel The base model type, which determines the base dimension used in calculations.
+ * @param {number} optimalDimension The optimal dimension for the base model.
  * @param {number} width The current width to be adjusted for HRF.
  * @param {number} height The current height to be adjusted for HRF.
  * @return {{newWidth: number, newHeight: number}} The new width and height, adjusted and rounded as needed.
  */
 function calculateHrfRes(
-  baseModel: string,
+  optimalDimension: number,
   width: number,
   height: number
 ): { newWidth: number; newHeight: number } {
   const aspect = width / height;
-  let dimension;
-  if (baseModel == 'sdxl') {
-    dimension = 1024;
-  } else {
-    dimension = 512;
-  }
 
-  const minDimension = Math.floor(dimension * 0.5);
-  const modelArea = dimension * dimension; // Assuming square images for model_area
+  const minDimension = Math.floor(optimalDimension * 0.5);
+  const modelArea = optimalDimension * optimalDimension; // Assuming square images for model_area
 
   let initWidth;
   let initHeight;
@@ -113,23 +109,21 @@ export const addHrfToGraph = (
 ): void => {
   // Double check hrf is enabled.
   if (
-    !state.generation.hrfEnabled ||
-    state.config.disabledSDFeatures.includes('hrf') ||
-    state.generation.model?.model_type === 'onnx' // TODO: ONNX support
+    !state.hrf.hrfEnabled ||
+    state.config.disabledSDFeatures.includes('hrf')
   ) {
     return;
   }
   const log = logger('txt2img');
 
-  const { vae, hrfStrength, hrfEnabled, hrfMethod } = state.generation;
+  const { vae } = state.generation;
+  const { hrfStrength, hrfEnabled, hrfMethod } = state.hrf;
   const isAutoVae = !vae;
   const width = state.generation.width;
   const height = state.generation.height;
-  const baseModel = state.generation.model
-    ? state.generation.model.base_model
-    : 'sd1';
+  const optimalDimension = selectOptimalDimension(state);
   const { newWidth: hrfWidth, newHeight: hrfHeight } = calculateHrfRes(
-    baseModel,
+    optimalDimension,
     width,
     height
   );
@@ -309,7 +303,7 @@ export const addHrfToGraph = (
     cfg_scale: originalDenoiseLatentsNode?.cfg_scale,
     scheduler: originalDenoiseLatentsNode?.scheduler,
     steps: originalDenoiseLatentsNode?.steps,
-    denoising_start: 1 - state.generation.hrfStrength,
+    denoising_start: 1 - hrfStrength,
     denoising_end: 1,
   };
   graph.edges.push(

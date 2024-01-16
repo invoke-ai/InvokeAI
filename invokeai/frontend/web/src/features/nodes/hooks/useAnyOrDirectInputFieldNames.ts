@@ -1,24 +1,25 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { keys, map } from 'lodash-es';
-import { useMemo } from 'react';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { getSortedFilteredFieldNames } from 'features/nodes/util/node/getSortedFilteredFieldNames';
 import { TEMPLATE_BUILDER_MAP } from 'features/nodes/util/schema/buildFieldInputTemplate';
+import { keys, map } from 'lodash-es';
+import { useMemo } from 'react';
 
 export const useAnyOrDirectInputFieldNames = (nodeId: string) => {
   const selector = useMemo(
     () =>
-      createSelector(
-        stateSelector,
-        ({ nodes }) => {
+      createMemoizedSelector(
+        selectNodesSlice,
+        selectNodeTemplatesSlice,
+        (nodes, nodeTemplates) => {
           const node = nodes.nodes.find((node) => node.id === nodeId);
           if (!isInvocationNode(node)) {
             return [];
           }
-          const nodeTemplate = nodes.nodeTemplates[node.data.type];
+          const nodeTemplate = nodeTemplates.templates[node.data.type];
           if (!nodeTemplate) {
             return [];
           }
@@ -29,8 +30,7 @@ export const useAnyOrDirectInputFieldNames = (nodeId: string) => {
               keys(TEMPLATE_BUILDER_MAP).includes(field.type.name)
           );
           return getSortedFilteredFieldNames(fields);
-        },
-        defaultSelectorOptions
+        }
       ),
     [nodeId]
   );

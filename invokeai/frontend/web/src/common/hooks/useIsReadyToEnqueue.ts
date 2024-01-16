@@ -1,22 +1,42 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { selectControlAdapterAll } from 'features/controlAdapters/store/controlAdaptersSlice';
+import {
+  selectControlAdapterAll,
+  selectControlAdaptersSlice,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
+import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
+import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
+import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
 import { forEach } from 'lodash-es';
 import { getConnectedEdges } from 'reactflow';
 
-const selector = createSelector(
-  [stateSelector, activeTabNameSelector],
+const selector = createMemoizedSelector(
+  [
+    selectControlAdaptersSlice,
+    selectGenerationSlice,
+    selectSystemSlice,
+    selectNodesSlice,
+    selectNodeTemplatesSlice,
+    selectDynamicPromptsSlice,
+    activeTabNameSelector,
+  ],
   (
-    { controlAdapters, generation, system, nodes, dynamicPrompts },
+    controlAdapters,
+    generation,
+    system,
+    nodes,
+    nodeTemplates,
+    dynamicPrompts,
     activeTabName
   ) => {
-    const { initialImage, model } = generation;
+    const { initialImage, model, positivePrompt } = generation;
 
     const { isConnected } = system;
 
@@ -42,7 +62,7 @@ const selector = createSelector(
             return;
           }
 
-          const nodeTemplate = nodes.nodeTemplates[node.data.type];
+          const nodeTemplate = nodeTemplates.templates[node.data.type];
 
           if (!nodeTemplate) {
             // Node type not found
@@ -81,7 +101,10 @@ const selector = createSelector(
         });
       }
     } else {
-      if (dynamicPrompts.prompts.length === 0) {
+      if (
+        dynamicPrompts.prompts.length === 0 &&
+        getShouldProcessPrompt(positivePrompt)
+      ) {
         reasons.push(i18n.t('parameters.invoke.noPrompts'));
       }
 
@@ -125,8 +148,7 @@ const selector = createSelector(
     }
 
     return { isReady: !reasons.length, reasons };
-  },
-  defaultSelectorOptions
+  }
 );
 
 export const useIsReadyToEnqueue = () => {

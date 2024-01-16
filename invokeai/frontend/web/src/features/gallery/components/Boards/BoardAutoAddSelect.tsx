@@ -1,87 +1,72 @@
-import { SelectItem } from '@mantine/core';
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
-import IAIMantineSelectItemWithTooltip from 'common/components/IAIMantineSelectItemWithTooltip';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvSelect } from 'common/components/InvSelect/InvSelect';
+import type {
+  InvSelectOnChange,
+  InvSelectOption,
+} from 'common/components/InvSelect/types';
 import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
-import { memo, useCallback, useRef } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
-
-const selector = createSelector(
-  [stateSelector],
-  ({ gallery }) => {
-    const { autoAddBoardId, autoAssignBoardOnClick } = gallery;
-
-    return {
-      autoAddBoardId,
-      autoAssignBoardOnClick,
-    };
-  },
-  defaultSelectorOptions
-);
 
 const BoardAutoAddSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const { autoAddBoardId, autoAssignBoardOnClick } = useAppSelector(selector);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const { boards, hasBoards } = useListAllBoardsQuery(undefined, {
+  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
+  const autoAssignBoardOnClick = useAppSelector(
+    (s) => s.gallery.autoAssignBoardOnClick
+  );
+  const { options, hasBoards } = useListAllBoardsQuery(undefined, {
     selectFromResult: ({ data }) => {
-      const boards: SelectItem[] = [
+      const options: InvSelectOption[] = [
         {
           label: 'None',
           value: 'none',
         },
-      ];
-      data?.forEach(({ board_id, board_name }) => {
-        boards.push({
+      ].concat(
+        (data ?? []).map(({ board_id, board_name }) => ({
           label: board_name,
           value: board_id,
-        });
-      });
+        }))
+      );
       return {
-        boards,
-        hasBoards: boards.length > 1,
+        options,
+        hasBoards: options.length > 1,
       };
     },
   });
 
-  const handleChange = useCallback(
-    (v: string | null) => {
+  const onChange = useCallback<InvSelectOnChange>(
+    (v) => {
       if (!v) {
         return;
       }
-
-      dispatch(autoAddBoardIdChanged(v));
+      dispatch(autoAddBoardIdChanged(v.value));
     },
     [dispatch]
   );
 
-  const filterFunc = useCallback(
-    (value: string, item: SelectItem) =>
-      item.label?.toLowerCase().includes(value.toLowerCase().trim()) ||
-      item.value.toLowerCase().includes(value.toLowerCase().trim()),
-    []
+  const value = useMemo(
+    () => options.find((o) => o.value === autoAddBoardId),
+    [options, autoAddBoardId]
   );
+
+  const noOptionsMessage = useCallback(() => t('boards.noMatching'), [t]);
 
   return (
-    <IAIMantineSearchableSelect
+    <InvControl
       label={t('boards.autoAddBoard')}
-      inputRef={inputRef}
-      autoFocus
-      placeholder={t('boards.selectBoard')}
-      value={autoAddBoardId}
-      data={boards}
-      nothingFound={t('boards.noMatching')}
-      itemComponent={IAIMantineSelectItemWithTooltip}
-      disabled={!hasBoards || autoAssignBoardOnClick}
-      filter={filterFunc}
-      onChange={handleChange}
-    />
+      isDisabled={!hasBoards || autoAssignBoardOnClick}
+    >
+      <InvSelect
+        value={value}
+        options={options}
+        onChange={onChange}
+        placeholder={t('boards.selectBoard')}
+        noOptionsMessage={noOptionsMessage}
+      />
+    </InvControl>
   );
 };
-
 export default memo(BoardAutoAddSelect);

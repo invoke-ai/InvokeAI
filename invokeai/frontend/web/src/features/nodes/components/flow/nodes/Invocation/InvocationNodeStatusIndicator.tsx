@@ -1,30 +1,23 @@
-import {
-  Badge,
-  CircularProgress,
-  Flex,
-  Icon,
-  Image,
-  Text,
-  Tooltip,
-} from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
+import type { SystemStyleObject } from '@chakra-ui/react';
+import { Badge, CircularProgress, Flex, Icon, Image } from '@chakra-ui/react';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { InvText } from 'common/components/InvText/wrapper';
+import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
-import {
-  NodeExecutionState,
-  zNodeStatus,
-} from 'features/nodes/types/invocation';
+import type { NodeExecutionState } from 'features/nodes/types/invocation';
+import { zNodeStatus } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
-import { FaCheck, FaEllipsisH, FaExclamation } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
+import { FaCheck, FaEllipsisH, FaExclamation } from 'react-icons/fa';
 
 type Props = {
   nodeId: string;
 };
 
 const iconBoxSize = 3;
-const circleStyles = {
+const circleStyles: SystemStyleObject = {
   circle: {
     transitionProperty: 'none',
     transitionDuration: '0s',
@@ -35,9 +28,9 @@ const circleStyles = {
 const InvocationNodeStatusIndicator = ({ nodeId }: Props) => {
   const selectNodeExecutionState = useMemo(
     () =>
-      createSelector(
-        stateSelector,
-        ({ nodes }) => nodes.nodeExecutionStates[nodeId]
+      createMemoizedSelector(
+        selectNodesSlice,
+        (nodes) => nodes.nodeExecutionStates[nodeId]
       ),
     [nodeId]
   );
@@ -49,22 +42,20 @@ const InvocationNodeStatusIndicator = ({ nodeId }: Props) => {
   }
 
   return (
-    <Tooltip
+    <InvTooltip
       label={<TooltipLabel nodeExecutionState={nodeExecutionState} />}
       placement="top"
     >
       <Flex
         className={DRAG_HANDLE_CLASSNAME}
-        sx={{
-          w: 5,
-          h: 'full',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-        }}
+        w={5}
+        h="full"
+        alignItems="center"
+        justifyContent="flex-end"
       >
         <StatusIcon nodeExecutionState={nodeExecutionState} />
       </Flex>
-    </Tooltip>
+    </InvTooltip>
   );
 };
 
@@ -78,21 +69,21 @@ const TooltipLabel = memo(({ nodeExecutionState }: TooltipLabelProps) => {
   const { status, progress, progressImage } = nodeExecutionState;
   const { t } = useTranslation();
   if (status === zNodeStatus.enum.PENDING) {
-    return <Text>{t('queue.pending')}</Text>;
+    return <InvText>{t('queue.pending')}</InvText>;
   }
   if (status === zNodeStatus.enum.IN_PROGRESS) {
     if (progressImage) {
       return (
-        <Flex sx={{ pos: 'relative', pt: 1.5, pb: 0.5 }}>
+        <Flex pos="relative" pt={1.5} pb={0.5}>
           <Image
             src={progressImage.dataURL}
-            sx={{ w: 32, h: 32, borderRadius: 'base', objectFit: 'contain' }}
+            w={32}
+            h={32}
+            borderRadius="base"
+            objectFit="contain"
           />
           {progress !== null && (
-            <Badge
-              variant="solid"
-              sx={{ pos: 'absolute', top: 2.5, insetInlineEnd: 1 }}
-            >
+            <Badge variant="solid" pos="absolute" top={2.5} insetInlineEnd={1}>
               {Math.round(progress * 100)}%
             </Badge>
           )}
@@ -102,21 +93,21 @@ const TooltipLabel = memo(({ nodeExecutionState }: TooltipLabelProps) => {
 
     if (progress !== null) {
       return (
-        <Text>
+        <InvText>
           {t('nodes.executionStateInProgress')} ({Math.round(progress * 100)}%)
-        </Text>
+        </InvText>
       );
     }
 
-    return <Text>{t('nodes.executionStateInProgress')}</Text>;
+    return <InvText>{t('nodes.executionStateInProgress')}</InvText>;
   }
 
   if (status === zNodeStatus.enum.COMPLETED) {
-    return <Text>{t('nodes.executionStateCompleted')}</Text>;
+    return <InvText>{t('nodes.executionStateCompleted')}</InvText>;
   }
 
   if (status === zNodeStatus.enum.FAILED) {
-    return <Text>{t('nodes.executionStateError')}</Text>;
+    return <InvText>{t('nodes.executionStateError')}</InvText>;
   }
 
   return null;
@@ -131,16 +122,7 @@ type StatusIconProps = {
 const StatusIcon = memo((props: StatusIconProps) => {
   const { progress, status } = props.nodeExecutionState;
   if (status === zNodeStatus.enum.PENDING) {
-    return (
-      <Icon
-        as={FaEllipsisH}
-        sx={{
-          boxSize: iconBoxSize,
-          color: 'base.600',
-          _dark: { color: 'base.300' },
-        }}
-      />
-    );
+    return <Icon as={FaEllipsisH} boxSize={iconBoxSize} color="base.300" />;
   }
   if (status === zNodeStatus.enum.IN_PROGRESS) {
     return progress === null ? (
@@ -162,28 +144,10 @@ const StatusIcon = memo((props: StatusIconProps) => {
     );
   }
   if (status === zNodeStatus.enum.COMPLETED) {
-    return (
-      <Icon
-        as={FaCheck}
-        sx={{
-          boxSize: iconBoxSize,
-          color: 'ok.600',
-          _dark: { color: 'ok.300' },
-        }}
-      />
-    );
+    return <Icon as={FaCheck} boxSize={iconBoxSize} color="ok.300" />;
   }
   if (status === zNodeStatus.enum.FAILED) {
-    return (
-      <Icon
-        as={FaExclamation}
-        sx={{
-          boxSize: iconBoxSize,
-          color: 'error.600',
-          _dark: { color: 'error.300' },
-        }}
-      />
-    );
+    return <Icon as={FaExclamation} boxSize={iconBoxSize} color="error.300" />;
   }
   return null;
 });

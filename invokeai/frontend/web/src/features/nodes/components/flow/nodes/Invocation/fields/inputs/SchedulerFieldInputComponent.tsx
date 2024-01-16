@@ -1,72 +1,56 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import IAIMantineSearchableSelect from 'common/components/IAIMantineSearchableSelect';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvSelect } from 'common/components/InvSelect/InvSelect';
+import type { InvSelectOnChange } from 'common/components/InvSelect/types';
 import { fieldSchedulerValueChanged } from 'features/nodes/store/nodesSlice';
-import {
-  SchedulerFieldInputTemplate,
+import type {
   SchedulerFieldInputInstance,
+  SchedulerFieldInputTemplate,
 } from 'features/nodes/types/field';
-import { FieldComponentProps } from './types';
-import { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
-import { SCHEDULER_LABEL_MAP } from 'features/parameters/types/constants';
-import { map } from 'lodash-es';
-import { memo, useCallback } from 'react';
+import { SCHEDULER_OPTIONS } from 'features/parameters/types/constants';
+import { isParameterScheduler } from 'features/parameters/types/parameterSchemas';
+import { memo, useCallback, useMemo } from 'react';
 
-const selector = createSelector(
-  [stateSelector],
-  ({ ui }) => {
-    const { favoriteSchedulers: enabledSchedulers } = ui;
+import type { FieldComponentProps } from './types';
 
-    const data = map(SCHEDULER_LABEL_MAP, (label, name) => ({
-      value: name,
-      label: label,
-      group: enabledSchedulers.includes(name as ParameterScheduler)
-        ? 'Favorites'
-        : undefined,
-    })).sort((a, b) => a.label.localeCompare(b.label));
+type Props = FieldComponentProps<
+  SchedulerFieldInputInstance,
+  SchedulerFieldInputTemplate
+>;
 
-    return {
-      data,
-    };
-  },
-  defaultSelectorOptions
-);
-
-const SchedulerFieldInputComponent = (
-  props: FieldComponentProps<
-    SchedulerFieldInputInstance,
-    SchedulerFieldInputTemplate
-  >
-) => {
+const SchedulerFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
-  const { data } = useAppSelector(selector);
 
-  const handleChange = useCallback(
-    (value: string | null) => {
-      if (!value) {
+  const onChange = useCallback<InvSelectOnChange>(
+    (v) => {
+      if (!isParameterScheduler(v?.value)) {
         return;
       }
       dispatch(
         fieldSchedulerValueChanged({
           nodeId,
           fieldName: field.name,
-          value: value as ParameterScheduler,
+          value: v.value,
         })
       );
     },
     [dispatch, field.name, nodeId]
   );
 
+  const value = useMemo(
+    () => SCHEDULER_OPTIONS.find((o) => o.value === field?.value),
+    [field?.value]
+  );
+
   return (
-    <IAIMantineSearchableSelect
-      className="nowheel nodrag"
-      value={field.value}
-      data={data}
-      onChange={handleChange}
-    />
+    <InvControl className="nowheel nodrag">
+      <InvSelect
+        value={value}
+        options={SCHEDULER_OPTIONS}
+        onChange={onChange}
+      />
+    </InvControl>
   );
 };
 

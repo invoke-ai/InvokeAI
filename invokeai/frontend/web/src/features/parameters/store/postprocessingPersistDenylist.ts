@@ -1,4 +1,4 @@
-import { PostprocessingState } from './postprocessingSlice';
+import type { PostprocessingState } from './postprocessingSlice';
 
 /**
  * Postprocessing slice persist denylist

@@ -1,40 +1,17 @@
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
-import { useHotkeys } from 'react-hotkeys-hook';
-import { FaUndo } from 'react-icons/fa';
-
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { undo } from 'features/canvas/store/canvasSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-
-import { isEqual } from 'lodash-es';
+import { memo, useCallback } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { stateSelector } from 'app/store/store';
-import { useCallback } from 'react';
+import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 
-const canvasUndoSelector = createSelector(
-  [stateSelector, activeTabNameSelector],
-  ({ canvas }, activeTabName) => {
-    const { pastLayerStates } = canvas;
-
-    return {
-      canUndo: pastLayerStates.length > 0,
-      activeTabName,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
-
-export default function IAICanvasUndoButton() {
+const IAICanvasUndoButton = () => {
   const dispatch = useAppDispatch();
-
   const { t } = useTranslation();
-
-  const { canUndo, activeTabName } = useAppSelector(canvasUndoSelector);
+  const activeTabName = useAppSelector(activeTabNameSelector);
+  const canUndo = useAppSelector((s) => s.canvas.pastLayerStates.length > 0);
 
   const handleUndo = useCallback(() => {
     dispatch(undo());
@@ -53,12 +30,14 @@ export default function IAICanvasUndoButton() {
   );
 
   return (
-    <IAIIconButton
+    <InvIconButton
       aria-label={`${t('unifiedCanvas.undo')} (Ctrl+Z)`}
       tooltip={`${t('unifiedCanvas.undo')} (Ctrl+Z)`}
-      icon={<FaUndo />}
+      icon={<PiArrowCounterClockwiseBold />}
       onClick={handleUndo}
       isDisabled={!canUndo}
     />
   );
-}
+};
+
+export default memo(IAICanvasUndoButton);

@@ -1,18 +1,19 @@
-import {
+import type {
   ControlNetMetadataItem,
   CoreMetadata,
-  LoRAMetadataItem,
   IPAdapterMetadataItem,
+  LoRAMetadataItem,
   T2IAdapterMetadataItem,
 } from 'features/nodes/types/metadata';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
-import { memo, useMemo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import {
   isParameterControlNetModel,
   isParameterLoRAModel,
   isParameterT2IAdapterModel,
 } from 'features/parameters/types/parameterSchemas';
+import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import ImageMetadataItem from './ImageMetadataItem';
 
 type Props = {
@@ -44,6 +45,8 @@ const ImageMetadataActions = (props: Props) => {
     recallControlNet,
     recallIPAdapter,
     recallT2IAdapter,
+    recallSDXLPositiveStylePrompt,
+    recallSDXLNegativeStylePrompt,
   } = useRecallParameters();
 
   const handleRecallPositivePrompt = useCallback(() => {
@@ -53,6 +56,14 @@ const ImageMetadataActions = (props: Props) => {
   const handleRecallNegativePrompt = useCallback(() => {
     recallNegativePrompt(metadata?.negative_prompt);
   }, [metadata?.negative_prompt, recallNegativePrompt]);
+
+  const handleRecallSDXLPositiveStylePrompt = useCallback(() => {
+    recallSDXLPositiveStylePrompt(metadata?.positive_style_prompt);
+  }, [metadata?.positive_style_prompt, recallSDXLPositiveStylePrompt]);
+
+  const handleRecallSDXLNegativeStylePrompt = useCallback(() => {
+    recallSDXLNegativeStylePrompt(metadata?.negative__style_prompt);
+  }, [metadata?.negative__style_prompt, recallSDXLNegativeStylePrompt]);
 
   const handleRecallSeed = useCallback(() => {
     recallSeed(metadata?.seed);
@@ -190,6 +201,22 @@ const ImageMetadataActions = (props: Props) => {
           labelPosition="top"
           value={metadata.negative_prompt}
           onClick={handleRecallNegativePrompt}
+        />
+      )}
+      {metadata.positive_style_prompt && (
+        <ImageMetadataItem
+          label={t('sdxl.posStylePrompt')}
+          labelPosition="top"
+          value={metadata.positive_style_prompt}
+          onClick={handleRecallSDXLPositiveStylePrompt}
+        />
+      )}
+      {metadata.negative_style_prompt && (
+        <ImageMetadataItem
+          label={t('sdxl.negStylePrompt')}
+          labelPosition="top"
+          value={metadata.negative_style_prompt}
+          onClick={handleRecallSDXLNegativeStylePrompt}
         />
       )}
       {metadata.seed !== undefined && metadata.seed !== null && (

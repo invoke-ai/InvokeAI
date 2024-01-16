@@ -1,15 +1,30 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { RootState } from 'app/store/store';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { isInvocationNode } from 'features/nodes/types/invocation';
-import { some } from 'lodash-es';
-import { ImageUsage } from './types';
-import { selectControlAdapterAll } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
+import type { CanvasState } from 'features/canvas/store/canvasTypes';
+import {
+  selectControlAdapterAll,
+  selectControlAdaptersSlice,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
+import type { ControlAdaptersState } from 'features/controlAdapters/store/types';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
+import { selectDeleteImageModalSlice } from 'features/deleteImageModal/store/slice';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import type { NodesState } from 'features/nodes/store/types';
 import { isImageFieldInputInstance } from 'features/nodes/types/field';
+import { isInvocationNode } from 'features/nodes/types/invocation';
+import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
+import type { GenerationState } from 'features/parameters/store/types';
+import { some } from 'lodash-es';
 
-export const getImageUsage = (state: RootState, image_name: string) => {
-  const { generation, canvas, nodes, controlAdapters } = state;
+import type { ImageUsage } from './types';
+
+export const getImageUsage = (
+  generation: GenerationState,
+  canvas: CanvasState,
+  nodes: NodesState,
+  controlAdapters: ControlAdaptersState,
+  image_name: string
+) => {
   const isInitialImage = generation.initialImage?.imageName === image_name;
 
   const isCanvasImage = canvas.layerState.objects.some(
@@ -41,20 +56,23 @@ export const getImageUsage = (state: RootState, image_name: string) => {
   return imageUsage;
 };
 
-export const selectImageUsage = createSelector(
-  [(state: RootState) => state],
-  (state) => {
-    const { imagesToDelete } = state.deleteImageModal;
+export const selectImageUsage = createMemoizedSelector(
+  selectDeleteImageModalSlice,
+  selectGenerationSlice,
+  selectCanvasSlice,
+  selectNodesSlice,
+  selectControlAdaptersSlice,
+  (deleteImageModal, generation, canvas, nodes, controlAdapters) => {
+    const { imagesToDelete } = deleteImageModal;
 
     if (!imagesToDelete.length) {
       return [];
     }
 
     const imagesUsage = imagesToDelete.map((i) =>
-      getImageUsage(state, i.image_name)
+      getImageUsage(generation, canvas, nodes, controlAdapters, i.image_name)
     );
 
     return imagesUsage;
-  },
-  defaultSelectorOptions
+  }
 );

@@ -2,9 +2,10 @@ from typing import Optional
 
 from PIL.Image import Image as PILImageType
 
-from invokeai.app.invocations.baseinvocation import MetadataField, WorkflowField
+from invokeai.app.invocations.baseinvocation import MetadataField
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 
 from ..image_files.image_files_common import (
     ImageFileDeleteException,
@@ -42,7 +43,7 @@ class ImageService(ImageServiceABC):
         board_id: Optional[str] = None,
         is_intermediate: Optional[bool] = False,
         metadata: Optional[MetadataField] = None,
-        workflow: Optional[WorkflowField] = None,
+        workflow: Optional[WorkflowWithoutID] = None,
         **kwargs
     ) -> ImageDTO:
         if image_origin not in ResourceOrigin:
@@ -56,12 +57,6 @@ class ImageService(ImageServiceABC):
         (width, height) = image.size
 
         try:
-            if workflow is not None:
-                created_workflow = self.__invoker.services.workflow_records.create(workflow)
-                workflow_id = created_workflow.model_dump()["id"]
-            else:
-                workflow_id = None
-
             # TODO: Consider using a transaction here to ensure consistency between storage and database
             self.__invoker.services.image_records.save(
                 # Non-nullable fields
@@ -70,6 +65,7 @@ class ImageService(ImageServiceABC):
                 image_category=image_category,
                 width=width,
                 height=height,
+                has_workflow=workflow is not None,
                 # Meta fields
                 is_intermediate=is_intermediate,
                 # Nullable fields
@@ -80,8 +76,6 @@ class ImageService(ImageServiceABC):
             )
             if board_id is not None:
                 self.__invoker.services.board_image_records.add_image_to_board(board_id=board_id, image_name=image_name)
-            if workflow_id is not None:
-                self.__invoker.services.workflow_image_records.create(workflow_id=workflow_id, image_name=image_name)
             self.__invoker.services.image_files.save(
                 image_name=image_name, image=image, metadata=metadata, workflow=workflow
             )
@@ -145,7 +139,6 @@ class ImageService(ImageServiceABC):
                 image_url=self.__invoker.services.urls.get_image_url(image_name),
                 thumbnail_url=self.__invoker.services.urls.get_image_url(image_name, True),
                 board_id=self.__invoker.services.board_image_records.get_board_for_image(image_name),
-                workflow_id=self.__invoker.services.workflow_image_records.get_workflow_for_image(image_name),
             )
 
             return image_dto
@@ -166,18 +159,15 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error("Problem getting image DTO")
             raise e
 
-    def get_workflow(self, image_name: str) -> Optional[WorkflowField]:
+    def get_workflow(self, image_name: str) -> Optional[WorkflowWithoutID]:
         try:
-            workflow_id = self.__invoker.services.workflow_image_records.get_workflow_for_image(image_name)
-            if workflow_id is None:
-                return None
-            return self.__invoker.services.workflow_records.get(workflow_id)
-        except ImageRecordNotFoundException:
-            self.__invoker.services.logger.error("Image record not found")
+            return self.__invoker.services.image_files.get_workflow(image_name)
+        except ImageFileNotFoundException:
+            self.__invoker.services.logger.error("Image file not found")
             raise
-        except Exception as e:
-            self.__invoker.services.logger.error("Problem getting image DTO")
-            raise e
+        except Exception:
+            self.__invoker.services.logger.error("Problem getting image workflow")
+            raise
 
     def get_path(self, image_name: str, thumbnail: bool = False) -> str:
         try:
@@ -225,7 +215,6 @@ class ImageService(ImageServiceABC):
                     image_url=self.__invoker.services.urls.get_image_url(r.image_name),
                     thumbnail_url=self.__invoker.services.urls.get_image_url(r.image_name, True),
                     board_id=self.__invoker.services.board_image_records.get_board_for_image(r.image_name),
-                    workflow_id=self.__invoker.services.workflow_image_records.get_workflow_for_image(r.image_name),
                 )
                 for r in results.items
             ]

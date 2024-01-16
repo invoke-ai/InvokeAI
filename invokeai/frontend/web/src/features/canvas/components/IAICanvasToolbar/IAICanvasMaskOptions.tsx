@@ -1,16 +1,18 @@
-import { Box, ButtonGroup, Flex } from '@chakra-ui/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { Box, Flex } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIButton from 'common/components/IAIButton';
 import IAIColorPicker from 'common/components/IAIColorPicker';
-import IAIIconButton from 'common/components/IAIIconButton';
-import IAIPopover from 'common/components/IAIPopover';
-import IAISimpleCheckbox from 'common/components/IAISimpleCheckbox';
-import { canvasMaskSavedToGallery } from 'features/canvas/store/actions';
+import { InvButton } from 'common/components/InvButton/InvButton';
+import { InvCheckbox } from 'common/components/InvCheckbox/wrapper';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import {
-  canvasSelector,
-  isStagingSelector,
-} from 'features/canvas/store/canvasSelectors';
+  InvPopover,
+  InvPopoverBody,
+  InvPopoverContent,
+  InvPopoverTrigger,
+} from 'common/components/InvPopover/wrapper';
+import { canvasMaskSavedToGallery } from 'features/canvas/store/actions';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   clearMask,
   setIsMaskEnabled,
@@ -18,47 +20,27 @@ import {
   setMaskColor,
   setShouldPreserveMaskedArea,
 } from 'features/canvas/store/canvasSlice';
-import { rgbaColorToString } from 'features/canvas/util/colorToString';
-import { isEqual } from 'lodash-es';
-import { ChangeEvent, memo, useCallback } from 'react';
-import { RgbaColor } from 'react-colorful';
-
+import type { ChangeEvent } from 'react';
+import { memo, useCallback } from 'react';
+import type { RgbaColor } from 'react-colorful';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { FaMask, FaSave, FaTrash } from 'react-icons/fa';
+import {
+  PiExcludeBold,
+  PiFloppyDiskBackFill,
+  PiTrashSimpleFill,
+} from 'react-icons/pi';
 
-export const selector = createSelector(
-  [canvasSelector, isStagingSelector],
-  (canvas, isStaging) => {
-    const { maskColor, layer, isMaskEnabled, shouldPreserveMaskedArea } =
-      canvas;
-
-    return {
-      layer,
-      maskColor,
-      maskColorString: rgbaColorToString(maskColor),
-      isMaskEnabled,
-      shouldPreserveMaskedArea,
-      isStaging,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
 const IAICanvasMaskOptions = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
-  const {
-    layer,
-    maskColor,
-    isMaskEnabled,
-    shouldPreserveMaskedArea,
-    isStaging,
-  } = useAppSelector(selector);
+  const layer = useAppSelector((s) => s.canvas.layer);
+  const maskColor = useAppSelector((s) => s.canvas.maskColor);
+  const isMaskEnabled = useAppSelector((s) => s.canvas.isMaskEnabled);
+  const shouldPreserveMaskedArea = useAppSelector(
+    (s) => s.canvas.shouldPreserveMaskedArea
+  );
+  const isStaging = useAppSelector(isStagingSelector);
 
   useHotkeys(
     ['q'],
@@ -127,41 +109,55 @@ const IAICanvasMaskOptions = () => {
   );
 
   return (
-    <IAIPopover
-      triggerComponent={
-        <ButtonGroup>
-          <IAIIconButton
-            aria-label={t('unifiedCanvas.maskingOptions')}
-            tooltip={t('unifiedCanvas.maskingOptions')}
-            icon={<FaMask />}
-            isChecked={layer === 'mask'}
-            isDisabled={isStaging}
-          />
-        </ButtonGroup>
-      }
-    >
-      <Flex direction="column" gap={2}>
-        <IAISimpleCheckbox
-          label={`${t('unifiedCanvas.enableMask')} (H)`}
-          isChecked={isMaskEnabled}
-          onChange={handleToggleEnableMask}
+    <InvPopover isLazy>
+      <InvPopoverTrigger>
+        <InvIconButton
+          aria-label={t('unifiedCanvas.maskingOptions')}
+          tooltip={t('unifiedCanvas.maskingOptions')}
+          icon={<PiExcludeBold />}
+          isChecked={layer === 'mask'}
+          isDisabled={isStaging}
         />
-        <IAISimpleCheckbox
-          label={t('unifiedCanvas.preserveMaskedArea')}
-          isChecked={shouldPreserveMaskedArea}
-          onChange={handleChangePreserveMaskedArea}
-        />
-        <Box sx={{ paddingTop: 2, paddingBottom: 2 }}>
-          <IAIColorPicker color={maskColor} onChange={handleChangeMaskColor} />
-        </Box>
-        <IAIButton size="sm" leftIcon={<FaSave />} onClick={handleSaveMask}>
-          {t('unifiedCanvas.saveMask')}
-        </IAIButton>
-        <IAIButton size="sm" leftIcon={<FaTrash />} onClick={handleClearMask}>
-          {t('unifiedCanvas.clearMask')}
-        </IAIButton>
-      </Flex>
-    </IAIPopover>
+      </InvPopoverTrigger>
+      <InvPopoverContent>
+        <InvPopoverBody>
+          <Flex direction="column" gap={2}>
+            <InvControl label={`${t('unifiedCanvas.enableMask')} (H)`}>
+              <InvCheckbox
+                isChecked={isMaskEnabled}
+                onChange={handleToggleEnableMask}
+              />
+            </InvControl>
+            <InvControl label={t('unifiedCanvas.preserveMaskedArea')}>
+              <InvCheckbox
+                isChecked={shouldPreserveMaskedArea}
+                onChange={handleChangePreserveMaskedArea}
+              />
+            </InvControl>
+            <Box pt={2} pb={2}>
+              <IAIColorPicker
+                color={maskColor}
+                onChange={handleChangeMaskColor}
+              />
+            </Box>
+            <InvButton
+              size="sm"
+              leftIcon={<PiFloppyDiskBackFill />}
+              onClick={handleSaveMask}
+            >
+              {t('unifiedCanvas.saveMask')}
+            </InvButton>
+            <InvButton
+              size="sm"
+              leftIcon={<PiTrashSimpleFill />}
+              onClick={handleClearMask}
+            >
+              {t('unifiedCanvas.clearMask')}
+            </InvButton>
+          </Flex>
+        </InvPopoverBody>
+      </InvPopoverContent>
+    </InvPopover>
   );
 };
 

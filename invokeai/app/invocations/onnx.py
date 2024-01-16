@@ -1,7 +1,6 @@
 # Copyright (c) 2023 Borisov Sergey (https://github.com/StAlKeR7779)
 
 import inspect
-import re
 
 # from contextlib import ExitStack
 from typing import List, Literal, Union
@@ -21,6 +20,7 @@ from invokeai.backend import BaseModelType, ModelType, SubModelType
 from ...backend.model_management import ONNXModelPatcher
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.util import choose_torch_device
+from ..util.ti_utils import extract_ti_triggers_from_prompt
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -31,7 +31,6 @@ from .baseinvocation import (
     UIComponent,
     UIType,
     WithMetadata,
-    WithWorkflow,
     invocation,
     invocation_output,
 )
@@ -79,7 +78,7 @@ class ONNXPromptInvocation(BaseInvocation):
             ]
 
             ti_list = []
-            for trigger in re.findall(r"<[a-zA-Z0-9., _-]+>", self.prompt):
+            for trigger in extract_ti_triggers_from_prompt(self.prompt):
                 name = trigger[1:-1]
                 try:
                     ti_list.append(
@@ -326,9 +325,9 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
     title="ONNX Latents to Image",
     tags=["latents", "image", "vae", "onnx"],
     category="image",
-    version="1.1.0",
+    version="1.2.0",
 )
-class ONNXLatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
+class ONNXLatentsToImageInvocation(BaseInvocation, WithMetadata):
     """Generates an image from latents."""
 
     latents: LatentsField = InputField(
@@ -378,7 +377,7 @@ class ONNXLatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
             metadata=self.metadata,
-            workflow=self.workflow,
+            workflow=context.workflow,
         )
 
         return ImageOutput(

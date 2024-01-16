@@ -3,7 +3,7 @@ from typing import Callable, Optional
 
 from PIL.Image import Image as PILImageType
 
-from invokeai.app.invocations.baseinvocation import MetadataField, WorkflowField
+from invokeai.app.invocations.baseinvocation import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageRecord,
@@ -12,6 +12,7 @@ from invokeai.app.services.image_records.image_records_common import (
 )
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 
 
 class ImageServiceABC(ABC):
@@ -51,7 +52,7 @@ class ImageServiceABC(ABC):
         board_id: Optional[str] = None,
         is_intermediate: Optional[bool] = False,
         metadata: Optional[MetadataField] = None,
-        workflow: Optional[WorkflowField] = None,
+        workflow: Optional[WorkflowWithoutID] = None,
         **kwargs
     ) -> ImageDTO:
         """Creates an image, storing the file and its metadata."""
@@ -84,6 +85,11 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
         """Gets an image's metadata."""
+        pass
+
+    @abstractmethod
+    def get_workflow(self, image_name: str) -> Optional[WorkflowWithoutID]:
+        """Gets an image's workflow."""
         pass
 
     @abstractmethod

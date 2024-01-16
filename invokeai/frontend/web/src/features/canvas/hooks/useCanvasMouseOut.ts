@@ -1,13 +1,12 @@
-import { useAppDispatch } from 'app/store/storeHooks';
-import { mouseLeftCanvas } from 'features/canvas/store/canvasSlice';
+import { setCanvasInteractionStateMouseOut } from 'features/canvas/store/canvasNanostore';
 import { useCallback } from 'react';
 
 const useCanvasMouseOut = () => {
-  const dispatch = useAppDispatch();
+  const onMouseOut = useCallback(() => {
+    setCanvasInteractionStateMouseOut();
+  }, []);
 
-  return useCallback(() => {
-    dispatch(mouseLeftCanvas());
-  }, [dispatch]);
+  return onMouseOut;
 };
 
 export default useCanvasMouseOut;

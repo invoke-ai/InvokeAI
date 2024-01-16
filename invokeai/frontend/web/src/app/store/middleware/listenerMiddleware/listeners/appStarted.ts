@@ -1,4 +1,5 @@
 import { createAction } from '@reduxjs/toolkit';
+
 import { startAppListening } from '..';
 
 export const appStarted = createAction('app/appStarted');

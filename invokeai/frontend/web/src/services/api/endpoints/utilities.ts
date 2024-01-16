@@ -1,5 +1,6 @@
+import type { components } from 'services/api/schema';
+
 import { api } from '..';
-import { components } from 'services/api/schema';
 
 export const utilitiesApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -13,6 +14,9 @@ export const utilitiesApi = api.injectEndpoints({
         method: 'POST',
       }),
       keepUnusedDataFor: 86400, // 24 hours
+      // We need to fetch this on reconnect bc the user may have changed the text field while
+      // disconnected.
+      providesTags: ['FetchOnReconnect'],
     }),
   }),
 });

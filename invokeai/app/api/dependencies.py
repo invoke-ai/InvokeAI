@@ -2,7 +2,8 @@
 
 from logging import Logger
 
-from invokeai.app.services.workflow_image_records.workflow_image_records_sqlite import SqliteWorkflowImageRecordsStorage
+from invokeai.app.services.shared.sqlite.sqlite_util import init_db
+from invokeai.backend.model_manager.metadata import ModelMetadataStore
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
 
@@ -11,6 +12,7 @@ from ..services.board_images.board_images_default import BoardImagesService
 from ..services.board_records.board_records_sqlite import SqliteBoardRecordStorage
 from ..services.boards.boards_default import BoardService
 from ..services.config import InvokeAIAppConfig
+from ..services.download import DownloadQueueService
 from ..services.image_files.image_files_disk import DiskImageFileStorage
 from ..services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from ..services.images.images_default import ImageService
@@ -23,14 +25,13 @@ from ..services.invoker import Invoker
 from ..services.item_storage.item_storage_sqlite import SqliteItemStorage
 from ..services.latents_storage.latents_storage_disk import DiskLatentsStorage
 from ..services.latents_storage.latents_storage_forward_cache import ForwardCacheLatentsStorage
+from ..services.model_install import ModelInstallService
 from ..services.model_manager.model_manager_default import ModelManagerService
 from ..services.model_records import ModelRecordServiceSQL
 from ..services.names.names_default import SimpleNameService
 from ..services.session_processor.session_processor_default import DefaultSessionProcessor
 from ..services.session_queue.session_queue_sqlite import SqliteSessionQueue
-from ..services.shared.default_graphs import create_system_graphs
-from ..services.shared.graph import GraphExecutionState, LibraryGraph
-from ..services.shared.sqlite import SqliteDatabase
+from ..services.shared.graph import GraphExecutionState
 from ..services.urls.urls_default import LocalUrlService
 from ..services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from .events import FastAPIEventService
@@ -61,14 +62,15 @@ class ApiDependencies:
     invoker: Invoker
 
     @staticmethod
-    def initialize(config: InvokeAIAppConfig, event_handler_id: int, logger: Logger = logger):
+    def initialize(config: InvokeAIAppConfig, event_handler_id: int, logger: Logger = logger) -> None:
         logger.info(f"InvokeAI version {__version__}")
         logger.info(f"Root directory = {str(config.root_path)}")
         logger.debug(f"Internet connectivity is {config.internet_available}")
 
         output_folder = config.output_path
+        image_files = DiskImageFileStorage(f"{output_folder}/images")
 
-        db = SqliteDatabase(config, logger)
+        db = init_db(config=config, logger=logger, image_files=image_files)
 
         configuration = config
         logger = logger
@@ -79,14 +81,21 @@ class ApiDependencies:
         boards = BoardService()
         events = FastAPIEventService(event_handler_id)
         graph_execution_manager = SqliteItemStorage[GraphExecutionState](db=db, table_name="graph_executions")
-        graph_library = SqliteItemStorage[LibraryGraph](db=db, table_name="graphs")
-        image_files = DiskImageFileStorage(f"{output_folder}/images")
         image_records = SqliteImageRecordStorage(db=db)
         images = ImageService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f"{output_folder}/latents"))
         model_manager = ModelManagerService(config, logger)
         model_record_service = ModelRecordServiceSQL(db=db)
+        download_queue_service = DownloadQueueService(event_bus=events)
+        metadata_store = ModelMetadataStore(db=db)
+        model_install_service = ModelInstallService(
+            app_config=config,
+            record_store=model_record_service,
+            download_queue=download_queue_service,
+            metadata_store=metadata_store,
+            event_bus=events,
+        )
         names = SimpleNameService()
         performance_statistics = InvocationStatsService()
         processor = DefaultInvocationProcessor()
@@ -94,7 +103,6 @@ class ApiDependencies:
         session_processor = DefaultSessionProcessor()
         session_queue = SqliteSessionQueue(db=db)
         urls = LocalUrlService()
-        workflow_image_records = SqliteWorkflowImageRecordsStorage(db=db)
         workflow_records = SqliteWorkflowRecordsStorage(db=db)
 
         services = InvocationServices(
@@ -105,7 +113,6 @@ class ApiDependencies:
             configuration=configuration,
             events=events,
             graph_execution_manager=graph_execution_manager,
-            graph_library=graph_library,
             image_files=image_files,
             image_records=image_records,
             images=images,
@@ -114,6 +121,8 @@ class ApiDependencies:
             logger=logger,
             model_manager=model_manager,
             model_records=model_record_service,
+            download_queue=download_queue_service,
+            model_install=model_install_service,
             names=names,
             performance_statistics=performance_statistics,
             processor=processor,
@@ -121,17 +130,13 @@ class ApiDependencies:
             session_processor=session_processor,
             session_queue=session_queue,
             urls=urls,
-            workflow_image_records=workflow_image_records,
             workflow_records=workflow_records,
         )
 
-        create_system_graphs(services.graph_library)
-
         ApiDependencies.invoker = Invoker(services)
-
         db.clean()
 
     @staticmethod
-    def shutdown():
+    def shutdown() -> None:
         if ApiDependencies.invoker:
             ApiDependencies.invoker.stop()

@@ -1,4 +1,5 @@
-import { Flex, Text, forwardRef } from '@chakra-ui/react';
+import { Flex, forwardRef } from '@chakra-ui/react';
+import { InvText } from 'common/components/InvText/wrapper';
 import { useFieldLabel } from 'features/nodes/hooks/useFieldLabel';
 import { useFieldTemplateTitle } from 'features/nodes/hooks/useFieldTemplateTitle';
 import { memo } from 'react';
@@ -18,19 +19,17 @@ const FieldTitle = forwardRef((props: Props, ref) => {
   return (
     <Flex
       ref={ref}
-      sx={{
-        position: 'relative',
-        overflow: 'hidden',
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-        gap: 1,
-        h: 'full',
-        w: 'full',
-      }}
+      position="relative"
+      overflow="hidden"
+      alignItems="center"
+      justifyContent="flex-start"
+      gap={1}
+      h="full"
+      w="full"
     >
-      <Text sx={{ fontWeight: isMissingInput ? 600 : 400 }}>
+      <InvText fontWeight={isMissingInput ? 'bold' : 'normal'}>
         {label || fieldTemplateTitle}
-      </Text>
+      </InvText>
     </Flex>
   );
 });

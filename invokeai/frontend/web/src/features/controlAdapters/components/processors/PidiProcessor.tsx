@@ -1,10 +1,13 @@
-import IAISlider from 'common/components/IAISlider';
-import IAISwitch from 'common/components/IAISwitch';
-import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
-import { RequiredPidiImageProcessorInvocation } from 'features/controlAdapters/store/types';
-import { ChangeEvent, memo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
+import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import type { RequiredPidiImageProcessorInvocation } from 'features/controlAdapters/store/types';
+import type { ChangeEvent } from 'react';
+import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import ProcessorWrapper from './common/ProcessorWrapper';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.pidi_image_processor
@@ -36,18 +39,6 @@ const PidiProcessor = (props: Props) => {
     [controlNetId, processorChanged]
   );
 
-  const handleDetectResolutionReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      detect_resolution: DEFAULTS.detect_resolution,
-    });
-  }, [controlNetId, processorChanged]);
-
-  const handleImageResolutionReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      image_resolution: DEFAULTS.image_resolution,
-    });
-  }, [controlNetId, processorChanged]);
-
   const handleScribbleChanged = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       processorChanged(controlNetId, { scribble: e.target.checked });
@@ -64,41 +55,40 @@ const PidiProcessor = (props: Props) => {
 
   return (
     <ProcessorWrapper>
-      <IAISlider
+      <InvControl
         label={t('controlnet.detectResolution')}
-        value={detect_resolution}
-        onChange={handleDetectResolutionChanged}
-        handleReset={handleDetectResolutionReset}
-        withReset
-        min={0}
-        max={4096}
-        withInput
-        withSliderMarks
         isDisabled={!isEnabled}
-      />
-      <IAISlider
+      >
+        <InvSlider
+          value={detect_resolution}
+          onChange={handleDetectResolutionChanged}
+          defaultValue={DEFAULTS.detect_resolution}
+          min={0}
+          max={4096}
+          marks
+          withNumberInput
+        />
+      </InvControl>
+      <InvControl
         label={t('controlnet.imageResolution')}
-        value={image_resolution}
-        onChange={handleImageResolutionChanged}
-        handleReset={handleImageResolutionReset}
-        withReset
-        min={0}
-        max={4096}
-        withInput
-        withSliderMarks
         isDisabled={!isEnabled}
-      />
-      <IAISwitch
-        label={t('controlnet.scribble')}
-        isChecked={scribble}
-        onChange={handleScribbleChanged}
-      />
-      <IAISwitch
-        label={t('controlnet.safe')}
-        isChecked={safe}
-        onChange={handleSafeChanged}
-        isDisabled={!isEnabled}
-      />
+      >
+        <InvSlider
+          value={image_resolution}
+          onChange={handleImageResolutionChanged}
+          defaultValue={DEFAULTS.image_resolution}
+          min={0}
+          max={4096}
+          marks
+          withNumberInput
+        />
+      </InvControl>
+      <InvControl label={t('controlnet.scribble')} isDisabled={!isEnabled}>
+        <InvSwitch isChecked={scribble} onChange={handleScribbleChanged} />
+      </InvControl>
+      <InvControl label={t('controlnet.safe')} isDisabled={!isEnabled}>
+        <InvSwitch isChecked={safe} onChange={handleSafeChanged} />
+      </InvControl>
     </ProcessorWrapper>
   );
 };

@@ -109,7 +109,23 @@
         "somethingWentWrong": "出了点问题",
         "copyError": "$t(gallery.copy) 错误",
         "input": "输入",
-        "notInstalled": "非 $t(common.installed)"
+        "notInstalled": "非 $t(common.installed)",
+        "delete": "删除",
+        "updated": "已上传",
+        "save": "保存",
+        "created": "已创建",
+        "prevPage": "上一页",
+        "unknownError": "未知错误",
+        "direction": "指向",
+        "orderBy": "排序方式：",
+        "nextPage": "下一页",
+        "saveAs": "保存为",
+        "unsaved": "未保存",
+        "ai": "ai",
+        "preferencesLabel": "首选项",
+        "or": "或",
+        "advancedOptions": "高级选项",
+        "free": "自由"
     },
     "gallery": {
         "generations": "生成的图像",
@@ -145,21 +161,25 @@
         "image": "图像",
         "drop": "弃用",
         "dropOrUpload": "$t(gallery.drop) 或上传",
-        "dropToUpload": "$t(gallery.drop) 以上传"
+        "dropToUpload": "$t(gallery.drop) 以上传",
+        "problemDeletingImagesDesc": "有一张或多张图像无法被删除",
+        "problemDeletingImages": "删除图像时出现问题",
+        "unstarImage": "取消收藏图像",
+        "starImage": "收藏图像"
     },
     "hotkeys": {
-        "keyboardShortcuts": "键盘快捷键",
-        "appHotkeys": "应用快捷键",
-        "generalHotkeys": "一般快捷键",
-        "galleryHotkeys": "图库快捷键",
-        "unifiedCanvasHotkeys": "统一画布快捷键",
+        "keyboardShortcuts": "快捷键",
+        "appHotkeys": "应用",
+        "generalHotkeys": "一般",
+        "galleryHotkeys": "图库",
+        "unifiedCanvasHotkeys": "统一画布",
         "invoke": {
             "title": "Invoke",
             "desc": "生成图像"
         },
         "cancel": {
             "title": "取消",
-            "desc": "取消图像生成"
+            "desc": "取消当前队列项目"
         },
         "focusPrompt": {
             "title": "打开提示词框",
@@ -172,10 +192,6 @@
         "pinOptions": {
             "title": "常开选项卡",
             "desc": "保持选项浮窗常开"
-        },
-        "toggleViewer": {
-            "title": "切换图像查看器",
-            "desc": "打开或关闭图像查看器"
         },
         "toggleGallery": {
             "title": "切换图库",
@@ -236,10 +252,6 @@
         "nextImage": {
             "title": "下一张图像",
             "desc": "显示图库中的下一张图像"
-        },
-        "toggleGalleryPin": {
-            "title": "切换图库常开",
-            "desc": "开关图库在界面中的常开模式"
         },
         "increaseGalleryThumbSize": {
             "title": "增大预览尺寸",
@@ -353,11 +365,26 @@
             "title": "接受暂存图像",
             "desc": "接受当前暂存区中的图像"
         },
-        "nodesHotkeys": "节点快捷键",
+        "nodesHotkeys": "节点",
         "addNodes": {
             "title": "添加节点",
             "desc": "打开添加节点菜单"
-        }
+        },
+        "cancelAndClear": {
+            "desc": "取消当前队列项目并且清除所有待定项目",
+            "title": "取消和清除"
+        },
+        "resetOptionsAndGallery": {
+            "title": "重置选项和图库",
+            "desc": "重置选项和图库面板"
+        },
+        "searchHotkeys": "检索快捷键",
+        "noHotkeysFound": "未找到快捷键",
+        "toggleOptionsAndGallery": {
+            "desc": "打开和关闭选项和图库面板",
+            "title": "开关选项和图库"
+        },
+        "clearSearch": "清除检索项"
     },
     "modelManager": {
         "modelManager": "模型管理器",
@@ -555,8 +582,8 @@
         "info": "信息",
         "initialImage": "初始图像",
         "showOptionsPanel": "显示侧栏浮窗 (O 或 T)",
-        "seamlessYAxis": "Y 轴",
-        "seamlessXAxis": "X 轴",
+        "seamlessYAxis": "无缝平铺 Y 轴",
+        "seamlessXAxis": "无缝平铺 X 轴",
         "boundingBoxWidth": "边界框宽度",
         "boundingBoxHeight": "边界框高度",
         "denoisingStrength": "去噪强度",
@@ -603,7 +630,7 @@
             "readyToInvoke": "准备调用",
             "noControlImageForControlAdapter": "有 #{{number}} 个 Control Adapter 缺失控制图像",
             "noModelForControlAdapter": "有 #{{number}} 个 Control Adapter 没有选择模型。",
-            "incompatibleBaseModelForControlAdapter": "有 #{{number}} 个 Control Adapter 模型与主模型不匹配。"
+            "incompatibleBaseModelForControlAdapter": "有 #{{number}} 个 Control Adapter 模型与主模型不兼容。"
         },
         "patchmatchDownScaleSize": "缩小",
         "coherenceSteps": "步数",
@@ -634,7 +661,14 @@
         "unmasked": "取消遮罩",
         "cfgRescaleMultiplier": "CFG 重缩放倍数",
         "cfgRescale": "CFG 重缩放",
-        "useSize": "使用尺寸"
+        "useSize": "使用尺寸",
+        "setToOptimalSize": "优化模型大小",
+        "setToOptimalSizeTooSmall": "$t(parameters.setToOptimalSize) （可能过小）",
+        "imageSize": "图像尺寸",
+        "lockAspectRatio": "锁定纵横比",
+        "swapDimensions": "交换尺寸",
+        "aspect": "纵横",
+        "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) （可能过大）"
     },
     "settings": {
         "models": "模型",
@@ -723,8 +757,7 @@
         "nodesUnrecognizedTypes": "无法加载。节点图有无法识别的节点类型",
         "nodesNotValidJSON": "无效的 JSON",
         "nodesNotValidGraph": "无效的 InvokeAi 节点图",
-        "nodesCleared": "节点已清空",
-        "nodesLoadedFailed": "节点图加载失败",
+        "nodesLoadedFailed": "节点加载失败",
         "modelAddedSimple": "已添加模型",
         "modelAdded": "已添加模型: {{modelName}}",
         "imageSavingFailed": "图像保存失败",
@@ -760,7 +793,10 @@
         "problemImportingMask": "导入遮罩时出现问题",
         "baseModelChangedCleared_other": "基础模型已更改, 已清除或禁用 {{count}} 个不兼容的子模型",
         "setAsCanvasInitialImage": "设为画布初始图像",
-        "invalidUpload": "无效的上传"
+        "invalidUpload": "无效的上传",
+        "problemDeletingWorkflow": "删除工作流时出现问题",
+        "workflowDeleted": "已删除工作流",
+        "problemRetrievingWorkflow": "检索工作流时发生问题"
     },
     "unifiedCanvas": {
         "layer": "图层",
@@ -875,11 +911,8 @@
     },
     "nodes": {
         "zoomInNodes": "放大",
-        "resetWorkflowDesc": "是否确定要清空节点图?",
-        "resetWorkflow": "清空节点图",
-        "loadWorkflow": "读取节点图",
+        "loadWorkflow": "加载工作流",
         "zoomOutNodes": "缩小",
-        "resetWorkflowDesc2": "重置节点图将清除所有节点、边际和节点图详情.",
         "reloadNodeTemplates": "重载节点模板",
         "hideGraphNodes": "隐藏节点图信息",
         "fitViewportNodes": "自适应视图",
@@ -888,7 +921,7 @@
         "showLegendNodes": "显示字段类型图例",
         "hideLegendNodes": "隐藏字段类型图例",
         "showGraphNodes": "显示节点图信息",
-        "downloadWorkflow": "下载节点图 JSON",
+        "downloadWorkflow": "下载工作流 JSON",
         "workflowDescription": "简述",
         "versionUnknown": " 未知版本",
         "noNodeSelected": "无选中的节点",
@@ -1103,7 +1136,13 @@
         "collectionOrScalarFieldType": "{{name}} 合集 | 标量",
         "nodeVersion": "节点版本",
         "deletedInvalidEdge": "已删除无效的边缘 {{source}} -> {{target}}",
-        "unknownInput": "未知输入：{{name}}"
+        "unknownInput": "未知输入：{{name}}",
+        "prototypeDesc": "此调用是一个原型 (prototype)。它可能会在本项目更新期间发生破坏性更改，并且随时可能被删除。",
+        "betaDesc": "此调用尚处于测试阶段。在稳定之前，它可能会在项目更新期间发生破坏性更改。本项目计划长期支持这种调用。",
+        "newWorkflow": "新建工作流",
+        "newWorkflowDesc": "是否创建一个新的工作流？",
+        "newWorkflowDesc2": "当前工作流有未保存的更改。",
+        "unsupportedAnyOfLength": "联合（union）数据类型数目过多 ({{count}})"
     },
     "controlnet": {
         "resize": "直接缩放",
@@ -1128,7 +1167,6 @@
         "crop": "裁剪",
         "processor": "处理器",
         "none": "无",
-        "incompatibleBaseModel": "不兼容的基础模型：",
         "enableControlnet": "启用 ControlNet",
         "detectResolution": "检测分辨率",
         "pidiDescription": "像素差分 (PIDI) 图像处理",
@@ -1189,7 +1227,8 @@
         "openPose": "Openpose",
         "controlAdapter_other": "Control Adapters",
         "lineartAnime": "Lineart Anime",
-        "canny": "Canny"
+        "canny": "Canny",
+        "resizeSimple": "缩放（简单）"
     },
     "queue": {
         "status": "状态",
@@ -1236,7 +1275,7 @@
         "notReady": "无法排队",
         "batchFailedToQueue": "批次加入队列失败",
         "batchValues": "批次数",
-        "queueCountPrediction": "添加 {{predicted}} 到队列",
+        "queueCountPrediction": "{{promptsCount}} 提示词 × {{iterations}} 迭代次数 -> {{count}} 次生成",
         "batchQueued": "加入队列的批次",
         "queuedCount": "{{pending}} 待处理",
         "front": "前",
@@ -1250,7 +1289,8 @@
         "queueMaxExceeded": "超出最大值 {{max_queue_size}}，将跳过 {{skip}}",
         "graphFailedToQueue": "节点图加入队列失败",
         "batchFieldValues": "批处理值",
-        "time": "时间"
+        "time": "时间",
+        "openQueue": "打开队列"
     },
     "sdxl": {
         "refinerStart": "Refiner 开始作用时机",
@@ -1264,11 +1304,12 @@
         "denoisingStrength": "去噪强度",
         "refinermodel": "Refiner 模型",
         "posAestheticScore": "正向美学评分",
-        "concatPromptStyle": "连接提示词 & 样式",
+        "concatPromptStyle": "链接提示词 & 样式",
         "loading": "加载中...",
         "steps": "步数",
         "posStylePrompt": "正向样式提示词",
-        "refiner": "Refiner"
+        "refiner": "Refiner",
+        "freePromptStyle": "手动输入样式提示词"
     },
     "metadata": {
         "positivePrompt": "正向提示词",
@@ -1312,7 +1353,13 @@
         "noLoRAsInstalled": "无已安装的 LoRA",
         "esrganModel": "ESRGAN 模型",
         "addLora": "添加 LoRA",
-        "noLoRAsLoaded": "无已加载的 LoRA"
+        "noLoRAsLoaded": "无已加载的 LoRA",
+        "noMainModelSelected": "未选择主模型",
+        "lora": "LoRA",
+        "allLoRAsAdded": "已添加所有 LoRA",
+        "defaultVAE": "默认 VAE",
+        "incompatibleBaseModel": "不兼容基础模型",
+        "loraAlreadyAdded": "LoRA 已经被添加"
     },
     "boards": {
         "autoAddBoard": "自动添加面板",
@@ -1356,7 +1403,9 @@
         "maxPrompts": "最大提示词数",
         "dynamicPrompts": "动态提示词",
         "promptsWithCount_other": "{{count}} 个提示词",
-        "promptsPreview": "提示词预览"
+        "promptsPreview": "提示词预览",
+        "showDynamicPrompts": "显示动态提示词",
+        "loading": "生成动态提示词中..."
     },
     "popovers": {
         "compositingMaskAdjustments": {
@@ -1607,5 +1656,59 @@
         "hrf": "高分辨率修复",
         "hrfStrength": "高分辨率修复强度",
         "strengthTooltip": "值越低细节越少，但可以减少部分潜在的伪影。"
+    },
+    "workflows": {
+        "saveWorkflowAs": "保存工作流为",
+        "workflowEditorMenu": "工作流编辑器菜单",
+        "noSystemWorkflows": "无系统工作流",
+        "workflowName": "工作流名称",
+        "noUserWorkflows": "无用户工作流",
+        "defaultWorkflows": "默认工作流",
+        "saveWorkflow": "保存工作流",
+        "openWorkflow": "打开工作流",
+        "clearWorkflowSearchFilter": "清除工作流检索过滤器",
+        "workflowLibrary": "工作流库",
+        "downloadWorkflow": "保存到文件",
+        "noRecentWorkflows": "无最近工作流",
+        "workflowSaved": "已保存工作流",
+        "workflowIsOpen": "工作流已打开",
+        "unnamedWorkflow": "未命名的工作流",
+        "savingWorkflow": "保存工作流中...",
+        "problemLoading": "加载工作流时出现问题",
+        "loading": "加载工作流中",
+        "searchWorkflows": "检索工作流",
+        "problemSavingWorkflow": "保存工作流时出现问题",
+        "deleteWorkflow": "删除工作流",
+        "workflows": "工作流",
+        "noDescription": "无描述",
+        "uploadWorkflow": "从文件中加载",
+        "userWorkflows": "我的工作流",
+        "newWorkflowCreated": "已创建新的工作流"
+    },
+    "app": {
+        "storeNotInitialized": "商店尚未初始化"
+    },
+    "accordions": {
+        "compositing": {
+            "infillTab": "内补",
+            "coherenceTab": "一致性层",
+            "title": "合成"
+        },
+        "control": {
+            "controlAdaptersTab": "Control Adapters",
+            "ipTab": "图像提示",
+            "title": "Control"
+        },
+        "generation": {
+            "title": "生成",
+            "conceptsTab": "概念",
+            "modelTab": "模型"
+        },
+        "advanced": {
+            "title": "高级"
+        },
+        "image": {
+            "title": "图像"
+        }
     }
 }

@@ -1,14 +1,17 @@
-import {
-  AnyAction,
+import type {
   EntityState,
   ThunkDispatch,
-  createEntityAdapter,
+  UnknownAction,
 } from '@reduxjs/toolkit';
+import { createEntityAdapter } from '@reduxjs/toolkit';
+import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
 import { $queueId } from 'app/store/nanostores/queueId';
 import { listParamsReset } from 'features/queue/store/queueSlice';
 import queryString from 'query-string';
-import { ApiTagDescription, api } from '..';
-import { components, paths } from 'services/api/schema';
+import type { components, paths } from 'services/api/schema';
+
+import type { ApiTagDescription } from '..';
+import { api } from '..';
 
 const getListQueueItemsUrl = (
   queryArgs?: paths['/api/v1/queue/{queue_id}/list']['get']['parameters']['query']
@@ -33,9 +36,10 @@ export type SessionQueueItemStatus = NonNullable<
 >;
 
 export const queueItemsAdapter = createEntityAdapter<
-  components['schemas']['SessionQueueItemDTO']
+  components['schemas']['SessionQueueItemDTO'],
+  string
 >({
-  selectId: (queueItem) => queueItem.item_id,
+  selectId: (queueItem) => String(queueItem.item_id),
   sortComparer: (a, b) => {
     // Sort by priority in descending order
     if (a.priority > b.priority) {
@@ -56,6 +60,10 @@ export const queueItemsAdapter = createEntityAdapter<
     return 0;
   },
 });
+export const queueItemsAdapterSelectors = queueItemsAdapter.getSelectors(
+  undefined,
+  getSelectorsOptions
+);
 
 export const queueApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -156,7 +164,10 @@ export const queueApi = api.injectEndpoints({
         method: 'GET',
       }),
       providesTags: (result) => {
-        const tags: ApiTagDescription[] = ['CurrentSessionQueueItem'];
+        const tags: ApiTagDescription[] = [
+          'CurrentSessionQueueItem',
+          'FetchOnReconnect',
+        ];
         if (result) {
           tags.push({ type: 'SessionQueueItem', id: result.item_id });
         }
@@ -172,7 +183,10 @@ export const queueApi = api.injectEndpoints({
         method: 'GET',
       }),
       providesTags: (result) => {
-        const tags: ApiTagDescription[] = ['NextSessionQueueItem'];
+        const tags: ApiTagDescription[] = [
+          'NextSessionQueueItem',
+          'FetchOnReconnect',
+        ];
         if (result) {
           tags.push({ type: 'SessionQueueItem', id: result.item_id });
         }
@@ -187,7 +201,7 @@ export const queueApi = api.injectEndpoints({
         url: `queue/${$queueId.get()}/status`,
         method: 'GET',
       }),
-      providesTags: ['SessionQueueStatus'],
+      providesTags: ['SessionQueueStatus', 'FetchOnReconnect'],
     }),
     getBatchStatus: build.query<
       paths['/api/v1/queue/{queue_id}/b/{batch_id}/status']['get']['responses']['200']['content']['application/json'],
@@ -198,10 +212,11 @@ export const queueApi = api.injectEndpoints({
         method: 'GET',
       }),
       providesTags: (result) => {
-        if (!result) {
-          return [];
+        const tags: ApiTagDescription[] = ['FetchOnReconnect'];
+        if (result) {
+          tags.push({ type: 'BatchStatus', id: result.batch_id });
         }
-        return [{ type: 'BatchStatus', id: result.batch_id }];
+        return tags;
       },
     }),
     getQueueItem: build.query<
@@ -213,10 +228,11 @@ export const queueApi = api.injectEndpoints({
         method: 'GET',
       }),
       providesTags: (result) => {
-        if (!result) {
-          return [];
+        const tags: ApiTagDescription[] = ['FetchOnReconnect'];
+        if (result) {
+          tags.push({ type: 'SessionQueueItem', id: result.item_id });
         }
-        return [{ type: 'SessionQueueItem', id: result.item_id }];
+        return tags;
       },
     }),
     cancelQueueItem: build.mutation<
@@ -236,7 +252,7 @@ export const queueApi = api.injectEndpoints({
               undefined,
               (draft) => {
                 queueItemsAdapter.updateOne(draft, {
-                  id: item_id,
+                  id: String(item_id),
                   changes: {
                     status: data.status,
                     completed_at: data.completed_at,
@@ -281,7 +297,7 @@ export const queueApi = api.injectEndpoints({
       invalidatesTags: ['SessionQueueStatus', 'BatchStatus'],
     }),
     listQueueItems: build.query<
-      EntityState<components['schemas']['SessionQueueItemDTO']> & {
+      EntityState<components['schemas']['SessionQueueItemDTO'], string> & {
         has_more: boolean;
       },
       { cursor?: number; priority?: number } | undefined
@@ -305,12 +321,13 @@ export const queueApi = api.injectEndpoints({
       merge: (cache, response) => {
         queueItemsAdapter.addMany(
           cache,
-          queueItemsAdapter.getSelectors().selectAll(response)
+          queueItemsAdapterSelectors.selectAll(response)
         );
         cache.has_more = response.has_more;
       },
       forceRefetch: ({ currentArg, previousArg }) => currentArg !== previousArg,
       keepUnusedDataFor: 60 * 5, // 5 minutes
+      providesTags: ['FetchOnReconnect'],
     }),
   }),
 });
@@ -331,8 +348,12 @@ export const {
   useGetBatchStatusQuery,
 } = queueApi;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const resetListQueryData = (dispatch: ThunkDispatch<any, any, AnyAction>) => {
+export const selectQueueStatus = queueApi.endpoints.getQueueStatus.select();
+
+const resetListQueryData = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  dispatch: ThunkDispatch<any, any, UnknownAction>
+) => {
   dispatch(
     queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
       // remove all items from the list

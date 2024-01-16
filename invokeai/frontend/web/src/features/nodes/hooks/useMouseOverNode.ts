@@ -1,31 +1,25 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { useCallback, useMemo } from 'react';
-import { mouseOverNodeChanged } from 'features/nodes/store/nodesSlice';
+import { atom } from 'nanostores';
+import { useCallback, useEffect, useState } from 'react';
+
+export const $mouseOverNode = atom<string | null>(null);
 
 export const useMouseOverNode = (nodeId: string) => {
-  const dispatch = useAppDispatch();
-  const selector = useMemo(
-    () =>
-      createSelector(
-        stateSelector,
-        ({ nodes }) => nodes.mouseOverNode === nodeId,
-        defaultSelectorOptions
-      ),
-    [nodeId]
-  );
+  const [isMouseOverNode, setIsMouseOverNode] = useState(false);
 
-  const isMouseOverNode = useAppSelector(selector);
+  useEffect(() => {
+    const unsubscribe = $mouseOverNode.subscribe((v) => {
+      setIsMouseOverNode(v === nodeId);
+    });
+    return unsubscribe;
+  }, [isMouseOverNode, nodeId]);
 
   const handleMouseOver = useCallback(() => {
-    !isMouseOverNode && dispatch(mouseOverNodeChanged(nodeId));
-  }, [dispatch, nodeId, isMouseOverNode]);
+    $mouseOverNode.set(nodeId);
+  }, [nodeId]);
 
   const handleMouseOut = useCallback(() => {
-    isMouseOverNode && dispatch(mouseOverNodeChanged(null));
-  }, [dispatch, isMouseOverNode]);
+    $mouseOverNode.set(null);
+  }, []);
 
   return { isMouseOverNode, handleMouseOver, handleMouseOut };
 };

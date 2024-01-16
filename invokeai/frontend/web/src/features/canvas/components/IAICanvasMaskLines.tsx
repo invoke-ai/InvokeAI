@@ -1,24 +1,8 @@
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { canvasSelector } from 'features/canvas/store/canvasSelectors';
-import { GroupConfig } from 'konva/lib/Group';
-import { isEqual } from 'lodash-es';
-
-import { Group, Line } from 'react-konva';
 import { isCanvasMaskLine } from 'features/canvas/store/canvasTypes';
+import type { GroupConfig } from 'konva/lib/Group';
 import { memo } from 'react';
-
-export const canvasLinesSelector = createSelector(
-  [canvasSelector],
-  (canvas) => {
-    return { objects: canvas.layerState.objects };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
+import { Group, Line } from 'react-konva';
 
 type InpaintingCanvasLinesProps = GroupConfig;
 
@@ -28,11 +12,10 @@ type InpaintingCanvasLinesProps = GroupConfig;
  * Uses globalCompositeOperation to handle the brush and eraser tools.
  */
 const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
-  const { ...rest } = props;
-  const { objects } = useAppSelector(canvasLinesSelector);
+  const objects = useAppSelector((s) => s.canvas.layerState.objects);
 
   return (
-    <Group listening={false} {...rest}>
+    <Group listening={false} {...props}>
       {objects.filter(isCanvasMaskLine).map((line, i) => (
         <Line
           key={i}

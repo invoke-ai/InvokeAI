@@ -1,20 +1,21 @@
 // type-safe dnd from https://github.com/clauderic/dnd-kit/issues/935
-import {
+import type {
   Active,
   Collision,
   DndContextProps,
   Over,
   Translate,
-  UseDraggableArguments,
-  UseDroppableArguments,
   useDraggable as useOriginalDraggable,
+  UseDraggableArguments,
   useDroppable as useOriginalDroppable,
+  UseDroppableArguments,
 } from '@dnd-kit/core';
-import {
-  FieldInputTemplate,
+import type { BoardId } from 'features/gallery/store/types';
+import type {
   FieldInputInstance,
+  FieldInputTemplate,
 } from 'features/nodes/types/field';
-import { ImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 
 type BaseDropData = {
   id: string;
@@ -51,15 +52,6 @@ export type NodesImageDropData = BaseDropData & {
   };
 };
 
-export type NodesMultiImageDropData = BaseDropData & {
-  actionType: 'SET_MULTI_NODES_IMAGE';
-  context: { nodeId: string; fieldName: string };
-};
-
-export type AddToBatchDropData = BaseDropData & {
-  actionType: 'ADD_TO_BATCH';
-};
-
 export type AddToBoardDropData = BaseDropData & {
   actionType: 'ADD_TO_BOARD';
   context: { boardId: string };
@@ -69,21 +61,14 @@ export type RemoveFromBoardDropData = BaseDropData & {
   actionType: 'REMOVE_FROM_BOARD';
 };
 
-export type AddFieldToLinearViewDropData = BaseDropData & {
-  actionType: 'ADD_FIELD_TO_LINEAR';
-};
-
 export type TypesafeDroppableData =
   | CurrentImageDropData
   | InitialImageDropData
   | ControlAdapterDropData
   | CanvasInitialImageDropData
   | NodesImageDropData
-  | AddToBatchDropData
-  | NodesMultiImageDropData
   | AddToBoardDropData
-  | RemoveFromBoardDropData
-  | AddFieldToLinearViewDropData;
+  | RemoveFromBoardDropData;
 
 type BaseDragData = {
   id: string;
@@ -103,15 +88,15 @@ export type ImageDraggableData = BaseDragData & {
   payload: { imageDTO: ImageDTO };
 };
 
-export type ImageDTOsDraggableData = BaseDragData & {
-  payloadType: 'IMAGE_DTOS';
-  payload: { imageDTOs: ImageDTO[] };
+export type GallerySelectionDraggableData = BaseDragData & {
+  payloadType: 'GALLERY_SELECTION';
+  payload: { boardId: BoardId };
 };
 
 export type TypesafeDraggableData =
   | NodeFieldDraggableData
   | ImageDraggableData
-  | ImageDTOsDraggableData;
+  | GallerySelectionDraggableData;
 
 export interface UseDroppableTypesafeArguments
   extends Omit<UseDroppableArguments, 'data'> {

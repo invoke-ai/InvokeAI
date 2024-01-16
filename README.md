@@ -1,10 +1,10 @@
 <div align="center">
 
-![project hero](https://github.com/invoke-ai/InvokeAI/assets/31807370/1a917d94-e099-4fa1-a70f-7dd8d0691018)
+![project hero](https://github.com/invoke-ai/InvokeAI/assets/31807370/6e3728c7-e90e-4711-905c-3b55844ff5be)
 
-# Invoke AI - Generative AI for Professional Creatives
-## Professional Creative Tools for Stable Diffusion, Custom-Trained Models, and more. 
-  To learn more about Invoke AI, get started instantly, or implement our Business solutions, visit [invoke.ai](https://invoke.ai)
+# Invoke - Professional Creative AI Tools for Visual Media 
+##  To learn more about Invoke, or implement our Business solutions, visit [invoke.com](https://www.invoke.com/about)
+  
 
 
 [![discord badge]][discord link]
@@ -56,7 +56,9 @@ the foundation for multiple commercial products.
 
 <div align="center">
 
-![canvas preview](https://github.com/invoke-ai/InvokeAI/raw/main/docs/assets/canvas_preview.png)
+
+![Highlighted Features - Canvas and Workflows](https://github.com/invoke-ai/InvokeAI/assets/31807370/708f7a82-084f-4860-bfbe-e2588c53548d)
+
 
 </div>
 
@@ -125,8 +127,8 @@ and go to http://localhost:9090.
 
 You must have Python 3.10 through 3.11 installed on your machine. Earlier or
 later versions are not supported.
-Node.js also needs to be installed along with yarn (can be installed with
-the command `npm install -g yarn` if needed)
+Node.js also needs to be installed along with `pnpm` (can be installed with
+the command `npm install -g pnpm` if needed)
 
 1. Open a command-line window on your machine. The PowerShell is recommended for Windows.
 2. Create a directory to install InvokeAI into. You'll need at least 15 GB of free space:
@@ -270,7 +272,7 @@ upgrade script.** See the next section for a Windows recipe.
 3. Select option [1] to upgrade to the latest release.
 
 4. Once the upgrade is finished you will be returned to the launcher
-menu. Select option [7] "Re-run the configure script to fix a broken
+menu. Select option [6] "Re-run the configure script to fix a broken
 install or to complete a major upgrade".
 
 This will run the configure script against the v2.3 directory and

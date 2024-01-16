@@ -1,16 +1,16 @@
 import { satisfies } from 'compare-versions';
 import { NodeUpdateError } from 'features/nodes/types/error';
-import {
-  InvocationNodeData,
+import type {
+  InvocationNode,
   InvocationTemplate,
 } from 'features/nodes/types/invocation';
 import { zParsedSemver } from 'features/nodes/types/semver';
-import { cloneDeep, defaultsDeep } from 'lodash-es';
-import { Node } from 'reactflow';
+import { cloneDeep, defaultsDeep, keys, pick } from 'lodash-es';
+
 import { buildInvocationNode } from './buildInvocationNode';
 
 export const getNeedsUpdate = (
-  node: Node<InvocationNodeData>,
+  node: InvocationNode,
   template: InvocationTemplate
 ): boolean => {
   if (node.data.type !== template.type) {
@@ -24,7 +24,7 @@ export const getNeedsUpdate = (
  */
 
 export const getMayUpdateNode = (
-  node: Node<InvocationNodeData>,
+  node: InvocationNode,
   template: InvocationTemplate
 ): boolean => {
   const needsUpdate = getNeedsUpdate(node, template);
@@ -45,9 +45,9 @@ export const getMayUpdateNode = (
  */
 
 export const updateNode = (
-  node: Node<InvocationNodeData>,
+  node: InvocationNode,
   template: InvocationTemplate
-): Node<InvocationNodeData> => {
+): InvocationNode => {
   const mayUpdate = getMayUpdateNode(node, template);
 
   if (!mayUpdate || node.data.type !== template.type) {
@@ -64,5 +64,8 @@ export const updateNode = (
   clone.data.version = template.version;
   defaultsDeep(clone, defaults); // mutates!
 
+  // Remove any fields that are not in the template
+  clone.data.inputs = pick(clone.data.inputs, keys(defaults.data.inputs));
+  clone.data.outputs = pick(clone.data.outputs, keys(defaults.data.outputs));
   return clone;
 };

@@ -22,12 +22,22 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Setup Node 18
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
-      - uses: actions/checkout@v3
-      - run: 'yarn install --frozen-lockfile'
-      - run: 'yarn run lint:tsc'
-      - run: 'yarn run lint:madge'
-      - run: 'yarn run lint:eslint'
-      - run: 'yarn run lint:prettier'
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8.12.1'
+      - name: Install dependencies
+        run: 'pnpm install --prefer-frozen-lockfile'
+      - name: Typescript
+        run: 'pnpm run lint:tsc'
+      - name: Madge
+        run: 'pnpm run lint:madge'
+      - name: ESLint
+        run: 'pnpm run lint:eslint'
+      - name: Prettier
+        run: 'pnpm run lint:prettier'

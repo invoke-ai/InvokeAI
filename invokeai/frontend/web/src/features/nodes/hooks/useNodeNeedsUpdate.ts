@@ -1,35 +1,30 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { useMemo } from 'react';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
+import { useMemo } from 'react';
 
 export const useNodeNeedsUpdate = (nodeId: string) => {
   const selector = useMemo(
     () =>
-      createSelector(
-        stateSelector,
-        ({ nodes }) => {
+      createMemoizedSelector(
+        selectNodesSlice,
+        selectNodeTemplatesSlice,
+        (nodes, nodeTemplates) => {
           const node = nodes.nodes.find((node) => node.id === nodeId);
-          const template = nodes.nodeTemplates[node?.data.type ?? ''];
-          return { node, template };
-        },
-        defaultSelectorOptions
+          const template = nodeTemplates.templates[node?.data.type ?? ''];
+          if (isInvocationNode(node) && template) {
+            return getNeedsUpdate(node, template);
+          }
+          return false;
+        }
       ),
     [nodeId]
   );
 
-  const { node, template } = useAppSelector(selector);
-
-  const needsUpdate = useMemo(
-    () =>
-      isInvocationNode(node) && template
-        ? getNeedsUpdate(node, template)
-        : false,
-    [node, template]
-  );
+  const needsUpdate = useAppSelector(selector);
 
   return needsUpdate;
 };

@@ -1,5 +1,5 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import {
+import type {
   UseDraggableTypesafeArguments,
   UseDraggableTypesafeReturnValue,
   UseDroppableTypesafeArguments,

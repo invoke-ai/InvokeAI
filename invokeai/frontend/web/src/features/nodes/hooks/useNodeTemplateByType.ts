@@ -1,20 +1,17 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
+import type { InvocationTemplate } from 'features/nodes/types/invocation';
 import { useMemo } from 'react';
-import { InvocationTemplate } from 'features/nodes/types/invocation';
 
 export const useNodeTemplateByType = (type: string) => {
   const selector = useMemo(
     () =>
-      createSelector(
-        stateSelector,
-        ({ nodes }): InvocationTemplate | undefined => {
-          const nodeTemplate = nodes.nodeTemplates[type];
-          return nodeTemplate;
-        },
-        defaultSelectorOptions
+      createMemoizedSelector(
+        selectNodeTemplatesSlice,
+        (nodeTemplates): InvocationTemplate | undefined => {
+          return nodeTemplates.templates[type];
+        }
       ),
     [type]
   );

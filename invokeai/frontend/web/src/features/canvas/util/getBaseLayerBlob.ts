@@ -1,5 +1,6 @@
-import { RootState } from 'app/store/store';
-import { getCanvasBaseLayer } from './konvaInstanceProvider';
+import type { RootState } from 'app/store/store';
+import { $canvasBaseLayer } from 'features/canvas/store/canvasNanostore';
+
 import { konvaNodeToBlob } from './konvaNodeToBlob';
 
 /**
@@ -9,7 +10,7 @@ export const getBaseLayerBlob = async (
   state: RootState,
   alwaysUseBoundingBox: boolean = false
 ) => {
-  const canvasBaseLayer = getCanvasBaseLayer();
+  const canvasBaseLayer = $canvasBaseLayer.get();
 
   if (!canvasBaseLayer) {
     throw new Error('Problem getting base layer blob');

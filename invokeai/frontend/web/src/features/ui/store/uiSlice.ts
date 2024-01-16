@@ -1,22 +1,18 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
-import { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
-import { InvokeTabName } from './tabMap';
-import { UIState } from './uiTypes';
+
+import type { InvokeTabName } from './tabMap';
+import type { UIState } from './uiTypes';
 
 export const initialUIState: UIState = {
+  _version: 1,
   activeTab: 'txt2img',
   shouldShowImageDetails: false,
-  shouldUseCanvasBetaLayout: false,
   shouldShowExistingModelsInSearch: false,
-  shouldUseSliders: false,
   shouldHidePreview: false,
   shouldShowProgressInViewer: true,
-  shouldShowEmbeddingPicker: false,
-  shouldAutoChangeDimensions: false,
-  favoriteSchedulers: [],
-  globalContextMenuCloseTrigger: 0,
   panels: {},
 };
 
@@ -30,9 +26,6 @@ export const uiSlice = createSlice({
     setShouldShowImageDetails: (state, action: PayloadAction<boolean>) => {
       state.shouldShowImageDetails = action.payload;
     },
-    setShouldUseCanvasBetaLayout: (state, action: PayloadAction<boolean>) => {
-      state.shouldUseCanvasBetaLayout = action.payload;
-    },
     setShouldHidePreview: (state, action: PayloadAction<boolean>) => {
       state.shouldHidePreview = action.payload;
     },
@@ -42,26 +35,8 @@ export const uiSlice = createSlice({
     ) => {
       state.shouldShowExistingModelsInSearch = action.payload;
     },
-    setShouldUseSliders: (state, action: PayloadAction<boolean>) => {
-      state.shouldUseSliders = action.payload;
-    },
     setShouldShowProgressInViewer: (state, action: PayloadAction<boolean>) => {
       state.shouldShowProgressInViewer = action.payload;
-    },
-    favoriteSchedulersChanged: (
-      state,
-      action: PayloadAction<ParameterScheduler[]>
-    ) => {
-      state.favoriteSchedulers = action.payload;
-    },
-    toggleEmbeddingPicker: (state) => {
-      state.shouldShowEmbeddingPicker = !state.shouldShowEmbeddingPicker;
-    },
-    setShouldAutoChangeDimensions: (state, action: PayloadAction<boolean>) => {
-      state.shouldAutoChangeDimensions = action.payload;
-    },
-    contextMenusClosed: (state) => {
-      state.globalContextMenuCloseTrigger += 1;
     },
     panelsChanged: (
       state,
@@ -80,16 +55,20 @@ export const uiSlice = createSlice({
 export const {
   setActiveTab,
   setShouldShowImageDetails,
-  setShouldUseCanvasBetaLayout,
   setShouldShowExistingModelsInSearch,
-  setShouldUseSliders,
   setShouldHidePreview,
   setShouldShowProgressInViewer,
-  favoriteSchedulersChanged,
-  toggleEmbeddingPicker,
-  setShouldAutoChangeDimensions,
-  contextMenusClosed,
   panelsChanged,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;
+
+export const selectUiSlice = (state: RootState) => state.ui;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateUIState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

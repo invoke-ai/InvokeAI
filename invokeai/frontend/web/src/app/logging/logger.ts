@@ -1,7 +1,14 @@
 import { createLogWriter } from '@roarr/browser-log-writer';
 import { atom } from 'nanostores';
-import { Logger, ROARR, Roarr } from 'roarr';
+import type { Logger, MessageSerializer } from 'roarr';
+import { ROARR, Roarr } from 'roarr';
+import { z } from 'zod';
 
+const serializeMessage: MessageSerializer = (message) => {
+  return JSON.stringify(message);
+};
+
+ROARR.serializeMessage = serializeMessage;
 ROARR.write = createLogWriter();
 
 export const BASE_CONTEXT = {};
@@ -26,19 +33,20 @@ export type LoggerNamespace =
 export const logger = (namespace: LoggerNamespace) =>
   $logger.get().child({ namespace });
 
-export const VALID_LOG_LEVELS = [
+export const zLogLevel = z.enum([
   'trace',
   'debug',
   'info',
   'warn',
   'error',
   'fatal',
-] as const;
-
-export type InvokeLogLevel = (typeof VALID_LOG_LEVELS)[number];
+]);
+export type LogLevel = z.infer<typeof zLogLevel>;
+export const isLogLevel = (v: unknown): v is LogLevel =>
+  zLogLevel.safeParse(v).success;
 
 // Translate human-readable log levels to numbers, used for log filtering
-export const LOG_LEVEL_MAP: Record<InvokeLogLevel, number> = {
+export const LOG_LEVEL_MAP: Record<LogLevel, number> = {
   trace: 10,
   debug: 20,
   info: 30,

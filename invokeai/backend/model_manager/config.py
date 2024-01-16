@@ -23,7 +23,7 @@ from enum import Enum
 from typing import Literal, Optional, Type, Union
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
-from typing_extensions import Annotated
+from typing_extensions import Annotated, Any, Dict
 
 
 class InvalidModelConfigException(Exception):
@@ -99,6 +99,17 @@ class SchedulerPredictionType(str, Enum):
     Sample = "sample"
 
 
+class ModelRepoVariant(str, Enum):
+    """Various hugging face variants on the diffusers format."""
+
+    DEFAULT = "default"  # model files without "fp16" or other qualifier
+    FP16 = "fp16"
+    FP32 = "fp32"
+    ONNX = "onnx"
+    OPENVINO = "openvino"
+    FLAX = "flax"
+
+
 class ModelConfigBase(BaseModel):
     """Base class for model configuration information."""
 
@@ -122,7 +133,7 @@ class ModelConfigBase(BaseModel):
         validate_assignment=True,
     )
 
-    def update(self, attributes: dict):
+    def update(self, attributes: Dict[str, Any]) -> None:
         """Update the object with fields in dict."""
         for key, value in attributes.items():
             setattr(self, key, value)  # may raise a validation error
@@ -195,8 +206,6 @@ class MainCheckpointConfig(_CheckpointConfig, _MainConfig):
     """Model config for main checkpoint models."""
 
     type: Literal[ModelType.Main] = ModelType.Main
-    # Note that we do not need prediction_type or upcast_attention here
-    # because they are provided in the checkpoint's own config file.
 
 
 class MainDiffusersConfig(_DiffusersConfig, _MainConfig):

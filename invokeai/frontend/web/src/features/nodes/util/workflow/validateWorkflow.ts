@@ -1,14 +1,13 @@
 import { parseify } from 'common/util/serialize';
+import type { InvocationTemplate } from 'features/nodes/types/invocation';
+import type { WorkflowV2 } from 'features/nodes/types/workflow';
+import { isWorkflowInvocationNode } from 'features/nodes/types/workflow';
+import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
 import { t } from 'i18next';
 import { keyBy } from 'lodash-es';
-import { JsonObject } from 'type-fest';
-import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
-import { InvocationTemplate } from 'features/nodes/types/invocation';
+import type { JsonObject } from 'type-fest';
+
 import { parseAndMigrateWorkflow } from './migrations';
-import {
-  WorkflowV2,
-  isWorkflowInvocationNode,
-} from 'features/nodes/types/workflow';
 
 type WorkflowWarning = {
   message: string;
@@ -38,6 +37,13 @@ export const validateWorkflow = (
 ): ValidateWorkflowResult => {
   // Parse the raw workflow data & migrate it to the latest version
   const _workflow = parseAndMigrateWorkflow(workflow);
+
+  // System workflows are only allowed to be used as templates.
+  // If a system workflow is loaded, change its category to user and remove its ID so that we can save it as a user workflow.
+  if (_workflow.meta.category === 'default') {
+    _workflow.meta.category = 'user';
+    _workflow.id = undefined;
+  }
 
   // Now we can validate the graph
   const { nodes, edges } = _workflow;
@@ -79,6 +85,12 @@ export const validateWorkflow = (
     // Validate each edge. If the edge is invalid, we must remove it to prevent runtime errors with reactflow.
     const sourceNode = keyedNodes[edge.source];
     const targetNode = keyedNodes[edge.target];
+    const sourceTemplate = sourceNode
+      ? invocationTemplates[sourceNode.data.type]
+      : undefined;
+    const targetTemplate = targetNode
+      ? invocationTemplates[targetNode.data.type]
+      : undefined;
     const issues: string[] = [];
 
     if (!sourceNode) {
@@ -88,9 +100,23 @@ export const validateWorkflow = (
           node: edge.source,
         })
       );
-    } else if (
+    }
+
+    if (!sourceTemplate) {
+      // The edge's source/output node template does not exist
+      issues.push(
+        t('nodes.missingTemplate', {
+          node: edge.source,
+          type: sourceNode?.data.type,
+        })
+      );
+    }
+
+    if (
+      sourceNode &&
+      sourceTemplate &&
       edge.type === 'default' &&
-      !(edge.sourceHandle in sourceNode.data.outputs)
+      !(edge.sourceHandle in sourceTemplate.outputs)
     ) {
       // The edge's source/output node field does not exist
       issues.push(
@@ -108,34 +134,29 @@ export const validateWorkflow = (
           node: edge.target,
         })
       );
-    } else if (
+    }
+
+    if (!targetTemplate) {
+      // The edge's target/input node template does not exist
+      issues.push(
+        t('nodes.missingTemplate', {
+          node: edge.target,
+          type: targetNode?.data.type,
+        })
+      );
+    }
+
+    if (
+      targetNode &&
+      targetTemplate &&
       edge.type === 'default' &&
-      !(edge.targetHandle in targetNode.data.inputs)
+      !(edge.targetHandle in targetTemplate.inputs)
     ) {
       // The edge's target/input node field does not exist
       issues.push(
         t('nodes.targetNodeFieldDoesNotExist', {
           node: edge.target,
           field: edge.targetHandle,
-        })
-      );
-    }
-
-    if (!sourceNode?.data.type || !invocationTemplates[sourceNode.data.type]) {
-      // The edge's source/output node template does not exist
-      issues.push(
-        t('nodes.missingTemplate', {
-          node: edge.source,
-          type: sourceNode?.data.type,
-        })
-      );
-    }
-    if (!targetNode?.data.type || !invocationTemplates[targetNode?.data.type]) {
-      // The edge's target/input node template does not exist
-      issues.push(
-        t('nodes.missingTemplate', {
-          node: edge.target,
-          type: targetNode?.data.type,
         })
       );
     }

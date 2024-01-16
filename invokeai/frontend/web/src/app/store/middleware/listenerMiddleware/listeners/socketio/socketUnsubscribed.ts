@@ -1,17 +1,14 @@
 import { logger } from 'app/logging/logger';
-import {
-  appSocketUnsubscribedSession,
-  socketUnsubscribedSession,
-} from 'services/events/actions';
+import { socketUnsubscribedSession } from 'services/events/actions';
+
 import { startAppListening } from '../..';
+const log = logger('socketio');
 
 export const addSocketUnsubscribedEventListener = () => {
   startAppListening({
     actionCreator: socketUnsubscribedSession,
-    effect: (action, { dispatch }) => {
-      const log = logger('socketio');
+    effect: (action) => {
       log.debug(action.payload, 'Unsubscribed');
-      dispatch(appSocketUnsubscribedSession(action.payload));
     },
   });
 };

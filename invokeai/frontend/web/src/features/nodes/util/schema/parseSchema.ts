@@ -1,20 +1,21 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { FieldParseError } from 'features/nodes/types/error';
-import {
+import type {
   FieldInputTemplate,
   FieldOutputTemplate,
 } from 'features/nodes/types/field';
-import { InvocationTemplate } from 'features/nodes/types/invocation';
+import type { InvocationTemplate } from 'features/nodes/types/invocation';
+import type { InvocationSchemaObject } from 'features/nodes/types/openapi';
 import {
-  InvocationSchemaObject,
   isInvocationFieldSchema,
   isInvocationOutputSchemaObject,
   isInvocationSchemaObject,
 } from 'features/nodes/types/openapi';
 import { t } from 'i18next';
 import { reduce } from 'lodash-es';
-import { OpenAPIV3_1 } from 'openapi-types';
+import type { OpenAPIV3_1 } from 'openapi-types';
+
 import { buildFieldInputTemplate } from './buildFieldInputTemplate';
 import { buildFieldOutputTemplate } from './buildFieldOutputTemplate';
 import { parseFieldType } from './parseFieldType';
@@ -23,7 +24,14 @@ const RESERVED_INPUT_FIELD_NAMES = ['id', 'type', 'use_cache'];
 const RESERVED_OUTPUT_FIELD_NAMES = ['type'];
 const RESERVED_FIELD_TYPES = ['IsIntermediate'];
 
-const invocationDenylist: string[] = ['graph', 'linear_ui_output'];
+const invocationDenylist: string[] = [
+  'graph',
+  'linear_ui_output',
+  'l2i_onnx',
+  'prompt_onnx',
+  't2l_onnx',
+  'onnx_model_loader',
+];
 
 const isReservedInputField = (nodeType: string, fieldName: string) => {
   if (RESERVED_INPUT_FIELD_NAMES.includes(fieldName)) {
@@ -83,7 +91,7 @@ export const parseSchema = (
     const description = schema.description ?? '';
     const version = schema.version;
     const nodePack = schema.node_pack;
-    let withWorkflow = false;
+    const classification = schema.classification;
 
     const inputs = reduce(
       schema.properties,
@@ -110,12 +118,6 @@ export const parseSchema = (
 
         try {
           const fieldType = parseFieldType(property);
-
-          if (fieldType.name === 'WorkflowField') {
-            // This supports workflows, set the flag and skip to next field
-            withWorkflow = true;
-            return inputsAccumulator;
-          }
 
           if (isReservedFieldType(fieldType.name)) {
             // Skip processing this reserved field
@@ -251,8 +253,8 @@ export const parseSchema = (
       inputs,
       outputs,
       useCache,
-      withWorkflow,
       nodePack,
+      classification,
     };
 
     Object.assign(invocationsAccumulator, { [type]: invocation });

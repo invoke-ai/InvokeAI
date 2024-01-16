@@ -1,10 +1,10 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
+import { selectPostprocessingSlice } from 'features/parameters/store/postprocessingSlice';
+import { selectConfigSlice } from 'features/system/store/configSlice';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 
 const getUpscaledPixels = (imageDTO?: ImageDTO, maxUpscalePixels?: number) => {
   if (!imageDTO) {
@@ -61,9 +61,10 @@ const getDetailTKey = (
 };
 
 export const createIsAllowedToUpscaleSelector = (imageDTO?: ImageDTO) =>
-  createSelector(
-    stateSelector,
-    ({ postprocessing, config }) => {
+  createMemoizedSelector(
+    selectPostprocessingSlice,
+    selectConfigSlice,
+    (postprocessing, config) => {
       const { esrganModelName } = postprocessing;
       const { maxUpscalePixels } = config;
 
@@ -79,8 +80,7 @@ export const createIsAllowedToUpscaleSelector = (imageDTO?: ImageDTO) =>
           scaleFactor === 2 ? isAllowedToUpscale.x2 : isAllowedToUpscale.x4,
         detailTKey,
       };
-    },
-    defaultSelectorOptions
+    }
   );
 
 export const useIsAllowedToUpscale = (imageDTO?: ImageDTO) => {

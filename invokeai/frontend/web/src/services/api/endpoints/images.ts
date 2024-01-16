@@ -1,17 +1,19 @@
-import { EntityState, Update } from '@reduxjs/toolkit';
-import { PatchCollection } from '@reduxjs/toolkit/dist/query/core/buildThunks';
+import type { EntityState, Update } from '@reduxjs/toolkit';
+import type { PatchCollection } from '@reduxjs/toolkit/dist/query/core/buildThunks';
 import { logger } from 'app/logging/logger';
+import type { BoardId } from 'features/gallery/store/types';
 import {
   ASSETS_CATEGORIES,
-  BoardId,
   IMAGE_CATEGORIES,
   IMAGE_LIMIT,
 } from 'features/gallery/store/types';
-import { CoreMetadata, zCoreMetadata } from 'features/nodes/types/metadata';
+import type { CoreMetadata } from 'features/nodes/types/metadata';
+import { zCoreMetadata } from 'features/nodes/types/metadata';
+import { addToast } from 'features/system/store/systemSlice';
+import { t } from 'i18next';
 import { keyBy } from 'lodash-es';
-import { ApiTagDescription, LIST_TAG, api } from '..';
-import { components, paths } from 'services/api/schema';
-import {
+import type { components, paths } from 'services/api/schema';
+import type {
   DeleteBoardResult,
   ImageCategory,
   ImageDTO,
@@ -26,6 +28,9 @@ import {
   imagesAdapter,
   imagesSelectors,
 } from 'services/api/util';
+
+import type { ApiTagDescription } from '..';
+import { api, LIST_TAG } from '..';
 import { boardsApi } from './boards';
 
 export const imagesApi = api.injectEndpoints({
@@ -33,7 +38,7 @@ export const imagesApi = api.injectEndpoints({
     /**
      * Image Queries
      */
-    listImages: build.query<EntityState<ImageDTO>, ListImagesArgs>({
+    listImages: build.query<EntityState<ImageDTO, string>, ListImagesArgs>({
       query: (queryArgs) => ({
         // Use the helper to create the URL.
         url: getListImagesUrl(queryArgs),
@@ -42,6 +47,7 @@ export const imagesApi = api.injectEndpoints({
       providesTags: (result, error, { board_id, categories }) => [
         // Make the tags the same as the cache key
         { type: 'ImageList', id: getListImagesUrl({ board_id, categories }) },
+        'FetchOnReconnect',
       ],
       serializeQueryArgs: ({ queryArgs }) => {
         // Create cache & key based on board_id and categories - skip the other args.
@@ -95,7 +101,7 @@ export const imagesApi = api.injectEndpoints({
     }),
     getIntermediatesCount: build.query<number, void>({
       query: () => ({ url: 'images/intermediates' }),
-      providesTags: ['IntermediatesCount'],
+      providesTags: ['IntermediatesCount', 'FetchOnReconnect'],
     }),
     clearIntermediates: build.mutation<number, void>({
       query: () => ({ url: `images/intermediates`, method: 'DELETE' }),
@@ -126,6 +132,16 @@ export const imagesApi = api.injectEndpoints({
         }
         return;
       },
+      keepUnusedDataFor: 86400, // 24 hours
+    }),
+    getImageWorkflow: build.query<
+      paths['/api/v1/images/i/{image_name}/workflow']['get']['responses']['200']['content']['application/json'],
+      string
+    >({
+      query: (image_name) => ({ url: `images/i/${image_name}/workflow` }),
+      providesTags: (result, error, image_name) => [
+        { type: 'ImageWorkflow', id: image_name },
+      ],
       keepUnusedDataFor: 86400, // 24 hours
     }),
     deleteImage: build.mutation<void, ImageDTO>({
@@ -207,6 +223,16 @@ export const imagesApi = api.injectEndpoints({
          */
         try {
           const { data } = await queryFulfilled;
+
+          if (data.deleted_images.length < imageDTOs.length) {
+            dispatch(
+              addToast({
+                title: t('gallery.problemDeletingImages'),
+                description: t('gallery.problemDeletingImagesDesc'),
+                status: 'warning',
+              })
+            );
+          }
 
           // convert to an object so we can access the successfully delete image DTOs by name
           const groupedImageDTOs = keyBy(imageDTOs, 'image_name');
@@ -349,9 +375,8 @@ export const imagesApi = api.injectEndpoints({
             categories,
           };
 
-          const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(
-            getState()
-          );
+          const currentCache =
+            imagesApi.endpoints.listImages.select(queryArgs)(getState());
 
           const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
             ? boardsApi.endpoints.getBoardImagesTotal.select(
@@ -518,9 +543,8 @@ export const imagesApi = api.injectEndpoints({
               categories,
             };
 
-            const currentCache = imagesApi.endpoints.listImages.select(
-              queryArgs
-            )(getState());
+            const currentCache =
+              imagesApi.endpoints.listImages.select(queryArgs)(getState());
 
             const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
               ? boardsApi.endpoints.getBoardImagesTotal.select(
@@ -633,9 +657,8 @@ export const imagesApi = api.injectEndpoints({
               categories,
             };
 
-            const currentCache = imagesApi.endpoints.listImages.select(
-              queryArgs
-            )(getState());
+            const currentCache =
+              imagesApi.endpoints.listImages.select(queryArgs)(getState());
 
             const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
               ? boardsApi.endpoints.getBoardImagesTotal.select(
@@ -853,7 +876,7 @@ export const imagesApi = api.injectEndpoints({
             },
           ];
 
-          const updates: Update<ImageDTO>[] = deleted_board_images.map(
+          const updates: Update<ImageDTO, string>[] = deleted_board_images.map(
             (image_name) => ({
               id: image_name,
               changes: { board_id: undefined },
@@ -1059,9 +1082,8 @@ export const imagesApi = api.injectEndpoints({
 
           // $cache = board_id/[images|assets]
           const queryArgs = { board_id: board_id ?? 'none', categories };
-          const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(
-            getState()
-          );
+          const currentCache =
+            imagesApi.endpoints.listImages.select(queryArgs)(getState());
 
           // IF it eligible for insertion into existing $cache
           // "eligible" means either:
@@ -1201,9 +1223,8 @@ export const imagesApi = api.injectEndpoints({
 
         // $cache = no_board/[images|assets]
         const queryArgs = { board_id: 'none', categories };
-        const currentCache = imagesApi.endpoints.listImages.select(queryArgs)(
-          getState()
-        );
+        const currentCache =
+          imagesApi.endpoints.listImages.select(queryArgs)(getState());
 
         // IF it eligible for insertion into existing $cache
         // "eligible" means either:
@@ -1348,9 +1369,8 @@ export const imagesApi = api.injectEndpoints({
               categories,
             };
 
-            const currentCache = imagesApi.endpoints.listImages.select(
-              queryArgs
-            )(getState());
+            const currentCache =
+              imagesApi.endpoints.listImages.select(queryArgs)(getState());
 
             const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
               ? boardsApi.endpoints.getBoardImagesTotal.select(
@@ -1496,9 +1516,8 @@ export const imagesApi = api.injectEndpoints({
               categories,
             };
 
-            const currentCache = imagesApi.endpoints.listImages.select(
-              queryArgs
-            )(getState());
+            const currentCache =
+              imagesApi.endpoints.listImages.select(queryArgs)(getState());
 
             const { data } = IMAGE_CATEGORIES.includes(imageDTO.image_category)
               ? boardsApi.endpoints.getBoardImagesTotal.select(
@@ -1560,6 +1579,8 @@ export const {
   useLazyListImagesQuery,
   useGetImageDTOQuery,
   useGetImageMetadataQuery,
+  useGetImageWorkflowQuery,
+  useLazyGetImageWorkflowQuery,
   useDeleteImageMutation,
   useDeleteImagesMutation,
   useUploadImageMutation,

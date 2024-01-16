@@ -1,4 +1,4 @@
-import { ImageCategory, ImageDTO } from 'services/api/types';
+import type { ImageCategory, ImageDTO } from 'services/api/types';
 
 export const IMAGE_CATEGORIES: ImageCategory[] = ['general'];
 export const ASSETS_CATEGORIES: ImageCategory[] = [
@@ -22,4 +22,6 @@ export type GalleryState = {
   selectedBoardId: BoardId;
   galleryView: GalleryView;
   boardSearchText: string;
+  offset: number;
+  limit: number;
 };

@@ -1,17 +1,17 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { RootState, stateSelector } from 'app/store/store';
-import { CanvasImage, CanvasState, isCanvasBaseImage } from './canvasTypes';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 
-export const canvasSelector = (state: RootState): CanvasState => state.canvas;
+import { selectCanvasSlice } from './canvasSlice';
+import { isCanvasBaseImage } from './canvasTypes';
 
 export const isStagingSelector = createSelector(
-  [stateSelector],
-  ({ canvas }) =>
+  selectCanvasSlice,
+  (canvas) =>
     canvas.batchIds.length > 0 ||
     canvas.layerState.stagingArea.images.length > 0
 );
 
-export const initialCanvasImageSelector = (
-  state: RootState
-): CanvasImage | undefined =>
-  state.canvas.layerState.objects.find(isCanvasBaseImage);
+export const initialCanvasImageSelector = createMemoizedSelector(
+  selectCanvasSlice,
+  (canvas) => canvas.layerState.objects.find(isCanvasBaseImage)
+);

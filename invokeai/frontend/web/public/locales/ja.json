@@ -133,10 +133,6 @@
             "title": "ピン",
             "desc": "オプションパネルを固定"
         },
-        "toggleViewer": {
-            "title": "ビュワーのトグル",
-            "desc": "ビュワーを開閉"
-        },
         "toggleGallery": {
             "title": "ギャラリーのトグル",
             "desc": "ギャラリードロワーの開閉"
@@ -196,10 +192,6 @@
         "nextImage": {
             "title": "次の画像",
             "desc": "ギャラリー内の1つ後の画像を表示"
-        },
-        "toggleGalleryPin": {
-            "title": "ギャラリードロワーの固定",
-            "desc": "ギャラリーをUIにピン留め/解除"
         },
         "increaseGalleryThumbSize": {
             "title": "ギャラリーの画像を拡大",
@@ -590,7 +582,6 @@
         "processor": "プロセッサー",
         "addControlNet": "$t(common.controlNet)を追加",
         "none": "なし",
-        "incompatibleBaseModel": "互換性のないベースモデル:",
         "enableControlnet": "コントロールネットを有効化",
         "detectResolution": "検出解像度",
         "controlNetT2IMutexDesc": "$t(common.controlNet)と$t(common.t2iAdapter)の同時使用は現在サポートされていません。",

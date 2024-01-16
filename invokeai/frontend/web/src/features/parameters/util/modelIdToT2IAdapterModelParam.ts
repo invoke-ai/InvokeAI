@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { zParameterT2IAdapterModel } from 'features/parameters/types/parameterSchemas';
-import { T2IAdapterModelField } from 'services/api/types';
+import type { T2IAdapterModelField } from 'services/api/types';
 
 export const modelIdToT2IAdapterModelParam = (
   t2iAdapterModelId: string

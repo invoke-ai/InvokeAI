@@ -1,24 +1,22 @@
-import { IRect, Vector2d } from 'konva/lib/types';
-import { RgbaColor } from 'react-colorful';
+import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
+import type { IRect, Vector2d } from 'konva/lib/types';
+import type { RgbaColor } from 'react-colorful';
+import { z } from 'zod';
 
-export const LAYER_NAMES_DICT = [
+export type CanvasLayer = 'base' | 'mask';
+
+export const LAYER_NAMES_DICT: { label: string; value: CanvasLayer }[] = [
   { label: 'Base', value: 'base' },
   { label: 'Mask', value: 'mask' },
 ];
 
 export const LAYER_NAMES = ['base', 'mask'] as const;
 
-export type CanvasLayer = (typeof LAYER_NAMES)[number];
-
-export const BOUNDING_BOX_SCALES_DICT = [
-  { label: 'None', value: 'none' },
-  { label: 'Auto', value: 'auto' },
-  { label: 'Manual', value: 'manual' },
-];
-
-export const BOUNDING_BOX_SCALES = ['none', 'auto', 'manual'] as const;
-
-export type BoundingBoxScale = (typeof BOUNDING_BOX_SCALES)[number];
+export const zBoundingBoxScaleMethod = z.enum(['none', 'auto', 'manual']);
+export type BoundingBoxScaleMethod = z.infer<typeof zBoundingBoxScaleMethod>;
+export const isBoundingBoxScaleMethod = (
+  v: unknown
+): v is BoundingBoxScaleMethod => zBoundingBoxScaleMethod.safeParse(v).success;
 
 export type CanvasDrawingTool = 'brush' | 'eraser';
 
@@ -119,28 +117,19 @@ export const isCanvasAnyLine = (
 ): obj is CanvasMaskLine | CanvasBaseLine => obj.kind === 'line';
 
 export interface CanvasState {
+  _version: 1;
   boundingBoxCoordinates: Vector2d;
   boundingBoxDimensions: Dimensions;
   boundingBoxPreviewFill: RgbaColor;
-  boundingBoxScaleMethod: BoundingBoxScale;
+  boundingBoxScaleMethod: BoundingBoxScaleMethod;
   brushColor: RgbaColor;
   brushSize: number;
   colorPickerColor: RgbaColor;
-  cursorPosition: Vector2d | null;
   futureLayerStates: CanvasLayerState[];
-  isDrawing: boolean;
   isMaskEnabled: boolean;
-  isMouseOverBoundingBox: boolean;
-  isMoveBoundingBoxKeyHeld: boolean;
-  isMoveStageKeyHeld: boolean;
-  isMovingBoundingBox: boolean;
-  isMovingStage: boolean;
-  isTransformingBoundingBox: boolean;
   layer: CanvasLayer;
   layerState: CanvasLayerState;
   maskColor: RgbaColor;
-  maxHistory: number;
-  minimumStageScale: number;
   pastLayerStates: CanvasLayerState[];
   scaledBoundingBoxDimensions: Dimensions;
   shouldAntialias: boolean;
@@ -151,10 +140,7 @@ export interface CanvasState {
   shouldPreserveMaskedArea: boolean;
   shouldRestrictStrokesToBox: boolean;
   shouldShowBoundingBox: boolean;
-  shouldShowBrush: boolean;
-  shouldShowBrushPreview: boolean;
   shouldShowCanvasDebugInfo: boolean;
-  shouldShowCheckboardTransparency: boolean;
   shouldShowGrid: boolean;
   shouldShowIntermediates: boolean;
   shouldShowStagingImage: boolean;
@@ -163,9 +149,9 @@ export interface CanvasState {
   stageCoordinates: Vector2d;
   stageDimensions: Dimensions;
   stageScale: number;
-  tool: CanvasTool;
   generationMode?: GenerationMode;
   batchIds: string[];
+  aspectRatio: AspectRatioState;
 }
 
 export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';

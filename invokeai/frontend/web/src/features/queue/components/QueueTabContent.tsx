@@ -1,6 +1,7 @@
 import { Box, Flex } from '@chakra-ui/react';
-import { memo } from 'react';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { memo } from 'react';
+
 import InvocationCacheStatus from './InvocationCacheStatus';
 import QueueList from './QueueList/QueueList';
 import QueueStatus from './QueueStatus';
@@ -11,21 +12,13 @@ const QueueTabContent = () => {
     useFeatureStatus('invocationCache').isFeatureEnabled;
 
   return (
-    <Flex
-      layerStyle="first"
-      borderRadius="base"
-      w="full"
-      h="full"
-      p={2}
-      flexDir="column"
-      gap={2}
-    >
+    <Flex borderRadius="base" w="full" h="full" flexDir="column" gap={2}>
       <Flex gap={2} w="full">
         <QueueTabQueueControls />
         <QueueStatus />
         {isInvocationCacheEnabled && <InvocationCacheStatus />}
       </Flex>
-      <Box layerStyle="second" p={2} borderRadius="base" w="full" h="full">
+      <Box layerStyle="first" p={2} borderRadius="base" w="full" h="full">
         <QueueList />
       </Box>
     </Flex>

@@ -5,7 +5,7 @@ from typing import Optional, Union, cast
 
 from invokeai.app.invocations.baseinvocation import MetadataField, MetadataFieldValidator
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite import SqliteDatabase
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 from .image_records_base import ImageRecordStorageBase
 from .image_records_common import (
@@ -31,91 +31,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         self._lock = db.lock
         self._conn = db.conn
         self._cursor = self._conn.cursor()
-
-        try:
-            self._lock.acquire()
-            self._create_tables()
-            self._conn.commit()
-        finally:
-            self._lock.release()
-
-    def _create_tables(self) -> None:
-        """Creates the `images` table."""
-
-        # Create the `images` table.
-        self._cursor.execute(
-            """--sql
-            CREATE TABLE IF NOT EXISTS images (
-                image_name TEXT NOT NULL PRIMARY KEY,
-                -- This is an enum in python, unrestricted string here for flexibility
-                image_origin TEXT NOT NULL,
-                -- This is an enum in python, unrestricted string here for flexibility
-                image_category TEXT NOT NULL,
-                width INTEGER NOT NULL,
-                height INTEGER NOT NULL,
-                session_id TEXT,
-                node_id TEXT,
-                metadata TEXT,
-                is_intermediate BOOLEAN DEFAULT FALSE,
-                created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- Updated via trigger
-                updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- Soft delete, currently unused
-                deleted_at DATETIME
-            );
-            """
-        )
-
-        self._cursor.execute("PRAGMA table_info(images)")
-        columns = [column[1] for column in self._cursor.fetchall()]
-
-        if "starred" not in columns:
-            self._cursor.execute(
-                """--sql
-                ALTER TABLE images ADD COLUMN starred BOOLEAN DEFAULT FALSE;
-                """
-            )
-
-        # Create the `images` table indices.
-        self._cursor.execute(
-            """--sql
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_images_image_name ON images(image_name);
-            """
-        )
-        self._cursor.execute(
-            """--sql
-            CREATE INDEX IF NOT EXISTS idx_images_image_origin ON images(image_origin);
-            """
-        )
-        self._cursor.execute(
-            """--sql
-            CREATE INDEX IF NOT EXISTS idx_images_image_category ON images(image_category);
-            """
-        )
-        self._cursor.execute(
-            """--sql
-            CREATE INDEX IF NOT EXISTS idx_images_created_at ON images(created_at);
-            """
-        )
-
-        self._cursor.execute(
-            """--sql
-            CREATE INDEX IF NOT EXISTS idx_images_starred ON images(starred);
-            """
-        )
-
-        # Add trigger for `updated_at`.
-        self._cursor.execute(
-            """--sql
-            CREATE TRIGGER IF NOT EXISTS tg_images_updated_at
-            AFTER UPDATE
-            ON images FOR EACH ROW
-            BEGIN
-                UPDATE images SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
-                    WHERE image_name = old.image_name;
-            END;
-            """
-        )
 
     def get(self, image_name: str) -> ImageRecord:
         try:
@@ -408,6 +323,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         image_category: ImageCategory,
         width: int,
         height: int,
+        has_workflow: bool,
         is_intermediate: Optional[bool] = False,
         starred: Optional[bool] = False,
         session_id: Optional[str] = None,
@@ -429,9 +345,10 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     session_id,
                     metadata,
                     is_intermediate,
-                    starred
+                    starred,
+                    has_workflow
                     )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     image_name,
@@ -444,6 +361,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     metadata_json,
                     is_intermediate,
                     starred,
+                    has_workflow,
                 ),
             )
             self._conn.commit()

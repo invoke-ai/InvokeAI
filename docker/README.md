@@ -1,6 +1,14 @@
 # InvokeAI Containerized
 
-All commands are to be run from the `docker` directory: `cd docker`
+All commands should be run within the `docker` directory: `cd docker`
+
+## Quickstart :rocket:
+
+On a known working Linux+Docker+CUDA (Nvidia) system, execute `./run.sh` in this directory. It will take a few minutes - depending on your internet speed - to install the core models. Once the application starts up, open `http://localhost:9090` in your browser to Invoke!
+
+For more configuration options (using an AMD GPU, custom root directory location, etc): read on.
+
+## Detailed setup
 
 #### Linux
 
@@ -18,12 +26,12 @@ All commands are to be run from the `docker` directory: `cd docker`
 
 This is done via Docker Desktop preferences
 
-## Quickstart
+### Configure Invoke environment
 
 1. Make a copy of `env.sample` and name it `.env` (`cp env.sample .env` (Mac/Linux) or `copy example.env .env` (Windows)). Make changes as necessary. Set `INVOKEAI_ROOT` to an absolute path to:
     a. the desired location of the InvokeAI runtime directory, or
     b. an existing, v3.0.0 compatible runtime directory.
-1. `docker compose up`
+1. Execute `run.sh`
 
 The image will be built automatically if needed.
 
@@ -37,19 +45,21 @@ The runtime directory (holding models and outputs) will be created in the locati
 
 The Docker daemon on the system must be already set up to use the GPU. In case of Linux, this involves installing `nvidia-docker-runtime` and configuring the `nvidia` runtime as default. Steps will be different for AMD. Please see Docker documentation for the most up-to-date instructions for using your GPU with Docker.
 
+To use an AMD GPU, set `GPU_DRIVER=rocm` in your `.env` file.
+
 ## Customize
 
-Check the `.env.sample` file. It contains some environment variables for running in Docker. Copy it, name it `.env`, and fill it in with your own values. Next time you run `docker compose up`, your custom values will be used.
+Check the `.env.sample` file. It contains some environment variables for running in Docker. Copy it, name it `.env`, and fill it in with your own values. Next time you run `run.sh`, your custom values will be used.
 
 You can also set these values in `docker-compose.yml` directly, but `.env` will help avoid conflicts when code is updated.
 
-Example (values are optional, but setting `INVOKEAI_ROOT` is highly recommended):
+Values are optional, but setting `INVOKEAI_ROOT` is highly recommended. The default is `~/invokeai`. Example:
 
 ```bash
 INVOKEAI_ROOT=/Volumes/WorkDrive/invokeai
 HUGGINGFACE_TOKEN=the_actual_token
 CONTAINER_UID=1000
-GPU_DRIVER=cuda
+GPU_DRIVER=nvidia
 ```
 
 Any environment variables supported by InvokeAI can be set here - please see the [Configuration docs](https://invoke-ai.github.io/InvokeAI/features/CONFIGURATION/) for further detail.

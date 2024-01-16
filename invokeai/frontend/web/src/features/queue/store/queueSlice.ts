@@ -1,4 +1,6 @@
-import { PayloadAction, createSlice } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 
 export interface QueueState {
   listCursor: number | undefined;
@@ -58,3 +60,5 @@ export const {
 } = queueSlice.actions;
 
 export default queueSlice.reducer;
+
+export const selectQueueSlice = (state: RootState) => state.queue;

@@ -1,10 +1,10 @@
-import { Connection, Edge, HandleType, Node } from 'reactflow';
-
-import {
+import type {
   FieldInputInstance,
   FieldOutputInstance,
   FieldType,
 } from 'features/nodes/types/field';
+import type { Connection, Edge, HandleType, Node } from 'reactflow';
+
 import { getIsGraphAcyclic } from './getIsGraphAcyclic';
 import { validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
 

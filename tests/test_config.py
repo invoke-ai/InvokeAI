@@ -206,9 +206,9 @@ def test_deny_nodes(patch_rootdir):
     # confirm invocations union will not have denied nodes
     all_invocations = BaseInvocation.get_invocations()
 
-    has_integer = len([i for i in all_invocations if i.__fields__.get("type").default == "integer"]) == 1
-    has_string = len([i for i in all_invocations if i.__fields__.get("type").default == "string"]) == 1
-    has_float = len([i for i in all_invocations if i.__fields__.get("type").default == "float"]) == 1
+    has_integer = len([i for i in all_invocations if i.model_fields.get("type").default == "integer"]) == 1
+    has_string = len([i for i in all_invocations if i.model_fields.get("type").default == "string"]) == 1
+    has_float = len([i for i in all_invocations if i.model_fields.get("type").default == "float"]) == 1
 
     assert has_integer
     assert has_string

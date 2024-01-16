@@ -19,6 +19,9 @@ export const zColorField = z.object({
 });
 export type ColorField = z.infer<typeof zColorField>;
 
+export const zClassification = z.enum(['stable', 'beta', 'prototype']);
+export type Classification = z.infer<typeof zClassification>;
+
 export const zSchedulerField = z.enum([
   'euler',
   'deis',
@@ -56,7 +59,6 @@ export const zBaseModel = z.enum([
   'sdxl-refiner',
 ]);
 export const zModelType = z.enum([
-  'onnx',
   'main',
   'vae',
   'lora',
@@ -77,23 +79,12 @@ export const zMainModelField = z.object({
   base_model: zBaseModel,
   model_type: z.literal('main'),
 });
-export const zONNXModelField = z.object({
-  model_name: zModelName,
-  base_model: zBaseModel,
-  model_type: z.literal('onnx'),
-});
-export const zMainOrONNXModelField = z.union([
-  zMainModelField,
-  zONNXModelField,
-]);
 export const zSDXLRefinerModelField = z.object({
   model_name: z.string().min(1),
   base_model: z.literal('sdxl-refiner'),
   model_type: z.literal('main'),
 });
 export type MainModelField = z.infer<typeof zMainModelField>;
-export type ONNXModelField = z.infer<typeof zONNXModelField>;
-export type MainOrONNXModelField = z.infer<typeof zMainOrONNXModelField>;
 export type SDXLRefinerModelField = z.infer<typeof zSDXLRefinerModelField>;
 
 export const zSubModelType = z.enum([

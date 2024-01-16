@@ -114,6 +114,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                                 session_queue_id=queue_item.queue_id,
                                 session_queue_item_id=queue_item.item_id,
                                 graph_execution_state=queue_item.session,
+                                workflow=queue_item.workflow,
                                 invoke_all=True,
                             )
                             queue_item = None

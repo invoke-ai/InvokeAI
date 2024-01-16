@@ -1,37 +1,14 @@
-import { createSelector } from '@reduxjs/toolkit';
 import { createLogWriter } from '@roarr/browser-log-writer';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { isEqual } from 'lodash-es';
 import { useEffect, useMemo } from 'react';
 import { ROARR, Roarr } from 'roarr';
-import {
-  $logger,
-  BASE_CONTEXT,
-  LOG_LEVEL_MAP,
-  LoggerNamespace,
-  logger,
-} from './logger';
 
-const selector = createSelector(
-  stateSelector,
-  ({ system }) => {
-    const { consoleLogLevel, shouldLogToConsole } = system;
-
-    return {
-      consoleLogLevel,
-      shouldLogToConsole,
-    };
-  },
-  {
-    memoizeOptions: {
-      resultEqualityCheck: isEqual,
-    },
-  }
-);
+import type { LoggerNamespace } from './logger';
+import { $logger, BASE_CONTEXT, LOG_LEVEL_MAP, logger } from './logger';
 
 export const useLogger = (namespace: LoggerNamespace) => {
-  const { consoleLogLevel, shouldLogToConsole } = useAppSelector(selector);
+  const consoleLogLevel = useAppSelector((s) => s.system.consoleLogLevel);
+  const shouldLogToConsole = useAppSelector((s) => s.system.shouldLogToConsole);
 
   // The provided Roarr browser log writer uses localStorage to config logging to console
   useEffect(() => {

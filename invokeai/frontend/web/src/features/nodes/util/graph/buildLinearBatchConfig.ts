@@ -1,9 +1,10 @@
 import { NUMPY_RAND_MAX } from 'app/constants';
-import { RootState } from 'app/store/store';
+import type { RootState } from 'app/store/store';
 import { generateSeeds } from 'common/util/generateSeeds';
 import { range } from 'lodash-es';
-import { components } from 'services/api/schema';
-import { Batch, BatchConfig, NonNullableGraph } from 'services/api/types';
+import type { components } from 'services/api/schema';
+import type { Batch, BatchConfig, NonNullableGraph } from 'services/api/types';
+
 import {
   CANVAS_COHERENCE_NOISE,
   METADATA,
@@ -18,31 +19,32 @@ export const prepareLinearUIBatch = (
   prepend: boolean
 ): BatchConfig => {
   const { iterations, model, shouldRandomizeSeed, seed } = state.generation;
-  const { shouldConcatSDXLStylePrompt, positiveStylePrompt } = state.sdxl;
+  const { shouldConcatSDXLStylePrompt } = state.sdxl;
   const { prompts, seedBehaviour } = state.dynamicPrompts;
 
   const data: Batch['data'] = [];
+  const firstBatchDatumList: components['schemas']['BatchDatum'][] = [];
+  const secondBatchDatumList: components['schemas']['BatchDatum'][] = [];
 
-  if (prompts.length === 1) {
+  // add seeds first to ensure the output order groups the prompts
+  if (seedBehaviour === 'PER_PROMPT') {
     const seeds = generateSeeds({
-      count: iterations,
+      count: prompts.length * iterations,
       start: shouldRandomizeSeed ? undefined : seed,
     });
 
-    const zipped: components['schemas']['BatchDatum'][] = [];
-
     if (graph.nodes[NOISE]) {
-      zipped.push({
+      firstBatchDatumList.push({
         node_path: NOISE,
         field_name: 'seed',
         items: seeds,
       });
     }
 
+    // add to metadata
     if (getHasMetadata(graph)) {
-      // add to metadata
       removeMetadata(graph, 'seed');
-      zipped.push({
+      firstBatchDatumList.push({
         node_path: METADATA,
         field_name: 'seed',
         items: seeds,
@@ -50,136 +52,92 @@ export const prepareLinearUIBatch = (
     }
 
     if (graph.nodes[CANVAS_COHERENCE_NOISE]) {
-      zipped.push({
+      firstBatchDatumList.push({
         node_path: CANVAS_COHERENCE_NOISE,
         field_name: 'seed',
         items: seeds.map((seed) => (seed + 1) % NUMPY_RAND_MAX),
       });
     }
-
-    data.push(zipped);
   } else {
-    // prompts.length > 1 aka dynamic prompts
-    const firstBatchDatumList: components['schemas']['BatchDatum'][] = [];
-    const secondBatchDatumList: components['schemas']['BatchDatum'][] = [];
+    // seedBehaviour = SeedBehaviour.PerRun
+    const seeds = generateSeeds({
+      count: iterations,
+      start: shouldRandomizeSeed ? undefined : seed,
+    });
 
-    // add seeds first to ensure the output order groups the prompts
-    if (seedBehaviour === 'PER_PROMPT') {
-      const seeds = generateSeeds({
-        count: prompts.length * iterations,
-        start: shouldRandomizeSeed ? undefined : seed,
+    if (graph.nodes[NOISE]) {
+      secondBatchDatumList.push({
+        node_path: NOISE,
+        field_name: 'seed',
+        items: seeds,
       });
-
-      if (graph.nodes[NOISE]) {
-        firstBatchDatumList.push({
-          node_path: NOISE,
-          field_name: 'seed',
-          items: seeds,
-        });
-      }
-
-      // add to metadata
-      if (getHasMetadata(graph)) {
-        removeMetadata(graph, 'seed');
-        firstBatchDatumList.push({
-          node_path: METADATA,
-          field_name: 'seed',
-          items: seeds,
-        });
-      }
-
-      if (graph.nodes[CANVAS_COHERENCE_NOISE]) {
-        firstBatchDatumList.push({
-          node_path: CANVAS_COHERENCE_NOISE,
-          field_name: 'seed',
-          items: seeds.map((seed) => (seed + 1) % NUMPY_RAND_MAX),
-        });
-      }
-    } else {
-      // seedBehaviour = SeedBehaviour.PerRun
-      const seeds = generateSeeds({
-        count: iterations,
-        start: shouldRandomizeSeed ? undefined : seed,
-      });
-
-      if (graph.nodes[NOISE]) {
-        secondBatchDatumList.push({
-          node_path: NOISE,
-          field_name: 'seed',
-          items: seeds,
-        });
-      }
-
-      // add to metadata
-      if (getHasMetadata(graph)) {
-        removeMetadata(graph, 'seed');
-        secondBatchDatumList.push({
-          node_path: METADATA,
-          field_name: 'seed',
-          items: seeds,
-        });
-      }
-
-      if (graph.nodes[CANVAS_COHERENCE_NOISE]) {
-        secondBatchDatumList.push({
-          node_path: CANVAS_COHERENCE_NOISE,
-          field_name: 'seed',
-          items: seeds.map((seed) => (seed + 1) % NUMPY_RAND_MAX),
-        });
-      }
-      data.push(secondBatchDatumList);
     }
 
-    const extendedPrompts =
-      seedBehaviour === 'PER_PROMPT'
-        ? range(iterations).flatMap(() => prompts)
-        : prompts;
+    // add to metadata
+    if (getHasMetadata(graph)) {
+      removeMetadata(graph, 'seed');
+      secondBatchDatumList.push({
+        node_path: METADATA,
+        field_name: 'seed',
+        items: seeds,
+      });
+    }
 
-    // zipped batch of prompts
+    if (graph.nodes[CANVAS_COHERENCE_NOISE]) {
+      secondBatchDatumList.push({
+        node_path: CANVAS_COHERENCE_NOISE,
+        field_name: 'seed',
+        items: seeds.map((seed) => (seed + 1) % NUMPY_RAND_MAX),
+      });
+    }
+    data.push(secondBatchDatumList);
+  }
+
+  const extendedPrompts =
+    seedBehaviour === 'PER_PROMPT'
+      ? range(iterations).flatMap(() => prompts)
+      : prompts;
+
+  // zipped batch of prompts
+  if (graph.nodes[POSITIVE_CONDITIONING]) {
+    firstBatchDatumList.push({
+      node_path: POSITIVE_CONDITIONING,
+      field_name: 'prompt',
+      items: extendedPrompts,
+    });
+  }
+
+  // add to metadata
+  if (getHasMetadata(graph)) {
+    removeMetadata(graph, 'positive_prompt');
+    firstBatchDatumList.push({
+      node_path: METADATA,
+      field_name: 'positive_prompt',
+      items: extendedPrompts,
+    });
+  }
+
+  if (shouldConcatSDXLStylePrompt && model?.base_model === 'sdxl') {
     if (graph.nodes[POSITIVE_CONDITIONING]) {
       firstBatchDatumList.push({
         node_path: POSITIVE_CONDITIONING,
-        field_name: 'prompt',
+        field_name: 'style',
         items: extendedPrompts,
       });
     }
 
     // add to metadata
     if (getHasMetadata(graph)) {
-      removeMetadata(graph, 'positive_prompt');
+      removeMetadata(graph, 'positive_style_prompt');
       firstBatchDatumList.push({
         node_path: METADATA,
-        field_name: 'positive_prompt',
+        field_name: 'positive_style_prompt',
         items: extendedPrompts,
       });
     }
-
-    if (shouldConcatSDXLStylePrompt && model?.base_model === 'sdxl') {
-      const stylePrompts = extendedPrompts.map((p) =>
-        [p, positiveStylePrompt].join(' ')
-      );
-
-      if (graph.nodes[POSITIVE_CONDITIONING]) {
-        firstBatchDatumList.push({
-          node_path: POSITIVE_CONDITIONING,
-          field_name: 'style',
-          items: stylePrompts,
-        });
-      }
-
-      // add to metadata
-      if (getHasMetadata(graph)) {
-        removeMetadata(graph, 'positive_style_prompt');
-        firstBatchDatumList.push({
-          node_path: METADATA,
-          field_name: 'positive_style_prompt',
-          items: extendedPrompts,
-        });
-      }
-    }
-
-    data.push(firstBatchDatumList);
   }
+
+  data.push(firstBatchDatumList);
 
   const enqueueBatchArg: BatchConfig = {
     prepend,

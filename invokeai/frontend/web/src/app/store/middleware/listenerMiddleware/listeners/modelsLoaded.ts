@@ -12,20 +12,17 @@ import {
 } from 'features/parameters/store/generationSlice';
 import {
   zParameterModel,
-  zParameterSDXLRefinerModel,
   zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
-import {
-  refinerModelChanged,
-  setShouldUseSDXLRefiner,
-} from 'features/sdxl/store/sdxlSlice';
+import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
 import { forEach, some } from 'lodash-es';
 import {
-  mainModelsAdapter,
+  mainModelsAdapterSelectors,
   modelsApi,
-  vaeModelsAdapter,
+  vaeModelsAdapterSelectors,
 } from 'services/api/endpoints/models';
-import { TypeGuardFor } from 'services/api/types';
+import type { TypeGuardFor } from 'services/api/types';
+
 import { startAppListening } from '..';
 
 export const addModelsLoadedListener = () => {
@@ -46,7 +43,7 @@ export const addModelsLoadedListener = () => {
       );
 
       const currentModel = getState().generation.model;
-      const models = mainModelsAdapter.getSelectors().selectAll(action.payload);
+      const models = mainModelsAdapterSelectors.selectAll(action.payload);
 
       if (models.length === 0) {
         // No models loaded at all
@@ -77,7 +74,7 @@ export const addModelsLoadedListener = () => {
         return;
       }
 
-      dispatch(modelChanged(result.data));
+      dispatch(modelChanged(result.data, currentModel));
     },
   });
   startAppListening({
@@ -97,12 +94,11 @@ export const addModelsLoadedListener = () => {
       );
 
       const currentModel = getState().sdxl.refinerModel;
-      const models = mainModelsAdapter.getSelectors().selectAll(action.payload);
+      const models = mainModelsAdapterSelectors.selectAll(action.payload);
 
       if (models.length === 0) {
         // No models loaded at all
         dispatch(refinerModelChanged(null));
-        dispatch(setShouldUseSDXLRefiner(false));
         return;
       }
 
@@ -115,21 +111,10 @@ export const addModelsLoadedListener = () => {
           )
         : false;
 
-      if (isCurrentModelAvailable) {
+      if (!isCurrentModelAvailable) {
+        dispatch(refinerModelChanged(null));
         return;
       }
-
-      const result = zParameterSDXLRefinerModel.safeParse(models[0]);
-
-      if (!result.success) {
-        log.error(
-          { error: result.error.format() },
-          'Failed to parse SDXL Refiner Model'
-        );
-        return;
-      }
-
-      dispatch(refinerModelChanged(result.data));
     },
   });
   startAppListening({
@@ -160,13 +145,11 @@ export const addModelsLoadedListener = () => {
         return;
       }
 
-      const firstModel = vaeModelsAdapter
-        .getSelectors()
-        .selectAll(action.payload)[0];
+      const firstModel = vaeModelsAdapterSelectors.selectAll(action.payload)[0];
 
       if (!firstModel) {
         // No custom VAEs loaded at all; use the default
-        dispatch(modelChanged(null));
+        dispatch(vaeSelected(null));
         return;
       }
 
@@ -244,7 +227,7 @@ export const addModelsLoadedListener = () => {
       const log = logger('models');
       log.info(
         { models: action.payload.entities },
-        `ControlNet models loaded (${action.payload.ids.length})`
+        `T2I Adapter models loaded (${action.payload.ids.length})`
       );
 
       selectAllT2IAdapters(getState().controlAdapters).forEach((ca) => {

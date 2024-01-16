@@ -242,17 +242,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         control_model: ControlNetModel = None,
     ):
         super().__init__(
-            vae,
-            text_encoder,
-            tokenizer,
-            unet,
-            scheduler,
-            safety_checker,
-            feature_extractor,
-            requires_safety_checker,
-        )
-
-        self.register_modules(
             vae=vae,
             text_encoder=text_encoder,
             tokenizer=tokenizer,
@@ -260,9 +249,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             scheduler=scheduler,
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
-            # FIXME: can't currently register control module
-            # control_model=control_model,
+            requires_safety_checker=requires_safety_checker,
         )
+
         self.invokeai_diffuser = InvokeAIDiffuserComponent(self.unet, self._unet_forward)
         self.control_model = control_model
         self.use_ip_adapter = False
@@ -287,7 +276,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             self.disable_attention_slicing()
             return
         elif config.attention_type == "torch-sdp":
-            raise Exception("torch-sdp attention slicing not yet implemented")
+            if hasattr(torch.nn.functional, "scaled_dot_product_attention"):
+                # diffusers enables sdp automatically
+                return
+            else:
+                raise Exception("torch-sdp attention slicing not available")
 
         # the remainder if this code is called when attention_type=='auto'
         if self.unet.device.type == "cuda":
@@ -295,7 +288,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 self.enable_xformers_memory_efficient_attention()
                 return
             elif hasattr(torch.nn.functional, "scaled_dot_product_attention"):
-                # diffusers enable sdp automatically
+                # diffusers enables sdp automatically
                 return
 
         if self.unet.device.type == "cpu" or self.unet.device.type == "mps":

@@ -1,26 +1,21 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { defaultSelectorOptions } from 'app/store/util/defaultMemoizeOptions';
-import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
+import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
 
 const selector = createSelector(
-  stateSelector,
-  (state) => {
-    const nodes = state.nodes.nodes;
-    const templates = state.nodes.nodeTemplates;
-
-    const needsUpdate = nodes.filter(isInvocationNode).some((node) => {
-      const template = templates[node.data.type];
+  selectNodesSlice,
+  selectNodeTemplatesSlice,
+  (nodes, nodeTemplates) =>
+    nodes.nodes.filter(isInvocationNode).some((node) => {
+      const template = nodeTemplates.templates[node.data.type];
       if (!template) {
         return false;
       }
       return getNeedsUpdate(node, template);
-    });
-    return needsUpdate;
-  },
-  defaultSelectorOptions
+    })
 );
 
 export const useGetNodesNeedUpdate = () => {

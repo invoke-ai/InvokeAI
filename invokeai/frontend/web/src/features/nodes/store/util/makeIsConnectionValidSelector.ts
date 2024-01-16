@@ -1,8 +1,9 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
-import { FieldType } from 'features/nodes/types/field';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import type { FieldType } from 'features/nodes/types/field';
 import i18n from 'i18next';
-import { HandleType } from 'reactflow';
+import type { HandleType } from 'reactflow';
+
 import { getIsGraphAcyclic } from './getIsGraphAcyclic';
 import { validateSourceAndTargetTypes } from './validateSourceAndTargetTypes';
 
@@ -17,13 +18,13 @@ export const makeConnectionErrorSelector = (
   handleType: HandleType,
   fieldType?: FieldType
 ) => {
-  return createSelector(stateSelector, (state): string | undefined => {
+  return createSelector(selectNodesSlice, (nodesSlice) => {
     if (!fieldType) {
       return i18n.t('nodes.noFieldType');
     }
 
     const { connectionStartFieldType, connectionStartParams, nodes, edges } =
-      state.nodes;
+      nodesSlice;
 
     if (!connectionStartParams || !connectionStartFieldType) {
       return i18n.t('nodes.noConnectionInProgress');

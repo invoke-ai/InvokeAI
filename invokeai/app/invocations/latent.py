@@ -64,7 +64,6 @@ from .baseinvocation import (
     OutputField,
     UIType,
     WithMetadata,
-    WithWorkflow,
     invocation,
     invocation_output,
 )
@@ -221,7 +220,7 @@ def get_scheduler(
     title="Denoise Latents",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.5.0",
+    version="1.5.1",
 )
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
@@ -280,7 +279,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         ui_order=7,
     )
     cfg_rescale_multiplier: float = InputField(
-        default=0, ge=0, lt=1, description=FieldDescriptions.cfg_rescale_multiplier
+        title="CFG Rescale Multiplier", default=0, ge=0, lt=1, description=FieldDescriptions.cfg_rescale_multiplier
     )
     latents: Optional[LatentsField] = InputField(
         default=None,
@@ -802,9 +801,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
     title="Latents to Image",
     tags=["latents", "image", "vae", "l2i"],
     category="latents",
-    version="1.1.0",
+    version="1.2.0",
 )
-class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
+class LatentsToImageInvocation(BaseInvocation, WithMetadata):
     """Generates an image from latents."""
 
     latents: LatentsField = InputField(
@@ -886,7 +885,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithWorkflow):
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
             metadata=self.metadata,
-            workflow=self.workflow,
+            workflow=context.workflow,
         )
 
         return ImageOutput(

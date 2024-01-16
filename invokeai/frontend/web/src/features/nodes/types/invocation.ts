@@ -1,6 +1,7 @@
-import { Edge, Node } from 'reactflow';
+import type { Edge, Node } from 'reactflow';
 import { z } from 'zod';
-import { zProgressImage } from './common';
+
+import { zClassification, zProgressImage } from './common';
 import {
   zFieldInputInstance,
   zFieldInputTemplate,
@@ -18,10 +19,10 @@ export const zInvocationTemplate = z.object({
   inputs: z.record(zFieldInputTemplate),
   outputs: z.record(zFieldOutputTemplate),
   outputType: z.string().min(1),
-  withWorkflow: z.boolean(),
   version: zSemVer,
   useCache: z.boolean(),
   nodePack: z.string().min(1).nullish(),
+  classification: zClassification,
 });
 export type InvocationTemplate = z.infer<typeof zInvocationTemplate>;
 // #endregion
@@ -33,7 +34,6 @@ export const zInvocationNodeData = z.object({
   label: z.string(),
   isOpen: z.boolean(),
   notes: z.string(),
-  embedWorkflow: z.boolean(),
   isIntermediate: z.boolean(),
   useCache: z.boolean(),
   version: zSemVer,

@@ -1,8 +1,9 @@
 import { Flex, forwardRef } from '@chakra-ui/react';
 import { memo } from 'react';
-import { Components } from 'react-virtuoso';
-import { SessionQueueItemDTO } from 'services/api/types';
-import { ListContext } from './types';
+import type { Components } from 'react-virtuoso';
+import type { SessionQueueItemDTO } from 'services/api/types';
+
+import type { ListContext } from './types';
 
 const QueueListComponent: Components<SessionQueueItemDTO, ListContext>['List'] =
   memo(

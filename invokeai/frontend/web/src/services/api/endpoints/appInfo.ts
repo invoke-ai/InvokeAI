@@ -1,6 +1,7 @@
+import type { paths } from 'services/api/schema';
+import type { AppConfig, AppVersion } from 'services/api/types';
+
 import { api } from '..';
-import { paths } from 'services/api/schema';
-import { AppConfig, AppVersion } from 'services/api/types';
 
 export const appInfoApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -28,7 +29,7 @@ export const appInfoApi = api.injectEndpoints({
         url: `app/invocation_cache/status`,
         method: 'GET',
       }),
-      providesTags: ['InvocationCacheStatus'],
+      providesTags: ['InvocationCacheStatus', 'FetchOnReconnect'],
     }),
     clearInvocationCache: build.mutation<void, void>({
       query: () => ({

@@ -1,4 +1,4 @@
-import { BaseModelType } from './types';
+import type { BaseModelType } from './types';
 
 export const ALL_BASE_MODELS: BaseModelType[] = [
   'sd-1',

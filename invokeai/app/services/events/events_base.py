@@ -1,6 +1,7 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Any, Optional
+
+from typing import Any, Dict, List, Optional, Union
 
 from invokeai.app.services.invocation_processor.invocation_processor_common import ProgressImage
 from invokeai.app.services.session_queue.session_queue_common import (
@@ -16,6 +17,8 @@ from invokeai.backend.model_management.models.base import BaseModelType, ModelTy
 
 class EventServiceBase:
     queue_event: str = "queue_event"
+    download_event: str = "download_event"
+    model_event: str = "model_event"
 
     """Basic event bus, to have an empty stand-in when not needed"""
 
@@ -27,6 +30,20 @@ class EventServiceBase:
         payload["timestamp"] = get_timestamp()
         self.dispatch(
             event_name=EventServiceBase.queue_event,
+            payload={"event": event_name, "data": payload},
+        )
+
+    def __emit_download_event(self, event_name: str, payload: dict) -> None:
+        payload["timestamp"] = get_timestamp()
+        self.dispatch(
+            event_name=EventServiceBase.download_event,
+            payload={"event": event_name, "data": payload},
+        )
+
+    def __emit_model_event(self, event_name: str, payload: dict) -> None:
+        payload["timestamp"] = get_timestamp()
+        self.dispatch(
+            event_name=EventServiceBase.model_event,
             payload={"event": event_name, "data": payload},
         )
 
@@ -312,4 +329,167 @@ class EventServiceBase:
         self.__emit_queue_event(
             event_name="queue_cleared",
             payload={"queue_id": queue_id},
+        )
+
+    def emit_download_started(self, source: str, download_path: str) -> None:
+        """
+        Emit when a download job is started.
+
+        :param url: The downloaded url
+        """
+        self.__emit_download_event(
+            event_name="download_started",
+            payload={"source": source, "download_path": download_path},
+        )
+
+    def emit_download_progress(self, source: str, download_path: str, current_bytes: int, total_bytes: int) -> None:
+        """
+        Emit "download_progress" events at regular intervals during a download job.
+
+        :param source: The downloaded source
+        :param download_path: The local downloaded file
+        :param current_bytes: Number of bytes downloaded so far
+        :param total_bytes: The size of the file being downloaded (if known)
+        """
+        self.__emit_download_event(
+            event_name="download_progress",
+            payload={
+                "source": source,
+                "download_path": download_path,
+                "current_bytes": current_bytes,
+                "total_bytes": total_bytes,
+            },
+        )
+
+    def emit_download_complete(self, source: str, download_path: str, total_bytes: int) -> None:
+        """
+        Emit a "download_complete" event at the end of a successful download.
+
+        :param source: Source URL
+        :param download_path: Path to the locally downloaded file
+        :param total_bytes: The size of the downloaded file
+        """
+        self.__emit_download_event(
+            event_name="download_complete",
+            payload={
+                "source": source,
+                "download_path": download_path,
+                "total_bytes": total_bytes,
+            },
+        )
+
+    def emit_download_cancelled(self, source: str) -> None:
+        """Emit a "download_cancelled" event in the event that the download was cancelled by user."""
+        self.__emit_download_event(
+            event_name="download_cancelled",
+            payload={
+                "source": source,
+            },
+        )
+
+    def emit_download_error(self, source: str, error_type: str, error: str) -> None:
+        """
+        Emit a "download_error" event when an download job encounters an exception.
+
+        :param source: Source URL
+        :param error_type: The name of the exception that raised the error
+        :param error: The traceback from this error
+        """
+        self.__emit_download_event(
+            event_name="download_error",
+            payload={
+                "source": source,
+                "error_type": error_type,
+                "error": error,
+            },
+        )
+
+    def emit_model_install_downloading(
+        self,
+        source: str,
+        local_path: str,
+        bytes: int,
+        total_bytes: int,
+        parts: List[Dict[str, Union[str, int]]],
+    ) -> None:
+        """
+        Emit at intervals while the install job is in progress (remote models only).
+
+        :param source: Source of the model
+        :param local_path: Where model is downloading to
+        :param parts: Progress of downloading URLs that comprise the model, if any.
+        :param bytes: Number of bytes downloaded so far.
+        :param total_bytes: Total size of download, including all files.
+        This emits a Dict with keys "source", "local_path", "bytes" and "total_bytes".
+        """
+        self.__emit_model_event(
+            event_name="model_install_downloading",
+            payload={
+                "source": source,
+                "local_path": local_path,
+                "bytes": bytes,
+                "total_bytes": total_bytes,
+                "parts": parts,
+            },
+        )
+
+    def emit_model_install_running(self, source: str) -> None:
+        """
+        Emit once when an install job becomes active.
+
+        :param source: Source of the model; local path, repo_id or url
+        """
+        self.__emit_model_event(
+            event_name="model_install_running",
+            payload={"source": source},
+        )
+
+    def emit_model_install_completed(self, source: str, key: str, total_bytes: Optional[int] = None) -> None:
+        """
+        Emit when an install job is completed successfully.
+
+        :param source: Source of the model; local path, repo_id or url
+        :param key: Model config record key
+        :param total_bytes: Size of the model (may be None for installation of a local path)
+        """
+        self.__emit_model_event(
+            event_name="model_install_completed",
+            payload={
+                "source": source,
+                "total_bytes": total_bytes,
+                "key": key,
+            },
+        )
+
+    def emit_model_install_cancelled(self, source: str) -> None:
+        """
+        Emit when an install job is cancelled.
+
+        :param source: Source of the model; local path, repo_id or url
+        """
+        self.__emit_model_event(
+            event_name="model_install_cancelled",
+            payload={"source": source},
+        )
+
+    def emit_model_install_error(
+        self,
+        source: str,
+        error_type: str,
+        error: str,
+    ) -> None:
+        """
+        Emit when an install job encounters an exception.
+
+        :param source: Source of the model
+        :param error_type: The name of the exception
+        :param error: A text description of the exception
+        """
+        self.__emit_model_event(
+            event_name="model_install_error",
+            payload={
+                "source": source,
+                "error_type": error_type,
+                "error": error,
+            },
         )

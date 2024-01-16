@@ -1,26 +1,31 @@
-import { Box, Flex, Text } from '@chakra-ui/react';
-import { RootState } from 'app/store/store';
+import { Box, Flex } from '@chakra-ui/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIIconButton from 'common/components/IAIIconButton';
-import IAIMantineSelect from 'common/components/IAIMantineSelect';
-import { motion } from 'framer-motion';
-import { useCallback, useEffect, useState, useMemo } from 'react';
-import { FaTimes } from 'react-icons/fa';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { InvSelect } from 'common/components/InvSelect/InvSelect';
+import type {
+  InvSelectOnChange,
+  InvSelectOption,
+} from 'common/components/InvSelect/types';
+import { InvText } from 'common/components/InvText/wrapper';
 import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { FaTimes } from 'react-icons/fa';
+
 import AdvancedAddCheckpoint from './AdvancedAddCheckpoint';
 import AdvancedAddDiffusers from './AdvancedAddDiffusers';
-import { ManualAddMode } from './AdvancedAddModels';
-import { useTranslation } from 'react-i18next';
-import { SelectItem } from '@mantine/core';
+import type { ManualAddMode } from './AdvancedAddModels';
+import { isManualAddMode } from './AdvancedAddModels';
 
-export default function ScanAdvancedAddModels() {
+const ScanAdvancedAddModels = () => {
   const advancedAddScanModel = useAppSelector(
-    (state: RootState) => state.modelmanager.advancedAddScanModel
+    (s) => s.modelmanager.advancedAddScanModel
   );
 
   const { t } = useTranslation();
 
-  const advancedAddModeData: SelectItem[] = useMemo(
+  const options: InvSelectOption[] = useMemo(
     () => [
       { label: t('modelManager.diffusersModels'), value: 'diffusers' },
       { label: t('modelManager.checkpointOrSafetensors'), value: 'checkpoint' },
@@ -49,17 +54,22 @@ export default function ScanAdvancedAddModels() {
     [dispatch]
   );
 
-  const handleChangeAddMode = useCallback((v: string | null) => {
-    if (!v) {
+  const handleChangeAddMode = useCallback<InvSelectOnChange>((v) => {
+    if (!isManualAddMode(v?.value)) {
       return;
     }
-    setAdvancedAddMode(v as ManualAddMode);
-    if (v === 'checkpoint') {
+    setAdvancedAddMode(v.value);
+    if (v.value === 'checkpoint') {
       setIsCheckpoint(true);
     } else {
       setIsCheckpoint(false);
     }
   }, []);
+
+  const value = useMemo(
+    () => options.find((o) => o.value === advancedAddMode),
+    [options, advancedAddMode]
+  );
 
   if (!advancedAddScanModel) {
     return null;
@@ -67,43 +77,36 @@ export default function ScanAdvancedAddModels() {
 
   return (
     <Box
-      as={motion.div}
-      initial={{ x: -100, opacity: 0 }}
-      animate={{ x: 0, opacity: 1, transition: { duration: 0.2 } }}
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        minWidth: '40%',
-        maxHeight: window.innerHeight - 300,
-        overflow: 'scroll',
-        p: 4,
-        gap: 4,
-        borderRadius: 4,
-        bg: 'base.200',
-        _dark: {
-          bg: 'base.800',
-        },
-      }}
+      display="flex"
+      flexDirection="column"
+      minWidth="40%"
+      maxHeight="calc(100vh - 300px)"
+      overflow="scroll"
+      p={4}
+      gap={4}
+      borderRadius={4}
+      bg="base.800"
     >
       <Flex justifyContent="space-between" alignItems="center">
-        <Text size="xl" fontWeight={600}>
+        <InvText size="xl" fontWeight="semibold">
           {isCheckpoint || advancedAddMode === 'checkpoint'
             ? 'Add Checkpoint Model'
             : 'Add Diffusers Model'}
-        </Text>
-        <IAIIconButton
+        </InvText>
+        <InvIconButton
           icon={<FaTimes />}
           aria-label={t('modelManager.closeAdvanced')}
           onClick={handleClickSetAdvanced}
           size="sm"
         />
       </Flex>
-      <IAIMantineSelect
-        label={t('modelManager.modelType')}
-        value={advancedAddMode}
-        data={advancedAddModeData}
-        onChange={handleChangeAddMode}
-      />
+      <InvControl label={t('modelManager.modelType')}>
+        <InvSelect
+          value={value}
+          options={options}
+          onChange={handleChangeAddMode}
+        />
+      </InvControl>
       {isCheckpoint ? (
         <AdvancedAddCheckpoint
           key={advancedAddScanModel}
@@ -117,4 +120,6 @@ export default function ScanAdvancedAddModels() {
       )}
     </Box>
   );
-}
+};
+
+export default memo(ScanAdvancedAddModels);

@@ -1,17 +1,18 @@
-import { PayloadAction, createSlice } from '@reduxjs/toolkit';
-import {
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
+import type {
   ParameterNegativeStylePromptSDXL,
   ParameterPositiveStylePromptSDXL,
-  ParameterSDXLRefinerModel,
   ParameterScheduler,
+  ParameterSDXLRefinerModel,
 } from 'features/parameters/types/parameterSchemas';
 
 type SDXLState = {
+  _version: 1;
   positiveStylePrompt: ParameterPositiveStylePromptSDXL;
   negativeStylePrompt: ParameterNegativeStylePromptSDXL;
   shouldConcatSDXLStylePrompt: boolean;
-  shouldUseSDXLRefiner: boolean;
-  sdxlImg2ImgDenoisingStrength: number;
   refinerModel: ParameterSDXLRefinerModel | null;
   refinerSteps: number;
   refinerCFGScale: number;
@@ -22,11 +23,10 @@ type SDXLState = {
 };
 
 export const initialSDXLState: SDXLState = {
+  _version: 1,
   positiveStylePrompt: '',
   negativeStylePrompt: '',
   shouldConcatSDXLStylePrompt: true,
-  shouldUseSDXLRefiner: false,
-  sdxlImg2ImgDenoisingStrength: 0.7,
   refinerModel: null,
   refinerSteps: 20,
   refinerCFGScale: 7.5,
@@ -48,12 +48,6 @@ const sdxlSlice = createSlice({
     },
     setShouldConcatSDXLStylePrompt: (state, action: PayloadAction<boolean>) => {
       state.shouldConcatSDXLStylePrompt = action.payload;
-    },
-    setShouldUseSDXLRefiner: (state, action: PayloadAction<boolean>) => {
-      state.shouldUseSDXLRefiner = action.payload;
-    },
-    setSDXLImg2ImgDenoisingStrength: (state, action: PayloadAction<number>) => {
-      state.sdxlImg2ImgDenoisingStrength = action.payload;
     },
     refinerModelChanged: (
       state,
@@ -92,8 +86,6 @@ export const {
   setPositiveStylePromptSDXL,
   setNegativeStylePromptSDXL,
   setShouldConcatSDXLStylePrompt,
-  setShouldUseSDXLRefiner,
-  setSDXLImg2ImgDenoisingStrength,
   refinerModelChanged,
   setRefinerSteps,
   setRefinerCFGScale,
@@ -104,3 +96,13 @@ export const {
 } = sdxlSlice.actions;
 
 export default sdxlSlice.reducer;
+
+export const selectSdxlSlice = (state: RootState) => state.sdxl;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+export const migrateSDXLState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};

@@ -1,11 +1,32 @@
 #!/usr/bin/env bash
-set -e
+set -e -o pipefail
 
-# This script is provided for backwards compatibility with the old docker setup.
-# it doesn't do much aside from wrapping the usual docker compose CLI.
+run() {
+  local scriptdir=$(dirname "${BASH_SOURCE[0]}")
+  cd "$scriptdir" || exit 1
 
-SCRIPTDIR=$(dirname "${BASH_SOURCE[0]}")
-cd "$SCRIPTDIR" || exit 1
+  local build_args=""
+  local profile=""
 
-docker compose up -d
-docker compose logs -f
+  touch .env
+  build_args=$(awk '$1 ~ /=[^$]/ && $0 !~ /^#/ {print "--build-arg " $0 " "}' .env) &&
+  profile="$(awk -F '=' '/GPU_DRIVER/ {print $2}' .env)"
+
+  [[ -z "$profile" ]] && profile="nvidia"
+
+  local service_name="invokeai-$profile"
+
+  if [[ ! -z "$build_args" ]]; then
+    printf "%s\n" "docker compose build args:"
+    printf "%s\n" "$build_args"
+  fi
+
+  docker compose build $build_args
+  unset build_args
+
+  printf "%s\n" "starting service $service_name"
+  docker compose --profile "$profile" up -d "$service_name"
+  docker compose logs -f
+}
+
+run

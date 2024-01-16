@@ -1,21 +1,24 @@
-import { Flex, Text } from '@chakra-ui/react';
-
-import { useState } from 'react';
-import {
-  MainModelConfigEntity,
+import { Flex } from '@chakra-ui/react';
+import { InvText } from 'common/components/InvText/wrapper';
+import { memo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ALL_BASE_MODELS } from 'services/api/constants';
+import type {
   DiffusersModelConfigEntity,
   LoRAModelConfigEntity,
-  useGetMainModelsQuery,
-  useGetLoRAModelsQuery,
+  MainModelConfigEntity,
 } from 'services/api/endpoints/models';
+import {
+  useGetLoRAModelsQuery,
+  useGetMainModelsQuery,
+} from 'services/api/endpoints/models';
+
 import CheckpointModelEdit from './ModelManagerPanel/CheckpointModelEdit';
 import DiffusersModelEdit from './ModelManagerPanel/DiffusersModelEdit';
 import LoRAModelEdit from './ModelManagerPanel/LoRAModelEdit';
 import ModelList from './ModelManagerPanel/ModelList';
-import { ALL_BASE_MODELS } from 'services/api/constants';
-import { useTranslation } from 'react-i18next';
 
-export default function ModelManagerPanel() {
+const ModelManagerPanel = () => {
   const [selectedModelId, setSelectedModelId] = useState<string>();
   const { mainModel } = useGetMainModelsQuery(ALL_BASE_MODELS, {
     selectFromResult: ({ data }) => ({
@@ -31,7 +34,7 @@ export default function ModelManagerPanel() {
   const model = mainModel ? mainModel : loraModel;
 
   return (
-    <Flex sx={{ gap: 8, w: 'full', h: 'full' }}>
+    <Flex gap={8} w="full" h="full">
       <ModelList
         selectedModelId={selectedModelId}
         setSelectedModelId={setSelectedModelId}
@@ -39,7 +42,7 @@ export default function ModelManagerPanel() {
       <ModelEdit model={model} />
     </Flex>
   );
-}
+};
 
 type ModelEditProps = {
   model: MainModelConfigEntity | LoRAModelConfigEntity | undefined;
@@ -68,16 +71,16 @@ const ModelEdit = (props: ModelEditProps) => {
 
   return (
     <Flex
-      sx={{
-        w: 'full',
-        h: 'full',
-        justifyContent: 'center',
-        alignItems: 'center',
-        maxH: 96,
-        userSelect: 'none',
-      }}
+      w="full"
+      h="full"
+      justifyContent="center"
+      alignItems="center"
+      maxH={96}
+      userSelect="none"
     >
-      <Text variant="subtext">{t('modelManager.noModelSelected')}</Text>
+      <InvText variant="subtext">{t('modelManager.noModelSelected')}</InvText>
     </Flex>
   );
 };
+
+export default memo(ModelManagerPanel);

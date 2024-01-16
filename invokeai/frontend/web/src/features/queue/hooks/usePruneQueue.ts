@@ -1,4 +1,8 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import {
+  listCursorChanged,
+  listPriorityChanged,
+} from 'features/queue/store/queueSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -6,15 +10,11 @@ import {
   useGetQueueStatusQuery,
   usePruneQueueMutation,
 } from 'services/api/endpoints/queue';
-import {
-  listCursorChanged,
-  listPriorityChanged,
-} from 'features/queue/store/queueSlice';
 
 export const usePruneQueue = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const isConnected = useAppSelector((state) => state.system.isConnected);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
   const [trigger, { isLoading }] = usePruneQueueMutation({
     fixedCacheKey: 'pruneQueue',
   });

@@ -1,10 +1,13 @@
-import IAISlider from 'common/components/IAISlider';
-import IAISwitch from 'common/components/IAISwitch';
-import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
-import { RequiredLineartImageProcessorInvocation } from 'features/controlAdapters/store/types';
-import { ChangeEvent, memo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
+import { InvControl } from 'common/components/InvControl/InvControl';
+import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
+import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import type { RequiredLineartImageProcessorInvocation } from 'features/controlAdapters/store/types';
+import type { ChangeEvent } from 'react';
+import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import ProcessorWrapper from './common/ProcessorWrapper';
 
 const DEFAULTS = CONTROLNET_PROCESSORS.lineart_image_processor
@@ -36,18 +39,6 @@ const LineartProcessor = (props: LineartProcessorProps) => {
     [controlNetId, processorChanged]
   );
 
-  const handleDetectResolutionReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      detect_resolution: DEFAULTS.detect_resolution,
-    });
-  }, [controlNetId, processorChanged]);
-
-  const handleImageResolutionReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      image_resolution: DEFAULTS.image_resolution,
-    });
-  }, [controlNetId, processorChanged]);
-
   const handleCoarseChanged = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       processorChanged(controlNetId, { coarse: e.target.checked });
@@ -57,36 +48,37 @@ const LineartProcessor = (props: LineartProcessorProps) => {
 
   return (
     <ProcessorWrapper>
-      <IAISlider
+      <InvControl
         label={t('controlnet.detectResolution')}
-        value={detect_resolution}
-        onChange={handleDetectResolutionChanged}
-        handleReset={handleDetectResolutionReset}
-        withReset
-        min={0}
-        max={4096}
-        withInput
-        withSliderMarks
         isDisabled={!isEnabled}
-      />
-      <IAISlider
+      >
+        <InvSlider
+          value={detect_resolution}
+          onChange={handleDetectResolutionChanged}
+          defaultValue={DEFAULTS.detect_resolution}
+          min={0}
+          max={4096}
+          marks
+          withNumberInput
+        />
+      </InvControl>
+      <InvControl
         label={t('controlnet.imageResolution')}
-        value={image_resolution}
-        onChange={handleImageResolutionChanged}
-        handleReset={handleImageResolutionReset}
-        withReset
-        min={0}
-        max={4096}
-        withInput
-        withSliderMarks
         isDisabled={!isEnabled}
-      />
-      <IAISwitch
-        label={t('controlnet.coarse')}
-        isChecked={coarse}
-        onChange={handleCoarseChanged}
-        isDisabled={!isEnabled}
-      />
+      >
+        <InvSlider
+          value={image_resolution}
+          onChange={handleImageResolutionChanged}
+          defaultValue={DEFAULTS.image_resolution}
+          min={0}
+          max={4096}
+          marks
+          withNumberInput
+        />
+      </InvControl>
+      <InvControl label={t('controlnet.coarse')} isDisabled={!isEnabled}>
+        <InvSwitch isChecked={coarse} onChange={handleCoarseChanged} />
+      </InvControl>
     </ProcessorWrapper>
   );
 };

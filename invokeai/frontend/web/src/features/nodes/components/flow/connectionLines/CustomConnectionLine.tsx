@@ -1,30 +1,26 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
-import { memo } from 'react';
-import { ConnectionLineComponentProps, getBezierPath } from 'reactflow';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import type { CSSProperties } from 'react';
+import { memo } from 'react';
+import type { ConnectionLineComponentProps } from 'reactflow';
+import { getBezierPath } from 'reactflow';
 
-const selector = createSelector(stateSelector, ({ nodes }) => {
-  const { shouldAnimateEdges, connectionStartFieldType, shouldColorEdges } =
-    nodes;
+const selectStroke = createSelector(selectNodesSlice, (nodes) =>
+  nodes.shouldColorEdges
+    ? getFieldColor(nodes.connectionStartFieldType)
+    : colorTokenToCssVar('base.500')
+);
 
-  const stroke = shouldColorEdges
-    ? getFieldColor(connectionStartFieldType)
-    : colorTokenToCssVar('base.500');
+const selectClassName = createSelector(selectNodesSlice, (nodes) =>
+  nodes.shouldAnimateEdges
+    ? 'react-flow__custom_connection-path animated'
+    : 'react-flow__custom_connection-path'
+);
 
-  let className = 'react-flow__custom_connection-path';
-
-  if (shouldAnimateEdges) {
-    className = className.concat(' animated');
-  }
-
-  return {
-    stroke,
-    className,
-  };
-});
+const pathStyles: CSSProperties = { opacity: 0.8 };
 
 const CustomConnectionLine = ({
   fromX,
@@ -34,7 +30,8 @@ const CustomConnectionLine = ({
   toY,
   toPosition,
 }: ConnectionLineComponentProps) => {
-  const { stroke, className } = useAppSelector(selector);
+  const stroke = useAppSelector(selectStroke);
+  const className = useAppSelector(selectClassName);
 
   const pathParams = {
     sourceX: fromX,
@@ -55,7 +52,7 @@ const CustomConnectionLine = ({
         strokeWidth={2}
         className={className}
         d={dAttr}
-        style={{ opacity: 0.8 }}
+        style={pathStyles}
       />
     </g>
   );
