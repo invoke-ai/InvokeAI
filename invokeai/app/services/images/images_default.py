@@ -43,6 +43,7 @@ class ImageService(ImageServiceABC):
         is_intermediate: Optional[bool] = False,
         metadata: Optional[MetadataField] = None,
         workflow: Optional[WorkflowField] = None,
+        **kwargs
     ) -> ImageDTO:
         if image_origin not in ResourceOrigin:
             raise InvalidOriginException
@@ -75,6 +76,7 @@ class ImageService(ImageServiceABC):
                 node_id=node_id,
                 metadata=metadata,
                 session_id=session_id,
+                **kwargs
             )
             if board_id is not None:
                 self.__invoker.services.board_image_records.add_image_to_board(board_id=board_id, image_name=image_name)

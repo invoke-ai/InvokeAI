@@ -52,6 +52,7 @@ class ImageServiceABC(ABC):
         is_intermediate: Optional[bool] = False,
         metadata: Optional[MetadataField] = None,
         workflow: Optional[WorkflowField] = None,
+        **kwargs
     ) -> ImageDTO:
         """Creates an image, storing the file and its metadata."""
         pass
