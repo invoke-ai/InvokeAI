@@ -225,7 +225,9 @@ try:
     app.mount("/", NoCacheStaticFiles(directory=Path(web_root_path, "dist"), html=True), name="ui")
 except RuntimeError:
     logger.warn(f"No UI found at {web_root_path}/dist, skipping UI mount")
-app.mount("/static", NoCacheStaticFiles(directory=Path(web_root_path, "static/")), name="static")  # docs favicon is in here
+app.mount(
+    "/static", NoCacheStaticFiles(directory=Path(web_root_path, "static/")), name="static"
+)  # docs favicon is in here
 
 
 def invoke_api() -> None:
