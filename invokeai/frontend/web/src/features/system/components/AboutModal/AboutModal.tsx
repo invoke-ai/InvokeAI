@@ -56,7 +56,7 @@ const AboutModal = ({ children }: AboutModalProps) => {
       })}
       <InvModal isOpen={isOpen} onClose={onClose} isCentered size="2xl">
         <InvModalOverlay />
-        <InvModalContent maxH="80vh" h="80vh">
+        <InvModalContent maxH="80vh" h="50vh">
           <InvModalHeader>{t('accessibility.about')}</InvModalHeader>
           <InvModalCloseButton />
           <InvModalBody display="flex" flexDir="column" gap={4}>
@@ -78,24 +78,29 @@ const AboutModal = ({ children }: AboutModalProps) => {
                     {t('common.localSystem')}
                   </InvHeading>
                   {deps.map(({ name, version }, i) => (
-                    <Flex
+                    <Grid
                       key={i}
-                      flexDir="row"
-                      w="full"
                       py="3"
                       px="1"
-                      alignItems="center"
-                      gap="12"
-                      justifyContent="space-between"
+                      w="full"
+                      templateColumns="repeat(2, 1fr)"
                     >
                       <InvText>{name}</InvText>
-                      <InvText>{version ? version : 'Not Installed'}</InvText>
-                    </Flex>
+                      <InvText>
+                        {version ? version : t('common.notInstalled')}
+                      </InvText>
+                    </Grid>
                   ))}
                 </ScrollableContent>
               </GridItem>
               <GridItem>
-                <Flex flexDir="column" gap={3} mt="5rem" alignItems="center">
+                <Flex
+                  flexDir="column"
+                  gap={3}
+                  justifyContent="center"
+                  alignItems="center"
+                  h="full"
+                >
                   <Image src={InvokeLogoYellow} alt="invoke-logo" w="120px" />
                   {appVersion && <InvText>{`v${appVersion?.version}`}</InvText>}
                   <Grid templateColumns="repeat(2, 1fr)" gap="3">
