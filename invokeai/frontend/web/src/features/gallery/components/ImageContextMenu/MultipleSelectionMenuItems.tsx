@@ -8,7 +8,6 @@ import {
   isModalOpenChanged,
 } from 'features/changeBoardModal/store/slice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
-import { bulkDownloadRequested } from 'features/gallery/store/actions';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { addToast } from 'features/system/store/systemSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -61,8 +60,6 @@ const MultipleSelectionMenuItems = () => {
       const response = await bulkDownload({
         image_names: selection.map((img) => img.image_name),
       }).unwrap();
-
-      dispatch(bulkDownloadRequested({ type: 'images' }));
 
       dispatch(
         addToast({
