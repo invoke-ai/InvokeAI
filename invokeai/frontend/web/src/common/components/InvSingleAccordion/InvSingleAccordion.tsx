@@ -1,14 +1,14 @@
+import { useAppDispatch } from 'app/store/storeHooks';
 import { InvAccordionButton } from 'common/components/InvAccordion/InvAccordionButton';
 import {
   InvAccordion,
   InvAccordionItem,
   InvAccordionPanel,
 } from 'common/components/InvAccordion/wrapper';
+import { singleAccordionExpanded } from 'features/parameters/store/actions';
 import { memo, useCallback } from 'react';
 
 import type { InvSingleAccordionProps } from './types';
-import { singleAccordionExpanded } from '../../../features/parameters/store/actions';
-import { useAppDispatch } from '../../../app/store/storeHooks';
 
 export const InvSingleAccordion = memo((props: InvSingleAccordionProps) => {
   const dispatch = useAppDispatch();
@@ -18,7 +18,7 @@ export const InvSingleAccordion = memo((props: InvSingleAccordionProps) => {
         dispatch(singleAccordionExpanded({ id: props.id, isOpen }));
       }
     },
-    [props]
+    [props, dispatch]
   );
 
   return (

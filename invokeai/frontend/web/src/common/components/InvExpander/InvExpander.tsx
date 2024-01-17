@@ -1,13 +1,13 @@
 import { Divider, Flex } from '@chakra-ui/layout';
 import type { SystemStyleObject } from '@chakra-ui/react';
 import { Collapse, Icon, useDisclosure } from '@chakra-ui/react';
+import { useAppDispatch } from 'app/store/storeHooks';
 import type { InvExpanderProps } from 'common/components/InvExpander/types';
 import { InvText } from 'common/components/InvText/wrapper';
+import { expanderToggled } from 'features/parameters/store/actions';
 import { t } from 'i18next';
 import { useCallback } from 'react';
 import { BiCollapseVertical, BiExpandVertical } from 'react-icons/bi';
-import { useAppDispatch } from '../../../app/store/storeHooks';
-import { expanderToggled } from '../../../features/parameters/store/actions';
 
 const buttonStyles: SystemStyleObject = {
   color: 'base.400',
