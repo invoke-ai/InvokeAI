@@ -53,7 +53,11 @@ export const AdvancedSettingsAccordion = memo(() => {
   const { t } = useTranslation();
 
   return (
-    <InvSingleAccordion label={t('accordions.advanced.title')} badges={badges}>
+    <InvSingleAccordion
+      label={t('accordions.advanced.title')}
+      badges={badges}
+      id="advanced-settings"
+    >
       <Flex gap={4} alignItems="center" p={4} flexDir="column">
         <Flex gap={4} w="full">
           <ParamVAEModelSelect />

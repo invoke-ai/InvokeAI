@@ -67,7 +67,7 @@ export const GenerationSettingsAccordion = memo(() => {
               <ParamMainModelSelect />
               <SyncModelsIconButton />
             </Flex>
-            <InvExpander>
+            <InvExpander id="generation-settings">
               <Flex gap={4} flexDir="column" pb={4}>
                 <InvControlGroup labelProps={labelProps}>
                   <ParamScheduler />
