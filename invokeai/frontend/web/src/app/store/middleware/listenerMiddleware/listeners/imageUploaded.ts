@@ -5,7 +5,6 @@ import {
   controlAdapterImageChanged,
   controlAdapterIsEnabledChanged,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { imageUploaded } from 'features/gallery/store/actions';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import {
   initialImageChanged,
@@ -40,8 +39,6 @@ export const addImageUploadedFulfilledListener = () => {
       ) {
         return;
       }
-
-      dispatch(imageUploaded({ postUploadAction: postUploadAction?.type }));
 
       const DEFAULT_UPLOADED_TOAST: UseToastOptions = {
         title: t('toast.imageUploaded'),

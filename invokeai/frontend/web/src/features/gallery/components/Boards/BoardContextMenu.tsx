@@ -5,7 +5,6 @@ import { InvContextMenu } from 'common/components/InvContextMenu/InvContextMenu'
 import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
 import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
 import { InvMenuGroup } from 'common/components/InvMenu/wrapper';
-import { bulkDownloadRequested } from 'features/gallery/store/actions';
 import {
   autoAddBoardIdChanged,
   selectGallerySlice,
@@ -66,8 +65,6 @@ const BoardContextMenu = ({
         image_names: [],
         board_id: board_id,
       }).unwrap();
-
-      dispatch(bulkDownloadRequested({ type: 'board' }));
 
       dispatch(
         addToast({
