@@ -9,13 +9,10 @@ export const modelSelected = createAction<MainModelField>(
   'generation/modelSelected'
 );
 
-export const imageAdvancedOptionsExpanded = createAction(
-  'parameters/imageAdvancedOptionsExpanded'
+export const expanderToggled = createAction<{ id: string, isOpen: boolean }>(
+  'parameters/expanderToggled'
 );
-export const generationAdvancedOptionsExpanded = createAction(
-  'parameters/generationAdvancedOptionsExpanded'
+export const singleAccordionExpanded = createAction<{ id: string, isOpen: boolean }>(
+  'parameters/singleAccordionExpanded'
 );
 
-export const advancedPanelExpanded = createAction(
-  'parameters/advancedPanelExpanded'
-);

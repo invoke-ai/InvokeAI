@@ -7,11 +7,16 @@ import {
 import { memo, useCallback } from 'react';
 
 import type { InvSingleAccordionProps } from './types';
+import { singleAccordionExpanded } from '../../../features/parameters/store/actions';
+import { useAppDispatch } from '../../../app/store/storeHooks';
 
 export const InvSingleAccordion = memo((props: InvSingleAccordionProps) => {
+  const dispatch = useAppDispatch();
   const handleAccordionClick = useCallback(
-    (isExpanded: boolean) => {
-      props.onClick && props.onClick(isExpanded);
+    (isOpen: boolean) => {
+      if (props.id) {
+        dispatch(singleAccordionExpanded({ id: props.id, isOpen }));
+      }
     },
     [props]
   );
