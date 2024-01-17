@@ -53,11 +53,8 @@ async def upload_images(
 ) -> List[ImageDTO]:
     """Uploads multiple images"""
     upload_data_list = []
-
-    print("-------------images.py-------------------")
-    print(is_intermediate)
-    print(image_category)
-    print("-----------------------------------------")
+    # frontend emit event for upload started
+    ApiDependencies.invoker.services.events.emit_upload_started("Upload job started from the WebSockets API")
 
     # my added loop to handle multiple files
     for file in files:
@@ -149,10 +146,6 @@ async def upload_image(
     crop_visible: Optional[bool] = Query(default=False, description="Whether to crop the image"),
 ) -> ImageDTO:
     """Uploads an image"""
-    print("-------------images.py-------------------")
-    print("/upload route for single file upload")
-    print("-----------------------------------------")
-    print(file.filename, file.content_type)
     if not file.content_type or not file.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
 

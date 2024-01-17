@@ -10,6 +10,7 @@ import type {
   ModelLoadStartedEvent,
   QueueItemStatusChangedEvent,
   SessionRetrievalErrorEvent,
+  UploadStartedEvent
 } from 'services/events/types';
 
 // Create actions for each socket
@@ -66,3 +67,7 @@ export const socketInvocationRetrievalError = createAction<{
 export const socketQueueItemStatusChanged = createAction<{
   data: QueueItemStatusChangedEvent;
 }>('socket/socketQueueItemStatusChanged');
+
+export const socketUploadStarted = createAction<{
+    data: UploadStartedEvent;
+}>('socket/socketUploadStarted');

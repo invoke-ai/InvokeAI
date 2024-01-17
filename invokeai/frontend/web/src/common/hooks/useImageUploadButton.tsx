@@ -42,16 +42,15 @@ export const useImageUploadButton = ({
         return;
       }
 
-      //   uploadImage({
-      //     file,
-      //     image_category: 'user',
-      //     is_intermediate: false,
-      //     postUploadAction: postUploadAction ?? { type: 'TOAST' },
-      //     board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-      //   });
+        uploadImage({
+          file,
+          image_category: 'user',
+          is_intermediate: false,
+          postUploadAction: postUploadAction ?? { type: 'TOAST' },
+          board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+        });
     },
-    []
-    // [autoAddBoardId, postUploadAction, uploadImage]
+    [autoAddBoardId, postUploadAction, uploadImage]
   );
 
   const {

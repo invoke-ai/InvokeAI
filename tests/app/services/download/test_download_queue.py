@@ -5,11 +5,10 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import pytest
-import requests
 from pydantic import BaseModel
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
-from requests_testadapter import TestAdapter
+from requests_testadapter import TestAdapter, TestSession
 
 from invokeai.app.services.download import DownloadJob, DownloadJobStatus, DownloadQueueService
 from invokeai.app.services.events.events_base import EventServiceBase
@@ -19,8 +18,8 @@ TestAdapter.__test__ = False
 
 
 @pytest.fixture
-def session() -> requests.sessions.Session:
-    sess = requests.Session()
+def session() -> Session:
+    sess = TestSession()
     for i in ["12345", "9999", "54321"]:
         content = (
             b"I am a safetensors file " + bytearray(i, "utf-8") + bytearray(32_000)
@@ -160,7 +159,7 @@ def test_event_bus(tmp_path: Path, session: Session) -> None:
     queue.stop()
 
 
-def test_broken_callbacks(tmp_path: Path, session: requests.sessions.Session, capsys) -> None:
+def test_broken_callbacks(tmp_path: Path, session: Session, capsys) -> None:
     queue = DownloadQueueService(
         requests_session=session,
     )
@@ -191,7 +190,7 @@ def test_broken_callbacks(tmp_path: Path, session: requests.sessions.Session, ca
     queue.stop()
 
 
-def test_cancel(tmp_path: Path, session: requests.sessions.Session) -> None:
+def test_cancel(tmp_path: Path, session: Session) -> None:
     event_bus = DummyEventService()
 
     queue = DownloadQueueService(requests_session=session, event_bus=event_bus)

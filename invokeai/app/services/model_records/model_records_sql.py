@@ -42,9 +42,11 @@ Typical usage:
 
 import json
 import sqlite3
+from math import ceil
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
+from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
@@ -52,20 +54,20 @@ from invokeai.backend.model_manager.config import (
     ModelFormat,
     ModelType,
 )
+from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore, UnknownMetadataException
 
 from ..shared.sqlite.sqlite_database import SqliteDatabase
 from .model_records_base import (
     DuplicateModelException,
+    ModelRecordOrderBy,
     ModelRecordServiceBase,
+    ModelSummary,
     UnknownModelException,
 )
 
 
 class ModelRecordServiceSQL(ModelRecordServiceBase):
     """Implementation of the ModelConfigStore ABC using a SQL database."""
-
-    _db: SqliteDatabase
-    _cursor: sqlite3.Cursor
 
     def __init__(self, db: SqliteDatabase):
         """
@@ -78,7 +80,12 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         self._db = db
         self._cursor = self._db.conn.cursor()
 
-    def add_model(self, key: str, config: Union[dict, AnyModelConfig]) -> AnyModelConfig:
+    @property
+    def db(self) -> SqliteDatabase:
+        """Return the underlying database."""
+        return self._db
+
+    def add_model(self, key: str, config: Union[Dict[str, Any], AnyModelConfig]) -> AnyModelConfig:
         """
         Add a model to the database.
 
@@ -293,3 +300,95 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             )
             results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
         return results
+
+    @property
+    def metadata_store(self) -> ModelMetadataStore:
+        """Return a ModelMetadataStore initialized on the same database."""
+        return ModelMetadataStore(self._db)
+
+    def get_metadata(self, key: str) -> Optional[AnyModelRepoMetadata]:
+        """
+        Retrieve metadata (if any) from when model was downloaded from a repo.
+
+        :param key: Model key
+        """
+        store = self.metadata_store
+        try:
+            metadata = store.get_metadata(key)
+            return metadata
+        except UnknownMetadataException:
+            return None
+
+    def search_by_metadata_tag(self, tags: Set[str]) -> List[AnyModelConfig]:
+        """
+        Search model metadata for ones with all listed tags and return their corresponding configs.
+
+        :param tags: Set of tags to search for. All tags must be present.
+        """
+        store = ModelMetadataStore(self._db)
+        keys = store.search_by_tag(tags)
+        return [self.get_model(x) for x in keys]
+
+    def list_tags(self) -> Set[str]:
+        """Return a unique set of all the model tags in the metadata database."""
+        store = ModelMetadataStore(self._db)
+        return store.list_tags()
+
+    def list_all_metadata(self) -> List[Tuple[str, AnyModelRepoMetadata]]:
+        """List metadata for all models that have it."""
+        store = ModelMetadataStore(self._db)
+        return store.list_all_metadata()
+
+    def list_models(
+        self, page: int = 0, per_page: int = 10, order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default
+    ) -> PaginatedResults[ModelSummary]:
+        """Return a paginated summary listing of each model in the database."""
+        ordering = {
+            ModelRecordOrderBy.Default: "a.type, a.base, a.format, a.name",
+            ModelRecordOrderBy.Type: "a.type",
+            ModelRecordOrderBy.Base: "a.base",
+            ModelRecordOrderBy.Name: "a.name",
+            ModelRecordOrderBy.Format: "a.format",
+        }
+
+        def _fixup(summary: Dict[str, str]) -> Dict[str, Union[str, int, Set[str]]]:
+            """Fix up results so that there are no null values."""
+            result: Dict[str, Union[str, int, Set[str]]] = {}
+            for key, item in summary.items():
+                result[key] = item or ""
+            result["tags"] = set(json.loads(summary["tags"] or "[]"))
+            return result
+
+        # Lock so that the database isn't updated while we're doing the two queries.
+        with self._db.lock:
+            # query1: get the total number of model configs
+            self._cursor.execute(
+                """--sql
+                select count(*) from model_config;
+                """,
+                (),
+            )
+            total = int(self._cursor.fetchone()[0])
+
+            # query2: fetch key fields from the join of model_config and model_metadata
+            self._cursor.execute(
+                f"""--sql
+                SELECT a.id as key, a.type, a.base, a.format, a.name,
+                       json_extract(a.config, '$.description') as description,
+                       json_extract(b.metadata, '$.tags') as tags
+                FROM model_config AS a
+                LEFT JOIN model_metadata AS b on a.id=b.id
+                ORDER BY {ordering[order_by]} -- using ? to bind doesn't work here for some reason
+                LIMIT ?
+                OFFSET ?;
+                """,
+                (
+                    per_page,
+                    page * per_page,
+                ),
+            )
+            rows = self._cursor.fetchall()
+            items = [ModelSummary.model_validate(_fixup(dict(x))) for x in rows]
+            return PaginatedResults(
+                page=page, pages=ceil(total / per_page), per_page=per_page, total=total, items=items
+            )

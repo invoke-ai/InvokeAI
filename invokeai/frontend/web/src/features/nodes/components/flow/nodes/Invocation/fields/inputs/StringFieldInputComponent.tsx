@@ -42,7 +42,13 @@ const StringFieldInputComponent = (
     );
   }
 
-  return <InvInput onChange={handleValueChanged} value={field.value} />;
+  return (
+    <InvInput
+      className="nodrag"
+      onChange={handleValueChanged}
+      value={field.value}
+    />
+  );
 };
 
 export default memo(StringFieldInputComponent);

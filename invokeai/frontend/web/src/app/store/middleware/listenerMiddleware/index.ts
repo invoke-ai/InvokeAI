@@ -69,6 +69,7 @@ import { addSocketQueueItemStatusChangedEventListener } from './listeners/socket
 import { addSessionRetrievalErrorEventListener } from './listeners/socketio/socketSessionRetrievalError';
 import { addSocketSubscribedEventListener as addSocketSubscribedListener } from './listeners/socketio/socketSubscribed';
 import { addSocketUnsubscribedEventListener as addSocketUnsubscribedListener } from './listeners/socketio/socketUnsubscribed';
+import { addSocketUploadStartedEventListener as addSocketUploadStartedListener } from './listeners/socketio/socketUploadStarted'; // My upload event
 import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSaved';
 import { addUpdateAllNodesRequestedListener } from './listeners/updateAllNodesRequested';
 import { addUpscaleRequestedListener } from './listeners/upscaleRequested';
@@ -189,3 +190,6 @@ addUpscaleRequestedListener();
 
 // Dynamic prompts
 addDynamicPromptsListener();
+
+// Upload started listener
+addSocketUploadStartedListener();

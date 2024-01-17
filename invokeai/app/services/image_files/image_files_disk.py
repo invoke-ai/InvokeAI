@@ -1,7 +1,9 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
+from bz2 import compress
 from pathlib import Path
 from queue import Queue
 from typing import Dict, Optional, Union, List
+import cv2
 
 # Eryx Imports
 import time
@@ -89,7 +91,8 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 image_path,
                 "PNG",
                 pnginfo=pnginfo,
-                compress_level=self.__invoker.services.configuration.png_compress_level,
+                compress_level=1,
+                # compress_level=self.__invoker.services.configuration.png_compress_level,
             )
 
             thumbnail_name = get_thumbnail_name(image_name)

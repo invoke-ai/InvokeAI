@@ -318,13 +318,10 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         finally:
             self._lock.release()
     ############################################################################################################
-    ############################    ERYX CODE   ############################################################
+    ############################    ERYX CODE   ################################################################
     ############################################################################################################
     def save_record_eryx(self, image_dtos: List[ImageUploadData]) -> List[datetime]:
         try:
-            print("-------------------------> Saving image records here <-------------------------")
-            print(image_dtos)
-            print("-------------------------------------------------------------------------------")
             self._lock.acquire()
             # Prepare the list of tuples for bulk insert
             insert_values = [

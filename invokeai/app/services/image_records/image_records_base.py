@@ -8,6 +8,8 @@ from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 
 from .image_records_common import ImageCategory, ImageRecord, ImageRecordChanges, ResourceOrigin
 
+from ..images.images_common import ImageUploadData
+
 
 class ImageRecordStorageBase(ABC):
     """Low-level service responsible for interfacing with the image record store."""
@@ -69,7 +71,7 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
-    def save_record_eryx(self, image_records: List[Tuple]) -> List[datetime]:
+    def save_record_eryx(self, image_records: List[ImageUploadData]) -> List[datetime]:
         """Saves an image record."""
         pass
 

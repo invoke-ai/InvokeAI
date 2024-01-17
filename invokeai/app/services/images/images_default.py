@@ -1,3 +1,9 @@
+import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
+from turtle import color
+from tqdm import tqdm
+
 from typing import Optional, List, Tuple
 
 import time
@@ -100,76 +106,137 @@ class ImageService(ImageServiceABC):
     # TODO: Add image record code here for multiple insert as well
     # TODO: change the return list to image DTOs from None
     async def create_eryx(self, upload_data_list: List[ImageUploadData]) -> List[ImageDTO]:
-        """Starts the upload process"""
-        # TODO: Implement the start upload process method here
-        print("-----------------------------------")
-        print(f"{datetime.now()}")
         print("Starting upload process")
-        print("-----------------------------------")
-        print(f"Images: {upload_data_list}")
-        print("-----------------------------------")
-        
-        images_DTOs = []
-        
-        # TODO: Add additional processing here
-        for idx, image in enumerate(upload_data_list):
-            if image.image_origin not in ResourceOrigin:
-                raise InvalidOriginException
+        # Progress bar for processing
+        total_images = len(upload_data_list)
+        progress_lock = Lock()
+        processed_counter = 0  # Shared counter
 
-            if image.image_category not in ImageCategory:
-                raise InvalidImageCategoryException
-            
-            # Extract width and height from the PIL image and add it to image DTO
-            width, height = image.image.size
-            image.width = width
-            image.height = height
-
-            # Create a name for the image and add it to image DTO
-            image_name = self.__invoker.services.names.create_image_name()
-            image.image_name = image_name
-
-            # append the image to the list of images DTOs
-            images_DTOs.append(image)
+        def process_and_save_image(image_data: ImageUploadData, processed_counter=processed_counter):
             try:
-                # TODO: Consider using a transaction here to ensure consistency between storage and database
-                # TODO: Change arguments to just one images_DTOs[idx] instead of all the arguments
-                self.__invoker.services.image_records.save_record_eryx(images_DTOs)
+                # Existing logic for processing and saving each image
+                width, height = image_data.image.size
+                image_data.width = width
+                image_data.height = height
+                image_name = self.__invoker.services.names.create_image_name()
+                image_data.image_name = image_name
+                # if image_data.image.size[0] < 5000:  # Example condition: fail if width or height is too large
+                #     raise Exception("Intentional failure for testing: Image size too large")
+                self.__invoker.services.image_records.save_record_eryx([image_data])
 
-                # Link image to board if board_id is provided
-                if image.board_id is not None:
-                    self.__invoker.services.board_image_records.add_image_to_board(board_id=image.board_id, image_name=image.image_name)
-                
-                # Save the image file
+                if image_data.board_id is not None:
+                    self.__invoker.services.board_image_records.add_image_to_board(board_id=image_data.board_id, image_name=image_data.image_name)
+
                 self.__invoker.services.image_files.save(
-                    image_name=image.image_name, image=image.image, metadata=image.metadata, workflow=image.workflow
+                    image_name=image_data.image_name, image=image_data.image, metadata=image_data.metadata, workflow=image_data.workflow
                 )
 
-                # Retrieve the created ImageDTO
-                image_dto = self.get_dto(image_name)
-                # Replace in place the image data to ImageDTO created
-                images_DTOs[idx] = image_dto
-
-                print("Image DTO was created here <------------------")
-                print(f"Image DTO: {image_dto}")
-                print(f"this is the image url: {image_dto.image_url}")
+                image_dto = self.get_dto(image_data.image_name)
                 self._on_changed(image_dto)
-                print("This is after the on_changed method was called <------------------")
-                print(f"{image_dto}")
-                print("-----------------------------------")
 
-            except ImageRecordSaveException:
-                self.__invoker.services.logger.error("Failed to save image record")
-                raise
-            except ImageFileSaveException:
-                self.__invoker.services.logger.error("Failed to save image file")
-                raise
+                with progress_lock:
+                    processed_counter += 1  # Increment counter
+
+                return image_dto
             except Exception as e:
-                self.__invoker.services.logger.error(f"Problem saving image record and file: {str(e)}")
-                raise e
+                self.__invoker.services.logger.error(f"Problem processing and saving image: {str(e)}")
+                raise
+        
+        # Determine the number of available CPU cores
+        num_cores = os.cpu_count() or 1
+        num_workers = max(1, num_cores - 1)
 
+        images_DTOs = []
 
-        print(f"Image DTOs: {images_DTOs}")
+        # Initialize tqdm progress bar
+        pbar = tqdm(total=total_images, desc="Processing Images", unit="images", colour="green")
+
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+            futures = [executor.submit(process_and_save_image, image) for image in upload_data_list]
+            for future in as_completed(futures):
+                try:
+                    image_dto = future.result()
+                    images_DTOs.append(image_dto)
+                    pbar.update(1)  # Update progress bar
+                except Exception as e:
+                    self.__invoker.services.logger.error(f"Error in processing image: {str(e)}")
+
+        pbar.close()
         return images_DTOs
+    # async def create_eryx(self, upload_data_list: List[ImageUploadData]) -> List[ImageDTO]:
+    #     """Starts the upload process"""
+    #     # TODO: Implement the start upload process method here
+    #     print("-----------------------------------")
+    #     print(f"{datetime.now()}")
+    #     print("Starting upload process")
+    #     print("-----------------------------------")
+    #     print(f"Images: {upload_data_list}")
+    #     print("-----------------------------------")
+        
+    #     images_DTOs = []
+
+    #     # Determine the number of available CPU cores
+    #     num_cores = os.cpu_count() or 1  # Fallback to 1 if cpu_count() returns None
+
+    #     # Set the number of workers (you can adjust this formula as needed)
+    #     num_workers = max(1, num_cores - 1)  # Use all but one core, or 1 if only 1 core is available
+
+    #     print(f"Number of cores: {num_cores}")
+    #     print(f"Number of workers: {num_workers}")
+    #     # TODO: Add additional processing here
+    #     for idx, image in enumerate(upload_data_list):
+    #         if image.image_origin not in ResourceOrigin:
+    #             raise InvalidOriginException
+
+    #         if image.image_category not in ImageCategory:
+    #             raise InvalidImageCategoryException
+            
+    #         # Extract width and height from the PIL image and add it to image DTO
+    #         width, height = image.image.size
+    #         image.width = width
+    #         image.height = height
+
+    #         # Create a name for the image and add it to image DTO
+    #         image_name = self.__invoker.services.names.create_image_name()
+    #         image.image_name = image_name
+
+    #         # append the image to the list of images DTOs
+    #         images_DTOs.append(image)
+    #         try:
+    #             # TODO: Consider using a transaction here to ensure consistency between storage and database
+    #             # TODO: Change arguments to just one images_DTOs[idx] instead of all the arguments
+    #             self.__invoker.services.image_records.save_record_eryx(images_DTOs)
+
+    #             # Link image to board if board_id is provided
+    #             if image.board_id is not None:
+    #                 self.__invoker.services.board_image_records.add_image_to_board(board_id=image.board_id, image_name=image.image_name)
+                
+    #             # Save the image file
+    #             self.__invoker.services.image_files.save(
+    #                 image_name=image.image_name, image=image.image, metadata=image.metadata, workflow=image.workflow
+    #             )
+
+    #             # Retrieve the created ImageDTO
+    #             image_dto = self.get_dto(image_name)
+    #             # Replace in place the image data to ImageDTO created
+    #             images_DTOs[idx] = image_dto
+
+    #             # Call the on_changed method
+    #             self._on_changed(image_dto)
+
+    #         except ImageRecordSaveException:
+    #             self.__invoker.services.logger.error("Failed to save image record")
+    #             raise
+    #         except ImageFileSaveException:
+    #             self.__invoker.services.logger.error("Failed to save image file")
+    #             raise
+    #         except Exception as e:
+    #             self.__invoker.services.logger.error(f"Problem saving image record and file: {str(e)}")
+    #             raise e
+
+
+    #     print(f"Image DTOs: {images_DTOs}")
+    #     return images_DTOs
 
     ############################################################################################################
     ############################    ORIGINAL CODE   ############################################################

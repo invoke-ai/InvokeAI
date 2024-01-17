@@ -209,7 +209,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     """Configuration object for InvokeAI App."""
 
     singleton_config: ClassVar[Optional[InvokeAIAppConfig]] = None
-    singleton_init: ClassVar[Optional[Dict]] = None
+    singleton_init: ClassVar[Optional[Dict[str, Any]]] = None
 
     # fmt: off
     type: Literal["InvokeAI"] = "InvokeAI"
@@ -263,14 +263,14 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     # DEVICE
     device              : Literal["auto", "cpu", "cuda", "cuda:1", "mps"] = Field(default="auto", description="Generation device", json_schema_extra=Categories.Device)
-    precision           : Literal["auto", "float16", "float32", "autocast"] = Field(default="auto", description="Floating point precision", json_schema_extra=Categories.Device)
+    precision           : Literal["auto", "float16", "bfloat16", "float32", "autocast"] = Field(default="auto", description="Floating point precision", json_schema_extra=Categories.Device)
 
     # GENERATION
     sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements", json_schema_extra=Categories.Generation)
     attention_type      : Literal["auto", "normal", "xformers", "sliced", "torch-sdp"] = Field(default="auto", description="Attention type", json_schema_extra=Categories.Generation)
     attention_slice_size: Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8] = Field(default="auto", description='Slice size, valid when attention_type=="sliced"', json_schema_extra=Categories.Generation)
     force_tiled_decode  : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", json_schema_extra=Categories.Generation)
-    png_compress_level  : int = Field(default=1, description="The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = fastest, largest filesize, 9 = slowest, smallest filesize", json_schema_extra=Categories.Generation)
+    png_compress_level  : int = Field(default=0, description="The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = fastest, largest filesize, 9 = slowest, smallest filesize", json_schema_extra=Categories.Generation)
 
     # QUEUE
     max_queue_size      : int = Field(default=10000, gt=0, description="Maximum number of items in the session queue", json_schema_extra=Categories.Queue)
@@ -301,8 +301,8 @@ class InvokeAIAppConfig(InvokeAISettings):
         self,
         argv: Optional[list[str]] = None,
         conf: Optional[DictConfig] = None,
-        clobber=False,
-    ):
+        clobber: Optional[bool] = False,
+    ) -> None:
         """
         Update settings with contents of init file, environment, and command-line settings.
 
@@ -337,7 +337,7 @@ class InvokeAIAppConfig(InvokeAISettings):
                 )
 
     @classmethod
-    def get_config(cls, **kwargs: Dict[str, Any]) -> InvokeAIAppConfig:
+    def get_config(cls, **kwargs: Any) -> InvokeAIAppConfig:
         """Return a singleton InvokeAIAppConfig configuration object."""
         if (
             cls.singleton_config is None
@@ -455,7 +455,7 @@ class InvokeAIAppConfig(InvokeAISettings):
         return _find_root()
 
 
-def get_invokeai_config(**kwargs) -> InvokeAIAppConfig:
+def get_invokeai_config(**kwargs: Any) -> InvokeAIAppConfig:
     """Legacy function which returns InvokeAIAppConfig.get_config()."""
     return InvokeAIAppConfig.get_config(**kwargs)
 
