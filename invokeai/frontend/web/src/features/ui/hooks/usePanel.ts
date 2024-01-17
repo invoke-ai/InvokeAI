@@ -125,13 +125,15 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
 
       _setMinSize(minSizePct);
 
-      const currentSize = panelHandleRef.current.getSize();
-
-      // If currentSize is 0, the panel is collapsed, so we don't want to resize it
-      // If it's not 0, but less than the minSize, resize it
-      if (currentSize > 0 && currentSize < minSizePct) {
-        panelHandleRef.current.resize(minSizePct);
-      }
+      /**
+       * TODO(psyche): Ideally, we only resize the panel if there is not enough room for it in the
+       * panel group. This is a bit tricky, though. We'd need to track the last known panel size
+       * and compare it to the new size before resizing. This introduces some complexity that I'd
+       * rather not need to maintain.
+       *
+       * For now, we'll just resize the panel to the min size every time the panel group is resized.
+       */
+      panelHandleRef.current.resize(minSizePct);
     });
 
     resizeObserver.observe(panelGroupElement);

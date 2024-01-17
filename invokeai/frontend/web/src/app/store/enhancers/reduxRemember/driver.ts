@@ -1,4 +1,5 @@
 import { StorageError } from 'app/store/enhancers/reduxRemember/errors';
+import { $projectId } from 'app/store/nanostores/projectId';
 import type { UseStore } from 'idb-keyval';
 import {
   clear,
@@ -24,14 +25,23 @@ export const idbKeyValDriver: Driver = {
     try {
       return get(key, $idbKeyValStore.get());
     } catch (originalError) {
-      throw new StorageError({ key, originalError });
+      throw new StorageError({
+        key,
+        projectId: $projectId.get(),
+        originalError,
+      });
     }
   },
   setItem: (key, value) => {
     try {
       return set(key, value, $idbKeyValStore.get());
     } catch (originalError) {
-      throw new StorageError({ key, value, originalError });
+      throw new StorageError({
+        key,
+        value,
+        projectId: $projectId.get(),
+        originalError,
+      });
     }
   },
 };

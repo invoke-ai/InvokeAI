@@ -2,7 +2,7 @@ import '@fontsource-variable/inter';
 import 'overlayscrollbars/overlayscrollbars.css';
 import 'common/components/OverlayScrollbars/overlayscrollbars.css';
 
-import { ChakraProvider, extendTheme } from '@chakra-ui/react';
+import { ChakraProvider, DarkMode, extendTheme } from '@chakra-ui/react';
 import type { ReactNode } from 'react';
 import { memo, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -30,7 +30,7 @@ function ThemeLocaleProvider({ children }: ThemeLocaleProviderProps) {
 
   return (
     <ChakraProvider theme={theme} toastOptions={TOAST_OPTIONS}>
-      {children}
+      <DarkMode>{children}</DarkMode>
     </ChakraProvider>
   );
 }

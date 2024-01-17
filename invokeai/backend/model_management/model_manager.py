@@ -759,7 +759,7 @@ class ModelManager(object):
         model_type: ModelType,
         new_name: Optional[str] = None,
         new_base: Optional[BaseModelType] = None,
-    ):
+    ) -> None:
         """
         Rename or rebase a model.
         """
@@ -781,6 +781,9 @@ class ModelManager(object):
 
         # if this is a model file/directory that we manage ourselves, we need to move it
         if old_path.is_relative_to(self.app_config.models_path):
+            # keep the suffix!
+            if old_path.is_file():
+                new_name = Path(new_name).with_suffix(old_path.suffix).as_posix()
             new_path = self.resolve_model_path(
                 Path(
                     BaseModelType(new_base).value,

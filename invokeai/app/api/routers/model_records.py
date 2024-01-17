@@ -4,7 +4,7 @@
 
 from hashlib import sha1
 from random import randbytes
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from fastapi import Body, Path, Query, Response
 from fastapi.routing import APIRouter
@@ -16,13 +16,18 @@ from invokeai.app.services.model_install import ModelInstallJob, ModelSource
 from invokeai.app.services.model_records import (
     DuplicateModelException,
     InvalidModelException,
+    ModelRecordOrderBy,
+    ModelSummary,
     UnknownModelException,
 )
+from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
+    ModelFormat,
     ModelType,
 )
+from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
 
 from ..dependencies import ApiDependencies
 
@@ -32,9 +37,18 @@ model_records_router = APIRouter(prefix="/v1/model/record", tags=["model_manager
 class ModelsList(BaseModel):
     """Return list of configs."""
 
-    models: list[AnyModelConfig]
+    models: List[AnyModelConfig]
 
     model_config = ConfigDict(use_enum_values=True)
+
+
+class ModelTagSet(BaseModel):
+    """Return tags for a set of models."""
+
+    key: str
+    name: str
+    author: str
+    tags: Set[str]
 
 
 @model_records_router.get(
@@ -45,7 +59,7 @@ async def list_model_records(
     base_models: Optional[List[BaseModelType]] = Query(default=None, description="Base models to include"),
     model_type: Optional[ModelType] = Query(default=None, description="The type of model to get"),
     model_name: Optional[str] = Query(default=None, description="Exact match on the name of the model"),
-    model_format: Optional[str] = Query(
+    model_format: Optional[ModelFormat] = Query(
         default=None, description="Exact match on the format of the model (e.g. 'diffusers')"
     ),
 ) -> ModelsList:
@@ -84,6 +98,59 @@ async def get_model_record(
         return record_store.get_model(key)
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@model_records_router.get("/meta", operation_id="list_model_summary")
+async def list_model_summary(
+    page: int = Query(default=0, description="The page to get"),
+    per_page: int = Query(default=10, description="The number of models per page"),
+    order_by: ModelRecordOrderBy = Query(default=ModelRecordOrderBy.Default, description="The attribute to order by"),
+) -> PaginatedResults[ModelSummary]:
+    """Gets a page of model summary data."""
+    return ApiDependencies.invoker.services.model_records.list_models(page=page, per_page=per_page, order_by=order_by)
+
+
+@model_records_router.get(
+    "/meta/i/{key}",
+    operation_id="get_model_metadata",
+    responses={
+        200: {"description": "Success"},
+        400: {"description": "Bad request"},
+        404: {"description": "No metadata available"},
+    },
+)
+async def get_model_metadata(
+    key: str = Path(description="Key of the model repo metadata to fetch."),
+) -> Optional[AnyModelRepoMetadata]:
+    """Get a model metadata object."""
+    record_store = ApiDependencies.invoker.services.model_records
+    result = record_store.get_metadata(key)
+    if not result:
+        raise HTTPException(status_code=404, detail="No metadata for a model with this key")
+    return result
+
+
+@model_records_router.get(
+    "/tags",
+    operation_id="list_tags",
+)
+async def list_tags() -> Set[str]:
+    """Get a unique set of all the model tags."""
+    record_store = ApiDependencies.invoker.services.model_records
+    return record_store.list_tags()
+
+
+@model_records_router.get(
+    "/tags/search",
+    operation_id="search_by_metadata_tags",
+)
+async def search_by_metadata_tags(
+    tags: Set[str] = Query(default=None, description="Tags to search for"),
+) -> ModelsList:
+    """Get a list of models."""
+    record_store = ApiDependencies.invoker.services.model_records
+    results = record_store.search_by_metadata_tag(tags)
+    return ModelsList(models=results)
 
 
 @model_records_router.patch(
@@ -159,9 +226,7 @@ async def del_model_record(
 async def add_model_record(
     config: Annotated[AnyModelConfig, Body(description="Model config", discriminator="type")],
 ) -> AnyModelConfig:
-    """
-    Add a model using the configuration information appropriate for its type.
-    """
+    """Add a model using the configuration information appropriate for its type."""
     logger = ApiDependencies.invoker.services.logger
     record_store = ApiDependencies.invoker.services.model_records
     if config.key == "<NOKEY>":
@@ -243,7 +308,7 @@ async def import_model(
     Installation occurs in the background. Either use list_model_install_jobs()
     to poll for completion, or listen on the event bus for the following events:
 
-      "model_install_started"
+      "model_install_running"
       "model_install_completed"
       "model_install_error"
 
@@ -279,14 +344,44 @@ async def import_model(
     operation_id="list_model_install_jobs",
 )
 async def list_model_install_jobs() -> List[ModelInstallJob]:
-    """
-    Return list of model install jobs.
-
-    If the optional 'source' argument is provided, then the list will be filtered
-    for partial string matches against the install source.
-    """
+    """Return list of model install jobs."""
     jobs: List[ModelInstallJob] = ApiDependencies.invoker.services.model_install.list_jobs()
     return jobs
+
+
+@model_records_router.get(
+    "/import/{id}",
+    operation_id="get_model_install_job",
+    responses={
+        200: {"description": "Success"},
+        404: {"description": "No such job"},
+    },
+)
+async def get_model_install_job(id: int = Path(description="Model install id")) -> ModelInstallJob:
+    """Return model install job corresponding to the given source."""
+    try:
+        return ApiDependencies.invoker.services.model_install.get_job_by_id(id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@model_records_router.delete(
+    "/import/{id}",
+    operation_id="cancel_model_install_job",
+    responses={
+        201: {"description": "The job was cancelled successfully"},
+        415: {"description": "No such job"},
+    },
+    status_code=201,
+)
+async def cancel_model_install_job(id: int = Path(description="Model install job ID")) -> None:
+    """Cancel the model install job(s) corresponding to the given job ID."""
+    installer = ApiDependencies.invoker.services.model_install
+    try:
+        job = installer.get_job_by_id(id)
+    except ValueError as e:
+        raise HTTPException(status_code=415, detail=str(e))
+    installer.cancel_job(job)
 
 
 @model_records_router.patch(
@@ -298,9 +393,7 @@ async def list_model_install_jobs() -> List[ModelInstallJob]:
     },
 )
 async def prune_model_install_jobs() -> Response:
-    """
-    Prune all completed and errored jobs from the install job list.
-    """
+    """Prune all completed and errored jobs from the install job list."""
     ApiDependencies.invoker.services.model_install.prune_jobs()
     return Response(status_code=204)
 
@@ -315,7 +408,9 @@ async def prune_model_install_jobs() -> Response:
 )
 async def sync_models_to_config() -> Response:
     """
-    Traverse the models and autoimport directories. Model files without a corresponding
+    Traverse the models and autoimport directories.
+
+    Model files without a corresponding
     record in the database are added. Orphan records without a models file are deleted.
     """
     ApiDependencies.invoker.services.model_install.sync_to_config()

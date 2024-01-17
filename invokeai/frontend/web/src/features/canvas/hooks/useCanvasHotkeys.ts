@@ -1,4 +1,5 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { isInputElement } from 'common/util/isInputElement';
 import {
   $canvasStage,
   $tool,
@@ -13,6 +14,7 @@ import {
   setShouldShowBoundingBox,
   setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
+import { isElChildOfCanvasTab } from 'features/canvas/util/isElChildOfCanvasTab';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -93,16 +95,13 @@ const useInpaintingCanvasHotkeys = () => {
     [activeTabName, shouldShowBoundingBox]
   );
 
-  useEffect(() => {
-    window.addEventListener('keydown', (e) => {
-      if (e.key === ' ' && !e.repeat) {
-        console.log('spaceeee');
-      }
-    });
-  }, []);
-
   const onKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.repeat || e.key !== ' ') {
+    if (
+      e.repeat ||
+      e.key !== ' ' ||
+      isInputElement(e.target as HTMLElement) ||
+      !isElChildOfCanvasTab(e.target as HTMLElement)
+    ) {
       return;
     }
     if ($toolStash.get() || $tool.get() === 'move') {
@@ -114,7 +113,12 @@ const useInpaintingCanvasHotkeys = () => {
     resetToolInteractionState();
   }, []);
   const onKeyUp = useCallback((e: KeyboardEvent) => {
-    if (e.repeat || e.key !== ' ') {
+    if (
+      e.repeat ||
+      e.key !== ' ' ||
+      isInputElement(e.target as HTMLElement) ||
+      !isElChildOfCanvasTab(e.target as HTMLElement)
+    ) {
       return;
     }
     if (!$toolStash.get() || $tool.get() !== 'move') {

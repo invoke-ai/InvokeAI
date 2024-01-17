@@ -1,7 +1,7 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from invokeai.app.services.invocation_processor.invocation_processor_common import ProgressImage
 from invokeai.app.services.session_queue.session_queue_common import (
@@ -404,53 +404,72 @@ class EventServiceBase:
             },
         )
 
-    def emit_model_install_started(self, source: str) -> None:
+    def emit_model_install_downloading(
+        self,
+        source: str,
+        local_path: str,
+        bytes: int,
+        total_bytes: int,
+        parts: List[Dict[str, Union[str, int]]],
+    ) -> None:
         """
-        Emitted when an install job is started.
+        Emit at intervals while the install job is in progress (remote models only).
+
+        :param source: Source of the model
+        :param local_path: Where model is downloading to
+        :param parts: Progress of downloading URLs that comprise the model, if any.
+        :param bytes: Number of bytes downloaded so far.
+        :param total_bytes: Total size of download, including all files.
+        This emits a Dict with keys "source", "local_path", "bytes" and "total_bytes".
+        """
+        self.__emit_model_event(
+            event_name="model_install_downloading",
+            payload={
+                "source": source,
+                "local_path": local_path,
+                "bytes": bytes,
+                "total_bytes": total_bytes,
+                "parts": parts,
+            },
+        )
+
+    def emit_model_install_running(self, source: str) -> None:
+        """
+        Emit once when an install job becomes active.
 
         :param source: Source of the model; local path, repo_id or url
         """
         self.__emit_model_event(
-            event_name="model_install_started",
+            event_name="model_install_running",
             payload={"source": source},
         )
 
-    def emit_model_install_completed(self, source: str, key: str) -> None:
+    def emit_model_install_completed(self, source: str, key: str, total_bytes: Optional[int] = None) -> None:
         """
-        Emitted when an install job is completed successfully.
+        Emit when an install job is completed successfully.
 
         :param source: Source of the model; local path, repo_id or url
         :param key: Model config record key
+        :param total_bytes: Size of the model (may be None for installation of a local path)
         """
         self.__emit_model_event(
             event_name="model_install_completed",
             payload={
                 "source": source,
+                "total_bytes": total_bytes,
                 "key": key,
             },
         )
 
-    def emit_model_install_progress(
-        self,
-        source: str,
-        current_bytes: int,
-        total_bytes: int,
-    ) -> None:
+    def emit_model_install_cancelled(self, source: str) -> None:
         """
-        Emitted while the install job is in progress.
-        (Downloaded models only)
+        Emit when an install job is cancelled.
 
-        :param source: Source of the model
-        :param current_bytes: Number of bytes downloaded so far
-        :param total_bytes: Total bytes to download
+        :param source: Source of the model; local path, repo_id or url
         """
         self.__emit_model_event(
-            event_name="model_install_progress",
-            payload={
-                "source": source,
-                "current_bytes": int,
-                "total_bytes": int,
-            },
+            event_name="model_install_cancelled",
+            payload={"source": source},
         )
 
     def emit_model_install_error(
@@ -460,10 +479,11 @@ class EventServiceBase:
         error: str,
     ) -> None:
         """
-        Emitted when an install job encounters an exception.
+        Emit when an install job encounters an exception.
 
         :param source: Source of the model
-        :param exception: The exception that raised the error
+        :param error_type: The name of the exception
+        :param error: A text description of the exception
         """
         self.__emit_model_event(
             event_name="model_install_error",

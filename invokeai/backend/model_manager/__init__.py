@@ -6,6 +6,7 @@ from .config import (
     InvalidModelConfigException,
     ModelConfigFactory,
     ModelFormat,
+    ModelRepoVariant,
     ModelType,
     ModelVariantType,
     SchedulerPredictionType,
@@ -15,15 +16,16 @@ from .probe import ModelProbe
 from .search import ModelSearch
 
 __all__ = [
-    "ModelProbe",
-    "ModelSearch",
+    "AnyModelConfig",
+    "BaseModelType",
+    "ModelRepoVariant",
     "InvalidModelConfigException",
     "ModelConfigFactory",
-    "BaseModelType",
-    "ModelType",
-    "SubModelType",
-    "ModelVariantType",
     "ModelFormat",
+    "ModelProbe",
+    "ModelSearch",
+    "ModelType",
+    "ModelVariantType",
     "SchedulerPredictionType",
-    "AnyModelConfig",
+    "SubModelType",
 ]
