@@ -1235,8 +1235,8 @@ class CropLatentsCoreInvocation(BaseInvocation):
 class IdealSizeOutput(BaseInvocationOutput):
     """Base class for invocations that output an image"""
 
-    width: int = OutputField(description="The ideal width of the image in pixels")
-    height: int = OutputField(description="The ideal height of the image in pixels")
+    width: int = OutputField(description="The ideal width of the image (in pixels)")
+    height: int = OutputField(description="The ideal height of the image (in pixels)")
 
 
 @invocation(
@@ -1248,10 +1248,13 @@ class IdealSizeOutput(BaseInvocationOutput):
 class IdealSizeInvocation(BaseInvocation):
     """Calculates the ideal size for generation to avoid duplication"""
 
-    width: int = InputField(default=1024, description="Target width")
-    height: int = InputField(default=576, description="Target height")
-    unet: UNetField = InputField(default=None, description="UNet submodel")
-    multiplier: float = InputField(default=1.0, description="Dimensional multiplier")
+    width: int = InputField(default=1024, description="Final image width")
+    height: int = InputField(default=576, description="Final image height")
+    unet: UNetField = InputField(default=None, description=FieldDescriptions.unet)
+    multiplier: float = InputField(
+        default=1.0,
+        description="Amount to multiply the model's dimensions by when calculating the ideal size (may result in initial generation artifacts if too large)",
+    )
 
     def trim_to_multiple_of(self, *args, multiple_of=LATENT_SCALE_FACTOR):
         return tuple((x - x % multiple_of) for x in args)
