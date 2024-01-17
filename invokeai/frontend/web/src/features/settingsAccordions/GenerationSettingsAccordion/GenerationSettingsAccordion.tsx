@@ -1,6 +1,6 @@
 import { Flex } from '@chakra-ui/layout';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
 import type { InvLabelProps } from 'common/components/InvControl/types';
 import { InvExpander } from 'common/components/InvExpander/InvExpander';
@@ -20,10 +20,9 @@ import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
-import { generationAdvancedOptionsExpanded } from 'features/parameters/store/actions';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { size } from 'lodash-es';
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const labelProps: InvLabelProps = {
@@ -48,16 +47,6 @@ const badgesSelector = createMemoizedSelector(
 export const GenerationSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const { loraTabBadges, accordionBadges } = useAppSelector(badgesSelector);
-  const dispatch = useAppDispatch();
-
-  const onToggleExpander = useCallback(
-    (isOpen?: boolean) => {
-      if (!isOpen) {
-        dispatch(generationAdvancedOptionsExpanded());
-      }
-    },
-    [dispatch]
-  );
 
   return (
     <InvSingleAccordion
@@ -78,7 +67,7 @@ export const GenerationSettingsAccordion = memo(() => {
               <ParamMainModelSelect />
               <SyncModelsIconButton />
             </Flex>
-            <InvExpander onClick={onToggleExpander}>
+            <InvExpander>
               <Flex gap={4} flexDir="column" pb={4}>
                 <InvControlGroup labelProps={labelProps}>
                   <ParamScheduler />
