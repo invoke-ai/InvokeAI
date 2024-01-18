@@ -17,7 +17,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaImage } from 'react-icons/fa';
+import { PiImageBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 const selectLastSelectedImageName = createSelector(
@@ -99,7 +99,7 @@ const CurrentImagePreview = () => {
           dropLabel={t('gallery.setCurrentImage')}
           noContentFallback={
             <IAINoContentFallback
-              icon={FaImage}
+              icon={PiImageBold}
               label={t('gallery.noImageSelected')}
             />
           }

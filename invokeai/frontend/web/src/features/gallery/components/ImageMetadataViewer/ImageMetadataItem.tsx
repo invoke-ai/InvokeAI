@@ -5,8 +5,8 @@ import { InvText } from 'common/components/InvText/wrapper';
 import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaCopy } from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
+import { PiCopyBold } from 'react-icons/pi';
 
 type MetadataItemProps = {
   isLink?: boolean;
@@ -57,7 +57,7 @@ const ImageMetadataItem = ({
         <InvTooltip label={`Copy ${label}`}>
           <InvIconButton
             aria-label={`Copy ${label}`}
-            icon={<FaCopy />}
+            icon={<PiCopyBold />}
             size="xs"
             variant="ghost"
             fontSize={14}

@@ -8,7 +8,7 @@ import { workflowExposedFieldRemoved } from 'features/nodes/store/workflowSlice'
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaInfoCircle, FaTrash } from 'react-icons/fa';
+import { PiInfoBold, PiTrashSimpleBold } from 'react-icons/pi';
 
 import EditableFieldTitle from './EditableFieldTitle';
 import FieldTooltipContent from './FieldTooltipContent';
@@ -58,7 +58,7 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
           placement="top"
         >
           <Flex h="full" alignItems="center">
-            <Icon fontSize="sm" color="base.300" as={FaInfoCircle} />
+            <Icon fontSize="sm" color="base.300" as={PiInfoBold} />
           </Flex>
         </InvTooltip>
         <InvIconButton
@@ -67,7 +67,7 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
           variant="ghost"
           size="sm"
           onClick={handleRemoveField}
-          icon={<FaTrash />}
+          icon={<PiTrashSimpleBold />}
         />
       </Flex>
       <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />

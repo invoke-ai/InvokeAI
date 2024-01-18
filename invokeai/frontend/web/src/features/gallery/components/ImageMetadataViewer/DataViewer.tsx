@@ -7,7 +7,7 @@ import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaCopy, FaDownload } from 'react-icons/fa';
+import { PiCopyBold, PiDownloadSimpleBold } from 'react-icons/pi';
 
 type Props = {
   label: string;
@@ -72,7 +72,7 @@ const DataViewer = (props: Props) => {
           <InvTooltip label={`${t('gallery.download')} ${label} JSON`}>
             <InvIconButton
               aria-label={`${t('gallery.download')} ${label} JSON`}
-              icon={<FaDownload />}
+              icon={<PiDownloadSimpleBold size={16} />}
               variant="ghost"
               opacity={0.7}
               onClick={handleDownload}
@@ -83,7 +83,7 @@ const DataViewer = (props: Props) => {
           <InvTooltip label={`${t('gallery.copy')} ${label} JSON`}>
             <InvIconButton
               aria-label={`${t('gallery.copy')} ${label} JSON`}
-              icon={<FaCopy />}
+              icon={<PiCopyBold size={16} />}
               variant="ghost"
               opacity={0.7}
               onClick={handleCopy}

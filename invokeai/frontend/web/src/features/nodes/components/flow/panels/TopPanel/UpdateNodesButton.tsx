@@ -4,7 +4,7 @@ import { useGetNodesNeedUpdate } from 'features/nodes/hooks/useGetNodesNeedUpdat
 import { updateAllNodesRequested } from 'features/nodes/store/actions';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaExclamationTriangle } from 'react-icons/fa';
+import { PiWarningBold } from 'react-icons/pi';
 
 const UpdateNodesButton = () => {
   const dispatch = useAppDispatch();
@@ -20,7 +20,7 @@ const UpdateNodesButton = () => {
 
   return (
     <InvButton
-      leftIcon={<FaExclamationTriangle />}
+      leftIcon={<PiWarningBold />}
       onClick={handleClickUpdateNodes}
       pointerEvents="auto"
     >

@@ -11,7 +11,7 @@ import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { loraRemoved, loraWeightChanged } from 'features/lora/store/loraSlice';
 import { memo, useCallback } from 'react';
-import { FaTrashCan } from 'react-icons/fa6';
+import { PiTrashSimpleBold } from 'react-icons/pi';
 
 type LoRACardProps = {
   lora: LoRA;
@@ -43,7 +43,7 @@ export const LoRACard = memo((props: LoRACardProps) => {
           variant="ghost"
           size="sm"
           onClick={handleRemoveLora}
-          icon={<FaTrashCan />}
+          icon={<PiTrashSimpleBold />}
         />
       </InvCardHeader>
       <InvCardBody>

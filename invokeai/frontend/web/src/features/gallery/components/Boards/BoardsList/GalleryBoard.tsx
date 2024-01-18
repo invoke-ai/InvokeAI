@@ -25,7 +25,7 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaUser } from 'react-icons/fa';
+import { PiImagesSquare } from 'react-icons/pi';
 import {
   useGetBoardAssetsTotalQuery,
   useGetBoardImagesTotalQuery,
@@ -195,8 +195,8 @@ const GalleryBoard = ({
                     alignItems="center"
                   >
                     <Icon
-                      boxSize={12}
-                      as={FaUser}
+                      boxSize={14}
+                      as={PiImagesSquare}
                       mt={-6}
                       opacity={0.7}
                       color="base.500"

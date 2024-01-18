@@ -14,7 +14,7 @@ import { merge, omit } from 'lodash-es';
 import type { ReactElement } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaExternalLinkAlt } from 'react-icons/fa';
+import { PiArrowSquareOutBold } from 'react-icons/pi';
 
 import type { Feature, PopoverData } from './constants';
 import { OPEN_DELAY, POPOVER_DATA, POPPER_MODIFIERS } from './constants';
@@ -132,7 +132,7 @@ const PopoverContent = ({ data, feature }: PopoverContentProps) => {
               <InvButton
                 pt={1}
                 onClick={handleClick}
-                leftIcon={<FaExternalLinkAlt />}
+                leftIcon={<PiArrowSquareOutBold />}
                 alignSelf="flex-end"
                 variant="link"
               >

@@ -1,7 +1,7 @@
 import type { As, FlexProps, StyleProps } from '@chakra-ui/react';
 import { Flex, Icon, Skeleton, Spinner } from '@chakra-ui/react';
 import { memo, useMemo } from 'react';
-import { FaImage } from 'react-icons/fa';
+import { PiImageBold } from 'react-icons/pi'
 import type { ImageDTO } from 'services/api/types';
 
 import { InvText } from './InvText/wrapper';
@@ -43,7 +43,7 @@ type IAINoImageFallbackProps = FlexProps & {
 };
 
 export const IAINoContentFallback = memo((props: IAINoImageFallbackProps) => {
-  const { icon = FaImage, boxSize = 16, sx, ...rest } = props;
+  const { icon = PiImageBold, boxSize = 16, sx, ...rest } = props;
 
   const styles = useMemo(
     () => ({
