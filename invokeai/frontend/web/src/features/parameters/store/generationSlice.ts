@@ -242,6 +242,11 @@ export const generationSlice = createSlice({
 
         if (result.success) {
           state.model = result.data;
+
+          const optimalDimension = getOptimalDimension(result.data);
+
+          state.width = optimalDimension;
+          state.height = optimalDimension;
         }
       }
     });

@@ -209,7 +209,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     """Configuration object for InvokeAI App."""
 
     singleton_config: ClassVar[Optional[InvokeAIAppConfig]] = None
-    singleton_init: ClassVar[Optional[Dict]] = None
+    singleton_init: ClassVar[Optional[Dict[str, Any]]] = None
 
     # fmt: off
     type: Literal["InvokeAI"] = "InvokeAI"
@@ -301,8 +301,8 @@ class InvokeAIAppConfig(InvokeAISettings):
         self,
         argv: Optional[list[str]] = None,
         conf: Optional[DictConfig] = None,
-        clobber=False,
-    ):
+        clobber: Optional[bool] = False,
+    ) -> None:
         """
         Update settings with contents of init file, environment, and command-line settings.
 
@@ -337,7 +337,7 @@ class InvokeAIAppConfig(InvokeAISettings):
                 )
 
     @classmethod
-    def get_config(cls, **kwargs: Dict[str, Any]) -> InvokeAIAppConfig:
+    def get_config(cls, **kwargs: Any) -> InvokeAIAppConfig:
         """Return a singleton InvokeAIAppConfig configuration object."""
         if (
             cls.singleton_config is None
@@ -455,7 +455,7 @@ class InvokeAIAppConfig(InvokeAISettings):
         return _find_root()
 
 
-def get_invokeai_config(**kwargs) -> InvokeAIAppConfig:
+def get_invokeai_config(**kwargs: Any) -> InvokeAIAppConfig:
     """Legacy function which returns InvokeAIAppConfig.get_config()."""
     return InvokeAIAppConfig.get_config(**kwargs)
 

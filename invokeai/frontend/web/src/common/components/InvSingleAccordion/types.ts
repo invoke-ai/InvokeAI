@@ -4,4 +4,5 @@ export type InvSingleAccordionProps = PropsWithChildren<{
   label: string;
   badges?: (string | number)[];
   defaultIsOpen?: boolean;
+  id?: string;
 }>;
