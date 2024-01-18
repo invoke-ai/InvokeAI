@@ -56,7 +56,7 @@ const AboutModal = ({ children }: AboutModalProps) => {
       })}
       <InvModal isOpen={isOpen} onClose={onClose} isCentered size="2xl">
         <InvModalOverlay />
-        <InvModalContent maxH="80vh" h="50vh">
+        <InvModalContent maxH="80vh" h="33rem">
           <InvModalHeader>{t('accessibility.about')}</InvModalHeader>
           <InvModalCloseButton />
           <InvModalBody display="flex" flexDir="column" gap={4}>
@@ -72,7 +72,7 @@ const AboutModal = ({ children }: AboutModalProps) => {
                     position="sticky"
                     top="0"
                     backgroundColor="base.750"
-                    fontSize="large"
+                    size="md"
                     p="1"
                   >
                     {t('common.localSystem')}
@@ -80,7 +80,7 @@ const AboutModal = ({ children }: AboutModalProps) => {
                   {deps.map(({ name, version }, i) => (
                     <Grid
                       key={i}
-                      py="3"
+                      py="2"
                       px="1"
                       w="full"
                       templateColumns="repeat(2, 1fr)"
@@ -122,7 +122,7 @@ const AboutModal = ({ children }: AboutModalProps) => {
                   </InvHeading>
                   <InvText fontSize="sm">{t('common.aboutDesc')}</InvText>
                   <Link isExternal href={websiteLink} fontSize="sm">
-                    {websiteLink}
+                    {websiteLink} <ExternalLinkIcon mx="2px" />
                   </Link>
                 </Flex>
               </GridItem>
