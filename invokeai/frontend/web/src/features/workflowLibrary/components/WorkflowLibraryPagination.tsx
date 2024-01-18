@@ -4,7 +4,7 @@ import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import type { Dispatch, SetStateAction } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 import type { paths } from 'services/api/schema';
 
 const PAGES_TO_DISPLAY = 7;
@@ -60,7 +60,7 @@ const WorkflowLibraryPagination = ({ page, setPage, data }: Props) => {
         onClick={handlePrevPage}
         isDisabled={page === 0}
         aria-label={t('common.prevPage')}
-        icon={<FaChevronLeft />}
+        icon={<PiCaretLeftBold />}
       />
       {pages.map((p) => (
         <InvButton
@@ -79,7 +79,7 @@ const WorkflowLibraryPagination = ({ page, setPage, data }: Props) => {
         onClick={handleNextPage}
         isDisabled={page === data.pages - 1}
         aria-label={t('common.nextPage')}
-        icon={<FaChevronRight />}
+        icon={<PiCaretRightBold />}
       />
     </InvButtonGroup>
   );

@@ -4,8 +4,7 @@ import { useNodeClassification } from 'features/nodes/hooks/useNodeClassificatio
 import type { Classification } from 'features/nodes/types/common';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaFlask } from 'react-icons/fa';
-import { FaHammer } from 'react-icons/fa6';
+import { PiFlaskBold, PiHammerBold } from 'react-icons/pi'
 
 interface Props {
   nodeId: string;
@@ -56,11 +55,11 @@ ClassificationTooltipContent.displayName = 'ClassificationTooltipContent';
 
 const getIcon = (classification: Classification) => {
   if (classification === 'beta') {
-    return FaHammer;
+    return PiHammerBold;
   }
 
   if (classification === 'prototype') {
-    return FaFlask;
+    return PiFlaskBold;
   }
 
   return undefined;

@@ -8,7 +8,7 @@ import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
 import { isInvocationNodeData } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaInfoCircle } from 'react-icons/fa';
+import { PiInfoBold } from 'react-icons/pi'
 
 interface Props {
   nodeId: string;
@@ -24,7 +24,7 @@ const InvocationNodeInfoIcon = ({ nodeId }: Props) => {
       shouldWrapChildren
     >
       <Icon
-        as={FaInfoCircle}
+        as={PiInfoBold}
         display="block"
         boxSize={4}
         w={8}

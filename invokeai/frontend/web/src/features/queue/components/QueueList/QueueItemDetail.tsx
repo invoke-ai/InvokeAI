@@ -10,7 +10,7 @@ import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTime
 import type { ReactNode } from 'react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaTimes } from 'react-icons/fa';
+import { PiXBold } from 'react-icons/pi';
 import { useGetQueueItemQuery } from 'services/api/endpoints/queue';
 import type { SessionQueueItemDTO } from 'services/api/types';
 
@@ -81,7 +81,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
                 : true
             }
             aria-label={t('queue.cancelItem')}
-            leftIcon={<FaTimes />}
+            leftIcon={<PiXBold />}
             colorScheme="error"
           >
             {t('queue.cancelItem')}
@@ -91,7 +91,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
             isLoading={isLoadingCancelBatch}
             isDisabled={isCanceled}
             aria-label={t('queue.cancelBatch')}
-            leftIcon={<FaTimes />}
+            leftIcon={<PiXBold />}
             colorScheme="error"
           >
             {t('queue.cancelBatch')}

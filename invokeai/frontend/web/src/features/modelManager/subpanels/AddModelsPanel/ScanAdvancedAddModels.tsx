@@ -11,7 +11,7 @@ import { InvText } from 'common/components/InvText/wrapper';
 import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaTimes } from 'react-icons/fa';
+import { PiXBold } from 'react-icons/pi';
 
 import AdvancedAddCheckpoint from './AdvancedAddCheckpoint';
 import AdvancedAddDiffusers from './AdvancedAddDiffusers';
@@ -94,7 +94,7 @@ const ScanAdvancedAddModels = () => {
             : 'Add Diffusers Model'}
         </InvText>
         <InvIconButton
-          icon={<FaTimes />}
+          icon={<PiXBold />}
           aria-label={t('modelManager.closeAdvanced')}
           onClick={handleClickSetAdvanced}
           size="sm"

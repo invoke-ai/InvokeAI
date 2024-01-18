@@ -4,8 +4,7 @@ import { InvText } from 'common/components/InvText/wrapper';
 import newGithubIssueUrl from 'new-github-issue-url';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaCopy, FaExternalLinkAlt } from 'react-icons/fa';
-import { FaArrowRotateLeft } from 'react-icons/fa6';
+import { PiArrowCounterClockwiseBold,PiArrowSquareOutBold, PiCopyBold } from 'react-icons/pi'
 import { serializeError } from 'serialize-error';
 
 type Props = {
@@ -68,16 +67,16 @@ const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
         </Flex>
         <Flex gap={4}>
           <InvButton
-            leftIcon={<FaArrowRotateLeft />}
+            leftIcon={<PiArrowCounterClockwiseBold />}
             onClick={resetErrorBoundary}
           >
             {t('accessibility.resetUI')}
           </InvButton>
-          <InvButton leftIcon={<FaCopy />} onClick={handleCopy}>
+          <InvButton leftIcon={<PiCopyBold />} onClick={handleCopy}>
             {t('common.copyError')}
           </InvButton>
           <Link href={url} isExternal>
-            <InvButton leftIcon={<FaExternalLinkAlt />}>
+            <InvButton leftIcon={<PiArrowSquareOutBold />}>
               {t('accessibility.createIssue')}
             </InvButton>
           </Link>
