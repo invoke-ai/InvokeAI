@@ -289,11 +289,11 @@ class ModelInstall(object):
             key = self.reverse_paths.get(path)
             if key and all_models[key].installed:
                 models_to_remove.append(path)
-        
+
         for path in models_to_remove:
             logger.warning(f"{path} already installed. Skipping")
             model_list.remove(path)
-            
+
     def _add_required_models(self, model_list: List[str]):
         additional_models = []
         all_models = self.all_models()
