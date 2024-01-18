@@ -228,6 +228,7 @@ exclude = [
 [tool.mypy]
 ignore_missing_imports = true # ignores missing types in third-party libraries
 strict = true
+plugins = "pydantic.mypy"
 exclude = ["tests/*"]
 
 # overrides for specific modules

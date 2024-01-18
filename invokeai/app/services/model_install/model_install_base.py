@@ -1,27 +1,42 @@
+# Copyright 2023 Lincoln D. Stein and the InvokeAI development team
+"""Baseclass definitions for the model installer."""
+
 import re
 import traceback
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Set, Union
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic.networks import AnyHttpUrl
 from typing_extensions import Annotated
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase
 from invokeai.app.services.events import EventServiceBase
+from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import ModelRecordServiceBase
-from invokeai.backend.model_manager import AnyModelConfig
+from invokeai.backend.model_manager import AnyModelConfig, ModelRepoVariant
+from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore
 
 
 class InstallStatus(str, Enum):
     """State of an install job running in the background."""
 
     WAITING = "waiting"  # waiting to be dequeued
+    DOWNLOADING = "downloading"  # downloading of model files in process
     RUNNING = "running"  # being processed
     COMPLETED = "completed"  # finished running
     ERROR = "error"  # terminated with an error message
+    CANCELLED = "cancelled"  # terminated with an error message
+
+
+class ModelInstallPart(BaseModel):
+    url: AnyHttpUrl
+    path: Path
+    bytes: int = 0
+    total_bytes: int = 0
 
 
 class UnknownInstallJobException(Exception):
@@ -74,12 +89,31 @@ class LocalModelSource(StringLikeSource):
         return Path(self.path).as_posix()
 
 
+class CivitaiModelSource(StringLikeSource):
+    """A Civitai version id, with optional variant and access token."""
+
+    version_id: int
+    variant: Optional[ModelRepoVariant] = None
+    access_token: Optional[str] = None
+    type: Literal["civitai"] = "civitai"
+
+    def __str__(self) -> str:
+        """Return string version of repoid when string rep needed."""
+        base: str = str(self.version_id)
+        base += f" ({self.variant})" if self.variant else ""
+        return base
+
+
 class HFModelSource(StringLikeSource):
-    """A HuggingFace repo_id, with optional variant and sub-folder."""
+    """
+    A HuggingFace repo_id with optional variant, sub-folder and access token.
+    Note that the variant option, if not provided to the constructor, will default to fp16, which is
+    what people (almost) always want.
+    """
 
     repo_id: str
-    variant: Optional[str] = None
-    subfolder: Optional[str | Path] = None
+    variant: Optional[ModelRepoVariant] = ModelRepoVariant.FP16
+    subfolder: Optional[Path] = None
     access_token: Optional[str] = None
     type: Literal["hf"] = "hf"
 
@@ -103,19 +137,22 @@ class URLModelSource(StringLikeSource):
 
     url: AnyHttpUrl
     access_token: Optional[str] = None
-    type: Literal["generic_url"] = "generic_url"
+    type: Literal["url"] = "url"
 
     def __str__(self) -> str:
         """Return string version of the url when string rep needed."""
         return str(self.url)
 
 
-ModelSource = Annotated[Union[LocalModelSource, HFModelSource, URLModelSource], Field(discriminator="type")]
+ModelSource = Annotated[
+    Union[LocalModelSource, HFModelSource, CivitaiModelSource, URLModelSource], Field(discriminator="type")
+]
 
 
 class ModelInstallJob(BaseModel):
     """Object that tracks the current status of an install request."""
 
+    id: int = Field(description="Unique ID for this job")
     status: InstallStatus = Field(default=InstallStatus.WAITING, description="Current status of install process")
     config_in: Dict[str, Any] = Field(
         default_factory=dict, description="Configuration information (e.g. 'description') to apply to model."
@@ -128,14 +165,73 @@ class ModelInstallJob(BaseModel):
     )
     source: ModelSource = Field(description="Source (URL, repo_id, or local path) of model")
     local_path: Path = Field(description="Path to locally-downloaded model; may be the same as the source")
-    error_type: Optional[str] = Field(default=None, description="Class name of the exception that led to status==ERROR")
-    error: Optional[str] = Field(default=None, description="Error traceback")  # noqa #501
+    bytes: Optional[int] = Field(
+        default=None, description="For a remote model, the number of bytes downloaded so far (may not be available)"
+    )
+    total_bytes: int = Field(default=0, description="Total size of the model to be installed")
+    source_metadata: Optional[AnyModelRepoMetadata] = Field(
+        default=None, description="Metadata provided by the model source"
+    )
+    download_parts: Set[DownloadJob] = Field(
+        default_factory=set, description="Download jobs contributing to this install"
+    )
+    # internal flags and transitory settings
+    _install_tmpdir: Optional[Path] = PrivateAttr(default=None)
+    _exception: Optional[Exception] = PrivateAttr(default=None)
 
     def set_error(self, e: Exception) -> None:
         """Record the error and traceback from an exception."""
-        self.error_type = e.__class__.__name__
-        self.error = "".join(traceback.format_exception(e))
+        self._exception = e
         self.status = InstallStatus.ERROR
+
+    def cancel(self) -> None:
+        """Call to cancel the job."""
+        self.status = InstallStatus.CANCELLED
+
+    @property
+    def error_type(self) -> Optional[str]:
+        """Class name of the exception that led to status==ERROR."""
+        return self._exception.__class__.__name__ if self._exception else None
+
+    @property
+    def error(self) -> Optional[str]:
+        """Error traceback."""
+        return "".join(traceback.format_exception(self._exception)) if self._exception else None
+
+    @property
+    def cancelled(self) -> bool:
+        """Set status to CANCELLED."""
+        return self.status == InstallStatus.CANCELLED
+
+    @property
+    def errored(self) -> bool:
+        """Return true if job has errored."""
+        return self.status == InstallStatus.ERROR
+
+    @property
+    def waiting(self) -> bool:
+        """Return true if job is waiting to run."""
+        return self.status == InstallStatus.WAITING
+
+    @property
+    def downloading(self) -> bool:
+        """Return true if job is downloading."""
+        return self.status == InstallStatus.DOWNLOADING
+
+    @property
+    def running(self) -> bool:
+        """Return true if job is running."""
+        return self.status == InstallStatus.RUNNING
+
+    @property
+    def complete(self) -> bool:
+        """Return true if job completed without errors."""
+        return self.status == InstallStatus.COMPLETED
+
+    @property
+    def in_terminal_state(self) -> bool:
+        """Return true if job is in a terminal state."""
+        return self.status in [InstallStatus.COMPLETED, InstallStatus.ERROR, InstallStatus.CANCELLED]
 
 
 class ModelInstallServiceBase(ABC):
@@ -146,6 +242,8 @@ class ModelInstallServiceBase(ABC):
         self,
         app_config: InvokeAIAppConfig,
         record_store: ModelRecordServiceBase,
+        download_queue: DownloadQueueServiceBase,
+        metadata_store: ModelMetadataStore,
         event_bus: Optional["EventServiceBase"] = None,
     ):
         """
@@ -156,12 +254,14 @@ class ModelInstallServiceBase(ABC):
         :param event_bus: InvokeAI event bus for reporting events to.
         """
 
+    # make the invoker optional here because we don't need it and it
+    # makes the installer harder to use outside the web app
     @abstractmethod
-    def start(self, *args: Any, **kwarg: Any) -> None:
+    def start(self, invoker: Optional[Invoker] = None) -> None:
         """Start the installer service."""
 
     @abstractmethod
-    def stop(self, *args: Any, **kwarg: Any) -> None:
+    def stop(self, invoker: Optional[Invoker] = None) -> None:
         """Stop the model install service. After this the objection can be safely deleted."""
 
     @property
@@ -264,8 +364,12 @@ class ModelInstallServiceBase(ABC):
         """
 
     @abstractmethod
-    def get_job(self, source: ModelSource) -> List[ModelInstallJob]:
+    def get_job_by_source(self, source: ModelSource) -> List[ModelInstallJob]:
         """Return the ModelInstallJob(s) corresponding to the provided source."""
+
+    @abstractmethod
+    def get_job_by_id(self, id: int) -> ModelInstallJob:
+        """Return the ModelInstallJob corresponding to the provided id. Raises ValueError if no job has that ID."""
 
     @abstractmethod
     def list_jobs(self) -> List[ModelInstallJob]:  # noqa D102
@@ -278,16 +382,19 @@ class ModelInstallServiceBase(ABC):
         """Prune all completed and errored jobs."""
 
     @abstractmethod
-    def wait_for_installs(self) -> List[ModelInstallJob]:
+    def cancel_job(self, job: ModelInstallJob) -> None:
+        """Cancel the indicated job."""
+
+    @abstractmethod
+    def wait_for_installs(self, timeout: int = 0) -> List[ModelInstallJob]:
         """
         Wait for all pending installs to complete.
 
         This will block until all pending installs have
-        completed, been cancelled, or errored out. It will
-        block indefinitely if one or more jobs are in the
-        paused state.
+        completed, been cancelled, or errored out.
 
-        It will return the current list of jobs.
+        :param timeout: Wait up to indicated number of seconds. Raise an Exception('timeout') if
+        installs do not complete within the indicated time.
         """
 
     @abstractmethod
