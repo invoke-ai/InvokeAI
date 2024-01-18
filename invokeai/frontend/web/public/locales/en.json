@@ -1,5 +1,6 @@
 {
     "accessibility": {
+        "about": "About",
         "copyMetadataJson": "Copy metadata JSON",
         "createIssue": "Create Issue",
         "exitViewer": "Exit Viewer",
@@ -74,6 +75,8 @@
         }
     },
     "common": {
+        "aboutDesc": "Using Invoke for work? Check out:",
+        "aboutHeading": "Own Your Creative Power",
         "accept": "Accept",
         "advanced": "Advanced",
         "advancedOptions": "Advanced Options",
@@ -136,6 +139,7 @@
         "load": "Load",
         "loading": "Loading",
         "loadingInvokeAI": "Loading Invoke AI",
+        "localSystem": "Local System",
         "learnMore": "Learn More",
         "modelManager": "Model Manager",
         "nodeEditor": "Node Editor",
