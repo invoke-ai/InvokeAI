@@ -1,11 +1,11 @@
 import { useDisclosure } from '@chakra-ui/react';
+import { useStore } from '@nanostores/react';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import type { InvIconButtonProps } from 'common/components/InvIconButton/types';
+import { $shift } from 'common/hooks/useGlobalModifiers';
 import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
-import { useState } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold, PiXBold } from 'react-icons/pi';
 
@@ -60,24 +60,16 @@ const ClearSingleQueueItemIconButton = (props: Props) => {
 export const ClearQueueButton = (props: Props) => {
   // Show the single item clear button when shift is pressed
   // Otherwise show the clear queue button
-  const [showSingleItemClear, setShowSingleItemClear] = useState(true);
-  useHotkeys('shift', () => setShowSingleItemClear(false), {
-    keydown: true,
-    keyup: false,
-  });
-  useHotkeys('shift', () => setShowSingleItemClear(true), {
-    keydown: false,
-    keyup: true,
-  });
+  const shift = useStore($shift);
 
   const disclosure = useDisclosure();
 
   return (
     <>
-      {showSingleItemClear ? (
-        <ClearSingleQueueItemIconButton {...props} />
-      ) : (
+      {shift ? (
         <ClearQueueIconButton {...props} onOpen={disclosure.onOpen} />
+      ) : (
+        <ClearSingleQueueItemIconButton {...props} />
       )}
       <ClearQueueConfirmationAlertDialog disclosure={disclosure} />
     </>
