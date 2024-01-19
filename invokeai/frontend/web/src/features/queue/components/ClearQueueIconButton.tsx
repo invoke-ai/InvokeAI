@@ -9,12 +9,16 @@ import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold, PiXBold } from 'react-icons/pi';
 
-type Props = Omit<InvIconButtonProps, 'aria-label'>;
+type ClearQueueButtonProps = Omit<InvIconButtonProps, 'aria-label'>;
 
-const ClearQueueIconButton = ({
+type ClearQueueIconButtonProps = ClearQueueButtonProps & {
+  onOpen: () => void;
+};
+
+const ClearAllQueueIconButton = ({
   onOpen,
   ...props
-}: Props & { onOpen: () => void }) => {
+}: ClearQueueIconButtonProps) => {
   const { t } = useTranslation();
   const { isLoading, isDisabled } = useClearQueue();
 
@@ -33,7 +37,7 @@ const ClearQueueIconButton = ({
   );
 };
 
-const ClearSingleQueueItemIconButton = (props: Props) => {
+const ClearSingleQueueItemIconButton = (props: ClearQueueButtonProps) => {
   const { t } = useTranslation();
   const { cancelQueueItem, isLoading, isDisabled } =
     useCancelCurrentQueueItem();
@@ -53,17 +57,16 @@ const ClearSingleQueueItemIconButton = (props: Props) => {
   );
 };
 
-export const ClearQueueButton = (props: Props) => {
+export const ClearQueueIconButton = (props: ClearQueueButtonProps) => {
   // Show the single item clear button when shift is pressed
   // Otherwise show the clear queue button
   const shift = useStore($shift);
-
   const disclosure = useDisclosure();
 
   return (
     <>
       {shift ? (
-        <ClearQueueIconButton {...props} onOpen={disclosure.onOpen} />
+        <ClearAllQueueIconButton {...props} onOpen={disclosure.onOpen} />
       ) : (
         <ClearSingleQueueItemIconButton {...props} />
       )}
@@ -72,4 +75,4 @@ export const ClearQueueButton = (props: Props) => {
   );
 };
 
-export default ClearQueueButton;
+export default ClearQueueIconButton;
