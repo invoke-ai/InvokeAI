@@ -38,9 +38,16 @@ export const LoRACard = memo((props: LoRACardProps) => {
   return (
     <InvCard variant="lora">
       <InvCardHeader>
-        <InvTooltip label={lora.model_name} placement="top" isDisabled={lora.model_name.length < loRaNameMaxLength}>
+        <InvTooltip
+          label={lora.model_name}
+          placement="top"
+          isDisabled={lora.model_name.length < loRaNameMaxLength}
+        >
           <InvLabel noOfLines={1}>
-            {truncate(String(lora.model_name), { length: loRaNameMaxLength, omission: '...' })}
+            {truncate(String(lora.model_name), {
+              length: loRaNameMaxLength,
+              omission: '...',
+            })}
           </InvLabel>
         </InvTooltip>
         <InvIconButton
