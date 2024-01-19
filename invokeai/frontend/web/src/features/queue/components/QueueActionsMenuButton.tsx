@@ -26,7 +26,7 @@ export const QueueActionsMenuButton = memo(() => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const clearQueueDisclosure = useDisclosure()
+  const clearQueueDisclosure = useDisclosure();
   const isPauseEnabled = useFeatureStatus('pauseQueue').isFeatureEnabled;
   const isResumeEnabled = useFeatureStatus('resumeQueue').isFeatureEnabled;
   const { queueSize } = useGetQueueStatusQuery(undefined, {
@@ -36,10 +36,8 @@ export const QueueActionsMenuButton = memo(() => {
         : 0,
     }),
   });
-  const {
-    isLoading: isLoadingClearQueue,
-    isDisabled: isDisabledClearQueue,
-  } = useClearQueue();
+  const { isLoading: isLoadingClearQueue, isDisabled: isDisabledClearQueue } =
+    useClearQueue();
   const {
     resumeProcessor,
     isLoading: isLoadingResumeProcessor,
