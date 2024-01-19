@@ -11,7 +11,7 @@ import { useOverlayScrollbars } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiImageBold, PiWarningCircleBold } from 'react-icons/pi'
+import { PiImageBold, PiWarningCircleBold } from 'react-icons/pi';
 import type {
   GridComponents,
   ItemContent,

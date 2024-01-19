@@ -4,7 +4,11 @@ import { InvText } from 'common/components/InvText/wrapper';
 import newGithubIssueUrl from 'new-github-issue-url';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold,PiArrowSquareOutBold, PiCopyBold } from 'react-icons/pi'
+import {
+  PiArrowCounterClockwiseBold,
+  PiArrowSquareOutBold,
+  PiCopyBold,
+} from 'react-icons/pi';
 import { serializeError } from 'serialize-error';
 
 type Props = {

@@ -25,7 +25,11 @@ import {
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold,PiFloppyDiskBold, PiRulerBold } from 'react-icons/pi'
+import {
+  PiArrowCounterClockwiseBold,
+  PiFloppyDiskBold,
+  PiRulerBold,
+} from 'react-icons/pi';
 import {
   useAddImageToBoardMutation,
   useChangeImageIsIntermediateMutation,
@@ -210,7 +214,9 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
       <>
         <IAIDndImageIcon
           onClick={handleResetControlImage}
-          icon={controlImage ? <PiArrowCounterClockwiseBold size={16} /> : undefined}
+          icon={
+            controlImage ? <PiArrowCounterClockwiseBold size={16} /> : undefined
+          }
           tooltip={t('controlnet.resetControlImage')}
         />
         <IAIDndImageIcon

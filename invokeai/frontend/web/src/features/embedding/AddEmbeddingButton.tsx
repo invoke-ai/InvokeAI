@@ -2,7 +2,7 @@ import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCodeBold } from 'react-icons/pi'
+import { PiCodeBold } from 'react-icons/pi';
 
 type Props = {
   isOpen: boolean;

@@ -10,7 +10,11 @@ import type { NodeExecutionState } from 'features/nodes/types/invocation';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCheckBold, PiDotsThreeOutlineFill, PiWarningBold } from 'react-icons/pi'
+import {
+  PiCheckBold,
+  PiDotsThreeOutlineFill,
+  PiWarningBold,
+} from 'react-icons/pi';
 
 type Props = {
   nodeId: string;
@@ -122,7 +126,13 @@ type StatusIconProps = {
 const StatusIcon = memo((props: StatusIconProps) => {
   const { progress, status } = props.nodeExecutionState;
   if (status === zNodeStatus.enum.PENDING) {
-    return <Icon as={PiDotsThreeOutlineFill} boxSize={iconBoxSize} color="base.300" />;
+    return (
+      <Icon
+        as={PiDotsThreeOutlineFill}
+        boxSize={iconBoxSize}
+        color="base.300"
+      />
+    );
   }
   if (status === zNodeStatus.enum.IN_PROGRESS) {
     return progress === null ? (

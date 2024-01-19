@@ -1,7 +1,7 @@
 import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiTrashSimpleBold } from 'react-icons/pi'
+import { PiTrashSimpleBold } from 'react-icons/pi';
 import type { BoardDTO } from 'services/api/types';
 
 type Props = {
@@ -20,7 +20,11 @@ const GalleryBoardContextMenuItems = ({ board, setBoardToDelete }: Props) => {
 
   return (
     <>
-      <InvMenuItem color="error.300" icon={<PiTrashSimpleBold />} onClick={handleDelete}>
+      <InvMenuItem
+        color="error.300"
+        icon={<PiTrashSimpleBold />}
+        onClick={handleDelete}
+      >
         {t('boards.deleteBoard')}
       </InvMenuItem>
     </>

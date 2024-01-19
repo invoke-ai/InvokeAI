@@ -9,7 +9,7 @@ import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableCon
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiWarningCircleBold } from 'react-icons/pi'
+import { PiWarningCircleBold } from 'react-icons/pi';
 
 const selectPrompts = createMemoizedSelector(
   selectDynamicPromptsSlice,

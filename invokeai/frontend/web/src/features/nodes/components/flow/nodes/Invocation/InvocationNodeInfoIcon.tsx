@@ -8,7 +8,7 @@ import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
 import { isInvocationNodeData } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiInfoBold } from 'react-icons/pi'
+import { PiInfoBold } from 'react-icons/pi';
 
 interface Props {
   nodeId: string;
