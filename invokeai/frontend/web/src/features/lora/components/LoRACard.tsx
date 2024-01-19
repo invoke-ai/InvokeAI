@@ -8,8 +8,10 @@ import { InvLabel } from 'common/components/InvControl/InvLabel';
 import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
 import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { loraRemoved, loraWeightChanged } from 'features/lora/store/loraSlice';
+import { truncate } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { FaTrashCan } from 'react-icons/fa6';
 
@@ -20,6 +22,7 @@ type LoRACardProps = {
 export const LoRACard = memo((props: LoRACardProps) => {
   const dispatch = useAppDispatch();
   const { lora } = props;
+  const loRaNameMaxLength = 24;
 
   const handleChange = useCallback(
     (v: number) => {
@@ -35,9 +38,11 @@ export const LoRACard = memo((props: LoRACardProps) => {
   return (
     <InvCard variant="lora">
       <InvCardHeader>
-        <InvLabel noOfLines={1} wordBreak="break-all">
-          {lora.model_name}
-        </InvLabel>
+        <InvTooltip label={lora.model_name} placement="top" isDisabled={lora.model_name.length < loRaNameMaxLength}>
+          <InvLabel noOfLines={1}>
+            {truncate(String(lora.model_name), { length: loRaNameMaxLength, omission: '...' })}
+          </InvLabel>
+        </InvTooltip>
         <InvIconButton
           aria-label="Remove LoRA"
           variant="ghost"
