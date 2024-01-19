@@ -7,7 +7,7 @@ import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { PiTrashSimpleBold } from 'react-icons/pi';
+import { PiTrashSimpleBold, PiXBold } from 'react-icons/pi';
 
 type Props = Omit<InvIconButtonProps, 'aria-label'>;
 
@@ -45,12 +45,12 @@ const ClearSingleQueueItemIconButton = (props: Props) => {
       <InvIconButton
         isDisabled={isDisabled}
         isLoading={isLoading}
-        aria-label={t('queue.cancelTooltip')}
+        aria-label={t('queue.cancel')}
         tooltip={t('queue.cancelTooltip')}
-        icon={<PiTrashSimpleBold size="16px" />}
+        icon={<PiXBold size="16px" />}
         colorScheme="error"
         onClick={cancelQueueItem}
-        data-testid={t('queue.clear')}
+        data-testid={t('queue.cancel')}
         {...props}
       />
     </>
