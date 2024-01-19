@@ -11,7 +11,7 @@ export const addSocketUploadStartedEventListener = () => {
     actionCreator: socketUploadStarted,
     effect: (action) => {
       log.trace(action.payload, `Upload started`);
-      console.log(action.payload);
+      console.log(action.payload); // Log the payload for debugging
     },
   });
 };
