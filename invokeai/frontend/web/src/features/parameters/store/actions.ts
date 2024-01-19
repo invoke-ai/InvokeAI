@@ -8,3 +8,11 @@ export const initialImageSelected = createAction<ImageDTO | undefined>(
 export const modelSelected = createAction<MainModelField>(
   'generation/modelSelected'
 );
+
+export const expanderToggled = createAction<{ id: string; isOpen: boolean }>(
+  'parameters/expanderToggled'
+);
+export const singleAccordionExpanded = createAction<{
+  id: string;
+  isOpen: boolean;
+}>('parameters/singleAccordionExpanded');

@@ -11,7 +11,11 @@ import {
 import type { CSSProperties } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaSearch, FaSync, FaTrash } from 'react-icons/fa';
+import {
+  PiArrowsCounterClockwiseBold,
+  PiMagnifyingGlassBold,
+  PiTrashSimpleBold,
+} from 'react-icons/pi';
 import { useGetModelsInFolderQuery } from 'services/api/endpoints/models';
 
 type SearchFolderForm = {
@@ -93,7 +97,7 @@ function SearchFolderForm() {
             <InvIconButton
               aria-label={t('modelManager.findModels')}
               tooltip={t('modelManager.findModels')}
-              icon={<FaSearch />}
+              icon={<PiMagnifyingGlassBold />}
               fontSize={18}
               size="sm"
               type="submit"
@@ -102,7 +106,7 @@ function SearchFolderForm() {
             <InvIconButton
               aria-label={t('modelManager.scanAgain')}
               tooltip={t('modelManager.scanAgain')}
-              icon={<FaSync />}
+              icon={<PiArrowsCounterClockwiseBold />}
               onClick={scanAgainHandler}
               fontSize={18}
               size="sm"
@@ -112,7 +116,7 @@ function SearchFolderForm() {
           <InvIconButton
             aria-label={t('modelManager.clearCheckpointFolder')}
             tooltip={t('modelManager.clearCheckpointFolder')}
-            icon={<FaTrash />}
+            icon={<PiTrashSimpleBold />}
             size="sm"
             onClick={handleClickClearCheckpointFolder}
             isDisabled={!searchFolder}

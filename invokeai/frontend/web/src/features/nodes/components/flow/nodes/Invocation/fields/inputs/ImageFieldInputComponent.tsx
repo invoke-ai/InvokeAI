@@ -15,7 +15,7 @@ import type {
 } from 'features/nodes/types/field';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaUndo } from 'react-icons/fa';
+import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { PostUploadAction } from 'services/api/types';
 
@@ -95,7 +95,7 @@ const ImageFieldInputComponent = (
       >
         <IAIDndImageIcon
           onClick={handleReset}
-          icon={imageDTO ? <FaUndo /> : undefined}
+          icon={imageDTO ? <PiArrowCounterClockwiseBold /> : undefined}
           tooltip="Reset Image"
         />
       </IAIDndImage>

@@ -10,14 +10,15 @@ import {
   InvMenuButton,
   InvMenuDivider,
 } from 'common/components/InvMenu/wrapper';
-import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
+import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQueueConfirmationAlertDialog';
+import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
 import { useResumeProcessor } from 'features/queue/hooks/useResumeProcessor';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiPauseFill, PiPlayFill, PiXBold } from 'react-icons/pi';
+import { PiPauseFill, PiPlayFill, PiTrashSimpleBold } from 'react-icons/pi';
 import { RiListCheck, RiPlayList2Fill } from 'react-icons/ri';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
@@ -25,6 +26,7 @@ export const QueueActionsMenuButton = memo(() => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const clearQueueDisclosure = useDisclosure();
   const isPauseEnabled = useFeatureStatus('pauseQueue').isFeatureEnabled;
   const isResumeEnabled = useFeatureStatus('resumeQueue').isFeatureEnabled;
   const { queueSize } = useGetQueueStatusQuery(undefined, {
@@ -34,11 +36,8 @@ export const QueueActionsMenuButton = memo(() => {
         : 0,
     }),
   });
-  const {
-    cancelQueueItem,
-    isLoading: isLoadingCancelQueueItem,
-    isDisabled: isDisabledCancelQueueItem,
-  } = useCancelCurrentQueueItem();
+  const { isLoading: isLoadingClearQueue, isDisabled: isDisabledClearQueue } =
+    useClearQueue();
   const {
     resumeProcessor,
     isLoading: isLoadingResumeProcessor,
@@ -55,6 +54,8 @@ export const QueueActionsMenuButton = memo(() => {
 
   return (
     <Box pos="relative">
+      <ClearQueueConfirmationAlertDialog disclosure={clearQueueDisclosure} />
+
       <InvMenu
         isOpen={isOpen}
         onOpen={onOpen}
@@ -69,12 +70,12 @@ export const QueueActionsMenuButton = memo(() => {
         <InvMenuList>
           <InvMenuItem
             isDestructive
-            icon={<PiXBold size="16px" />}
-            onClick={cancelQueueItem}
-            isLoading={isLoadingCancelQueueItem}
-            isDisabled={isDisabledCancelQueueItem}
+            icon={<PiTrashSimpleBold size="16px" />}
+            onClick={clearQueueDisclosure.onOpen}
+            isLoading={isLoadingClearQueue}
+            isDisabled={isDisabledClearQueue}
           >
-            {t('queue.cancelTooltip')}
+            {t('queue.clearTooltip')}
           </InvMenuItem>
           {isResumeEnabled && (
             <InvMenuItem

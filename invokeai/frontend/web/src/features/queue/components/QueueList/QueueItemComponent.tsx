@@ -9,7 +9,7 @@ import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTime
 import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaTimes } from 'react-icons/fa';
+import { PiXBold } from 'react-icons/pi';
 import type { SessionQueueItemDTO } from 'services/api/types';
 
 import { COLUMN_WIDTHS } from './constants';
@@ -63,7 +63,7 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
     [item.status]
   );
 
-  const icon = useMemo(() => <FaTimes />, []);
+  const icon = useMemo(() => <PiXBold />, []);
   return (
     <Flex
       flexDir="column"

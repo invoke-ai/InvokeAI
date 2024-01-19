@@ -22,16 +22,16 @@ import type {
   SyntheticEvent,
 } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { FaImage, FaUpload } from 'react-icons/fa';
+import { PiImageBold, PiUploadSimpleBold } from 'react-icons/pi';
 import type { ImageDTO, PostUploadAction } from 'services/api/types';
 
 import IAIDraggable from './IAIDraggable';
 import IAIDroppable from './IAIDroppable';
 import SelectionOverlay from './SelectionOverlay';
 
-const defaultUploadElement = <Icon as={FaUpload} boxSize={16} />;
+const defaultUploadElement = <Icon as={PiUploadSimpleBold} boxSize={16} />;
 
-const defaultNoContentFallback = <IAINoContentFallback icon={FaImage} />;
+const defaultNoContentFallback = <IAINoContentFallback icon={PiImageBold} />;
 
 type IAIDndImageProps = FlexProps & {
   imageDTO: ImageDTO | undefined;

@@ -207,7 +207,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
         isCentered
       >
         <InvModalOverlay />
-        <InvModalContent maxH="80vh" h="80vh">
+        <InvModalContent maxH="80vh" h="50vh">
           <InvModalHeader bg="none">{t('common.settingsLabel')}</InvModalHeader>
           <InvModalCloseButton />
           <InvModalBody display="flex" flexDir="column" gap={4}>

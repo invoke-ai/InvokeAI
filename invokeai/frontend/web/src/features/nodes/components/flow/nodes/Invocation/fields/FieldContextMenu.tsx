@@ -16,7 +16,7 @@ import {
 import type { ReactNode } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaMinus, FaPlus } from 'react-icons/fa';
+import { PiMinusBold, PiPlusBold } from 'react-icons/pi';
 
 type Props = {
   nodeId: string;
@@ -65,7 +65,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
       menuItems.push(
         <InvMenuItem
           key={`${nodeId}.${fieldName}.expose-field`}
-          icon={<FaPlus />}
+          icon={<PiPlusBold />}
           onClick={handleExposeField}
         >
           {t('nodes.addLinearView')}
@@ -76,7 +76,7 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
       menuItems.push(
         <InvMenuItem
           key={`${nodeId}.${fieldName}.unexpose-field`}
-          icon={<FaMinus />}
+          icon={<PiMinusBold />}
           onClick={handleUnexposeField}
         >
           {t('nodes.removeLinearView')}

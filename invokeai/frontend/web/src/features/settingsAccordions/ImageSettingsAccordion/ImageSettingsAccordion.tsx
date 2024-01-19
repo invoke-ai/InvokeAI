@@ -86,7 +86,7 @@ export const ImageSettingsAccordion = memo(() => {
         ) : (
           <ImageSizeLinear />
         )}
-        <InvExpander>
+        <InvExpander id="image-settings">
           <Flex gap={4} pb={4} flexDir="column">
             <Flex gap={4} alignItems="center">
               <ParamSeedNumberInput />

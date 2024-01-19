@@ -10,7 +10,11 @@ import type { NodeExecutionState } from 'features/nodes/types/invocation';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaCheck, FaEllipsisH, FaExclamation } from 'react-icons/fa';
+import {
+  PiCheckBold,
+  PiDotsThreeOutlineFill,
+  PiWarningBold,
+} from 'react-icons/pi';
 
 type Props = {
   nodeId: string;
@@ -122,7 +126,13 @@ type StatusIconProps = {
 const StatusIcon = memo((props: StatusIconProps) => {
   const { progress, status } = props.nodeExecutionState;
   if (status === zNodeStatus.enum.PENDING) {
-    return <Icon as={FaEllipsisH} boxSize={iconBoxSize} color="base.300" />;
+    return (
+      <Icon
+        as={PiDotsThreeOutlineFill}
+        boxSize={iconBoxSize}
+        color="base.300"
+      />
+    );
   }
   if (status === zNodeStatus.enum.IN_PROGRESS) {
     return progress === null ? (
@@ -144,10 +154,10 @@ const StatusIcon = memo((props: StatusIconProps) => {
     );
   }
   if (status === zNodeStatus.enum.COMPLETED) {
-    return <Icon as={FaCheck} boxSize={iconBoxSize} color="ok.300" />;
+    return <Icon as={PiCheckBold} boxSize={iconBoxSize} color="ok.300" />;
   }
   if (status === zNodeStatus.enum.FAILED) {
-    return <Icon as={FaExclamation} boxSize={iconBoxSize} color="error.300" />;
+    return <Icon as={PiWarningBold} boxSize={iconBoxSize} color="error.300" />;
   }
   return null;
 });
