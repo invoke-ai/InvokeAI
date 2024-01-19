@@ -18,7 +18,7 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiPauseFill, PiPlayFill, PiXBold } from 'react-icons/pi';
+import { PiPauseFill, PiPlayFill, PiTrashSimpleBold } from 'react-icons/pi';
 import { RiListCheck, RiPlayList2Fill } from 'react-icons/ri';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
@@ -70,7 +70,7 @@ export const QueueActionsMenuButton = memo(() => {
         <InvMenuList>
           <InvMenuItem
             isDestructive
-            icon={<PiXBold size="16px" />}
+            icon={<PiTrashSimpleBold size="16px" />}
             onClick={clearQueueDisclosure.onOpen}
             isLoading={isLoadingClearQueue}
             isDisabled={isDisabledClearQueue}
