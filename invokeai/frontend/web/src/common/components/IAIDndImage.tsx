@@ -22,7 +22,7 @@ import type {
   SyntheticEvent,
 } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { PiImageBold, PiUploadSimpleBold } from 'react-icons/pi'
+import { PiImageBold, PiUploadSimpleBold } from 'react-icons/pi';
 import type { ImageDTO, PostUploadAction } from 'services/api/types';
 
 import IAIDraggable from './IAIDraggable';

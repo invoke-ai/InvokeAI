@@ -1,7 +1,7 @@
 import type { As, FlexProps, StyleProps } from '@chakra-ui/react';
 import { Flex, Icon, Skeleton, Spinner } from '@chakra-ui/react';
 import { memo, useMemo } from 'react';
-import { PiImageBold } from 'react-icons/pi'
+import { PiImageBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
 import { InvText } from './InvText/wrapper';

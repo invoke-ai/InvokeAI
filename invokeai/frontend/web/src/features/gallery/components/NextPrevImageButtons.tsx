@@ -5,7 +5,11 @@ import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCaretDoubleRightBold,PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi'
+import {
+  PiCaretDoubleRightBold,
+  PiCaretLeftBold,
+  PiCaretRightBold,
+} from 'react-icons/pi';
 
 const nextPrevButtonStyles: ChakraProps['sx'] = {
   color: 'base.100',

@@ -11,7 +11,11 @@ import {
 import type { CSSProperties } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsCounterClockwiseBold, PiMagnifyingGlassBold, PiTrashSimpleBold } from 'react-icons/pi';
+import {
+  PiArrowsCounterClockwiseBold,
+  PiMagnifyingGlassBold,
+  PiTrashSimpleBold,
+} from 'react-icons/pi';
 import { useGetModelsInFolderQuery } from 'services/api/endpoints/models';
 
 type SearchFolderForm = {

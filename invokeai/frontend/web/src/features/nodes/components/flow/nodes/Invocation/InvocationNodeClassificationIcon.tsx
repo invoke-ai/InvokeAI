@@ -4,7 +4,7 @@ import { useNodeClassification } from 'features/nodes/hooks/useNodeClassificatio
 import type { Classification } from 'features/nodes/types/common';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiFlaskBold, PiHammerBold } from 'react-icons/pi'
+import { PiFlaskBold, PiHammerBold } from 'react-icons/pi';
 
 interface Props {
   nodeId: string;
