@@ -19,19 +19,17 @@ const ClearQueueIconButton = ({
   const { isLoading, isDisabled } = useClearQueue();
 
   return (
-    <>
-      <InvIconButton
-        isDisabled={isDisabled}
-        isLoading={isLoading}
-        aria-label={t('queue.clear')}
-        tooltip={t('queue.clearTooltip')}
-        icon={<PiTrashSimpleBold size="16px" />}
-        colorScheme="error"
-        onClick={onOpen}
-        data-testid={t('queue.clear')}
-        {...props}
-      />
-    </>
+    <InvIconButton
+      isDisabled={isDisabled}
+      isLoading={isLoading}
+      aria-label={t('queue.clear')}
+      tooltip={t('queue.clearTooltip')}
+      icon={<PiTrashSimpleBold size="16px" />}
+      colorScheme="error"
+      onClick={onOpen}
+      data-testid={t('queue.clear')}
+      {...props}
+    />
   );
 };
 
@@ -41,19 +39,17 @@ const ClearSingleQueueItemIconButton = (props: Props) => {
     useCancelCurrentQueueItem();
 
   return (
-    <>
-      <InvIconButton
-        isDisabled={isDisabled}
-        isLoading={isLoading}
-        aria-label={t('queue.cancel')}
-        tooltip={t('queue.cancelTooltip')}
-        icon={<PiXBold size="16px" />}
-        colorScheme="error"
-        onClick={cancelQueueItem}
-        data-testid={t('queue.cancel')}
-        {...props}
-      />
-    </>
+    <InvIconButton
+      isDisabled={isDisabled}
+      isLoading={isLoading}
+      aria-label={t('queue.cancel')}
+      tooltip={t('queue.cancelTooltip')}
+      icon={<PiXBold size="16px" />}
+      colorScheme="error"
+      onClick={cancelQueueItem}
+      data-testid={t('queue.cancel')}
+      {...props}
+    />
   );
 };
 
