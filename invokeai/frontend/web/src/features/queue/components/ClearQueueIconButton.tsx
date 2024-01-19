@@ -5,13 +5,16 @@ import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQu
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { useState } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook'
+import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 
 type Props = Omit<InvIconButtonProps, 'aria-label'>;
 
-const ClearQueueIconButton = ({ onOpen, ...props }: Props & { onOpen: () => void }) => {
+const ClearQueueIconButton = ({
+  onOpen,
+  ...props
+}: Props & { onOpen: () => void }) => {
   const { t } = useTranslation();
   const { isLoading, isDisabled } = useClearQueue();
 
@@ -34,11 +37,8 @@ const ClearQueueIconButton = ({ onOpen, ...props }: Props & { onOpen: () => void
 
 const ClearSingleQueueItemIconButton = (props: Props) => {
   const { t } = useTranslation();
-  const {
-    cancelQueueItem,
-    isLoading,
-    isDisabled,
-  } = useCancelCurrentQueueItem();
+  const { cancelQueueItem, isLoading, isDisabled } =
+    useCancelCurrentQueueItem();
 
   return (
     <>
@@ -55,26 +55,33 @@ const ClearSingleQueueItemIconButton = (props: Props) => {
       />
     </>
   );
-}
+};
 
 export const ClearQueueButton = (props: Props) => {
   // Show the single item clear button when shift is pressed
   // Otherwise show the clear queue button
-  const [showSingleItemClear, setShowSingleItemClear] = useState(true)
-  useHotkeys('shift', () => setShowSingleItemClear(false), { keydown: true, keyup: false })
-  useHotkeys('shift', () => setShowSingleItemClear(true), { keydown: false, keyup: true });
+  const [showSingleItemClear, setShowSingleItemClear] = useState(true);
+  useHotkeys('shift', () => setShowSingleItemClear(false), {
+    keydown: true,
+    keyup: false,
+  });
+  useHotkeys('shift', () => setShowSingleItemClear(true), {
+    keydown: false,
+    keyup: true,
+  });
 
-  const disclosure = useDisclosure()
+  const disclosure = useDisclosure();
 
   return (
     <>
-      {showSingleItemClear
-        ? <ClearSingleQueueItemIconButton {...props} />
-        : <ClearQueueIconButton {...props} onOpen={disclosure.onOpen} />
-      }
+      {showSingleItemClear ? (
+        <ClearSingleQueueItemIconButton {...props} />
+      ) : (
+        <ClearQueueIconButton {...props} onOpen={disclosure.onOpen} />
+      )}
       <ClearQueueConfirmationAlertDialog disclosure={disclosure} />
     </>
-  )
-}
+  );
+};
 
 export default ClearQueueButton;
