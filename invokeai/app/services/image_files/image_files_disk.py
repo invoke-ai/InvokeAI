@@ -58,9 +58,6 @@ class DiskImageFileStorage(ImageFileStorageBase):
         except FileNotFoundError as e:
             raise ImageFileNotFoundException from e
 
-    ############################################################################################################
-    ############################    ORIGINAL CODE   ############################################################
-    ############################################################################################################
     def save(
         self,
         image: PILImageType,
@@ -91,6 +88,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 image_path,
                 "PNG",
                 pnginfo=pnginfo,
+                # compress_level from the config service doesnt actually work so needs hardcoding as of 3.6.0
                 compress_level=1,
                 # compress_level=self.__invoker.services.configuration.png_compress_level,
             )
@@ -104,10 +102,6 @@ class DiskImageFileStorage(ImageFileStorageBase):
             self.__set_cache(thumbnail_path, thumbnail_image)
         except Exception as e:
             raise ImageFileSaveException from e
-
-    ############################################################################################################
-    ############################################################################################################
-    ############################################################################################################
 
     def delete(self, image_name: str) -> None:
         try:

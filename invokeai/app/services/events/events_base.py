@@ -51,7 +51,6 @@ class EventServiceBase:
 
     def __emit_upload_event(self, event_name: str, payload: dict) -> None:
         payload["timestamp"] = get_timestamp()
-        print(f"This is coming from __emit_upload_event: {payload}")
         self.dispatch(
             event_name=EventServiceBase.upload_event,
             payload={"event": event_name, "data": payload},
@@ -504,10 +503,6 @@ class EventServiceBase:
             },
         )
     
-    ##############################################################################################################
-    ########################################   ERYX CODE  ########################################################
-    ##############################################################################################################
-    
     def emit_upload_started(
             self,
             message: str
@@ -515,10 +510,25 @@ class EventServiceBase:
         """
         Emit when a upload job is started.
 
-        :param message: The uploaded message
+        :param message: A message indacting the upload process of the image started
         """
-        print(f"This is coming from __emit_upload_event: {message}")
         self.__emit_upload_event(
             event_name="upload_started",
             payload={"message": message},
         )
+    
+    def emit_upload_progress(self, message: str, progress: float, processed: int, total: int) -> None:
+        """
+        Emit when an image was done processing
+
+        :param progress: The precentage of images out of the total images who were processed
+        :param processed: The number of images who have been processed so far out of the total images
+        :param total: The total number of images who are about to be processed
+        """
+        payload = {
+            "message": message,
+            "progress": progress,
+            "processed": processed,
+            "total": total
+        }
+        self.__emit_upload_event(event_name="upload_progress", payload=payload)

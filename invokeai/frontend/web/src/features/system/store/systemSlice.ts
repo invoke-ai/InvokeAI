@@ -1,4 +1,4 @@
-import type { UseToastOptions } from '@chakra-ui/react';
+import type { ToastId, UseToastOptions } from '@chakra-ui/react';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
@@ -39,6 +39,8 @@ export const initialSystemState: SystemState = {
   shouldUseWatermarker: false,
   shouldEnableInformationalPopovers: false,
   status: 'DISCONNECTED',
+  uploadProgress: null,
+  uploadProgressToastId: null,
 };
 
 export const systemSlice = createSlice({
@@ -83,6 +85,22 @@ export const systemSlice = createSlice({
       action: PayloadAction<boolean>
     ) {
       state.shouldEnableInformationalPopovers = action.payload;
+    },
+    setUploadProgress: (
+      state,
+      action: PayloadAction<{
+        progress: number;
+        processed: number;
+        total: number;
+      } | null>
+    ) => {
+      state.uploadProgress = action.payload;
+    },
+    setUploadProgressToastId: (
+      state,
+      action: PayloadAction<ToastId | null>
+    ) => {
+      state.uploadProgressToastId = action.payload;
     },
   },
   extraReducers(builder) {
@@ -202,6 +220,8 @@ export const {
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
   setShouldEnableInformationalPopovers,
+  setUploadProgress,
+  setUploadProgressToastId,
 } = systemSlice.actions;
 
 export default systemSlice.reducer;

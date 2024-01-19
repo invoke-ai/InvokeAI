@@ -42,7 +42,8 @@ class ImageServiceABC(ABC):
             callback(item_id)
     
     @abstractmethod
-    async def create_eryx(self, upload_data_list: List[ImageUploadData]) -> List[ImageDTO]:
+    async def create_multiple(self, upload_data_list: List[ImageUploadData]) -> List[ImageDTO]:
+        """Creates an images array DTO out of an array of images, storing the images and their metadata"""
         pass
 
     @abstractmethod

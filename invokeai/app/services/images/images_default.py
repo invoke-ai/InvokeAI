@@ -43,10 +43,7 @@ class ImageService(ImageServiceABC):
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
 
-    ############################################################################################################
-    ############################    Eryx CODE   ################################################################
-    ############################################################################################################
-    """ The create_eryx method is the new create method that will be used to upload images to the system.
+    """ The create_multiple method is the new create method that will be used to upload images to the system.
     This is the object it receives for 1,2,....n images:
     Images: [
         ImageUploadData(
@@ -105,16 +102,17 @@ class ImageService(ImageServiceABC):
     # TODO: Add additional processing from the process_images method
     # TODO: Add image record code here for multiple insert as well
     # TODO: change the return list to image DTOs from None
-    async def create_eryx(self, upload_data_list: List[ImageUploadData]) -> List[ImageDTO]:
+    async def create_multiple(self, upload_data_list: List[ImageUploadData]) -> List[ImageDTO]:
         print("Starting upload process")
         # Progress bar for processing
         total_images = len(upload_data_list)
+        processed_counter = 0  # Local counter
         progress_lock = Lock()
-        processed_counter = 0  # Shared counter
 
-        def process_and_save_image(image_data: ImageUploadData, processed_counter=processed_counter):
+        def process_and_save_image(image_data: ImageUploadData):
+            nonlocal processed_counter # refer to the counter in the enclosing scope
             try:
-                # Existing logic for processing and saving each image
+                # processing and saving each image
                 width, height = image_data.image.size
                 image_data.width = width
                 image_data.height = height
@@ -136,6 +134,15 @@ class ImageService(ImageServiceABC):
 
                 with progress_lock:
                     processed_counter += 1  # Increment counter
+
+                progress_percentage = (processed_counter / total_images) * 100
+                # Emit progress event
+                self.__invoker.services.events.emit_upload_progress(
+                    message="Image uploaded",
+                    progress=progress_percentage,
+                    processed=processed_counter,
+                    total=total_images
+                )
 
                 return image_dto
             except Exception as e:
@@ -163,84 +170,7 @@ class ImageService(ImageServiceABC):
 
         pbar.close()
         return images_DTOs
-    # async def create_eryx(self, upload_data_list: List[ImageUploadData]) -> List[ImageDTO]:
-    #     """Starts the upload process"""
-    #     # TODO: Implement the start upload process method here
-    #     print("-----------------------------------")
-    #     print(f"{datetime.now()}")
-    #     print("Starting upload process")
-    #     print("-----------------------------------")
-    #     print(f"Images: {upload_data_list}")
-    #     print("-----------------------------------")
-        
-    #     images_DTOs = []
-
-    #     # Determine the number of available CPU cores
-    #     num_cores = os.cpu_count() or 1  # Fallback to 1 if cpu_count() returns None
-
-    #     # Set the number of workers (you can adjust this formula as needed)
-    #     num_workers = max(1, num_cores - 1)  # Use all but one core, or 1 if only 1 core is available
-
-    #     print(f"Number of cores: {num_cores}")
-    #     print(f"Number of workers: {num_workers}")
-    #     # TODO: Add additional processing here
-    #     for idx, image in enumerate(upload_data_list):
-    #         if image.image_origin not in ResourceOrigin:
-    #             raise InvalidOriginException
-
-    #         if image.image_category not in ImageCategory:
-    #             raise InvalidImageCategoryException
-            
-    #         # Extract width and height from the PIL image and add it to image DTO
-    #         width, height = image.image.size
-    #         image.width = width
-    #         image.height = height
-
-    #         # Create a name for the image and add it to image DTO
-    #         image_name = self.__invoker.services.names.create_image_name()
-    #         image.image_name = image_name
-
-    #         # append the image to the list of images DTOs
-    #         images_DTOs.append(image)
-    #         try:
-    #             # TODO: Consider using a transaction here to ensure consistency between storage and database
-    #             # TODO: Change arguments to just one images_DTOs[idx] instead of all the arguments
-    #             self.__invoker.services.image_records.save_record_eryx(images_DTOs)
-
-    #             # Link image to board if board_id is provided
-    #             if image.board_id is not None:
-    #                 self.__invoker.services.board_image_records.add_image_to_board(board_id=image.board_id, image_name=image.image_name)
-                
-    #             # Save the image file
-    #             self.__invoker.services.image_files.save(
-    #                 image_name=image.image_name, image=image.image, metadata=image.metadata, workflow=image.workflow
-    #             )
-
-    #             # Retrieve the created ImageDTO
-    #             image_dto = self.get_dto(image_name)
-    #             # Replace in place the image data to ImageDTO created
-    #             images_DTOs[idx] = image_dto
-
-    #             # Call the on_changed method
-    #             self._on_changed(image_dto)
-
-    #         except ImageRecordSaveException:
-    #             self.__invoker.services.logger.error("Failed to save image record")
-    #             raise
-    #         except ImageFileSaveException:
-    #             self.__invoker.services.logger.error("Failed to save image file")
-    #             raise
-    #         except Exception as e:
-    #             self.__invoker.services.logger.error(f"Problem saving image record and file: {str(e)}")
-    #             raise e
-
-
-    #     print(f"Image DTOs: {images_DTOs}")
-    #     return images_DTOs
-
-    ############################################################################################################
-    ############################    ORIGINAL CODE   ############################################################
-    ############################################################################################################
+    
     def create(
         self,
         image: PILImageType,
@@ -299,9 +229,6 @@ class ImageService(ImageServiceABC):
         except Exception as e:
             self.__invoker.services.logger.error(f"Problem saving image record and file: {str(e)}")
             raise e
-    ############################################################################################################
-    ############################################################################################################
-    ############################################################################################################
 
     def update(
         self,

@@ -1,13 +1,8 @@
 import io
-import asyncio
-from operator import is_
-from re import L
 import traceback
-from typing import Optional, List
-import time
+from typing import Optional, List, Dict
 
-
-from fastapi import Body, HTTPException, Path, Query, Request, Response, UploadFile
+from fastapi import Body, HTTPException, Path, Query, Request, Response, UploadFile, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from PIL import Image
@@ -27,10 +22,6 @@ images_router = APIRouter(prefix="/v1/images", tags=["images"])
 # images are immutable; set a high max-age
 IMAGE_MAX_AGE = 31536000
 
-############################################################################################################
-############################    ERYX CODE   ############################################################
-############################################################################################################
-
 @images_router.post(
     "/upload_multiple",
     operation_id="upload_multiple_images",
@@ -39,10 +30,12 @@ IMAGE_MAX_AGE = 31536000
         415: {"description": "Images upload failed"},
     },
     status_code=201,
-    response_model=List[ImageDTO],
+    response_model=List[ImageDTO]
+    # response_model=Dict[str, str],
 )
 async def upload_images(
     files: List[UploadFile],
+    # background_tasks: BackgroundTasks,
     request: Request,
     response: Response,
     image_category: ImageCategory = Query(description="The category of the images"),
@@ -51,12 +44,13 @@ async def upload_images(
     session_id: Optional[str] = Query(default=None, description="The session ID associated with this upload, if any"),
     crop_visible: Optional[bool] = Query(default=False, description="Whether to crop the images"),
 ) -> List[ImageDTO]:
+# ) -> Dict[str, str]:
     """Uploads multiple images"""
     upload_data_list = []
     # frontend emit event for upload started
-    ApiDependencies.invoker.services.events.emit_upload_started("Upload job started from the WebSockets API")
+    ApiDependencies.invoker.services.events.emit_upload_started("Upload job started processing the image...")
 
-    # my added loop to handle multiple files
+    # loop to handle multiple files
     for file in files:
         if not file.content_type or not file.content_type.startswith("image"):
             raise HTTPException(status_code=415, detail="Not an image")
@@ -105,7 +99,7 @@ async def upload_images(
         upload_data_list.append(upload_data)
 
     try:
-        image_dtos = await ApiDependencies.invoker.services.images.create_eryx(upload_data_list)
+        image_dtos = await ApiDependencies.invoker.services.images.create_multiple(upload_data_list)
         
         response.status_code = 201
         response.headers["Location"] = image_dtos[0].image_url if image_dtos else ""
@@ -117,14 +111,13 @@ async def upload_images(
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="Failed to create image")
 
-############################################################################################################
-############################################################################################################
-############################################################################################################
+    # # Schedule image processing as a background task
+    # background_tasks.add_task(ApiDependencies.invoker.services.images.create_multiple, upload_data_list)
+
+    # # Return a response immediately
+    # return {"message": "Images are being processed"}
 
 
-############################################################################################################
-############################    ORIGINAL CODE   ############################################################
-############################################################################################################
 @images_router.post(
     "/upload",
     operation_id="upload_image",
@@ -146,6 +139,8 @@ async def upload_image(
     crop_visible: Optional[bool] = Query(default=False, description="Whether to crop the image"),
 ) -> ImageDTO:
     """Uploads an image"""
+    ApiDependencies.invoker.services.events.emit_upload_started("Upload job started from the WebSockets API")
+    
     if not file.content_type or not file.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
 
@@ -162,7 +157,7 @@ async def upload_image(
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=415, detail="Failed to read image")
 
-    # TOD0O: retain non-invokeai metadata on upload?
+    # TODO: retain non-invokeai metadata on upload?
     # attempt to parse metadata from image
     metadata_raw = pil_image.info.get("invokeai_metadata", None)
     if metadata_raw:
@@ -200,260 +195,6 @@ async def upload_image(
     except Exception:
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="Failed to create image")
-############################################################################################################
-############################################################################################################
-############################################################################################################
-
-# # My helper function to process the images in batches instead of one by one
-# async def process_file(file, image_category, is_intermediate, board_id, session_id, crop_visible):
-#     print("-------------images.py-------------------")
-#     print(file.filename, file.content_type)
-#     print("-----------------------------------------")
-
-#     if not file.content_type or not file.content_type.startswith("image"):
-#         raise HTTPException(status_code=415, detail="Not an image")
-    
-#     metadata = None
-#     workflow = None
-
-#     # Read file content
-#     contents = await file.read()
-
-#     # Process with PIL
-#     try:
-#         pil_image = Image.open(io.BytesIO(contents))
-#         if crop_visible:
-#             bbox = pil_image.getbbox()
-#             pil_image = pil_image.crop(bbox)
-#     except Exception:
-#         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
-#         raise HTTPException(status_code=415, detail="Failed to read image")
-    
-    
-
-#     ## TOD0O: retain non-invokeai metadata on upload?
-#     # attempt to parse metadata from image
-#     metadata_raw = pil_image.info.get("invokeai_metadata", None)
-#     if metadata_raw:
-#         try:
-#             metadata = MetadataFieldValidator.validate_json(metadata_raw)
-#         except ValidationError:
-#             ApiDependencies.invoker.services.logger.warn("Failed to parse metadata for uploaded image")
-#             pass
-
-#     # attempt to parse workflow from image
-#     workflow_raw = pil_image.info.get("invokeai_workflow", None)
-#     if workflow_raw is not None:
-#         try:
-#             workflow = WorkflowWithoutIDValidator.validate_json(workflow_raw)
-#         except ValidationError:
-#             ApiDependencies.invoker.services.logger.warn("Failed to parse metadata for uploaded image")
-#             pass
-
-#     # Image creation process
-#     create_start = time.perf_counter()
-#     try:
-#         image_dto = ApiDependencies.invoker.services.images.create(
-#             image=pil_image,
-#             image_origin=ResourceOrigin.EXTERNAL,
-#             image_category=image_category,
-#             session_id=session_id,
-#             board_id=board_id,
-#             metadata=None,  # Replace with actual metadata if available
-#             workflow=None,  # Replace with actual workflow if available
-#             is_intermediate=is_intermediate,
-#         )
-#     except Exception:
-#         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
-#         raise HTTPException(status_code=500, detail="Failed to create image")
-#     create_duration = time.perf_counter() - create_start
-#     print(f"Time for image creation: {create_duration:.6f} seconds")
-
-#     return image_dto
-
-
-# # Function to process images concurrently in batches
-# async def process_files_concurrently(files, image_category, is_intermediate, board_id, session_id, crop_visible):
-#     # Create a list of tasks for each file to be processed
-#     tasks = [process_file(file, image_category, is_intermediate, board_id, session_id, crop_visible) for file in files]
-#     # Use asyncio.gather to process files concurrently
-#     return await asyncio.gather(*tasks)
-
-
-# @images_router.post(
-#     "/upload",
-#     operation_id="upload_image",
-#     responses={
-#         201: {"description": "The images were uploaded successfully"},
-#         415: {"description": "Image upload failed"},
-#     },
-#     status_code=201,
-#     response_model=List[ImageDTO],
-# )
-# async def upload_image(
-#     files: List[UploadFile],
-#     request: Request,
-#     response: Response,
-#     image_category: ImageCategory = Query(description="The category of the image"),
-#     is_intermediate: bool = Query(description="Whether this is an intermediate image"),
-#     board_id: Optional[str] = Query(default=None, description="The board to add this image to, if any"),
-#     session_id: Optional[str] = Query(default=None, description="The session ID associated with this upload, if any"),
-#     crop_visible: Optional[bool] = Query(default=False, description="Whether to crop the image"),
-# ) -> List[ImageDTO]:
-#     """Uploads an image"""
-#     image_dtos = await process_files_concurrently(files, image_category, is_intermediate, board_id, session_id, crop_visible)
-#     return image_dtos
-    # image_dtos = []
-    # # my added loop to handle multiple files
-    # for file in files:
-    #     print("-------------images.py-------------------")
-    #     print(file.filename, file.content_type)
-    #     print("-----------------------------------------")
-
-
-    #     if not file.content_type or not file.content_type.startswith("image"):
-    #         raise HTTPException(status_code=415, detail="Not an image")
-
-    #     metadata = None
-    #     workflow = None
-
-    #     contents = await file.read()
-    #     try:
-    #         pil_image = Image.open(io.BytesIO(contents))
-    #         if crop_visible:
-    #             bbox = pil_image.getbbox()
-    #             pil_image = pil_image.crop(bbox)
-    #     except Exception:
-    #         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
-    #         raise HTTPException(status_code=415, detail="Failed to read image")
-
-    #     # TOD0O: retain non-invokeai metadata on upload?
-    #     # attempt to parse metadata from image
-    #     metadata_raw = pil_image.info.get("invokeai_metadata", None)
-    #     if metadata_raw:
-    #         try:
-    #             metadata = MetadataFieldValidator.validate_json(metadata_raw)
-    #         except ValidationError:
-    #             ApiDependencies.invoker.services.logger.warn("Failed to parse metadata for uploaded image")
-    #             pass
-
-    #     # attempt to parse workflow from image
-    #     workflow_raw = pil_image.info.get("invokeai_workflow", None)
-    #     if workflow_raw is not None:
-    #         try:
-    #             workflow = WorkflowWithoutIDValidator.validate_json(workflow_raw)
-    #         except ValidationError:
-    #             ApiDependencies.invoker.services.logger.warn("Failed to parse metadata for uploaded image")
-    #             pass
-
-    #     try:
-    #         image_dto = ApiDependencies.invoker.services.images.create(
-    #             image=pil_image,
-    #             image_origin=ResourceOrigin.EXTERNAL,
-    #             image_category=image_category,
-    #             session_id=session_id,
-    #             board_id=board_id,
-    #             metadata=metadata,
-    #             workflow=workflow,
-    #             is_intermediate=is_intermediate,
-    #         )
-    #         # added by me: 
-    #         image_dtos.append(image_dto)
-
-    #         response.status_code = 201
-    #         response.headers["Location"] = image_dto.image_url
-
-    #         # return image_dto
-    #     except Exception as e:
-    #         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
-    #         raise HTTPException(status_code=500, detail=f"Failed to create image: {str(e)}")
-            
-    # return image_dtos  # Return the list of ImageDTOs after processing all files
-
-
-# @images_router.post(
-#     "/upload",
-#     operation_id="upload_image",
-#     responses={
-#         201: {"description": "The images were uploaded successfully"},
-#         415: {"description": "Image upload failed"},
-#     },
-#     status_code=201,
-#     response_model=List[ImageDTO],
-# )
-# @images_router.post(
-#     "/upload",
-#     operation_id="upload_image",
-#     responses={
-#         201: {"description": "The images were uploaded successfully"},
-#         415: {"description": "Image upload failed"},
-#     },
-#     status_code=201,
-#     response_model=List[ImageDTO],
-# )
-# async def upload_image(
-#     files: List[UploadFile],
-#     request: Request,
-#     response: Response,
-#     image_category: ImageCategory = Query(description="The category of the image"),
-#     is_intermediate: bool = Query(description="Whether this is an intermediate image"),
-#     board_id: Optional[str] = Query(default=None, description="The board to add this image to, if any"),
-#     session_id: Optional[str] = Query(default=None, description="The session ID associated with this upload, if any"),
-#     crop_visible: Optional[bool] = Query(default=False, description="Whether to crop the image"),
-# ) -> List[ImageDTO]:
-#     """Uploads an image"""
-
-#     print("-------------images.py-------------------")
-#     print(files)
-#     print("-----------------------------------------")
-
-#     # Prepare data for batch processing
-#     images = []
-#     node_ids = []
-#     session_ids = []
-#     board_ids = []
-#     metadatas = []
-#     workflows = []
-
-#     for file in files:
-#         # Process the file and populate the lists
-#         contents = await file.read()
-#         try:
-#             pil_image = Image.open(io.BytesIO(contents))
-#             if crop_visible:
-#                 bbox = pil_image.getbbox()
-#                 pil_image = pil_image.crop(bbox)
-#         except Exception:
-#             ApiDependencies.invoker.services.logger.error(traceback.format_exc())
-#             raise HTTPException(status_code=415, detail="Failed to read image")
-
-#         images.append(pil_image)
-#         node_ids.append(None)  # Update if node_id is applicable
-#         session_ids.append(session_id)
-#         board_ids.append(board_id)
-#         metadatas.append(None)  # Update with actual metadata if available
-#         workflows.append(None)  # Update with actual workflow if available
-
-#     # Create images in batch
-#     image_dtos = ApiDependencies.invoker.services.images.create_many(
-#         images=images,
-#         image_origin=ResourceOrigin.EXTERNAL,
-#         image_category=image_category,
-#         node_ids=node_ids,
-#         session_ids=session_ids,
-#         board_ids=board_ids,
-#         is_intermediate=is_intermediate,
-#         metadatas=metadatas,
-#         workflows=workflows
-#     )
-
-#     print("-------------images.py-------------------")
-#     print(image_dtos)
-#     print("-----------------------------------------")
-    
-#     return image_dtos
-
-
 
 
 @images_router.delete("/i/{image_name}", operation_id="delete_image")

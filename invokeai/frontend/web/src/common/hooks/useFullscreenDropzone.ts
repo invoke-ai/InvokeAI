@@ -6,7 +6,10 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Accept, FileRejection } from 'react-dropzone';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
-import { useUploadImageMutation, useUploadMultipleImagesMutation } from 'services/api/endpoints/images';
+import {
+  useUploadImageMutation,
+  useUploadMultipleImagesMutation,
+} from 'services/api/endpoints/images';
 import type { PostUploadAction } from 'services/api/types';
 
 const accept: Accept = {
@@ -39,7 +42,7 @@ export const useFullscreenDropzone = () => {
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
 
   const [uploadImage] = useUploadImageMutation();
-  const [uploadMultipleImages] = useUploadMultipleImagesMutation()
+  const [uploadMultipleImages] = useUploadMultipleImagesMutation();
 
   const fileRejectionCallback = useCallback(
     (rejection: FileRejection) => {
@@ -61,16 +64,13 @@ export const useFullscreenDropzone = () => {
         formData.append('files', file); // Use 'files' as the key for each file
       });
 
-      console.log('image object in hook to thunk: ');
-      console.log(files)
-
       uploadMultipleImages({
-            formData,
-            image_category: 'user',
-            is_intermediate: false,
-            postUploadAction,
-            board_id: autoAddBoardId === 'none' ? undefined: autoAddBoardId,
-        });
+        formData,
+        image_category: 'user',
+        is_intermediate: false,
+        postUploadAction,
+        board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+      });
     },
     [autoAddBoardId, postUploadAction, uploadMultipleImages]
   );
@@ -90,31 +90,37 @@ export const useFullscreenDropzone = () => {
 
   const onDrop = useCallback(
     (acceptedFiles: Array<File>, fileRejections: Array<FileRejection>) => {
-      if (fileRejections.length > 99) {
-        // number of files allowed to upload at once
-        toaster({
-          title: t('toast.uploadFailed'),
-          description: t('toast.uploadFailedInvalidUploadDesc'),
-          status: 'error',
-        });
-        return;
-      }
+      // number of files allowed to upload at once code block isn't required anymore because of multiple uploads
+      //   if (fileRejections.length > 99) {
+      //     toaster({
+      //       title: t('toast.uploadFailed'),
+      //       description: t('toast.uploadFailedInvalidUploadDesc'),
+      //       status: 'error',
+      //     });
+      //     return;
+      //   }
 
       fileRejections.forEach((rejection: FileRejection) => {
         fileRejectionCallback(rejection);
       });
 
       if (acceptedFiles.length > 1) {
-        console.log("multiple files uploaded")
+        console.log('multiple files uploaded');
+        {
+          /* TODO: remove, debugging purpuses */
+        }
         filesAcceptedCallback(acceptedFiles);
       } else {
-        console.log("single file uploaded")
+        console.log('single file uploaded');
+        {
+          /* TODO: remove, debugging purpuses */
+        }
         acceptedFiles.forEach((file: File) => {
-            fileAcceptedCallback(file);
-          });
+          fileAcceptedCallback(file);
+        });
       }
     },
-    [t, toaster, filesAcceptedCallback, fileAcceptedCallback, fileRejectionCallback]
+    [filesAcceptedCallback, fileAcceptedCallback, fileRejectionCallback]
   );
 
   const onDragOver = useCallback(() => {

@@ -15,7 +15,8 @@ import {
   socketModelLoadStarted,
   socketQueueItemStatusChanged,
   socketSessionRetrievalError,
-  socketUploadStarted
+  socketUploadProgress,
+  socketUploadStarted,
 } from 'services/events/actions';
 import type {
   ClientToServerEvents,
@@ -157,20 +158,22 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
     dispatch(socketQueueItemStatusChanged({ data }));
   });
 
-    /**
+  /**
    * image Upload started event
    */
-    socket.on('upload_started', (data) => {
-        dispatch(socketUploadStarted({ data }))
-        dispatch(
-            addToast(
-              makeToast({
-                title: "Image Upload started",
-                status: 'info',
-                duration: 10000,
-              })
-            )
-          );
-      });
+  socket.on('upload_started', (data) => {
+    dispatch(socketUploadStarted({ data }));
+    dispatch(
+      addToast(
+        makeToast({
+          title: 'Image Upload started',
+          status: 'info',
+          duration: 10000,
+        })
+      )
+    );
+  });
+  socket.on('upload_progress', (data) => {
+    dispatch(socketUploadProgress({ data }));
+  });
 };
-

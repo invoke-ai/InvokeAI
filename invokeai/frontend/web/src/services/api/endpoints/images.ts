@@ -698,13 +698,11 @@ export const imagesApi = api.injectEndpoints({
         }
       },
     }),
-    /*==============================================================*/
-    /*=========================  ERYX CODE =========================*/
-    /*==============================================================*/
+
     uploadMultipleImages: build.mutation<
       ImageDTO[],
       {
-        formData: File[];
+        formData: FormData;
         image_category: ImageCategory;
         is_intermediate: boolean;
         postUploadAction?: PostUploadAction;
@@ -721,8 +719,6 @@ export const imagesApi = api.injectEndpoints({
         board_id,
         crop_visible,
       }) => {
-        
-
         return {
           url: `images/upload_multiple`,
           method: 'POST',
@@ -750,10 +746,8 @@ export const imagesApi = api.injectEndpoints({
            */
 
           const { data: imageDTOs } = await queryFulfilled;
-          console.log("this is intermediate image")
           imageDTOs.forEach((imageDTO) => {
             if (imageDTO.is_intermediate) {
-                console.log("this is intermediate image")
               // Don't add it to anything
               return;
             }
@@ -800,13 +794,7 @@ export const imagesApi = api.injectEndpoints({
         }
       },
     }),
-    /*==============================================================*/
-    /*==============================================================*/
-    /*==============================================================*/
 
-    /*==============================================================*/
-    /*=====================  ORIGINAL CODE =========================*/
-    /*==============================================================*/
     uploadImage: build.mutation<
       ImageDTO,
       {
@@ -1696,7 +1684,7 @@ export const {
   useUploadMultipleImagesMutation,
 
   useUploadImageMutation,
-  
+
   useClearIntermediatesMutation,
   useAddImagesToBoardMutation,
   useRemoveImagesFromBoardMutation,

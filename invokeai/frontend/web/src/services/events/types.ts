@@ -210,14 +210,19 @@ export type ClientEmitUnsubscribeQueue = {
 
 /**
  * A `upload_started` socket.io event.
- * 
+ *
  * @example socket.on(`upload_Started`, (message: UploadStartedEvent) => {toast(message)})
  */
 
 export type UploadStartedEvent = {
-    queue_id: string;
-    message: string;
-}
+  message: string;
+};
+
+export type UploadProgressEvent = {
+  progress: number;
+  processed: number;
+  total: number;
+};
 
 export type ServerToClientEvents = {
   generator_progress: (payload: GeneratorProgressEvent) => void;
@@ -233,6 +238,7 @@ export type ServerToClientEvents = {
   invocation_retrieval_error: (payload: InvocationRetrievalErrorEvent) => void;
   queue_item_status_changed: (payload: QueueItemStatusChangedEvent) => void;
   upload_started: (payload: UploadStartedEvent) => void;
+  upload_progress: (payload: UploadProgressEvent) => void;
 };
 
 export type ClientToServerEvents = {

@@ -1,4 +1,4 @@
-import type { UseToastOptions } from '@chakra-ui/react';
+import type { ToastId, UseToastOptions } from '@chakra-ui/react';
 import type { LogLevel } from 'app/logging/logger';
 import type { ProgressImage } from 'services/events/types';
 import { z } from 'zod';
@@ -57,6 +57,8 @@ export interface SystemState {
   shouldUseWatermarker: boolean;
   status: SystemStatus;
   shouldEnableInformationalPopovers: boolean;
+  uploadProgress: { progress: number; processed: number; total: number } | null;
+  uploadProgressToastId: ToastId | null;
 }
 
 export const STATUS_TRANSLATION_KEYS: Record<SystemStatus, string> = {
