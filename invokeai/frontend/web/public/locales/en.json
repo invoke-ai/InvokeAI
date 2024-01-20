@@ -203,7 +203,11 @@
         "prevPage": "Previous Page",
         "nextPage": "Next Page",
         "unknownError": "Unknown Error",
-        "unsaved": "Unsaved"
+        "unsaved": "Unsaved",
+        "red": "Red",
+        "green": "Green",
+        "blue": "Blue",
+        "alpha": "Alpha"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
@@ -703,6 +707,7 @@
         "clearCheckpointFolder": "Clear Checkpoint Folder",
         "closeAdvanced": "Close Advanced",
         "config": "Config",
+        "configFile": "Config File",
         "configValidationMsg": "Path to the config file of your model.",
         "conversionNotSupported": "Conversion Not Supported",
         "convert": "Convert",

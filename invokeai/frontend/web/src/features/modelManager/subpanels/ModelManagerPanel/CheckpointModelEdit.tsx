@@ -190,7 +190,7 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
                 </FormControl>
               )}
               <FormControl>
-                <FormLabel>Use Custom Config</FormLabel>
+                <FormLabel>{t('modelManager.useCustomConfig')}</FormLabel>
                 <Checkbox
                   isChecked={useCustomConfig}
                   onChange={handleChangeUseCustomConfig}
