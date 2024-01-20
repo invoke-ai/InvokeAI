@@ -1,7 +1,5 @@
 import type { IconButtonProps } from '@invoke-ai/ui';
-import { IconButton, useDisclosure } from '@invoke-ai/ui';
-import { useStore } from '@nanostores/react';
-import { $shift } from 'common/hooks/useGlobalModifiers';
+import { IconButton, useDisclosure, useShiftModifier } from '@invoke-ai/ui';
 import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
@@ -59,7 +57,7 @@ const ClearSingleQueueItemIconButton = (props: ClearQueueButtonProps) => {
 export const ClearQueueIconButton = (props: ClearQueueButtonProps) => {
   // Show the single item clear button when shift is pressed
   // Otherwise show the clear queue button
-  const shift = useStore($shift);
+  const shift = useShiftModifier()
   const disclosure = useDisclosure();
 
   return (
