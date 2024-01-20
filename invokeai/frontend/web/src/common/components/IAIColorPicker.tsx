@@ -12,6 +12,7 @@ import type {
   ColorPickerBaseProps,
   RgbaColor,
 } from 'react-colorful/dist/types';
+import { useTranslation } from 'react-i18next';
 
 type IAIColorPickerProps = ColorPickerBaseProps<RgbaColor> & {
   withNumberInput?: boolean;
@@ -37,6 +38,7 @@ const numberInputWidth: ChakraProps['w'] = '4.2rem';
 
 const IAIColorPicker = (props: IAIColorPickerProps) => {
   const { color, onChange, withNumberInput, ...rest } = props;
+  const { t } = useTranslation();
   const handleChangeR = useCallback(
     (r: number) => onChange({ ...color, r }),
     [color, onChange]
@@ -64,7 +66,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
       {withNumberInput && (
         <Flex>
           <FormControl>
-            <FormLabel>Red</FormLabel>
+            <FormLabel>{t('common.red')}</FormLabel>
             <CompositeNumberInput
               value={color.r}
               onChange={handleChangeR}
@@ -76,7 +78,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
             />
           </FormControl>
           <FormControl>
-            <FormLabel>Green</FormLabel>
+            <FormLabel>{t('common.green')}</FormLabel>
             <CompositeNumberInput
               value={color.g}
               onChange={handleChangeG}
@@ -88,7 +90,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
             />
           </FormControl>
           <FormControl>
-            <FormLabel>Blue</FormLabel>
+            <FormLabel>{t('common.blue')}</FormLabel>
             <CompositeNumberInput
               value={color.b}
               onChange={handleChangeB}
@@ -100,7 +102,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
             />
           </FormControl>
           <FormControl>
-            <FormLabel>Alpha</FormLabel>
+            <FormLabel>{t('common.alpha')}</FormLabel>
             <CompositeNumberInput
               value={color.a}
               onChange={handleChangeA}

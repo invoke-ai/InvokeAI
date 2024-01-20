@@ -6,6 +6,7 @@ import type {
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { memo, useCallback, useMemo } from 'react';
 import { useController, type UseControllerProps } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { useGetCheckpointConfigsQuery } from 'services/api/endpoints/models';
 import type { CheckpointModelConfig } from 'services/api/types';
 
@@ -15,6 +16,7 @@ const CheckpointConfigsSelect = (
   props: UseControllerProps<CheckpointModelConfig>
 ) => {
   const { data } = useGetCheckpointConfigsQuery();
+  const { t } = useTranslation();
   const options = useMemo<ComboboxOption[]>(
     () => (data ? data.map((i) => ({ label: i, value: i })) : []),
     [data]
@@ -33,7 +35,7 @@ const CheckpointConfigsSelect = (
 
   return (
     <FormControl>
-      <FormLabel>Config File</FormLabel>
+      <FormLabel>{t('modelManager.configFile')}</FormLabel>
       <Combobox
         placeholder="Select A Config File"
         value={value}
