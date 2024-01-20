@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 import { memo, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-
+import { useTranslation } from 'react-i18next';
 type Props = {
   isOver: boolean;
   label?: ReactNode;
@@ -23,7 +23,8 @@ const exit: AnimationProps['exit'] = {
 };
 
 const IAIDropOverlay = (props: Props) => {
-  const { isOver, label = 'Drop' } = props;
+  const { t } = useTranslation();
+  const { isOver, label = t('gallery.drop') } = props;
   const motionId = useRef(uuidv4());
   return (
     <motion.div

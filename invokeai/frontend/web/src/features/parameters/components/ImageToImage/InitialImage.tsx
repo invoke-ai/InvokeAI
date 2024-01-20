@@ -3,6 +3,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { useTranslation } from 'react-i18next';
 import type {
   TypesafeDraggableData,
   TypesafeDroppableData,
@@ -20,6 +21,7 @@ const selectInitialImage = createMemoizedSelector(
 );
 
 const InitialImage = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const initialImage = useAppSelector(selectInitialImage);
   const isConnected = useAppSelector((s) => s.system.isConnected);
@@ -62,7 +64,7 @@ const InitialImage = () => {
       fitContainer
       dropLabel="Set as Initial Image"
       noContentFallback={
-        <IAINoContentFallback label="No initial image selected" />
+        <IAINoContentFallback label={t('parameters.invoke.noInitialImageSelected')} />
       }
       dataTestId="initial-image"
     />
