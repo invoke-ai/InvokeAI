@@ -39,7 +39,7 @@ const GalleryImage = (props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
   const { imageName } = props;
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName);
-  const shift = useShiftModifier()
+  const shift = useShiftModifier();
   const { t } = useTranslation();
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const { handleClick, isSelected, areMultiplesSelected } =

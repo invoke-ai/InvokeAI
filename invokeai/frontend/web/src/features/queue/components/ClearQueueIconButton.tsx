@@ -57,7 +57,7 @@ const ClearSingleQueueItemIconButton = (props: ClearQueueButtonProps) => {
 export const ClearQueueIconButton = (props: ClearQueueButtonProps) => {
   // Show the single item clear button when shift is pressed
   // Otherwise show the clear queue button
-  const shift = useShiftModifier()
+  const shift = useShiftModifier();
   const disclosure = useDisclosure();
 
   return (
