@@ -1,4 +1,4 @@
-import { Flex } from '@chakra-ui/react';
+import { Flex } from '@invoke-ai/ui';
 import { memo } from 'react';
 
 import SyncModels from './ModelManagerSettingsPanel/SyncModels';

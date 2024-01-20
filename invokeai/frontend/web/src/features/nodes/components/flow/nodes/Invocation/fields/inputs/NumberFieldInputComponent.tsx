@@ -1,6 +1,6 @@
+import { CompositeNumberInput } from '@invoke-ai/ui';
 import { NUMPY_RAND_MAX } from 'app/constants';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
 import { fieldNumberValueChanged } from 'features/nodes/store/nodesSlice';
 import type {
   FloatFieldInputInstance,
@@ -60,7 +60,7 @@ const NumberFieldInputComponent = (
   }, [fieldTemplate.exclusiveMaximum, fieldTemplate.maximum]);
 
   return (
-    <InvNumberInput
+    <CompositeNumberInput
       defaultValue={fieldTemplate.default}
       onChange={handleValueChanged}
       value={field.value}

@@ -1,6 +1,4 @@
-import { Flex } from '@chakra-ui/react';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
+import { Button, ButtonGroup, Flex } from '@invoke-ai/ui';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -18,16 +16,16 @@ const ImportModelsPanel = () => {
 
   return (
     <Flex flexDirection="column" gap={4} h="full">
-      <InvButtonGroup>
-        <InvButton
+      <ButtonGroup>
+        <Button
           onClick={handleClickAddTab}
           isChecked={addModelTab == 'add'}
           size="sm"
           width="100%"
         >
           {t('modelManager.addModel')}
-        </InvButton>
-        <InvButton
+        </Button>
+        <Button
           onClick={handleClickScanTab}
           isChecked={addModelTab == 'scan'}
           size="sm"
@@ -35,8 +33,8 @@ const ImportModelsPanel = () => {
           isDisabled
         >
           {t('modelManager.scanForModels')}
-        </InvButton>
-      </InvButtonGroup>
+        </Button>
+      </ButtonGroup>
 
       {addModelTab == 'add' && <AddModels />}
       {addModelTab == 'scan' && <ScanModels />}

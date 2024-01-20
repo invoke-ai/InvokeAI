@@ -1,18 +1,8 @@
+import { CompositeNumberInput } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
-import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
-import type { InvNumberInputFieldProps } from 'common/components/InvNumberInput/types';
 import { setIterations } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
-
-const numberInputFieldProps: InvNumberInputFieldProps = {
-  ps: 6,
-  borderInlineStartRadius: 'base',
-  h: 'full',
-  textAlign: 'center',
-  fontSize: 'md',
-  fontWeight: 'semibold',
-};
 
 export const QueueIterationsNumberInput = memo(() => {
   const iterations = useAppSelector((s) => s.generation.iterations);
@@ -28,7 +18,7 @@ export const QueueIterationsNumberInput = memo(() => {
 
   return (
     <IAIInformationalPopover feature="paramIterations">
-      <InvNumberInput
+      <CompositeNumberInput
         step={coarseStep}
         fineStep={fineStep}
         min={1}
@@ -36,14 +26,13 @@ export const QueueIterationsNumberInput = memo(() => {
         onChange={handleChange}
         value={iterations}
         defaultValue={1}
-        numberInputFieldProps={numberInputFieldProps}
         pos="absolute"
         insetInlineEnd={0}
         h="full"
         ps={0}
         w="72px"
         flexShrink={0}
-        variant="darkFilled"
+        variant="iterations"
       />
     </IAIInformationalPopover>
   );

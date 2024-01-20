@@ -1,4 +1,4 @@
-import { Box, Flex } from '@chakra-ui/react';
+import { Box, Flex } from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 import IAICanvasStatusTextCursorPos from './IAICanvasStatusText/IAICanvasStatusTextCursorPos';
 
-const warningColor = 'var(--invokeai-colors-warning-500)';
+const warningColor = 'var(--invoke-colors-warning-500)';
 
 const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
   const {

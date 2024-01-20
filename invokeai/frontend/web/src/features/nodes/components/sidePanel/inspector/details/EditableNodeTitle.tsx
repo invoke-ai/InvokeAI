@@ -1,9 +1,4 @@
-import {
-  Editable,
-  EditableInput,
-  EditablePreview,
-  Flex,
-} from '@chakra-ui/react';
+import { Editable, EditableInput, EditablePreview, Flex } from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useNodeLabel } from 'features/nodes/hooks/useNodeLabel';
 import { useNodeTemplateTitle } from 'features/nodes/hooks/useNodeTemplateTitle';

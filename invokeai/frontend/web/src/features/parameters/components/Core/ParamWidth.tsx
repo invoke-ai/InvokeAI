@@ -1,6 +1,10 @@
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -34,8 +38,9 @@ export const ParamWidth = memo(() => {
   );
 
   return (
-    <InvControl label={t('parameters.width')}>
-      <InvSlider
+    <FormControl>
+      <FormLabel>{t('parameters.width')}</FormLabel>
+      <CompositeSlider
         value={ctx.width}
         onChange={onChange}
         defaultValue={optimalDimension}
@@ -44,11 +49,17 @@ export const ParamWidth = memo(() => {
         step={coarseStep}
         fineStep={fineStep}
         marks={marks}
-        withNumberInput
-        numberInputMin={numberInputMin}
-        numberInputMax={numberInputMax}
       />
-    </InvControl>
+      <CompositeNumberInput
+        value={ctx.width}
+        onChange={onChange}
+        defaultValue={optimalDimension}
+        min={numberInputMin}
+        max={numberInputMax}
+        step={coarseStep}
+        fineStep={fineStep}
+      />
+    </FormControl>
   );
 });
 

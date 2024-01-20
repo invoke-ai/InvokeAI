@@ -1,9 +1,12 @@
-import { Flex } from '@chakra-ui/react';
+import {
+  Button,
+  Flex,
+  FormControl,
+  FormLabel,
+  Input,
+  Text,
+} from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvInput } from 'common/components/InvInput/InvInput';
-import { InvText } from 'common/components/InvText/wrapper';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
 import { addToast } from 'features/system/store/systemSlice';
@@ -115,31 +118,29 @@ const FoundModelsList = () => {
           bg="base.800"
         >
           <Flex w="full" minW="25%" flexDir="column">
-            <InvText fontWeight="semibold">
-              {model.split('\\').slice(-1)[0]}
-            </InvText>
-            <InvText fontSize="sm" color="base.400">
+            <Text fontWeight="semibold">{model.split('\\').slice(-1)[0]}</Text>
+            <Text fontSize="sm" color="base.400">
               {model}
-            </InvText>
+            </Text>
           </Flex>
           {showActions ? (
             <Flex gap={2}>
-              <InvButton
+              <Button
                 id={model}
                 onClick={quickAddHandler}
                 isLoading={isLoading}
               >
                 {t('modelManager.quickAdd')}
-              </InvButton>
-              <InvButton
+              </Button>
+              <Button
                 onClick={handleClickSetAdvanced.bind(null, model)}
                 isLoading={isLoading}
               >
                 {t('modelManager.advanced')}
-              </InvButton>
+              </Button>
             </Flex>
           ) : (
-            <InvText
+            <Text
               fontWeight="semibold"
               p={2}
               borderRadius={4}
@@ -147,7 +148,7 @@ const FoundModelsList = () => {
               bg="invokeBlue.600"
             >
               {t('common.installed')}
-            </InvText>
+            </Text>
           )}
         </Flex>
       );
@@ -170,23 +171,24 @@ const FoundModelsList = () => {
           userSelect="none"
           bg="base.900"
         >
-          <InvText variant="subtext">{t('modelManager.noModels')}</InvText>
+          <Text variant="subtext">{t('modelManager.noModels')}</Text>
         </Flex>
       );
     }
 
     return (
       <Flex flexDirection="column" gap={2} w="100%" minW="50%">
-        <InvControl label={t('modelManager.search')}>
-          <InvInput onChange={handleSearchFilter} />
-        </InvControl>
+        <FormControl>
+          <FormLabel>{t('modelManager.search')}</FormLabel>
+          <Input onChange={handleSearchFilter} />
+        </FormControl>
         <Flex p={2} gap={2}>
-          <InvText fontWeight="semibold">
+          <Text fontWeight="semibold">
             {t('modelManager.modelsFound')}: {foundModels.length}
-          </InvText>
-          <InvText fontWeight="semibold" color="invokeBlue.200">
+          </Text>
+          <Text fontWeight="semibold" color="invokeBlue.200">
             {t('common.notInstalled')}: {filteredModels.length}
-          </InvText>
+          </Text>
         </Flex>
 
         <ScrollableContent>

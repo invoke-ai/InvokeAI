@@ -1,10 +1,12 @@
-import { Flex } from '@chakra-ui/layout';
-import { Divider } from '@chakra-ui/react';
+import {
+  Button,
+  ButtonGroup,
+  Divider,
+  Flex,
+  StandaloneAccordion,
+} from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
-import { InvSingleAccordion } from 'common/components/InvSingleAccordion/InvSingleAccordion';
 import ControlAdapterConfig from 'features/controlAdapters/components/ControlAdapterConfig';
 import { useAddControlAdapter } from 'features/controlAdapters/hooks/useAddControlAdapter';
 import {
@@ -17,6 +19,7 @@ import {
   selectValidIPAdapters,
   selectValidT2IAdapters,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { Fragment, memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -75,7 +78,10 @@ export const ControlSettingsAccordion: React.FC = memo(() => {
   const { t } = useTranslation();
   const { controlAdapterIds, badges } = useAppSelector(selector);
   const isControlNetDisabled = useFeatureStatus('controlNet').isFeatureDisabled;
-
+  const { isOpen, onToggle } = useStandaloneAccordionToggle({
+    id: 'control-settings',
+    defaultIsOpen: true,
+  });
   const [addControlNet, isAddControlNetDisabled] =
     useAddControlAdapter('controlnet');
   const [addIPAdapter, isAddIPAdapterDisabled] =
@@ -88,20 +94,21 @@ export const ControlSettingsAccordion: React.FC = memo(() => {
   }
 
   return (
-    <InvSingleAccordion
+    <StandaloneAccordion
       label={t('accordions.control.title')}
-      defaultIsOpen={true}
       badges={badges}
+      isOpen={isOpen}
+      onToggle={onToggle}
     >
       <Flex gap={2} p={4} flexDir="column">
-        <InvButtonGroup
+        <ButtonGroup
           size="sm"
           w="full"
           justifyContent="space-between"
           variant="ghost"
           isAttached={false}
         >
-          <InvButton
+          <Button
             tooltip={t('controlnet.addControlNet')}
             leftIcon={<PiPlusBold />}
             onClick={addControlNet}
@@ -110,8 +117,8 @@ export const ControlSettingsAccordion: React.FC = memo(() => {
             isDisabled={isAddControlNetDisabled}
           >
             {t('common.controlNet')}
-          </InvButton>
-          <InvButton
+          </Button>
+          <Button
             tooltip={t('controlnet.addIPAdapter')}
             leftIcon={<PiPlusBold />}
             onClick={addIPAdapter}
@@ -120,8 +127,8 @@ export const ControlSettingsAccordion: React.FC = memo(() => {
             isDisabled={isAddIPAdapterDisabled}
           >
             {t('common.ipAdapter')}
-          </InvButton>
-          <InvButton
+          </Button>
+          <Button
             tooltip={t('controlnet.addT2IAdapter')}
             leftIcon={<PiPlusBold />}
             onClick={addT2IAdapter}
@@ -130,8 +137,8 @@ export const ControlSettingsAccordion: React.FC = memo(() => {
             isDisabled={isAddT2IAdapterDisabled}
           >
             {t('common.t2iAdapter')}
-          </InvButton>
-        </InvButtonGroup>
+          </Button>
+        </ButtonGroup>
         {controlAdapterIds.map((id, i) => (
           <Fragment key={id}>
             <Divider />
@@ -139,7 +146,7 @@ export const ControlSettingsAccordion: React.FC = memo(() => {
           </Fragment>
         ))}
       </Flex>
-    </InvSingleAccordion>
+    </StandaloneAccordion>
   );
 });
 

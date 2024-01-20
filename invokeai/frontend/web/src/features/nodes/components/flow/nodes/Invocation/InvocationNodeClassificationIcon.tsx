@@ -1,5 +1,4 @@
-import { Icon } from '@chakra-ui/react';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { Icon, Tooltip } from '@invoke-ai/ui';
 import { useNodeClassification } from 'features/nodes/hooks/useNodeClassification';
 import type { Classification } from 'features/nodes/types/common';
 import { memo } from 'react';
@@ -18,7 +17,7 @@ const InvocationNodeClassificationIcon = ({ nodeId }: Props) => {
   }
 
   return (
-    <InvTooltip
+    <Tooltip
       label={<ClassificationTooltipContent classification={classification} />}
       placement="top"
       shouldWrapChildren
@@ -29,7 +28,7 @@ const InvocationNodeClassificationIcon = ({ nodeId }: Props) => {
         boxSize={4}
         color="base.400"
       />
-    </InvTooltip>
+    </Tooltip>
   );
 };
 

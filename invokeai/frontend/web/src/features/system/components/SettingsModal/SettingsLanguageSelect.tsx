@@ -1,7 +1,6 @@
+import type { ComboboxOnChange } from '@invoke-ai/ui';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type { InvSelectOnChange } from 'common/components/InvSelect/types';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { languageChanged } from 'features/system/store/systemSlice';
 import { isLanguage } from 'features/system/store/types';
@@ -44,7 +43,7 @@ export const SettingsLanguageSelect = memo(() => {
     [language, options]
   );
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!isLanguage(v?.value)) {
         return;
@@ -54,12 +53,10 @@ export const SettingsLanguageSelect = memo(() => {
     [dispatch]
   );
   return (
-    <InvControl
-      label={t('common.languagePickerLabel')}
-      isDisabled={!isLocalizationEnabled}
-    >
-      <InvSelect value={value} options={options} onChange={onChange} />
-    </InvControl>
+    <FormControl isDisabled={!isLocalizationEnabled}>
+      <FormLabel>{t('common.languagePickerLabel')}</FormLabel>
+      <Combobox value={value} options={options} onChange={onChange} />
+    </FormControl>
   );
 });
 

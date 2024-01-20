@@ -3,21 +3,19 @@ import {
   Flex,
   Grid,
   GridItem,
+  Heading,
   Image,
   Link,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
+  Text,
   useDisclosure,
-} from '@chakra-ui/react';
-import { InvHeading } from 'common/components/InvHeading/wrapper';
-import {
-  InvModal,
-  InvModalBody,
-  InvModalCloseButton,
-  InvModalContent,
-  InvModalFooter,
-  InvModalHeader,
-  InvModalOverlay,
-} from 'common/components/InvModal/wrapper';
-import { InvText } from 'common/components/InvText/wrapper';
+} from '@invoke-ai/ui';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import {
   discordLink,
@@ -54,12 +52,12 @@ const AboutModal = ({ children }: AboutModalProps) => {
       {cloneElement(children, {
         onClick: onOpen,
       })}
-      <InvModal isOpen={isOpen} onClose={onClose} isCentered size="2xl">
-        <InvModalOverlay />
-        <InvModalContent maxH="80vh" h="33rem">
-          <InvModalHeader>{t('accessibility.about')}</InvModalHeader>
-          <InvModalCloseButton />
-          <InvModalBody display="flex" flexDir="column" gap={4}>
+      <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl">
+        <ModalOverlay />
+        <ModalContent maxH="80vh" h="33rem">
+          <ModalHeader>{t('accessibility.about')}</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody display="flex" flexDir="column" gap={4}>
             <Grid templateColumns="repeat(2, 1fr)" h="full">
               <GridItem
                 backgroundColor="base.750"
@@ -68,7 +66,7 @@ const AboutModal = ({ children }: AboutModalProps) => {
                 h="full"
               >
                 <ScrollableContent>
-                  <InvHeading
+                  <Heading
                     position="sticky"
                     top="0"
                     backgroundColor="base.750"
@@ -76,7 +74,7 @@ const AboutModal = ({ children }: AboutModalProps) => {
                     p="1"
                   >
                     {t('common.localSystem')}
-                  </InvHeading>
+                  </Heading>
                   {deps.map(({ name, version }, i) => (
                     <Grid
                       key={i}
@@ -85,10 +83,10 @@ const AboutModal = ({ children }: AboutModalProps) => {
                       w="full"
                       templateColumns="repeat(2, 1fr)"
                     >
-                      <InvText>{name}</InvText>
-                      <InvText>
+                      <Text>{name}</Text>
+                      <Text>
                         {version ? version : t('common.notInstalled')}
-                      </InvText>
+                      </Text>
                     </Grid>
                   ))}
                 </ScrollableContent>
@@ -102,7 +100,7 @@ const AboutModal = ({ children }: AboutModalProps) => {
                   h="full"
                 >
                   <Image src={InvokeLogoYellow} alt="invoke-logo" w="120px" />
-                  {appVersion && <InvText>{`v${appVersion?.version}`}</InvText>}
+                  {appVersion && <Text>{`v${appVersion?.version}`}</Text>}
                   <Grid templateColumns="repeat(2, 1fr)" gap="3">
                     <GridItem>
                       <Link fontSize="sm" href={githubLink} isExternal>
@@ -117,20 +115,18 @@ const AboutModal = ({ children }: AboutModalProps) => {
                       </Link>
                     </GridItem>
                   </Grid>
-                  <InvHeading fontSize="large">
-                    {t('common.aboutHeading')}
-                  </InvHeading>
-                  <InvText fontSize="sm">{t('common.aboutDesc')}</InvText>
+                  <Heading fontSize="large">{t('common.aboutHeading')}</Heading>
+                  <Text fontSize="sm">{t('common.aboutDesc')}</Text>
                   <Link isExternal href={websiteLink} fontSize="sm">
                     {websiteLink} <ExternalLinkIcon mx="2px" />
                   </Link>
                 </Flex>
               </GridItem>
             </Grid>
-          </InvModalBody>
-          <InvModalFooter />
-        </InvModalContent>
-      </InvModal>
+          </ModalBody>
+          <ModalFooter />
+        </ModalContent>
+      </Modal>
     </>
   );
 };

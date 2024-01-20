@@ -1,9 +1,7 @@
-import { Box, Flex, HStack } from '@chakra-ui/react';
+import { Box, Flex, FormControl, FormLabel, HStack, Text } from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvText } from 'common/components/InvText/wrapper';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import NotesTextarea from 'features/nodes/components/flow/nodes/Invocation/NotesTextarea';
 import { useNodeNeedsUpdate } from 'features/nodes/hooks/useNodeNeedsUpdate';
@@ -85,16 +83,18 @@ const Content = memo((props: ContentProps) => {
         >
           <EditableNodeTitle nodeId={props.nodeId} />
           <HStack>
-            <InvControl label={t('nodes.nodeType')}>
-              <InvText fontSize="sm" fontWeight="semibold">
+            <FormControl>
+              <FormLabel>{t('nodes.nodeType')}</FormLabel>
+              <Text fontSize="sm" fontWeight="semibold">
                 {props.templateTitle}
-              </InvText>
-            </InvControl>
-            <InvControl label={t('nodes.nodeVersion')} isInvalid={needsUpdate}>
-              <InvText fontSize="sm" fontWeight="semibold">
+              </Text>
+            </FormControl>
+            <FormControl isInvalid={needsUpdate}>
+              <FormLabel>{t('nodes.nodeVersion')}</FormLabel>
+              <Text fontSize="sm" fontWeight="semibold">
                 {props.nodeVersion}
-              </InvText>
-            </InvControl>
+              </Text>
+            </FormControl>
           </HStack>
           <NotesTextarea nodeId={props.nodeId} />
         </Flex>

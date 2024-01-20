@@ -1,9 +1,7 @@
-import { Flex } from '@chakra-ui/layout';
+import type { FormLabelProps } from '@invoke-ai/ui';
+import { Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
-import type { InvLabelProps } from 'common/components/InvControl/types';
-import { InvSingleAccordion } from 'common/components/InvSingleAccordion/InvSingleAccordion';
 import ParamCFGRescaleMultiplier from 'features/parameters/components/Advanced/ParamCFGRescaleMultiplier';
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
@@ -11,14 +9,15 @@ import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSea
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
+import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const labelProps: InvLabelProps = {
+const formLabelProps: FormLabelProps = {
   minW: '9.2rem',
 };
 
-const labelProps2: InvLabelProps = {
+const formLabelProps2: FormLabelProps = {
   flexGrow: 1,
 };
 
@@ -51,30 +50,35 @@ const selectBadges = createMemoizedSelector(
 export const AdvancedSettingsAccordion = memo(() => {
   const badges = useAppSelector(selectBadges);
   const { t } = useTranslation();
+  const { isOpen, onToggle } = useStandaloneAccordionToggle({
+    id: 'advanced-settings',
+    defaultIsOpen: false,
+  });
 
   return (
-    <InvSingleAccordion
+    <StandaloneAccordion
       label={t('accordions.advanced.title')}
       badges={badges}
-      id="advanced-settings"
+      isOpen={isOpen}
+      onToggle={onToggle}
     >
       <Flex gap={4} alignItems="center" p={4} flexDir="column">
         <Flex gap={4} w="full">
           <ParamVAEModelSelect />
           <ParamVAEPrecision />
         </Flex>
-        <InvControlGroup labelProps={labelProps}>
+        <FormControlGroup formLabelProps={formLabelProps}>
           <ParamClipSkip />
           <ParamCFGRescaleMultiplier />
-        </InvControlGroup>
+        </FormControlGroup>
         <Flex gap={4} w="full">
-          <InvControlGroup labelProps={labelProps2}>
+          <FormControlGroup formLabelProps={formLabelProps2}>
             <ParamSeamlessXAxis />
             <ParamSeamlessYAxis />
-          </InvControlGroup>
+          </FormControlGroup>
         </Flex>
       </Flex>
-    </InvSingleAccordion>
+    </StandaloneAccordion>
   );
 });
 

@@ -1,10 +1,7 @@
+import type { ContextMenuProps } from '@invoke-ai/ui';
+import { ContextMenu, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import type { InvContextMenuProps } from 'common/components/InvContextMenu/InvContextMenu';
-import { InvContextMenu } from 'common/components/InvContextMenu/InvContextMenu';
-import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
-import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
-import { InvMenuGroup } from 'common/components/InvMenu/wrapper';
 import { useFieldInputKind } from 'features/nodes/hooks/useFieldInputKind';
 import { useFieldLabel } from 'features/nodes/hooks/useFieldLabel';
 import { useFieldTemplateTitle } from 'features/nodes/hooks/useFieldTemplateTitle';
@@ -22,7 +19,7 @@ type Props = {
   nodeId: string;
   fieldName: string;
   kind: 'input' | 'output';
-  children: InvContextMenuProps<HTMLDivElement>['children'];
+  children: ContextMenuProps<HTMLDivElement>['children'];
 };
 
 const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
@@ -63,24 +60,24 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
     const menuItems: ReactNode[] = [];
     if (mayExpose && !isExposed) {
       menuItems.push(
-        <InvMenuItem
+        <MenuItem
           key={`${nodeId}.${fieldName}.expose-field`}
           icon={<PiPlusBold />}
           onClick={handleExposeField}
         >
           {t('nodes.addLinearView')}
-        </InvMenuItem>
+        </MenuItem>
       );
     }
     if (mayExpose && isExposed) {
       menuItems.push(
-        <InvMenuItem
+        <MenuItem
           key={`${nodeId}.${fieldName}.unexpose-field`}
           icon={<PiMinusBold />}
           onClick={handleUnexposeField}
         >
           {t('nodes.removeLinearView')}
-        </InvMenuItem>
+        </MenuItem>
       );
     }
     return menuItems;
@@ -97,20 +94,18 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
   const renderMenuFunc = useCallback(
     () =>
       !menuItems.length ? null : (
-        <InvMenuList visibility="visible">
-          <InvMenuGroup
+        <MenuList visibility="visible">
+          <MenuGroup
             title={label || fieldTemplateTitle || t('nodes.unknownField')}
           >
             {menuItems}
-          </InvMenuGroup>
-        </InvMenuList>
+          </MenuGroup>
+        </MenuList>
       ),
     [fieldTemplateTitle, label, menuItems, t]
   );
 
-  return (
-    <InvContextMenu renderMenu={renderMenuFunc}>{children}</InvContextMenu>
-  );
+  return <ContextMenu renderMenu={renderMenuFunc}>{children}</ContextMenu>;
 };
 
 export default memo(FieldContextMenu);

@@ -1,7 +1,6 @@
-import { useDisclosure } from '@chakra-ui/react';
+import type { IconButtonProps } from '@invoke-ai/ui';
+import { IconButton, useDisclosure } from '@invoke-ai/ui';
 import { useStore } from '@nanostores/react';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import type { InvIconButtonProps } from 'common/components/InvIconButton/types';
 import { $shift } from 'common/hooks/useGlobalModifiers';
 import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
@@ -9,7 +8,7 @@ import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold, PiXBold } from 'react-icons/pi';
 
-type ClearQueueButtonProps = Omit<InvIconButtonProps, 'aria-label'>;
+type ClearQueueButtonProps = Omit<IconButtonProps, 'aria-label'>;
 
 type ClearQueueIconButtonProps = ClearQueueButtonProps & {
   onOpen: () => void;
@@ -23,7 +22,7 @@ const ClearAllQueueIconButton = ({
   const { isLoading, isDisabled } = useClearQueue();
 
   return (
-    <InvIconButton
+    <IconButton
       isDisabled={isDisabled}
       isLoading={isLoading}
       aria-label={t('queue.clear')}
@@ -43,7 +42,7 @@ const ClearSingleQueueItemIconButton = (props: ClearQueueButtonProps) => {
     useCancelCurrentQueueItem();
 
   return (
-    <InvIconButton
+    <IconButton
       isDisabled={isDisabled}
       isLoading={isLoading}
       aria-label={t('queue.cancel')}

@@ -1,4 +1,4 @@
-import { Box } from '@chakra-ui/react';
+import { Box } from '@invoke-ai/ui';
 import { useDroppableTypesafe } from 'features/dnd/hooks/typesafeHooks';
 import type { TypesafeDroppableData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';

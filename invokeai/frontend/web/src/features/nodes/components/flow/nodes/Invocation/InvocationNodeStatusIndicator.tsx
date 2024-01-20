@@ -1,9 +1,15 @@
-import type { SystemStyleObject } from '@chakra-ui/react';
-import { Badge, CircularProgress, Flex, Icon, Image } from '@chakra-ui/react';
+import type { SystemStyleObject } from '@invoke-ai/ui';
+import {
+  Badge,
+  CircularProgress,
+  Flex,
+  Icon,
+  Image,
+  Text,
+  Tooltip,
+} from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvText } from 'common/components/InvText/wrapper';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import type { NodeExecutionState } from 'features/nodes/types/invocation';
@@ -46,7 +52,7 @@ const InvocationNodeStatusIndicator = ({ nodeId }: Props) => {
   }
 
   return (
-    <InvTooltip
+    <Tooltip
       label={<TooltipLabel nodeExecutionState={nodeExecutionState} />}
       placement="top"
     >
@@ -59,7 +65,7 @@ const InvocationNodeStatusIndicator = ({ nodeId }: Props) => {
       >
         <StatusIcon nodeExecutionState={nodeExecutionState} />
       </Flex>
-    </InvTooltip>
+    </Tooltip>
   );
 };
 
@@ -73,7 +79,7 @@ const TooltipLabel = memo(({ nodeExecutionState }: TooltipLabelProps) => {
   const { status, progress, progressImage } = nodeExecutionState;
   const { t } = useTranslation();
   if (status === zNodeStatus.enum.PENDING) {
-    return <InvText>{t('queue.pending')}</InvText>;
+    return <Text>{t('queue.pending')}</Text>;
   }
   if (status === zNodeStatus.enum.IN_PROGRESS) {
     if (progressImage) {
@@ -97,21 +103,21 @@ const TooltipLabel = memo(({ nodeExecutionState }: TooltipLabelProps) => {
 
     if (progress !== null) {
       return (
-        <InvText>
+        <Text>
           {t('nodes.executionStateInProgress')} ({Math.round(progress * 100)}%)
-        </InvText>
+        </Text>
       );
     }
 
-    return <InvText>{t('nodes.executionStateInProgress')}</InvText>;
+    return <Text>{t('nodes.executionStateInProgress')}</Text>;
   }
 
   if (status === zNodeStatus.enum.COMPLETED) {
-    return <InvText>{t('nodes.executionStateCompleted')}</InvText>;
+    return <Text>{t('nodes.executionStateCompleted')}</Text>;
   }
 
   if (status === zNodeStatus.enum.FAILED) {
-    return <InvText>{t('nodes.executionStateError')}</InvText>;
+    return <Text>{t('nodes.executionStateError')}</Text>;
   }
 
   return null;

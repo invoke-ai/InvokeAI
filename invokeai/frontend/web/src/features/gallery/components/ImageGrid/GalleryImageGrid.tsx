@@ -1,8 +1,7 @@
-import { Box, Flex } from '@chakra-ui/react';
+import { Box, Button, Flex } from '@invoke-ai/ui';
 import type { EntityId } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { InvButton } from 'common/components/InvButton/InvButton';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { virtuosoGridRefs } from 'features/gallery/components/ImageGrid/types';
 import { useGalleryHotkeys } from 'features/gallery/hooks/useGalleryHotkeys';
@@ -120,7 +119,7 @@ const GalleryImageGrid = () => {
             overscan={10}
           />
         </Box>
-        <InvButton
+        <Button
           onClick={handleLoadMoreImages}
           isDisabled={!areMoreImagesAvailable}
           isLoading={isFetching}
@@ -128,7 +127,7 @@ const GalleryImageGrid = () => {
           flexShrink={0}
         >
           {`Load More (${currentData.ids.length} of ${currentViewTotal})`}
-        </InvButton>
+        </Button>
       </>
     );
   }

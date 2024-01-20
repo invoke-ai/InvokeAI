@@ -1,10 +1,12 @@
-import { Flex } from '@chakra-ui/react';
+import type { FormLabelProps } from '@invoke-ai/ui';
+import {
+  Expander,
+  Flex,
+  FormControlGroup,
+  StandaloneAccordion,
+} from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
-import type { InvLabelProps } from 'common/components/InvControl/types';
-import { InvExpander } from 'common/components/InvExpander/InvExpander';
-import { InvSingleAccordion } from 'common/components/InvSingleAccordion/InvSingleAccordion';
 import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import { HrfSettings } from 'features/hrf/components/HrfSettings';
 import { selectHrfSlice } from 'features/hrf/store/hrfSlice';
@@ -17,6 +19,8 @@ import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamS
 import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
 import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
+import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
+import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -66,19 +70,24 @@ const selector = createMemoizedSelector(
   }
 );
 
-const scalingLabelProps: InvLabelProps = {
+const scalingLabelProps: FormLabelProps = {
   minW: '4.5rem',
 };
 
 export const ImageSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const { badges, activeTabName } = useAppSelector(selector);
+  const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } =
+    useStandaloneAccordionToggle({ id: 'image-settings', defaultIsOpen: true });
+  const { isOpen: isOpenExpander, onToggle: onToggleExpander } =
+    useExpanderToggle({ id: 'image-settings-advanced', defaultIsOpen: false });
 
   return (
-    <InvSingleAccordion
+    <StandaloneAccordion
       label={t('accordions.image.title')}
-      defaultIsOpen={true}
       badges={badges}
+      isOpen={isOpenAccordion}
+      onToggle={onToggleAccordion}
     >
       <Flex px={4} pt={4} w="full" h="full" flexDir="column">
         {activeTabName === 'unifiedCanvas' ? (
@@ -86,7 +95,7 @@ export const ImageSettingsAccordion = memo(() => {
         ) : (
           <ImageSizeLinear />
         )}
-        <InvExpander id="image-settings">
+        <Expander isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">
             <Flex gap={4} alignItems="center">
               <ParamSeedNumberInput />
@@ -100,16 +109,16 @@ export const ImageSettingsAccordion = memo(() => {
             {activeTabName === 'unifiedCanvas' && (
               <>
                 <ParamScaleBeforeProcessing />
-                <InvControlGroup labelProps={scalingLabelProps}>
+                <FormControlGroup formLabelProps={scalingLabelProps}>
                   <ParamScaledWidth />
                   <ParamScaledHeight />
-                </InvControlGroup>
+                </FormControlGroup>
               </>
             )}
           </Flex>
-        </InvExpander>
+        </Expander>
       </Flex>
-    </InvSingleAccordion>
+    </StandaloneAccordion>
   );
 });
 

@@ -1,4 +1,4 @@
-import type { UseToastOptions } from '@chakra-ui/react';
+import type { UseToastOptions } from '@invoke-ai/ui';
 import type { EntityState } from '@reduxjs/toolkit';
 import type { components, paths } from 'services/api/schema';
 import type { O } from 'ts-toolbelt';
@@ -235,8 +235,5 @@ type TypeGuard<T> = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type TypeGuardFor<T extends TypeGuard<any>> = T extends TypeGuard<
-  infer U
->
-  ? U
-  : never;
+export type TypeGuardFor<T extends TypeGuard<any>> =
+  T extends TypeGuard<infer U> ? U : never;

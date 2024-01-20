@@ -1,5 +1,9 @@
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type { RequiredMediapipeFaceProcessorInvocation } from 'features/controlAdapters/store/types';
@@ -39,19 +43,27 @@ const MediapipeFaceProcessor = (props: Props) => {
 
   return (
     <ProcessorWrapper>
-      <InvControl label={t('controlnet.maxFaces')} isDisabled={!isEnabled}>
-        <InvSlider
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.maxFaces')}</FormLabel>
+        <CompositeSlider
           value={max_faces}
           onChange={handleMaxFacesChanged}
           defaultValue={DEFAULTS.max_faces}
           min={1}
           max={20}
           marks
-          withNumberInput
         />
-      </InvControl>
-      <InvControl label={t('controlnet.minConfidence')} isDisabled={!isEnabled}>
-        <InvSlider
+        <CompositeNumberInput
+          value={max_faces}
+          onChange={handleMaxFacesChanged}
+          defaultValue={DEFAULTS.max_faces}
+          min={1}
+          max={20}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.minConfidence')}</FormLabel>
+        <CompositeSlider
           value={min_confidence}
           onChange={handleMinConfidenceChanged}
           defaultValue={DEFAULTS.min_confidence}
@@ -59,9 +71,16 @@ const MediapipeFaceProcessor = (props: Props) => {
           max={1}
           step={0.01}
           marks
-          withNumberInput
         />
-      </InvControl>
+        <CompositeNumberInput
+          value={min_confidence}
+          onChange={handleMinConfidenceChanged}
+          defaultValue={DEFAULTS.min_confidence}
+          min={0}
+          max={1}
+          step={0.01}
+        />
+      </FormControl>
     </ProcessorWrapper>
   );
 };

@@ -1,9 +1,7 @@
+import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterModel } from 'features/controlAdapters/hooks/useControlAdapterModel';
 import { useControlAdapterModelEntities } from 'features/controlAdapters/hooks/useControlAdapterModelEntities';
@@ -81,7 +79,7 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   );
 
   const { options, value, onChange, noOptionsMessage } =
-    useGroupedModelInvSelect({
+    useGroupedModelCombobox({
       modelEntities: models,
       onChange: _onChange,
       selectedModel,
@@ -89,20 +87,20 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
     });
 
   return (
-    <InvTooltip label={value?.description}>
-      <InvControl
+    <Tooltip label={value?.description}>
+      <FormControl
         isDisabled={!isEnabled}
         isInvalid={!value || mainModel?.base_model !== model?.base_model}
       >
-        <InvSelect
+        <Combobox
           options={options}
           placeholder={t('controlnet.selectModel')}
           value={value}
           onChange={onChange}
           noOptionsMessage={noOptionsMessage}
         />
-      </InvControl>
-    </InvTooltip>
+      </FormControl>
+    </Tooltip>
   );
 };
 

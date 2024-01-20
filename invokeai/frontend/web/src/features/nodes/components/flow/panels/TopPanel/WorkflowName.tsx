@@ -1,5 +1,5 @@
+import { Text } from '@invoke-ai/ui';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvText } from 'common/components/InvText/wrapper';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,7 +20,7 @@ const TopCenterPanel = () => {
   }, [t, name, isTouched, isWorkflowLibraryEnabled]);
 
   return (
-    <InvText
+    <Text
       m={2}
       fontSize="lg"
       userSelect="none"
@@ -30,7 +30,7 @@ const TopCenterPanel = () => {
       opacity={0.8}
     >
       {displayName}
-    </InvText>
+    </Text>
   );
 };
 

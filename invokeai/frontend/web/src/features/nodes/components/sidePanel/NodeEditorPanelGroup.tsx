@@ -1,6 +1,6 @@
 import 'reactflow/dist/style.css';
 
-import { Flex } from '@chakra-ui/react';
+import { Flex } from '@invoke-ai/ui';
 import QueueControls from 'features/queue/components/QueueControls';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';

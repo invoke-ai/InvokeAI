@@ -1,5 +1,4 @@
-import { Flex } from '@chakra-ui/react';
-import { InvText } from 'common/components/InvText/wrapper';
+import { Flex, Text } from '@invoke-ai/ui';
 import { SyncModelsButton } from 'features/modelManager/components/SyncModels/SyncModelsButton';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,10 +17,10 @@ const SyncModels = () => {
       bg="base.800"
     >
       <Flex flexDirection="column" gap={2}>
-        <InvText fontWeight="semibold">{t('modelManager.syncModels')}</InvText>
-        <InvText fontSize="sm" variant="subtext">
+        <Text fontWeight="semibold">{t('modelManager.syncModels')}</Text>
+        <Text fontSize="sm" variant="subtext">
           {t('modelManager.syncModelsDesc')}
-        </InvText>
+        </Text>
       </Flex>
       <SyncModelsButton />
     </Flex>

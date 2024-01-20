@@ -93,6 +93,27 @@ module.exports = {
     '@typescript-eslint/no-import-type-side-effects': 'error',
     'simple-import-sort/imports': 'error',
     'simple-import-sort/exports': 'error',
+    // Prefer @invoke-ai/ui components over chakra
+    'no-restricted-imports': 'off',
+    '@typescript-eslint/no-restricted-imports': [
+      'warn',
+      {
+        paths: [
+          {
+            name: '@chakra-ui/react',
+            message: "Please import from '@invoke-ai/ui' instead.",
+          },
+          {
+            name: '@chakra-ui/layout',
+            message: "Please import from '@invoke-ai/ui' instead.",
+          },
+          {
+            name: '@chakra-ui/portal',
+            message: "Please import from '@invoke-ai/ui' instead.",
+          },
+        ],
+      },
+    ],
   },
   overrides: [
     {

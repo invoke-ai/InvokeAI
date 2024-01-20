@@ -1,10 +1,9 @@
-import type { ChakraProps } from '@chakra-ui/react';
-import { Flex, ListItem, OrderedList, Spinner } from '@chakra-ui/react';
+import type { ChakraProps } from '@invoke-ai/ui';
+import { Flex, ListItem, OrderedList, Spinner, Text } from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
-import { InvText } from 'common/components/InvText/wrapper';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo, useMemo } from 'react';
@@ -57,9 +56,9 @@ const ParamDynamicPromptsPreview = () => {
 
   return (
     <>
-      <InvText fontSize="sm" fontWeight="bold">
+      <Text fontSize="sm" fontWeight="bold">
         {label}
-      </InvText>
+      </Text>
       <Flex
         w="full"
         h="full"
@@ -76,7 +75,7 @@ const ParamDynamicPromptsPreview = () => {
                 key={`${prompt}.${i}`}
                 sx={listItemStyles}
               >
-                <InvText as="span">{prompt}</InvText>
+                <Text as="span">{prompt}</Text>
               </ListItem>
             ))}
           </OrderedList>

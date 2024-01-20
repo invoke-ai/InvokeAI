@@ -1,6 +1,5 @@
+import { IconButton, Tooltip } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { setShouldConcatSDXLStylePrompt } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -27,8 +26,8 @@ export const SDXLConcatButton = memo(() => {
   );
 
   return (
-    <InvTooltip label={label}>
-      <InvIconButton
+    <Tooltip label={label}>
+      <IconButton
         aria-label={label}
         onClick={handleShouldConcatPromptChange}
         icon={
@@ -42,7 +41,7 @@ export const SDXLConcatButton = memo(() => {
         fontSize={12}
         px={0.5}
       />
-    </InvTooltip>
+    </Tooltip>
   );
 });
 

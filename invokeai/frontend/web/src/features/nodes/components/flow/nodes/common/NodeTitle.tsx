@@ -1,4 +1,4 @@
-import type { SystemStyleObject } from '@chakra-ui/react';
+import type { SystemStyleObject } from '@invoke-ai/ui';
 import {
   Box,
   Editable,
@@ -6,7 +6,7 @@ import {
   EditablePreview,
   Flex,
   useEditableControls,
-} from '@chakra-ui/react';
+} from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useNodeLabel } from 'features/nodes/hooks/useNodeLabel';
 import { useNodeTemplateTitle } from 'features/nodes/hooks/useNodeTemplateTitle';

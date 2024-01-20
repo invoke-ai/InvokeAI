@@ -1,10 +1,6 @@
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import { Combobox, FormControl } from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
 import { fieldBoardValueChanged } from 'features/nodes/store/nodesSlice';
 import type {
   BoardFieldInputInstance,
@@ -24,7 +20,7 @@ const BoardFieldInputComponent = (
   const { t } = useTranslation();
   const { options, hasBoards } = useListAllBoardsQuery(undefined, {
     selectFromResult: ({ data }) => {
-      const options: InvSelectOption[] = [
+      const options: ComboboxOption[] = [
         {
           label: 'None',
           value: 'none',
@@ -42,7 +38,7 @@ const BoardFieldInputComponent = (
     },
   });
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!v) {
         return;
@@ -66,15 +62,15 @@ const BoardFieldInputComponent = (
   const noOptionsMessage = useCallback(() => t('boards.noMatching'), [t]);
 
   return (
-    <InvControl className="nowheel nodrag" isDisabled={!hasBoards}>
-      <InvSelect
+    <FormControl className="nowheel nodrag" isDisabled={!hasBoards}>
+      <Combobox
         value={value}
         options={options}
         onChange={onChange}
         placeholder={t('boards.selectBoard')}
         noOptionsMessage={noOptionsMessage}
       />
-    </InvControl>
+    </FormControl>
   );
 };
 

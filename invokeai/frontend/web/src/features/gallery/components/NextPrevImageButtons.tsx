@@ -1,6 +1,5 @@
-import type { ChakraProps } from '@chakra-ui/react';
-import { Box, Flex, Spinner } from '@chakra-ui/react';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import type { ChakraProps } from '@invoke-ai/ui';
+import { Box, Flex, IconButton, Spinner } from '@invoke-ai/ui';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
 import { memo } from 'react';
@@ -37,7 +36,7 @@ const NextPrevImageButtons = () => {
         insetInlineStart={1}
       >
         {!isOnFirstImage && (
-          <InvIconButton
+          <IconButton
             aria-label={t('accessibility.previousImage')}
             icon={<PiCaretLeftBold size={64} />}
             variant="unstyled"
@@ -54,7 +53,7 @@ const NextPrevImageButtons = () => {
         insetInlineEnd={6}
       >
         {!isOnLastImage && (
-          <InvIconButton
+          <IconButton
             aria-label={t('accessibility.nextImage')}
             icon={<PiCaretRightBold size={64} />}
             variant="unstyled"
@@ -64,7 +63,7 @@ const NextPrevImageButtons = () => {
           />
         )}
         {isOnLastImage && areMoreImagesAvailable && !isFetching && (
-          <InvIconButton
+          <IconButton
             aria-label={t('accessibility.loadMore')}
             icon={<PiCaretDoubleRightBold size={64} />}
             variant="unstyled"

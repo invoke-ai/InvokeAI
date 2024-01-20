@@ -1,4 +1,4 @@
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { Tooltip } from '@invoke-ai/ui';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
@@ -106,7 +106,7 @@ const FieldHandle = (props: FieldHandleProps) => {
   }, [connectionError, fieldTypeName, isConnectionInProgress]);
 
   return (
-    <InvTooltip
+    <Tooltip
       label={tooltip}
       placement={handleType === 'target' ? 'start' : 'end'}
       openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
@@ -117,7 +117,7 @@ const FieldHandle = (props: FieldHandleProps) => {
         position={handleType === 'target' ? Position.Left : Position.Right}
         style={styles}
       />
-    </InvTooltip>
+    </Tooltip>
   );
 };
 

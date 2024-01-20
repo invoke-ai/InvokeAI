@@ -1,6 +1,4 @@
-import { Flex } from '@chakra-ui/react';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
+import { Button, ButtonGroup, Flex } from '@invoke-ai/ui';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -25,22 +23,22 @@ const AddModels = () => {
       maxHeight={window.innerHeight - 250}
       gap={4}
     >
-      <InvButtonGroup>
-        <InvButton
+      <ButtonGroup>
+        <Button
           size="sm"
           isChecked={addModelMode == 'simple'}
           onClick={handleAddModelSimple}
         >
           {t('common.simple')}
-        </InvButton>
-        <InvButton
+        </Button>
+        <Button
           size="sm"
           isChecked={addModelMode == 'advanced'}
           onClick={handleAddModelAdvanced}
         >
           {t('common.advanced')}
-        </InvButton>
-      </InvButtonGroup>
+        </Button>
+      </ButtonGroup>
       <Flex p={4} borderRadius={4} bg="base.800">
         {addModelMode === 'simple' && <SimpleAddModels />}
         {addModelMode === 'advanced' && <AdvancedAddModels />}

@@ -1,4 +1,4 @@
-import { InvButton } from 'common/components/InvButton/InvButton';
+import { Button } from '@invoke-ai/ui';
 import { useClearInvocationCache } from 'features/queue/hooks/useClearInvocationCache';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,13 +9,13 @@ const ClearInvocationCacheButton = () => {
     useClearInvocationCache();
 
   return (
-    <InvButton
+    <Button
       isDisabled={isDisabled}
       isLoading={isLoading}
       onClick={clearInvocationCache}
     >
       {t('invocationCache.clear')}
-    </InvButton>
+    </Button>
   );
 };
 

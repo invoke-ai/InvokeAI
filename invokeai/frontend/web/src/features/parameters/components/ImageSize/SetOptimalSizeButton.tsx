@@ -1,5 +1,5 @@
+import { IconButton } from '@invoke-ai/ui';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import {
@@ -36,7 +36,7 @@ export const SetOptimalSizeButton = memo(() => {
   }, [isSizeTooLarge, isSizeTooSmall, t]);
 
   return (
-    <InvIconButton
+    <IconButton
       tooltip={tooltip}
       aria-label={t('parameters.setToOptimalSize')}
       onClick={onClick}

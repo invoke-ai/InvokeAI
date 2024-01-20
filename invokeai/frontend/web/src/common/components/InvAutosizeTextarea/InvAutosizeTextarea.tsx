@@ -1,4 +1,4 @@
-import { Box, forwardRef, Textarea as ChakraTextarea } from '@chakra-ui/react';
+import { Box, forwardRef, Textarea as ChakraTextarea } from '@invoke-ai/ui';
 import { useGlobalModifiersSetters } from 'common/hooks/useGlobalModifiers';
 import { stopPastePropagation } from 'common/util/stopPastePropagation';
 import type { KeyboardEvent } from 'react';

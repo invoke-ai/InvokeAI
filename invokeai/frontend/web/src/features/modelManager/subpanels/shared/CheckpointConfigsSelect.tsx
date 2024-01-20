@@ -1,10 +1,9 @@
-import type { ChakraProps } from '@chakra-ui/react';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
 import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
+  ChakraProps,
+  ComboboxOnChange,
+  ComboboxOption,
+} from '@invoke-ai/ui';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { memo, useCallback, useMemo } from 'react';
 import { useController, type UseControllerProps } from 'react-hook-form';
 import { useGetCheckpointConfigsQuery } from 'services/api/endpoints/models';
@@ -16,7 +15,7 @@ const CheckpointConfigsSelect = (
   props: UseControllerProps<CheckpointModelConfig>
 ) => {
   const { data } = useGetCheckpointConfigsQuery();
-  const options = useMemo<InvSelectOption[]>(
+  const options = useMemo<ComboboxOption[]>(
     () => (data ? data.map((i) => ({ label: i, value: i })) : []),
     [data]
   );
@@ -25,7 +24,7 @@ const CheckpointConfigsSelect = (
     () => options.find((o) => o.value === field.value),
     [field.value, options]
   );
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       field.onChange(v?.value);
     },
@@ -33,15 +32,16 @@ const CheckpointConfigsSelect = (
   );
 
   return (
-    <InvControl label="Config File">
-      <InvSelect
+    <FormControl>
+      <FormLabel>Config File</FormLabel>
+      <Combobox
         placeholder="Select A Config File"
         value={value}
         options={options}
         onChange={onChange}
         sx={sx}
       />
-    </InvControl>
+    </FormControl>
   );
 };
 

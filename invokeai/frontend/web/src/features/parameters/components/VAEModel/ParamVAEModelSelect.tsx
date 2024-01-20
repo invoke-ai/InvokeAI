@@ -1,8 +1,7 @@
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
+import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import {
   selectGenerationSlice,
   vaeSelected,
@@ -38,7 +37,7 @@ const ParamVAEModelSelect = () => {
     [dispatch]
   );
   const { options, value, onChange, placeholder, noOptionsMessage } =
-    useGroupedModelInvSelect({
+    useGroupedModelCombobox({
       modelEntities: data,
       onChange: _onChange,
       selectedModel: vae ? { ...vae, model_type: 'vae' } : null,
@@ -47,13 +46,13 @@ const ParamVAEModelSelect = () => {
     });
 
   return (
-    <InvControl
-      label={t('modelManager.vae')}
+    <FormControl
       isDisabled={!options.length}
       isInvalid={!options.length}
       feature="paramVAE"
     >
-      <InvSelect
+      <FormLabel>{t('modelManager.vae')}</FormLabel>
+      <Combobox
         isClearable
         value={value}
         placeholder={value ? placeholder : t('models.defaultVAE')}
@@ -61,7 +60,7 @@ const ParamVAEModelSelect = () => {
         onChange={onChange}
         noOptionsMessage={noOptionsMessage}
       />
-    </InvControl>
+    </FormControl>
   );
 };
 

@@ -1,9 +1,5 @@
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { typedMemo } from 'common/util/typedMemo';
 import { useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
@@ -14,7 +10,7 @@ import type {
   DiffusersModelConfig,
 } from 'services/api/types';
 
-const options: InvSelectOption[] = [
+const options: ComboboxOption[] = [
   { value: 'normal', label: 'Normal' },
   { value: 'inpaint', label: 'Inpaint' },
   { value: 'depth', label: 'Depth' },
@@ -31,16 +27,17 @@ const ModelVariantSelect = <
     () => options.find((o) => o.value === field.value),
     [field.value]
   );
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       field.onChange(v?.value);
     },
     [field]
   );
   return (
-    <InvControl label={t('modelManager.variant')}>
-      <InvSelect value={value} options={options} onChange={onChange} />
-    </InvControl>
+    <FormControl>
+      <FormLabel>{t('modelManager.variant')}</FormLabel>
+      <Combobox value={value} options={options} onChange={onChange} />
+    </FormControl>
   );
 };
 

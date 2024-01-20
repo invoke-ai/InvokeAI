@@ -1,6 +1,10 @@
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setInfillTileSize } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -34,24 +38,28 @@ const ParamInfillTileSize = () => {
   );
 
   return (
-    <InvControl
-      isDisabled={infillMethod !== 'tile'}
-      label={t('parameters.tileSize')}
-    >
-      <InvSlider
+    <FormControl isDisabled={infillMethod !== 'tile'}>
+      <FormLabel>{t('parameters.tileSize')}</FormLabel>
+      <CompositeSlider
         min={sliderMin}
         max={sliderMax}
-        numberInputMin={numberInputMin}
-        numberInputMax={numberInputMax}
         value={infillTileSize}
         defaultValue={initial}
         onChange={handleChange}
         step={coarseStep}
         fineStep={fineStep}
-        withNumberInput
         marks
       />
-    </InvControl>
+      <CompositeNumberInput
+        min={numberInputMin}
+        max={numberInputMax}
+        value={infillTileSize}
+        defaultValue={initial}
+        onChange={handleChange}
+        step={coarseStep}
+        fineStep={fineStep}
+      />
+    </FormControl>
   );
 };
 

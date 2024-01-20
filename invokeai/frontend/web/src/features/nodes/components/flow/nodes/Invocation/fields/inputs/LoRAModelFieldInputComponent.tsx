@@ -1,7 +1,6 @@
+import { Combobox, FormControl } from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
+import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldLoRAModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type {
   LoRAModelFieldInputInstance,
@@ -39,7 +38,7 @@ const LoRAModelFieldInputComponent = (props: Props) => {
   );
 
   const { options, value, onChange, placeholder, noOptionsMessage } =
-    useGroupedModelInvSelect({
+    useGroupedModelCombobox({
       modelEntities: data,
       onChange: _onChange,
       selectedModel: field.value
@@ -49,19 +48,19 @@ const LoRAModelFieldInputComponent = (props: Props) => {
     });
 
   return (
-    <InvControl
+    <FormControl
       className="nowheel nodrag"
       isInvalid={!value}
       isDisabled={!options.length}
     >
-      <InvSelect
+      <Combobox
         value={value}
         placeholder={placeholder}
         noOptionsMessage={noOptionsMessage}
         options={options}
         onChange={onChange}
       />
-    </InvControl>
+    </FormControl>
   );
 };
 

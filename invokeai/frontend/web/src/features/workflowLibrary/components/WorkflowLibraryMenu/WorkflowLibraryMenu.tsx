@@ -1,11 +1,11 @@
-import { useDisclosure } from '@chakra-ui/react';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
 import {
-  InvMenu,
-  InvMenuButton,
-  InvMenuDivider,
-} from 'common/components/InvMenu/wrapper';
+  IconButton,
+  Menu,
+  MenuButton,
+  MenuDivider,
+  MenuList,
+  useDisclosure,
+} from '@invoke-ai/ui';
 import { useGlobalMenuClose } from 'common/hooks/useGlobalMenuClose';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import DownloadWorkflowMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/DownloadWorkflowMenuItem';
@@ -27,23 +27,23 @@ const WorkflowLibraryMenu = () => {
     useFeatureStatus('workflowLibrary').isFeatureEnabled;
 
   return (
-    <InvMenu isOpen={isOpen} onOpen={onOpen} onClose={onClose}>
-      <InvMenuButton
-        as={InvIconButton}
+    <Menu isOpen={isOpen} onOpen={onOpen} onClose={onClose}>
+      <MenuButton
+        as={IconButton}
         aria-label={t('workflows.workflowEditorMenu')}
         icon={<PiDotsThreeOutlineFill />}
         pointerEvents="auto"
       />
-      <InvMenuList pointerEvents="auto">
+      <MenuList pointerEvents="auto">
         {isWorkflowLibraryEnabled && <SaveWorkflowMenuItem />}
         {isWorkflowLibraryEnabled && <SaveWorkflowAsMenuItem />}
         <DownloadWorkflowMenuItem />
         <UploadWorkflowMenuItem />
         <NewWorkflowMenuItem />
-        <InvMenuDivider />
+        <MenuDivider />
         <SettingsMenuItem />
-      </InvMenuList>
-    </InvMenu>
+      </MenuList>
+    </Menu>
   );
 };
 

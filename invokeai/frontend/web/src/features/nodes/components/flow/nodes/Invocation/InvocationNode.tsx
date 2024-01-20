@@ -1,4 +1,4 @@
-import { Flex, Grid, GridItem } from '@chakra-ui/react';
+import { Flex, Grid, GridItem } from '@invoke-ai/ui';
 import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import { useAnyOrDirectInputFieldNames } from 'features/nodes/hooks/useAnyOrDirectInputFieldNames';
 import { useConnectionInputFieldNames } from 'features/nodes/hooks/useConnectionInputFieldNames';

@@ -1,4 +1,4 @@
-import type { PopoverProps } from '@chakra-ui/react';
+import type { PopoverProps } from '@invoke-ai/ui';
 
 export type Feature =
   | 'clipSkip'

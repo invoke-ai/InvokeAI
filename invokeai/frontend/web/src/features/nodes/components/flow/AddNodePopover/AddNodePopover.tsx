@@ -1,21 +1,18 @@
 import 'reactflow/dist/style.css';
 
-import { Flex } from '@chakra-ui/react';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import {
+  Combobox,
+  Flex,
+  Popover,
+  PopoverAnchor,
+  PopoverBody,
+  PopoverContent,
+} from '@invoke-ai/ui';
 import { useAppToaster } from 'app/components/Toaster';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { SelectInstance } from 'chakra-react-select';
-import {
-  InvPopover,
-  InvPopoverAnchor,
-  InvPopoverBody,
-  InvPopoverContent,
-} from 'common/components/InvPopover/wrapper';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
 import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
 import {
   addNodePopoverClosed,
@@ -46,7 +43,7 @@ const createRegex = memoize(
 );
 
 const filterOption = memoize(
-  (option: FilterOptionOption<InvSelectOption>, inputValue: string) => {
+  (option: FilterOptionOption<ComboboxOption>, inputValue: string) => {
     if (!inputValue) {
       return true;
     }
@@ -64,7 +61,7 @@ const AddNodePopover = () => {
   const buildInvocation = useBuildNode();
   const toaster = useAppToaster();
   const { t } = useTranslation();
-  const selectRef = useRef<SelectInstance<InvSelectOption> | null>(null);
+  const selectRef = useRef<SelectInstance<ComboboxOption> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const fieldFilter = useAppSelector((s) => s.nodes.connectionStartFieldType);
@@ -92,7 +89,7 @@ const AddNodePopover = () => {
           })
         : map(nodeTemplates.templates);
 
-      const options: InvSelectOption[] = map(
+      const options: ComboboxOption[] = map(
         filteredNodeTemplates,
         (template) => {
           return {
@@ -149,7 +146,7 @@ const AddNodePopover = () => {
     [dispatch, buildInvocation, toaster, t]
   );
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!v) {
         return;
@@ -197,7 +194,7 @@ const AddNodePopover = () => {
   const noOptionsMessage = useCallback(() => t('nodes.noMatchingNodes'), [t]);
 
   return (
-    <InvPopover
+    <Popover
       isOpen={isOpen}
       onClose={onClose}
       placement="bottom"
@@ -207,15 +204,15 @@ const AddNodePopover = () => {
       returnFocusOnClose={true}
       initialFocusRef={inputRef}
     >
-      <InvPopoverAnchor>
+      <PopoverAnchor>
         <Flex
           position="absolute"
           top="15%"
           insetInlineStart="50%"
           pointerEvents="none"
         />
-      </InvPopoverAnchor>
-      <InvPopoverContent
+      </PopoverAnchor>
+      <PopoverContent
         p={0}
         top={-1}
         shadow="dark-lg"
@@ -223,8 +220,8 @@ const AddNodePopover = () => {
         borderWidth="2px"
         borderStyle="solid"
       >
-        <InvPopoverBody w="32rem" p={0}>
-          <InvSelect
+        <PopoverBody w="32rem" p={0}>
+          <Combobox
             menuIsOpen={isOpen}
             selectRef={selectRef}
             value={null}
@@ -238,9 +235,9 @@ const AddNodePopover = () => {
             inputRef={inputRef}
             closeMenuOnSelect={false}
           />
-        </InvPopoverBody>
-      </InvPopoverContent>
-    </InvPopover>
+        </PopoverBody>
+      </PopoverContent>
+    </Popover>
   );
 };
 

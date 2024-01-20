@@ -1,8 +1,10 @@
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
-import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterWeight } from 'features/controlAdapters/hooks/useControlAdapterWeight';
 import { controlAdapterWeightChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
@@ -46,35 +48,30 @@ const ParamControlAdapterWeight = ({ id }: ParamControlAdapterWeightProps) => {
   }
 
   return (
-    <InvControlGroup orientation="vertical">
-      <InvControl
-        label={t('controlnet.weight')}
-        isDisabled={!isEnabled}
-        feature="controlNetWeight"
-      >
-        <InvSlider
-          value={weight}
-          onChange={onChange}
-          defaultValue={initial}
-          min={sliderMin}
-          max={sliderMax}
-          step={coarseStep}
-          fineStep={fineStep}
-          marks={marks}
-          formatValue={formatValue}
-        />
-        <InvNumberInput
-          value={weight}
-          onChange={onChange}
-          min={numberInputMin}
-          max={numberInputMax}
-          step={coarseStep}
-          fineStep={fineStep}
-          maxW={20}
-          defaultValue={initial}
-        />
-      </InvControl>
-    </InvControlGroup>
+    <FormControl isDisabled={!isEnabled} feature="controlNetWeight">
+      <FormLabel>{t('controlnet.weight')}</FormLabel>
+      <CompositeSlider
+        value={weight}
+        onChange={onChange}
+        defaultValue={initial}
+        min={sliderMin}
+        max={sliderMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        marks={marks}
+        formatValue={formatValue}
+      />
+      <CompositeNumberInput
+        value={weight}
+        onChange={onChange}
+        min={numberInputMin}
+        max={numberInputMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        maxW={20}
+        defaultValue={initial}
+      />
+    </FormControl>
   );
 };
 

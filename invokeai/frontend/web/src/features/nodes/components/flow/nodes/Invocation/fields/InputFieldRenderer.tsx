@@ -1,5 +1,4 @@
-import { Box } from '@chakra-ui/react';
-import { InvText } from 'common/components/InvText/wrapper';
+import { Box, Text } from '@invoke-ai/ui';
 import { useFieldInstance } from 'features/nodes/hooks/useFieldData';
 import { useFieldTemplate } from 'features/nodes/hooks/useFieldTemplate';
 import {
@@ -292,9 +291,9 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
 
   return (
     <Box p={1}>
-      <InvText fontSize="sm" fontWeight="semibold" color="error.300">
+      <Text fontSize="sm" fontWeight="semibold" color="error.300">
         {t('nodes.unknownFieldType', { type: fieldInstance?.type.name })}
-      </InvText>
+      </Text>
     </Box>
   );
 };

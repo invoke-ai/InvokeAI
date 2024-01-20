@@ -1,17 +1,17 @@
-import { Flex } from '@chakra-ui/layout';
+import type { FormLabelProps } from '@invoke-ai/ui';
+import {
+  Expander,
+  Flex,
+  FormControlGroup,
+  StandaloneAccordion,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
+} from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
-import type { InvLabelProps } from 'common/components/InvControl/types';
-import { InvExpander } from 'common/components/InvExpander/InvExpander';
-import { InvSingleAccordion } from 'common/components/InvSingleAccordion/InvSingleAccordion';
-import { InvTab } from 'common/components/InvTabs/InvTab';
-import {
-  InvTabList,
-  InvTabPanel,
-  InvTabPanels,
-  InvTabs,
-} from 'common/components/InvTabs/wrapper';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
 import { selectLoraSlice } from 'features/lora/store/loraSlice';
@@ -21,11 +21,13 @@ import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
+import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
+import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { size } from 'lodash-es';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const labelProps: InvLabelProps = {
+const formLabelProps: FormLabelProps = {
   minW: '4rem',
 };
 
@@ -47,45 +49,56 @@ const badgesSelector = createMemoizedSelector(
 export const GenerationSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const { loraTabBadges, accordionBadges } = useAppSelector(badgesSelector);
+  const { isOpen: isOpenExpander, onToggle: onToggleExpander } =
+    useExpanderToggle({
+      id: 'generation-settings-advanced',
+      defaultIsOpen: false,
+    });
+  const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } =
+    useStandaloneAccordionToggle({
+      id: 'generation-settings',
+      defaultIsOpen: false,
+    });
 
   return (
-    <InvSingleAccordion
+    <StandaloneAccordion
       label={t('accordions.generation.title')}
-      defaultIsOpen={true}
       badges={accordionBadges}
+      isOpen={isOpenAccordion}
+      onToggle={onToggleAccordion}
     >
-      <InvTabs variant="collapse">
-        <InvTabList>
-          <InvTab>{t('accordions.generation.modelTab')}</InvTab>
-          <InvTab badges={loraTabBadges}>
+      <Tabs variant="collapse">
+        <TabList>
+          <Tab>{t('accordions.generation.modelTab')}</Tab>
+          <Tab badges={loraTabBadges}>
             {t('accordions.generation.conceptsTab')}
-          </InvTab>
-        </InvTabList>
-        <InvTabPanels>
-          <InvTabPanel overflow="visible" px={4} pt={4}>
+          </Tab>
+        </TabList>
+        <TabPanels>
+          <TabPanel overflow="visible" px={4} pt={4}>
             <Flex gap={4} alignItems="center">
               <ParamMainModelSelect />
               <SyncModelsIconButton />
             </Flex>
-            <InvExpander id="generation-settings">
+            <Expander isOpen={isOpenExpander} onToggle={onToggleExpander}>
               <Flex gap={4} flexDir="column" pb={4}>
-                <InvControlGroup labelProps={labelProps}>
+                <FormControlGroup formLabelProps={formLabelProps}>
                   <ParamScheduler />
                   <ParamSteps />
                   <ParamCFGScale />
-                </InvControlGroup>
+                </FormControlGroup>
               </Flex>
-            </InvExpander>
-          </InvTabPanel>
-          <InvTabPanel>
+            </Expander>
+          </TabPanel>
+          <TabPanel>
             <Flex gap={4} p={4} flexDir="column">
               <LoRASelect />
               <LoRAList />
             </Flex>
-          </InvTabPanel>
-        </InvTabPanels>
-      </InvTabs>
-    </InvSingleAccordion>
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
+    </StandaloneAccordion>
   );
 });
 

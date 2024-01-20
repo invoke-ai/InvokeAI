@@ -1,6 +1,10 @@
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setImg2imgStrength } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -35,11 +39,9 @@ const ImageToImageStrength = () => {
   );
 
   return (
-    <InvControl
-      label={`${t('parameters.denoisingStrength')}`}
-      feature="paramDenoisingStrength"
-    >
-      <InvSlider
+    <FormControl feature="paramDenoisingStrength">
+      <FormLabel>{`${t('parameters.denoisingStrength')}`}</FormLabel>
+      <CompositeSlider
         step={coarseStep}
         fineStep={fineStep}
         min={sliderMin}
@@ -48,11 +50,17 @@ const ImageToImageStrength = () => {
         value={img2imgStrength}
         defaultValue={initial}
         marks={marks}
-        withNumberInput
-        numberInputMin={numberInputMin}
-        numberInputMax={numberInputMax}
       />
-    </InvControl>
+      <CompositeNumberInput
+        step={coarseStep}
+        fineStep={fineStep}
+        min={numberInputMin}
+        max={numberInputMax}
+        onChange={handleChange}
+        value={img2imgStrength}
+        defaultValue={initial}
+      />
+    </FormControl>
   );
 };
 

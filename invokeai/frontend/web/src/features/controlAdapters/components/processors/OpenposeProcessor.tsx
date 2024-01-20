@@ -1,6 +1,10 @@
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
-import { InvSwitch } from 'common/components/InvSwitch/wrapper';
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+  Switch,
+} from '@invoke-ai/ui';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type { RequiredOpenposeImageProcessorInvocation } from 'features/controlAdapters/store/types';
@@ -48,40 +52,46 @@ const OpenposeProcessor = (props: Props) => {
 
   return (
     <ProcessorWrapper>
-      <InvControl
-        label={t('controlnet.detectResolution')}
-        isDisabled={!isEnabled}
-      >
-        <InvSlider
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.detectResolution')}</FormLabel>
+        <CompositeSlider
           value={detect_resolution}
           onChange={handleDetectResolutionChanged}
           defaultValue={DEFAULTS.detect_resolution}
           min={0}
           max={4096}
           marks
-          withNumberInput
         />
-      </InvControl>
-      <InvControl
-        label={t('controlnet.imageResolution')}
-        isDisabled={!isEnabled}
-      >
-        <InvSlider
+        <CompositeNumberInput
+          value={detect_resolution}
+          onChange={handleDetectResolutionChanged}
+          defaultValue={DEFAULTS.detect_resolution}
+          min={0}
+          max={4096}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.imageResolution')}</FormLabel>
+        <CompositeSlider
           value={image_resolution}
           onChange={handleImageResolutionChanged}
           defaultValue={DEFAULTS.image_resolution}
           min={0}
           max={4096}
           marks
-          withNumberInput
         />
-      </InvControl>
-      <InvControl label={t('controlnet.handAndFace')} isDisabled={!isEnabled}>
-        <InvSwitch
-          isChecked={hand_and_face}
-          onChange={handleHandAndFaceChanged}
+        <CompositeNumberInput
+          value={image_resolution}
+          onChange={handleImageResolutionChanged}
+          defaultValue={DEFAULTS.image_resolution}
+          min={0}
+          max={4096}
         />
-      </InvControl>
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.handAndFace')}</FormLabel>
+        <Switch isChecked={hand_and_face} onChange={handleHandAndFaceChanged} />
+      </FormControl>
     </ProcessorWrapper>
   );
 };

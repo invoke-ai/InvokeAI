@@ -1,5 +1,5 @@
-import type { FlexProps } from '@chakra-ui/react';
-import { Box, forwardRef } from '@chakra-ui/react';
+import type { FlexProps } from '@invoke-ai/ui';
+import { Box, forwardRef } from '@invoke-ai/ui';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 

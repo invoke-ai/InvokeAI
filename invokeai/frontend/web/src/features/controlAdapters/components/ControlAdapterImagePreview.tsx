@@ -1,5 +1,5 @@
-import type { SystemStyleObject } from '@chakra-ui/react';
-import { Box, Flex, Spinner } from '@chakra-ui/react';
+import type { SystemStyleObject } from '@invoke-ai/ui';
+import { Box, Flex, Spinner } from '@invoke-ai/ui';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';

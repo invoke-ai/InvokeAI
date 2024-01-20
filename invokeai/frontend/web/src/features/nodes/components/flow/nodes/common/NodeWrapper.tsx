@@ -1,5 +1,5 @@
-import type { ChakraProps } from '@chakra-ui/react';
-import { Box, useToken } from '@chakra-ui/react';
+import type { ChakraProps } from '@invoke-ai/ui';
+import { Box, useToken } from '@invoke-ai/ui';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';

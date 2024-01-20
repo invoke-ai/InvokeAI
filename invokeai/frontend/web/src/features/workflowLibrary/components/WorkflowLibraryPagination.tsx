@@ -1,6 +1,4 @@
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { Button, ButtonGroup, IconButton } from '@invoke-ai/ui';
 import type { Dispatch, SetStateAction } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -54,8 +52,8 @@ const WorkflowLibraryPagination = ({ page, setPage, data }: Props) => {
   }, [data.pages, page, setPage]);
 
   return (
-    <InvButtonGroup>
-      <InvIconButton
+    <ButtonGroup>
+      <IconButton
         variant="ghost"
         onClick={handlePrevPage}
         isDisabled={page === 0}
@@ -63,7 +61,7 @@ const WorkflowLibraryPagination = ({ page, setPage, data }: Props) => {
         icon={<PiCaretLeftBold />}
       />
       {pages.map((p) => (
-        <InvButton
+        <Button
           w={10}
           isDisabled={data.pages === 1}
           onClick={p.page === page ? undefined : p.onClick}
@@ -72,16 +70,16 @@ const WorkflowLibraryPagination = ({ page, setPage, data }: Props) => {
           transitionDuration="0s" // the delay in animation looks jank
         >
           {p.page + 1}
-        </InvButton>
+        </Button>
       ))}
-      <InvIconButton
+      <IconButton
         variant="ghost"
         onClick={handleNextPage}
         isDisabled={page === data.pages - 1}
         aria-label={t('common.nextPage')}
         icon={<PiCaretRightBold />}
       />
-    </InvButtonGroup>
+    </ButtonGroup>
   );
 };
 

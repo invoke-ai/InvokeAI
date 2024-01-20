@@ -1,6 +1,10 @@
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { maxPromptsChanged } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -34,24 +38,28 @@ const ParamDynamicPromptsMaxPrompts = () => {
   );
 
   return (
-    <InvControl
-      label={t('dynamicPrompts.maxPrompts')}
+    <FormControl
       isDisabled={isDisabled}
       feature="dynamicPromptsMaxPrompts"
       renderInfoPopoverInPortal={false}
     >
-      <InvSlider
+      <FormLabel>{t('dynamicPrompts.maxPrompts')}</FormLabel>
+      <CompositeSlider
         min={sliderMin}
         max={sliderMax}
         value={maxPrompts}
         defaultValue={initial}
         onChange={handleChange}
         marks
-        withNumberInput
-        numberInputMin={numberInputMin}
-        numberInputMax={numberInputMax}
       />
-    </InvControl>
+      <CompositeNumberInput
+        min={numberInputMin}
+        max={numberInputMax}
+        value={maxPrompts}
+        defaultValue={initial}
+        onChange={handleChange}
+      />
+    </FormControl>
   );
 };
 

@@ -1,6 +1,10 @@
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setSteps } from 'features/parameters/store/generationSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,8 +36,9 @@ const ParamSteps = () => {
   );
 
   return (
-    <InvControl label={t('parameters.steps')} feature="paramSteps">
-      <InvSlider
+    <FormControl feature="paramSteps">
+      <FormLabel>{t('parameters.steps')}</FormLabel>
+      <CompositeSlider
         value={steps}
         defaultValue={initial}
         min={sliderMin}
@@ -41,12 +46,18 @@ const ParamSteps = () => {
         step={coarseStep}
         fineStep={fineStep}
         onChange={onChange}
-        withNumberInput
         marks={marks}
-        numberInputMin={numberInputMin}
-        numberInputMax={numberInputMax}
       />
-    </InvControl>
+      <CompositeNumberInput
+        value={steps}
+        defaultValue={initial}
+        min={numberInputMin}
+        max={numberInputMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        onChange={onChange}
+      />
+    </FormControl>
   );
 };
 

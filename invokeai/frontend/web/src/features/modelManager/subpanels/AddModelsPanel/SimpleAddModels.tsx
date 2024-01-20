@@ -1,11 +1,14 @@
-import { Flex } from '@chakra-ui/react';
+import type { ComboboxOption } from '@invoke-ai/ui';
+import {
+  Button,
+  Combobox,
+  Flex,
+  FormControl,
+  FormLabel,
+  Input,
+} from '@invoke-ai/ui';
 import { useForm } from '@mantine/form';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvInput } from 'common/components/InvInput/InvInput';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type { InvSelectOption } from 'common/components/InvSelect/types';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import type { CSSProperties } from 'react';
@@ -13,7 +16,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useImportMainModelsMutation } from 'services/api/endpoints/models';
 
-const options: InvSelectOption[] = [
+const options: ComboboxOption[] = [
   { label: 'None', value: 'none' },
   { label: 'v_prediction', value: 'v_prediction' },
   { label: 'epsilon', value: 'epsilon' },
@@ -78,23 +81,25 @@ const SimpleAddModels = () => {
       style={formStyles}
     >
       <Flex flexDirection="column" width="100%" gap={4}>
-        <InvControl label={t('modelManager.modelLocation')}>
-          <InvInput
+        <FormControl>
+          <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
+          <Input
             placeholder={t('modelManager.simpleModelDesc')}
             w="100%"
             {...addModelForm.getInputProps('location')}
           />
-        </InvControl>
-        <InvControl label={t('modelManager.predictionType')}>
-          <InvSelect
+        </FormControl>
+        <FormControl>
+          <FormLabel>{t('modelManager.predictionType')}</FormLabel>
+          <Combobox
             options={options}
             defaultValue={options[0]}
             {...addModelForm.getInputProps('prediction_type')}
           />
-        </InvControl>
-        <InvButton type="submit" isLoading={isLoading}>
+        </FormControl>
+        <Button type="submit" isLoading={isLoading}>
           {t('modelManager.addModel')}
-        </InvButton>
+        </Button>
       </Flex>
     </form>
   );
