@@ -53,8 +53,8 @@ dependencies:
     specifier: ^5.0.16
     version: 5.0.16
   '@invoke-ai/ui':
-    specifier: ^0.0.8
-    version: 0.0.8(@chakra-ui/anatomy@2.2.2)(@chakra-ui/icons@2.1.1)(@chakra-ui/layout@2.3.1)(@chakra-ui/portal@2.1.0)(@chakra-ui/react@2.8.2)(@chakra-ui/styled-system@2.9.2)(@chakra-ui/theme-tools@2.1.2)(@emotion/react@11.11.3)(@emotion/styled@11.11.0)(@fontsource-variable/inter@5.0.16)(@nanostores/react@0.7.1)(chakra-react-select@4.7.6)(framer-motion@10.18.0)(lodash-es@4.17.21)(nanostores@0.9.5)(overlayscrollbars-react@0.5.3)(overlayscrollbars@2.4.6)(react-dom@18.2.0)(react-i18next@14.0.0)(react-select@5.8.0)(react@18.2.0)
+    specifier: ^0.0.9
+    version: 0.0.9(@chakra-ui/anatomy@2.2.2)(@chakra-ui/icons@2.1.1)(@chakra-ui/layout@2.3.1)(@chakra-ui/portal@2.1.0)(@chakra-ui/react@2.8.2)(@chakra-ui/styled-system@2.9.2)(@chakra-ui/theme-tools@2.1.2)(@emotion/react@11.11.3)(@emotion/styled@11.11.0)(@fontsource-variable/inter@5.0.16)(@nanostores/react@0.7.1)(chakra-react-select@4.7.6)(framer-motion@10.18.0)(lodash-es@4.17.21)(nanostores@0.9.5)(overlayscrollbars-react@0.5.3)(overlayscrollbars@2.4.6)(react-dom@18.2.0)(react-i18next@14.0.0)(react-select@5.8.0)(react@18.2.0)
   '@mantine/form':
     specifier: 6.0.21
     version: 6.0.21(react@18.2.0)
@@ -3688,8 +3688,8 @@ packages:
     resolution: {integrity: sha512-dvuCeX5fC9dXgJn9t+X5atfmgQAzUOWqS1254Gh0m6i8wKd10ebXkfNKiRK+1GWi/yTvvLDHpoxLr0xxxeslWw==}
     dev: true
 
-  /@invoke-ai/ui@0.0.8(@chakra-ui/anatomy@2.2.2)(@chakra-ui/icons@2.1.1)(@chakra-ui/layout@2.3.1)(@chakra-ui/portal@2.1.0)(@chakra-ui/react@2.8.2)(@chakra-ui/styled-system@2.9.2)(@chakra-ui/theme-tools@2.1.2)(@emotion/react@11.11.3)(@emotion/styled@11.11.0)(@fontsource-variable/inter@5.0.16)(@nanostores/react@0.7.1)(chakra-react-select@4.7.6)(framer-motion@10.18.0)(lodash-es@4.17.21)(nanostores@0.9.5)(overlayscrollbars-react@0.5.3)(overlayscrollbars@2.4.6)(react-dom@18.2.0)(react-i18next@14.0.0)(react-select@5.8.0)(react@18.2.0):
-    resolution: {integrity: sha512-FjW9rV2Bh1h+EDU5eMQH+oR4vpA77GBrAOdbuIezeDSVcmACU5tuJXIPxw121ZAsH2ioyhgGPMvfAsF1HkSigA==}
+  /@invoke-ai/ui@0.0.9(@chakra-ui/anatomy@2.2.2)(@chakra-ui/icons@2.1.1)(@chakra-ui/layout@2.3.1)(@chakra-ui/portal@2.1.0)(@chakra-ui/react@2.8.2)(@chakra-ui/styled-system@2.9.2)(@chakra-ui/theme-tools@2.1.2)(@emotion/react@11.11.3)(@emotion/styled@11.11.0)(@fontsource-variable/inter@5.0.16)(@nanostores/react@0.7.1)(chakra-react-select@4.7.6)(framer-motion@10.18.0)(lodash-es@4.17.21)(nanostores@0.9.5)(overlayscrollbars-react@0.5.3)(overlayscrollbars@2.4.6)(react-dom@18.2.0)(react-i18next@14.0.0)(react-select@5.8.0)(react@18.2.0):
+    resolution: {integrity: sha512-bFyTaHgMYk5wSZv7itStFlXkFwWBJQuNM0NQYrvbJ/+HhI8RRF7at6yfm1c2PGUFZUJx4xC6+XhhDI4K5y2vXQ==}
     peerDependencies:
       '@chakra-ui/anatomy': ^2.2.2
       '@chakra-ui/icons': ^2.1.1
