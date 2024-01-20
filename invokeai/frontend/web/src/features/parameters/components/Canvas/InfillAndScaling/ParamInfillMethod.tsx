@@ -1,6 +1,7 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setInfillMethod } from 'features/parameters/store/generationSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,8 +39,10 @@ const ParamInfillMethod = () => {
   );
 
   return (
-    <FormControl isDisabled={options.length === 0} feature="infillMethod">
-      <FormLabel>{t('parameters.infillMethod')}</FormLabel>
+    <FormControl isDisabled={options.length === 0}>
+      <InformationalPopover feature="infillMethod">
+        <FormLabel>{t('parameters.infillMethod')}</FormLabel>
+      </InformationalPopover>
       <Combobox value={value} options={options} onChange={onChange} />
     </FormControl>
   );

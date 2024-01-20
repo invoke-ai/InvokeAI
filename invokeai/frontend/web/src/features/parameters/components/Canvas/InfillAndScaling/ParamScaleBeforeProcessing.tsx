@@ -1,6 +1,7 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setBoundingBoxScaleMethod } from 'features/canvas/store/canvasSlice';
 import { isBoundingBoxScaleMethod } from 'features/canvas/store/canvasTypes';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
@@ -37,8 +38,10 @@ const ParamScaleBeforeProcessing = () => {
   );
 
   return (
-    <FormControl feature="scaleBeforeProcessing">
-      <FormLabel>{t('parameters.scaleBeforeProcessing')}</FormLabel>
+    <FormControl>
+      <InformationalPopover feature="scaleBeforeProcessing">
+        <FormLabel>{t('parameters.scaleBeforeProcessing')}</FormLabel>
+      </InformationalPopover>
       <Combobox value={value} options={OPTIONS} onChange={onChange} />
     </FormControl>
   );

@@ -5,6 +5,7 @@ import {
   FormLabel,
 } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setCanvasCoherenceSteps } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -46,8 +47,10 @@ const ParamCanvasCoherenceSteps = () => {
   );
 
   return (
-    <FormControl feature="compositingCoherenceSteps">
-      <FormLabel>{t('parameters.coherenceSteps')}</FormLabel>
+    <FormControl>
+      <InformationalPopover feature="compositingCoherenceSteps">
+        <FormLabel>{t('parameters.coherenceSteps')}</FormLabel>
+      </InformationalPopover>
       <CompositeSlider
         min={sliderMin}
         max={sliderMax}

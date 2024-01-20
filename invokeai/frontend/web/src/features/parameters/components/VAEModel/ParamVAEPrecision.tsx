@@ -1,6 +1,7 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { vaePrecisionChanged } from 'features/parameters/store/generationSlice';
 import { isParameterPrecision } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback, useMemo } from 'react';
@@ -33,8 +34,10 @@ const ParamVAEModelSelect = () => {
   );
 
   return (
-    <FormControl feature="paramVAEPrecision" w="14rem" flexShrink={0}>
-      <FormLabel>{t('modelManager.vaePrecision')}</FormLabel>
+    <FormControl w="14rem" flexShrink={0}>
+      <InformationalPopover feature="paramVAEPrecision">
+        <FormLabel>{t('modelManager.vaePrecision')}</FormLabel>
+      </InformationalPopover>
       <Combobox value={value} options={options} onChange={onChange} />
     </FormControl>
   );

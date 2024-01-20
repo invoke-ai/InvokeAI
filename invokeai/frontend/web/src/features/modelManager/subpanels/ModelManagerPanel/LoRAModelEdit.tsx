@@ -3,6 +3,7 @@ import {
   Divider,
   Flex,
   FormControl,
+  FormErrorMessage,
   FormLabel,
   Input,
   Text,
@@ -104,10 +105,7 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <Flex flexDirection="column" overflowY="scroll" gap={4}>
-          <FormControl
-            isInvalid={Boolean(errors.model_name)}
-            error={errors.model_name?.message}
-          >
+          <FormControl isInvalid={Boolean(errors.model_name)}>
             <FormLabel>{t('modelManager.name')}</FormLabel>
             <Input
               {...register('model_name', {
@@ -115,6 +113,9 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
                   value.trim().length > 3 || 'Must be at least 3 characters',
               })}
             />
+            {errors.model_name?.message && (
+              <FormErrorMessage>{errors.model_name?.message}</FormErrorMessage>
+            )}
           </FormControl>
           <FormControl>
             <FormLabel>{t('modelManager.description')}</FormLabel>
@@ -125,10 +126,7 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
             name="base_model"
           />
 
-          <FormControl
-            isInvalid={Boolean(errors.path)}
-            error={errors.path?.message}
-          >
+          <FormControl isInvalid={Boolean(errors.path)}>
             <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
             <Input
               {...register('path', {
@@ -136,6 +134,9 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
                   value.trim().length > 0 || 'Must provide a path',
               })}
             />
+            {errors.path?.message && (
+              <FormErrorMessage>{errors.path?.message}</FormErrorMessage>
+            )}
           </FormControl>
           <Button type="submit" isLoading={isLoading}>
             {t('modelManager.updateModel')}

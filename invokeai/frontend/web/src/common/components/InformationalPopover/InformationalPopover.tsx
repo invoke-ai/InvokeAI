@@ -28,51 +28,48 @@ type Props = {
   children: ReactElement;
 };
 
-const IAIInformationalPopover = ({
-  feature,
-  children,
-  inPortal = true,
-  ...rest
-}: Props) => {
-  const shouldEnableInformationalPopovers = useAppSelector(
-    (s) => s.system.shouldEnableInformationalPopovers
-  );
+export const InformationalPopover = memo(
+  ({ feature, children, inPortal = true, ...rest }: Props) => {
+    const shouldEnableInformationalPopovers = useAppSelector(
+      (s) => s.system.shouldEnableInformationalPopovers
+    );
 
-  const data = useMemo(() => POPOVER_DATA[feature], [feature]);
+    const data = useMemo(() => POPOVER_DATA[feature], [feature]);
 
-  const popoverProps = useMemo(
-    () => merge(omit(data, ['image', 'href', 'buttonLabel']), rest),
-    [data, rest]
-  );
+    const popoverProps = useMemo(
+      () => merge(omit(data, ['image', 'href', 'buttonLabel']), rest),
+      [data, rest]
+    );
 
-  if (!shouldEnableInformationalPopovers) {
-    return children;
-  }
+    if (!shouldEnableInformationalPopovers) {
+      return children;
+    }
 
-  return (
-    <Popover
-      isLazy
-      closeOnBlur={false}
-      trigger="hover"
-      variant="informational"
-      openDelay={OPEN_DELAY}
-      modifiers={POPPER_MODIFIERS}
-      placement="top"
-      {...popoverProps}
-    >
-      <PopoverTrigger>{children}</PopoverTrigger>
-      {inPortal ? (
-        <Portal>
+    return (
+      <Popover
+        isLazy
+        closeOnBlur={false}
+        trigger="hover"
+        variant="informational"
+        openDelay={OPEN_DELAY}
+        modifiers={POPPER_MODIFIERS}
+        placement="top"
+        {...popoverProps}
+      >
+        <PopoverTrigger>{children}</PopoverTrigger>
+        {inPortal ? (
+          <Portal>
+            <Content data={data} feature={feature} />
+          </Portal>
+        ) : (
           <Content data={data} feature={feature} />
-        </Portal>
-      ) : (
-        <Content data={data} feature={feature} />
-      )}
-    </Popover>
-  );
-};
+        )}
+      </Popover>
+    );
+  }
+);
 
-export default memo(IAIInformationalPopover);
+InformationalPopover.displayName = 'InformationalPopover';
 
 type ContentProps = {
   data?: PopoverData;

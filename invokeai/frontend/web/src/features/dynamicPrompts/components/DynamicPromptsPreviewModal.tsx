@@ -25,7 +25,7 @@ export const DynamicPromptsModal = memo(() => {
       <ModalContent w="80vw" h="80vh" maxW="unset" maxH="unset">
         <ModalHeader>{t('dynamicPrompts.dynamicPrompts')}</ModalHeader>
         <ModalCloseButton />
-        <ModalBody as={Flex} flexDir="column" gap={2} w="full" h="full" pb={4}>
+        <ModalBody as={Flex} flexDir="column" gap={4} w="full" h="full" pb={4}>
           <Flex gap={4}>
             <ParamDynamicPromptsSeedBehaviour />
             <ParamDynamicPromptsMaxPrompts />

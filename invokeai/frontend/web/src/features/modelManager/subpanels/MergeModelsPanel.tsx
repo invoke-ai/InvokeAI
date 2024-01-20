@@ -7,6 +7,7 @@ import {
   CompositeSlider,
   Flex,
   FormControl,
+  FormHelperText,
   FormLabel,
   Input,
   Radio,
@@ -318,7 +319,7 @@ const MergeModelsPanel = () => {
         gap={4}
         bg="base.800"
       >
-        <FormControl helperText={t('modelManager.modelMergeAlphaHelp')}>
+        <FormControl>
           <FormLabel>{t('modelManager.alpha')}</FormLabel>
           <CompositeSlider
             min={0.01}
@@ -337,6 +338,9 @@ const MergeModelsPanel = () => {
             onChange={handleChangeModelMergeAlpha}
             onReset={handleResetModelMergeAlpha}
           />
+          <FormHelperText>
+            {t('modelManager.modelMergeAlphaHelp')}
+          </FormHelperText>
         </FormControl>
       </Flex>
 

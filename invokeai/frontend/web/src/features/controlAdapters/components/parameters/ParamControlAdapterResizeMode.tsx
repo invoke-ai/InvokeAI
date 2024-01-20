@@ -1,6 +1,7 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterResizeMode } from 'features/controlAdapters/hooks/useControlAdapterResizeMode';
 import { controlAdapterResizeModeChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
@@ -54,8 +55,10 @@ const ParamControlAdapterResizeMode = ({ id }: Props) => {
   }
 
   return (
-    <FormControl feature="controlNetResizeMode">
-      <FormLabel>{t('controlnet.resizeMode')}</FormLabel>
+    <FormControl>
+      <InformationalPopover feature="controlNetResizeMode">
+        <FormLabel>{t('controlnet.resizeMode')}</FormLabel>
+      </InformationalPopover>
       <Combobox
         value={value}
         options={options}

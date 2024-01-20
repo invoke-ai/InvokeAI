@@ -1,6 +1,7 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setCanvasCoherenceMode } from 'features/parameters/store/generationSlice';
 import { isParameterCanvasCoherenceMode } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback, useMemo } from 'react';
@@ -39,8 +40,10 @@ const ParamCanvasCoherenceMode = () => {
   );
 
   return (
-    <FormControl feature="compositingCoherenceMode">
-      <FormLabel>{t('parameters.coherenceMode')}</FormLabel>
+    <FormControl>
+      <InformationalPopover feature="compositingCoherenceMode">
+        <FormLabel>{t('parameters.coherenceMode')}</FormLabel>
+      </InformationalPopover>
       <Combobox options={options} value={value} onChange={onChange} />
     </FormControl>
   );

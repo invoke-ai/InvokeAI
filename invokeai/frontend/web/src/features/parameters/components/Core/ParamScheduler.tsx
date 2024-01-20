@@ -1,6 +1,7 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setScheduler } from 'features/parameters/store/generationSlice';
 import { SCHEDULER_OPTIONS } from 'features/parameters/types/constants';
 import { isParameterScheduler } from 'features/parameters/types/parameterSchemas';
@@ -28,8 +29,10 @@ const ParamScheduler = () => {
   );
 
   return (
-    <FormControl feature="paramScheduler">
-      <FormLabel>{t('parameters.scheduler')}</FormLabel>
+    <FormControl>
+      <InformationalPopover feature="paramScheduler">
+        <FormLabel>{t('parameters.scheduler')}</FormLabel>
+      </InformationalPopover>
       <Combobox value={value} options={SCHEDULER_OPTIONS} onChange={onChange} />
     </FormControl>
   );

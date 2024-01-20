@@ -5,6 +5,7 @@ import {
   FormLabel,
 } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setSteps } from 'features/parameters/store/generationSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -36,8 +37,10 @@ const ParamSteps = () => {
   );
 
   return (
-    <FormControl feature="paramSteps">
-      <FormLabel>{t('parameters.steps')}</FormLabel>
+    <FormControl>
+      <InformationalPopover feature="paramSteps">
+        <FormLabel>{t('parameters.steps')}</FormLabel>
+      </InformationalPopover>
       <CompositeSlider
         value={steps}
         defaultValue={initial}
