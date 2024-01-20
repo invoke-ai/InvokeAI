@@ -1,6 +1,7 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import {
   isSeedBehaviour,
   seedBehaviourChanged,
@@ -44,11 +45,13 @@ const ParamDynamicPromptsSeedBehaviour = () => {
   );
 
   return (
-    <FormControl
-      feature="dynamicPromptsSeedBehaviour"
-      renderInfoPopoverInPortal={false}
-    >
-      <FormLabel>{t('dynamicPrompts.seedBehaviour.label')}</FormLabel>
+    <FormControl>
+      <InformationalPopover
+        feature="dynamicPromptsSeedBehaviour"
+        inPortal={false}
+      >
+        <FormLabel>{t('dynamicPrompts.seedBehaviour.label')}</FormLabel>
+      </InformationalPopover>
       <Combobox value={value} options={options} onChange={handleChange} />
     </FormControl>
   );

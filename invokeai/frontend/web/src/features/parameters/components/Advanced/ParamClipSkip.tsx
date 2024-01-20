@@ -5,6 +5,7 @@ import {
   FormLabel,
 } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setClipSkip } from 'features/parameters/store/generationSlice';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import { memo, useCallback, useMemo } from 'react';
@@ -50,8 +51,10 @@ const ParamClipSkip = () => {
   }
 
   return (
-    <FormControl feature="clipSkip">
-      <FormLabel>{t('parameters.clipSkip')}</FormLabel>
+    <FormControl>
+      <InformationalPopover feature="clipSkip">
+        <FormLabel>{t('parameters.clipSkip')}</FormLabel>
+      </InformationalPopover>
       <CompositeSlider
         value={clipSkip}
         defaultValue={initial}

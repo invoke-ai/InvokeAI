@@ -15,6 +15,7 @@ import {
   useDisclosure,
 } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useClearStorage } from 'common/hooks/useClearStorage';
 import { shouldUseCpuNoiseChanged } from 'features/parameters/store/generationSlice';
@@ -261,8 +262,13 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                       onChange={handleChangeShouldAntialiasProgressImage}
                     />
                   </FormControl>
-                  <FormControl feature="noiseUseCPU">
-                    <FormLabel>{t('parameters.useCpuNoise')}</FormLabel>
+                  <FormControl>
+                    <InformationalPopover
+                      feature="noiseUseCPU"
+                      inPortal={false}
+                    >
+                      <FormLabel>{t('parameters.useCpuNoise')}</FormLabel>
+                    </InformationalPopover>
                     <Switch
                       isChecked={shouldUseCpuNoise}
                       onChange={handleChangeShouldUseCpuNoise}

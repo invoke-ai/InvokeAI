@@ -5,6 +5,7 @@ import {
   FormLabel,
 } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterWeight } from 'features/controlAdapters/hooks/useControlAdapterWeight';
 import { controlAdapterWeightChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
@@ -48,8 +49,10 @@ const ParamControlAdapterWeight = ({ id }: ParamControlAdapterWeightProps) => {
   }
 
   return (
-    <FormControl isDisabled={!isEnabled} feature="controlNetWeight">
-      <FormLabel>{t('controlnet.weight')}</FormLabel>
+    <FormControl isDisabled={!isEnabled}>
+      <InformationalPopover feature="controlNetWeight">
+        <FormLabel>{t('controlnet.weight')}</FormLabel>
+      </InformationalPopover>
       <CompositeSlider
         value={weight}
         onChange={onChange}

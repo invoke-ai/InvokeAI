@@ -1,6 +1,7 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useControlAdapterControlMode } from 'features/controlAdapters/hooks/useControlAdapterControlMode';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { controlAdapterControlModeChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
@@ -53,8 +54,10 @@ const ParamControlAdapterControlMode = ({ id }: Props) => {
   }
 
   return (
-    <FormControl isDisabled={!isEnabled} feature="controlNetControlMode">
-      <FormLabel>{t('controlnet.controlMode')}</FormLabel>
+    <FormControl isDisabled={!isEnabled}>
+      <InformationalPopover feature="controlNetControlMode">
+        <FormLabel>{t('controlnet.controlMode')}</FormLabel>
+      </InformationalPopover>
       <Combobox
         value={value}
         options={CONTROL_MODE_DATA}

@@ -3,6 +3,7 @@ import {
   Divider,
   Flex,
   FormControl,
+  FormErrorMessage,
   FormLabel,
   Input,
   Text,
@@ -103,10 +104,7 @@ const DiffusersModelEdit = (props: DiffusersModelEditProps) => {
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <Flex flexDirection="column" overflowY="scroll" gap={4}>
-          <FormControl
-            isInvalid={Boolean(errors.model_name)}
-            error={errors.model_name?.message}
-          >
+          <FormControl isInvalid={Boolean(errors.model_name)}>
             <FormLabel>{t('modelManager.name')}</FormLabel>
             <Input
               {...register('model_name', {
@@ -114,6 +112,9 @@ const DiffusersModelEdit = (props: DiffusersModelEditProps) => {
                   value.trim().length > 3 || 'Must be at least 3 characters',
               })}
             />
+            {errors.model_name?.message && (
+              <FormErrorMessage>{errors.model_name?.message}</FormErrorMessage>
+            )}
           </FormControl>
           <FormControl>
             <FormLabel>{t('modelManager.description')}</FormLabel>
@@ -127,10 +128,7 @@ const DiffusersModelEdit = (props: DiffusersModelEditProps) => {
             control={control}
             name="variant"
           />
-          <FormControl
-            isInvalid={Boolean(errors.path)}
-            error={errors.path?.message}
-          >
+          <FormControl isInvalid={Boolean(errors.path)}>
             <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
             <Input
               {...register('path', {
@@ -138,6 +136,9 @@ const DiffusersModelEdit = (props: DiffusersModelEditProps) => {
                   value.trim().length > 0 || 'Must provide a path',
               })}
             />
+            {errors.path?.message && (
+              <FormErrorMessage>{errors.path?.message}</FormErrorMessage>
+            )}
           </FormControl>
           <FormControl>
             <FormLabel>{t('modelManager.vaeLocation')}</FormLabel>

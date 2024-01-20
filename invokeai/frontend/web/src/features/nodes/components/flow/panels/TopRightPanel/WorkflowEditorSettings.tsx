@@ -2,6 +2,7 @@ import {
   Divider,
   Flex,
   FormControl,
+  FormHelperText,
   FormLabel,
   Heading,
   Modal,
@@ -110,46 +111,55 @@ const WorkflowEditorSettings = ({ children }: Props) => {
           <ModalBody>
             <Flex flexDirection="column" gap={4} py={4}>
               <Heading size="sm">{t('parameters.general')}</Heading>
-              <FormControl helperText={t('nodes.animatedEdgesHelp')}>
+              <FormControl>
                 <FormLabel>{t('nodes.animatedEdges')}</FormLabel>
                 <Switch
                   onChange={handleChangeShouldAnimate}
                   isChecked={shouldAnimateEdges}
                 />
+                <FormHelperText>{t('nodes.animatedEdgesHelp')}</FormHelperText>
               </FormControl>
               <Divider />
-              <FormControl helperText={t('nodes.snapToGridHelp')}>
+              <FormControl>
                 <FormLabel>{t('nodes.snapToGrid')}</FormLabel>
                 <Switch
                   isChecked={shouldSnapToGrid}
                   onChange={handleChangeShouldSnap}
                 />
+                <FormHelperText>{t('nodes.snapToGridHelp')}</FormHelperText>
               </FormControl>
               <Divider />
-              <FormControl helperText={t('nodes.colorCodeEdgesHelp')}>
+              <FormControl>
                 <FormLabel>{t('nodes.colorCodeEdges')}</FormLabel>
                 <Switch
                   isChecked={shouldColorEdges}
                   onChange={handleChangeShouldColor}
                 />
+                <FormHelperText>{t('nodes.colorCodeEdgesHelp')}</FormHelperText>
               </FormControl>
               <Divider />
-              <FormControl helperText={t('nodes.fullyContainNodesHelp')}>
+              <FormControl>
                 <FormLabel>{t('nodes.fullyContainNodes')}</FormLabel>
                 <Switch
                   isChecked={selectionModeIsChecked}
                   onChange={handleChangeSelectionMode}
                 />
+                <FormHelperText>
+                  {t('nodes.fullyContainNodesHelp')}
+                </FormHelperText>
               </FormControl>
               <Heading size="sm" pt={4}>
                 {t('common.advanced')}
               </Heading>
-              <FormControl helperText={t('nodes.validateConnectionsHelp')}>
+              <FormControl>
                 <FormLabel>{t('nodes.validateConnections')}</FormLabel>
                 <Switch
                   isChecked={shouldValidateGraph}
                   onChange={handleChangeShouldValidate}
                 />
+                <FormHelperText>
+                  {t('nodes.validateConnectionsHelp')}
+                </FormHelperText>
               </FormControl>
               <ReloadNodeTemplatesButton />
             </Flex>

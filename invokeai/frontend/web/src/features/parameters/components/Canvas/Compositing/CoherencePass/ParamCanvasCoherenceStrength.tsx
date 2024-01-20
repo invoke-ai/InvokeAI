@@ -5,6 +5,7 @@ import {
   FormLabel,
 } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setCanvasCoherenceStrength } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,8 +25,10 @@ const ParamCanvasCoherenceStrength = () => {
   );
 
   return (
-    <FormControl feature="compositingStrength">
-      <FormLabel>{t('parameters.coherenceStrength')}</FormLabel>
+    <FormControl>
+      <InformationalPopover feature="compositingStrength">
+        <FormLabel>{t('parameters.coherenceStrength')}</FormLabel>
+      </InformationalPopover>
       <CompositeSlider
         min={0}
         max={1}

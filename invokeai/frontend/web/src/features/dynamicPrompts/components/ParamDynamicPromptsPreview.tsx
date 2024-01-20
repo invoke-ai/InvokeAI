@@ -1,9 +1,17 @@
 import type { ChakraProps } from '@invoke-ai/ui';
-import { Flex, ListItem, OrderedList, Spinner, Text } from '@invoke-ai/ui';
+import {
+  Flex,
+  FormControl,
+  FormLabel,
+  ListItem,
+  OrderedList,
+  Spinner,
+  Text,
+} from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo, useMemo } from 'react';
@@ -36,29 +44,27 @@ const ParamDynamicPromptsPreview = () => {
 
   if (isError) {
     return (
-      <IAIInformationalPopover feature="dynamicPrompts">
-        <Flex
-          w="full"
-          h="full"
-          layerStyle="second"
-          alignItems="center"
-          justifyContent="center"
-          p={8}
-        >
-          <IAINoContentFallback
-            icon={PiWarningCircleBold}
-            label="Problem generating prompts"
-          />
-        </Flex>
-      </IAIInformationalPopover>
+      <Flex
+        w="full"
+        h="full"
+        layerStyle="second"
+        alignItems="center"
+        justifyContent="center"
+        p={8}
+      >
+        <IAINoContentFallback
+          icon={PiWarningCircleBold}
+          label="Problem generating prompts"
+        />
+      </Flex>
     );
   }
 
   return (
-    <>
-      <Text fontSize="sm" fontWeight="bold">
-        {label}
-      </Text>
+    <FormControl orientation="vertical" w="full" h="full">
+      <InformationalPopover feature="dynamicPrompts" inPortal={false}>
+        <FormLabel>{label}</FormLabel>
+      </InformationalPopover>
       <Flex
         w="full"
         h="full"
@@ -96,7 +102,7 @@ const ParamDynamicPromptsPreview = () => {
           </Flex>
         )}
       </Flex>
-    </>
+    </FormControl>
   );
 };
 

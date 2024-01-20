@@ -5,6 +5,7 @@ import {
   FormLabel,
 } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setCfgRescaleMultiplier } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -44,8 +45,10 @@ const ParamCFGRescaleMultiplier = () => {
   );
 
   return (
-    <FormControl feature="paramCFGRescaleMultiplier">
-      <FormLabel>{t('parameters.cfgRescaleMultiplier')}</FormLabel>
+    <FormControl>
+      <InformationalPopover feature="paramCFGRescaleMultiplier">
+        <FormLabel>{t('parameters.cfgRescaleMultiplier')}</FormLabel>
+      </InformationalPopover>
       <CompositeSlider
         value={cfgRescaleMultiplier}
         defaultValue={initial}

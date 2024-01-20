@@ -1,4 +1,11 @@
-import { Button, Flex, FormControl, FormLabel, Input } from '@invoke-ai/ui';
+import {
+  Button,
+  Flex,
+  FormControl,
+  FormErrorMessage,
+  FormLabel,
+  Input,
+} from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
 import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
@@ -103,10 +110,7 @@ const AdvancedAddDiffusers = (props: AdvancedAddDiffusersProps) => {
   return (
     <form onSubmit={handleSubmit(onSubmit)} style={formStyles}>
       <Flex flexDirection="column" gap={2}>
-        <FormControl
-          isInvalid={Boolean(errors.model_name)}
-          error={errors.model_name?.message}
-        >
+        <FormControl isInvalid={Boolean(errors.model_name)}>
           <FormLabel>{t('modelManager.name')}</FormLabel>
           <Input
             {...register('model_name', {
@@ -114,6 +118,9 @@ const AdvancedAddDiffusers = (props: AdvancedAddDiffusersProps) => {
                 value.trim().length > 3 || 'Must be at least 3 characters',
             })}
           />
+          {errors.model_name?.message && (
+            <FormErrorMessage>{errors.model_name?.message}</FormErrorMessage>
+          )}
         </FormControl>
         <FormControl>
           <FormLabel>{t('modelManager.baseModel')}</FormLabel>
@@ -122,10 +129,7 @@ const AdvancedAddDiffusers = (props: AdvancedAddDiffusersProps) => {
             name="base_model"
           />
         </FormControl>
-        <FormControl
-          isInvalid={Boolean(errors.path)}
-          error={errors.path?.message}
-        >
+        <FormControl isInvalid={Boolean(errors.path)}>
           <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
           <Input
             {...register('path', {
@@ -133,7 +137,10 @@ const AdvancedAddDiffusers = (props: AdvancedAddDiffusersProps) => {
                 value.trim().length > 0 || 'Must provide a path',
               onBlur,
             })}
-          />
+          />{' '}
+          {errors.path?.message && (
+            <FormErrorMessage>{errors.path?.message}</FormErrorMessage>
+          )}
         </FormControl>
         <FormControl>
           <FormLabel>{t('modelManager.description')}</FormLabel>

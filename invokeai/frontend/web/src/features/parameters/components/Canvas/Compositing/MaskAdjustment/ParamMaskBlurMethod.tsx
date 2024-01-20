@@ -1,6 +1,7 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setMaskBlurMethod } from 'features/parameters/store/generationSlice';
 import { isParameterMaskBlurMethod } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback, useMemo } from 'react';
@@ -32,8 +33,10 @@ const ParamMaskBlurMethod = () => {
   );
 
   return (
-    <FormControl feature="compositingBlurMethod">
-      <FormLabel>{t('parameters.maskBlurMethod')}</FormLabel>
+    <FormControl>
+      <InformationalPopover feature="compositingBlurMethod">
+        <FormLabel>{t('parameters.maskBlurMethod')}</FormLabel>
+      </InformationalPopover>
       <Combobox value={value} onChange={onChange} options={options} />
     </FormControl>
   );

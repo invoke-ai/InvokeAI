@@ -5,6 +5,7 @@ import {
   FormLabel,
 } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setCfgScale } from 'features/parameters/store/generationSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -34,8 +35,10 @@ const ParamCFGScale = () => {
   );
 
   return (
-    <FormControl feature="paramCFGScale">
-      <FormLabel>{t('parameters.cfgScale')}</FormLabel>
+    <FormControl>
+      <InformationalPopover feature="paramCFGScale">
+        <FormLabel>{t('parameters.cfgScale')}</FormLabel>
+      </InformationalPopover>
       <CompositeSlider
         value={cfgScale}
         defaultValue={initial}

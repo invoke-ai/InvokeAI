@@ -5,6 +5,7 @@ import {
   FormLabel,
 } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setMaskBlur } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -33,8 +34,10 @@ const ParamMaskBlur = () => {
   );
 
   return (
-    <FormControl feature="compositingBlur">
-      <FormLabel>{t('parameters.maskBlur')}</FormLabel>
+    <FormControl>
+      <InformationalPopover feature="compositingBlur">
+        <FormLabel>{t('parameters.maskBlur')}</FormLabel>
+      </InformationalPopover>
       <CompositeSlider
         min={sliderMin}
         max={sliderMax}

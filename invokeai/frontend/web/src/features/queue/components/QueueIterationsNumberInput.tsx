@@ -1,6 +1,6 @@
 import { CompositeNumberInput } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setIterations } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 
@@ -17,7 +17,7 @@ export const QueueIterationsNumberInput = memo(() => {
   );
 
   return (
-    <IAIInformationalPopover feature="paramIterations">
+    <InformationalPopover feature="paramIterations">
       <CompositeNumberInput
         step={coarseStep}
         fineStep={fineStep}
@@ -34,7 +34,7 @@ export const QueueIterationsNumberInput = memo(() => {
         flexShrink={0}
         variant="iterations"
       />
-    </IAIInformationalPopover>
+    </InformationalPopover>
   );
 });
 

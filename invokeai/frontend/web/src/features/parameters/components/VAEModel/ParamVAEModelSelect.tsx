@@ -1,6 +1,7 @@
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import {
   selectGenerationSlice,
@@ -46,12 +47,10 @@ const ParamVAEModelSelect = () => {
     });
 
   return (
-    <FormControl
-      isDisabled={!options.length}
-      isInvalid={!options.length}
-      feature="paramVAE"
-    >
-      <FormLabel>{t('modelManager.vae')}</FormLabel>
+    <FormControl isDisabled={!options.length} isInvalid={!options.length}>
+      <InformationalPopover feature="paramVAE">
+        <FormLabel>{t('modelManager.vae')}</FormLabel>
+      </InformationalPopover>
       <Combobox
         isClearable
         value={value}

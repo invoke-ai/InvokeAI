@@ -65,7 +65,7 @@ const WorkflowLibraryPagination = ({ page, setPage, data }: Props) => {
           w={10}
           isDisabled={data.pages === 1}
           onClick={p.page === page ? undefined : p.onClick}
-          variant={p.page === page ? 'invokeAI' : 'ghost'}
+          variant={p.page === page ? 'solid' : 'ghost'}
           key={p.page}
           transitionDuration="0s" // the delay in animation looks jank
         >
