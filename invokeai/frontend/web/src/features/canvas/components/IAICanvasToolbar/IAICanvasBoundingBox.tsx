@@ -1,6 +1,6 @@
+import { useShiftModifier } from '@invoke-ai/ui';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { $shift } from 'common/hooks/useGlobalModifiers';
 import {
   roundDownToMultiple,
   roundDownToMultipleMin,
@@ -54,7 +54,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const transformerRef = useRef<Konva.Transformer>(null);
   const shapeRef = useRef<Konva.Rect>(null);
-  const shift = useStore($shift);
+  const shift = useShiftModifier();
   const tool = useStore($tool);
   const isDrawing = useStore($isDrawing);
   const isMovingBoundingBox = useStore($isMovingBoundingBox);

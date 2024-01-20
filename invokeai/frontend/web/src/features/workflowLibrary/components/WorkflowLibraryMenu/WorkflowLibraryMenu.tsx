@@ -5,8 +5,8 @@ import {
   MenuDivider,
   MenuList,
   useDisclosure,
+  useGlobalMenuClose,
 } from '@invoke-ai/ui';
-import { useGlobalMenuClose } from 'common/hooks/useGlobalMenuClose';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import DownloadWorkflowMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/DownloadWorkflowMenuItem';
 import NewWorkflowMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/NewWorkflowMenuItem';
