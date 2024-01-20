@@ -1,4 +1,4 @@
-import type { InvSelectOption } from 'common/components/InvSelect/types';
+import type { ComboboxOption } from '@invoke-ai/ui';
 
 import type { AspectRatioID, AspectRatioState } from './types';
 
@@ -26,7 +26,7 @@ export const ICON_CONTAINER_STYLES = {
   justifyContent: 'center',
 };
 
-export const ASPECT_RATIO_OPTIONS: InvSelectOption[] = [
+export const ASPECT_RATIO_OPTIONS: ComboboxOption[] = [
   { label: 'Free' as const, value: 'Free' },
   { label: '16:9' as const, value: '16:9' },
   { label: '3:2' as const, value: '3:2' },

@@ -1,5 +1,9 @@
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type { RequiredColorMapImageProcessorInvocation } from 'features/controlAdapters/store/types';
@@ -32,11 +36,9 @@ const ColorMapProcessor = (props: ColorMapProcessorProps) => {
 
   return (
     <ProcessorWrapper>
-      <InvControl
-        label={t('controlnet.colorMapTileSize')}
-        isDisabled={!isEnabled}
-      >
-        <InvSlider
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.colorMapTileSize')}</FormLabel>
+        <CompositeSlider
           value={color_map_tile_size}
           defaultValue={DEFAULTS.color_map_tile_size}
           onChange={handleColorMapTileSizeChanged}
@@ -44,10 +46,16 @@ const ColorMapProcessor = (props: ColorMapProcessorProps) => {
           max={256}
           step={1}
           marks
-          withNumberInput
-          numberInputMax={4096}
         />
-      </InvControl>
+        <CompositeNumberInput
+          value={color_map_tile_size}
+          defaultValue={DEFAULTS.color_map_tile_size}
+          onChange={handleColorMapTileSizeChanged}
+          min={1}
+          max={4096}
+          step={1}
+        />
+      </FormControl>
     </ProcessorWrapper>
   );
 };

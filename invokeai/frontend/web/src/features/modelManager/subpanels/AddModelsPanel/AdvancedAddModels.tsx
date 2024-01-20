@@ -1,10 +1,5 @@
-import { Flex } from '@chakra-ui/react';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
@@ -22,14 +17,14 @@ const AdvancedAddModels = () => {
     useState<ManualAddMode>('diffusers');
 
   const { t } = useTranslation();
-  const handleChange: InvSelectOnChange = useCallback((v) => {
+  const handleChange: ComboboxOnChange = useCallback((v) => {
     if (!isManualAddMode(v?.value)) {
       return;
     }
     setAdvancedAddMode(v.value);
   }, []);
 
-  const options: InvSelectOption[] = useMemo(
+  const options: ComboboxOption[] = useMemo(
     () => [
       { label: t('modelManager.diffusersModels'), value: 'diffusers' },
       { label: t('modelManager.checkpointOrSafetensors'), value: 'checkpoint' },
@@ -44,9 +39,10 @@ const AdvancedAddModels = () => {
 
   return (
     <Flex flexDirection="column" gap={4} width="100%">
-      <InvControl label={t('modelManager.modelType')}>
-        <InvSelect value={value} options={options} onChange={handleChange} />
-      </InvControl>
+      <FormControl>
+        <FormLabel>{t('modelManager.modelType')}</FormLabel>
+        <Combobox value={value} options={options} onChange={handleChange} />
+      </FormControl>
 
       <Flex p={4} borderRadius={4} bg="base.850">
         {advancedAddMode === 'diffusers' && <AdvancedAddDiffusers />}

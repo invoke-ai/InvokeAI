@@ -1,6 +1,10 @@
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setRefinerCFGScale } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,8 +35,9 @@ const ParamSDXLRefinerCFGScale = () => {
   );
 
   return (
-    <InvControl label={t('sdxl.cfgScale')}>
-      <InvSlider
+    <FormControl>
+      <FormLabel>{t('sdxl.cfgScale')}</FormLabel>
+      <CompositeSlider
         value={refinerCFGScale}
         defaultValue={initial}
         min={sliderMin}
@@ -40,12 +45,18 @@ const ParamSDXLRefinerCFGScale = () => {
         step={coarseStep}
         fineStep={fineStep}
         onChange={onChange}
-        withNumberInput
-        numberInputMin={numberInputMin}
-        numberInputMax={numberInputMax}
         marks={marks}
       />
-    </InvControl>
+      <CompositeNumberInput
+        value={refinerCFGScale}
+        defaultValue={initial}
+        min={numberInputMin}
+        max={numberInputMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        onChange={onChange}
+      />
+    </FormControl>
   );
 };
 

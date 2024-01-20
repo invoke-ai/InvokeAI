@@ -1,5 +1,5 @@
-import type { FlexProps } from '@chakra-ui/react';
-import { forwardRef, Grid } from '@chakra-ui/react';
+import type { FlexProps } from '@invoke-ai/ui';
+import { forwardRef, Grid } from '@invoke-ai/ui';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';

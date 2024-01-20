@@ -1,11 +1,7 @@
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterProcessorNode } from 'features/controlAdapters/hooks/useControlAdapterProcessorNode';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
@@ -21,7 +17,7 @@ type Props = {
 };
 
 const selectOptions = createMemoizedSelector(configSelector, (config) => {
-  const options: InvSelectOption[] = map(CONTROLNET_PROCESSORS, (p) => ({
+  const options: ComboboxOption[] = map(CONTROLNET_PROCESSORS, (p) => ({
     value: p.type,
     label: p.label,
   }))
@@ -50,7 +46,7 @@ const ParamControlAdapterProcessorSelect = ({ id }: Props) => {
   const options = useAppSelector(selectOptions);
   const { t } = useTranslation();
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!v) {
         return;
@@ -73,9 +69,10 @@ const ParamControlAdapterProcessorSelect = ({ id }: Props) => {
     return null;
   }
   return (
-    <InvControl label={t('controlnet.processor')} isDisabled={!isEnabled}>
-      <InvSelect value={value} options={options} onChange={onChange} />
-    </InvControl>
+    <FormControl isDisabled={!isEnabled}>
+      <FormLabel>{t('controlnet.processor')}</FormLabel>
+      <Combobox value={value} options={options} onChange={onChange} />
+    </FormControl>
   );
 };
 

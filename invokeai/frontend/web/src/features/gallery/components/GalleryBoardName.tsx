@@ -1,5 +1,5 @@
 import { ChevronUpIcon } from '@chakra-ui/icons';
-import { Button, Flex, Spacer } from '@chakra-ui/react';
+import { Button, Flex, Spacer } from '@invoke-ai/ui';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo, useMemo } from 'react';
 import { useBoardName } from 'services/api/hooks/useBoardName';

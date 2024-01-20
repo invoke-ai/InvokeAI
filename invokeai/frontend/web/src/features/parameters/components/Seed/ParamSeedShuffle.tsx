@@ -1,6 +1,6 @@
+import { Button } from '@invoke-ai/ui';
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
 import randomInt from 'common/util/randomInt';
 import { setSeed } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
@@ -20,7 +20,7 @@ export const ParamSeedShuffle = memo(() => {
   );
 
   return (
-    <InvButton
+    <Button
       size="sm"
       isDisabled={shouldRandomizeSeed}
       onClick={handleClickRandomizeSeed}
@@ -28,7 +28,7 @@ export const ParamSeedShuffle = memo(() => {
       flexShrink={0}
     >
       {t('parameters.shuffle')}
-    </InvButton>
+    </Button>
   );
 });
 

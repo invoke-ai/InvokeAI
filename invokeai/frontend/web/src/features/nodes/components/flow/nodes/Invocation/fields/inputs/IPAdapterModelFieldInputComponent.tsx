@@ -1,8 +1,6 @@
+import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldIPAdapterModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type {
   IPAdapterModelFieldInputInstance,
@@ -40,7 +38,7 @@ const IPAdapterModelFieldInputComponent = (
     [dispatch, field.name, nodeId]
   );
 
-  const { options, value, onChange } = useGroupedModelInvSelect({
+  const { options, value, onChange } = useGroupedModelCombobox({
     modelEntities: ipAdapterModels,
     onChange: _onChange,
     selectedModel: field.value
@@ -49,16 +47,16 @@ const IPAdapterModelFieldInputComponent = (
   });
 
   return (
-    <InvTooltip label={value?.description}>
-      <InvControl className="nowheel nodrag" isInvalid={!value}>
-        <InvSelect
+    <Tooltip label={value?.description}>
+      <FormControl className="nowheel nodrag" isInvalid={!value}>
+        <Combobox
           value={value}
           placeholder="Pick one"
           options={options}
           onChange={onChange}
         />
-      </InvControl>
-    </InvTooltip>
+      </FormControl>
+    </Tooltip>
   );
 };
 

@@ -1,6 +1,4 @@
-import { Flex, Heading, Link, useToast } from '@chakra-ui/react';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvText } from 'common/components/InvText/wrapper';
+import { Button, Flex, Heading, Link, Text, useToast } from '@invoke-ai/ui';
 import newGithubIssueUrl from 'new-github-issue-url';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -65,24 +63,24 @@ const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
           justifyContent="space-between"
           alignItems="center"
         >
-          <InvText fontWeight="semibold" color="error.400">
+          <Text fontWeight="semibold" color="error.400">
             {error.name}: {error.message}
-          </InvText>
+          </Text>
         </Flex>
         <Flex gap={4}>
-          <InvButton
+          <Button
             leftIcon={<PiArrowCounterClockwiseBold />}
             onClick={resetErrorBoundary}
           >
             {t('accessibility.resetUI')}
-          </InvButton>
-          <InvButton leftIcon={<PiCopyBold />} onClick={handleCopy}>
+          </Button>
+          <Button leftIcon={<PiCopyBold />} onClick={handleCopy}>
             {t('common.copyError')}
-          </InvButton>
+          </Button>
           <Link href={url} isExternal>
-            <InvButton leftIcon={<PiArrowSquareOutBold />}>
+            <Button leftIcon={<PiArrowSquareOutBold />}>
               {t('accessibility.createIssue')}
-            </InvButton>
+            </Button>
           </Link>
         </Flex>
       </Flex>

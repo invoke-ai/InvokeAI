@@ -1,14 +1,14 @@
-import type { SystemStyleObject } from '@chakra-ui/react';
+import type { SystemStyleObject } from '@invoke-ai/ui';
 import {
   Editable,
   EditableInput,
   EditablePreview,
   Flex,
   forwardRef,
+  Tooltip,
   useEditableControls,
-} from '@chakra-ui/react';
+} from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { useFieldLabel } from 'features/nodes/hooks/useFieldLabel';
 import { useFieldTemplateTitle } from 'features/nodes/hooks/useFieldTemplateTitle';
 import { fieldLabelChanged } from 'features/nodes/store/nodesSlice';
@@ -65,7 +65,7 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
   }, [label, fieldTemplateTitle, t]);
 
   return (
-    <InvTooltip
+    <Tooltip
       label={
         withTooltip ? (
           <FieldTooltipContent
@@ -99,7 +99,7 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
         <EditableInput className="nodrag" sx={editableInputStyles} />
         <EditableControls />
       </Editable>
-    </InvTooltip>
+    </Tooltip>
   );
 });
 

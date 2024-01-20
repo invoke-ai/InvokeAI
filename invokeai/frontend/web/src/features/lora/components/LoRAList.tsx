@@ -1,4 +1,4 @@
-import { Flex } from '@chakra-ui/layout';
+import { Flex } from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { LoRACard } from 'features/lora/components/LoRACard';

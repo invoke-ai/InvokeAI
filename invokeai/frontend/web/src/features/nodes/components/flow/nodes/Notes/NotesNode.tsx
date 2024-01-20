@@ -1,6 +1,5 @@
-import { Box, Flex } from '@chakra-ui/react';
+import { Box, Flex, Textarea } from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvTextarea } from 'common/components/InvTextarea/InvTextarea';
 import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
 import NodeTitle from 'features/nodes/components/flow/nodes/common/NodeTitle';
 import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
@@ -49,7 +48,7 @@ const NotesNode = (props: NodeProps<NotesNodeData>) => {
             gap={1}
           >
             <Flex className="nopan" w="full" h="full" flexDir="column">
-              <InvTextarea
+              <Textarea
                 value={notes}
                 onChange={handleChange}
                 rows={8}

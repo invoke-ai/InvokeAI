@@ -1,16 +1,12 @@
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
 import { setMaskBlurMethod } from 'features/parameters/store/generationSlice';
 import { isParameterMaskBlurMethod } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const options: InvSelectOption[] = [
+const options: ComboboxOption[] = [
   { label: 'Box Blur', value: 'box' },
   { label: 'Gaussian Blur', value: 'gaussian' },
 ];
@@ -20,7 +16,7 @@ const ParamMaskBlurMethod = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!isParameterMaskBlurMethod(v?.value)) {
         return;
@@ -36,12 +32,10 @@ const ParamMaskBlurMethod = () => {
   );
 
   return (
-    <InvControl
-      label={t('parameters.maskBlurMethod')}
-      feature="compositingBlurMethod"
-    >
-      <InvSelect value={value} onChange={onChange} options={options} />
-    </InvControl>
+    <FormControl feature="compositingBlurMethod">
+      <FormLabel>{t('parameters.maskBlurMethod')}</FormLabel>
+      <Combobox value={value} onChange={onChange} options={options} />
+    </FormControl>
   );
 };
 

@@ -1,6 +1,10 @@
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setScaledBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
@@ -43,8 +47,9 @@ const ParamScaledHeight = () => {
   );
 
   return (
-    <InvControl isDisabled={!isManual} label={t('parameters.scaledHeight')}>
-      <InvSlider
+    <FormControl isDisabled={!isManual}>
+      <FormLabel>{t('parameters.scaledHeight')}</FormLabel>
+      <CompositeSlider
         min={sliderMin}
         max={sliderMax}
         step={coarseStep}
@@ -52,12 +57,18 @@ const ParamScaledHeight = () => {
         value={height}
         onChange={onChange}
         marks
-        withNumberInput
-        numberInputMin={numberInputMin}
-        numberInputMax={numberInputMax}
         defaultValue={optimalDimension}
       />
-    </InvControl>
+      <CompositeNumberInput
+        min={numberInputMin}
+        max={numberInputMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        value={height}
+        onChange={onChange}
+        defaultValue={optimalDimension}
+      />
+    </FormControl>
   );
 };
 

@@ -1428,8 +1428,9 @@ export const imagesApi = api.injectEndpoints({
         const tags: ApiTagDescription[] = [];
 
         result?.removed_image_names.forEach((image_name) => {
-          const board_id = imageDTOs.find((i) => i.image_name === image_name)
-            ?.board_id;
+          const board_id = imageDTOs.find(
+            (i) => i.image_name === image_name
+          )?.board_id;
 
           if (!board_id || touchedBoardIds.includes(board_id)) {
             return;

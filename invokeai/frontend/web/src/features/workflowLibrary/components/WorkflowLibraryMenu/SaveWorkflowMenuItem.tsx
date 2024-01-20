@@ -1,4 +1,4 @@
-import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
+import { MenuItem } from '@invoke-ai/ui';
 import { useSaveLibraryWorkflow } from 'features/workflowLibrary/hooks/useSaveWorkflow';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,9 +8,9 @@ const SaveLibraryWorkflowMenuItem = () => {
   const { t } = useTranslation();
   const { saveWorkflow } = useSaveLibraryWorkflow();
   return (
-    <InvMenuItem as="button" icon={<PiFloppyDiskBold />} onClick={saveWorkflow}>
+    <MenuItem as="button" icon={<PiFloppyDiskBold />} onClick={saveWorkflow}>
       {t('workflows.saveWorkflow')}
-    </InvMenuItem>
+    </MenuItem>
   );
 };
 

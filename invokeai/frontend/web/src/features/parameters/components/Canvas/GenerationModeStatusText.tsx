@@ -1,4 +1,4 @@
-import { Box } from '@chakra-ui/react';
+import { Box } from '@invoke-ai/ui';
 import { useCanvasGenerationMode } from 'features/canvas/hooks/useCanvasGenerationMode';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

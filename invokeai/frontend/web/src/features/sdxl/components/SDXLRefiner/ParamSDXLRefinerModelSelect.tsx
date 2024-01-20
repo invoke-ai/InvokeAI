@@ -1,8 +1,7 @@
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { useModelInvSelect } from 'common/components/InvSelect/useModelInvSelect';
+import { useModelCombobox } from 'common/hooks/useModelCombobox';
 import {
   refinerModelChanged,
   selectSdxlSlice,
@@ -43,7 +42,7 @@ const ParamSDXLRefinerModelSelect = () => {
     [dispatch]
   );
   const { options, value, onChange, placeholder, noOptionsMessage } =
-    useModelInvSelect({
+    useModelCombobox({
       modelEntities: data,
       onChange: _onChange,
       selectedModel: model,
@@ -51,12 +50,9 @@ const ParamSDXLRefinerModelSelect = () => {
       optionsFilter,
     });
   return (
-    <InvControl
-      label={t('sdxl.refinermodel')}
-      isDisabled={!options.length}
-      isInvalid={!options.length}
-    >
-      <InvSelect
+    <FormControl isDisabled={!options.length} isInvalid={!options.length}>
+      <FormLabel>{t('sdxl.refinermodel')}</FormLabel>
+      <Combobox
         value={value}
         placeholder={placeholder}
         options={options}
@@ -64,7 +60,7 @@ const ParamSDXLRefinerModelSelect = () => {
         noOptionsMessage={noOptionsMessage}
         isClearable
       />
-    </InvControl>
+    </FormControl>
   );
 };
 

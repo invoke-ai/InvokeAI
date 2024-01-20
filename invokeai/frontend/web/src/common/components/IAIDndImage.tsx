@@ -1,9 +1,5 @@
-import type {
-  ChakraProps,
-  FlexProps,
-  SystemStyleObject,
-} from '@chakra-ui/react';
-import { Flex, Icon, Image } from '@chakra-ui/react';
+import type { ChakraProps, FlexProps, SystemStyleObject } from '@invoke-ai/ui';
+import { Flex, Icon, Image } from '@invoke-ai/ui';
 import {
   IAILoadingImageFallback,
   IAINoContentFallback,

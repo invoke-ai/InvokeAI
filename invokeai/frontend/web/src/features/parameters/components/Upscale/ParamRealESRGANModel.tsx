@@ -1,11 +1,7 @@
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { GroupBase } from 'chakra-react-select';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
 import {
   esrganModelNameChanged,
   isParamESRGANModelName,
@@ -13,7 +9,7 @@ import {
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const options: GroupBase<InvSelectOption>[] = [
+const options: GroupBase<ComboboxOption>[] = [
   {
     label: 'x2 Upscalers',
     options: [
@@ -56,7 +52,7 @@ const ParamESRGANModel = () => {
 
   const dispatch = useAppDispatch();
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!isParamESRGANModelName(v?.value)) {
         return;
@@ -75,9 +71,10 @@ const ParamESRGANModel = () => {
   );
 
   return (
-    <InvControl label={t('models.esrganModel')} orientation="vertical">
-      <InvSelect value={value} onChange={onChange} options={options} />
-    </InvControl>
+    <FormControl orientation="vertical">
+      <FormLabel>{t('models.esrganModel')} </FormLabel>
+      <Combobox value={value} onChange={onChange} options={options} />
+    </FormControl>
   );
 };
 

@@ -1,8 +1,5 @@
-import type { ChakraProps, CollapseProps } from '@chakra-ui/react';
-import { Collapse, Flex } from '@chakra-ui/react';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvText } from 'common/components/InvText/wrapper';
+import type { ChakraProps, CollapseProps } from '@invoke-ai/ui';
+import { ButtonGroup, Collapse, Flex, IconButton, Text } from '@invoke-ai/ui';
 import QueueStatusBadge from 'features/queue/components/common/QueueStatusBadge';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
 import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTimestamps';
@@ -88,7 +85,7 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
           alignItems="center"
           flexShrink={0}
         >
-          <InvText variant="subtext">{index + 1}</InvText>
+          <Text variant="subtext">{index + 1}</Text>
         </Flex>
         <Flex w={COLUMN_WIDTHS.statusBadge} alignItems="center" flexShrink={0}>
           <QueueStatusBadge status={item.status} />
@@ -97,14 +94,14 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
           {executionTime || '-'}
         </Flex>
         <Flex w={COLUMN_WIDTHS.batchId} flexShrink={0}>
-          <InvText
+          <Text
             overflow="hidden"
             textOverflow="ellipsis"
             whiteSpace="nowrap"
             alignItems="center"
           >
             {item.batch_id}
-          </InvText>
+          </Text>
         </Flex>
         <Flex alignItems="center" overflow="hidden" flexGrow={1}>
           {item.field_values && (
@@ -118,29 +115,29 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
               {item.field_values
                 .filter((v) => v.node_path !== 'metadata_accumulator')
                 .map(({ node_path, field_name, value }) => (
-                  <InvText
+                  <Text
                     as="span"
                     key={`${item.item_id}.${node_path}.${field_name}.${value}`}
                   >
-                    <InvText as="span" fontWeight="semibold">
+                    <Text as="span" fontWeight="semibold">
                       {node_path}.{field_name}
-                    </InvText>
+                    </Text>
                     : {value}
-                  </InvText>
+                  </Text>
                 ))}
             </Flex>
           )}
         </Flex>
         <Flex alignItems="center" w={COLUMN_WIDTHS.actions} pe={3}>
-          <InvButtonGroup size="xs" variant="ghost">
-            <InvIconButton
+          <ButtonGroup size="xs" variant="ghost">
+            <IconButton
               onClick={handleCancelQueueItem}
               isDisabled={isCanceled}
               isLoading={isLoading}
               aria-label={t('queue.cancelItem')}
               icon={icon}
             />
-          </InvButtonGroup>
+          </ButtonGroup>
         </Flex>
       </Flex>
 

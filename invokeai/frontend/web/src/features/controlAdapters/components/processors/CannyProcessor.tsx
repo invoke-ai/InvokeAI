@@ -1,5 +1,9 @@
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type { RequiredCannyImageProcessorInvocation } from 'features/controlAdapters/store/types';
@@ -39,26 +43,40 @@ const CannyProcessor = (props: CannyProcessorProps) => {
 
   return (
     <ProcessorWrapper>
-      <InvControl label={t('controlnet.lowThreshold')} isDisabled={!isEnabled}>
-        <InvSlider
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.lowThreshold')}</FormLabel>
+        <CompositeSlider
           value={low_threshold}
           onChange={handleLowThresholdChanged}
           defaultValue={DEFAULTS.low_threshold}
           min={0}
           max={255}
-          withNumberInput
         />
-      </InvControl>
-      <InvControl label={t('controlnet.highThreshold')} isDisabled={!isEnabled}>
-        <InvSlider
+        <CompositeNumberInput
+          value={low_threshold}
+          onChange={handleLowThresholdChanged}
+          defaultValue={DEFAULTS.low_threshold}
+          min={0}
+          max={255}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.highThreshold')}</FormLabel>
+        <CompositeSlider
           value={high_threshold}
           onChange={handleHighThresholdChanged}
           defaultValue={DEFAULTS.high_threshold}
           min={0}
           max={255}
-          withNumberInput
         />
-      </InvControl>
+        <CompositeNumberInput
+          value={high_threshold}
+          onChange={handleHighThresholdChanged}
+          defaultValue={DEFAULTS.high_threshold}
+          min={0}
+          max={255}
+        />
+      </FormControl>
     </ProcessorWrapper>
   );
 };

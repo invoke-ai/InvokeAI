@@ -1,10 +1,15 @@
-import { Badge, Divider, Flex } from '@chakra-ui/react';
+import {
+  Badge,
+  Button,
+  Checkbox,
+  Divider,
+  Flex,
+  FormControl,
+  FormLabel,
+  Input,
+  Text,
+} from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvCheckbox } from 'common/components/InvCheckbox/wrapper';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvInput } from 'common/components/InvInput/InvInput';
-import { InvText } from 'common/components/InvText/wrapper';
 import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
 import CheckpointConfigsSelect from 'features/modelManager/subpanels/shared/CheckpointConfigsSelect';
 import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVariantSelect';
@@ -110,12 +115,12 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
     <Flex flexDirection="column" rowGap={4} width="100%">
       <Flex justifyContent="space-between" alignItems="center">
         <Flex flexDirection="column">
-          <InvText fontSize="lg" fontWeight="bold">
+          <Text fontSize="lg" fontWeight="bold">
             {model.model_name}
-          </InvText>
-          <InvText fontSize="sm" color="base.400">
+          </Text>
+          <Text fontSize="sm" color="base.400">
             {MODEL_TYPE_MAP[model.base_model]} {t('modelManager.model')}
-          </InvText>
+          </Text>
         </Flex>
         {![''].includes(model.base_model) ? (
           <ModelConvert model={model} />
@@ -134,21 +139,22 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
       >
         <form onSubmit={handleSubmit(onSubmit)}>
           <Flex flexDirection="column" overflowY="scroll" gap={4}>
-            <InvControl
-              label={t('modelManager.name')}
+            <FormControl
               isInvalid={Boolean(errors.model_name)}
               error={errors.model_name?.message}
             >
-              <InvInput
+              <FormLabel>{t('modelManager.name')}</FormLabel>
+              <Input
                 {...register('model_name', {
                   validate: (value) =>
                     value.trim().length > 3 || 'Must be at least 3 characters',
                 })}
               />
-            </InvControl>
-            <InvControl label={t('modelManager.description')}>
-              <InvInput {...register('description')} />
-            </InvControl>
+            </FormControl>
+            <FormControl>
+              <FormLabel>{t('modelManager.description')}</FormLabel>
+              <Input {...register('description')} />
+            </FormControl>
             <BaseModelSelect<CheckpointModelConfig>
               control={control}
               name="base_model"
@@ -157,41 +163,44 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
               control={control}
               name="variant"
             />
-            <InvControl
-              label={t('modelManager.modelLocation')}
+            <FormControl
               isInvalid={Boolean(errors.path)}
               error={errors.path?.message}
             >
-              <InvInput
+              <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
+              <Input
                 {...register('path', {
                   validate: (value) =>
                     value.trim().length > 0 || 'Must provide a path',
                 })}
               />
-            </InvControl>
-            <InvControl label={t('modelManager.vaeLocation')}>
-              <InvInput {...register('vae')} />
-            </InvControl>
+            </FormControl>
+            <FormControl>
+              <FormLabel>{t('modelManager.vaeLocation')}</FormLabel>
+              <Input {...register('vae')} />
+            </FormControl>
 
             <Flex flexDirection="column" gap={2}>
               {!useCustomConfig ? (
                 <CheckpointConfigsSelect control={control} name="config" />
               ) : (
-                <InvControl isRequired label={t('modelManager.config')}>
-                  <InvInput {...register('config')} />
-                </InvControl>
+                <FormControl isRequired>
+                  <FormLabel>{t('modelManager.config')}</FormLabel>
+                  <Input {...register('config')} />
+                </FormControl>
               )}
-              <InvControl label="Use Custom Config">
-                <InvCheckbox
+              <FormControl>
+                <FormLabel>Use Custom Config</FormLabel>
+                <Checkbox
                   isChecked={useCustomConfig}
                   onChange={handleChangeUseCustomConfig}
                 />
-              </InvControl>
+              </FormControl>
             </Flex>
 
-            <InvButton type="submit" isLoading={isLoading}>
+            <Button type="submit" isLoading={isLoading}>
               {t('modelManager.updateModel')}
-            </InvButton>
+            </Button>
           </Flex>
         </form>
       </Flex>

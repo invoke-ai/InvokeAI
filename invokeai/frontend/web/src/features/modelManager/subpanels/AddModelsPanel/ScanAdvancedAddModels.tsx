@@ -1,13 +1,14 @@
-import { Box, Flex } from '@chakra-ui/react';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import {
+  Box,
+  Combobox,
+  Flex,
+  FormControl,
+  FormLabel,
+  IconButton,
+  Text,
+} from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
-import { InvText } from 'common/components/InvText/wrapper';
 import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +26,7 @@ const ScanAdvancedAddModels = () => {
 
   const { t } = useTranslation();
 
-  const options: InvSelectOption[] = useMemo(
+  const options: ComboboxOption[] = useMemo(
     () => [
       { label: t('modelManager.diffusersModels'), value: 'diffusers' },
       { label: t('modelManager.checkpointOrSafetensors'), value: 'checkpoint' },
@@ -54,7 +55,7 @@ const ScanAdvancedAddModels = () => {
     [dispatch]
   );
 
-  const handleChangeAddMode = useCallback<InvSelectOnChange>((v) => {
+  const handleChangeAddMode = useCallback<ComboboxOnChange>((v) => {
     if (!isManualAddMode(v?.value)) {
       return;
     }
@@ -88,25 +89,26 @@ const ScanAdvancedAddModels = () => {
       bg="base.800"
     >
       <Flex justifyContent="space-between" alignItems="center">
-        <InvText size="xl" fontWeight="semibold">
+        <Text size="xl" fontWeight="semibold">
           {isCheckpoint || advancedAddMode === 'checkpoint'
             ? 'Add Checkpoint Model'
             : 'Add Diffusers Model'}
-        </InvText>
-        <InvIconButton
+        </Text>
+        <IconButton
           icon={<PiXBold />}
           aria-label={t('modelManager.closeAdvanced')}
           onClick={handleClickSetAdvanced}
           size="sm"
         />
       </Flex>
-      <InvControl label={t('modelManager.modelType')}>
-        <InvSelect
+      <FormControl>
+        <FormLabel>{t('modelManager.modelType')}</FormLabel>
+        <Combobox
           value={value}
           options={options}
           onChange={handleChangeAddMode}
         />
-      </InvControl>
+      </FormControl>
       {isCheckpoint ? (
         <AdvancedAddCheckpoint
           key={advancedAddScanModel}

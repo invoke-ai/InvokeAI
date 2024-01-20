@@ -1,17 +1,20 @@
-import { Flex, Radio, RadioGroup } from '@chakra-ui/react';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import {
+  Button,
+  Checkbox,
+  Combobox,
+  CompositeNumberInput,
+  CompositeSlider,
+  Flex,
+  FormControl,
+  FormLabel,
+  Input,
+  Radio,
+  RadioGroup,
+  Text,
+  Tooltip,
+} from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvCheckbox } from 'common/components/InvCheckbox/wrapper';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvInput } from 'common/components/InvInput/InvInput';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
-import { InvText } from 'common/components/InvText/wrapper';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { pickBy } from 'lodash-es';
@@ -25,7 +28,7 @@ import {
 } from 'services/api/endpoints/models';
 import type { BaseModelType, MergeModelConfig } from 'services/api/types';
 
-const baseModelTypeSelectOptions: InvSelectOption[] = [
+const baseModelTypeSelectOptions: ComboboxOption[] = [
   { label: 'Stable Diffusion 1', value: 'sd-1' },
   { label: 'Stable Diffusion 2', value: 'sd-2' },
 ];
@@ -115,7 +118,7 @@ const MergeModelsPanel = () => {
     [modelsMap, baseModel, modelOne, modelTwo]
   );
 
-  const onChangeBaseModel = useCallback<InvSelectOnChange>((v) => {
+  const onChangeBaseModel = useCallback<ComboboxOnChange>((v) => {
     if (!v) {
       return;
     }
@@ -127,19 +130,19 @@ const MergeModelsPanel = () => {
     setModelTwo(null);
   }, []);
 
-  const onChangeModelOne = useCallback<InvSelectOnChange>((v) => {
+  const onChangeModelOne = useCallback<ComboboxOnChange>((v) => {
     if (!v) {
       return;
     }
     setModelOne(v.value);
   }, []);
-  const onChangeModelTwo = useCallback<InvSelectOnChange>((v) => {
+  const onChangeModelTwo = useCallback<ComboboxOnChange>((v) => {
     if (!v) {
       return;
     }
     setModelTwo(v.value);
   }, []);
-  const onChangeModelThree = useCallback<InvSelectOnChange>((v) => {
+  const onChangeModelThree = useCallback<ComboboxOnChange>((v) => {
     if (!v) {
       setModelThree(null);
       setModelMergeInterp('add_difference');
@@ -261,50 +264,52 @@ const MergeModelsPanel = () => {
   return (
     <Flex flexDir="column" gap={4}>
       <Flex flexDir="column" gap={1}>
-        <InvText>{t('modelManager.modelMergeHeaderHelp1')}</InvText>
-        <InvText fontSize="sm" variant="subtext">
+        <Text>{t('modelManager.modelMergeHeaderHelp1')}</Text>
+        <Text fontSize="sm" variant="subtext">
           {t('modelManager.modelMergeHeaderHelp2')}
-        </InvText>
+        </Text>
       </Flex>
 
       <Flex columnGap={4}>
-        <InvControl label={t('modelManager.modelType')} w="full">
-          <InvSelect
+        <FormControl w="full">
+          <FormLabel>{t('modelManager.modelType')}</FormLabel>
+          <Combobox
             options={baseModelTypeSelectOptions}
             value={valueBaseModel}
             onChange={onChangeBaseModel}
           />
-        </InvControl>
-        <InvControl label={t('modelManager.modelOne')} w="full">
-          <InvSelect
+        </FormControl>
+        <FormControl w="full">
+          <FormLabel>{t('modelManager.modelOne')}</FormLabel>
+          <Combobox
             options={optionsModelOne}
             value={valueModelOne}
             onChange={onChangeModelOne}
           />
-        </InvControl>
-        <InvControl label={t('modelManager.modelTwo')} w="full">
-          <InvSelect
+        </FormControl>
+        <FormControl w="full">
+          <FormLabel>{t('modelManager.modelTwo')}</FormLabel>
+          <Combobox
             options={optionsModelTwo}
             value={valueModelTwo}
             onChange={onChangeModelTwo}
           />
-        </InvControl>
-        <InvControl label={t('modelManager.modelThree')} w="full">
-          <InvSelect
+        </FormControl>
+        <FormControl w="full">
+          <FormLabel>{t('modelManager.modelThree')}</FormLabel>
+          <Combobox
             options={optionsModelThree}
             value={valueModelThree}
             onChange={onChangeModelThree}
             isClearable
           />
-        </InvControl>
+        </FormControl>
       </Flex>
 
-      <InvControl label={t('modelManager.mergedModelName')}>
-        <InvInput
-          value={mergedModelName}
-          onChange={handleChangeMergedModelName}
-        />
-      </InvControl>
+      <FormControl>
+        <FormLabel>{t('modelManager.mergedModelName')}</FormLabel>
+        <Input value={mergedModelName} onChange={handleChangeMergedModelName} />
+      </FormControl>
 
       <Flex
         flexDirection="column"
@@ -313,54 +318,53 @@ const MergeModelsPanel = () => {
         gap={4}
         bg="base.800"
       >
-        <InvControl
-          label={t('modelManager.alpha')}
-          helperText={t('modelManager.modelMergeAlphaHelp')}
-        >
-          <InvSlider
+        <FormControl helperText={t('modelManager.modelMergeAlphaHelp')}>
+          <FormLabel>{t('modelManager.alpha')}</FormLabel>
+          <CompositeSlider
             min={0.01}
             max={0.99}
             step={0.01}
             value={modelMergeAlpha}
             onChange={handleChangeModelMergeAlpha}
             onReset={handleResetModelMergeAlpha}
-            withNumberInput
             marks
           />
-        </InvControl>
+          <CompositeNumberInput
+            min={0.01}
+            max={0.99}
+            step={0.01}
+            value={modelMergeAlpha}
+            onChange={handleChangeModelMergeAlpha}
+            onReset={handleResetModelMergeAlpha}
+          />
+        </FormControl>
       </Flex>
 
       <Flex padding={4} gap={4} borderRadius="base" bg="base.800">
-        <InvText fontSize="sm" variant="subtext">
+        <Text fontSize="sm" variant="subtext">
           {t('modelManager.interpolationType')}
-        </InvText>
+        </Text>
         <RadioGroup value={modelMergeInterp} onChange={handleChangeMergeInterp}>
           <Flex columnGap={4}>
             {modelThree === null ? (
               <>
                 <Radio value="weighted_sum">
-                  <InvText fontSize="sm">
-                    {t('modelManager.weightedSum')}
-                  </InvText>
+                  <Text fontSize="sm">{t('modelManager.weightedSum')}</Text>
                 </Radio>
                 <Radio value="sigmoid">
-                  <InvText fontSize="sm">{t('modelManager.sigmoid')}</InvText>
+                  <Text fontSize="sm">{t('modelManager.sigmoid')}</Text>
                 </Radio>
                 <Radio value="inv_sigmoid">
-                  <InvText fontSize="sm">
-                    {t('modelManager.inverseSigmoid')}
-                  </InvText>
+                  <Text fontSize="sm">{t('modelManager.inverseSigmoid')}</Text>
                 </Radio>
               </>
             ) : (
               <Radio value="add_difference">
-                <InvTooltip
+                <Tooltip
                   label={t('modelManager.modelMergeInterpAddDifferenceHelp')}
                 >
-                  <InvText fontSize="sm">
-                    {t('modelManager.addDifference')}
-                  </InvText>
-                </InvTooltip>
+                  <Text fontSize="sm">{t('modelManager.addDifference')}</Text>
+                </Tooltip>
               </Radio>
             )}
           </Flex>
@@ -375,51 +379,53 @@ const MergeModelsPanel = () => {
         bg="base.900"
       >
         <Flex columnGap={4}>
-          <InvText fontSize="sm" variant="subtext">
+          <Text fontSize="sm" variant="subtext">
             {t('modelManager.mergedModelSaveLocation')}
-          </InvText>
+          </Text>
           <RadioGroup
             value={modelMergeSaveLocType}
             onChange={handleChangeMergeSaveLocType}
           >
             <Flex columnGap={4}>
               <Radio value="root">
-                <InvText fontSize="sm">
-                  {t('modelManager.invokeAIFolder')}
-                </InvText>
+                <Text fontSize="sm">{t('modelManager.invokeAIFolder')}</Text>
               </Radio>
 
               <Radio value="custom">
-                <InvText fontSize="sm">{t('modelManager.custom')}</InvText>
+                <Text fontSize="sm">{t('modelManager.custom')}</Text>
               </Radio>
             </Flex>
           </RadioGroup>
         </Flex>
 
         {modelMergeSaveLocType === 'custom' && (
-          <InvControl label={t('modelManager.mergedModelCustomSaveLocation')}>
-            <InvInput
+          <FormControl>
+            <FormLabel>
+              {t('modelManager.mergedModelCustomSaveLocation')}
+            </FormLabel>
+            <Input
               value={modelMergeCustomSaveLoc}
               onChange={handleChangeMergeCustomSaveLoc}
             />
-          </InvControl>
+          </FormControl>
         )}
       </Flex>
 
-      <InvControl label={t('modelManager.ignoreMismatch')}>
-        <InvCheckbox
+      <FormControl>
+        <FormLabel>{t('modelManager.ignoreMismatch')}</FormLabel>
+        <Checkbox
           isChecked={modelMergeForce}
           onChange={handleChangeModelMergeForce}
         />
-      </InvControl>
+      </FormControl>
 
-      <InvButton
+      <Button
         onClick={mergeModelsHandler}
         isLoading={isLoading}
         isDisabled={modelOne === null || modelTwo === null}
       >
         {t('modelManager.merge')}
-      </InvButton>
+      </Button>
     </Flex>
   );
 };

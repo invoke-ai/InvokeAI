@@ -1,4 +1,4 @@
-import { useDisclosure } from '@chakra-ui/react';
+import { useDisclosure } from '@invoke-ai/ui';
 import { isNil } from 'lodash-es';
 import type {
   ChangeEventHandler,

@@ -1,15 +1,15 @@
-import { Box } from '@chakra-ui/layout';
-import { useDisclosure } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { InvBadge } from 'common/components/InvBadge/wrapper';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
-import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
 import {
-  InvMenu,
-  InvMenuButton,
-  InvMenuDivider,
-} from 'common/components/InvMenu/wrapper';
+  Badge,
+  Box,
+  IconButton,
+  Menu,
+  MenuButton,
+  MenuDivider,
+  MenuItem,
+  MenuList,
+  useDisclosure,
+} from '@invoke-ai/ui';
+import { useAppDispatch } from 'app/store/storeHooks';
 import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
@@ -56,19 +56,19 @@ export const QueueActionsMenuButton = memo(() => {
     <Box pos="relative">
       <ClearQueueConfirmationAlertDialog disclosure={clearQueueDisclosure} />
 
-      <InvMenu
+      <Menu
         isOpen={isOpen}
         onOpen={onOpen}
         onClose={onClose}
         placement="bottom-end"
       >
-        <InvMenuButton
-          as={InvIconButton}
+        <MenuButton
+          as={IconButton}
           aria-label="Queue Actions Menu"
           icon={<RiListCheck />}
         />
-        <InvMenuList>
-          <InvMenuItem
+        <MenuList>
+          <MenuItem
             isDestructive
             icon={<PiTrashSimpleBold size="16px" />}
             onClick={clearQueueDisclosure.onOpen}
@@ -76,35 +76,35 @@ export const QueueActionsMenuButton = memo(() => {
             isDisabled={isDisabledClearQueue}
           >
             {t('queue.clearTooltip')}
-          </InvMenuItem>
+          </MenuItem>
           {isResumeEnabled && (
-            <InvMenuItem
+            <MenuItem
               icon={<PiPlayFill size="14px" />}
               onClick={resumeProcessor}
               isLoading={isLoadingResumeProcessor}
               isDisabled={isDisabledResumeProcessor}
             >
               {t('queue.resumeTooltip')}
-            </InvMenuItem>
+            </MenuItem>
           )}
           {isPauseEnabled && (
-            <InvMenuItem
+            <MenuItem
               icon={<PiPauseFill size="14px" />}
               onClick={pauseProcessor}
               isLoading={isLoadingPauseProcessor}
               isDisabled={isDisabledPauseProcessor}
             >
               {t('queue.pauseTooltip')}
-            </InvMenuItem>
+            </MenuItem>
           )}
-          <InvMenuDivider />
-          <InvMenuItem icon={<RiPlayList2Fill />} onClick={openQueue}>
+          <MenuDivider />
+          <MenuItem icon={<RiPlayList2Fill />} onClick={openQueue}>
             {t('queue.openQueue')}
-          </InvMenuItem>
-        </InvMenuList>
-      </InvMenu>
+          </MenuItem>
+        </MenuList>
+      </Menu>
       {queueSize > 0 && (
-        <InvBadge
+        <Badge
           pos="absolute"
           insetInlineStart={-3}
           insetBlockStart={-1.5}
@@ -112,7 +112,7 @@ export const QueueActionsMenuButton = memo(() => {
           zIndex="docked"
         >
           {queueSize}
-        </InvBadge>
+        </Badge>
       )}
     </Box>
   );

@@ -1,10 +1,8 @@
-import { Flex, Spinner } from '@chakra-ui/react';
+import { Flex, MenuDivider, MenuItem, Spinner } from '@invoke-ai/ui';
 import { useStore } from '@nanostores/react';
 import { useAppToaster } from 'app/components/Toaster';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
-import { InvMenuDivider } from 'common/components/InvMenu/wrapper';
 import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
@@ -152,20 +150,20 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
 
   return (
     <>
-      <InvMenuItem
+      <MenuItem
         as="a"
         href={imageDTO.image_url}
         target="_blank"
         icon={<PiShareFatBold />}
       >
         {t('common.openInNewTab')}
-      </InvMenuItem>
+      </MenuItem>
       {isClipboardAPIAvailable && (
-        <InvMenuItem icon={<PiCopyBold />} onClickCapture={handleCopyImage}>
+        <MenuItem icon={<PiCopyBold />} onClickCapture={handleCopyImage}>
           {t('parameters.copyImage')}
-        </InvMenuItem>
+        </MenuItem>
       )}
-      <InvMenuItem
+      <MenuItem
         as="a"
         download={true}
         href={imageDTO.image_url}
@@ -174,9 +172,9 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         w="100%"
       >
         {t('parameters.downloadImage')}
-      </InvMenuItem>
-      <InvMenuDivider />
-      <InvMenuItem
+      </MenuItem>
+      <MenuDivider />
+      <MenuItem
         icon={
           getAndLoadEmbeddedWorkflowResult.isLoading ? (
             <SpinnerIcon />
@@ -188,8 +186,8 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         isDisabled={!imageDTO.has_workflow}
       >
         {t('nodes.loadWorkflow')}
-      </InvMenuItem>
-      <InvMenuItem
+      </MenuItem>
+      <MenuItem
         icon={isLoadingMetadata ? <SpinnerIcon /> : <PiQuotesBold />}
         onClickCapture={handleRecallPrompt}
         isDisabled={
@@ -199,65 +197,65 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         }
       >
         {t('parameters.usePrompt')}
-      </InvMenuItem>
-      <InvMenuItem
+      </MenuItem>
+      <MenuItem
         icon={isLoadingMetadata ? <SpinnerIcon /> : <PiPlantBold />}
         onClickCapture={handleRecallSeed}
         isDisabled={isLoadingMetadata || metadata?.seed === undefined}
       >
         {t('parameters.useSeed')}
-      </InvMenuItem>
-      <InvMenuItem
+      </MenuItem>
+      <MenuItem
         icon={isLoadingMetadata ? <SpinnerIcon /> : <PiAsteriskBold />}
         onClickCapture={handleUseAllParameters}
         isDisabled={isLoadingMetadata || !metadata}
       >
         {t('parameters.useAll')}
-      </InvMenuItem>
-      <InvMenuDivider />
-      <InvMenuItem
+      </MenuItem>
+      <MenuDivider />
+      <MenuItem
         icon={<PiShareFatBold />}
         onClickCapture={handleSendToImageToImage}
         id="send-to-img2img"
       >
         {t('parameters.sendToImg2Img')}
-      </InvMenuItem>
+      </MenuItem>
       {isCanvasEnabled && (
-        <InvMenuItem
+        <MenuItem
           icon={<PiShareFatBold />}
           onClickCapture={handleSendToCanvas}
           id="send-to-canvas"
         >
           {t('parameters.sendToUnifiedCanvas')}
-        </InvMenuItem>
+        </MenuItem>
       )}
-      <InvMenuDivider />
-      <InvMenuItem icon={<PiFoldersBold />} onClickCapture={handleChangeBoard}>
+      <MenuDivider />
+      <MenuItem icon={<PiFoldersBold />} onClickCapture={handleChangeBoard}>
         {t('boards.changeBoard')}
-      </InvMenuItem>
+      </MenuItem>
       {imageDTO.starred ? (
-        <InvMenuItem
+        <MenuItem
           icon={customStarUi ? customStarUi.off.icon : <PiStarFill />}
           onClickCapture={handleUnstarImage}
         >
           {customStarUi ? customStarUi.off.text : t('gallery.unstarImage')}
-        </InvMenuItem>
+        </MenuItem>
       ) : (
-        <InvMenuItem
+        <MenuItem
           icon={customStarUi ? customStarUi.on.icon : <PiStarBold />}
           onClickCapture={handleStarImage}
         >
           {customStarUi ? customStarUi.on.text : t('gallery.starImage')}
-        </InvMenuItem>
+        </MenuItem>
       )}
-      <InvMenuDivider />
-      <InvMenuItem
+      <MenuDivider />
+      <MenuItem
         color="error.300"
         icon={<PiTrashSimpleBold />}
         onClickCapture={handleDelete}
       >
         {t('gallery.deleteImage')}
-      </InvMenuItem>
+      </MenuItem>
     </>
   );
 };

@@ -1,4 +1,4 @@
-import { Flex, Heading } from '@chakra-ui/react';
+import { Flex, Heading } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';

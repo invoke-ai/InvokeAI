@@ -1,5 +1,4 @@
-import { Flex } from '@chakra-ui/react';
-import { InvText } from 'common/components/InvText/wrapper';
+import { Flex, Text } from '@invoke-ai/ui';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_BASE_MODELS } from 'services/api/constants';
@@ -78,7 +77,7 @@ const ModelEdit = (props: ModelEditProps) => {
       maxH={96}
       userSelect="none"
     >
-      <InvText variant="subtext">{t('modelManager.noModelSelected')}</InvText>
+      <Text variant="subtext">{t('modelManager.noModelSelected')}</Text>
     </Flex>
   );
 };

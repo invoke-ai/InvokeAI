@@ -1,4 +1,4 @@
-import { Switch } from '@chakra-ui/react';
+import { Switch } from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldBooleanValueChanged } from 'features/nodes/store/nodesSlice';
 import type {

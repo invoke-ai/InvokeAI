@@ -1,10 +1,6 @@
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
 import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,7 +15,7 @@ const BoardAutoAddSelect = () => {
   );
   const { options, hasBoards } = useListAllBoardsQuery(undefined, {
     selectFromResult: ({ data }) => {
-      const options: InvSelectOption[] = [
+      const options: ComboboxOption[] = [
         {
           label: 'None',
           value: 'none',
@@ -37,7 +33,7 @@ const BoardAutoAddSelect = () => {
     },
   });
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!v) {
         return;
@@ -55,18 +51,16 @@ const BoardAutoAddSelect = () => {
   const noOptionsMessage = useCallback(() => t('boards.noMatching'), [t]);
 
   return (
-    <InvControl
-      label={t('boards.autoAddBoard')}
-      isDisabled={!hasBoards || autoAssignBoardOnClick}
-    >
-      <InvSelect
+    <FormControl isDisabled={!hasBoards || autoAssignBoardOnClick}>
+      <FormLabel>{t('boards.autoAddBoard')}</FormLabel>
+      <Combobox
         value={value}
         options={options}
         onChange={onChange}
         placeholder={t('boards.selectBoard')}
         noOptionsMessage={noOptionsMessage}
       />
-    </InvControl>
+    </FormControl>
   );
 };
 export default memo(BoardAutoAddSelect);

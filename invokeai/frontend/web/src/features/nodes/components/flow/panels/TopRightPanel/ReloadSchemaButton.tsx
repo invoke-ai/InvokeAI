@@ -1,5 +1,5 @@
+import { Button } from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsClockwiseBold } from 'react-icons/pi';
@@ -14,14 +14,14 @@ const ReloadNodeTemplatesButton = () => {
   }, [dispatch]);
 
   return (
-    <InvButton
+    <Button
       leftIcon={<PiArrowsClockwiseBold />}
       tooltip={t('nodes.reloadNodeTemplates')}
       aria-label={t('nodes.reloadNodeTemplates')}
       onClick={handleReloadSchema}
     >
       {t('nodes.reloadNodeTemplates')}
-    </InvButton>
+    </Button>
   );
 };
 

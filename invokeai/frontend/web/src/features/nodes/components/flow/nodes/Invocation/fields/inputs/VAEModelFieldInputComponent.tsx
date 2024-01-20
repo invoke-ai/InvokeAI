@@ -1,8 +1,6 @@
-import { Flex } from '@chakra-ui/layout';
+import { Combobox, Flex, FormControl } from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
+import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { SyncModelsIconButton } from 'features/modelManager/components/SyncModels/SyncModelsIconButton';
 import { fieldVaeModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type {
@@ -40,7 +38,7 @@ const VAEModelFieldInputComponent = (props: Props) => {
     [dispatch, field.name, nodeId]
   );
   const { options, value, onChange, placeholder, noOptionsMessage } =
-    useGroupedModelInvSelect({
+    useGroupedModelCombobox({
       modelEntities: data,
       onChange: _onChange,
       selectedModel: field.value ? { ...field.value, model_type: 'vae' } : null,
@@ -49,19 +47,19 @@ const VAEModelFieldInputComponent = (props: Props) => {
 
   return (
     <Flex w="full" alignItems="center" gap={2}>
-      <InvControl
+      <FormControl
         className="nowheel nodrag"
         isDisabled={!options.length}
         isInvalid={!value}
       >
-        <InvSelect
+        <Combobox
           value={value}
           placeholder={placeholder}
           options={options}
           onChange={onChange}
           noOptionsMessage={noOptionsMessage}
         />
-      </InvControl>
+      </FormControl>
       <SyncModelsIconButton className="nodrag" />
     </Flex>
   );

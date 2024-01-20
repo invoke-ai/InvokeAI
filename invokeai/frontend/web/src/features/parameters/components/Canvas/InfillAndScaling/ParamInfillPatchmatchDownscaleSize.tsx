@@ -1,6 +1,10 @@
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setInfillPatchmatchDownscaleSize } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -43,11 +47,9 @@ const ParamInfillPatchmatchDownscaleSize = () => {
   );
 
   return (
-    <InvControl
-      isDisabled={infillMethod !== 'patchmatch'}
-      label={t('parameters.patchmatchDownScaleSize')}
-    >
-      <InvSlider
+    <FormControl isDisabled={infillMethod !== 'patchmatch'}>
+      <FormLabel>{t('parameters.patchmatchDownScaleSize')}</FormLabel>
+      <CompositeSlider
         min={sliderMin}
         max={sliderMax}
         step={coarseStep}
@@ -55,12 +57,18 @@ const ParamInfillPatchmatchDownscaleSize = () => {
         value={infillPatchmatchDownscaleSize}
         defaultValue={initial}
         onChange={handleChange}
-        withNumberInput
-        numberInputMin={numberInputMin}
-        numberInputMax={numberInputMax}
         marks
       />
-    </InvControl>
+      <CompositeNumberInput
+        min={numberInputMin}
+        max={numberInputMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        value={infillPatchmatchDownscaleSize}
+        defaultValue={initial}
+        onChange={handleChange}
+      />
+    </FormControl>
   );
 };
 

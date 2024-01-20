@@ -1,6 +1,10 @@
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
@@ -38,8 +42,9 @@ const ParamBoundingBoxHeight = () => {
   );
 
   return (
-    <InvControl label={t('parameters.height')} isDisabled={isStaging}>
-      <InvSlider
+    <FormControl isDisabled={isStaging}>
+      <FormLabel>{t('parameters.height')}</FormLabel>
+      <CompositeSlider
         min={sliderMin}
         max={sliderMax}
         step={coarseStep}
@@ -48,11 +53,17 @@ const ParamBoundingBoxHeight = () => {
         defaultValue={optimalDimension}
         onChange={onChange}
         marks
-        withNumberInput
-        numberInputMin={numberInputMin}
-        numberInputMax={numberInputMax}
       />
-    </InvControl>
+      <CompositeNumberInput
+        min={numberInputMin}
+        max={numberInputMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        value={ctx.height}
+        defaultValue={optimalDimension}
+        onChange={onChange}
+      />
+    </FormControl>
   );
 };
 

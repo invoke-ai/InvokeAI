@@ -1,6 +1,10 @@
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setCfgRescaleMultiplier } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -40,11 +44,9 @@ const ParamCFGRescaleMultiplier = () => {
   );
 
   return (
-    <InvControl
-      label={t('parameters.cfgRescaleMultiplier')}
-      feature="paramCFGRescaleMultiplier"
-    >
-      <InvSlider
+    <FormControl feature="paramCFGRescaleMultiplier">
+      <FormLabel>{t('parameters.cfgRescaleMultiplier')}</FormLabel>
+      <CompositeSlider
         value={cfgRescaleMultiplier}
         defaultValue={initial}
         min={sliderMin}
@@ -52,12 +54,18 @@ const ParamCFGRescaleMultiplier = () => {
         step={coarseStep}
         fineStep={fineStep}
         onChange={handleChange}
-        numberInputMin={numberInputMin}
-        numberInputMax={numberInputMax}
-        withNumberInput
         marks
       />
-    </InvControl>
+      <CompositeNumberInput
+        value={cfgRescaleMultiplier}
+        defaultValue={initial}
+        min={numberInputMin}
+        max={numberInputMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        onChange={handleChange}
+      />
+    </FormControl>
   );
 };
 

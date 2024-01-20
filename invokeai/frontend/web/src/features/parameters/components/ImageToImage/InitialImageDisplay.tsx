@@ -1,8 +1,6 @@
-import { Flex, Spacer } from '@chakra-ui/react';
+import { Flex, IconButton, Spacer, Text } from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvText } from 'common/components/InvText/wrapper';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import {
@@ -72,29 +70,24 @@ const InitialImageDisplay = () => {
         alignItems="center"
         gap={2}
       >
-        <InvText
-          ps={2}
-          fontWeight="semibold"
-          userSelect="none"
-          color="base.200"
-        >
+        <Text ps={2} fontWeight="semibold" userSelect="none" color="base.200">
           {t('metadata.initImage')}
-        </InvText>
+        </Text>
         <Spacer />
-        <InvIconButton
+        <IconButton
           tooltip="Upload Initial Image"
           aria-label="Upload Initial Image"
           icon={<PiUploadSimpleBold />}
           {...getUploadButtonProps()}
         />
-        <InvIconButton
+        <IconButton
           tooltip={`${t('parameters.useSize')} (Shift+D)`}
           aria-label={`${t('parameters.useSize')} (Shift+D)`}
           icon={<PiRulerBold />}
           onClick={handleUseSizeInitialImage}
           isDisabled={!initialImage}
         />
-        <InvIconButton
+        <IconButton
           tooltip="Reset Initial Image"
           aria-label="Reset Initial Image"
           icon={<PiArrowCounterClockwiseBold />}

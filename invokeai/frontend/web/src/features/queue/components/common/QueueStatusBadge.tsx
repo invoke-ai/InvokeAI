@@ -1,4 +1,4 @@
-import { Badge } from '@chakra-ui/react';
+import { Badge } from '@invoke-ai/ui';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { SessionQueueItemStatus } from 'services/api/endpoints/queue';

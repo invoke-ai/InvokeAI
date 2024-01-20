@@ -1,4 +1,4 @@
-import type { UseToastOptions } from '@chakra-ui/react';
+import type { UseToastOptions } from '@invoke-ai/ui';
 
 export type MakeToastArg = string | UseToastOptions;
 

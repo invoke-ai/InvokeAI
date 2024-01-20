@@ -1,5 +1,10 @@
-import type { ChakraProps } from '@chakra-ui/react';
-import { Flex } from '@chakra-ui/react';
+import type { ChakraProps } from '@invoke-ai/ui';
+import {
+  CompositeNumberInput,
+  Flex,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import type { CSSProperties } from 'react';
 import { memo, useCallback } from 'react';
 import { RgbaColorPicker } from 'react-colorful';
@@ -7,9 +12,6 @@ import type {
   ColorPickerBaseProps,
   RgbaColor,
 } from 'react-colorful/dist/types';
-
-import { InvControl } from './InvControl/InvControl';
-import { InvNumberInput } from './InvNumberInput/InvNumberInput';
 
 type IAIColorPickerProps = ColorPickerBaseProps<RgbaColor> & {
   withNumberInput?: boolean;
@@ -61,8 +63,9 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
       />
       {withNumberInput && (
         <Flex>
-          <InvControl label="Red">
-            <InvNumberInput
+          <FormControl>
+            <FormLabel>Red</FormLabel>
+            <CompositeNumberInput
               value={color.r}
               onChange={handleChangeR}
               min={0}
@@ -71,9 +74,10 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
               w={numberInputWidth}
               defaultValue={90}
             />
-          </InvControl>
-          <InvControl label="Green">
-            <InvNumberInput
+          </FormControl>
+          <FormControl>
+            <FormLabel>Green</FormLabel>
+            <CompositeNumberInput
               value={color.g}
               onChange={handleChangeG}
               min={0}
@@ -82,9 +86,10 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
               w={numberInputWidth}
               defaultValue={90}
             />
-          </InvControl>
-          <InvControl label="Blue">
-            <InvNumberInput
+          </FormControl>
+          <FormControl>
+            <FormLabel>Blue</FormLabel>
+            <CompositeNumberInput
               value={color.b}
               onChange={handleChangeB}
               min={0}
@@ -93,9 +98,10 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
               w={numberInputWidth}
               defaultValue={255}
             />
-          </InvControl>
-          <InvControl label="Alpha">
-            <InvNumberInput
+          </FormControl>
+          <FormControl>
+            <FormLabel>Alpha</FormLabel>
+            <CompositeNumberInput
               value={color.a}
               onChange={handleChangeA}
               step={0.1}
@@ -104,7 +110,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
               w={numberInputWidth}
               defaultValue={1}
             />
-          </InvControl>
+          </FormControl>
         </Flex>
       )}
     </Flex>

@@ -1,15 +1,18 @@
-import { Divider, Flex, Image, Portal } from '@chakra-ui/react';
-import { useAppSelector } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvHeading } from 'common/components/InvHeading/wrapper';
 import {
-  InvPopover,
-  InvPopoverBody,
-  InvPopoverCloseButton,
-  InvPopoverContent,
-  InvPopoverTrigger,
-} from 'common/components/InvPopover/wrapper';
-import { InvText } from 'common/components/InvText/wrapper';
+  Button,
+  Divider,
+  Flex,
+  Heading,
+  Image,
+  Popover,
+  PopoverBody,
+  PopoverCloseButton,
+  PopoverContent,
+  PopoverTrigger,
+  Portal,
+  Text,
+} from '@invoke-ai/ui';
+import { useAppSelector } from 'app/store/storeHooks';
 import { merge, omit } from 'lodash-es';
 import type { ReactElement } from 'react';
 import { memo, useCallback, useMemo } from 'react';
@@ -47,7 +50,7 @@ const IAIInformationalPopover = ({
   }
 
   return (
-    <InvPopover
+    <Popover
       isLazy
       closeOnBlur={false}
       trigger="hover"
@@ -57,26 +60,26 @@ const IAIInformationalPopover = ({
       placement="top"
       {...popoverProps}
     >
-      <InvPopoverTrigger>{children}</InvPopoverTrigger>
+      <PopoverTrigger>{children}</PopoverTrigger>
       {inPortal ? (
         <Portal>
-          <PopoverContent data={data} feature={feature} />
+          <Content data={data} feature={feature} />
         </Portal>
       ) : (
-        <PopoverContent data={data} feature={feature} />
+        <Content data={data} feature={feature} />
       )}
-    </InvPopover>
+    </Popover>
   );
 };
 
 export default memo(IAIInformationalPopover);
 
-type PopoverContentProps = {
+type ContentProps = {
   data?: PopoverData;
   feature: Feature;
 };
 
-const PopoverContent = ({ data, feature }: PopoverContentProps) => {
+const Content = ({ data, feature }: ContentProps) => {
   const { t } = useTranslation();
 
   const heading = useMemo<string | undefined>(
@@ -100,13 +103,13 @@ const PopoverContent = ({ data, feature }: PopoverContentProps) => {
   }, [data?.href]);
 
   return (
-    <InvPopoverContent w={96}>
-      <InvPopoverCloseButton />
-      <InvPopoverBody>
+    <PopoverContent w={96}>
+      <PopoverCloseButton />
+      <PopoverBody>
         <Flex gap={2} flexDirection="column" alignItems="flex-start">
           {heading && (
             <>
-              <InvHeading size="sm">{heading}</InvHeading>
+              <Heading size="sm">{heading}</Heading>
               <Divider />
             </>
           )}
@@ -124,12 +127,12 @@ const PopoverContent = ({ data, feature }: PopoverContentProps) => {
             </>
           )}
           {paragraphs.map((p) => (
-            <InvText key={p}>{p}</InvText>
+            <Text key={p}>{p}</Text>
           ))}
           {data?.href && (
             <>
               <Divider />
-              <InvButton
+              <Button
                 pt={1}
                 onClick={handleClick}
                 leftIcon={<PiArrowSquareOutBold />}
@@ -137,11 +140,11 @@ const PopoverContent = ({ data, feature }: PopoverContentProps) => {
                 variant="link"
               >
                 {t('common.learnMore') ?? heading}
-              </InvButton>
+              </Button>
             </>
           )}
         </Flex>
-      </InvPopoverBody>
-    </InvPopoverContent>
+      </PopoverBody>
+    </PopoverContent>
   );
 };

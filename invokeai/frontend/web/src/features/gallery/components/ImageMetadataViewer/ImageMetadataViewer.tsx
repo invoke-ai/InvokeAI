@@ -7,9 +7,9 @@ import {
   TabPanel,
   TabPanels,
   Tabs,
-} from '@chakra-ui/react';
+  Text,
+} from '@invoke-ai/ui';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { InvText } from 'common/components/InvText/wrapper';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -47,7 +47,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
       overflow="hidden"
     >
       <Flex gap={2}>
-        <InvText fontWeight="semibold">{t('common.file')}:</InvText>
+        <Text fontWeight="semibold">{t('common.file')}:</Text>
         <Link href={image.image_url} isExternal maxW="calc(100% - 3rem)">
           {image.image_name}
           <ExternalLinkIcon mx="2px" />

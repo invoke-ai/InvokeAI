@@ -1,12 +1,12 @@
-import type { StyleProps } from '@chakra-ui/react';
-import { Box, Flex } from '@chakra-ui/react';
+import type { ChakraProps } from '@invoke-ai/ui';
+import { Box, Flex } from '@invoke-ai/ui';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties, PropsWithChildren } from 'react';
 import { memo } from 'react';
 
 type Props = PropsWithChildren & {
-  maxHeight?: StyleProps['maxHeight'];
+  maxHeight?: ChakraProps['maxHeight'];
 };
 
 const styles: CSSProperties = { height: '100%', width: '100%' };

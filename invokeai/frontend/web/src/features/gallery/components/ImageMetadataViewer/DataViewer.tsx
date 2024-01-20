@@ -1,6 +1,4 @@
-import { Box, Flex } from '@chakra-ui/react';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { Box, Flex, IconButton, Tooltip } from '@invoke-ai/ui';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { isString } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
@@ -69,26 +67,26 @@ const DataViewer = (props: Props) => {
       </Box>
       <Flex position="absolute" top={0} insetInlineEnd={0} p={2}>
         {withDownload && (
-          <InvTooltip label={`${t('gallery.download')} ${label} JSON`}>
-            <InvIconButton
+          <Tooltip label={`${t('gallery.download')} ${label} JSON`}>
+            <IconButton
               aria-label={`${t('gallery.download')} ${label} JSON`}
               icon={<PiDownloadSimpleBold size={16} />}
               variant="ghost"
               opacity={0.7}
               onClick={handleDownload}
             />
-          </InvTooltip>
+          </Tooltip>
         )}
         {withCopy && (
-          <InvTooltip label={`${t('gallery.copy')} ${label} JSON`}>
-            <InvIconButton
+          <Tooltip label={`${t('gallery.copy')} ${label} JSON`}>
+            <IconButton
               aria-label={`${t('gallery.copy')} ${label} JSON`}
               icon={<PiCopyBold size={16} />}
               variant="ghost"
               opacity={0.7}
               onClick={handleCopy}
             />
-          </InvTooltip>
+          </Tooltip>
         )}
       </Flex>
     </Flex>

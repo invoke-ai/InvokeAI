@@ -1,5 +1,5 @@
-import type { SystemStyleObject } from '@chakra-ui/react';
-import { chakra, Flex } from '@chakra-ui/react';
+import type { SystemStyleObject } from '@invoke-ai/ui';
+import { chakra, Flex } from '@invoke-ai/ui';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo } from 'react';
 import { MiniMap } from 'reactflow';
@@ -28,8 +28,8 @@ const MinimapPanel = () => {
           zoomable
           nodeBorderRadius={15}
           sx={minimapStyles}
-          nodeColor="var(--invokeai-colors-base-600)"
-          maskColor="var(--invokeai-colors-blackAlpha-600)"
+          nodeColor="var(--invoke-colors-base-600)"
+          maskColor="var(--invoke-colors-blackAlpha-600)"
         />
       )}
     </Flex>

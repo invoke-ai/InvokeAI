@@ -1,7 +1,6 @@
+import type { ComboboxOnChange } from '@invoke-ai/ui';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type { InvSelectOnChange } from 'common/components/InvSelect/types';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterResizeMode } from 'features/controlAdapters/hooks/useControlAdapterResizeMode';
 import { controlAdapterResizeModeChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
@@ -30,7 +29,7 @@ const ParamControlAdapterResizeMode = ({ id }: Props) => {
     [t]
   );
 
-  const handleResizeModeChange = useCallback<InvSelectOnChange>(
+  const handleResizeModeChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!isResizeMode(v?.value)) {
         return;
@@ -55,17 +54,15 @@ const ParamControlAdapterResizeMode = ({ id }: Props) => {
   }
 
   return (
-    <InvControl
-      label={t('controlnet.resizeMode')}
-      feature="controlNetResizeMode"
-    >
-      <InvSelect
+    <FormControl feature="controlNetResizeMode">
+      <FormLabel>{t('controlnet.resizeMode')}</FormLabel>
+      <Combobox
         value={value}
         options={options}
         isDisabled={!isEnabled}
         onChange={handleResizeModeChange}
       />
-    </InvControl>
+    </FormControl>
   );
 };
 

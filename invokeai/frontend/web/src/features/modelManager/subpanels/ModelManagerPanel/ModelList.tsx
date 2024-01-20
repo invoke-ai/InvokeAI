@@ -1,10 +1,14 @@
-import { Flex, Spinner } from '@chakra-ui/react';
+import {
+  Button,
+  ButtonGroup,
+  Flex,
+  FormControl,
+  FormLabel,
+  Input,
+  Spinner,
+  Text,
+} from '@invoke-ai/ui';
 import type { EntityState } from '@reduxjs/toolkit';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvInput } from 'common/components/InvInput/InvInput';
-import { InvText } from 'common/components/InvText/wrapper';
 import { forEach } from 'lodash-es';
 import type { ChangeEvent, PropsWithChildren } from 'react';
 import { memo, useCallback, useState } from 'react';
@@ -82,40 +86,41 @@ const ModelList = (props: ModelListProps) => {
   return (
     <Flex flexDirection="column" rowGap={4} width="50%" minWidth="50%">
       <Flex flexDirection="column" gap={4} paddingInlineEnd={4}>
-        <InvButtonGroup>
-          <InvButton
+        <ButtonGroup>
+          <Button
             onClick={setModelFormatFilter.bind(null, 'all')}
             isChecked={modelFormatFilter === 'all'}
             size="sm"
           >
             {t('modelManager.allModels')}
-          </InvButton>
-          <InvButton
+          </Button>
+          <Button
             size="sm"
             onClick={setModelFormatFilter.bind(null, 'diffusers')}
             isChecked={modelFormatFilter === 'diffusers'}
           >
             {t('modelManager.diffusersModels')}
-          </InvButton>
-          <InvButton
+          </Button>
+          <Button
             size="sm"
             onClick={setModelFormatFilter.bind(null, 'checkpoint')}
             isChecked={modelFormatFilter === 'checkpoint'}
           >
             {t('modelManager.checkpointModels')}
-          </InvButton>
-          <InvButton
+          </Button>
+          <Button
             size="sm"
             onClick={setModelFormatFilter.bind(null, 'lora')}
             isChecked={modelFormatFilter === 'lora'}
           >
             {t('modelManager.loraModels')}
-          </InvButton>
-        </InvButtonGroup>
+          </Button>
+        </ButtonGroup>
 
-        <InvControl label={t('modelManager.search')}>
-          <InvInput onChange={handleSearchFilter} />
-        </InvControl>
+        <FormControl>
+          <FormLabel>{t('modelManager.search')}</FormLabel>
+          <Input onChange={handleSearchFilter} />
+        </FormControl>
 
         <Flex
           flexDirection="column"
@@ -222,9 +227,9 @@ const ModelListWrapper = memo((props: ModelListWrapperProps) => {
   return (
     <StyledModelContainer>
       <Flex gap={2} flexDir="column">
-        <InvText variant="subtext" fontSize="sm">
+        <Text variant="subtext" fontSize="sm">
           {title}
-        </InvText>
+        </Text>
         {modelList.map((model) => (
           <ModelListItem
             key={model.id}
@@ -252,9 +257,9 @@ const FetchingModelsLoader = memo(
           gap={8}
         >
           <Spinner />
-          <InvText variant="subtext">
+          <Text variant="subtext">
             {loadingMessage ? loadingMessage : 'Fetching...'}
-          </InvText>
+          </Text>
         </Flex>
       </StyledModelContainer>
     );

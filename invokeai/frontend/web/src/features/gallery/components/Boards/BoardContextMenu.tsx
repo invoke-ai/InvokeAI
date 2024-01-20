@@ -1,10 +1,7 @@
+import type { ContextMenuProps } from '@invoke-ai/ui';
+import { ContextMenu, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import type { InvContextMenuProps } from 'common/components/InvContextMenu/InvContextMenu';
-import { InvContextMenu } from 'common/components/InvContextMenu/InvContextMenu';
-import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
-import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
-import { InvMenuGroup } from 'common/components/InvMenu/wrapper';
 import {
   autoAddBoardIdChanged,
   selectGallerySlice,
@@ -24,7 +21,7 @@ import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
 type Props = {
   board?: BoardDTO;
   board_id: BoardId;
-  children: InvContextMenuProps<HTMLDivElement>['children'];
+  children: ContextMenuProps<HTMLDivElement>['children'];
   setBoardToDelete?: (board?: BoardDTO) => void;
 };
 
@@ -91,22 +88,22 @@ const BoardContextMenu = ({
 
   const renderMenuFunc = useCallback(
     () => (
-      <InvMenuList visibility="visible">
-        <InvMenuGroup title={boardName}>
-          <InvMenuItem
+      <MenuList visibility="visible">
+        <MenuGroup title={boardName}>
+          <MenuItem
             icon={<PiPlusBold />}
             isDisabled={isSelectedForAutoAdd || autoAssignBoardOnClick}
             onClick={handleSetAutoAdd}
           >
             {t('boards.menuItemAutoAdd')}
-          </InvMenuItem>
+          </MenuItem>
           {isBulkDownloadEnabled && (
-            <InvMenuItem
+            <MenuItem
               icon={<PiDownloadBold />}
               onClickCapture={handleBulkDownload}
             >
               {t('boards.downloadBoard')}
-            </InvMenuItem>
+            </MenuItem>
           )}
           {board && (
             <GalleryBoardContextMenuItems
@@ -114,8 +111,8 @@ const BoardContextMenu = ({
               setBoardToDelete={setBoardToDelete}
             />
           )}
-        </InvMenuGroup>
-      </InvMenuList>
+        </MenuGroup>
+      </MenuList>
     ),
     [
       autoAssignBoardOnClick,
@@ -130,9 +127,7 @@ const BoardContextMenu = ({
     ]
   );
 
-  return (
-    <InvContextMenu renderMenu={renderMenuFunc}>{children}</InvContextMenu>
-  );
+  return <ContextMenu renderMenu={renderMenuFunc}>{children}</ContextMenu>;
 };
 
 export default memo(BoardContextMenu);

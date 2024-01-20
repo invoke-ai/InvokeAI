@@ -1,7 +1,6 @@
+import type { ComboboxOnChange } from '@invoke-ai/ui';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type { InvSelectOnChange } from 'common/components/InvSelect/types';
 import { vaePrecisionChanged } from 'features/parameters/store/generationSlice';
 import { isParameterPrecision } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback, useMemo } from 'react';
@@ -17,7 +16,7 @@ const ParamVAEModelSelect = () => {
   const dispatch = useAppDispatch();
   const vaePrecision = useAppSelector((s) => s.generation.vaePrecision);
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!isParameterPrecision(v?.value)) {
         return;
@@ -34,14 +33,10 @@ const ParamVAEModelSelect = () => {
   );
 
   return (
-    <InvControl
-      label={t('modelManager.vaePrecision')}
-      feature="paramVAEPrecision"
-      w="14rem"
-      flexShrink={0}
-    >
-      <InvSelect value={value} options={options} onChange={onChange} />
-    </InvControl>
+    <FormControl feature="paramVAEPrecision" w="14rem" flexShrink={0}>
+      <FormLabel>{t('modelManager.vaePrecision')}</FormLabel>
+      <Combobox value={value} options={options} onChange={onChange} />
+    </FormControl>
   );
 };
 

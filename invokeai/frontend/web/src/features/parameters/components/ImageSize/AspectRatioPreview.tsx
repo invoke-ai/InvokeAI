@@ -1,5 +1,5 @@
-import { Flex, Icon } from '@chakra-ui/react';
 import { useSize } from '@chakra-ui/react-use-size';
+import { Flex, Icon } from '@invoke-ai/ui';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useMemo, useRef } from 'react';

@@ -1,10 +1,14 @@
-import { Divider, Flex } from '@chakra-ui/react';
+import {
+  ConfirmationAlertDialog,
+  Divider,
+  Flex,
+  FormControl,
+  FormLabel,
+  Switch,
+  Text,
+} from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvConfirmationAlertDialog } from 'common/components/InvConfirmationAlertDialog/InvConfirmationAlertDialog';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSwitch } from 'common/components/InvSwitch/wrapper';
-import { InvText } from 'common/components/InvText/wrapper';
 import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import { selectControlAdaptersSlice } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
@@ -101,7 +105,7 @@ const DeleteImageModal = () => {
   }, [dispatch, imagesToDelete, imagesUsage]);
 
   return (
-    <InvConfirmationAlertDialog
+    <ConfirmationAlertDialog
       title={t('gallery.deleteImage')}
       isOpen={isModalOpen}
       onClose={handleClose}
@@ -112,20 +116,21 @@ const DeleteImageModal = () => {
       <Flex direction="column" gap={3}>
         <ImageUsageMessage imageUsage={imageUsageSummary} />
         <Divider />
-        <InvText>
+        <Text>
           {canRestoreDeletedImagesFromBin
             ? t('gallery.deleteImageBin')
             : t('gallery.deleteImagePermanent')}
-        </InvText>
-        <InvText>{t('common.areYouSure')}</InvText>
-        <InvControl label={t('common.dontAskMeAgain')}>
-          <InvSwitch
+        </Text>
+        <Text>{t('common.areYouSure')}</Text>
+        <FormControl>
+          <FormLabel>{t('common.dontAskMeAgain')}</FormLabel>
+          <Switch
             isChecked={!shouldConfirmOnDelete}
             onChange={handleChangeShouldConfirmOnDelete}
           />
-        </InvControl>
+        </FormControl>
       </Flex>
-    </InvConfirmationAlertDialog>
+    </ConfirmationAlertDialog>
   );
 };
 

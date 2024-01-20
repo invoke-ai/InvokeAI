@@ -1,4 +1,4 @@
-import { Badge, Flex } from '@chakra-ui/react';
+import { Badge, Flex } from '@invoke-ai/ui';
 import { memo } from 'react';
 import type { ImageDTO } from 'services/api/types';
 

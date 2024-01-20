@@ -1,6 +1,10 @@
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setCanvasCoherenceSteps } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -42,11 +46,9 @@ const ParamCanvasCoherenceSteps = () => {
   );
 
   return (
-    <InvControl
-      label={t('parameters.coherenceSteps')}
-      feature="compositingCoherenceSteps"
-    >
-      <InvSlider
+    <FormControl feature="compositingCoherenceSteps">
+      <FormLabel>{t('parameters.coherenceSteps')}</FormLabel>
+      <CompositeSlider
         min={sliderMin}
         max={sliderMax}
         step={coarseStep}
@@ -54,12 +56,18 @@ const ParamCanvasCoherenceSteps = () => {
         value={canvasCoherenceSteps}
         defaultValue={initial}
         onChange={handleChange}
-        withNumberInput
-        numberInputMin={numberInputMin}
-        numberInputMax={numberInputMax}
         marks
       />
-    </InvControl>
+      <CompositeNumberInput
+        min={numberInputMin}
+        max={numberInputMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        value={canvasCoherenceSteps}
+        defaultValue={initial}
+        onChange={handleChange}
+      />
+    </FormControl>
   );
 };
 
