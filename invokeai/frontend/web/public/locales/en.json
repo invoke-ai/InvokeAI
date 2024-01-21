@@ -1098,6 +1098,7 @@
         "boundingBoxHeader": "Bounding Box",
         "boundingBoxHeight": "Bounding Box Height",
         "boundingBoxWidth": "Bounding Box Width",
+        "boxBlur": "Box Blur",
         "cancel": {
             "cancel": "Cancel",
             "immediate": "Cancel immediately",
@@ -1372,6 +1373,7 @@
         "promptNotSet": "Prompt Not Set",
         "promptNotSetDesc": "Could not find prompt for this image.",
         "promptSet": "Prompt Set",
+        "resetInitialImage":"Reset Initial Image",
         "seedNotSet": "Seed Not Set",
         "seedNotSetDesc": "Could not find seed for this image.",
         "seedSet": "Seed Set",
@@ -1388,6 +1390,7 @@
         "uploadFailed": "Upload failed",
         "uploadFailedInvalidUploadDesc": "Must be single PNG or JPEG image",
         "uploadFailedUnableToLoadDesc": "Unable to load file",
+        "uploadInitialImage":"Upload Initial Image",
         "upscalingFailed": "Upscaling Failed",
         "workflowLoaded": "Workflow Loaded",
         "problemRetrievingWorkflow": "Problem Retrieving Workflow",

@@ -3,7 +3,6 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { useTranslation } from 'react-i18next';
 import type {
   TypesafeDraggableData,
   TypesafeDroppableData,
@@ -13,6 +12,7 @@ import {
   selectGenerationSlice,
 } from 'features/parameters/store/generationSlice';
 import { memo, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 const selectInitialImage = createMemoizedSelector(
@@ -62,9 +62,11 @@ const InitialImage = () => {
       draggableData={draggableData}
       isUploadDisabled={true}
       fitContainer
-      dropLabel="Set as Initial Image"
+      dropLabel={t('toast.setInitialImage')}
       noContentFallback={
-        <IAINoContentFallback label={t('parameters.invoke.noInitialImageSelected')} />
+        <IAINoContentFallback
+          label={t('parameters.invoke.noInitialImageSelected')}
+        />
       }
       dataTestId="initial-image"
     />
