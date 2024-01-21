@@ -87,9 +87,15 @@ const InitialImageDisplay = () => {
           onClick={handleUseSizeInitialImage}
           isDisabled={!initialImage}
         />
+<<<<<<< HEAD
         <IconButton
           tooltip="Reset Initial Image"
           aria-label="Reset Initial Image"
+=======
+        <InvIconButton
+          tooltip={t('toast.resetInitialImage')}
+          aria-label={t('toast.resetInitialImage')}
+>>>>>>> a94e09658 (more strings and translations added)
           icon={<PiArrowCounterClockwiseBold />}
           onClick={handleReset}
           isDisabled={!initialImage}

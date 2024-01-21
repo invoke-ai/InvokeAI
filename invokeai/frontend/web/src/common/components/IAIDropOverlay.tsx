@@ -3,8 +3,8 @@ import type { AnimationProps } from 'framer-motion';
 import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 import { memo, useRef } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import { useTranslation } from 'react-i18next';
+import { v4 as uuidv4 } from 'uuid';
 type Props = {
   isOver: boolean;
   label?: ReactNode;
