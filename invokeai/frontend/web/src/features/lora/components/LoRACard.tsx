@@ -4,8 +4,8 @@ import {
   CardHeader,
   CompositeNumberInput,
   CompositeSlider,
-  FormLabel,
   IconButton,
+  Text,
 } from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
 import type { LoRA } from 'features/lora/store/loraSlice';
@@ -35,9 +35,9 @@ export const LoRACard = memo((props: LoRACardProps) => {
   return (
     <Card variant="lora">
       <CardHeader>
-        <FormLabel noOfLines={1} wordBreak="break-all">
+        <Text noOfLines={1} wordBreak="break-all" color="base.200">
           {lora.model_name}
-        </FormLabel>
+        </Text>
         <IconButton
           aria-label="Remove LoRA"
           variant="ghost"
