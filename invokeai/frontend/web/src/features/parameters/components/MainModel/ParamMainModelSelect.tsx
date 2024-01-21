@@ -43,9 +43,13 @@ const ParamMainModelSelect = () => {
     });
 
   return (
-    <InvTooltip label={
-      Object.values(Object.values(data?.entities ?? {})).find((m) => m.model_name === model?.model_name)?.description
-    }>
+    <InvTooltip
+      label={
+        Object.values(Object.values(data?.entities ?? {})).find(
+          (m) => m.model_name === model?.model_name
+        )?.description
+      }
+    >
       <InvControl
         label={t('modelManager.model')}
         isDisabled={!options.length}
