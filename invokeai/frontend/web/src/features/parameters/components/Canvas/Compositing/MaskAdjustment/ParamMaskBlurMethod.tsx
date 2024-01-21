@@ -29,7 +29,7 @@ const ParamMaskBlurMethod = () => {
 
   const value = useMemo(
     () => options.find((o) => o.value === maskBlurMethod),
-    [maskBlurMethod]
+    [maskBlurMethod, options]
   );
 
   return (
