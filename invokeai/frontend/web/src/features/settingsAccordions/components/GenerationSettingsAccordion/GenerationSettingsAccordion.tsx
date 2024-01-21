@@ -57,7 +57,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } =
     useStandaloneAccordionToggle({
       id: 'generation-settings',
-      defaultIsOpen: false,
+      defaultIsOpen: true,
     });
 
   return (
