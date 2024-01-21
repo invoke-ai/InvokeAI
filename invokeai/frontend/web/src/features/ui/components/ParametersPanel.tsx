@@ -4,12 +4,12 @@ import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/con
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import QueueControls from 'features/queue/components/QueueControls';
 import { SDXLPrompts } from 'features/sdxl/components/SDXLPrompts/SDXLPrompts';
-import { AdvancedSettingsAccordion } from 'features/settingsAccordions/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
-import { CompositingSettingsAccordion } from 'features/settingsAccordions/CompositingSettingsAccordion/CompositingSettingsAccordion';
-import { ControlSettingsAccordion } from 'features/settingsAccordions/ControlSettingsAccordion/ControlSettingsAccordion';
-import { GenerationSettingsAccordion } from 'features/settingsAccordions/GenerationSettingsAccordion/GenerationSettingsAccordion';
-import { ImageSettingsAccordion } from 'features/settingsAccordions/ImageSettingsAccordion/ImageSettingsAccordion';
-import { RefinerSettingsAccordion } from 'features/settingsAccordions/RefinerSettingsAccordion/RefinerSettingsAccordion';
+import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
+import { CompositingSettingsAccordion } from 'features/settingsAccordions/components/CompositingSettingsAccordion/CompositingSettingsAccordion';
+import { ControlSettingsAccordion } from 'features/settingsAccordions/components/ControlSettingsAccordion/ControlSettingsAccordion';
+import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
+import { ImageSettingsAccordion } from 'features/settingsAccordions/components/ImageSettingsAccordion/ImageSettingsAccordion';
+import { RefinerSettingsAccordion } from 'features/settingsAccordions/components/RefinerSettingsAccordion/RefinerSettingsAccordion';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
