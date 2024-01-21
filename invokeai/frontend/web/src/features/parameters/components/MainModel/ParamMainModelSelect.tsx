@@ -2,6 +2,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InvControl } from 'common/components/InvControl/InvControl';
 import { InvSelect } from 'common/components/InvSelect/InvSelect';
+import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
 import { modelSelected } from 'features/parameters/store/actions';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
@@ -42,19 +43,23 @@ const ParamMainModelSelect = () => {
     });
 
   return (
-    <InvControl
-      label={t('modelManager.model')}
-      isDisabled={!options.length}
-      isInvalid={!options.length}
-    >
-      <InvSelect
-        value={value}
-        placeholder={placeholder}
-        options={options}
-        onChange={onChange}
-        noOptionsMessage={noOptionsMessage}
-      />
-    </InvControl>
+    <InvTooltip label={
+      Object.values(Object.values(data?.entities ?? {})).find((m) => m.model_name === model?.model_name)?.description
+    }>
+      <InvControl
+        label={t('modelManager.model')}
+        isDisabled={!options.length}
+        isInvalid={!options.length}
+      >
+        <InvSelect
+          value={value}
+          placeholder={placeholder}
+          options={options}
+          onChange={onChange}
+          noOptionsMessage={noOptionsMessage}
+        />
+      </InvControl>
+    </InvTooltip>
   );
 };
 
