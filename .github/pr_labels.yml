@@ -1,0 +1,40 @@
+Root:
+- changed-files:
+  - any-glob-to-any-file: '*'
+
+PythonDeps:
+- changed-files:
+  - any-glob-to-any-file: 'pyproject.toml'
+
+Python:
+- changed-files:
+  - any-glob-to-any-file: 
+    - 'invokeai/**'
+    - '!invokeai/frontend/web/**'
+    - 'tests/**'
+
+Invocations:
+- changed-files:
+  - any-glob-to-any-file: 'invokeai/app/invocations/**'
+
+Backend:
+- changed-files:
+  - any-glob-to-any-file: 'invokeai/backend/**'
+
+Api:
+- changed-files:
+  - any-glob-to-any-file: 'invokeai/app/api/**'
+
+Services:
+- changed-files:
+  - any-glob-to-any-file: 'invokeai/app/services/**'
+
+FrontendDeps:
+- changed-files:
+  - any-glob-to-any-file:
+    - '**/*/package.json'
+    - '**/*/pnpm-lock.yaml'
+
+Frontend:
+- changed-files:
+  - any-glob-to-any-file: 'invokeai/frontend/web/**'
