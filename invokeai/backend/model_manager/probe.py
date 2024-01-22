@@ -20,6 +20,7 @@ from .config import (
     ModelFormat,
     ModelType,
     ModelVariantType,
+    ModelRepoVariant,
     SchedulerPredictionType,
 )
 from .hash import FastModelHash
@@ -154,6 +155,9 @@ class ModelProbe(object):
         fields["format"] = fields.get("format") or probe.get_format()
         fields["original_hash"] = fields.get("original_hash") or hash
         fields["current_hash"] = fields.get("current_hash") or hash
+
+        if format_type == ModelFormat.Diffusers:
+            fields["repo_variant"] = fields.get("repo_variant") or probe.get_repo_variant()
 
         # additional fields needed for main and controlnet models
         if fields["type"] in [ModelType.Main, ModelType.ControlNet] and fields["format"] == ModelFormat.Checkpoint:
@@ -477,6 +481,20 @@ class FolderProbeBase(ProbeBase):
     def get_format(self) -> ModelFormat:
         return ModelFormat("diffusers")
 
+    def get_repo_variant(self) -> ModelRepoVariant:
+        # get all files ending in .bin or .safetensors
+        weight_files = list(self.model_path.glob('**/*.safetensors'))
+        weight_files.extend(list(self.model_path.glob('**/*.bin')))
+        for x in weight_files:
+            if ".fp16" in x.suffixes:
+                return ModelRepoVariant.FP16
+            if "openvino_model" in x.name:
+                return ModelRepoVariant.OPENVINO
+            if "flax_model" in x.name:
+                return ModelRepoVariant.FLAX
+            if x.suffix == ".onnx":
+                return ModelRepoVariant.ONNX
+        return ModelRepoVariant.DEFAULT
 
 class PipelineFolderProbe(FolderProbeBase):
     def get_base_type(self) -> BaseModelType:
@@ -522,6 +540,7 @@ class PipelineFolderProbe(FolderProbeBase):
         except Exception:
             pass
         return ModelVariantType.Normal
+        
 
 
 class VaeFolderProbe(FolderProbeBase):

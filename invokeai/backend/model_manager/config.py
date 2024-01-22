@@ -150,7 +150,7 @@ class _DiffusersConfig(ModelConfigBase):
     """Model config for diffusers-style models."""
 
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
-
+    repo_variant: Optional[ModelRepoVariant] = ModelRepoVariant.DEFAULT
 
 class LoRAConfig(ModelConfigBase):
     """Model config for LoRA/Lycoris models."""
@@ -178,7 +178,6 @@ class ControlNetDiffusersConfig(_DiffusersConfig):
 
     type: Literal[ModelType.ControlNet] = ModelType.ControlNet
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
-
 
 class ControlNetCheckpointConfig(_CheckpointConfig):
     """Model config for ControlNet models (diffusers version)."""
@@ -214,7 +213,6 @@ class MainDiffusersConfig(_DiffusersConfig, _MainConfig):
     type: Literal[ModelType.Main] = ModelType.Main
     prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon
     upcast_attention: bool = False
-
 
 class ONNXSD1Config(_MainConfig):
     """Model config for ONNX format models based on sd-1."""
