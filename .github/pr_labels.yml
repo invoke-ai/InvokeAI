@@ -8,10 +8,13 @@ PythonDeps:
 
 Python:
 - changed-files:
-  - any-glob-to-any-file: 
+  - all-globs-to-any-file: 
     - 'invokeai/**'
     - '!invokeai/frontend/web/**'
-    - 'tests/**'
+
+PythonTests:
+- changed-files:
+  - any-glob-to-any-file: 'tests/**'
 
 CICD:
 - changed-files:
