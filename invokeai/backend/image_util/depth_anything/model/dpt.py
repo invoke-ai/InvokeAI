@@ -22,9 +22,7 @@ def _make_fusion_block(features, use_bn, size=None):
 
 
 class DPTHead(nn.Module):
-    def __init__(
-        self, nclass, in_channels, features=256, use_bn=False, out_channels=[256, 512, 1024, 1024], use_clstoken=False
-    ):
+    def __init__(self, nclass, in_channels, features, out_channels, use_bn=False, use_clstoken=False):
         super(DPTHead, self).__init__()
 
         self.nclass = nclass
@@ -138,19 +136,18 @@ class DPTHead(nn.Module):
 class DPT_DINOv2(nn.Module):
     def __init__(
         self,
+        features,
+        out_channels,
         encoder="vitl",
-        features=256,
-        out_channels=[256, 512, 1024, 1024],
         use_bn=False,
         use_clstoken=False,
-        localhub=True,
     ):
         super(DPT_DINOv2, self).__init__()
 
         assert encoder in ["vits", "vitb", "vitl"]
 
         # # in case the Internet connection is not stable, please load the DINOv2 locally
-        # if localhub:
+        # if use_local:
         #     self.pretrained = torch.hub.load(
         #         torchhub_path / "facebookresearch_dinov2_main",
         #         "dinov2_{:}14".format(encoder),
@@ -170,7 +167,7 @@ class DPT_DINOv2(nn.Module):
 
         dim = self.pretrained.blocks[0].attn.qkv.in_features
 
-        self.depth_head = DPTHead(1, dim, features, use_bn, out_channels=out_channels, use_clstoken=use_clstoken)
+        self.depth_head = DPTHead(1, dim, features, out_channels=out_channels, use_bn=use_bn, use_clstoken=use_clstoken)
 
     def forward(self, x):
         h, w = x.shape[-2:]

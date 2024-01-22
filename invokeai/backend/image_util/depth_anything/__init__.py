@@ -65,13 +65,11 @@ class DepthAnythingDetector:
             self.model_size = model_size
 
             if self.model_size == "small":
-                self.model = DPT_DINOv2(encoder="vits", features=64, out_channels=[48, 96, 192, 384], localhub=True)
+                self.model = DPT_DINOv2(encoder="vits", features=64, out_channels=[48, 96, 192, 384])
             if self.model_size == "base":
-                self.model = DPT_DINOv2(encoder="vitb", features=128, out_channels=[96, 192, 384, 768], localhub=True)
+                self.model = DPT_DINOv2(encoder="vitb", features=128, out_channels=[96, 192, 384, 768])
             if self.model_size == "large":
-                self.model = DPT_DINOv2(
-                    encoder="vitl", features=256, out_channels=[256, 512, 1024, 1024], localhub=True
-                )
+                self.model = DPT_DINOv2(encoder="vitl", features=256, out_channels=[256, 512, 1024, 1024])
 
             self.model.load_state_dict(torch.load(DEPTH_ANYTHING_MODEL_PATH.as_posix(), map_location="cpu"))
             self.model.eval()
