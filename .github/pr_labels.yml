@@ -13,6 +13,22 @@ Python:
     - '!invokeai/frontend/web/**'
     - 'tests/**'
 
+CICD:
+- changed-files:
+  - any-glob-to-any-file: .github/**
+
+Docker:
+- changed-files:
+  - any-glob-to-any-file: docker/**
+
+Installer:
+- changed-files:
+  - any-glob-to-any-file: installer/**
+
+Documentation:
+- changed-files:
+  - any-glob-to-any-file: docs/**
+
 Invocations:
 - changed-files:
   - any-glob-to-any-file: 'invokeai/app/invocations/**'
