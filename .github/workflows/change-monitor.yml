@@ -1,0 +1,32 @@
+name: Trigger Target Workflow
+
+on:
+  pull_request:
+    types:
+      - closed
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Workflow in Another Repository
+        run: |
+          # Set the required variables
+          repo_owner="invoke-ai" 
+          repo_name="InvokeAI"  
+          event_type="invokeai-pr-merge" 
+          service=${{ github.event.inputs.target_service }}"
+          version="${{ github.event.inputs.target_version }}"
+  
+          curl -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.PAT }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/$repo_owner/$repo_name/dispatches \
+            -d "{\"event_type\": \"$event_type\", \"client_payload\": {\"service\": \"$service\", \"version\": \"$version\", \"unit\": false, \"integration\": true}}"
