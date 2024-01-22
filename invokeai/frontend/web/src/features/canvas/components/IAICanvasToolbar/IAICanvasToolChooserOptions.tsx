@@ -101,7 +101,7 @@ const IAICanvasToolChooserOptions = () => {
   );
 
   useHotkeys(
-    ['mod+down'],
+    ['BracketLeft','mod+down'],
     () => {
       if (brushSize - 5 <= 5) {
         dispatch(setBrushSize(Math.max(brushSize - 1, 1)));
@@ -117,7 +117,7 @@ const IAICanvasToolChooserOptions = () => {
   );
 
   useHotkeys(
-    ['mod+up'],
+    ['BracketRight','mod+up'],
     () => {
       dispatch(setBrushSize(Math.min(brushSize + 5, 500)));
     },
