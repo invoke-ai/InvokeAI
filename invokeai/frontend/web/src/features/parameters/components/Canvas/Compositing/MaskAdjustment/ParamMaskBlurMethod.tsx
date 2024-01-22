@@ -7,15 +7,18 @@ import { isParameterMaskBlurMethod } from 'features/parameters/types/parameterSc
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const options: ComboboxOption[] = [
-  { label: 'Box Blur', value: 'box' },
-  { label: 'Gaussian Blur', value: 'gaussian' },
-];
-
 const ParamMaskBlurMethod = () => {
   const maskBlurMethod = useAppSelector((s) => s.generation.maskBlurMethod);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+
+  const options: ComboboxOption[] = useMemo(
+    () => [
+      { label: t('parameters.boxBlur'), value: 'box' },
+      { label: t('parameters.gaussianBlur'), value: 'gaussian' },
+    ],
+    [t]
+  );
 
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {

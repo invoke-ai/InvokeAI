@@ -126,7 +126,7 @@ const GalleryImageGrid = () => {
           loadingText={t('gallery.loading')}
           flexShrink={0}
         >
-          {`Load More (${currentData.ids.length} of ${currentViewTotal})`}
+          {`${t('accessibility.loadMore')} (${currentData.ids.length} of ${currentViewTotal})`}
         </Button>
       </>
     );

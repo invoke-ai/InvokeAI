@@ -75,8 +75,8 @@ const InitialImageDisplay = () => {
         </Text>
         <Spacer />
         <IconButton
-          tooltip="Upload Initial Image"
-          aria-label="Upload Initial Image"
+          tooltip={t('toast.uploadInitialImage')}
+          aria-label={t('toast.uploadInitialImage')}
           icon={<PiUploadSimpleBold />}
           {...getUploadButtonProps()}
         />
@@ -87,15 +87,9 @@ const InitialImageDisplay = () => {
           onClick={handleUseSizeInitialImage}
           isDisabled={!initialImage}
         />
-<<<<<<< HEAD
         <IconButton
-          tooltip="Reset Initial Image"
-          aria-label="Reset Initial Image"
-=======
-        <InvIconButton
           tooltip={t('toast.resetInitialImage')}
           aria-label={t('toast.resetInitialImage')}
->>>>>>> a94e09658 (more strings and translations added)
           icon={<PiArrowCounterClockwiseBold />}
           onClick={handleReset}
           isDisabled={!initialImage}
