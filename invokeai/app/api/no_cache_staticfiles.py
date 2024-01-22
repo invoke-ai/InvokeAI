@@ -11,7 +11,7 @@ class NoCacheStaticFiles(StaticFiles):
     never cache the files.
 
     Static files include the javascript bundles, fonts, locales, and some images. Generated
-    images are not included, as they are service by a router.
+    images are not included, as they are served by a router.
     """
 
     def __init__(self, *args: Any, **kwargs: Any):
