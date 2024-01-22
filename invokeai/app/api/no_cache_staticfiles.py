@@ -10,7 +10,7 @@ class NoCacheStaticFiles(StaticFiles):
     ensuring we *never* cache static files. It modifies the file response headers to strictly
     never cache the files.
 
-    Ttatic files include the javascript bundles, fonts, locales, and some images. Generated
+    Static files include the javascript bundles, fonts, locales, and some images. Generated
     images are not included, as they are service by a router.
     """
 
