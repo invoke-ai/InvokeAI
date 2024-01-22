@@ -75,6 +75,8 @@ from .model import ModelInfo, UNetField, VaeField
 if choose_torch_device() == torch.device("mps"):
     from torch import mps
 
+print("test")
+
 DEFAULT_PRECISION = choose_precision(choose_torch_device())
 
 SAMPLER_NAME_VALUES = Literal[tuple(SCHEDULER_MAP.keys())]

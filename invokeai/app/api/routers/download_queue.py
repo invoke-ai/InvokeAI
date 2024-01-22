@@ -24,6 +24,7 @@ download_queue_router = APIRouter(prefix="/v1/download_queue", tags=["download_q
 )
 async def list_downloads() -> List[DownloadJob]:
     """Get a list of active and inactive jobs."""
+    print("test")
     queue = ApiDependencies.invoker.services.download_queue
     return queue.list_jobs()
 

@@ -20,6 +20,7 @@
   ],
   "scripts": {
     "dev": "concurrently \"vite dev\" \"pnpm run theme:watch\"",
+    "hi": "echo test",
     "dev:host": "concurrently \"vite dev --host\" \"pnpm run theme:watch\"",
     "build": "pnpm run lint && vite build",
     "typegen": "node scripts/typegen.js",

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "InvokeAI"
-description = "An implementation of Stable Diffusion which provides various new features and options to aid the image generation process"
+description = "An test implementation of Stable Diffusion which provides various new features and options to aid the image generation process"
 requires-python = ">=3.10, <3.12"
 readme = { content-type = "text/markdown", file = "README.md" }
 keywords = ["stable-diffusion", "AI"]

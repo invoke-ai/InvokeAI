@@ -23,6 +23,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
         self.__threadLimit = BoundedSemaphore(1)
         self.__invoker = invoker
         self.__stop_event = Event()
+        print("test")
         self.__invoker_thread = Thread(
             name="invoker_processor",
             target=self.__process,

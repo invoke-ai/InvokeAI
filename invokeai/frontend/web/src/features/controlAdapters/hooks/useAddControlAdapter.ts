@@ -16,7 +16,7 @@ export const useAddControlAdapter = (type: ControlAdapterType) => {
     const firstCompatibleModel = models.filter((m) =>
       baseModel ? m.base_model === baseModel : true
     )[0];
-
+    console.log("test")
     if (firstCompatibleModel) {
       return firstCompatibleModel;
     }

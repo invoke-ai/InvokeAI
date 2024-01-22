@@ -113,7 +113,7 @@ class ModelPatcher:
                     for layer_key, layer in lora.layers.items():
                         if not layer_key.startswith(prefix):
                             continue
-
+                        print("test")
                         # TODO(ryand): A non-negligible amount of time is currently spent resolving LoRA keys. This
                         # should be improved in the following ways:
                         # 1. The key mapping could be more-efficiently pre-computed. This would save time every time a
