@@ -12,6 +12,7 @@ import {
   selectGenerationSlice,
 } from 'features/parameters/store/generationSlice';
 import { memo, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 const selectInitialImage = createMemoizedSelector(
@@ -20,6 +21,7 @@ const selectInitialImage = createMemoizedSelector(
 );
 
 const InitialImage = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const initialImage = useAppSelector(selectInitialImage);
   const isConnected = useAppSelector((s) => s.system.isConnected);
@@ -60,9 +62,11 @@ const InitialImage = () => {
       draggableData={draggableData}
       isUploadDisabled={true}
       fitContainer
-      dropLabel="Set as Initial Image"
+      dropLabel={t('toast.setInitialImage')}
       noContentFallback={
-        <IAINoContentFallback label="No initial image selected" />
+        <IAINoContentFallback
+          label={t('parameters.invoke.noInitialImageSelected')}
+        />
       }
       dataTestId="initial-image"
     />
