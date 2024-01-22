@@ -18,7 +18,7 @@ jobs:
         run: |
           # Set the required variables
           repo_owner="invoke-ai" 
-          repo_name="InvokeAI"  
+          repo_name="Invoke"  
           event_type="invokeai-pr-merge" 
           service=${{ github.event.inputs.target_service }}"
           version="${{ github.event.inputs.target_version }}"
