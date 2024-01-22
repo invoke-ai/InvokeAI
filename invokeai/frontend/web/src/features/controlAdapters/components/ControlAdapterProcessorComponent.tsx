@@ -5,6 +5,7 @@ import { memo } from 'react';
 import CannyProcessor from './processors/CannyProcessor';
 import ColorMapProcessor from './processors/ColorMapProcessor';
 import ContentShuffleProcessor from './processors/ContentShuffleProcessor';
+import DepthAnyThingProcessor from './processors/DepthAnyThingProcessor';
 import HedProcessor from './processors/HedProcessor';
 import LineartAnimeProcessor from './processors/LineartAnimeProcessor';
 import LineartProcessor from './processors/LineartProcessor';
@@ -41,6 +42,16 @@ const ControlAdapterProcessorComponent = ({ id }: Props) => {
   if (processorNode.type === 'color_map_image_processor') {
     return (
       <ColorMapProcessor
+        controlNetId={id}
+        processorNode={processorNode}
+        isEnabled={isEnabled}
+      />
+    );
+  }
+
+  if (processorNode.type === 'depth_anything_image_processor') {
+    return (
+      <DepthAnyThingProcessor
         controlNetId={id}
         processorNode={processorNode}
         isEnabled={isEnabled}

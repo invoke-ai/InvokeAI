@@ -83,6 +83,21 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
       f: 256,
     },
   },
+  depth_anything_image_processor: {
+    type: 'depth_anything_image_processor',
+    get label() {
+      return i18n.t('controlnet.depthAnything');
+    },
+    get description() {
+      return i18n.t('controlnet.depthAnythingDescription');
+    },
+    default: {
+      id: 'depth_anything_image_processor',
+      type: 'depth_anything_image_processor',
+      model_size: 'large',
+      offload: false,
+    },
+  },
   hed_image_processor: {
     type: 'hed_image_processor',
     get label() {
