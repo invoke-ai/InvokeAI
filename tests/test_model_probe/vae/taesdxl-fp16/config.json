@@ -1,0 +1,37 @@
+{
+  "_class_name": "AutoencoderTiny",
+  "_diffusers_version": "0.20.0.dev0",
+  "act_fn": "relu",
+  "decoder_block_out_channels": [
+    64,
+    64,
+    64,
+    64
+  ],
+  "encoder_block_out_channels": [
+    64,
+    64,
+    64,
+    64
+  ],
+  "force_upcast": false,
+  "in_channels": 3,
+  "latent_channels": 4,
+  "latent_magnitude": 3,
+  "latent_shift": 0.5,
+  "num_decoder_blocks": [
+    3,
+    3,
+    3,
+    1
+  ],
+  "num_encoder_blocks": [
+    1,
+    3,
+    3,
+    3
+  ],
+  "out_channels": 3,
+  "scaling_factor": 1.0,
+  "upsampling_scaling_factor": 2
+}
