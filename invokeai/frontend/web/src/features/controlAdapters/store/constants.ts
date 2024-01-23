@@ -260,7 +260,7 @@ export const CONTROLNET_MODEL_DEFAULT_PROCESSORS: {
 } = {
   canny: 'canny_image_processor',
   mlsd: 'mlsd_image_processor',
-  depth: 'midas_depth_image_processor',
+  depth: 'depth_anything_image_processor',
   bae: 'normalbae_image_processor',
   sketch: 'pidi_image_processor',
   scribble: 'lineart_image_processor',
