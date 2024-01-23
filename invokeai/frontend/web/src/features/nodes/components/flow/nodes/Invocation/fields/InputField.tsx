@@ -109,28 +109,28 @@ const InputField = ({ nodeId, fieldName }: Props) => {
 
   return (
     <InputFieldWrapper shouldDim={shouldDim}>
-      <FieldContextMenu nodeId={nodeId} fieldName={fieldName} kind="input">
-        {(ref) => (
-          <FormControl
-            ref={ref}
-            isInvalid={isMissingInput}
-            isDisabled={isConnected}
-            orientation="vertical"
-            px={2}
-          >
-            <Flex flexDir="column" w="full" gap={1}>
+      <FormControl
+        isInvalid={isMissingInput}
+        isDisabled={isConnected}
+        orientation="vertical"
+        px={2}
+      >
+        <Flex flexDir="column" w="full" gap={1}>
+          <FieldContextMenu nodeId={nodeId} fieldName={fieldName} kind="input">
+            {(ref) => (
               <EditableFieldTitle
+                ref={ref}
                 nodeId={nodeId}
                 fieldName={fieldName}
                 kind="input"
                 isMissingInput={isMissingInput}
                 withTooltip
               />
-              <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
-            </Flex>
-          </FormControl>
-        )}
-      </FieldContextMenu>
+            )}
+          </FieldContextMenu>
+          <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
+        </Flex>
+      </FormControl>
 
       {fieldTemplate.input !== 'direct' && (
         <FieldHandle
