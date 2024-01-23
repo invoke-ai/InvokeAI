@@ -13,6 +13,8 @@ import {
   InputRightElement,
   Spacer,
 } from '@invoke-ai/ui';
+import { useStore } from '@nanostores/react';
+import { $projectId } from 'app/store/nanostores/projectId';
 import {
   IAINoContentFallback,
   IAINoContentFallbackWithSpinner,
@@ -62,6 +64,7 @@ const WorkflowLibraryList = () => {
   const [order_by, setOrderBy] = useState<WorkflowRecordOrderBy>('opened_at');
   const [direction, setDirection] = useState<SQLiteDirection>('ASC');
   const [debouncedQuery] = useDebounce(query, 500);
+  const projectId = useStore($projectId);
 
   const queryArg = useMemo<Parameters<typeof useListWorkflowsQuery>[0]>(() => {
     if (category === 'user') {
@@ -142,13 +145,8 @@ const WorkflowLibraryList = () => {
     []
   );
 
-  const handleSetUserCategory = useCallback(() => {
-    setCategory('user');
-    setPage(0);
-  }, []);
-
-  const handleSetDefaultCategory = useCallback(() => {
-    setCategory('default');
+  const handleSetCategory = useCallback((category: WorkflowCategory) => {
+    setCategory(category);
     setPage(0);
   }, []);
 
@@ -158,21 +156,31 @@ const WorkflowLibraryList = () => {
         <ButtonGroup>
           <Button
             variant={category === 'user' ? undefined : 'ghost'}
-            onClick={handleSetUserCategory}
+            onClick={handleSetCategory.bind(null, 'user')}
             isChecked={category === 'user'}
           >
             {t('workflows.userWorkflows')}
           </Button>
-          <Button
-            variant={category === 'default' ? undefined : 'ghost'}
-            onClick={handleSetDefaultCategory}
-            isChecked={category === 'default'}
-          >
-            {t('workflows.defaultWorkflows')}
-          </Button>
+          {projectId ? (
+            <Button
+              variant={category === 'project' ? undefined : 'ghost'}
+              onClick={handleSetCategory.bind(null, 'project')}
+              isChecked={category === 'project'}
+            >
+              {t('workflows.projectWorkflows')}
+            </Button>
+          ) : (
+            <Button
+              variant={category === 'default' ? undefined : 'ghost'}
+              onClick={handleSetCategory.bind(null, 'default')}
+              isChecked={category === 'default'}
+            >
+              {t('workflows.defaultWorkflows')}
+            </Button>
+          )}
         </ButtonGroup>
         <Spacer />
-        {category === 'user' && (
+        {category !== 'default' && (
           <>
             <FormControl isDisabled={isFetching} w={64} minW={56}>
               <FormLabel>{t('common.orderBy')}</FormLabel>
@@ -228,7 +236,7 @@ const WorkflowLibraryList = () => {
           </Flex>
         </ScrollableContent>
       ) : (
-        <IAINoContentFallback label={t('workflows.noUserWorkflows')} />
+        <IAINoContentFallback label={t('workflows.noWorkflows')} />
       )}
       <Divider />
       {data && (
