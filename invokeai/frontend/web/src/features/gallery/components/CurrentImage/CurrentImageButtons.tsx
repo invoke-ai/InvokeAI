@@ -135,7 +135,7 @@ const CurrentImageButtons = () => {
     recallAllParameters({
       ...metadata,
       seed: undefined,
-    })
+    });
   }, [metadata, recallAllParameters]);
 
   useHotkeys('r', handleRemixImage, [metadata]);
