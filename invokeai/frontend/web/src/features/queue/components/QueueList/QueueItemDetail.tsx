@@ -6,7 +6,6 @@ import {
   Spinner,
   Text,
 } from '@invoke-ai/ui';
-import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import { useCancelBatch } from 'features/queue/hooks/useCancelBatch';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
@@ -127,9 +126,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
         justifyContent="center"
       >
         {queueItem ? (
-          <ScrollableContent>
-            <DataViewer label="Queue Item" data={queueItem} />
-          </ScrollableContent>
+          <DataViewer label="Queue Item" data={queueItem} />
         ) : (
           <Spinner opacity={0.5} />
         )}
