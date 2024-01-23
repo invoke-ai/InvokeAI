@@ -65,7 +65,7 @@ export const zModelType = z.enum([
   'controlnet',
   'embedding',
 ]);
-export const zModelName = z.string().trim().min(1);
+export const zModelName = z.string().min(3);
 export const zModelIdentifier = z.object({
   model_name: zModelName,
   base_model: zBaseModel,
