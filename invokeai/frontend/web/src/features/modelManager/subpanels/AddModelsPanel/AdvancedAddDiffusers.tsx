@@ -122,13 +122,10 @@ const AdvancedAddDiffusers = (props: AdvancedAddDiffusersProps) => {
             <FormErrorMessage>{errors.model_name?.message}</FormErrorMessage>
           )}
         </FormControl>
-        <FormControl>
-          <FormLabel>{t('modelManager.baseModel')}</FormLabel>
-          <BaseModelSelect<DiffusersModelConfig>
-            control={control}
-            name="base_model"
-          />
-        </FormControl>
+        <BaseModelSelect<DiffusersModelConfig>
+          control={control}
+          name="base_model"
+        />
         <FormControl isInvalid={Boolean(errors.path)}>
           <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
           <Input
@@ -137,7 +134,7 @@ const AdvancedAddDiffusers = (props: AdvancedAddDiffusersProps) => {
                 value.trim().length > 0 || 'Must provide a path',
               onBlur,
             })}
-          />{' '}
+          />
           {errors.path?.message && (
             <FormErrorMessage>{errors.path?.message}</FormErrorMessage>
           )}
