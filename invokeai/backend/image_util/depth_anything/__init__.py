@@ -24,11 +24,11 @@ DEPTH_ANYTHING_MODELS = {
     },
     "base": {
         "url": "https://huggingface.co/spaces/LiheYoung/Depth-Anything/resolve/main/checkpoints/depth_anything_vitb14.pth?download=true",
-        "local": "any/annotators/depth_anything/depth_anything/depth_anything_vitb14.pth",
+        "local": "any/annotators/depth_anything/depth_anything_vitb14.pth",
     },
     "small": {
         "url": "https://huggingface.co/spaces/LiheYoung/Depth-Anything/resolve/main/checkpoints/depth_anything_vits14.pth?download=true",
-        "local": "any/annotators/depth_anything/depth_anything/depth_anything_vits14.pth",
+        "local": "any/annotators/depth_anything/depth_anything_vits14.pth",
     },
 }
 
