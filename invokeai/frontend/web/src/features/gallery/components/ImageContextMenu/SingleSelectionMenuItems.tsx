@@ -197,7 +197,9 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         {t('nodes.loadWorkflow')}
       </MenuItem>
       <MenuItem
-        icon={isLoadingMetadata ? <SpinnerIcon /> : <PiArrowsCounterClockwiseBold />}
+        icon={
+          isLoadingMetadata ? <SpinnerIcon /> : <PiArrowsCounterClockwiseBold />
+        }
         onClickCapture={handleRemixImage}
         isDisabled={
           isLoadingMetadata ||
