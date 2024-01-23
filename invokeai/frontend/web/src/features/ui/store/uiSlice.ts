@@ -10,7 +10,6 @@ export const initialUIState: UIState = {
   _version: 1,
   activeTab: 'txt2img',
   shouldShowImageDetails: false,
-  shouldShowExistingModelsInSearch: false,
   shouldHidePreview: false,
   shouldShowProgressInViewer: true,
   panels: {},
@@ -28,12 +27,6 @@ export const uiSlice = createSlice({
     },
     setShouldHidePreview: (state, action: PayloadAction<boolean>) => {
       state.shouldHidePreview = action.payload;
-    },
-    setShouldShowExistingModelsInSearch: (
-      state,
-      action: PayloadAction<boolean>
-    ) => {
-      state.shouldShowExistingModelsInSearch = action.payload;
     },
     setShouldShowProgressInViewer: (state, action: PayloadAction<boolean>) => {
       state.shouldShowProgressInViewer = action.payload;
@@ -55,7 +48,6 @@ export const uiSlice = createSlice({
 export const {
   setActiveTab,
   setShouldShowImageDetails,
-  setShouldShowExistingModelsInSearch,
   setShouldHidePreview,
   setShouldShowProgressInViewer,
   panelsChanged,
