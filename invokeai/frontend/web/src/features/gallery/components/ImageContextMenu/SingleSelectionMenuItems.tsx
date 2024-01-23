@@ -24,6 +24,7 @@ import { memo, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
+  PiArrowsCounterClockwiseBold,
   PiAsteriskBold,
   PiCopyBold,
   PiDownloadSimpleBold,
@@ -127,6 +128,14 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     recallAllParameters(metadata);
   }, [metadata, recallAllParameters]);
 
+  const handleRemixImage = useCallback(() => {
+    // Recalls all metadata parameters except seed
+    recallAllParameters({
+      ...metadata,
+      seed: undefined,
+    });
+  }, [metadata, recallAllParameters]);
+
   const handleChangeBoard = useCallback(() => {
     dispatch(imagesToChangeSelected([imageDTO]));
     dispatch(isModalOpenChanged(true));
@@ -186,6 +195,17 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         isDisabled={!imageDTO.has_workflow}
       >
         {t('nodes.loadWorkflow')}
+      </MenuItem>
+      <MenuItem
+        icon={isLoadingMetadata ? <SpinnerIcon /> : <PiArrowsCounterClockwiseBold />}
+        onClickCapture={handleRemixImage}
+        isDisabled={
+          isLoadingMetadata ||
+          (metadata?.positive_prompt === undefined &&
+            metadata?.negative_prompt === undefined)
+        }
+      >
+        {t('parameters.remixImage')}
       </MenuItem>
       <MenuItem
         icon={isLoadingMetadata ? <SpinnerIcon /> : <PiQuotesBold />}

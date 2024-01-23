@@ -32,6 +32,7 @@ import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
+  PiArrowsCounterClockwiseBold,
   PiAsteriskBold,
   PiDotsThreeOutlineFill,
   PiFlowArrowBold,
@@ -128,6 +129,16 @@ const CurrentImageButtons = () => {
   ]);
 
   useHotkeys('p', handleUsePrompt, [metadata]);
+
+  const handleRemixImage = useCallback(() => {
+    // Recalls all metadata parameters except seed
+    recallAllParameters({
+      ...metadata,
+      seed: undefined,
+    })
+  }, [metadata, recallAllParameters]);
+
+  useHotkeys('r', handleRemixImage, [metadata]);
 
   const handleUseSize = useCallback(() => {
     recallWidthAndHeight(metadata?.width, metadata?.height);
@@ -230,6 +241,14 @@ const CurrentImageButtons = () => {
             isDisabled={!imageDTO?.has_workflow}
             onClick={handleLoadWorkflow}
             isLoading={getAndLoadEmbeddedWorkflowResult.isLoading}
+          />
+          <IconButton
+            isLoading={isLoadingMetadata}
+            icon={<PiArrowsCounterClockwiseBold />}
+            tooltip={`${t('parameters.remixImage')} (R)`}
+            aria-label={`${t('parameters.remixImage')} (R)`}
+            isDisabled={!metadata?.positive_prompt}
+            onClick={handleRemixImage}
           />
           <IconButton
             isLoading={isLoadingMetadata}

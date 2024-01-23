@@ -1216,6 +1216,7 @@
         "useCpuNoise": "Use CPU Noise",
         "cpuNoise": "CPU Noise",
         "gpuNoise": "GPU Noise",
+        "remixImage": "Remix Image",
         "useInitImg": "Use Initial Image",
         "usePrompt": "Use Prompt",
         "useSeed": "Use Seed",
