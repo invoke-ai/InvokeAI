@@ -1,5 +1,4 @@
-import { ExternalLinkIcon } from '@chakra-ui/icons';
-import { Flex, IconButton, Link, Text, Tooltip } from '@invoke-ai/ui';
+import { ExternalLink, Flex, IconButton, Text, Tooltip } from '@invoke-ai/ui';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
@@ -67,9 +66,7 @@ const ImageMetadataItem = ({
           {label}:
         </Text>
         {isLink ? (
-          <Link href={value.toString()} isExternal wordBreak="break-all">
-            {value.toString()} <ExternalLinkIcon mx="2px" />
-          </Link>
+          <ExternalLink href={value.toString()} label={value.toString()} />
         ) : (
           <Text overflowY="scroll" wordBreak="break-all">
             {value.toString()}

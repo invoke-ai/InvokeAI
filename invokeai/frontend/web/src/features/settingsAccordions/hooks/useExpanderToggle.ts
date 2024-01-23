@@ -1,9 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  expanderStateChanged,
-  selectUiSlice,
-} from 'features/ui/store/uiSlice';
+import { expanderStateChanged, selectUiSlice } from 'features/ui/store/uiSlice';
 import { useCallback, useMemo } from 'react';
 
 type UseExpanderToggleArg = {
@@ -14,7 +11,11 @@ type UseExpanderToggleArg = {
 export const useExpanderToggle = (arg: UseExpanderToggleArg) => {
   const dispatch = useAppDispatch();
   const selectIsOpen = useMemo(
-    () => createSelector(selectUiSlice, (ui) => ui.expanders[arg.id] ?? arg.defaultIsOpen),
+    () =>
+      createSelector(
+        selectUiSlice,
+        (ui) => ui.expanders[arg.id] ?? arg.defaultIsOpen
+      ),
     [arg]
   );
   const isOpen = useAppSelector(selectIsOpen);
