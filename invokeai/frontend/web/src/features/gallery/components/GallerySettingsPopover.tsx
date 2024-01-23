@@ -1,8 +1,10 @@
+import type { FormLabelProps } from '@invoke-ai/ui';
 import {
   Checkbox,
   CompositeSlider,
   Flex,
   FormControl,
+  FormControlGroup,
   FormLabel,
   IconButton,
   Popover,
@@ -23,6 +25,10 @@ import { useTranslation } from 'react-i18next';
 import { RiSettings4Fill } from 'react-icons/ri';
 
 import BoardAutoAddSelect from './Boards/BoardAutoAddSelect';
+
+const formLabelProps: FormLabelProps = {
+  flexGrow: 1,
+};
 
 const GallerySettingsPopover = () => {
   const dispatch = useAppDispatch();
@@ -78,20 +84,22 @@ const GallerySettingsPopover = () => {
                 defaultValue={90}
               />
             </FormControl>
-            <FormControl>
-              <FormLabel>{t('gallery.autoSwitchNewImages')}</FormLabel>
-              <Switch
-                isChecked={shouldAutoSwitch}
-                onChange={handleChangeAutoSwitch}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>{t('gallery.autoAssignBoardOnClick')}</FormLabel>
-              <Checkbox
-                isChecked={autoAssignBoardOnClick}
-                onChange={handleChangeAutoAssignBoardOnClick}
-              />
-            </FormControl>
+            <FormControlGroup formLabelProps={formLabelProps}>
+              <FormControl>
+                <FormLabel>{t('gallery.autoSwitchNewImages')}</FormLabel>
+                <Switch
+                  isChecked={shouldAutoSwitch}
+                  onChange={handleChangeAutoSwitch}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('gallery.autoAssignBoardOnClick')}</FormLabel>
+                <Checkbox
+                  isChecked={autoAssignBoardOnClick}
+                  onChange={handleChangeAutoAssignBoardOnClick}
+                />
+              </FormControl>
+            </FormControlGroup>
             <BoardAutoAddSelect />
           </Flex>
         </PopoverBody>
