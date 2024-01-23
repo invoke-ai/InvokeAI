@@ -34,7 +34,7 @@ import {
   modelSelected,
 } from 'features/parameters/store/actions';
 import {
-  heightChanged,
+  heightRecalled,
   selectGenerationSlice,
   setCfgRescaleMultiplier,
   setCfgScale,
@@ -45,7 +45,7 @@ import {
   setSeed,
   setSteps,
   vaeSelected,
-  widthChanged,
+  widthRecalled,
 } from 'features/parameters/store/generationSlice';
 import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import {
@@ -373,7 +373,7 @@ export const useRecallParameters = () => {
         parameterNotSetToast();
         return;
       }
-      dispatch(widthChanged(width));
+      dispatch(widthRecalled(width));
       parameterSetToast();
     },
     [dispatch, parameterSetToast, parameterNotSetToast]
@@ -388,7 +388,7 @@ export const useRecallParameters = () => {
         parameterNotSetToast();
         return;
       }
-      dispatch(heightChanged(height));
+      dispatch(heightRecalled(height));
       parameterSetToast();
     },
     [dispatch, parameterSetToast, parameterNotSetToast]
@@ -407,8 +407,8 @@ export const useRecallParameters = () => {
         allParameterNotSetToast();
         return;
       }
-      dispatch(heightChanged(height));
-      dispatch(widthChanged(width));
+      dispatch(heightRecalled(height));
+      dispatch(widthRecalled(width));
       allParameterSetToast();
     },
     [dispatch, allParameterSetToast, allParameterNotSetToast]
@@ -893,11 +893,11 @@ export const useRecallParameters = () => {
       }
 
       if (isParameterWidth(width)) {
-        dispatch(widthChanged(width));
+        dispatch(widthRecalled(width));
       }
 
       if (isParameterHeight(height)) {
-        dispatch(heightChanged(height));
+        dispatch(heightRecalled(height));
       }
 
       if (isParameterStrength(strength)) {
