@@ -230,6 +230,18 @@ export const generationSlice = createSlice({
     heightChanged: (state, action: PayloadAction<number>) => {
       state.height = action.payload;
     },
+    widthRecalled: (state, action: PayloadAction<number>) => {
+      state.width = action.payload;
+      state.aspectRatio.value = action.payload / state.height;
+      state.aspectRatio.id = 'Free';
+      state.aspectRatio.isLocked = false;
+    },
+    heightRecalled: (state, action: PayloadAction<number>) => {
+      state.height = action.payload;
+      state.aspectRatio.value = state.width / action.payload;
+      state.aspectRatio.id = 'Free';
+      state.aspectRatio.isLocked = false;
+    },
     aspectRatioChanged: (state, action: PayloadAction<AspectRatioState>) => {
       state.aspectRatio = action.payload;
     },
@@ -306,6 +318,8 @@ export const {
   aspectRatioChanged,
   widthChanged,
   heightChanged,
+  widthRecalled,
+  heightRecalled,
 } = generationSlice.actions;
 
 export const { selectOptimalDimension } = generationSlice.selectors;
