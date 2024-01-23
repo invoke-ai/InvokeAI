@@ -131,6 +131,7 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
           variant="ghost"
           icon={
             <ChevronUpIcon
+              boxSize={6}
               transform={isExpanded ? 'rotate(0deg)' : 'rotate(180deg)'}
               transitionProperty="common"
               transitionDuration="normal"
