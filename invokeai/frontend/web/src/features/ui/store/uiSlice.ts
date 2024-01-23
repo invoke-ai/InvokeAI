@@ -13,6 +13,8 @@ export const initialUIState: UIState = {
   shouldHidePreview: false,
   shouldShowProgressInViewer: true,
   panels: {},
+  accordions: {},
+  expanders: {},
 };
 
 export const uiSlice = createSlice({
@@ -37,6 +39,20 @@ export const uiSlice = createSlice({
     ) => {
       state.panels[action.payload.name] = action.payload.value;
     },
+    accordionStateChanged: (
+      state,
+      action: PayloadAction<{ id: string; isOpen: boolean }>
+    ) => {
+      const { id, isOpen } = action.payload; 
+      state.accordions[id] = isOpen;
+    },
+    expanderStateChanged: (
+      state,
+      action: PayloadAction<{ id: string; isOpen: boolean }>
+    ) => {
+      const { id, isOpen } = action.payload;
+      state.expanders[id] = isOpen;
+    },
   },
   extraReducers(builder) {
     builder.addCase(initialImageChanged, (state) => {
@@ -51,6 +67,8 @@ export const {
   setShouldHidePreview,
   setShouldShowProgressInViewer,
   panelsChanged,
+  accordionStateChanged,
+  expanderStateChanged,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;
