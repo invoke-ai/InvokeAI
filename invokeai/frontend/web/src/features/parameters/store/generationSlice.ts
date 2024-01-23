@@ -175,8 +175,15 @@ export const generationSlice = createSlice({
         }
 
         // Clamp ClipSkip Based On Selected Model
-        const { maxClip } = CLIP_SKIP_MAP[newModel.base_model];
-        state.clipSkip = clamp(state.clipSkip, 0, maxClip);
+        // TODO(psyche): remove this special handling when https://github.com/invoke-ai/InvokeAI/issues/4583 is resolved
+        // WIP PR here: https://github.com/invoke-ai/InvokeAI/pull/4624
+        if (newModel.base_model === 'sdxl') {
+          // We don't support clip skip for SDXL yet - it's not in the graphs
+          state.clipSkip = 0;
+        } else {
+          const { maxClip } = CLIP_SKIP_MAP[newModel.base_model];
+          state.clipSkip = clamp(state.clipSkip, 0, maxClip);
+        }
 
         if (action.meta.previousModel?.base_model === newModel.base_model) {
           // The base model hasn't changed, we don't need to optimize the size
