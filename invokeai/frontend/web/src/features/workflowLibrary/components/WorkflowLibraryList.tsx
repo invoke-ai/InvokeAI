@@ -1,4 +1,3 @@
-import { CloseIcon } from '@chakra-ui/icons';
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
 import {
   Button,
@@ -25,6 +24,7 @@ import WorkflowLibraryPagination from 'features/workflowLibrary/components/Workf
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiXBold } from 'react-icons/pi';
 import { useListWorkflowsQuery } from 'services/api/endpoints/workflows';
 import type {
   SQLiteDirection,
@@ -202,14 +202,13 @@ const WorkflowLibraryList = () => {
             minW={64}
           />
           {query.trim().length && (
-            <InputRightElement>
+            <InputRightElement h="full" pe={2}>
               <IconButton
                 onClick={resetFilterText}
-                size="xs"
-                variant="ghost"
+                size="sm"
+                variant="link"
                 aria-label={t('workflows.clearWorkflowSearchFilter')}
-                opacity={0.5}
-                icon={<CloseIcon boxSize={2} />}
+                icon={<PiXBold />}
               />
             </InputRightElement>
           )}

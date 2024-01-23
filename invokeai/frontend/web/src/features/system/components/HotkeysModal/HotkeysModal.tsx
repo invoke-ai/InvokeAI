@@ -1,4 +1,3 @@
-import { CloseIcon } from '@chakra-ui/icons';
 import {
   Divider,
   Flex,
@@ -30,6 +29,7 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiXBold } from 'react-icons/pi';
 
 import HotkeyListItem from './HotkeyListItem';
 
@@ -103,7 +103,8 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
                     size="sm"
                     variant="ghost"
                     aria-label={t('hotkeys.clearSearch')}
-                    icon={<CloseIcon boxSize={3} />}
+                    boxSize={4}
+                    icon={<PiXBold />}
                   />
                 </InputRightElement>
               )}
