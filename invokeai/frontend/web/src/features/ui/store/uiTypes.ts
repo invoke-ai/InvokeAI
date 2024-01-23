@@ -14,10 +14,6 @@ export interface UIState {
    */
   shouldShowImageDetails: boolean;
   /**
-   * Whether or not to hide the preview.
-   */
-  shouldHidePreview: boolean;
-  /**
    * Whether or not to show progress in the viewer.
    */
   shouldShowProgressInViewer: boolean;

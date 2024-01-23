@@ -10,7 +10,6 @@ export const initialUIState: UIState = {
   _version: 1,
   activeTab: 'txt2img',
   shouldShowImageDetails: false,
-  shouldHidePreview: false,
   shouldShowProgressInViewer: true,
   panels: {},
   accordions: {},
@@ -27,9 +26,6 @@ export const uiSlice = createSlice({
     setShouldShowImageDetails: (state, action: PayloadAction<boolean>) => {
       state.shouldShowImageDetails = action.payload;
     },
-    setShouldHidePreview: (state, action: PayloadAction<boolean>) => {
-      state.shouldHidePreview = action.payload;
-    },
     setShouldShowProgressInViewer: (state, action: PayloadAction<boolean>) => {
       state.shouldShowProgressInViewer = action.payload;
     },
@@ -43,7 +39,7 @@ export const uiSlice = createSlice({
       state,
       action: PayloadAction<{ id: string; isOpen: boolean }>
     ) => {
-      const { id, isOpen } = action.payload; 
+      const { id, isOpen } = action.payload;
       state.accordions[id] = isOpen;
     },
     expanderStateChanged: (
@@ -64,7 +60,6 @@ export const uiSlice = createSlice({
 export const {
   setActiveTab,
   setShouldShowImageDetails,
-  setShouldHidePreview,
   setShouldShowProgressInViewer,
   panelsChanged,
   accordionStateChanged,
