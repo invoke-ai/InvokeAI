@@ -29,8 +29,8 @@ dependencies:
     specifier: ^5.0.16
     version: 5.0.16
   '@invoke-ai/ui':
-    specifier: 0.0.12
-    version: 0.0.12(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@fontsource-variable/inter@5.0.16)(@internationalized/date@3.5.1)(@types/react@18.2.48)(i18next@23.7.16)(react-dom@18.2.0)(react@18.2.0)
+    specifier: 0.0.13
+    version: 0.0.13(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@fontsource-variable/inter@5.0.16)(@internationalized/date@3.5.1)(@types/react@18.2.48)(i18next@23.7.16)(react-dom@18.2.0)(react@18.2.0)
   '@mantine/form':
     specifier: 6.0.21
     version: 6.0.21(react@18.2.0)
@@ -3759,8 +3759,8 @@ packages:
       '@swc/helpers': 0.5.3
     dev: false
 
-  /@invoke-ai/ui@0.0.12(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@fontsource-variable/inter@5.0.16)(@internationalized/date@3.5.1)(@types/react@18.2.48)(i18next@23.7.16)(react-dom@18.2.0)(react@18.2.0):
-    resolution: {integrity: sha512-G0iPzGx1Nu7mHOZtwUYtqNWAqo2KnYGvs883w4WJwUpoCEbnaZd9Pi876UvOh9aNyjO93t/5ctIffkcYlDKGNg==}
+  /@invoke-ai/ui@0.0.13(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@fontsource-variable/inter@5.0.16)(@internationalized/date@3.5.1)(@types/react@18.2.48)(i18next@23.7.16)(react-dom@18.2.0)(react@18.2.0):
+    resolution: {integrity: sha512-X4Txij2dMnzPUXTPhorBHezByJQ/ceyHxCM+zZ0gpFsSyXUieOFWjaSu+dAVpghS9y0dxFQGayHvNyX6VsX/PA==}
     peerDependencies:
       '@fontsource-variable/inter': ^5.0.16
       react: ^18.2.0
@@ -12063,7 +12063,7 @@ packages:
     peerDependencies:
       react: ^15.3.0 || ^16.0.0 || ^17.0.0 || ^18.0.0
     dependencies:
-      '@babel/runtime': 7.23.7
+      '@babel/runtime': 7.23.8
       react: 18.2.0
     dev: false
 
@@ -12158,7 +12158,7 @@ packages:
       '@types/react':
         optional: true
     dependencies:
-      '@babel/runtime': 7.23.7
+      '@babel/runtime': 7.23.8
       '@types/react': 18.2.48
       focus-lock: 1.0.0
       prop-types: 15.8.1
