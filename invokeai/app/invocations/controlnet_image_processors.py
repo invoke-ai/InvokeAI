@@ -619,7 +619,7 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
     """Generates a depth map based on the Depth Anything algorithm"""
 
     model_size: DEPTH_ANYTHING_MODEL_SIZES = InputField(
-        default="large", description="The size of the depth model to use"
+        default="small", description="The size of the depth model to use"
     )
     offload: bool = InputField(default=False)
 
