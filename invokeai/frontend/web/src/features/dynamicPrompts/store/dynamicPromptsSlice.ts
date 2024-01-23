@@ -47,6 +47,7 @@ export const dynamicPromptsSlice = createSlice({
     },
     promptsChanged: (state, action: PayloadAction<string[]>) => {
       state.prompts = action.payload;
+      state.isLoading = false;
     },
     parsingErrorChanged: (
       state,
