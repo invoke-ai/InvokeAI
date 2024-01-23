@@ -621,6 +621,7 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
     model_size: DEPTH_ANYTHING_MODEL_SIZES = InputField(
         default="small", description="The size of the depth model to use"
     )
+    resolution: int = InputField(default=512, ge=64, multiple_of=64, description=FieldDescriptions.image_res)
     offload: bool = InputField(default=False)
 
     def run_processor(self, image):
@@ -630,5 +631,5 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
         if image.mode == "RGBA":
             image = image.convert("RGB")
 
-        processed_image = depth_anything_detector(image=image, offload=self.offload)
+        processed_image = depth_anything_detector(image=image, resolution=self.resolution, offload=self.offload)
         return processed_image

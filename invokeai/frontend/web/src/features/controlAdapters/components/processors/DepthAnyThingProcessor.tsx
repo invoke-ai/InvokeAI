@@ -1,5 +1,11 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
+import {
+  Combobox,
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type {
@@ -23,7 +29,7 @@ type Props = {
 
 const DepthAnythingProcessor = (props: Props) => {
   const { controlNetId, processorNode, isEnabled } = props;
-  const { model_size } = processorNode;
+  const { model_size, resolution } = processorNode;
   const processorChanged = useProcessorNodeChanged();
 
   const { t } = useTranslation();
@@ -54,6 +60,17 @@ const DepthAnythingProcessor = (props: Props) => {
     [options, model_size]
   );
 
+  const handleResolutionChange = useCallback(
+    (v: number) => {
+      processorChanged(controlNetId, { resolution: v });
+    },
+    [controlNetId, processorChanged]
+  );
+
+  const handleResolutionDefaultChange = useCallback(() => {
+    processorChanged(controlNetId, { resolution: 512 });
+  }, [controlNetId, processorChanged]);
+
   return (
     <ProcessorWrapper>
       <FormControl isDisabled={!isEnabled}>
@@ -63,6 +80,27 @@ const DepthAnythingProcessor = (props: Props) => {
           defaultInputValue={DEFAULTS.model_size}
           options={options}
           onChange={handleModelSizeChange}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.imageResolution')}</FormLabel>
+        <CompositeSlider
+          value={resolution}
+          onChange={handleResolutionChange}
+          defaultValue={DEFAULTS.resolution}
+          min={64}
+          max={4096}
+          step={64}
+          marks
+          onReset={handleResolutionDefaultChange}
+        />
+        <CompositeNumberInput
+          value={resolution}
+          onChange={handleResolutionChange}
+          defaultValue={DEFAULTS.resolution}
+          min={64}
+          max={4096}
+          step={64}
         />
       </FormControl>
     </ProcessorWrapper>

@@ -80,7 +80,7 @@ export type RequiredContentShuffleImageProcessorInvocation = O.Required<
  */
 export type RequiredDepthAnythingImageProcessorInvocation = O.Required<
   DepthAnythingImageProcessorInvocation,
-  'type' | 'model_size' | 'offload'
+  'type' | 'model_size' | 'resolution' | 'offload'
 >;
 
 export const zDepthAnythingModelSize = z.enum(['large', 'base', 'small']);
