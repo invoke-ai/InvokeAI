@@ -1,11 +1,10 @@
-import { ExternalLinkIcon } from '@chakra-ui/icons';
 import {
+  ExternalLink,
   Flex,
   Grid,
   GridItem,
   Heading,
   Image,
-  Link,
   Modal,
   ModalBody,
   ModalCloseButton,
@@ -103,23 +102,21 @@ const AboutModal = ({ children }: AboutModalProps) => {
                   {appVersion && <Text>{`v${appVersion?.version}`}</Text>}
                   <Grid templateColumns="repeat(2, 1fr)" gap="3">
                     <GridItem>
-                      <Link fontSize="sm" href={githubLink} isExternal>
-                        {t('common.githubLabel')}
-                        <ExternalLinkIcon mx="2px" />
-                      </Link>
+                      <ExternalLink
+                        href={githubLink}
+                        label={t('common.githubLabel')}
+                      />
                     </GridItem>
                     <GridItem>
-                      <Link fontSize="sm" href={discordLink} isExternal>
-                        {t('common.discordLabel')}
-                        <ExternalLinkIcon mx="2px" />
-                      </Link>
+                      <ExternalLink
+                        href={discordLink}
+                        label={t('common.discordLabel')}
+                      />
                     </GridItem>
                   </Grid>
                   <Heading fontSize="large">{t('common.aboutHeading')}</Heading>
                   <Text fontSize="sm">{t('common.aboutDesc')}</Text>
-                  <Link isExternal href={websiteLink} fontSize="sm">
-                    {websiteLink} <ExternalLinkIcon mx="2px" />
-                  </Link>
+                  <ExternalLink href={websiteLink} label={websiteLink} />
                 </Flex>
               </GridItem>
             </Grid>

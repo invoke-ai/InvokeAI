@@ -1,4 +1,3 @@
-import { CloseIcon } from '@chakra-ui/icons';
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
 import {
   Button,
@@ -14,6 +13,8 @@ import {
   InputRightElement,
   Spacer,
 } from '@invoke-ai/ui';
+import { useStore } from '@nanostores/react';
+import { $projectId } from 'app/store/nanostores/projectId';
 import {
   IAINoContentFallback,
   IAINoContentFallbackWithSpinner,
@@ -25,6 +26,7 @@ import WorkflowLibraryPagination from 'features/workflowLibrary/components/Workf
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiXBold } from 'react-icons/pi';
 import { useListWorkflowsQuery } from 'services/api/endpoints/workflows';
 import type {
   SQLiteDirection,
@@ -62,6 +64,7 @@ const WorkflowLibraryList = () => {
   const [order_by, setOrderBy] = useState<WorkflowRecordOrderBy>('opened_at');
   const [direction, setDirection] = useState<SQLiteDirection>('ASC');
   const [debouncedQuery] = useDebounce(query, 500);
+  const projectId = useStore($projectId);
 
   const queryArg = useMemo<Parameters<typeof useListWorkflowsQuery>[0]>(() => {
     if (category === 'user') {
@@ -142,13 +145,8 @@ const WorkflowLibraryList = () => {
     []
   );
 
-  const handleSetUserCategory = useCallback(() => {
-    setCategory('user');
-    setPage(0);
-  }, []);
-
-  const handleSetDefaultCategory = useCallback(() => {
-    setCategory('default');
+  const handleSetCategory = useCallback((category: WorkflowCategory) => {
+    setCategory(category);
     setPage(0);
   }, []);
 
@@ -158,21 +156,31 @@ const WorkflowLibraryList = () => {
         <ButtonGroup>
           <Button
             variant={category === 'user' ? undefined : 'ghost'}
-            onClick={handleSetUserCategory}
+            onClick={handleSetCategory.bind(null, 'user')}
             isChecked={category === 'user'}
           >
             {t('workflows.userWorkflows')}
           </Button>
-          <Button
-            variant={category === 'default' ? undefined : 'ghost'}
-            onClick={handleSetDefaultCategory}
-            isChecked={category === 'default'}
-          >
-            {t('workflows.defaultWorkflows')}
-          </Button>
+          {projectId ? (
+            <Button
+              variant={category === 'project' ? undefined : 'ghost'}
+              onClick={handleSetCategory.bind(null, 'project')}
+              isChecked={category === 'project'}
+            >
+              {t('workflows.projectWorkflows')}
+            </Button>
+          ) : (
+            <Button
+              variant={category === 'default' ? undefined : 'ghost'}
+              onClick={handleSetCategory.bind(null, 'default')}
+              isChecked={category === 'default'}
+            >
+              {t('workflows.defaultWorkflows')}
+            </Button>
+          )}
         </ButtonGroup>
         <Spacer />
-        {category === 'user' && (
+        {category !== 'default' && (
           <>
             <FormControl isDisabled={isFetching} w={64} minW={56}>
               <FormLabel>{t('common.orderBy')}</FormLabel>
@@ -202,14 +210,13 @@ const WorkflowLibraryList = () => {
             minW={64}
           />
           {query.trim().length && (
-            <InputRightElement>
+            <InputRightElement h="full" pe={2}>
               <IconButton
                 onClick={resetFilterText}
-                size="xs"
-                variant="ghost"
+                size="sm"
+                variant="link"
                 aria-label={t('workflows.clearWorkflowSearchFilter')}
-                opacity={0.5}
-                icon={<CloseIcon boxSize={2} />}
+                icon={<PiXBold />}
               />
             </InputRightElement>
           )}
@@ -229,7 +236,7 @@ const WorkflowLibraryList = () => {
           </Flex>
         </ScrollableContent>
       ) : (
-        <IAINoContentFallback label={t('workflows.noUserWorkflows')} />
+        <IAINoContentFallback label={t('workflows.noWorkflows')} />
       )}
       <Divider />
       {data && (

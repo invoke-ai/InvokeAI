@@ -61,7 +61,12 @@ const ParamDynamicPromptsPreview = () => {
   }
 
   return (
-    <FormControl orientation="vertical" w="full" h="full">
+    <FormControl
+      orientation="vertical"
+      w="full"
+      h="full"
+      isInvalid={Boolean(parsingError || isError)}
+    >
       <InformationalPopover feature="dynamicPrompts" inPortal={false}>
         <FormLabel>{label}</FormLabel>
       </InformationalPopover>

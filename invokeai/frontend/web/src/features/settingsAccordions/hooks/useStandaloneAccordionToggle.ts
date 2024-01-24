@@ -1,25 +1,31 @@
-import { useDisclosure } from '@invoke-ai/ui';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { standaloneAccordionToggled } from 'features/settingsAccordions/store/actions';
-import { useCallback } from 'react';
+import { createSelector } from '@reduxjs/toolkit';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import {
+  accordionStateChanged,
+  selectUiSlice,
+} from 'features/ui/store/uiSlice';
+import { useCallback, useMemo } from 'react';
 
 type UseStandaloneAccordionToggleArg = {
   defaultIsOpen: boolean;
-  id?: string;
+  id: string;
 };
 
 export const useStandaloneAccordionToggle = (
   arg: UseStandaloneAccordionToggleArg
 ) => {
   const dispatch = useAppDispatch();
-  const { isOpen, onToggle: _onToggle } = useDisclosure({
-    defaultIsOpen: arg.defaultIsOpen,
-  });
+  const selectIsOpen = useMemo(
+    () =>
+      createSelector(
+        selectUiSlice,
+        (ui) => ui.accordions[arg.id] ?? arg.defaultIsOpen
+      ),
+    [arg]
+  );
+  const isOpen = useAppSelector(selectIsOpen);
   const onToggle = useCallback(() => {
-    if (arg.id) {
-      dispatch(standaloneAccordionToggled({ id: arg.id, isOpen }));
-    }
-    _onToggle();
-  }, [_onToggle, arg.id, dispatch, isOpen]);
+    dispatch(accordionStateChanged({ id: arg.id, isOpen: !isOpen }));
+  }, [arg.id, dispatch, isOpen]);
   return { isOpen, onToggle };
 };

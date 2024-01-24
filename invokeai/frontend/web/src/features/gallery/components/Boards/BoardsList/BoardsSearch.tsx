@@ -58,7 +58,7 @@ const BoardsSearch = () => {
           <IconButton
             onClick={clearBoardSearch}
             size="sm"
-            variant="ghost"
+            variant="link"
             aria-label={t('boards.clearSearch')}
             icon={<PiXBold />}
           />

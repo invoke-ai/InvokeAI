@@ -13,7 +13,11 @@ const loadingStyles: SystemStyleObject = {
 export const ShowDynamicPromptsPreviewButton = memo(() => {
   const { t } = useTranslation();
   const isLoading = useAppSelector((s) => s.dynamicPrompts.isLoading);
+  const isError = useAppSelector((s) =>
+    Boolean(s.dynamicPrompts.isError || s.dynamicPrompts.parsingError)
+  );
   const { isOpen, onOpen } = useDynamicPromptsModal();
+
   return (
     <Tooltip
       label={
@@ -30,6 +34,7 @@ export const ShowDynamicPromptsPreviewButton = memo(() => {
         icon={<BsBracesAsterisk />}
         onClick={onOpen}
         sx={isLoading ? loadingStyles : undefined}
+        colorScheme={isError && !isLoading ? 'error' : 'base'}
       />
     </Tooltip>
   );

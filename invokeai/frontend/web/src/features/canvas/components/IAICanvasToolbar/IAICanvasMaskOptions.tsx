@@ -1,9 +1,12 @@
+import type { FormLabelProps } from '@invoke-ai/ui';
 import {
   Box,
   Button,
+  ButtonGroup,
   Checkbox,
   Flex,
   FormControl,
+  FormControlGroup,
   FormLabel,
   IconButton,
   Popover,
@@ -32,6 +35,10 @@ import {
   PiFloppyDiskBackFill,
   PiTrashSimpleFill,
 } from 'react-icons/pi';
+
+const formLabelProps: FormLabelProps = {
+  flexGrow: 1,
+};
 
 const IAICanvasMaskOptions = () => {
   const dispatch = useAppDispatch();
@@ -124,40 +131,44 @@ const IAICanvasMaskOptions = () => {
       <PopoverContent>
         <PopoverBody>
           <Flex direction="column" gap={2}>
-            <FormControl>
-              <FormLabel>{`${t('unifiedCanvas.enableMask')} (H)`}</FormLabel>
-              <Checkbox
-                isChecked={isMaskEnabled}
-                onChange={handleToggleEnableMask}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>{t('unifiedCanvas.preserveMaskedArea')}</FormLabel>
-              <Checkbox
-                isChecked={shouldPreserveMaskedArea}
-                onChange={handleChangePreserveMaskedArea}
-              />
-            </FormControl>
+            <FormControlGroup formLabelProps={formLabelProps}>
+              <FormControl>
+                <FormLabel>{`${t('unifiedCanvas.enableMask')} (H)`}</FormLabel>
+                <Checkbox
+                  isChecked={isMaskEnabled}
+                  onChange={handleToggleEnableMask}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('unifiedCanvas.preserveMaskedArea')}</FormLabel>
+                <Checkbox
+                  isChecked={shouldPreserveMaskedArea}
+                  onChange={handleChangePreserveMaskedArea}
+                />
+              </FormControl>
+            </FormControlGroup>
             <Box pt={2} pb={2}>
               <IAIColorPicker
                 color={maskColor}
                 onChange={handleChangeMaskColor}
               />
             </Box>
-            <Button
-              size="sm"
-              leftIcon={<PiFloppyDiskBackFill />}
-              onClick={handleSaveMask}
-            >
-              {t('unifiedCanvas.saveMask')}
-            </Button>
-            <Button
-              size="sm"
-              leftIcon={<PiTrashSimpleFill />}
-              onClick={handleClearMask}
-            >
-              {t('unifiedCanvas.clearMask')}
-            </Button>
+            <ButtonGroup isAttached={false}>
+              <Button
+                size="sm"
+                leftIcon={<PiFloppyDiskBackFill />}
+                onClick={handleSaveMask}
+              >
+                {t('unifiedCanvas.saveMask')}
+              </Button>
+              <Button
+                size="sm"
+                leftIcon={<PiTrashSimpleFill />}
+                onClick={handleClearMask}
+              >
+                {t('unifiedCanvas.clearMask')}
+              </Button>
+            </ButtonGroup>
           </Flex>
         </PopoverBody>
       </PopoverContent>

@@ -1,7 +1,9 @@
+import type { FormLabelProps } from '@invoke-ai/ui';
 import {
   Checkbox,
   Flex,
   FormControl,
+  FormControlGroup,
   FormLabel,
   IconButton,
   Popover,
@@ -27,6 +29,10 @@ import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiGearSixBold } from 'react-icons/pi';
+
+const formLabelProps: FormLabelProps = {
+  flexGrow: 1,
+};
 
 const IAICanvasSettingsButtonPopover = () => {
   const dispatch = useAppDispatch();
@@ -122,69 +128,73 @@ const IAICanvasSettingsButtonPopover = () => {
       <PopoverContent>
         <PopoverBody>
           <Flex direction="column" gap={2}>
-            <FormControl>
-              <FormLabel>{t('unifiedCanvas.showIntermediates')}</FormLabel>
-              <Checkbox
-                isChecked={shouldShowIntermediates}
-                onChange={handleChangeShouldShowIntermediates}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>{t('unifiedCanvas.showGrid')}</FormLabel>
-              <Checkbox
-                isChecked={shouldShowGrid}
-                onChange={handleChangeShouldShowGrid}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>{t('unifiedCanvas.snapToGrid')}</FormLabel>
-              <Checkbox
-                isChecked={shouldSnapToGrid}
-                onChange={handleChangeShouldSnapToGrid}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>{t('unifiedCanvas.darkenOutsideSelection')}</FormLabel>
-              <Checkbox
-                isChecked={shouldDarkenOutsideBoundingBox}
-                onChange={handleChangeShouldDarkenOutsideBoundingBox}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>{t('unifiedCanvas.autoSaveToGallery')}</FormLabel>
-              <Checkbox
-                isChecked={shouldAutoSave}
-                onChange={handleChangeShouldAutoSave}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>{t('unifiedCanvas.saveBoxRegionOnly')}</FormLabel>
-              <Checkbox
-                isChecked={shouldCropToBoundingBoxOnSave}
-                onChange={handleChangeShouldCropToBoundingBoxOnSave}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>{t('unifiedCanvas.limitStrokesToBox')}</FormLabel>
-              <Checkbox
-                isChecked={shouldRestrictStrokesToBox}
-                onChange={handleChangeShouldRestrictStrokesToBox}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>{t('unifiedCanvas.showCanvasDebugInfo')}</FormLabel>
-              <Checkbox
-                isChecked={shouldShowCanvasDebugInfo}
-                onChange={handleChangeShouldShowCanvasDebugInfo}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>{t('unifiedCanvas.antialiasing')}</FormLabel>
-              <Checkbox
-                isChecked={shouldAntialias}
-                onChange={handleChangeShouldAntialias}
-              />
-            </FormControl>
+            <FormControlGroup formLabelProps={formLabelProps}>
+              <FormControl>
+                <FormLabel>{t('unifiedCanvas.showIntermediates')}</FormLabel>
+                <Checkbox
+                  isChecked={shouldShowIntermediates}
+                  onChange={handleChangeShouldShowIntermediates}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('unifiedCanvas.showGrid')}</FormLabel>
+                <Checkbox
+                  isChecked={shouldShowGrid}
+                  onChange={handleChangeShouldShowGrid}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('unifiedCanvas.snapToGrid')}</FormLabel>
+                <Checkbox
+                  isChecked={shouldSnapToGrid}
+                  onChange={handleChangeShouldSnapToGrid}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>
+                  {t('unifiedCanvas.darkenOutsideSelection')}
+                </FormLabel>
+                <Checkbox
+                  isChecked={shouldDarkenOutsideBoundingBox}
+                  onChange={handleChangeShouldDarkenOutsideBoundingBox}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('unifiedCanvas.autoSaveToGallery')}</FormLabel>
+                <Checkbox
+                  isChecked={shouldAutoSave}
+                  onChange={handleChangeShouldAutoSave}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('unifiedCanvas.saveBoxRegionOnly')}</FormLabel>
+                <Checkbox
+                  isChecked={shouldCropToBoundingBoxOnSave}
+                  onChange={handleChangeShouldCropToBoundingBoxOnSave}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('unifiedCanvas.limitStrokesToBox')}</FormLabel>
+                <Checkbox
+                  isChecked={shouldRestrictStrokesToBox}
+                  onChange={handleChangeShouldRestrictStrokesToBox}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('unifiedCanvas.showCanvasDebugInfo')}</FormLabel>
+                <Checkbox
+                  isChecked={shouldShowCanvasDebugInfo}
+                  onChange={handleChangeShouldShowCanvasDebugInfo}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('unifiedCanvas.antialiasing')}</FormLabel>
+                <Checkbox
+                  isChecked={shouldAntialias}
+                  onChange={handleChangeShouldAntialias}
+                />
+              </FormControl>
+            </FormControlGroup>
             <ClearCanvasHistoryButtonModal />
           </Flex>
         </PopoverBody>

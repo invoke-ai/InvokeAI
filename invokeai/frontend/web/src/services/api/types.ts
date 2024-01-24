@@ -164,6 +164,8 @@ export type ColorMapImageProcessorInvocation =
   s['ColorMapImageProcessorInvocation'];
 export type ContentShuffleImageProcessorInvocation =
   s['ContentShuffleImageProcessorInvocation'];
+export type DepthAnythingImageProcessorInvocation =
+  s['DepthAnythingImageProcessorInvocation'];
 export type HedImageProcessorInvocation = s['HedImageProcessorInvocation'];
 export type LineartAnimeImageProcessorInvocation =
   s['LineartAnimeImageProcessorInvocation'];

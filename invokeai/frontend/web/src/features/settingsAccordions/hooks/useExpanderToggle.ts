@@ -1,23 +1,26 @@
-import { useDisclosure } from '@invoke-ai/ui';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { expanderToggled } from 'features/settingsAccordions/store/actions';
-import { useCallback } from 'react';
+import { createSelector } from '@reduxjs/toolkit';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { expanderStateChanged, selectUiSlice } from 'features/ui/store/uiSlice';
+import { useCallback, useMemo } from 'react';
 
 type UseExpanderToggleArg = {
   defaultIsOpen: boolean;
-  id?: string;
+  id: string;
 };
 
 export const useExpanderToggle = (arg: UseExpanderToggleArg) => {
   const dispatch = useAppDispatch();
-  const { isOpen, onToggle: _onToggle } = useDisclosure({
-    defaultIsOpen: arg.defaultIsOpen,
-  });
+  const selectIsOpen = useMemo(
+    () =>
+      createSelector(
+        selectUiSlice,
+        (ui) => ui.expanders[arg.id] ?? arg.defaultIsOpen
+      ),
+    [arg]
+  );
+  const isOpen = useAppSelector(selectIsOpen);
   const onToggle = useCallback(() => {
-    if (arg.id) {
-      dispatch(expanderToggled({ id: arg.id, isOpen }));
-    }
-    _onToggle();
-  }, [_onToggle, dispatch, arg.id, isOpen]);
+    dispatch(expanderStateChanged({ id: arg.id, isOpen: !isOpen }));
+  }, [dispatch, arg.id, isOpen]);
   return { isOpen, onToggle };
 };

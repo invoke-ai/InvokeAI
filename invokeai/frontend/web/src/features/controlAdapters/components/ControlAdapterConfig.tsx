@@ -1,9 +1,9 @@
-import { ChevronUpIcon } from '@chakra-ui/icons';
 import {
   Box,
   Flex,
   FormControl,
   FormLabel,
+  Icon,
   IconButton,
   Switch,
 } from '@invoke-ai/ui';
@@ -19,7 +19,7 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCopyBold, PiTrashSimpleBold } from 'react-icons/pi';
+import { PiCaretUpBold, PiCopyBold, PiTrashSimpleBold } from 'react-icons/pi';
 import { useToggle } from 'react-use';
 
 import ControlAdapterImagePreview from './ControlAdapterImagePreview';
@@ -130,7 +130,9 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
           onClick={toggleIsExpanded}
           variant="ghost"
           icon={
-            <ChevronUpIcon
+            <Icon
+              boxSize={4}
+              as={PiCaretUpBold}
               transform={isExpanded ? 'rotate(0deg)' : 'rotate(180deg)'}
               transitionProperty="common"
               transitionDuration="normal"

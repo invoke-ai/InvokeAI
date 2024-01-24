@@ -52,7 +52,7 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
               {workflowDTO.name || t('workflows.unnamedWorkflow')}
             </Heading>
             <Spacer />
-            {workflowDTO.category === 'user' && (
+            {workflowDTO.category !== 'default' && (
               <Text
                 fontSize="sm"
                 variant="subtext"
@@ -81,7 +81,7 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
               </Text>
             )}
             <Spacer />
-            {workflowDTO.category === 'user' && (
+            {workflowDTO.category !== 'default' && (
               <Text
                 fontSize="sm"
                 variant="subtext"
@@ -104,7 +104,7 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
         >
           {t('common.load')}
         </Button>
-        {workflowDTO.category === 'user' && (
+        {workflowDTO.category !== 'default' && (
           <Button
             flexShrink={0}
             colorScheme="error"
