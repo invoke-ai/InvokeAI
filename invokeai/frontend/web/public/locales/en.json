@@ -600,6 +600,10 @@
             "desc": "Send current image to Image to Image",
             "title": "Send To Image To Image"
         },
+        "remixImage": {
+            "desc": "Use all parameters except seed from the current image",
+            "title": "Remix image"
+        },
         "setParameters": {
             "desc": "Use all parameters of the current image",
             "title": "Set Parameters"
@@ -1216,6 +1220,7 @@
         "useCpuNoise": "Use CPU Noise",
         "cpuNoise": "CPU Noise",
         "gpuNoise": "GPU Noise",
+        "remixImage": "Remix Image",
         "useInitImg": "Use Initial Image",
         "usePrompt": "Use Prompt",
         "useSeed": "Use Seed",
