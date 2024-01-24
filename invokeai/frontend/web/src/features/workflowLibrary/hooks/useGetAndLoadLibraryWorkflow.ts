@@ -26,7 +26,7 @@ export const useGetAndLoadLibraryWorkflow: UseGetAndLoadLibraryWorkflow = ({
 }) => {
   const dispatch = useAppDispatch();
   const toaster = useAppToaster();
-  const toast = useToast()
+  const toast = useToast();
   const { t } = useTranslation();
   const [_getAndLoadWorkflow, getAndLoadWorkflowResult] =
     useLazyGetWorkflowQuery();

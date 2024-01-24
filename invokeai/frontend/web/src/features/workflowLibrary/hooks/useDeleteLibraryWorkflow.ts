@@ -23,7 +23,7 @@ export const useDeleteLibraryWorkflow: UseDeleteLibraryWorkflow = ({
   onError,
 }) => {
   const toaster = useAppToaster();
-  const toast = useToast()
+  const toast = useToast();
   const { t } = useTranslation();
   const [_deleteWorkflow, deleteWorkflowResult] = useDeleteWorkflowMutation();
 

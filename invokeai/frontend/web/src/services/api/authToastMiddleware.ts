@@ -27,7 +27,7 @@ export const authToastMiddleware: Middleware =
     if (isRejectedWithValue(action)) {
       try {
         const parsed = zRejectedForbiddenAction.parse(action);
-        const endpointName = parsed.meta?.arg?.endpointName
+        const endpointName = parsed.meta?.arg?.endpointName;
         if (endpointName === 'getImageDTO') {
           // do not show toast if problem is image access
           return;
