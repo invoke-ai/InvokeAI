@@ -40,7 +40,7 @@ export const useGetAndLoadLibraryWorkflow: UseGetAndLoadLibraryWorkflow = ({
         // No toast - the listener for this action does that after the workflow is loaded
         onSuccess && onSuccess();
       } catch {
-        if (!toast.isActive('auth-error-toast')) {
+        if (!toast.isActive('auth-error-toast-getWorkflow')) {
           toaster({
             title: t('toast.problemRetrievingWorkflow'),
             status: 'error',

@@ -36,7 +36,7 @@ export const useDeleteLibraryWorkflow: UseDeleteLibraryWorkflow = ({
         });
         onSuccess && onSuccess();
       } catch {
-        if (!toast.isActive('auth-error-toast')) {
+        if (!toast.isActive('auth-error-toast-deleteWorkflow')) {
           toaster({
             title: t('toast.problemDeletingWorkflow'),
             status: 'error',
