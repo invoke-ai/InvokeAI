@@ -57,7 +57,9 @@ const dynamicBaseQuery: BaseQueryFn<
   const projectId = $projectId.get();
 
   const rawBaseQuery = fetchBaseQuery({
-    baseUrl: `${baseUrl ?? ''}/api/v1`,
+    baseUrl: baseUrl
+      ? `${baseUrl}/api/v1`
+      : `${window.location.href.replace(/\/$/, '')}/api/v1`,
     prepareHeaders: (headers) => {
       if (authToken) {
         headers.set('Authorization', `Bearer ${authToken}`);
