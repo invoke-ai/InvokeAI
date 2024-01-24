@@ -1,13 +1,11 @@
-import { ExternalLinkIcon } from '@chakra-ui/icons';
 import {
+  ExternalLink,
   Flex,
-  Link,
   Tab,
   TabList,
   TabPanel,
   TabPanels,
   Tabs,
-  Text,
 } from '@invoke-ai/ui';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
@@ -46,13 +44,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
       position="absolute"
       overflow="hidden"
     >
-      <Flex gap={2}>
-        <Text fontWeight="semibold">{t('common.file')}:</Text>
-        <Link href={image.image_url} isExternal maxW="calc(100% - 3rem)">
-          {image.image_name}
-          <ExternalLinkIcon mx="2px" />
-        </Link>
-      </Flex>
+      <ExternalLink href={image.image_url} label={image.image_name} />
 
       <Tabs
         variant="line"

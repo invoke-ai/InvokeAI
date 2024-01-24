@@ -36,9 +36,9 @@ export const addModelSelectedListener = () => {
 
       const newModel = result.data;
 
-      const { base_model } = newModel;
+      const newBaseModel = newModel.base_model;
       const didBaseModelChange =
-        state.generation.model?.base_model !== base_model;
+        state.generation.model?.base_model !== newBaseModel;
 
       if (didBaseModelChange) {
         // we may need to reset some incompatible submodels
@@ -46,7 +46,7 @@ export const addModelSelectedListener = () => {
 
         // handle incompatible loras
         forEach(state.lora.loras, (lora, id) => {
-          if (lora.base_model !== base_model) {
+          if (lora.base_model !== newBaseModel) {
             dispatch(loraRemoved(id));
             modelsCleared += 1;
           }
@@ -54,14 +54,14 @@ export const addModelSelectedListener = () => {
 
         // handle incompatible vae
         const { vae } = state.generation;
-        if (vae && vae.base_model !== base_model) {
+        if (vae && vae.base_model !== newBaseModel) {
           dispatch(vaeSelected(null));
           modelsCleared += 1;
         }
 
         // handle incompatible controlnets
         selectControlAdapterAll(state.controlAdapters).forEach((ca) => {
-          if (ca.model?.base_model !== base_model) {
+          if (ca.model?.base_model !== newBaseModel) {
             dispatch(
               controlAdapterIsEnabledChanged({ id: ca.id, isEnabled: false })
             );

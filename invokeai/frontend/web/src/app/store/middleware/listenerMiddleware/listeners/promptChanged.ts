@@ -46,14 +46,14 @@ export const addDynamicPromptsListener = () => {
 
       if (cachedPrompts) {
         dispatch(promptsChanged(cachedPrompts.prompts));
+        dispatch(parsingErrorChanged(cachedPrompts.error));
         return;
       }
 
       if (!getShouldProcessPrompt(state.generation.positivePrompt)) {
-        if (state.dynamicPrompts.isLoading) {
-          dispatch(isLoadingChanged(false));
-        }
         dispatch(promptsChanged([state.generation.positivePrompt]));
+        dispatch(parsingErrorChanged(undefined));
+        dispatch(isErrorChanged(false));
         return;
       }
 
@@ -78,7 +78,6 @@ export const addDynamicPromptsListener = () => {
         dispatch(promptsChanged(res.prompts));
         dispatch(parsingErrorChanged(res.error));
         dispatch(isErrorChanged(false));
-        dispatch(isLoadingChanged(false));
       } catch {
         dispatch(isErrorChanged(true));
         dispatch(isLoadingChanged(false));

@@ -1,5 +1,5 @@
 import { Box, Flex, IconButton, Tooltip } from '@invoke-ai/ui';
-import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
+import { getOverlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { isString } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
@@ -14,6 +14,11 @@ type Props = {
   withDownload?: boolean;
   withCopy?: boolean;
 };
+
+const overlayscrollbarsOptions = getOverlayScrollbarsParams(
+  'scroll',
+  'scroll'
+).options;
 
 const DataViewer = (props: Props) => {
   const { label, data, fileName, withDownload = true, withCopy = true } = props;
@@ -60,7 +65,7 @@ const DataViewer = (props: Props) => {
         <OverlayScrollbarsComponent
           defer
           style={overlayScrollbarsStyles}
-          options={overlayScrollbarsParams.options}
+          options={overlayscrollbarsOptions}
         >
           <pre>{dataString}</pre>
         </OverlayScrollbarsComponent>

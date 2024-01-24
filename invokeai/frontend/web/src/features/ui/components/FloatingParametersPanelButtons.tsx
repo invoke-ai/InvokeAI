@@ -1,8 +1,8 @@
-import { SpinnerIcon } from '@chakra-ui/icons';
 import type { SystemStyleObject } from '@invoke-ai/ui';
 import {
   ButtonGroup,
   Flex,
+  Icon,
   IconButton,
   Portal,
   spinAnimation,
@@ -14,7 +14,7 @@ import { useQueueBack } from 'features/queue/hooks/useQueueBack';
 import type { UsePanelReturn } from 'features/ui/hooks/usePanel';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiSlidersHorizontalBold } from 'react-icons/pi';
+import { PiCircleNotchBold, PiSlidersHorizontalBold } from 'react-icons/pi';
 import { RiSparklingFill } from 'react-icons/ri';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
@@ -35,7 +35,7 @@ const FloatingSidePanelButtons = (props: Props) => {
   const queueButtonIcon = useMemo(
     () =>
       !isDisabled && queueStatus?.processor.is_processing ? (
-        <SpinnerIcon animation={spinAnimation} />
+        <Icon boxSize={6} as={PiCircleNotchBold} animation={spinAnimation} />
       ) : (
         <RiSparklingFill size="16px" />
       ),

@@ -276,9 +276,9 @@ const IAICanvasToolChooserOptions = () => {
               </Flex>
               <Box w="full" pt={2} pb={2}>
                 <IAIColorPicker
-                  withNumberInput={true}
                   color={brushColor}
                   onChange={handleChangeBrushColor}
+                  withNumberInput
                 />
               </Box>
             </Flex>
