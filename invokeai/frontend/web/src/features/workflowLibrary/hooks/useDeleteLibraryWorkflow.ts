@@ -1,3 +1,4 @@
+import { useToast } from '@invoke-ai/ui';
 import { useAppToaster } from 'app/components/Toaster';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,6 +23,7 @@ export const useDeleteLibraryWorkflow: UseDeleteLibraryWorkflow = ({
   onError,
 }) => {
   const toaster = useAppToaster();
+  const toast = useToast()
   const { t } = useTranslation();
   const [_deleteWorkflow, deleteWorkflowResult] = useDeleteWorkflowMutation();
 
@@ -34,14 +36,16 @@ export const useDeleteLibraryWorkflow: UseDeleteLibraryWorkflow = ({
         });
         onSuccess && onSuccess();
       } catch {
-        toaster({
-          title: t('toast.problemDeletingWorkflow'),
-          status: 'error',
-        });
+        if (!toast.isActive('auth-error-toast')) {
+          toaster({
+            title: t('toast.problemDeletingWorkflow'),
+            status: 'error',
+          });
+        }
         onError && onError();
       }
     },
-    [_deleteWorkflow, toaster, t, onSuccess, onError]
+    [_deleteWorkflow, toaster, t, onSuccess, onError, toast]
   );
 
   return { deleteWorkflow, deleteWorkflowResult };

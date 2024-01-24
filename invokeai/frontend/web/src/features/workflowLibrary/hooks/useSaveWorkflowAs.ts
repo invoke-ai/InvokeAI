@@ -59,12 +59,14 @@ export const useSaveWorkflowAs: UseSaveWorkflowAs = () => {
         });
       } catch (e) {
         onError && onError();
-        toast.update(toastRef.current, {
-          title: t('workflows.problemSavingWorkflow'),
-          status: 'error',
-          duration: 1000,
-          isClosable: true,
-        });
+        if (!toast.isActive('auth-error-toast')) {
+          toast.update(toastRef.current, {
+            title: t('workflows.problemSavingWorkflow'),
+            status: 'error',
+            duration: 1000,
+            isClosable: true,
+          });
+        }
       }
     },
     [toast, createWorkflow, dispatch, t]

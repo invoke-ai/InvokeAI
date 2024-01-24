@@ -39,6 +39,7 @@ export const authToastMiddleware: Middleware =
             : undefined;
         dispatch(
           addToast({
+            id: "auth-error-toast",
             title: t('common.somethingWentWrong'),
             status: 'error',
             description: customMessage,
