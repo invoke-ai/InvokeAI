@@ -110,7 +110,28 @@
         "somethingWentWrong": "Etwas ist schief gelaufen",
         "copyError": "$t(gallery.copy) Fehler",
         "input": "Eingabe",
-        "notInstalled": "Nicht $t(common.installed)"
+        "notInstalled": "Nicht $t(common.installed)",
+        "advancedOptions": "Erweiterte Einstellungen",
+        "alpha": "Alpha",
+        "red": "Rot",
+        "green": "Grün",
+        "blue": "Blau",
+        "delete": "Löschen",
+        "or": "oder",
+        "direction": "Richtung",
+        "free": "Frei",
+        "save": "Speichern",
+        "preferencesLabel": "Präferenzen",
+        "created": "Erstellt",
+        "prevPage": "Vorherige Seite",
+        "nextPage": "Nächste Seite",
+        "unknownError": "Unbekannter Fehler",
+        "unsaved": "Nicht gespeichert",
+        "aboutDesc": "Verwenden Sie Invoke für die Arbeit? Dann siehe hier:",
+        "localSystem": "Lokales System",
+        "orderBy": "Ordnen nach",
+        "saveAs": "Speicher als",
+        "updated": "Aktualisiert"
     },
     "gallery": {
         "generations": "Erzeugungen",
@@ -701,7 +722,8 @@
         "invokeProgressBar": "Invoke Fortschrittsanzeige",
         "mode": "Modus",
         "resetUI": "$t(accessibility.reset) von UI",
-        "createIssue": "Ticket erstellen"
+        "createIssue": "Ticket erstellen",
+        "about": "Über"
     },
     "boards": {
         "autoAddBoard": "Automatisches Hinzufügen zum Ordner",
@@ -809,7 +831,8 @@
         "canny": "Canny",
         "hedDescription": "Ganzheitlich verschachtelte Kantenerkennung",
         "scribble": "Scribble",
-        "maxFaces": "Maximal Anzahl Gesichter"
+        "maxFaces": "Maximal Anzahl Gesichter",
+        "resizeSimple": "Größe ändern (einfach)"
     },
     "queue": {
         "status": "Status",
@@ -999,5 +1022,27 @@
         "selectLoRA": "Wählen ein LoRA aus",
         "esrganModel": "ESRGAN Modell",
         "addLora": "LoRA hinzufügen"
+    },
+    "accordions": {
+        "generation": {
+            "title": "Erstellung",
+            "modelTab": "Modell",
+            "conceptsTab": "Konzepte"
+        },
+        "image": {
+            "title": "Bild"
+        },
+        "advanced": {
+            "title": "Erweitert"
+        },
+        "control": {
+            "title": "Kontrolle",
+            "controlAdaptersTab": "Kontroll Adapter",
+            "ipTab": "Bild Beschreibung"
+        },
+        "compositing": {
+            "coherenceTab": "Kohärenzpass",
+            "infillTab": "Füllung"
+        }
     }
 }

@@ -112,6 +112,34 @@ export type paths = {
      */
     patch: operations["update_model_record"];
   };
+  "/api/v1/model/record/meta": {
+    /**
+     * List Model Summary
+     * @description Gets a page of model summary data.
+     */
+    get: operations["list_model_summary"];
+  };
+  "/api/v1/model/record/meta/i/{key}": {
+    /**
+     * Get Model Metadata
+     * @description Get a model metadata object.
+     */
+    get: operations["get_model_metadata"];
+  };
+  "/api/v1/model/record/tags": {
+    /**
+     * List Tags
+     * @description Get a unique set of all the model tags.
+     */
+    get: operations["list_tags"];
+  };
+  "/api/v1/model/record/tags/search": {
+    /**
+     * Search By Metadata Tags
+     * @description Get a list of models.
+     */
+    get: operations["search_by_metadata_tags"];
+  };
   "/api/v1/model/record/i/": {
     /**
      * Add Model Record
@@ -123,9 +151,6 @@ export type paths = {
     /**
      * List Model Install Jobs
      * @description Return list of model install jobs.
-     *
-     * If the optional 'source' argument is provided, then the list will be filtered
-     * for partial string matches against the install source.
      */
     get: operations["list_model_install_jobs"];
     /**
@@ -175,7 +200,7 @@ export type paths = {
      * Installation occurs in the background. Either use list_model_install_jobs()
      * to poll for completion, or listen on the event bus for the following events:
      *
-     *   "model_install_started"
+     *   "model_install_running"
      *   "model_install_completed"
      *   "model_install_error"
      *
@@ -191,10 +216,24 @@ export type paths = {
      */
     patch: operations["prune_model_install_jobs"];
   };
+  "/api/v1/model/record/import/{id}": {
+    /**
+     * Get Model Install Job
+     * @description Return model install job corresponding to the given source.
+     */
+    get: operations["get_model_install_job"];
+    /**
+     * Cancel Model Install Job
+     * @description Cancel the model install job(s) corresponding to the given job ID.
+     */
+    delete: operations["cancel_model_install_job"];
+  };
   "/api/v1/model/record/sync": {
     /**
      * Sync Models To Config
-     * @description Traverse the models and autoimport directories. Model files without a corresponding
+     * @description Traverse the models and autoimport directories.
+     *
+     * Model files without a corresponding
      * record in the database are added. Orphan records without a models file are deleted.
      */
     patch: operations["sync_models_to_config"];
@@ -736,46 +775,31 @@ export type components = {
       version: string;
     };
     /**
-     * Average Images
-     * @description Average images
+     * BaseMetadata
+     * @description Adds typing data for discriminated union.
      */
-    AverageImagesInvocation: {
-      /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+    BaseMetadata: {
       /**
-       * Id
-       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       * Name
+       * @description model's name
        */
-      id: string;
+      name: string;
       /**
-       * Is Intermediate
-       * @description Whether or not this is an intermediate invocation.
-       * @default false
+       * Author
+       * @description model's author
        */
-      is_intermediate?: boolean;
+      author: string;
       /**
-       * Use Cache
-       * @description Whether or not to use the cache
-       * @default true
+       * Tags
+       * @description tags provided by model source
        */
-      use_cache?: boolean;
+      tags: string[];
       /**
-       * Images
-       * @description The collection of images to average
-       */
-      images?: components["schemas"]["ImageField"][];
-      /**
-       * Gamma
-       * @description Gamma for color correcting before/after blending
-       * @default 2.2
-       */
-      gamma?: number;
-      /**
-       * type
-       * @default average_images
+       * Type
+       * @default basemetadata
        * @constant
        */
-      type: "average_images";
+      type?: "basemetadata";
     };
     /** Batch */
     Batch: {
@@ -1137,7 +1161,7 @@ export type components = {
     /** Body_import_model_record */
     Body_import_model_record: {
       /** Source */
-      source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["URLModelSource"];
+      source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["CivitaiModelSource"] | components["schemas"]["URLModelSource"];
       /**
        * Config
        * @description Dict of fields that override auto-probed values in the model config record, such as name, description and prediction_type
@@ -1748,6 +1772,136 @@ export type components = {
       type: "img_pad_crop";
     };
     /**
+     * CivitaiMetadata
+     * @description Extended metadata fields provided by Civitai.
+     */
+    CivitaiMetadata: {
+      /**
+       * Name
+       * @description model's name
+       */
+      name: string;
+      /**
+       * Author
+       * @description model's author
+       */
+      author: string;
+      /**
+       * Tags
+       * @description tags provided by model source
+       */
+      tags: string[];
+      /**
+       * Files
+       * @description model files and their sizes
+       */
+      files?: components["schemas"]["RemoteModelFile"][];
+      /**
+       * Type
+       * @default civitai
+       * @constant
+       */
+      type?: "civitai";
+      /**
+       * Id
+       * @description Civitai version identifier
+       */
+      id: number;
+      /**
+       * Version Name
+       * @description Version identifier, such as 'V2-alpha'
+       */
+      version_name: string;
+      /**
+       * Version Id
+       * @description Civitai model version identifier
+       */
+      version_id: number;
+      /**
+       * Created
+       * Format: date-time
+       * @description date the model was created
+       */
+      created: string;
+      /**
+       * Updated
+       * Format: date-time
+       * @description date the model was last modified
+       */
+      updated: string;
+      /**
+       * Published
+       * Format: date-time
+       * @description date the model was published to Civitai
+       */
+      published: string;
+      /**
+       * Description
+       * @description text description of model; may contain HTML
+       */
+      description: string;
+      /**
+       * Version Description
+       * @description text description of the model's reversion; usually change history; may contain HTML
+       */
+      version_description: string;
+      /**
+       * Nsfw
+       * @description whether the model tends to generate NSFW content
+       * @default false
+       */
+      nsfw?: boolean;
+      /** @description license terms */
+      restrictions?: components["schemas"]["LicenseRestrictions"];
+      /**
+       * Trained Words
+       * @description words to trigger the model
+       */
+      trained_words?: string[];
+      /**
+       * Download Url
+       * Format: uri
+       * @description download URL for this model
+       */
+      download_url: string;
+      /**
+       * Base Model Trained On
+       * @description base model on which this model was trained (currently not an enum)
+       */
+      base_model_trained_on: string;
+      /**
+       * Thumbnail Url
+       * @description a thumbnail image for this model
+       */
+      thumbnail_url?: string | null;
+      /**
+       * Weight Minmax
+       * @description minimum and maximum slider values for a LoRA or other secondary model
+       * @default [
+       *   -1,
+       *   2
+       * ]
+       */
+      weight_minmax?: [number, number];
+    };
+    /**
+     * CivitaiModelSource
+     * @description A Civitai version id, with optional variant and access token.
+     */
+    CivitaiModelSource: {
+      /** Version Id */
+      version_id: number;
+      variant?: components["schemas"]["ModelRepoVariant"] | null;
+      /** Access Token */
+      access_token?: string | null;
+      /**
+       * Type
+       * @default civitai
+       * @constant
+       */
+      type?: "civitai";
+    };
+    /**
      * ClearResult
      * @description Result of clearing the session queue
      */
@@ -2065,6 +2219,12 @@ export type components = {
        */
       type: "color_output";
     };
+    /**
+     * CommercialUsage
+     * @description Type of commercial usage allowed.
+     * @enum {string}
+     */
+    CommercialUsage: "None" | "Image" | "Rent" | "RentCivit" | "Sell";
     /**
      * Prompt
      * @description Parse prompt using compel package to conditioning.
@@ -2778,7 +2938,7 @@ export type components = {
       /**
        * Fp32
        * @description Whether or not to use full float32 precision
-       * @default false
+       * @default true
        */
       fp32?: boolean;
       /**
@@ -2993,7 +3153,7 @@ export type components = {
        */
       t2i_adapter?: components["schemas"]["T2IAdapterField"] | components["schemas"]["T2IAdapterField"][] | null;
       /**
-       * Cfg Rescale Multiplier
+       * CFG Rescale Multiplier
        * @description Rescale multiplier for CFG guidance, used for models trained with zero-terminal SNR
        * @default 0
        */
@@ -3134,6 +3294,11 @@ export type components = {
        * @description Timestamp for when the download job ende1d (completed or errored)
        */
       job_ended?: string | null;
+      /**
+       * Content Type
+       * @description Content type of downloaded file
+       */
+      content_type?: string | null;
       /**
        * Bytes
        * @description Bytes downloaded so far
@@ -3908,7 +4073,7 @@ export type components = {
        * @description The nodes in this graph
        */
       nodes?: {
-        [key: string]: components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["LinearUIOutputInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["AverageImagesInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["InfillTileInvocation"];
+        [key: string]: components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["LinearUIOutputInvocation"] | components["schemas"]["HedImageProcessorInvocation"];
       };
       /**
        * Edges
@@ -3945,7 +4110,7 @@ export type components = {
        * @description The results of node executions
        */
       results: {
-        [key: string]: components["schemas"]["CollectInvocationOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["SDXLLoraLoaderOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["GraphInvocationOutput"] | components["schemas"]["String2Output"] | components["schemas"]["NoiseOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["ONNXModelLoaderOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["ClipSkipInvocationOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["IntegerCollectionOutput"];
+        [key: string]: components["schemas"]["ColorOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["ONNXModelLoaderOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["ClipSkipInvocationOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["GraphInvocationOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["String2Output"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["SDXLLoraLoaderOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["DenoiseMaskOutput"];
       };
       /**
        * Errors
@@ -4011,13 +4176,15 @@ export type components = {
     };
     /**
      * HFModelSource
-     * @description A HuggingFace repo_id, with optional variant and sub-folder.
+     * @description A HuggingFace repo_id with optional variant, sub-folder and access token.
+     * Note that the variant option, if not provided to the constructor, will default to fp16, which is
+     * what people (almost) always want.
      */
     HFModelSource: {
       /** Repo Id */
       repo_id: string;
-      /** Variant */
-      variant?: string | null;
+      /** @default fp16 */
+      variant?: components["schemas"]["ModelRepoVariant"] | null;
       /** Subfolder */
       subfolder?: string | null;
       /** Access Token */
@@ -4084,6 +4251,51 @@ export type components = {
        * @constant
        */
       type: "hed_image_processor";
+    };
+    /**
+     * HuggingFaceMetadata
+     * @description Extended metadata fields provided by HuggingFace.
+     */
+    HuggingFaceMetadata: {
+      /**
+       * Name
+       * @description model's name
+       */
+      name: string;
+      /**
+       * Author
+       * @description model's author
+       */
+      author: string;
+      /**
+       * Tags
+       * @description tags provided by model source
+       */
+      tags: string[];
+      /**
+       * Files
+       * @description model files and their sizes
+       */
+      files?: components["schemas"]["RemoteModelFile"][];
+      /**
+       * Type
+       * @default huggingface
+       * @constant
+       */
+      type?: "huggingface";
+      /**
+       * Id
+       * @description huggingface model id
+       */
+      id: string;
+      /** Tag Dict */
+      tag_dict: Record<string, never>;
+      /**
+       * Last Modified
+       * Format: date-time
+       * @description date of last commit to repo
+       */
+      last_modified: string;
     };
     /**
      * IPAdapterConfig
@@ -4287,79 +4499,6 @@ export type components = {
        * @constant
        */
       type: "ip_adapter_output";
-    };
-    /**
-     * Ideal Size
-     * @description Calculates the ideal size for generation to avoid duplication
-     */
-    IdealSizeInvocation: {
-      /**
-       * Id
-       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
-       */
-      id: string;
-      /**
-       * Is Intermediate
-       * @description Whether or not this is an intermediate invocation.
-       * @default false
-       */
-      is_intermediate?: boolean;
-      /**
-       * Use Cache
-       * @description Whether or not to use the cache
-       * @default true
-       */
-      use_cache?: boolean;
-      /**
-       * Width
-       * @description Target width
-       * @default 1024
-       */
-      width?: number;
-      /**
-       * Height
-       * @description Target height
-       * @default 576
-       */
-      height?: number;
-      /** @description UNet submodel */
-      unet?: components["schemas"]["UNetField"];
-      /** @description Vae submodel */
-      vae?: components["schemas"]["VaeField"];
-      /**
-       * Multiplier
-       * @description Dimensional multiplier
-       * @default 1
-       */
-      multiplier?: number;
-      /**
-       * type
-       * @default ideal_size
-       * @constant
-       */
-      type: "ideal_size";
-    };
-    /**
-     * IdealSizeOutput
-     * @description Base class for invocations that output an image
-     */
-    IdealSizeOutput: {
-      /**
-       * Width
-       * @description The ideal width of the image in pixels
-       */
-      width: number;
-      /**
-       * Height
-       * @description The ideal height of the image in pixels
-       */
-      height: number;
-      /**
-       * type
-       * @default ideal_size_output
-       * @constant
-       */
-      type: "ideal_size_output";
     };
     /**
      * Blur Image
@@ -5264,7 +5403,7 @@ export type components = {
       /**
        * Fp32
        * @description Whether or not to use full float32 precision
-       * @default false
+       * @default true
        */
       fp32?: boolean;
       /**
@@ -5489,7 +5628,7 @@ export type components = {
      * @description State of an install job running in the background.
      * @enum {string}
      */
-    InstallStatus: "waiting" | "running" | "completed" | "error";
+    InstallStatus: "waiting" | "downloading" | "running" | "completed" | "error" | "cancelled";
     /**
      * Integer Collection Primitive
      * @description A collection of integer primitive values
@@ -5931,7 +6070,7 @@ export type components = {
       /**
        * Fp32
        * @description Whether or not to use full float32 precision
-       * @default false
+       * @default true
        */
       fp32?: boolean;
       /**
@@ -6003,6 +6142,32 @@ export type components = {
        * @constant
        */
       type: "leres_image_processor";
+    };
+    /**
+     * LicenseRestrictions
+     * @description Broad categories of licensing restrictions.
+     */
+    LicenseRestrictions: {
+      /**
+       * Allownocredit
+       * @description if true, model can be redistributed without crediting author
+       * @default false
+       */
+      AllowNoCredit?: boolean;
+      /**
+       * Allowderivatives
+       * @description if true, derivatives of this model can be redistributed
+       * @default false
+       */
+      AllowDerivatives?: boolean;
+      /**
+       * Allowdifferentlicense
+       * @description if true, derivatives of this model be redistributed under a different license
+       * @default false
+       */
+      AllowDifferentLicense?: boolean;
+      /** @description Type of commercial use allowed or 'No' if no commercial use is allowed. */
+      AllowCommercialUse?: components["schemas"]["CommercialUsage"];
     };
     /**
      * Linear UI Image Output
@@ -7028,6 +7193,12 @@ export type components = {
      * @constant
      */
     ModelError: "not_found";
+    /**
+     * ModelFormat
+     * @description Storage format of model.
+     * @enum {string}
+     */
+    ModelFormat: "diffusers" | "checkpoint" | "lycoris" | "onnx" | "olive" | "embedding_file" | "embedding_folder" | "invokeai";
     /** ModelInfo */
     ModelInfo: {
       /**
@@ -7047,6 +7218,11 @@ export type components = {
      * @description Object that tracks the current status of an install request.
      */
     ModelInstallJob: {
+      /**
+       * Id
+       * @description Unique ID for this job
+       */
+      id: number;
       /**
        * @description Current status of install process
        * @default waiting
@@ -7072,7 +7248,7 @@ export type components = {
        * Source
        * @description Source (URL, repo_id, or local path) of model
        */
-      source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["URLModelSource"];
+      source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["CivitaiModelSource"] | components["schemas"]["URLModelSource"];
       /**
        * Local Path
        * Format: path
@@ -7080,15 +7256,26 @@ export type components = {
        */
       local_path: string;
       /**
-       * Error Type
-       * @description Class name of the exception that led to status==ERROR
+       * Bytes
+       * @description For a remote model, the number of bytes downloaded so far (may not be available)
        */
-      error_type?: string | null;
+      bytes?: number | null;
       /**
-       * Error
-       * @description Error traceback
+       * Total Bytes
+       * @description Total size of the model to be installed
+       * @default 0
        */
-      error?: string | null;
+      total_bytes?: number;
+      /**
+       * Source Metadata
+       * @description Metadata provided by the model source
+       */
+      source_metadata?: (components["schemas"]["BaseMetadata"] | components["schemas"]["HuggingFaceMetadata"] | components["schemas"]["CivitaiMetadata"]) | null;
+      /**
+       * Download Parts
+       * @description Download jobs contributing to this install
+       */
+      download_parts?: components["schemas"]["DownloadJob"][];
     };
     /**
      * ModelLoaderOutput
@@ -7116,6 +7303,50 @@ export type components = {
        * @description UNet (scheduler, LoRAs)
        */
       unet: components["schemas"]["UNetField"];
+    };
+    /**
+     * ModelRecordOrderBy
+     * @description The order in which to return model summaries.
+     * @enum {string}
+     */
+    ModelRecordOrderBy: "default" | "type" | "base" | "name" | "format";
+    /**
+     * ModelRepoVariant
+     * @description Various hugging face variants on the diffusers format.
+     * @enum {string}
+     */
+    ModelRepoVariant: "default" | "fp16" | "fp32" | "onnx" | "openvino" | "flax";
+    /**
+     * ModelSummary
+     * @description A short summary of models for UI listing purposes.
+     */
+    ModelSummary: {
+      /**
+       * Key
+       * @description model key
+       */
+      key: string;
+      /** @description model type */
+      type: components["schemas"]["invokeai__backend__model_manager__config__ModelType"];
+      /** @description base model */
+      base: components["schemas"]["invokeai__backend__model_manager__config__BaseModelType"];
+      /** @description model format */
+      format: components["schemas"]["ModelFormat"];
+      /**
+       * Name
+       * @description model name
+       */
+      name: string;
+      /**
+       * Description
+       * @description short description of model
+       */
+      description: string;
+      /**
+       * Tags
+       * @description tags associated with model
+       */
+      tags: string[];
     };
     /**
      * Multiply Integers
@@ -7791,6 +8022,34 @@ export type components = {
        */
       type: "openpose_image_processor";
     };
+    /** PaginatedResults[ModelSummary] */
+    PaginatedResults_ModelSummary_: {
+      /**
+       * Page
+       * @description Current Page
+       */
+      page: number;
+      /**
+       * Pages
+       * @description Total number of pages
+       */
+      pages: number;
+      /**
+       * Per Page
+       * @description Number of items per page
+       */
+      per_page: number;
+      /**
+       * Total
+       * @description Total number of items in result
+       */
+      total: number;
+      /**
+       * Items
+       * @description Items
+       */
+      items: components["schemas"]["ModelSummary"][];
+    };
     /** PaginatedResults[WorkflowRecordListItemDTO] */
     PaginatedResults_WorkflowRecordListItemDTO_: {
       /**
@@ -8221,6 +8480,34 @@ export type components = {
        * @constant
        */
       type: "range_of_size";
+    };
+    /**
+     * RemoteModelFile
+     * @description Information about a downloadable file that forms part of a model.
+     */
+    RemoteModelFile: {
+      /**
+       * Url
+       * Format: uri
+       * @description The url to download this model file
+       */
+      url: string;
+      /**
+       * Path
+       * Format: path
+       * @description The path to the file, relative to the model root
+       */
+      path: string;
+      /**
+       * Size
+       * @description The size of this file, in bytes
+       */
+      size: number;
+      /**
+       * Sha256
+       * @description SHA256 hash of this model (not always available)
+       */
+      sha256?: string | null;
     };
     /** RemoveImagesFromBoardResult */
     RemoveImagesFromBoardResult: {
@@ -10274,10 +10561,10 @@ export type components = {
       access_token?: string | null;
       /**
        * Type
-       * @default generic_url
+       * @default url
        * @constant
        */
-      type?: "generic_url";
+      type?: "url";
     };
     /**
      * Unsharp Mask
@@ -10603,7 +10890,7 @@ export type components = {
      * WorkflowCategory
      * @enum {string}
      */
-    WorkflowCategory: "user" | "default";
+    WorkflowCategory: "user" | "default" | "project";
     /** WorkflowMeta */
     WorkflowMeta: {
       /**
@@ -11004,23 +11291,17 @@ export type components = {
      */
     UIType: "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VAEModelField" | "LoRAModelField" | "ControlNetModelField" | "IPAdapterModelField" | "SchedulerField" | "AnyField" | "CollectionField" | "CollectionItemField" | "DEPRECATED_Boolean" | "DEPRECATED_Color" | "DEPRECATED_Conditioning" | "DEPRECATED_Control" | "DEPRECATED_Float" | "DEPRECATED_Image" | "DEPRECATED_Integer" | "DEPRECATED_Latents" | "DEPRECATED_String" | "DEPRECATED_BooleanCollection" | "DEPRECATED_ColorCollection" | "DEPRECATED_ConditioningCollection" | "DEPRECATED_ControlCollection" | "DEPRECATED_FloatCollection" | "DEPRECATED_ImageCollection" | "DEPRECATED_IntegerCollection" | "DEPRECATED_LatentsCollection" | "DEPRECATED_StringCollection" | "DEPRECATED_BooleanPolymorphic" | "DEPRECATED_ColorPolymorphic" | "DEPRECATED_ConditioningPolymorphic" | "DEPRECATED_ControlPolymorphic" | "DEPRECATED_FloatPolymorphic" | "DEPRECATED_ImagePolymorphic" | "DEPRECATED_IntegerPolymorphic" | "DEPRECATED_LatentsPolymorphic" | "DEPRECATED_StringPolymorphic" | "DEPRECATED_MainModel" | "DEPRECATED_UNet" | "DEPRECATED_Vae" | "DEPRECATED_CLIP" | "DEPRECATED_Collection" | "DEPRECATED_CollectionItem" | "DEPRECATED_Enum" | "DEPRECATED_WorkflowField" | "DEPRECATED_IsIntermediate" | "DEPRECATED_BoardField" | "DEPRECATED_MetadataItem" | "DEPRECATED_MetadataItemCollection" | "DEPRECATED_MetadataItemPolymorphic" | "DEPRECATED_MetadataDict";
     /**
-     * ControlNetModelFormat
+     * StableDiffusion1ModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    ControlNetModelFormat: "checkpoint" | "diffusers";
+    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
     /**
-     * IPAdapterModelFormat
+     * StableDiffusionXLModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    IPAdapterModelFormat: "invokeai";
-    /**
-     * StableDiffusion2ModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
+    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
     /**
      * T2IAdapterModelFormat
      * @description An enumeration.
@@ -11034,11 +11315,17 @@ export type components = {
      */
     CLIPVisionModelFormat: "diffusers";
     /**
-     * StableDiffusionXLModelFormat
+     * IPAdapterModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
+    IPAdapterModelFormat: "invokeai";
+    /**
+     * ControlNetModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    ControlNetModelFormat: "checkpoint" | "diffusers";
     /**
      * StableDiffusionOnnxModelFormat
      * @description An enumeration.
@@ -11046,11 +11333,11 @@ export type components = {
      */
     StableDiffusionOnnxModelFormat: "olive" | "onnx";
     /**
-     * StableDiffusion1ModelFormat
+     * StableDiffusion2ModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    StableDiffusion1ModelFormat: "checkpoint" | "diffusers";
+    StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
   };
   responses: never;
   parameters: never;
@@ -11456,7 +11743,7 @@ export type operations = {
         /** @description Exact match on the name of the model */
         model_name?: string | null;
         /** @description Exact match on the format of the model (e.g. 'diffusers') */
-        model_format?: string | null;
+        model_format?: components["schemas"]["ModelFormat"] | null;
       };
     };
     responses: {
@@ -11583,6 +11870,110 @@ export type operations = {
     };
   };
   /**
+   * List Model Summary
+   * @description Gets a page of model summary data.
+   */
+  list_model_summary: {
+    parameters: {
+      query?: {
+        /** @description The page to get */
+        page?: number;
+        /** @description The number of models per page */
+        per_page?: number;
+        /** @description The attribute to order by */
+        order_by?: components["schemas"]["ModelRecordOrderBy"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PaginatedResults_ModelSummary_"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Get Model Metadata
+   * @description Get a model metadata object.
+   */
+  get_model_metadata: {
+    parameters: {
+      path: {
+        /** @description Key of the model repo metadata to fetch. */
+        key: string;
+      };
+    };
+    responses: {
+      /** @description Success */
+      200: {
+        content: {
+          "application/json": (components["schemas"]["BaseMetadata"] | components["schemas"]["HuggingFaceMetadata"] | components["schemas"]["CivitaiMetadata"]) | null;
+        };
+      };
+      /** @description Bad request */
+      400: {
+        content: never;
+      };
+      /** @description No metadata available */
+      404: {
+        content: never;
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * List Tags
+   * @description Get a unique set of all the model tags.
+   */
+  list_tags: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": string[];
+        };
+      };
+    };
+  };
+  /**
+   * Search By Metadata Tags
+   * @description Get a list of models.
+   */
+  search_by_metadata_tags: {
+    parameters: {
+      query?: {
+        /** @description Tags to search for */
+        tags?: string[];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["invokeai__app__api__routers__model_records__ModelsList"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
    * Add Model Record
    * @description Add a model using the configuration information appropriate for its type.
    */
@@ -11618,9 +12009,6 @@ export type operations = {
   /**
    * List Model Install Jobs
    * @description Return list of model install jobs.
-   *
-   * If the optional 'source' argument is provided, then the list will be filtered
-   * for partial string matches against the install source.
    */
   list_model_install_jobs: {
     responses: {
@@ -11679,7 +12067,7 @@ export type operations = {
    * Installation occurs in the background. Either use list_model_install_jobs()
    * to poll for completion, or listen on the event bus for the following events:
    *
-   *   "model_install_started"
+   *   "model_install_running"
    *   "model_install_completed"
    *   "model_install_error"
    *
@@ -11744,8 +12132,70 @@ export type operations = {
     };
   };
   /**
+   * Get Model Install Job
+   * @description Return model install job corresponding to the given source.
+   */
+  get_model_install_job: {
+    parameters: {
+      path: {
+        /** @description Model install id */
+        id: number;
+      };
+    };
+    responses: {
+      /** @description Success */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ModelInstallJob"];
+        };
+      };
+      /** @description No such job */
+      404: {
+        content: never;
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Cancel Model Install Job
+   * @description Cancel the model install job(s) corresponding to the given job ID.
+   */
+  cancel_model_install_job: {
+    parameters: {
+      path: {
+        /** @description Model install job ID */
+        id: number;
+      };
+    };
+    responses: {
+      /** @description The job was cancelled successfully */
+      201: {
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description No such job */
+      415: {
+        content: never;
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
    * Sync Models To Config
-   * @description Traverse the models and autoimport directories. Model files without a corresponding
+   * @description Traverse the models and autoimport directories.
+   *
+   * Model files without a corresponding
    * record in the database are added. Orphan records without a models file are deleted.
    */
   sync_models_to_config: {
