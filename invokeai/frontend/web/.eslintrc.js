@@ -126,7 +126,7 @@ module.exports = {
       files: ['**/*.ts', '**/*.tsx'],
       rules: {
         'react/prop-types': 'off',
-      }
+      },
     },
   ],
   settings: {

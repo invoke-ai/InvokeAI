@@ -293,7 +293,9 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                         feature="collapseAdvancedOptions"
                         inPortal={false}
                       >
-                        <FormLabel>{t('settings.collapseAdvancedOptions')}</FormLabel>
+                        <FormLabel>
+                          {t('settings.collapseAdvancedOptions')}
+                        </FormLabel>
                       </InformationalPopover>
                       <Switch
                         isChecked={shouldCollapseAdvancedOptions}

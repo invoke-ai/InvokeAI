@@ -41,8 +41,12 @@ const ParametersPanel = () => {
           >
             <Flex gap={2} flexDirection="column" h="full" w="full">
               {isSDXL ? <SDXLPrompts /> : <Prompts />}
-              <ImageSettingsAccordion collapseAdvanced={shouldCollapseAdvancedOptions} />
-              <GenerationSettingsAccordion collapseAdvanced={shouldCollapseAdvancedOptions} />
+              <ImageSettingsAccordion
+                collapseAdvanced={shouldCollapseAdvancedOptions}
+              />
+              <GenerationSettingsAccordion
+                collapseAdvanced={shouldCollapseAdvancedOptions}
+              />
               <ControlSettingsAccordion />
               {activeTabName === 'unifiedCanvas' && (
                 <CompositingSettingsAccordion />

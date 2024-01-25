@@ -85,12 +85,9 @@ export const systemSlice = createSlice({
     ) {
       state.shouldEnableInformationalPopovers = action.payload;
     },
-    setShouldCollapseAdvancedOptions(
-      state,
-      action: PayloadAction<boolean>
-    ) {
+    setShouldCollapseAdvancedOptions(state, action: PayloadAction<boolean>) {
       state.shouldCollapseAdvancedOptions = action.payload;
-    }
+    },
   },
   extraReducers(builder) {
     /**

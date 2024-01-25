@@ -78,52 +78,60 @@ interface ImageSettingsAccordionProps {
   collapseAdvanced?: boolean;
 }
 
-export const ImageSettingsAccordion = memo<ImageSettingsAccordionProps>(({ collapseAdvanced = false }) => {
-  const { t } = useTranslation();
-  const { badges, activeTabName } = useAppSelector(selector);
-  const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } =
-    useStandaloneAccordionToggle({ id: 'image-settings', defaultIsOpen: true });
-  const { isOpen: isOpenExpander, onToggle: onToggleExpander } =
-    useExpanderToggle({ id: 'image-settings-advanced', defaultIsOpen: !collapseAdvanced });
+export const ImageSettingsAccordion = memo<ImageSettingsAccordionProps>(
+  ({ collapseAdvanced = false }) => {
+    const { t } = useTranslation();
+    const { badges, activeTabName } = useAppSelector(selector);
+    const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } =
+      useStandaloneAccordionToggle({
+        id: 'image-settings',
+        defaultIsOpen: true,
+      });
+    const { isOpen: isOpenExpander, onToggle: onToggleExpander } =
+      useExpanderToggle({
+        id: 'image-settings-advanced',
+        defaultIsOpen: !collapseAdvanced,
+      });
 
-  return (
-    <StandaloneAccordion
-      label={t('accordions.image.title')}
-      badges={badges}
-      isOpen={isOpenAccordion}
-      onToggle={onToggleAccordion}
-    >
-      <Flex px={4} pt={4} w="full" h="full" flexDir="column">
-        {activeTabName === 'unifiedCanvas' ? (
-          <ImageSizeCanvas />
-        ) : (
-          <ImageSizeLinear />
-        )}
-        <Expander isOpen={isOpenExpander} onToggle={onToggleExpander}>
-          <Flex gap={4} pb={4} flexDir="column">
-            <Flex gap={4} alignItems="center">
-              <ParamSeedNumberInput />
-              <ParamSeedShuffle />
-              <ParamSeedRandomize />
+    return (
+      <StandaloneAccordion
+        label={t('accordions.image.title')}
+        badges={badges}
+        isOpen={isOpenAccordion}
+        onToggle={onToggleAccordion}
+      >
+        <Flex px={4} pt={4} w="full" h="full" flexDir="column">
+          {activeTabName === 'unifiedCanvas' ? (
+            <ImageSizeCanvas />
+          ) : (
+            <ImageSizeLinear />
+          )}
+          <Expander isOpen={isOpenExpander} onToggle={onToggleExpander}>
+            <Flex gap={4} pb={4} flexDir="column">
+              <Flex gap={4} alignItems="center">
+                <ParamSeedNumberInput />
+                <ParamSeedShuffle />
+                <ParamSeedRandomize />
+              </Flex>
+              {(activeTabName === 'img2img' ||
+                activeTabName === 'unifiedCanvas') && <ImageToImageStrength />}
+              {activeTabName === 'img2img' && <ImageToImageFit />}
+              {activeTabName === 'txt2img' && <HrfSettings />}
+              {activeTabName === 'unifiedCanvas' && (
+                <>
+                  <ParamScaleBeforeProcessing />
+                  <FormControlGroup formLabelProps={scalingLabelProps}>
+                    <ParamScaledWidth />
+                    <ParamScaledHeight />
+                  </FormControlGroup>
+                </>
+              )}
             </Flex>
-            {(activeTabName === 'img2img' ||
-              activeTabName === 'unifiedCanvas') && <ImageToImageStrength />}
-            {activeTabName === 'img2img' && <ImageToImageFit />}
-            {activeTabName === 'txt2img' && <HrfSettings />}
-            {activeTabName === 'unifiedCanvas' && (
-              <>
-                <ParamScaleBeforeProcessing />
-                <FormControlGroup formLabelProps={scalingLabelProps}>
-                  <ParamScaledWidth />
-                  <ParamScaledHeight />
-                </FormControlGroup>
-              </>
-            )}
-          </Flex>
-        </Expander>
-      </Flex>
-    </StandaloneAccordion>
-  );
-});
+          </Expander>
+        </Flex>
+      </StandaloneAccordion>
+    );
+  }
+);
 
 ImageSettingsAccordion.displayName = 'ImageSettingsAccordion';

@@ -50,60 +50,61 @@ interface GenerationSettingsAccordionProps {
   collapseAdvanced: boolean;
 }
 
-export const GenerationSettingsAccordion = memo<GenerationSettingsAccordionProps>(({ collapseAdvanced = false }) => {
-  const { t } = useTranslation();
-  const { loraTabBadges, accordionBadges } = useAppSelector(badgesSelector);
-  const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } =
-    useStandaloneAccordionToggle({
-      id: 'generation-settings',
-      defaultIsOpen: true,
-    });
-  const { isOpen: isOpenExpander, onToggle: onToggleExpander } =
-    useExpanderToggle({
-      id: 'generation-settings-advanced',
-      defaultIsOpen: !collapseAdvanced,
-    });
+export const GenerationSettingsAccordion =
+  memo<GenerationSettingsAccordionProps>(({ collapseAdvanced = false }) => {
+    const { t } = useTranslation();
+    const { loraTabBadges, accordionBadges } = useAppSelector(badgesSelector);
+    const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } =
+      useStandaloneAccordionToggle({
+        id: 'generation-settings',
+        defaultIsOpen: true,
+      });
+    const { isOpen: isOpenExpander, onToggle: onToggleExpander } =
+      useExpanderToggle({
+        id: 'generation-settings-advanced',
+        defaultIsOpen: !collapseAdvanced,
+      });
 
-  return (
-    <StandaloneAccordion
-      label={t('accordions.generation.title')}
-      badges={accordionBadges}
-      isOpen={isOpenAccordion}
-      onToggle={onToggleAccordion}
-    >
-      <Tabs variant="collapse">
-        <TabList>
-          <Tab>{t('accordions.generation.modelTab')}</Tab>
-          <Tab badges={loraTabBadges}>
-            {t('accordions.generation.conceptsTab')}
-          </Tab>
-        </TabList>
-        <TabPanels>
-          <TabPanel overflow="visible" px={4} pt={4}>
-            <Flex gap={4} alignItems="center">
-              <ParamMainModelSelect />
-              <SyncModelsIconButton />
-            </Flex>
-            <Expander isOpen={isOpenExpander} onToggle={onToggleExpander}>
-              <Flex gap={4} flexDir="column" pb={4}>
-                <FormControlGroup formLabelProps={formLabelProps}>
-                  <ParamScheduler />
-                  <ParamSteps />
-                  <ParamCFGScale />
-                </FormControlGroup>
+    return (
+      <StandaloneAccordion
+        label={t('accordions.generation.title')}
+        badges={accordionBadges}
+        isOpen={isOpenAccordion}
+        onToggle={onToggleAccordion}
+      >
+        <Tabs variant="collapse">
+          <TabList>
+            <Tab>{t('accordions.generation.modelTab')}</Tab>
+            <Tab badges={loraTabBadges}>
+              {t('accordions.generation.conceptsTab')}
+            </Tab>
+          </TabList>
+          <TabPanels>
+            <TabPanel overflow="visible" px={4} pt={4}>
+              <Flex gap={4} alignItems="center">
+                <ParamMainModelSelect />
+                <SyncModelsIconButton />
               </Flex>
-            </Expander>
-          </TabPanel>
-          <TabPanel>
-            <Flex gap={4} p={4} flexDir="column">
-              <LoRASelect />
-              <LoRAList />
-            </Flex>
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
-    </StandaloneAccordion>
-  );
-});
+              <Expander isOpen={isOpenExpander} onToggle={onToggleExpander}>
+                <Flex gap={4} flexDir="column" pb={4}>
+                  <FormControlGroup formLabelProps={formLabelProps}>
+                    <ParamScheduler />
+                    <ParamSteps />
+                    <ParamCFGScale />
+                  </FormControlGroup>
+                </Flex>
+              </Expander>
+            </TabPanel>
+            <TabPanel>
+              <Flex gap={4} p={4} flexDir="column">
+                <LoRASelect />
+                <LoRAList />
+              </Flex>
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
+      </StandaloneAccordion>
+    );
+  });
 
 GenerationSettingsAccordion.displayName = 'GenerationSettingsAccordion';
