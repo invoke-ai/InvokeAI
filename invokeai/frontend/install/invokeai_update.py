@@ -182,9 +182,19 @@ def main():
             print(f":exclamation: [bold red]'{release}' is not a recognized InvokeAI release.[/red bold]")
 
     extras = get_extras()
+
+    console.line()
+    force_reinstall = Confirm.ask(
+        "[bold]Force reinstallation of all dependencies?[/] This [i]may[/] help fix a broken upgrade, but is usually not necessary.",
+        default=False,
+    )
+
+    console.line()
     flags = []
     if (index_url := get_torch_extra_index_url()) is not None:
         flags.append(f"--extra-index-url {index_url}")
+    if force_reinstall:
+        flags.append("--force-reinstall")
     flags = " ".join(flags)
 
     print(f":crossed_fingers: Upgrading to [yellow]{release}[/yellow]")
