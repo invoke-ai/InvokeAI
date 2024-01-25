@@ -175,8 +175,15 @@ export const generationSlice = createSlice({
         }
 
         // Clamp ClipSkip Based On Selected Model
-        const { maxClip } = CLIP_SKIP_MAP[newModel.base_model];
-        state.clipSkip = clamp(state.clipSkip, 0, maxClip);
+        // TODO(psyche): remove this special handling when https://github.com/invoke-ai/InvokeAI/issues/4583 is resolved
+        // WIP PR here: https://github.com/invoke-ai/InvokeAI/pull/4624
+        if (newModel.base_model === 'sdxl') {
+          // We don't support clip skip for SDXL yet - it's not in the graphs
+          state.clipSkip = 0;
+        } else {
+          const { maxClip } = CLIP_SKIP_MAP[newModel.base_model];
+          state.clipSkip = clamp(state.clipSkip, 0, maxClip);
+        }
 
         if (action.meta.previousModel?.base_model === newModel.base_model) {
           // The base model hasn't changed, we don't need to optimize the size
@@ -223,6 +230,18 @@ export const generationSlice = createSlice({
     heightChanged: (state, action: PayloadAction<number>) => {
       state.height = action.payload;
     },
+    widthRecalled: (state, action: PayloadAction<number>) => {
+      state.width = action.payload;
+      state.aspectRatio.value = action.payload / state.height;
+      state.aspectRatio.id = 'Free';
+      state.aspectRatio.isLocked = false;
+    },
+    heightRecalled: (state, action: PayloadAction<number>) => {
+      state.height = action.payload;
+      state.aspectRatio.value = state.width / action.payload;
+      state.aspectRatio.id = 'Free';
+      state.aspectRatio.isLocked = false;
+    },
     aspectRatioChanged: (state, action: PayloadAction<AspectRatioState>) => {
       state.aspectRatio = action.payload;
     },
@@ -242,6 +261,11 @@ export const generationSlice = createSlice({
 
         if (result.success) {
           state.model = result.data;
+
+          const optimalDimension = getOptimalDimension(result.data);
+
+          state.width = optimalDimension;
+          state.height = optimalDimension;
         }
       }
     });
@@ -294,6 +318,8 @@ export const {
   aspectRatioChanged,
   widthChanged,
   heightChanged,
+  widthRecalled,
+  heightRecalled,
 } = generationSlice.actions;
 
 export const { selectOptimalDimension } = generationSlice.selectors;

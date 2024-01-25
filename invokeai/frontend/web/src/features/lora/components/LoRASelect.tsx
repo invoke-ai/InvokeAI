@@ -1,9 +1,8 @@
-import type { ChakraProps } from '@chakra-ui/react';
+import type { ChakraProps } from '@invoke-ai/ui';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
+import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { loraAdded, selectLoraSlice } from 'features/lora/store/loraSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -41,7 +40,7 @@ const LoRASelect = () => {
     [dispatch]
   );
 
-  const { options, onChange } = useGroupedModelInvSelect({
+  const { options, onChange } = useGroupedModelCombobox({
     modelEntities: data,
     getIsDisabled,
     onChange: _onChange,
@@ -62,8 +61,9 @@ const LoRASelect = () => {
   const noOptionsMessage = useCallback(() => t('models.noMatchingLoRAs'), [t]);
 
   return (
-    <InvControl label={t('models.lora')} isDisabled={!options.length}>
-      <InvSelect
+    <FormControl isDisabled={!options.length}>
+      <FormLabel>{t('models.lora')} </FormLabel>
+      <Combobox
         placeholder={placeholder}
         value={null}
         options={options}
@@ -72,7 +72,7 @@ const LoRASelect = () => {
         data-testid="add-lora"
         sx={selectStyles}
       />
-    </InvControl>
+    </FormControl>
   );
 };
 

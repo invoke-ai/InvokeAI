@@ -1,6 +1,5 @@
-import { Flex, Spacer } from '@chakra-ui/layout';
+import { Button, Flex, Spacer } from '@invoke-ai/ui';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
 import { QueueIterationsNumberInput } from 'features/queue/components/QueueIterationsNumberInput';
 import { useQueueBack } from 'features/queue/hooks/useQueueBack';
 import { memo } from 'react';
@@ -19,7 +18,7 @@ export const InvokeQueueBackButton = memo(() => {
   return (
     <Flex pos="relative" flexGrow={1} minW="240px">
       <QueueIterationsNumberInput />
-      <InvButton
+      <Button
         onClick={queueBack}
         isLoading={isLoading || isLoadingDynamicPrompts}
         loadingText={invoke}
@@ -37,7 +36,7 @@ export const InvokeQueueBackButton = memo(() => {
       >
         <span>{invoke}</span>
         <Spacer />
-      </InvButton>
+      </Button>
     </Flex>
   );
 });

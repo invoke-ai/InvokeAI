@@ -1,9 +1,8 @@
-import { Flex, Image } from '@chakra-ui/react';
+import { Flex, Image, Text } from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { InvText } from 'common/components/InvText/wrapper';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
@@ -94,9 +93,9 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
           justifyContent="center"
           h={8}
         >
-          <InvText fontSize="sm" fontWeight="semibold" color="base.200">
+          <Text fontSize="sm" fontWeight="semibold" color="base.200">
             {t('nodes.currentImage')}
-          </InvText>
+          </Text>
         </Flex>
         <Flex
           layerStyle="nodeBody"

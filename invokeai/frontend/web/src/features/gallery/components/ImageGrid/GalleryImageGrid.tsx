@@ -1,8 +1,7 @@
-import { Box, Flex } from '@chakra-ui/react';
+import { Box, Button, Flex } from '@invoke-ai/ui';
 import type { EntityId } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { InvButton } from 'common/components/InvButton/InvButton';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { virtuosoGridRefs } from 'features/gallery/components/ImageGrid/types';
 import { useGalleryHotkeys } from 'features/gallery/hooks/useGalleryHotkeys';
@@ -11,7 +10,7 @@ import { useOverlayScrollbars } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaExclamationCircle, FaImage } from 'react-icons/fa';
+import { PiImageBold, PiWarningCircleBold } from 'react-icons/pi';
 import type {
   GridComponents,
   ItemContent,
@@ -88,7 +87,7 @@ const GalleryImageGrid = () => {
   if (!currentData) {
     return (
       <Flex w="full" h="full" alignItems="center" justifyContent="center">
-        <IAINoContentFallback label={t('gallery.loading')} icon={FaImage} />
+        <IAINoContentFallback label={t('gallery.loading')} icon={PiImageBold} />
       </Flex>
     );
   }
@@ -98,7 +97,7 @@ const GalleryImageGrid = () => {
       <Flex w="full" h="full" alignItems="center" justifyContent="center">
         <IAINoContentFallback
           label={t('gallery.noImagesInGallery')}
-          icon={FaImage}
+          icon={PiImageBold}
         />
       </Flex>
     );
@@ -120,15 +119,15 @@ const GalleryImageGrid = () => {
             overscan={10}
           />
         </Box>
-        <InvButton
+        <Button
           onClick={handleLoadMoreImages}
           isDisabled={!areMoreImagesAvailable}
           isLoading={isFetching}
           loadingText={t('gallery.loading')}
           flexShrink={0}
         >
-          {`Load More (${currentData.ids.length} of ${currentViewTotal})`}
-        </InvButton>
+          {`${t('accessibility.loadMore')} (${currentData.ids.length} / ${currentViewTotal})`}
+        </Button>
       </>
     );
   }
@@ -138,7 +137,7 @@ const GalleryImageGrid = () => {
       <Box w="full" h="full">
         <IAINoContentFallback
           label={t('gallery.unableToLoad')}
-          icon={FaExclamationCircle}
+          icon={PiWarningCircleBold}
         />
       </Box>
     );

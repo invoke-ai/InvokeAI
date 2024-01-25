@@ -1,13 +1,16 @@
-import { Flex } from '@chakra-ui/react';
+import {
+  ButtonGroup,
+  Flex,
+  IconButton,
+  Menu,
+  MenuButton,
+  MenuList,
+} from '@invoke-ai/ui';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppToaster } from 'app/components/Toaster';
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
-import { InvMenu, InvMenuButton } from 'common/components/InvMenu/wrapper';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
@@ -29,6 +32,7 @@ import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
+  PiArrowsCounterClockwiseBold,
   PiAsteriskBold,
   PiDotsThreeOutlineFill,
   PiFlowArrowBold,
@@ -126,6 +130,16 @@ const CurrentImageButtons = () => {
 
   useHotkeys('p', handleUsePrompt, [metadata]);
 
+  const handleRemixImage = useCallback(() => {
+    // Recalls all metadata parameters except seed
+    recallAllParameters({
+      ...metadata,
+      seed: undefined,
+    });
+  }, [metadata, recallAllParameters]);
+
+  useHotkeys('r', handleRemixImage, [metadata]);
+
   const handleUseSize = useCallback(() => {
     recallWidthAndHeight(metadata?.width, metadata?.height);
   }, [metadata?.width, metadata?.height, recallWidthAndHeight]);
@@ -204,23 +218,23 @@ const CurrentImageButtons = () => {
   return (
     <>
       <Flex flexWrap="wrap" justifyContent="center" alignItems="center" gap={2}>
-        <InvButtonGroup isDisabled={shouldDisableToolbarButtons}>
-          <InvMenu isLazy>
-            <InvMenuButton
-              as={InvIconButton}
+        <ButtonGroup isDisabled={shouldDisableToolbarButtons}>
+          <Menu isLazy>
+            <MenuButton
+              as={IconButton}
               aria-label={t('parameters.imageActions')}
               tooltip={t('parameters.imageActions')}
               isDisabled={!imageDTO}
               icon={<PiDotsThreeOutlineFill />}
             />
-            <InvMenuList>
+            <MenuList>
               {imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}
-            </InvMenuList>
-          </InvMenu>
-        </InvButtonGroup>
+            </MenuList>
+          </Menu>
+        </ButtonGroup>
 
-        <InvButtonGroup isDisabled={shouldDisableToolbarButtons}>
-          <InvIconButton
+        <ButtonGroup isDisabled={shouldDisableToolbarButtons}>
+          <IconButton
             icon={<PiFlowArrowBold />}
             tooltip={`${t('nodes.loadWorkflow')} (W)`}
             aria-label={`${t('nodes.loadWorkflow')} (W)`}
@@ -228,7 +242,15 @@ const CurrentImageButtons = () => {
             onClick={handleLoadWorkflow}
             isLoading={getAndLoadEmbeddedWorkflowResult.isLoading}
           />
-          <InvIconButton
+          <IconButton
+            isLoading={isLoadingMetadata}
+            icon={<PiArrowsCounterClockwiseBold />}
+            tooltip={`${t('parameters.remixImage')} (R)`}
+            aria-label={`${t('parameters.remixImage')} (R)`}
+            isDisabled={!metadata?.positive_prompt}
+            onClick={handleRemixImage}
+          />
+          <IconButton
             isLoading={isLoadingMetadata}
             icon={<PiQuotesBold />}
             tooltip={`${t('parameters.usePrompt')} (P)`}
@@ -236,7 +258,7 @@ const CurrentImageButtons = () => {
             isDisabled={!metadata?.positive_prompt}
             onClick={handleUsePrompt}
           />
-          <InvIconButton
+          <IconButton
             isLoading={isLoadingMetadata}
             icon={<PiPlantBold />}
             tooltip={`${t('parameters.useSeed')} (S)`}
@@ -244,7 +266,7 @@ const CurrentImageButtons = () => {
             isDisabled={metadata?.seed === null || metadata?.seed === undefined}
             onClick={handleUseSeed}
           />
-          <InvIconButton
+          <IconButton
             isLoading={isLoadingMetadata}
             icon={<PiRulerBold />}
             tooltip={`${t('parameters.useSize')} (D)`}
@@ -257,7 +279,7 @@ const CurrentImageButtons = () => {
             }
             onClick={handleUseSize}
           />
-          <InvIconButton
+          <IconButton
             isLoading={isLoadingMetadata}
             icon={<PiAsteriskBold />}
             tooltip={`${t('parameters.useAll')} (A)`}
@@ -265,37 +287,37 @@ const CurrentImageButtons = () => {
             isDisabled={!metadata}
             onClick={handleClickUseAllParameters}
           />
-        </InvButtonGroup>
+        </ButtonGroup>
 
         {isUpscalingEnabled && (
-          <InvButtonGroup isDisabled={isQueueMutationInProgress}>
+          <ButtonGroup isDisabled={isQueueMutationInProgress}>
             {isUpscalingEnabled && <ParamUpscalePopover imageDTO={imageDTO} />}
-          </InvButtonGroup>
+          </ButtonGroup>
         )}
 
-        <InvButtonGroup>
-          <InvIconButton
+        <ButtonGroup>
+          <IconButton
             icon={<PiInfoBold />}
             tooltip={`${t('parameters.info')} (I)`}
             aria-label={`${t('parameters.info')} (I)`}
             isChecked={shouldShowImageDetails}
             onClick={handleClickShowImageDetails}
           />
-        </InvButtonGroup>
+        </ButtonGroup>
 
-        <InvButtonGroup>
-          <InvIconButton
+        <ButtonGroup>
+          <IconButton
             aria-label={t('settings.displayInProgress')}
             tooltip={t('settings.displayInProgress')}
             icon={<PiHourglassHighBold />}
             isChecked={shouldShowProgressInViewer}
             onClick={handleClickProgressImagesToggle}
           />
-        </InvButtonGroup>
+        </ButtonGroup>
 
-        <InvButtonGroup>
+        <ButtonGroup>
           <DeleteImageButton onClick={handleDelete} />
-        </InvButtonGroup>
+        </ButtonGroup>
       </Flex>
     </>
   );

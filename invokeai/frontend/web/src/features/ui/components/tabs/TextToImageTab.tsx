@@ -1,4 +1,4 @@
-import { Box, Flex } from '@chakra-ui/react';
+import { Box, Flex } from '@invoke-ai/ui';
 import CurrentImageDisplay from 'features/gallery/components/CurrentImage/CurrentImageDisplay';
 import { memo } from 'react';
 

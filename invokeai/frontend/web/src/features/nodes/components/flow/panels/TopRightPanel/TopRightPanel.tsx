@@ -1,4 +1,4 @@
-import { Flex } from '@chakra-ui/react';
+import { Flex } from '@invoke-ai/ui';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import WorkflowLibraryButton from 'features/workflowLibrary/components/WorkflowLibraryButton';
 import WorkflowLibraryMenu from 'features/workflowLibrary/components/WorkflowLibraryMenu/WorkflowLibraryMenu';

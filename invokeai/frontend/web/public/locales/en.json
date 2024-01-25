@@ -1,5 +1,6 @@
 {
     "accessibility": {
+        "about": "About",
         "copyMetadataJson": "Copy metadata JSON",
         "createIssue": "Create Issue",
         "exitViewer": "Exit Viewer",
@@ -74,6 +75,8 @@
         }
     },
     "common": {
+        "aboutDesc": "Using Invoke for work? Check out:",
+        "aboutHeading": "Own Your Creative Power",
         "accept": "Accept",
         "advanced": "Advanced",
         "advancedOptions": "Advanced Options",
@@ -136,6 +139,7 @@
         "load": "Load",
         "loading": "Loading",
         "loadingInvokeAI": "Loading Invoke AI",
+        "localSystem": "Local System",
         "learnMore": "Learn More",
         "modelManager": "Model Manager",
         "nodeEditor": "Node Editor",
@@ -199,7 +203,11 @@
         "prevPage": "Previous Page",
         "nextPage": "Next Page",
         "unknownError": "Unknown Error",
-        "unsaved": "Unsaved"
+        "unsaved": "Unsaved",
+        "red": "Red",
+        "green": "Green",
+        "blue": "Blue",
+        "alpha": "Alpha"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
@@ -216,6 +224,7 @@
         "amult": "a_mult",
         "autoConfigure": "Auto configure processor",
         "balanced": "Balanced",
+        "base": "Base",
         "beginEndStepPercent": "Begin / End Step Percentage",
         "bgth": "bg_th",
         "canny": "Canny",
@@ -229,6 +238,8 @@
         "controlMode": "Control Mode",
         "crop": "Crop",
         "delete": "Delete",
+        "depthAnything": "Depth Anything",
+        "depthAnythingDescription": "Depth map generation using the Depth Anything technique",
         "depthMidas": "Depth (Midas)",
         "depthMidasDescription": "Depth map generation using Midas",
         "depthZoe": "Depth (Zoe)",
@@ -248,6 +259,7 @@
         "colorMapTileSize": "Tile Size",
         "importImageFromCanvas": "Import Image From Canvas",
         "importMaskFromCanvas": "Import Mask From Canvas",
+        "large": "Large",
         "lineart": "Lineart",
         "lineartAnime": "Lineart Anime",
         "lineartAnimeDescription": "Anime-style lineart processing",
@@ -260,6 +272,7 @@
         "minConfidence": "Min Confidence",
         "mlsd": "M-LSD",
         "mlsdDescription": "Minimalist Line Segment Detector",
+        "modelSize": "Model Size",
         "none": "None",
         "noneDescription": "No processing applied",
         "normalBae": "Normal BAE",
@@ -280,6 +293,7 @@
         "selectModel": "Select a model",
         "setControlImageDimensions": "Set Control Image Dimensions To W/H",
         "showAdvanced": "Show Advanced",
+        "small": "Small",
         "toggleControlNet": "Toggle this ControlNet",
         "w": "W",
         "weight": "Weight",
@@ -592,6 +606,10 @@
             "desc": "Send current image to Image to Image",
             "title": "Send To Image To Image"
         },
+        "remixImage": {
+            "desc": "Use all parameters except seed from the current image",
+            "title": "Remix image"
+        },
         "setParameters": {
             "desc": "Use all parameters of the current image",
             "title": "Set Parameters"
@@ -699,6 +717,7 @@
         "clearCheckpointFolder": "Clear Checkpoint Folder",
         "closeAdvanced": "Close Advanced",
         "config": "Config",
+        "configFile": "Config File",
         "configValidationMsg": "Path to the config file of your model.",
         "conversionNotSupported": "Conversion Not Supported",
         "convert": "Convert",
@@ -1089,6 +1108,7 @@
         "boundingBoxHeader": "Bounding Box",
         "boundingBoxHeight": "Bounding Box Height",
         "boundingBoxWidth": "Bounding Box Width",
+        "boxBlur": "Box Blur",
         "cancel": {
             "cancel": "Cancel",
             "immediate": "Cancel immediately",
@@ -1116,6 +1136,7 @@
         "enableNoiseSettings": "Enable Noise Settings",
         "faceRestoration": "Face Restoration",
         "general": "General",
+        "gaussianBlur": "Gaussian Blur",
         "height": "Height",
         "hidePreview": "Hide Preview",
         "hiresOptim": "High Res Optimization",
@@ -1205,6 +1226,7 @@
         "useCpuNoise": "Use CPU Noise",
         "cpuNoise": "CPU Noise",
         "gpuNoise": "GPU Noise",
+        "remixImage": "Remix Image",
         "useInitImg": "Use Initial Image",
         "usePrompt": "Use Prompt",
         "useSeed": "Use Seed",
@@ -1363,6 +1385,7 @@
         "promptNotSet": "Prompt Not Set",
         "promptNotSetDesc": "Could not find prompt for this image.",
         "promptSet": "Prompt Set",
+        "resetInitialImage": "Reset Initial Image",
         "seedNotSet": "Seed Not Set",
         "seedNotSetDesc": "Could not find seed for this image.",
         "seedSet": "Seed Set",
@@ -1379,6 +1402,7 @@
         "uploadFailed": "Upload failed",
         "uploadFailedInvalidUploadDesc": "Must be single PNG or JPEG image",
         "uploadFailedUnableToLoadDesc": "Unable to load file",
+        "uploadInitialImage": "Upload Initial Image",
         "upscalingFailed": "Upscaling Failed",
         "workflowLoaded": "Workflow Loaded",
         "problemRetrievingWorkflow": "Problem Retrieving Workflow",
@@ -1684,6 +1708,7 @@
         "workflowLibrary": "Library",
         "userWorkflows": "My Workflows",
         "defaultWorkflows": "Default Workflows",
+        "projectWorkflows": "Project Workflows",
         "openWorkflow": "Open Workflow",
         "uploadWorkflow": "Load from File",
         "deleteWorkflow": "Delete Workflow",
@@ -1696,6 +1721,7 @@
         "workflowSaved": "Workflow Saved",
         "noRecentWorkflows": "No Recent Workflows",
         "noUserWorkflows": "No User Workflows",
+        "noWorkflows": "No Workflows",
         "noSystemWorkflows": "No System Workflows",
         "problemLoading": "Problem Loading Workflows",
         "loading": "Loading Workflows",

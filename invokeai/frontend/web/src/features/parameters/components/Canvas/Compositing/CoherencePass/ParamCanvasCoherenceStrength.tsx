@@ -1,6 +1,11 @@
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setCanvasCoherenceStrength } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,22 +25,27 @@ const ParamCanvasCoherenceStrength = () => {
   );
 
   return (
-    <InvControl
-      label={t('parameters.coherenceStrength')}
-      feature="compositingStrength"
-    >
-      <InvSlider
+    <FormControl>
+      <InformationalPopover feature="compositingStrength">
+        <FormLabel>{t('parameters.coherenceStrength')}</FormLabel>
+      </InformationalPopover>
+      <CompositeSlider
         min={0}
         max={1}
         step={0.01}
         value={canvasCoherenceStrength}
         defaultValue={0.75}
         onChange={handleChange}
-        withNumberInput
-        numberInputMax={999}
-        marks
       />
-    </InvControl>
+      <CompositeNumberInput
+        min={0}
+        max={1}
+        step={0.01}
+        value={canvasCoherenceStrength}
+        defaultValue={0.75}
+        onChange={handleChange}
+      />
+    </FormControl>
   );
 };
 

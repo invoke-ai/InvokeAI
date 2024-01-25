@@ -1,9 +1,0 @@
-export type {
-  ModalBody as InvModalBodyProps,
-  ModalCloseButton as InvModalCloseButtonProps,
-  ModalContent as InvModalContentProps,
-  ModalFooter as InvModalFooterProps,
-  ModalHeader as InvModalHeaderProps,
-  ModalOverlay as InvModalOverlayProps,
-  Modal as InvModalProps,
-} from '@chakra-ui/react';

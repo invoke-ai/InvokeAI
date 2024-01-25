@@ -1,8 +1,11 @@
-import { Flex, Heading, Spinner } from '@chakra-ui/react';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
-import { InvText } from 'common/components/InvText/wrapper';
-import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import {
+  Button,
+  ButtonGroup,
+  Flex,
+  Heading,
+  Spinner,
+  Text,
+} from '@invoke-ai/ui';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import { useCancelBatch } from 'features/queue/hooks/useCancelBatch';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
@@ -10,7 +13,7 @@ import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTime
 import type { ReactNode } from 'react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaTimes } from 'react-icons/fa';
+import { PiXBold } from 'react-icons/pi';
 import { useGetQueueItemQuery } from 'services/api/endpoints/queue';
 import type { SessionQueueItemDTO } from 'services/api/types';
 
@@ -71,8 +74,8 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
         <QueueItemData label={t('queue.item')} data={item_id} />
         <QueueItemData label={t('queue.batch')} data={batch_id} />
         <QueueItemData label={t('queue.session')} data={session_id} />
-        <InvButtonGroup size="xs" orientation="vertical">
-          <InvButton
+        <ButtonGroup size="xs" orientation="vertical">
+          <Button
             onClick={cancelQueueItem}
             isLoading={isLoadingCancelQueueItem}
             isDisabled={
@@ -81,22 +84,22 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
                 : true
             }
             aria-label={t('queue.cancelItem')}
-            leftIcon={<FaTimes />}
+            leftIcon={<PiXBold />}
             colorScheme="error"
           >
             {t('queue.cancelItem')}
-          </InvButton>
-          <InvButton
+          </Button>
+          <Button
             onClick={cancelBatch}
             isLoading={isLoadingCancelBatch}
             isDisabled={isCanceled}
             aria-label={t('queue.cancelBatch')}
-            leftIcon={<FaTimes />}
+            leftIcon={<PiXBold />}
             colorScheme="error"
           >
             {t('queue.cancelBatch')}
-          </InvButton>
-        </InvButtonGroup>
+          </Button>
+        </ButtonGroup>
       </Flex>
       {queueItem?.error && (
         <Flex
@@ -123,9 +126,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
         justifyContent="center"
       >
         {queueItem ? (
-          <ScrollableContent>
-            <DataViewer label="Queue Item" data={queueItem} />
-          </ScrollableContent>
+          <DataViewer label="Queue Item" data={queueItem} />
         ) : (
           <Spinner opacity={0.5} />
         )}
@@ -157,9 +158,9 @@ const QueueItemData = ({ label, data }: QueueItemDataProps) => {
       >
         {label}
       </Heading>
-      <InvText overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
+      <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
         {data}
-      </InvText>
+      </Text>
     </Flex>
   );
 };

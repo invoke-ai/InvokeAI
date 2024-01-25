@@ -1,5 +1,9 @@
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type { RequiredContentShuffleImageProcessorInvocation } from 'features/controlAdapters/store/types';
@@ -60,67 +64,96 @@ const ContentShuffleProcessor = (props: Props) => {
 
   return (
     <ProcessorWrapper>
-      <InvControl
-        label={t('controlnet.detectResolution')}
-        isDisabled={!isEnabled}
-      >
-        <InvSlider
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.detectResolution')}</FormLabel>
+        <CompositeSlider
           value={detect_resolution}
           defaultValue={DEFAULTS.detect_resolution}
           onChange={handleDetectResolutionChanged}
           min={0}
           max={4096}
           marks
-          withNumberInput
         />
-      </InvControl>
-      <InvControl
-        label={t('controlnet.imageResolution')}
-        isDisabled={!isEnabled}
-      >
-        <InvSlider
+        <CompositeNumberInput
+          value={detect_resolution}
+          defaultValue={DEFAULTS.detect_resolution}
+          onChange={handleDetectResolutionChanged}
+          min={0}
+          max={4096}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.imageResolution')}</FormLabel>
+        <CompositeSlider
           value={image_resolution}
           defaultValue={DEFAULTS.image_resolution}
           onChange={handleImageResolutionChanged}
           min={0}
           max={4096}
           marks
-          withNumberInput
         />
-      </InvControl>
-      <InvControl label={t('controlnet.w')} isDisabled={!isEnabled}>
-        <InvSlider
+        <CompositeNumberInput
+          value={image_resolution}
+          defaultValue={DEFAULTS.image_resolution}
+          onChange={handleImageResolutionChanged}
+          min={0}
+          max={4096}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.w')}</FormLabel>
+        <CompositeSlider
           value={w}
           defaultValue={DEFAULTS.w}
           onChange={handleWChanged}
           min={0}
           max={4096}
           marks
-          withNumberInput
         />
-      </InvControl>
-      <InvControl label={t('controlnet.h')} isDisabled={!isEnabled}>
-        <InvSlider
+        <CompositeNumberInput
+          value={w}
+          defaultValue={DEFAULTS.w}
+          onChange={handleWChanged}
+          min={0}
+          max={4096}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.h')}</FormLabel>
+        <CompositeSlider
           value={h}
           defaultValue={DEFAULTS.h}
           onChange={handleHChanged}
           min={0}
           max={4096}
           marks
-          withNumberInput
         />
-      </InvControl>
-      <InvControl label={t('controlnet.f')} isDisabled={!isEnabled}>
-        <InvSlider
+        <CompositeNumberInput
+          value={h}
+          defaultValue={DEFAULTS.h}
+          onChange={handleHChanged}
+          min={0}
+          max={4096}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.f')}</FormLabel>
+        <CompositeSlider
           value={f}
           defaultValue={DEFAULTS.f}
           onChange={handleFChanged}
           min={0}
           max={4096}
           marks
-          withNumberInput
         />
-      </InvControl>
+        <CompositeNumberInput
+          value={f}
+          defaultValue={DEFAULTS.f}
+          onChange={handleFChanged}
+          min={0}
+          max={4096}
+        />
+      </FormControl>
     </ProcessorWrapper>
   );
 };

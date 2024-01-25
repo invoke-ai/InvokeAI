@@ -1,10 +1,7 @@
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import {
   isSeedBehaviour,
   seedBehaviourChanged,
@@ -17,7 +14,7 @@ const ParamDynamicPromptsSeedBehaviour = () => {
   const { t } = useTranslation();
   const seedBehaviour = useAppSelector((s) => s.dynamicPrompts.seedBehaviour);
 
-  const options = useMemo<InvSelectOption[]>(() => {
+  const options = useMemo<ComboboxOption[]>(() => {
     return [
       {
         value: 'PER_ITERATION',
@@ -32,7 +29,7 @@ const ParamDynamicPromptsSeedBehaviour = () => {
     ];
   }, [t]);
 
-  const handleChange = useCallback<InvSelectOnChange>(
+  const handleChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!isSeedBehaviour(v?.value)) {
         return;
@@ -48,13 +45,15 @@ const ParamDynamicPromptsSeedBehaviour = () => {
   );
 
   return (
-    <InvControl
-      label={t('dynamicPrompts.seedBehaviour.label')}
-      feature="dynamicPromptsSeedBehaviour"
-      renderInfoPopoverInPortal={false}
-    >
-      <InvSelect value={value} options={options} onChange={handleChange} />
-    </InvControl>
+    <FormControl>
+      <InformationalPopover
+        feature="dynamicPromptsSeedBehaviour"
+        inPortal={false}
+      >
+        <FormLabel>{t('dynamicPrompts.seedBehaviour.label')}</FormLabel>
+      </InformationalPopover>
+      <Combobox value={value} options={options} onChange={handleChange} />
+    </FormControl>
   );
 };
 

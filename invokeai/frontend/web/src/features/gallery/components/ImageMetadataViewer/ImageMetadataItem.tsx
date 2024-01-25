@@ -1,12 +1,8 @@
-import { ExternalLinkIcon } from '@chakra-ui/icons';
-import { Flex, Link } from '@chakra-ui/react';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvText } from 'common/components/InvText/wrapper';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { ExternalLink, Flex, IconButton, Text, Tooltip } from '@invoke-ai/ui';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaCopy } from 'react-icons/fa';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';
+import { PiCopyBold } from 'react-icons/pi';
 
 type MetadataItemProps = {
   isLink?: boolean;
@@ -42,8 +38,8 @@ const ImageMetadataItem = ({
   return (
     <Flex gap={2}>
       {onClick && (
-        <InvTooltip label={`Recall ${label}`}>
-          <InvIconButton
+        <Tooltip label={`Recall ${label}`}>
+          <IconButton
             aria-label={t('accessibility.useThisParameter')}
             icon={<IoArrowUndoCircleOutline />}
             size="xs"
@@ -51,32 +47,30 @@ const ImageMetadataItem = ({
             fontSize={20}
             onClick={onClick}
           />
-        </InvTooltip>
+        </Tooltip>
       )}
       {withCopy && (
-        <InvTooltip label={`Copy ${label}`}>
-          <InvIconButton
+        <Tooltip label={`Copy ${label}`}>
+          <IconButton
             aria-label={`Copy ${label}`}
-            icon={<FaCopy />}
+            icon={<PiCopyBold />}
             size="xs"
             variant="ghost"
             fontSize={14}
             onClick={handleCopy}
           />
-        </InvTooltip>
+        </Tooltip>
       )}
       <Flex direction={labelPosition ? 'column' : 'row'}>
-        <InvText fontWeight="semibold" whiteSpace="pre-wrap" pr={2}>
+        <Text fontWeight="semibold" whiteSpace="pre-wrap" pr={2}>
           {label}:
-        </InvText>
+        </Text>
         {isLink ? (
-          <Link href={value.toString()} isExternal wordBreak="break-all">
-            {value.toString()} <ExternalLinkIcon mx="2px" />
-          </Link>
+          <ExternalLink href={value.toString()} label={value.toString()} />
         ) : (
-          <InvText overflowY="scroll" wordBreak="break-all">
+          <Text overflowY="scroll" wordBreak="break-all">
             {value.toString()}
-          </InvText>
+          </Text>
         )}
       </Flex>
     </Flex>

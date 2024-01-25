@@ -1,10 +1,8 @@
-import type { As, FlexProps, StyleProps } from '@chakra-ui/react';
-import { Flex, Icon, Skeleton, Spinner } from '@chakra-ui/react';
+import type { As, ChakraProps, FlexProps } from '@invoke-ai/ui';
+import { Flex, Icon, Skeleton, Spinner, Text } from '@invoke-ai/ui';
 import { memo, useMemo } from 'react';
-import { FaImage } from 'react-icons/fa';
+import { PiImageBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
-
-import { InvText } from './InvText/wrapper';
 
 type Props = { image: ImageDTO | undefined };
 
@@ -39,11 +37,11 @@ IAILoadingImageFallback.displayName = 'IAILoadingImageFallback';
 type IAINoImageFallbackProps = FlexProps & {
   label?: string;
   icon?: As | null;
-  boxSize?: StyleProps['boxSize'];
+  boxSize?: ChakraProps['boxSize'];
 };
 
 export const IAINoContentFallback = memo((props: IAINoImageFallbackProps) => {
-  const { icon = FaImage, boxSize = 16, sx, ...rest } = props;
+  const { icon = PiImageBold, boxSize = 16, sx, ...rest } = props;
 
   const styles = useMemo(
     () => ({
@@ -66,9 +64,9 @@ export const IAINoContentFallback = memo((props: IAINoImageFallbackProps) => {
     <Flex sx={styles} {...rest}>
       {icon && <Icon as={icon} boxSize={boxSize} opacity={0.7} />}
       {props.label && (
-        <InvText textAlign="center" fontSize="md">
+        <Text textAlign="center" fontSize="md">
           {props.label}
-        </InvText>
+        </Text>
       )}
     </Flex>
   );
@@ -102,7 +100,7 @@ export const IAINoContentFallbackWithSpinner = memo(
     return (
       <Flex sx={styles} {...rest}>
         <Spinner size="xl" />
-        {props.label && <InvText textAlign="center">{props.label}</InvText>}
+        {props.label && <Text textAlign="center">{props.label}</Text>}
       </Flex>
     );
   }

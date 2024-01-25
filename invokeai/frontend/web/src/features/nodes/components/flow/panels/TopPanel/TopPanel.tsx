@@ -1,4 +1,4 @@
-import { Flex, Spacer } from '@chakra-ui/layout';
+import { Flex, Spacer } from '@invoke-ai/ui';
 import AddNodeButton from 'features/nodes/components/flow/panels/TopPanel/AddNodeButton';
 import UpdateNodesButton from 'features/nodes/components/flow/panels/TopPanel/UpdateNodesButton';
 import WorkflowName from 'features/nodes/components/flow/panels/TopPanel/WorkflowName';

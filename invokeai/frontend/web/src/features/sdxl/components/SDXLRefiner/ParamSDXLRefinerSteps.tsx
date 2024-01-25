@@ -1,6 +1,10 @@
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setRefinerSteps } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -34,8 +38,9 @@ const ParamSDXLRefinerSteps = () => {
   );
 
   return (
-    <InvControl label={t('sdxl.steps')}>
-      <InvSlider
+    <FormControl>
+      <FormLabel>{t('sdxl.steps')}</FormLabel>
+      <CompositeSlider
         value={refinerSteps}
         defaultValue={initial}
         min={sliderMin}
@@ -43,12 +48,18 @@ const ParamSDXLRefinerSteps = () => {
         step={coarseStep}
         fineStep={fineStep}
         onChange={onChange}
-        withNumberInput
         marks={marks}
-        numberInputMin={numberInputMin}
-        numberInputMax={numberInputMax}
       />
-    </InvControl>
+      <CompositeNumberInput
+        value={refinerSteps}
+        defaultValue={initial}
+        min={numberInputMin}
+        max={numberInputMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        onChange={onChange}
+      />
+    </FormControl>
   );
 };
 

@@ -1,4 +1,4 @@
-import { Box } from '@chakra-ui/react';
+import { Box } from '@invoke-ai/ui';
 import { useStore } from '@nanostores/react';
 import { $cursorPosition } from 'features/canvas/store/canvasNanostore';
 import roundToHundreth from 'features/canvas/util/roundToHundreth';

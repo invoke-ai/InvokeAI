@@ -1,4 +1,4 @@
-import type { UseToastOptions } from '@chakra-ui/react';
+import type { UseToastOptions } from '@invoke-ai/ui';
 import type { EntityState } from '@reduxjs/toolkit';
 import type { components, paths } from 'services/api/schema';
 import type { O } from 'ts-toolbelt';
@@ -35,6 +35,7 @@ export type InvocationJSONSchemaExtra = s['UIConfigBase'];
 // App Info
 export type AppVersion = s['AppVersion'];
 export type AppConfig = s['AppConfig'];
+export type AppDependencyVersions = s['AppDependencyVersions'];
 
 // Images
 export type ImageDTO = s['ImageDTO'];
@@ -163,6 +164,8 @@ export type ColorMapImageProcessorInvocation =
   s['ColorMapImageProcessorInvocation'];
 export type ContentShuffleImageProcessorInvocation =
   s['ContentShuffleImageProcessorInvocation'];
+export type DepthAnythingImageProcessorInvocation =
+  s['DepthAnythingImageProcessorInvocation'];
 export type HedImageProcessorInvocation = s['HedImageProcessorInvocation'];
 export type LineartAnimeImageProcessorInvocation =
   s['LineartAnimeImageProcessorInvocation'];
@@ -234,8 +237,5 @@ type TypeGuard<T> = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type TypeGuardFor<T extends TypeGuard<any>> = T extends TypeGuard<
-  infer U
->
-  ? U
-  : never;
+export type TypeGuardFor<T extends TypeGuard<any>> =
+  T extends TypeGuard<infer U> ? U : never;

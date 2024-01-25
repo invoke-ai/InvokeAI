@@ -1,4 +1,4 @@
-import { Box, chakra, Flex } from '@chakra-ui/react';
+import { Box, chakra, Flex } from '@invoke-ai/ui';
 import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';

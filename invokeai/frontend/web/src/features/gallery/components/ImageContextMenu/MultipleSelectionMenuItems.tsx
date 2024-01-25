@@ -1,8 +1,7 @@
+import { MenuDivider, MenuItem } from '@invoke-ai/ui';
 import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
-import { InvMenuDivider } from 'common/components/InvMenu/wrapper';
 import {
   imagesToChangeSelected,
   isModalOpenChanged,
@@ -95,40 +94,40 @@ const MultipleSelectionMenuItems = () => {
   return (
     <>
       {areAllStarred && (
-        <InvMenuItem
+        <MenuItem
           icon={customStarUi ? customStarUi.on.icon : <PiStarBold />}
           onClickCapture={handleUnstarSelection}
         >
           {customStarUi ? customStarUi.off.text : `Unstar All`}
-        </InvMenuItem>
+        </MenuItem>
       )}
       {(areAllUnstarred || (!areAllStarred && !areAllUnstarred)) && (
-        <InvMenuItem
+        <MenuItem
           icon={customStarUi ? customStarUi.on.icon : <PiStarFill />}
           onClickCapture={handleStarSelection}
         >
           {customStarUi ? customStarUi.on.text : `Star All`}
-        </InvMenuItem>
+        </MenuItem>
       )}
       {isBulkDownloadEnabled && (
-        <InvMenuItem
+        <MenuItem
           icon={<PiDownloadSimpleBold />}
           onClickCapture={handleBulkDownload}
         >
           {t('gallery.downloadSelection')}
-        </InvMenuItem>
+        </MenuItem>
       )}
-      <InvMenuItem icon={<PiFoldersBold />} onClickCapture={handleChangeBoard}>
+      <MenuItem icon={<PiFoldersBold />} onClickCapture={handleChangeBoard}>
         {t('boards.changeBoard')}
-      </InvMenuItem>
-      <InvMenuDivider />
-      <InvMenuItem
+      </MenuItem>
+      <MenuDivider />
+      <MenuItem
         color="error.300"
         icon={<PiTrashSimpleBold />}
         onClickCapture={handleDeleteSelection}
       >
         {t('gallery.deleteSelection')}
-      </InvMenuItem>
+      </MenuItem>
     </>
   );
 };

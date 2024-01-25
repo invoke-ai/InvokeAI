@@ -1,5 +1,5 @@
-import type { SystemStyleObject } from '@chakra-ui/react';
-import { Box, Flex, Spinner } from '@chakra-ui/react';
+import type { SystemStyleObject } from '@invoke-ai/ui';
+import { Box, Flex, Spinner } from '@invoke-ai/ui';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -25,7 +25,11 @@ import {
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaRulerVertical, FaSave, FaUndo } from 'react-icons/fa';
+import {
+  PiArrowCounterClockwiseBold,
+  PiFloppyDiskBold,
+  PiRulerBold,
+} from 'react-icons/pi';
 import {
   useAddImageToBoardMutation,
   useChangeImageIsIntermediateMutation,
@@ -210,18 +214,20 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
       <>
         <IAIDndImageIcon
           onClick={handleResetControlImage}
-          icon={controlImage ? <FaUndo /> : undefined}
+          icon={
+            controlImage ? <PiArrowCounterClockwiseBold size={16} /> : undefined
+          }
           tooltip={t('controlnet.resetControlImage')}
         />
         <IAIDndImageIcon
           onClick={handleSaveControlImage}
-          icon={controlImage ? <FaSave size={16} /> : undefined}
+          icon={controlImage ? <PiFloppyDiskBold size={16} /> : undefined}
           tooltip={t('controlnet.saveControlImage')}
           styleOverrides={saveControlImageStyleOverrides}
         />
         <IAIDndImageIcon
           onClick={handleSetControlImageToDimensions}
-          icon={controlImage ? <FaRulerVertical size={16} /> : undefined}
+          icon={controlImage ? <PiRulerBold size={16} /> : undefined}
           tooltip={t('controlnet.setControlImageDimensions')}
           styleOverrides={setControlImageDimensionsStyleOverrides}
         />

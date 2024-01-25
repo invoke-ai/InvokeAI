@@ -1,6 +1,5 @@
+import { FormControl, FormLabel, Switch } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import { setShouldRandomizeSeed } from 'features/parameters/store/generationSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -21,12 +20,13 @@ export const ParamSeedRandomize = memo(() => {
   );
 
   return (
-    <InvControl label={t('common.random')} w="min-content">
-      <InvSwitch
+    <FormControl w="min-content">
+      <FormLabel>{t('common.random')}</FormLabel>
+      <Switch
         isChecked={shouldRandomizeSeed}
         onChange={handleChangeShouldRandomizeSeed}
       />
-    </InvControl>
+    </FormControl>
   );
 });
 

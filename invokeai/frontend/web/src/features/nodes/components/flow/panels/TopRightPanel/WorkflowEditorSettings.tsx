@@ -1,16 +1,21 @@
-import { Divider, Flex, Heading, useDisclosure } from '@chakra-ui/react';
+import {
+  Divider,
+  Flex,
+  FormControl,
+  FormHelperText,
+  FormLabel,
+  Heading,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalHeader,
+  ModalOverlay,
+  Switch,
+  useDisclosure,
+} from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import {
-  InvModal,
-  InvModalBody,
-  InvModalCloseButton,
-  InvModalContent,
-  InvModalHeader,
-  InvModalOverlay,
-} from 'common/components/InvModal/wrapper';
-import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import ReloadNodeTemplatesButton from 'features/nodes/components/flow/panels/TopRightPanel/ReloadSchemaButton';
 import {
   selectionModeChanged,
@@ -98,70 +103,69 @@ const WorkflowEditorSettings = ({ children }: Props) => {
     <>
       {children({ onOpen })}
 
-      <InvModal isOpen={isOpen} onClose={onClose} size="2xl" isCentered>
-        <InvModalOverlay />
-        <InvModalContent>
-          <InvModalHeader>{t('nodes.workflowSettings')}</InvModalHeader>
-          <InvModalCloseButton />
-          <InvModalBody>
+      <Modal isOpen={isOpen} onClose={onClose} size="2xl" isCentered>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>{t('nodes.workflowSettings')}</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
             <Flex flexDirection="column" gap={4} py={4}>
               <Heading size="sm">{t('parameters.general')}</Heading>
-              <InvControl
-                label={t('nodes.animatedEdges')}
-                helperText={t('nodes.animatedEdgesHelp')}
-              >
-                <InvSwitch
+              <FormControl>
+                <FormLabel>{t('nodes.animatedEdges')}</FormLabel>
+                <Switch
                   onChange={handleChangeShouldAnimate}
                   isChecked={shouldAnimateEdges}
                 />
-              </InvControl>
+                <FormHelperText>{t('nodes.animatedEdgesHelp')}</FormHelperText>
+              </FormControl>
               <Divider />
-              <InvControl
-                label={t('nodes.snapToGrid')}
-                helperText={t('nodes.snapToGridHelp')}
-              >
-                <InvSwitch
+              <FormControl>
+                <FormLabel>{t('nodes.snapToGrid')}</FormLabel>
+                <Switch
                   isChecked={shouldSnapToGrid}
                   onChange={handleChangeShouldSnap}
                 />
-              </InvControl>
+                <FormHelperText>{t('nodes.snapToGridHelp')}</FormHelperText>
+              </FormControl>
               <Divider />
-              <InvControl
-                label={t('nodes.colorCodeEdges')}
-                helperText={t('nodes.colorCodeEdgesHelp')}
-              >
-                <InvSwitch
+              <FormControl>
+                <FormLabel>{t('nodes.colorCodeEdges')}</FormLabel>
+                <Switch
                   isChecked={shouldColorEdges}
                   onChange={handleChangeShouldColor}
                 />
-              </InvControl>
+                <FormHelperText>{t('nodes.colorCodeEdgesHelp')}</FormHelperText>
+              </FormControl>
               <Divider />
-              <InvControl
-                label={t('nodes.fullyContainNodes')}
-                helperText={t('nodes.fullyContainNodesHelp')}
-              >
-                <InvSwitch
+              <FormControl>
+                <FormLabel>{t('nodes.fullyContainNodes')}</FormLabel>
+                <Switch
                   isChecked={selectionModeIsChecked}
                   onChange={handleChangeSelectionMode}
                 />
-              </InvControl>
+                <FormHelperText>
+                  {t('nodes.fullyContainNodesHelp')}
+                </FormHelperText>
+              </FormControl>
               <Heading size="sm" pt={4}>
                 {t('common.advanced')}
               </Heading>
-              <InvControl
-                label={t('nodes.validateConnections')}
-                helperText={t('nodes.validateConnectionsHelp')}
-              >
-                <InvSwitch
+              <FormControl>
+                <FormLabel>{t('nodes.validateConnections')}</FormLabel>
+                <Switch
                   isChecked={shouldValidateGraph}
                   onChange={handleChangeShouldValidate}
                 />
-              </InvControl>
+                <FormHelperText>
+                  {t('nodes.validateConnectionsHelp')}
+                </FormHelperText>
+              </FormControl>
               <ReloadNodeTemplatesButton />
             </Flex>
-          </InvModalBody>
-        </InvModalContent>
-      </InvModal>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
     </>
   );
 };

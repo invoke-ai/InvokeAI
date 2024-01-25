@@ -1,17 +1,18 @@
-import { Flex, Skeleton } from '@chakra-ui/react';
+import {
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogOverlay,
+  Button,
+  Flex,
+  Skeleton,
+  Text,
+} from '@invoke-ai/ui';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import {
-  InvAlertDialog,
-  InvAlertDialogBody,
-  InvAlertDialogContent,
-  InvAlertDialogFooter,
-  InvAlertDialogHeader,
-  InvAlertDialogOverlay,
-} from 'common/components/InvAlertDialog/wrapper';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvText } from 'common/components/InvText/wrapper';
 import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import { selectControlAdaptersSlice } from 'features/controlAdapters/store/controlAdaptersSlice';
 import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
@@ -117,19 +118,19 @@ const DeleteBoardModal = (props: Props) => {
   }
 
   return (
-    <InvAlertDialog
+    <AlertDialog
       isOpen={Boolean(boardToDelete)}
       onClose={handleClose}
       leastDestructiveRef={cancelRef}
       isCentered
     >
-      <InvAlertDialogOverlay>
-        <InvAlertDialogContent>
-          <InvAlertDialogHeader fontSize="lg" fontWeight="bold">
+      <AlertDialogOverlay>
+        <AlertDialogContent>
+          <AlertDialogHeader fontSize="lg" fontWeight="bold">
             {t('controlnet.delete')} {boardToDelete.board_name}
-          </InvAlertDialogHeader>
+          </AlertDialogHeader>
 
-          <InvAlertDialogBody>
+          <AlertDialogBody>
             <Flex direction="column" gap={3}>
               {isFetchingBoardNames ? (
                 <Skeleton>
@@ -142,38 +143,38 @@ const DeleteBoardModal = (props: Props) => {
                   bottomMessage={t('boards.bottomMessage')}
                 />
               )}
-              <InvText>{t('boards.deletedBoardsCannotbeRestored')}</InvText>
-              <InvText>
+              <Text>{t('boards.deletedBoardsCannotbeRestored')}</Text>
+              <Text>
                 {canRestoreDeletedImagesFromBin
                   ? t('gallery.deleteImageBin')
                   : t('gallery.deleteImagePermanent')}
-              </InvText>
+              </Text>
             </Flex>
-          </InvAlertDialogBody>
-          <InvAlertDialogFooter>
+          </AlertDialogBody>
+          <AlertDialogFooter>
             <Flex w="full" gap={2} justifyContent="end">
-              <InvButton ref={cancelRef} onClick={handleClose}>
+              <Button ref={cancelRef} onClick={handleClose}>
                 {t('boards.cancel')}
-              </InvButton>
-              <InvButton
+              </Button>
+              <Button
                 colorScheme="warning"
                 isLoading={isLoading}
                 onClick={handleDeleteBoardOnly}
               >
                 {t('boards.deleteBoardOnly')}
-              </InvButton>
-              <InvButton
+              </Button>
+              <Button
                 colorScheme="error"
                 isLoading={isLoading}
                 onClick={handleDeleteBoardAndImages}
               >
                 {t('boards.deleteBoardAndImages')}
-              </InvButton>
+              </Button>
             </Flex>
-          </InvAlertDialogFooter>
-        </InvAlertDialogContent>
-      </InvAlertDialogOverlay>
-    </InvAlertDialog>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialogOverlay>
+    </AlertDialog>
   );
 };
 

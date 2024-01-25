@@ -1,14 +1,12 @@
-import { Flex, Icon, Spacer } from '@chakra-ui/react';
+import { Flex, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { workflowExposedFieldRemoved } from 'features/nodes/store/workflowSlice';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaInfoCircle, FaTrash } from 'react-icons/fa';
+import { PiInfoBold, PiTrashSimpleBold } from 'react-icons/pi';
 
 import EditableFieldTitle from './EditableFieldTitle';
 import FieldTooltipContent from './FieldTooltipContent';
@@ -46,7 +44,7 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
           kind="input"
         />
         <Spacer />
-        <InvTooltip
+        <Tooltip
           label={
             <FieldTooltipContent
               nodeId={nodeId}
@@ -58,16 +56,16 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
           placement="top"
         >
           <Flex h="full" alignItems="center">
-            <Icon fontSize="sm" color="base.300" as={FaInfoCircle} />
+            <Icon fontSize="sm" color="base.300" as={PiInfoBold} />
           </Flex>
-        </InvTooltip>
-        <InvIconButton
+        </Tooltip>
+        <IconButton
           aria-label={t('nodes.removeLinearView')}
           tooltip={t('nodes.removeLinearView')}
           variant="ghost"
           size="sm"
           onClick={handleRemoveField}
-          icon={<FaTrash />}
+          icon={<PiTrashSimpleBold />}
         />
       </Flex>
       <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />

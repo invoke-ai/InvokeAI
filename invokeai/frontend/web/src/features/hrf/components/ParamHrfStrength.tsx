@@ -1,6 +1,10 @@
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setHrfStrength } from 'features/hrf/store/hrfSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,8 +33,9 @@ const ParamHrfStrength = () => {
   );
 
   return (
-    <InvControl label={t('parameters.denoisingStrength')}>
-      <InvSlider
+    <FormControl>
+      <FormLabel>{t('parameters.denoisingStrength')}</FormLabel>
+      <CompositeSlider
         min={sliderMin}
         max={sliderMax}
         step={coarseStep}
@@ -39,11 +44,17 @@ const ParamHrfStrength = () => {
         defaultValue={initial}
         onChange={onChange}
         marks
-        withNumberInput
-        numberInputMin={numberInputMin}
-        numberInputMax={numberInputMax}
       />
-    </InvControl>
+      <CompositeNumberInput
+        min={numberInputMin}
+        max={numberInputMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        value={hrfStrength}
+        defaultValue={initial}
+        onChange={onChange}
+      />
+    </FormControl>
   );
 };
 

@@ -1,25 +1,24 @@
-import { CloseIcon } from '@chakra-ui/icons';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
 import {
+  Button,
+  ButtonGroup,
+  Combobox,
   Divider,
   Flex,
+  FormControl,
+  FormLabel,
+  IconButton,
+  Input,
   InputGroup,
   InputRightElement,
   Spacer,
-} from '@chakra-ui/react';
+} from '@invoke-ai/ui';
+import { useStore } from '@nanostores/react';
+import { $projectId } from 'app/store/nanostores/projectId';
 import {
   IAINoContentFallback,
   IAINoContentFallbackWithSpinner,
 } from 'common/components/IAIImageFallback';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvInput } from 'common/components/InvInput/InvInput';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import WorkflowLibraryListItem from 'features/workflowLibrary/components/WorkflowLibraryListItem';
@@ -27,6 +26,7 @@ import WorkflowLibraryPagination from 'features/workflowLibrary/components/Workf
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiXBold } from 'react-icons/pi';
 import { useListWorkflowsQuery } from 'services/api/endpoints/workflows';
 import type {
   SQLiteDirection,
@@ -40,7 +40,7 @@ const PER_PAGE = 10;
 const zOrderBy = z.enum(['opened_at', 'created_at', 'updated_at', 'name']);
 type OrderBy = z.infer<typeof zOrderBy>;
 const isOrderBy = (v: unknown): v is OrderBy => zOrderBy.safeParse(v).success;
-const ORDER_BY_OPTIONS: InvSelectOption[] = [
+const ORDER_BY_OPTIONS: ComboboxOption[] = [
   { value: 'opened_at', label: 'Opened' },
   { value: 'created_at', label: 'Created' },
   { value: 'updated_at', label: 'Updated' },
@@ -51,7 +51,7 @@ const zDirection = z.enum(['ASC', 'DESC']);
 type Direction = z.infer<typeof zDirection>;
 const isDirection = (v: unknown): v is Direction =>
   zDirection.safeParse(v).success;
-const DIRECTION_OPTIONS: InvSelectOption[] = [
+const DIRECTION_OPTIONS: ComboboxOption[] = [
   { value: 'ASC', label: 'Ascending' },
   { value: 'DESC', label: 'Descending' },
 ];
@@ -64,6 +64,7 @@ const WorkflowLibraryList = () => {
   const [order_by, setOrderBy] = useState<WorkflowRecordOrderBy>('opened_at');
   const [direction, setDirection] = useState<SQLiteDirection>('ASC');
   const [debouncedQuery] = useDebounce(query, 500);
+  const projectId = useStore($projectId);
 
   const queryArg = useMemo<Parameters<typeof useListWorkflowsQuery>[0]>(() => {
     if (category === 'user') {
@@ -89,7 +90,7 @@ const WorkflowLibraryList = () => {
   const { data, isLoading, isError, isFetching } =
     useListWorkflowsQuery(queryArg);
 
-  const onChangeOrderBy = useCallback<InvSelectOnChange>(
+  const onChangeOrderBy = useCallback<ComboboxOnChange>(
     (v) => {
       if (!isOrderBy(v?.value) || v.value === order_by) {
         return;
@@ -104,7 +105,7 @@ const WorkflowLibraryList = () => {
     [order_by]
   );
 
-  const onChangeDirection = useCallback<InvSelectOnChange>(
+  const onChangeDirection = useCallback<ComboboxOnChange>(
     (v) => {
       if (!isDirection(v?.value) || v.value === direction) {
         return;
@@ -144,66 +145,63 @@ const WorkflowLibraryList = () => {
     []
   );
 
-  const handleSetUserCategory = useCallback(() => {
-    setCategory('user');
-    setPage(0);
-  }, []);
-
-  const handleSetDefaultCategory = useCallback(() => {
-    setCategory('default');
+  const handleSetCategory = useCallback((category: WorkflowCategory) => {
+    setCategory(category);
     setPage(0);
   }, []);
 
   return (
     <>
       <Flex gap={4} alignItems="center" h={10} flexShrink={0} flexGrow={0}>
-        <InvButtonGroup>
-          <InvButton
+        <ButtonGroup>
+          <Button
             variant={category === 'user' ? undefined : 'ghost'}
-            onClick={handleSetUserCategory}
+            onClick={handleSetCategory.bind(null, 'user')}
             isChecked={category === 'user'}
           >
             {t('workflows.userWorkflows')}
-          </InvButton>
-          <InvButton
-            variant={category === 'default' ? undefined : 'ghost'}
-            onClick={handleSetDefaultCategory}
-            isChecked={category === 'default'}
-          >
-            {t('workflows.defaultWorkflows')}
-          </InvButton>
-        </InvButtonGroup>
-        <Spacer />
-        {category === 'user' && (
-          <>
-            <InvControl
-              label={t('common.orderBy')}
-              isDisabled={isFetching}
-              w={64}
-              minW={56}
+          </Button>
+          {projectId ? (
+            <Button
+              variant={category === 'project' ? undefined : 'ghost'}
+              onClick={handleSetCategory.bind(null, 'project')}
+              isChecked={category === 'project'}
             >
-              <InvSelect
+              {t('workflows.projectWorkflows')}
+            </Button>
+          ) : (
+            <Button
+              variant={category === 'default' ? undefined : 'ghost'}
+              onClick={handleSetCategory.bind(null, 'default')}
+              isChecked={category === 'default'}
+            >
+              {t('workflows.defaultWorkflows')}
+            </Button>
+          )}
+        </ButtonGroup>
+        <Spacer />
+        {category !== 'default' && (
+          <>
+            <FormControl isDisabled={isFetching} w={64} minW={56}>
+              <FormLabel>{t('common.orderBy')}</FormLabel>
+              <Combobox
                 value={valueOrderBy}
                 options={ORDER_BY_OPTIONS}
                 onChange={onChangeOrderBy}
               />
-            </InvControl>
-            <InvControl
-              label={t('common.direction')}
-              isDisabled={isFetching}
-              w={64}
-              minW={56}
-            >
-              <InvSelect
+            </FormControl>
+            <FormControl isDisabled={isFetching} w={64} minW={56}>
+              <FormLabel>{t('common.direction')}</FormLabel>
+              <Combobox
                 value={valueDirection}
                 options={DIRECTION_OPTIONS}
                 onChange={onChangeDirection}
               />
-            </InvControl>
+            </FormControl>
           </>
         )}
         <InputGroup w="20rem">
-          <InvInput
+          <Input
             placeholder={t('workflows.searchWorkflows')}
             value={query}
             onKeyDown={handleKeydownFilterText}
@@ -212,14 +210,13 @@ const WorkflowLibraryList = () => {
             minW={64}
           />
           {query.trim().length && (
-            <InputRightElement>
-              <InvIconButton
+            <InputRightElement h="full" pe={2}>
+              <IconButton
                 onClick={resetFilterText}
-                size="xs"
-                variant="ghost"
+                size="sm"
+                variant="link"
                 aria-label={t('workflows.clearWorkflowSearchFilter')}
-                opacity={0.5}
-                icon={<CloseIcon boxSize={2} />}
+                icon={<PiXBold />}
               />
             </InputRightElement>
           )}
@@ -239,7 +236,7 @@ const WorkflowLibraryList = () => {
           </Flex>
         </ScrollableContent>
       ) : (
-        <IAINoContentFallback label={t('workflows.noUserWorkflows')} />
+        <IAINoContentFallback label={t('workflows.noWorkflows')} />
       )}
       <Divider />
       {data && (

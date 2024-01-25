@@ -1,2 +1,2 @@
 export const colorTokenToCssVar = (colorToken: string) =>
-  `var(--invokeai-colors-${colorToken.split('.').join('-')})`;
+  `var(--invoke-colors-${colorToken.split('.').join('-')})`;

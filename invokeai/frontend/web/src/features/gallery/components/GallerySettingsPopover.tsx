@@ -1,16 +1,19 @@
-import { Flex } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvCheckbox } from 'common/components/InvCheckbox/wrapper';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import type { FormLabelProps } from '@invoke-ai/ui';
 import {
-  InvPopover,
-  InvPopoverBody,
-  InvPopoverContent,
-  InvPopoverTrigger,
-} from 'common/components/InvPopover/wrapper';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
-import { InvSwitch } from 'common/components/InvSwitch/wrapper';
+  Checkbox,
+  CompositeSlider,
+  Flex,
+  FormControl,
+  FormControlGroup,
+  FormLabel,
+  IconButton,
+  Popover,
+  PopoverBody,
+  PopoverContent,
+  PopoverTrigger,
+  Switch,
+} from '@invoke-ai/ui';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   autoAssignBoardOnClickChanged,
   setGalleryImageMinimumWidth,
@@ -22,6 +25,10 @@ import { useTranslation } from 'react-i18next';
 import { RiSettings4Fill } from 'react-icons/ri';
 
 import BoardAutoAddSelect from './Boards/BoardAutoAddSelect';
+
+const formLabelProps: FormLabelProps = {
+  flexGrow: 1,
+};
 
 const GallerySettingsPopover = () => {
   const dispatch = useAppDispatch();
@@ -55,44 +62,49 @@ const GallerySettingsPopover = () => {
   );
 
   return (
-    <InvPopover isLazy>
-      <InvPopoverTrigger>
-        <InvIconButton
+    <Popover isLazy>
+      <PopoverTrigger>
+        <IconButton
           tooltip={t('gallery.gallerySettings')}
           aria-label={t('gallery.gallerySettings')}
           size="sm"
           icon={<RiSettings4Fill />}
         />
-      </InvPopoverTrigger>
-      <InvPopoverContent>
-        <InvPopoverBody>
+      </PopoverTrigger>
+      <PopoverContent>
+        <PopoverBody>
           <Flex direction="column" gap={2}>
-            <InvControl label={t('gallery.galleryImageSize')}>
-              <InvSlider
+            <FormControl>
+              <FormLabel>{t('gallery.galleryImageSize')}</FormLabel>
+              <CompositeSlider
                 value={galleryImageMinimumWidth}
                 onChange={handleChangeGalleryImageMinimumWidth}
                 min={45}
                 max={256}
                 defaultValue={90}
               />
-            </InvControl>
-            <InvControl label={t('gallery.autoSwitchNewImages')}>
-              <InvSwitch
-                isChecked={shouldAutoSwitch}
-                onChange={handleChangeAutoSwitch}
-              />
-            </InvControl>
-            <InvControl label={t('gallery.autoAssignBoardOnClick')}>
-              <InvCheckbox
-                isChecked={autoAssignBoardOnClick}
-                onChange={handleChangeAutoAssignBoardOnClick}
-              />
-            </InvControl>
+            </FormControl>
+            <FormControlGroup formLabelProps={formLabelProps}>
+              <FormControl>
+                <FormLabel>{t('gallery.autoSwitchNewImages')}</FormLabel>
+                <Switch
+                  isChecked={shouldAutoSwitch}
+                  onChange={handleChangeAutoSwitch}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('gallery.autoAssignBoardOnClick')}</FormLabel>
+                <Checkbox
+                  isChecked={autoAssignBoardOnClick}
+                  onChange={handleChangeAutoAssignBoardOnClick}
+                />
+              </FormControl>
+            </FormControlGroup>
             <BoardAutoAddSelect />
           </Flex>
-        </InvPopoverBody>
-      </InvPopoverContent>
-    </InvPopover>
+        </PopoverBody>
+      </PopoverContent>
+    </Popover>
   );
 };
 

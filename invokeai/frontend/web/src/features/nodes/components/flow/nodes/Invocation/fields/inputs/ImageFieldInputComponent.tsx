@@ -1,9 +1,8 @@
-import { Flex } from '@chakra-ui/react';
+import { Flex, Text } from '@invoke-ai/ui';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
-import { InvText } from 'common/components/InvText/wrapper';
 import type {
   TypesafeDraggableData,
   TypesafeDroppableData,
@@ -15,7 +14,7 @@ import type {
 } from 'features/nodes/types/field';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaUndo } from 'react-icons/fa';
+import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { PostUploadAction } from 'services/api/types';
 
@@ -95,7 +94,7 @@ const ImageFieldInputComponent = (
       >
         <IAIDndImageIcon
           onClick={handleReset}
-          icon={imageDTO ? <FaUndo /> : undefined}
+          icon={imageDTO ? <PiArrowCounterClockwiseBold /> : undefined}
           tooltip="Reset Image"
         />
       </IAIDndImage>
@@ -108,9 +107,9 @@ export default memo(ImageFieldInputComponent);
 const UploadElement = memo(() => {
   const { t } = useTranslation();
   return (
-    <InvText fontSize={16} fontWeight="semibold">
+    <Text fontSize={16} fontWeight="semibold">
       {t('gallery.dropOrUpload')}
-    </InvText>
+    </Text>
   );
 });
 
@@ -119,9 +118,9 @@ UploadElement.displayName = 'UploadElement';
 const DropLabel = memo(() => {
   const { t } = useTranslation();
   return (
-    <InvText fontSize={16} fontWeight="semibold">
+    <Text fontSize={16} fontWeight="semibold">
       {t('gallery.drop')}
-    </InvText>
+    </Text>
   );
 });
 

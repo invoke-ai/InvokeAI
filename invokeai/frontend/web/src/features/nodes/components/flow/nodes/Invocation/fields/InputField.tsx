@@ -1,6 +1,4 @@
-import { Flex } from '@chakra-ui/react';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvLabel } from 'common/components/InvControl/InvLabel';
+import { Flex, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
 import { useDoesInputHaveValue } from 'features/nodes/hooks/useDoesInputHaveValue';
 import { useFieldInputInstance } from 'features/nodes/hooks/useFieldInputInstance';
@@ -60,7 +58,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
   if (!fieldTemplate || !fieldInstance) {
     return (
       <InputFieldWrapper shouldDim={shouldDim}>
-        <InvControl
+        <FormControl
           alignItems="stretch"
           justifyContent="space-between"
           flexDir="column"
@@ -68,7 +66,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
           h="full"
           w="full"
         >
-          <InvLabel
+          <FormLabel
             display="flex"
             alignItems="center"
             mb={0}
@@ -79,8 +77,8 @@ const InputField = ({ nodeId, fieldName }: Props) => {
             {t('nodes.unknownInput', {
               name: fieldInstance?.label ?? fieldTemplate?.title ?? fieldName,
             })}
-          </InvLabel>
-        </InvControl>
+          </FormLabel>
+        </FormControl>
       </InputFieldWrapper>
     );
   }
@@ -88,7 +86,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
   if (fieldTemplate.input === 'connection') {
     return (
       <InputFieldWrapper shouldDim={shouldDim}>
-        <InvControl isInvalid={isMissingInput} isDisabled={isConnected} px={2}>
+        <FormControl isInvalid={isMissingInput} isDisabled={isConnected} px={2}>
           <EditableFieldTitle
             nodeId={nodeId}
             fieldName={fieldName}
@@ -96,7 +94,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
             isMissingInput={isMissingInput}
             withTooltip
           />
-        </InvControl>
+        </FormControl>
 
         <FieldHandle
           fieldTemplate={fieldTemplate}
@@ -111,28 +109,28 @@ const InputField = ({ nodeId, fieldName }: Props) => {
 
   return (
     <InputFieldWrapper shouldDim={shouldDim}>
-      <FieldContextMenu nodeId={nodeId} fieldName={fieldName} kind="input">
-        {(ref) => (
-          <InvControl
-            ref={ref}
-            isInvalid={isMissingInput}
-            isDisabled={isConnected}
-            orientation="vertical"
-            px={2}
-          >
-            <Flex flexDir="column" w="full" gap={1}>
+      <FormControl
+        isInvalid={isMissingInput}
+        isDisabled={isConnected}
+        orientation="vertical"
+        px={2}
+      >
+        <Flex flexDir="column" w="full" gap={1}>
+          <FieldContextMenu nodeId={nodeId} fieldName={fieldName} kind="input">
+            {(ref) => (
               <EditableFieldTitle
+                ref={ref}
                 nodeId={nodeId}
                 fieldName={fieldName}
                 kind="input"
                 isMissingInput={isMissingInput}
                 withTooltip
               />
-              <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
-            </Flex>
-          </InvControl>
-        )}
-      </FieldContextMenu>
+            )}
+          </FieldContextMenu>
+          <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
+        </Flex>
+      </FormControl>
 
       {fieldTemplate.input !== 'direct' && (
         <FieldHandle

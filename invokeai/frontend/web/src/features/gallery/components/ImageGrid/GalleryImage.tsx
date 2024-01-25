@@ -1,12 +1,11 @@
-import type { SystemStyleObject } from '@chakra-ui/react';
-import { Box, Flex } from '@chakra-ui/react';
+import type { SystemStyleObject } from '@invoke-ai/ui';
+import { Box, Flex, useShiftModifier } from '@invoke-ai/ui';
 import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
-import { $shift } from 'common/hooks/useGlobalModifiers';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import type {
   GallerySelectionDraggableData,
@@ -40,7 +39,7 @@ const GalleryImage = (props: HoverableImageProps) => {
   const dispatch = useAppDispatch();
   const { imageName } = props;
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName);
-  const shift = useStore($shift);
+  const shift = useShiftModifier();
   const { t } = useTranslation();
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const { handleClick, isSelected, areMultiplesSelected } =

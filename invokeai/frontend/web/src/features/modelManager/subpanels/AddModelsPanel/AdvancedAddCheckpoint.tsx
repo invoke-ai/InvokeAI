@@ -1,9 +1,13 @@
-import { Flex } from '@chakra-ui/react';
+import {
+  Button,
+  Checkbox,
+  Flex,
+  FormControl,
+  FormErrorMessage,
+  FormLabel,
+  Input,
+} from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvCheckbox } from 'common/components/InvCheckbox/wrapper';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvInput } from 'common/components/InvInput/InvInput';
 import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
 import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
 import CheckpointConfigsSelect from 'features/modelManager/subpanels/shared/CheckpointConfigsSelect';
@@ -117,41 +121,43 @@ const AdvancedAddCheckpoint = (props: AdvancedAddCheckpointProps) => {
   return (
     <form onSubmit={handleSubmit(onSubmit)} style={formStyles}>
       <Flex flexDirection="column" gap={2}>
-        <InvControl
-          label={t('modelManager.model')}
-          isInvalid={Boolean(errors.model_name)}
-          error={errors.model_name?.message}
-        >
-          <InvInput
+        <FormControl isInvalid={Boolean(errors.model_name)}>
+          <FormLabel>{t('modelManager.model')}</FormLabel>
+          <Input
             {...register('model_name', {
               validate: (value) =>
                 value.trim().length > 3 || 'Must be at least 3 characters',
             })}
           />
-        </InvControl>
+          {errors.model_name?.message && (
+            <FormErrorMessage>{errors.model_name?.message}</FormErrorMessage>
+          )}
+        </FormControl>
         <BaseModelSelect<CheckpointModelConfig>
           control={control}
           name="base_model"
         />
-        <InvControl
-          label={t('modelManager.modelLocation')}
-          isInvalid={Boolean(errors.path)}
-          error={errors.path?.message}
-        >
-          <InvInput
+        <FormControl isInvalid={Boolean(errors.path)}>
+          <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
+          <Input
             {...register('path', {
               validate: (value) =>
                 value.trim().length > 0 || 'Must provide a path',
               onBlur,
             })}
           />
-        </InvControl>
-        <InvControl label={t('modelManager.description')}>
-          <InvInput {...register('description')} />
-        </InvControl>
-        <InvControl label={t('modelManager.vaeLocation')}>
-          <InvInput {...register('vae')} />
-        </InvControl>
+          {errors.path?.message && (
+            <FormErrorMessage>{errors.path?.message}</FormErrorMessage>
+          )}
+        </FormControl>
+        <FormControl>
+          <FormLabel>{t('modelManager.description')}</FormLabel>
+          <Input {...register('description')} />
+        </FormControl>
+        <FormControl>
+          <FormLabel>{t('modelManager.vaeLocation')}</FormLabel>
+          <Input {...register('vae')} />
+        </FormControl>
         <ModelVariantSelect<CheckpointModelConfig>
           control={control}
           name="variant"
@@ -160,19 +166,21 @@ const AdvancedAddCheckpoint = (props: AdvancedAddCheckpointProps) => {
           {!useCustomConfig ? (
             <CheckpointConfigsSelect control={control} name="config" />
           ) : (
-            <InvControl isRequired label={t('modelManager.config')}>
-              <InvInput {...register('config')} />
-            </InvControl>
+            <FormControl isRequired>
+              <FormLabel>{t('modelManager.config')}</FormLabel>
+              <Input {...register('config')} />
+            </FormControl>
           )}
-          <InvControl label={t('modelManager.useCustomConfig')}>
-            <InvCheckbox
+          <FormControl>
+            <FormLabel>{t('modelManager.useCustomConfig')}</FormLabel>
+            <Checkbox
               isChecked={useCustomConfig}
               onChange={handleChangeUseCustomConfig}
             />
-          </InvControl>
-          <InvButton mt={2} type="submit">
+          </FormControl>
+          <Button mt={2} type="submit">
             {t('modelManager.addModel')}
-          </InvButton>
+          </Button>
         </Flex>
       </Flex>
     </form>

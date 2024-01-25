@@ -1,6 +1,5 @@
+import { Input, Textarea } from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvInput } from 'common/components/InvInput/InvInput';
-import { InvTextarea } from 'common/components/InvTextarea/InvTextarea';
 import { fieldStringValueChanged } from 'features/nodes/store/nodesSlice';
 import type {
   StringFieldInputInstance,
@@ -32,7 +31,7 @@ const StringFieldInputComponent = (
 
   if (fieldTemplate.ui_component === 'textarea') {
     return (
-      <InvTextarea
+      <Textarea
         className="nodrag"
         onChange={handleValueChanged}
         value={field.value}
@@ -43,7 +42,7 @@ const StringFieldInputComponent = (
   }
 
   return (
-    <InvInput
+    <Input
       className="nodrag"
       onChange={handleValueChanged}
       value={field.value}

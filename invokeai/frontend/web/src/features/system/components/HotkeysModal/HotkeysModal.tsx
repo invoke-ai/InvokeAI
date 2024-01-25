@@ -1,23 +1,20 @@
-import { CloseIcon } from '@chakra-ui/icons';
 import {
   Divider,
   Flex,
+  IconButton,
+  Input,
   InputGroup,
   InputRightElement,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
   useDisclosure,
-} from '@chakra-ui/react';
+} from '@invoke-ai/ui';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvInput } from 'common/components/InvInput/InvInput';
-import {
-  InvModal,
-  InvModalBody,
-  InvModalCloseButton,
-  InvModalContent,
-  InvModalFooter,
-  InvModalHeader,
-  InvModalOverlay,
-} from 'common/components/InvModal/wrapper';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import type { HotkeyGroup } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useHotkeyData } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -32,6 +29,7 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiXBold } from 'react-icons/pi';
 
 import HotkeyListItem from './HotkeyListItem';
 
@@ -86,26 +84,27 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
       {cloneElement(children, {
         onClick: onOpen,
       })}
-      <InvModal isOpen={isOpen} onClose={onClose} isCentered size="2xl">
-        <InvModalOverlay />
-        <InvModalContent maxH="80vh" h="80vh">
-          <InvModalHeader>{t('hotkeys.keyboardShortcuts')}</InvModalHeader>
-          <InvModalCloseButton />
-          <InvModalBody display="flex" flexDir="column" gap={4}>
+      <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl">
+        <ModalOverlay />
+        <ModalContent maxH="80vh" h="80vh">
+          <ModalHeader>{t('hotkeys.keyboardShortcuts')}</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody display="flex" flexDir="column" gap={4}>
             <InputGroup>
-              <InvInput
+              <Input
                 placeholder={t('hotkeys.searchHotkeys')}
                 value={hotkeyFilter}
                 onChange={onChange}
               />
               {hotkeyFilter.length && (
                 <InputRightElement h="full" pe={2}>
-                  <InvIconButton
+                  <IconButton
                     onClick={clearHotkeyFilter}
                     size="sm"
                     variant="ghost"
                     aria-label={t('hotkeys.clearSearch')}
-                    icon={<CloseIcon boxSize={3} />}
+                    boxSize={4}
+                    icon={<PiXBold />}
                   />
                 </InputRightElement>
               )}
@@ -135,10 +134,10 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
                 )}
               </Flex>
             </ScrollableContent>
-          </InvModalBody>
-          <InvModalFooter />
-        </InvModalContent>
-      </InvModal>
+          </ModalBody>
+          <ModalFooter />
+        </ModalContent>
+      </Modal>
     </>
   );
 };

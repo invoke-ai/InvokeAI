@@ -1,5 +1,9 @@
 import type { paths } from 'services/api/schema';
-import type { AppConfig, AppVersion } from 'services/api/types';
+import type {
+  AppConfig,
+  AppDependencyVersions,
+  AppVersion,
+} from 'services/api/types';
 
 import { api } from '..';
 
@@ -10,16 +14,21 @@ export const appInfoApi = api.injectEndpoints({
         url: `app/version`,
         method: 'GET',
       }),
-      providesTags: ['AppVersion'],
-      keepUnusedDataFor: 86400000, // 1 day
+      providesTags: ['FetchOnReconnect'],
+    }),
+    getAppDeps: build.query<AppDependencyVersions, void>({
+      query: () => ({
+        url: `app/app_deps`,
+        method: 'GET',
+      }),
+      providesTags: ['FetchOnReconnect'],
     }),
     getAppConfig: build.query<AppConfig, void>({
       query: () => ({
         url: `app/config`,
         method: 'GET',
       }),
-      providesTags: ['AppConfig'],
-      keepUnusedDataFor: 86400000, // 1 day
+      providesTags: ['FetchOnReconnect'],
     }),
     getInvocationCacheStatus: build.query<
       paths['/api/v1/app/invocation_cache/status']['get']['responses']['200']['content']['application/json'],
@@ -57,6 +66,7 @@ export const appInfoApi = api.injectEndpoints({
 
 export const {
   useGetAppVersionQuery,
+  useGetAppDepsQuery,
   useGetAppConfigQuery,
   useClearInvocationCacheMutation,
   useDisableInvocationCacheMutation,

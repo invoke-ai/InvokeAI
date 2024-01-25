@@ -1,5 +1,5 @@
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import type { InvIconButtonProps } from 'common/components/InvIconButton/types';
+import type { IconButtonProps } from '@invoke-ai/ui';
+import { IconButton } from '@invoke-ai/ui';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,7 +8,7 @@ import { PiArrowsClockwiseBold } from 'react-icons/pi';
 import { useSyncModels } from './useSyncModels';
 
 export const SyncModelsIconButton = memo(
-  (props: Omit<InvIconButtonProps, 'aria-label'>) => {
+  (props: Omit<IconButtonProps, 'aria-label'>) => {
     const { t } = useTranslation();
     const { syncModels, isLoading } = useSyncModels();
     const isSyncModelEnabled = useFeatureStatus('syncModels').isFeatureEnabled;
@@ -18,7 +18,7 @@ export const SyncModelsIconButton = memo(
     }
 
     return (
-      <InvIconButton
+      <IconButton
         icon={<PiArrowsClockwiseBold />}
         tooltip={t('modelManager.syncModels')}
         aria-label={t('modelManager.syncModels')}

@@ -1,7 +1,7 @@
+import { CompositeNumberInput, FormControl, FormLabel } from '@invoke-ai/ui';
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setSeed } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,8 +22,11 @@ export const ParamSeedNumberInput = memo(() => {
   );
 
   return (
-    <InvControl label={t('parameters.seed')} flexGrow={1} feature="paramSeed">
-      <InvNumberInput
+    <FormControl flexGrow={1}>
+      <InformationalPopover feature="paramSeed">
+        <FormLabel>{t('parameters.seed')}</FormLabel>
+      </InformationalPopover>
+      <CompositeNumberInput
         step={1}
         min={NUMPY_RAND_MIN}
         max={NUMPY_RAND_MAX}
@@ -33,7 +36,7 @@ export const ParamSeedNumberInput = memo(() => {
         flexGrow={1}
         defaultValue={0}
       />
-    </InvControl>
+    </FormControl>
   );
 });
 

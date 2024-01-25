@@ -1,5 +1,5 @@
-import type { SystemStyleObject } from '@chakra-ui/react';
-import { Box, Skeleton } from '@chakra-ui/react';
+import type { SystemStyleObject } from '@invoke-ai/ui';
+import { Box, Skeleton } from '@invoke-ai/ui';
 import { memo } from 'react';
 
 const skeletonStyles: SystemStyleObject = {

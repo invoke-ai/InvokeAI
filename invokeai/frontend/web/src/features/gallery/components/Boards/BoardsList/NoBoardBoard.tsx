@@ -1,8 +1,6 @@
-import { Box, Flex, Image } from '@chakra-ui/react';
+import { Box, Flex, Image, Text, Tooltip } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
-import { InvText } from 'common/components/InvText/wrapper';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import SelectionOverlay from 'common/components/SelectionOverlay';
 import type { RemoveFromBoardDropData } from 'features/dnd/types';
 import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
@@ -81,7 +79,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
       >
         <BoardContextMenu board_id="none">
           {(ref) => (
-            <InvTooltip label={tooltip} openDelay={1000}>
+            <Tooltip label={tooltip} openDelay={1000}>
               <Flex
                 ref={ref}
                 onClick={handleSelectBoard}
@@ -139,11 +137,11 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                 <IAIDroppable
                   data={droppableData}
                   dropLabel={
-                    <InvText fontSize="md">{t('unifiedCanvas.move')}</InvText>
+                    <Text fontSize="md">{t('unifiedCanvas.move')}</Text>
                   }
                 />
               </Flex>
-            </InvTooltip>
+            </Tooltip>
           )}
         </BoardContextMenu>
       </Flex>

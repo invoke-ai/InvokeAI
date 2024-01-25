@@ -1,4 +1,4 @@
-import { Flex } from '@chakra-ui/react';
+import { Flex } from '@invoke-ai/ui';
 import IAIDropOverlay from 'common/components/IAIDropOverlay';
 import IAICanvas from 'features/canvas/components/IAICanvas';
 import IAICanvasToolbar from 'features/canvas/components/IAICanvasToolbar/IAICanvasToolbar';

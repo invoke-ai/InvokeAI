@@ -1,17 +1,18 @@
-import { Flex, Spacer } from '@chakra-ui/react';
+import {
+  Flex,
+  IconButton,
+  Spacer,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
+  Tooltip,
+} from '@invoke-ai/ui';
 import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvTab } from 'common/components/InvTabs/InvTab';
-import {
-  InvTabList,
-  InvTabPanel,
-  InvTabPanels,
-  InvTabs,
-} from 'common/components/InvTabs/wrapper';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import ImageGalleryContent from 'features/gallery/components/ImageGalleryContent';
 import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
 import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
@@ -139,9 +140,9 @@ const InvokeTabs = () => {
   const tabs = useMemo(
     () =>
       enabledTabs.map((tab) => (
-        <InvTooltip key={tab.id} label={t(tab.translationKey)} placement="end">
-          <InvTab
-            as={InvIconButton}
+        <Tooltip key={tab.id} label={t(tab.translationKey)} placement="end">
+          <Tab
+            as={IconButton}
             p={0}
             onClick={handleClickTab}
             icon={tab.icon}
@@ -152,16 +153,14 @@ const InvokeTabs = () => {
             aria-label={t(tab.translationKey)}
             data-testid={t(tab.translationKey)}
           />
-        </InvTooltip>
+        </Tooltip>
       )),
     [enabledTabs, t, handleClickTab, activeTabName]
   );
 
   const tabPanels = useMemo(
     () =>
-      enabledTabs.map((tab) => (
-        <InvTabPanel key={tab.id}>{tab.content}</InvTabPanel>
-      )),
+      enabledTabs.map((tab) => <TabPanel key={tab.id}>{tab.content}</TabPanel>),
     [enabledTabs]
   );
 
@@ -236,7 +235,7 @@ const InvokeTabs = () => {
   );
 
   return (
-    <InvTabs
+    <Tabs
       id="invoke-app-tabs"
       variant="appTabs"
       defaultIndex={activeTabIndex}
@@ -250,9 +249,9 @@ const InvokeTabs = () => {
     >
       <Flex flexDir="column" alignItems="center" pt={4} pb={2} gap={4}>
         <InvokeAILogoComponent />
-        <InvTabList gap={4} pt={6} h="full" flexDir="column">
+        <TabList gap={4} pt={6} h="full" flexDir="column">
           {tabs}
-        </InvTabList>
+        </TabList>
         <Spacer />
         <StatusIndicator />
         {customNavComponent ? customNavComponent : <SettingsMenu />}
@@ -291,9 +290,9 @@ const InvokeTabs = () => {
           </>
         )}
         <Panel id="main-panel" order={1} minSize={20}>
-          <InvTabPanels w="full" h="full">
+          <TabPanels w="full" h="full">
             {tabPanels}
-          </InvTabPanels>
+          </TabPanels>
         </Panel>
         {shouldShowGalleryPanel && (
           <>
@@ -323,7 +322,7 @@ const InvokeTabs = () => {
       {shouldShowGalleryPanel && (
         <FloatingGalleryButton panelApi={galleryPanel} />
       )}
-    </InvTabs>
+    </Tabs>
   );
 };
 

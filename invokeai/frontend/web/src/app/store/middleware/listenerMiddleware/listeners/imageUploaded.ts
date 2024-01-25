@@ -1,4 +1,4 @@
-import type { UseToastOptions } from '@chakra-ui/react';
+import type { UseToastOptions } from '@invoke-ai/ui';
 import { logger } from 'app/logging/logger';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {

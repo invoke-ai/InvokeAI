@@ -1,4 +1,4 @@
-import { Badge, Flex } from '@chakra-ui/react';
+import { Badge, Flex } from '@invoke-ai/ui';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useChakraThemeTokens } from 'common/hooks/useChakraThemeTokens';
 import { memo, useMemo } from 'react';

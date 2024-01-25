@@ -1,6 +1,11 @@
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setMaskBlur } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,21 +34,30 @@ const ParamMaskBlur = () => {
   );
 
   return (
-    <InvControl label={t('parameters.maskBlur')} feature="compositingBlur">
-      <InvSlider
+    <FormControl>
+      <InformationalPopover feature="compositingBlur">
+        <FormLabel>{t('parameters.maskBlur')}</FormLabel>
+      </InformationalPopover>
+      <CompositeSlider
         min={sliderMin}
         max={sliderMax}
         value={maskBlur}
         defaultValue={initial}
         onChange={handleChange}
+        step={coarseStep}
+        fineStep={fineStep}
         marks
-        withNumberInput
-        numberInputMin={numberInputMin}
-        numberInputMax={numberInputMax}
+      />
+      <CompositeNumberInput
+        min={numberInputMin}
+        max={numberInputMax}
+        value={maskBlur}
+        defaultValue={initial}
+        onChange={handleChange}
         step={coarseStep}
         fineStep={fineStep}
       />
-    </InvControl>
+    </FormControl>
   );
 };
 

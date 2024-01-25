@@ -1,10 +1,7 @@
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setCanvasCoherenceMode } from 'features/parameters/store/generationSlice';
 import { isParameterCanvasCoherenceMode } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback, useMemo } from 'react';
@@ -17,7 +14,7 @@ const ParamCanvasCoherenceMode = () => {
   );
   const { t } = useTranslation();
 
-  const options = useMemo<InvSelectOption[]>(
+  const options = useMemo<ComboboxOption[]>(
     () => [
       { label: t('parameters.unmasked'), value: 'unmasked' },
       { label: t('unifiedCanvas.mask'), value: 'mask' },
@@ -26,7 +23,7 @@ const ParamCanvasCoherenceMode = () => {
     [t]
   );
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!isParameterCanvasCoherenceMode(v?.value)) {
         return;
@@ -43,12 +40,12 @@ const ParamCanvasCoherenceMode = () => {
   );
 
   return (
-    <InvControl
-      label={t('parameters.coherenceMode')}
-      feature="compositingCoherenceMode"
-    >
-      <InvSelect options={options} value={value} onChange={onChange} />
-    </InvControl>
+    <FormControl>
+      <InformationalPopover feature="compositingCoherenceMode">
+        <FormLabel>{t('parameters.coherenceMode')}</FormLabel>
+      </InformationalPopover>
+      <Combobox options={options} value={value} onChange={onChange} />
+    </FormControl>
   );
 };
 

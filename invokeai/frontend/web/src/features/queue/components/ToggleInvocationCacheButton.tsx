@@ -1,4 +1,4 @@
-import { InvButton } from 'common/components/InvButton/InvButton';
+import { Button } from '@invoke-ai/ui';
 import { useDisableInvocationCache } from 'features/queue/hooks/useDisableInvocationCache';
 import { useEnableInvocationCache } from 'features/queue/hooks/useEnableInvocationCache';
 import { memo } from 'react';
@@ -23,24 +23,24 @@ const ToggleInvocationCacheButton = () => {
 
   if (cacheStatus?.enabled) {
     return (
-      <InvButton
+      <Button
         isDisabled={isDisableDisabled}
         isLoading={isDisableLoading}
         onClick={disableInvocationCache}
       >
         {t('invocationCache.disable')}
-      </InvButton>
+      </Button>
     );
   }
 
   return (
-    <InvButton
+    <Button
       isDisabled={isEnableDisabled}
       isLoading={isEnableLoading}
       onClick={enableInvocationCache}
     >
       {t('invocationCache.enable')}
-    </InvButton>
+    </Button>
   );
 };
 

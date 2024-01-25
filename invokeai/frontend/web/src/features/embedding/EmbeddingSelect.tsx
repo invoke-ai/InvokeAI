@@ -1,8 +1,7 @@
-import type { ChakraProps } from '@chakra-ui/react';
+import type { ChakraProps } from '@invoke-ai/ui';
+import { Combobox, FormControl } from '@invoke-ai/ui';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
+import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import type { EmbeddingSelectProps } from 'features/embedding/types';
 import { t } from 'i18next';
 import { memo, useCallback } from 'react';
@@ -40,15 +39,15 @@ export const EmbeddingSelect = memo(
       [onSelect]
     );
 
-    const { options, onChange } = useGroupedModelInvSelect({
+    const { options, onChange } = useGroupedModelCombobox({
       modelEntities: data,
       getIsDisabled,
       onChange: _onChange,
     });
 
     return (
-      <InvControl>
-        <InvSelect
+      <FormControl>
+        <Combobox
           placeholder={
             isLoading ? t('common.loading') : t('embedding.addEmbedding')
           }
@@ -62,7 +61,7 @@ export const EmbeddingSelect = memo(
           data-testid="add-embedding"
           sx={selectStyles}
         />
-      </InvControl>
+      </FormControl>
     );
   }
 );

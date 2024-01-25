@@ -1,9 +1,12 @@
-import { useDisclosure } from '@chakra-ui/react';
+import {
+  ConfirmationAlertDialog,
+  FormControl,
+  FormLabel,
+  Input,
+  MenuItem,
+  useDisclosure,
+} from '@invoke-ai/ui';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvConfirmationAlertDialog } from 'common/components/InvConfirmationAlertDialog/InvConfirmationAlertDialog';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvInput } from 'common/components/InvInput/InvInput';
-import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
 import { useSaveWorkflowAs } from 'features/workflowLibrary/hooks/useSaveWorkflowAs';
 import { getWorkflowCopyName } from 'features/workflowLibrary/util/getWorkflowCopyName';
 import type { ChangeEvent } from 'react';
@@ -35,25 +38,26 @@ const SaveWorkflowAsButton = () => {
 
   return (
     <>
-      <InvMenuItem as="button" icon={<PiCopyBold />} onClick={onOpenCallback}>
+      <MenuItem as="button" icon={<PiCopyBold />} onClick={onOpenCallback}>
         {t('workflows.saveWorkflowAs')}
-      </InvMenuItem>
+      </MenuItem>
 
-      <InvConfirmationAlertDialog
+      <ConfirmationAlertDialog
         isOpen={isOpen}
         onClose={onClose}
         title={t('workflows.saveWorkflowAs')}
         acceptCallback={onSave}
       >
-        <InvControl label={t('workflows.workflowName')}>
-          <InvInput
+        <FormControl>
+          <FormLabel>{t('workflows.workflowName')}</FormLabel>
+          <Input
             ref={inputRef}
             value={name}
             onChange={onChange}
             placeholder={t('workflows.workflowName')}
           />
-        </InvControl>
-      </InvConfirmationAlertDialog>
+        </FormControl>
+      </ConfirmationAlertDialog>
     </>
   );
 };

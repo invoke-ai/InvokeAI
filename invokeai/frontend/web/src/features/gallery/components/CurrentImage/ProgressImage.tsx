@@ -1,5 +1,5 @@
-import type { SystemStyleObject } from '@chakra-ui/react';
-import { Image } from '@chakra-ui/react';
+import type { SystemStyleObject } from '@invoke-ai/ui';
+import { Image } from '@invoke-ai/ui';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo, useMemo } from 'react';
 

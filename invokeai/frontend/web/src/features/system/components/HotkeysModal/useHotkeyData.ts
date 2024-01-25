@@ -82,6 +82,11 @@ export const useHotkeyData = (): HotkeyGroup[] => {
       title: t('hotkeys.generalHotkeys'),
       hotkeyListItems: [
         {
+          title: t('hotkeys.remixImage.title'),
+          desc: t('hotkeys.remixImage.desc'),
+          hotkeys: [['R']],
+        },
+        {
           title: t('hotkeys.setPrompt.title'),
           desc: t('hotkeys.setPrompt.desc'),
           hotkeys: [['P']],

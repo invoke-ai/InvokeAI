@@ -1,6 +1,11 @@
+import {
+  CompositeNumberInput,
+  CompositeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setClipSkip } from 'features/parameters/store/generationSlice';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import { memo, useCallback, useMemo } from 'react';
@@ -46,8 +51,11 @@ const ParamClipSkip = () => {
   }
 
   return (
-    <InvControl label={t('parameters.clipSkip')} feature="clipSkip">
-      <InvSlider
+    <FormControl>
+      <InformationalPopover feature="clipSkip">
+        <FormLabel>{t('parameters.clipSkip')}</FormLabel>
+      </InformationalPopover>
+      <CompositeSlider
         value={clipSkip}
         defaultValue={initial}
         min={sliderMin}
@@ -55,12 +63,18 @@ const ParamClipSkip = () => {
         step={coarseStep}
         fineStep={fineStep}
         onChange={handleClipSkipChange}
-        withNumberInput
-        numberInputMin={numberInputMin}
-        numberInputMax={max}
         marks={sliderMarks}
       />
-    </InvControl>
+      <CompositeNumberInput
+        value={clipSkip}
+        defaultValue={initial}
+        min={numberInputMin}
+        max={max}
+        step={coarseStep}
+        fineStep={fineStep}
+        onChange={handleClipSkipChange}
+      />
+    </FormControl>
   );
 };
 

@@ -1,4 +1,4 @@
-import { Box, Flex, Heading } from '@chakra-ui/react';
+import { Box, Flex, Heading } from '@invoke-ai/ui';
 import type { AnimationProps } from 'framer-motion';
 import { motion } from 'framer-motion';
 import { memo } from 'react';

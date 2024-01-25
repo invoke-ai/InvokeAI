@@ -1,14 +1,13 @@
-import { Flex } from '@chakra-ui/react';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import {
+  Combobox,
+  ConfirmationAlertDialog,
+  Flex,
+  FormControl,
+  Text,
+} from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvConfirmationAlertDialog } from 'common/components/InvConfirmationAlertDialog/InvConfirmationAlertDialog';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
-import { InvText } from 'common/components/InvText/wrapper';
 import {
   changeBoardReset,
   isModalOpenChanged,
@@ -37,7 +36,7 @@ const ChangeBoardModal = () => {
   const [removeImagesFromBoard] = useRemoveImagesFromBoardMutation();
   const { t } = useTranslation();
 
-  const options = useMemo<InvSelectOption[]>(() => {
+  const options = useMemo<ComboboxOption[]>(() => {
     return [{ label: t('boards.uncategorized'), value: 'none' }].concat(
       (boards ?? []).map((board) => ({
         label: board.board_name,
@@ -79,7 +78,7 @@ const ChangeBoardModal = () => {
     selectedBoard,
   ]);
 
-  const onChange = useCallback<InvSelectOnChange>((v) => {
+  const onChange = useCallback<ComboboxOnChange>((v) => {
     if (!v) {
       return;
     }
@@ -87,7 +86,7 @@ const ChangeBoardModal = () => {
   }, []);
 
   return (
-    <InvConfirmationAlertDialog
+    <ConfirmationAlertDialog
       isOpen={isModalOpen}
       onClose={handleClose}
       title={t('boards.changeBoard')}
@@ -96,14 +95,14 @@ const ChangeBoardModal = () => {
       cancelButtonText={t('boards.cancel')}
     >
       <Flex flexDir="column" gap={4}>
-        <InvText>
+        <Text>
           {t('boards.movingImagesToBoard', {
             count: imagesToChange.length,
           })}
           :
-        </InvText>
-        <InvControl isDisabled={isFetching}>
-          <InvSelect
+        </Text>
+        <FormControl isDisabled={isFetching}>
+          <Combobox
             placeholder={
               isFetching ? t('boards.loading') : t('boards.selectBoard')
             }
@@ -111,9 +110,9 @@ const ChangeBoardModal = () => {
             value={value}
             options={options}
           />
-        </InvControl>
+        </FormControl>
       </Flex>
-    </InvConfirmationAlertDialog>
+    </ConfirmationAlertDialog>
   );
 };
 

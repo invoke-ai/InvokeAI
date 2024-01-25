@@ -1,5 +1,4 @@
-import { ListItem, UnorderedList } from '@chakra-ui/react';
-import { InvText } from 'common/components/InvText/wrapper';
+import { ListItem, Text, UnorderedList } from '@invoke-ai/ui';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { some } from 'lodash-es';
 import { memo } from 'react';
@@ -28,7 +27,7 @@ const ImageUsageMessage = (props: Props) => {
 
   return (
     <>
-      <InvText>{topMessage}</InvText>
+      <Text>{topMessage}</Text>
       <UnorderedList paddingInlineStart={6}>
         {imageUsage.isInitialImage && (
           <ListItem>{t('common.img2img')}</ListItem>
@@ -43,7 +42,7 @@ const ImageUsageMessage = (props: Props) => {
           <ListItem>{t('common.nodeEditor')}</ListItem>
         )}
       </UnorderedList>
-      <InvText>{bottomMessage}</InvText>
+      <Text>{bottomMessage}</Text>
     </>
   );
 };

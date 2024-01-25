@@ -1,4 +1,4 @@
-import { useToast } from '@chakra-ui/react';
+import { useToast } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { addToast, clearToastQueue } from 'features/system/store/systemSlice';
 import type { MakeToastArg } from 'features/system/util/makeToast';

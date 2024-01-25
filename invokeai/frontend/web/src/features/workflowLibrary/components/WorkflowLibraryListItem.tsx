@@ -1,7 +1,5 @@
-import { Flex, Heading, Spacer } from '@chakra-ui/react';
+import { Button, Flex, Heading, Spacer, Text } from '@invoke-ai/ui';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvText } from 'common/components/InvText/wrapper';
 import dateFormat, { masks } from 'dateformat';
 import { useWorkflowLibraryModalContext } from 'features/workflowLibrary/context/useWorkflowLibraryModalContext';
 import { useDeleteLibraryWorkflow } from 'features/workflowLibrary/hooks/useDeleteLibraryWorkflow';
@@ -54,8 +52,8 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
               {workflowDTO.name || t('workflows.unnamedWorkflow')}
             </Heading>
             <Spacer />
-            {workflowDTO.category === 'user' && (
-              <InvText
+            {workflowDTO.category !== 'default' && (
+              <Text
                 fontSize="sm"
                 variant="subtext"
                 flexShrink={0}
@@ -64,27 +62,27 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
                 {t('common.updated')}:{' '}
                 {dateFormat(workflowDTO.updated_at, masks.shortDate)}{' '}
                 {dateFormat(workflowDTO.updated_at, masks.shortTime)}
-              </InvText>
+              </Text>
             )}
           </Flex>
           <Flex alignItems="center" w="full" h="50%">
             {workflowDTO.description ? (
-              <InvText fontSize="sm" noOfLines={1}>
+              <Text fontSize="sm" noOfLines={1}>
                 {workflowDTO.description}
-              </InvText>
+              </Text>
             ) : (
-              <InvText
+              <Text
                 fontSize="sm"
                 variant="subtext"
                 fontStyle="italic"
                 noOfLines={1}
               >
                 {t('workflows.noDescription')}
-              </InvText>
+              </Text>
             )}
             <Spacer />
-            {workflowDTO.category === 'user' && (
-              <InvText
+            {workflowDTO.category !== 'default' && (
+              <Text
                 fontSize="sm"
                 variant="subtext"
                 flexShrink={0}
@@ -93,11 +91,11 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
                 {t('common.created')}:{' '}
                 {dateFormat(workflowDTO.created_at, masks.shortDate)}{' '}
                 {dateFormat(workflowDTO.created_at, masks.shortTime)}
-              </InvText>
+              </Text>
             )}
           </Flex>
         </Flex>
-        <InvButton
+        <Button
           flexShrink={0}
           isDisabled={isOpen}
           onClick={handleGetAndLoadWorkflow}
@@ -105,9 +103,9 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
           aria-label={t('workflows.openWorkflow')}
         >
           {t('common.load')}
-        </InvButton>
-        {workflowDTO.category === 'user' && (
-          <InvButton
+        </Button>
+        {workflowDTO.category !== 'default' && (
+          <Button
             flexShrink={0}
             colorScheme="error"
             isDisabled={isOpen}
@@ -116,7 +114,7 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
             aria-label={t('workflows.deleteWorkflow')}
           >
             {t('common.delete')}
-          </InvButton>
+          </Button>
         )}
       </Flex>
     </Flex>

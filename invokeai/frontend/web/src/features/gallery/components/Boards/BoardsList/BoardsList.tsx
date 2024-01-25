@@ -1,4 +1,4 @@
-import { Collapse, Flex, Grid, GridItem } from '@chakra-ui/react';
+import { Collapse, Flex, Grid, GridItem } from '@invoke-ai/ui';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';

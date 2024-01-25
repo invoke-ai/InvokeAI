@@ -1,17 +1,14 @@
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setBoundingBoxScaleMethod } from 'features/canvas/store/canvasSlice';
 import { isBoundingBoxScaleMethod } from 'features/canvas/store/canvasTypes';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const OPTIONS: InvSelectOption[] = [
+export const OPTIONS: ComboboxOption[] = [
   { label: 'None', value: 'none' },
   { label: 'Auto', value: 'auto' },
   { label: 'Manual', value: 'manual' },
@@ -25,7 +22,7 @@ const ParamScaleBeforeProcessing = () => {
   );
   const optimalDimension = useAppSelector(selectOptimalDimension);
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!isBoundingBoxScaleMethod(v?.value)) {
         return;
@@ -41,12 +38,12 @@ const ParamScaleBeforeProcessing = () => {
   );
 
   return (
-    <InvControl
-      label={t('parameters.scaleBeforeProcessing')}
-      feature="scaleBeforeProcessing"
-    >
-      <InvSelect value={value} options={OPTIONS} onChange={onChange} />
-    </InvControl>
+    <FormControl>
+      <InformationalPopover feature="scaleBeforeProcessing">
+        <FormLabel>{t('parameters.scaleBeforeProcessing')}</FormLabel>
+      </InformationalPopover>
+      <Combobox value={value} options={OPTIONS} onChange={onChange} />
+    </FormControl>
   );
 };
 

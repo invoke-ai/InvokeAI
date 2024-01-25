@@ -1,11 +1,14 @@
-import type { ChakraProps } from '@chakra-ui/react';
-import { Box, Flex, Spinner } from '@chakra-ui/react';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import type { ChakraProps } from '@invoke-ai/ui';
+import { Box, Flex, IconButton, Spinner } from '@invoke-ai/ui';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaAngleDoubleRight, FaAngleLeft, FaAngleRight } from 'react-icons/fa';
+import {
+  PiCaretDoubleRightBold,
+  PiCaretLeftBold,
+  PiCaretRightBold,
+} from 'react-icons/pi';
 
 const nextPrevButtonStyles: ChakraProps['sx'] = {
   color: 'base.100',
@@ -33,9 +36,9 @@ const NextPrevImageButtons = () => {
         insetInlineStart={1}
       >
         {!isOnFirstImage && (
-          <InvIconButton
+          <IconButton
             aria-label={t('accessibility.previousImage')}
-            icon={<FaAngleLeft size={64} />}
+            icon={<PiCaretLeftBold size={64} />}
             variant="unstyled"
             onClick={handleLeftImage}
             boxSize={16}
@@ -50,9 +53,9 @@ const NextPrevImageButtons = () => {
         insetInlineEnd={6}
       >
         {!isOnLastImage && (
-          <InvIconButton
+          <IconButton
             aria-label={t('accessibility.nextImage')}
-            icon={<FaAngleRight size={64} />}
+            icon={<PiCaretRightBold size={64} />}
             variant="unstyled"
             onClick={handleRightImage}
             boxSize={16}
@@ -60,9 +63,9 @@ const NextPrevImageButtons = () => {
           />
         )}
         {isOnLastImage && areMoreImagesAvailable && !isFetching && (
-          <InvIconButton
+          <IconButton
             aria-label={t('accessibility.loadMore')}
-            icon={<FaAngleDoubleRight size={64} />}
+            icon={<PiCaretDoubleRightBold size={64} />}
             variant="unstyled"
             onClick={handleLoadMoreImages}
             boxSize={16}

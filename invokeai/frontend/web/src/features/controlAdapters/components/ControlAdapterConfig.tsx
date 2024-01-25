@@ -1,10 +1,13 @@
-import { ChevronUpIcon } from '@chakra-ui/icons';
-import { Box, Flex } from '@chakra-ui/react';
+import {
+  Box,
+  Flex,
+  FormControl,
+  FormLabel,
+  Icon,
+  IconButton,
+  Switch,
+} from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import type { InvLabelProps } from 'common/components/InvControl/types';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
 import {
@@ -16,7 +19,7 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCopyBold, PiTrashSimpleBold } from 'react-icons/pi';
+import { PiCaretUpBold, PiCopyBold, PiTrashSimpleBold } from 'react-icons/pi';
 import { useToggle } from 'react-use';
 
 import ControlAdapterImagePreview from './ControlAdapterImagePreview';
@@ -29,10 +32,6 @@ import ParamControlAdapterModel from './parameters/ParamControlAdapterModel';
 import ParamControlAdapterProcessorSelect from './parameters/ParamControlAdapterProcessorSelect';
 import ParamControlAdapterResizeMode from './parameters/ParamControlAdapterResizeMode';
 import ParamControlAdapterWeight from './parameters/ParamControlAdapterWeight';
-
-const labelProps: InvLabelProps = {
-  flexGrow: 1,
-};
 
 const ControlAdapterConfig = (props: { id: string; number: number }) => {
   const { id, number } = props;
@@ -78,16 +77,16 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
       bg="base.750"
     >
       <Flex gap={2} alignItems="center" justifyContent="space-between">
-        <InvControl
-          label={t(`controlnet.${controlAdapterType}`, { number })}
-          labelProps={labelProps}
-        >
-          <InvSwitch
+        <FormControl>
+          <FormLabel flexGrow={1}>
+            {t(`controlnet.${controlAdapterType}`, { number })}
+          </FormLabel>
+          <Switch
             aria-label={t('controlnet.toggleControlNet')}
             isChecked={isEnabled}
             onChange={handleToggleIsEnabled}
           />
-        </InvControl>
+        </FormControl>
       </Flex>
       <Flex gap={4} alignItems="center">
         <Box
@@ -101,14 +100,14 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
         {activeTabName === 'unifiedCanvas' && (
           <ControlNetCanvasImageImports id={id} />
         )}
-        <InvIconButton
+        <IconButton
           size="sm"
           tooltip={t('controlnet.duplicate')}
           aria-label={t('controlnet.duplicate')}
           onClick={handleDuplicate}
           icon={<PiCopyBold />}
         />
-        <InvIconButton
+        <IconButton
           size="sm"
           tooltip={t('controlnet.delete')}
           aria-label={t('controlnet.delete')}
@@ -116,7 +115,7 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
           onClick={handleDelete}
           icon={<PiTrashSimpleBold />}
         />
-        <InvIconButton
+        <IconButton
           size="sm"
           tooltip={
             isExpanded
@@ -131,7 +130,9 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
           onClick={toggleIsExpanded}
           variant="ghost"
           icon={
-            <ChevronUpIcon
+            <Icon
+              boxSize={4}
+              as={PiCaretUpBold}
               transform={isExpanded ? 'rotate(0deg)' : 'rotate(180deg)'}
               transitionProperty="common"
               transitionDuration="normal"

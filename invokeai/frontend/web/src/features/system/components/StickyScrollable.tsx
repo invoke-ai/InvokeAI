@@ -1,5 +1,4 @@
-import { Flex } from '@chakra-ui/layout';
-import { InvHeading } from 'common/components/InvHeading/wrapper';
+import { Flex, Heading } from '@invoke-ai/ui';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 
@@ -11,7 +10,7 @@ export const StickyScrollableHeading = memo(
   (props: StickyScrollableHeadingProps) => {
     return (
       <Flex ps={2} pb={4} position="sticky" zIndex={1} top={0} bg="base.800">
-        <InvHeading size="sm">{props.title}</InvHeading>
+        <Heading size="sm">{props.title}</Heading>
       </Flex>
     );
   }

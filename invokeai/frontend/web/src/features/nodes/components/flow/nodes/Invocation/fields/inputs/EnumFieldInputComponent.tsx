@@ -1,4 +1,4 @@
-import { Select } from '@chakra-ui/react';
+import { Select } from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldEnumModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type {

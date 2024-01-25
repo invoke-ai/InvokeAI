@@ -1,11 +1,11 @@
 // Grid drawing adapted from https://longviewcoder.com/2021/12/08/konva-a-better-grid/
+import { getArbitraryBaseColor } from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import type { ReactElement } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { Group, Line as KonvaLine } from 'react-konva';
-import { getArbitraryBaseColor } from 'theme/colors';
 
 const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
   return {

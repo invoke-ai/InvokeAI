@@ -1,17 +1,17 @@
 import {
   Box,
+  Button,
+  ButtonGroup,
   Flex,
   Tab,
   TabList,
   Tabs,
   useDisclosure,
   VStack,
-} from '@chakra-ui/react';
+} from '@invoke-ai/ui';
 import { useStore } from '@nanostores/react';
 import { $galleryHeader } from 'app/store/nanostores/galleryHeader';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
 import { galleryViewChanged } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -77,9 +77,9 @@ const ImageGalleryContent = () => {
             w="full"
           >
             <TabList>
-              <InvButtonGroup w="full">
+              <ButtonGroup w="full">
                 <Tab
-                  as={InvButton}
+                  as={Button}
                   size="sm"
                   isChecked={galleryView === 'images'}
                   onClick={handleClickImages}
@@ -90,7 +90,7 @@ const ImageGalleryContent = () => {
                   {t('parameters.images')}
                 </Tab>
                 <Tab
-                  as={InvButton}
+                  as={Button}
                   size="sm"
                   isChecked={galleryView === 'assets'}
                   onClick={handleClickAssets}
@@ -100,7 +100,7 @@ const ImageGalleryContent = () => {
                 >
                   {t('gallery.assets')}
                 </Tab>
-              </InvButtonGroup>
+              </ButtonGroup>
             </TabList>
           </Tabs>
         </Flex>

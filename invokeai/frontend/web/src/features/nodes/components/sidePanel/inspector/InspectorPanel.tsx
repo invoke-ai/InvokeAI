@@ -1,11 +1,4 @@
-import {
-  Flex,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
-} from '@chakra-ui/react';
+import { Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 

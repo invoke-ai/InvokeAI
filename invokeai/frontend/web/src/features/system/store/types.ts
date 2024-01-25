@@ -1,4 +1,4 @@
-import type { UseToastOptions } from '@chakra-ui/react';
+import type { UseToastOptions } from '@invoke-ai/ui';
 import type { LogLevel } from 'app/logging/logger';
 import type { ProgressImage } from 'services/events/types';
 import { z } from 'zod';

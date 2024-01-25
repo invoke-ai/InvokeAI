@@ -33,12 +33,12 @@ classifiers = [
 ]
 dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
-  "accelerate==0.25.0",
+  "accelerate==0.26.1",
   "basicsr==1.4.2",
   "clip_anytorch==2.5.2",       # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel==2.0.2",
   "controlnet-aux==0.0.7",
-  "diffusers[torch]==0.25.0",
+  "diffusers[torch]==0.25.1",
   "invisible-watermark==0.2.0", # needed to install SDXL base and refiner using their repo_ids
   "mediapipe==0.10.7",          # needed for "mediapipeface" controlnet model
   "numpy==1.26.3",              # >1.24.0 is needed to use the 'strict' argument to np.testing.assert_array_equal()
@@ -52,7 +52,7 @@ dependencies = [
   "torchmetrics==0.11.4",
   "torchsde==0.2.6",
   "torchvision==0.16.2",
-  "transformers==4.36.2",
+  "transformers==4.37.0",
 
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events==0.10.0",
@@ -228,6 +228,7 @@ exclude = [
 [tool.mypy]
 ignore_missing_imports = true # ignores missing types in third-party libraries
 strict = true
+plugins = "pydantic.mypy"
 exclude = ["tests/*"]
 
 # overrides for specific modules

@@ -1,4 +1,4 @@
-import type { UseDisclosureReturn } from '@chakra-ui/react';
+import type { UseDisclosureReturn } from '@invoke-ai/ui';
 import { createContext } from 'react';
 
 export const WorkflowLibraryModalContext =

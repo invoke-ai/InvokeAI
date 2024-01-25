@@ -10,6 +10,7 @@ import type {
   CannyImageProcessorInvocation,
   ColorMapImageProcessorInvocation,
   ContentShuffleImageProcessorInvocation,
+  DepthAnythingImageProcessorInvocation,
   HedImageProcessorInvocation,
   LineartAnimeImageProcessorInvocation,
   LineartImageProcessorInvocation,
@@ -31,6 +32,7 @@ export type ControlAdapterProcessorNode =
   | CannyImageProcessorInvocation
   | ColorMapImageProcessorInvocation
   | ContentShuffleImageProcessorInvocation
+  | DepthAnythingImageProcessorInvocation
   | HedImageProcessorInvocation
   | LineartAnimeImageProcessorInvocation
   | LineartImageProcessorInvocation
@@ -72,6 +74,20 @@ export type RequiredContentShuffleImageProcessorInvocation = O.Required<
   ContentShuffleImageProcessorInvocation,
   'type' | 'detect_resolution' | 'image_resolution' | 'w' | 'h' | 'f'
 >;
+
+/**
+ * The DepthAnything processor node, with parameters flagged as required
+ */
+export type RequiredDepthAnythingImageProcessorInvocation = O.Required<
+  DepthAnythingImageProcessorInvocation,
+  'type' | 'model_size' | 'resolution' | 'offload'
+>;
+
+export const zDepthAnythingModelSize = z.enum(['large', 'base', 'small']);
+export type DepthAnythingModelSize = z.infer<typeof zDepthAnythingModelSize>;
+export const isDepthAnythingModelSize = (
+  v: unknown
+): v is DepthAnythingModelSize => zDepthAnythingModelSize.safeParse(v).success;
 
 /**
  * The HED processor node, with parameters flagged as required
@@ -161,6 +177,7 @@ export type RequiredControlAdapterProcessorNode =
       | RequiredCannyImageProcessorInvocation
       | RequiredColorMapImageProcessorInvocation
       | RequiredContentShuffleImageProcessorInvocation
+      | RequiredDepthAnythingImageProcessorInvocation
       | RequiredHedImageProcessorInvocation
       | RequiredLineartAnimeImageProcessorInvocation
       | RequiredLineartImageProcessorInvocation
@@ -213,6 +230,22 @@ export const isContentShuffleImageProcessorInvocation = (
     isObject(obj) &&
     'type' in obj &&
     obj.type === 'content_shuffle_image_processor'
+  ) {
+    return true;
+  }
+  return false;
+};
+
+/**
+ * Type guard for DepthAnythingImageProcessorInvocation
+ */
+export const isDepthAnythingImageProcessorInvocation = (
+  obj: unknown
+): obj is DepthAnythingImageProcessorInvocation => {
+  if (
+    isObject(obj) &&
+    'type' in obj &&
+    obj.type === 'depth_anything_image_processor'
   ) {
     return true;
   }

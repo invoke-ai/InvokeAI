@@ -1,15 +1,22 @@
-import type { ChakraProps } from '@chakra-ui/react';
-import { Flex, ListItem, OrderedList, Spinner } from '@chakra-ui/react';
+import type { ChakraProps } from '@invoke-ai/ui';
+import {
+  Flex,
+  FormControl,
+  FormLabel,
+  ListItem,
+  OrderedList,
+  Spinner,
+  Text,
+} from '@invoke-ai/ui';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import IAIInformationalPopover from 'common/components/IAIInformationalPopover/IAIInformationalPopover';
-import { InvText } from 'common/components/InvText/wrapper';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaCircleExclamation } from 'react-icons/fa6';
+import { PiWarningCircleBold } from 'react-icons/pi';
 
 const selectPrompts = createMemoizedSelector(
   selectDynamicPromptsSlice,
@@ -37,29 +44,32 @@ const ParamDynamicPromptsPreview = () => {
 
   if (isError) {
     return (
-      <IAIInformationalPopover feature="dynamicPrompts">
-        <Flex
-          w="full"
-          h="full"
-          layerStyle="second"
-          alignItems="center"
-          justifyContent="center"
-          p={8}
-        >
-          <IAINoContentFallback
-            icon={FaCircleExclamation}
-            label="Problem generating prompts"
-          />
-        </Flex>
-      </IAIInformationalPopover>
+      <Flex
+        w="full"
+        h="full"
+        layerStyle="second"
+        alignItems="center"
+        justifyContent="center"
+        p={8}
+      >
+        <IAINoContentFallback
+          icon={PiWarningCircleBold}
+          label="Problem generating prompts"
+        />
+      </Flex>
     );
   }
 
   return (
-    <>
-      <InvText fontSize="sm" fontWeight="bold">
-        {label}
-      </InvText>
+    <FormControl
+      orientation="vertical"
+      w="full"
+      h="full"
+      isInvalid={Boolean(parsingError || isError)}
+    >
+      <InformationalPopover feature="dynamicPrompts" inPortal={false}>
+        <FormLabel>{label}</FormLabel>
+      </InformationalPopover>
       <Flex
         w="full"
         h="full"
@@ -76,7 +86,7 @@ const ParamDynamicPromptsPreview = () => {
                 key={`${prompt}.${i}`}
                 sx={listItemStyles}
               >
-                <InvText as="span">{prompt}</InvText>
+                <Text as="span">{prompt}</Text>
               </ListItem>
             ))}
           </OrderedList>
@@ -97,7 +107,7 @@ const ParamDynamicPromptsPreview = () => {
           </Flex>
         )}
       </Flex>
-    </>
+    </FormControl>
   );
 };
 

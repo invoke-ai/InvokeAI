@@ -1,10 +1,7 @@
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setInfillMethod } from 'features/parameters/store/generationSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +12,7 @@ const ParamInfillMethod = () => {
   const dispatch = useAppDispatch();
   const infillMethod = useAppSelector((s) => s.generation.infillMethod);
   const { data: appConfigData } = useGetAppConfigQuery();
-  const options = useMemo<InvSelectOption[]>(
+  const options = useMemo<ComboboxOption[]>(
     () =>
       appConfigData
         ? appConfigData.infill_methods.map((method) => ({
@@ -26,7 +23,7 @@ const ParamInfillMethod = () => {
     [appConfigData]
   );
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!v || !options.find((o) => o.value === v.value)) {
         return;
@@ -42,13 +39,12 @@ const ParamInfillMethod = () => {
   );
 
   return (
-    <InvControl
-      label={t('parameters.infillMethod')}
-      isDisabled={options.length === 0}
-      feature="infillMethod"
-    >
-      <InvSelect value={value} options={options} onChange={onChange} />
-    </InvControl>
+    <FormControl isDisabled={options.length === 0}>
+      <InformationalPopover feature="infillMethod">
+        <FormLabel>{t('parameters.infillMethod')}</FormLabel>
+      </InformationalPopover>
+      <Combobox value={value} options={options} onChange={onChange} />
+    </FormControl>
   );
 };
 

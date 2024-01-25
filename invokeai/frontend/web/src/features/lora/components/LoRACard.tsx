@@ -1,17 +1,17 @@
-import { useAppDispatch } from 'app/store/storeHooks';
 import {
-  InvCard,
-  InvCardBody,
-  InvCardHeader,
-} from 'common/components/InvCard/wrapper';
-import { InvLabel } from 'common/components/InvControl/InvLabel';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
+  Card,
+  CardBody,
+  CardHeader,
+  CompositeNumberInput,
+  CompositeSlider,
+  IconButton,
+  Text,
+} from '@invoke-ai/ui';
+import { useAppDispatch } from 'app/store/storeHooks';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { loraRemoved, loraWeightChanged } from 'features/lora/store/loraSlice';
 import { memo, useCallback } from 'react';
-import { FaTrashCan } from 'react-icons/fa6';
+import { PiTrashSimpleBold } from 'react-icons/pi';
 
 type LoRACardProps = {
   lora: LoRA;
@@ -33,21 +33,21 @@ export const LoRACard = memo((props: LoRACardProps) => {
   }, [dispatch, lora.id]);
 
   return (
-    <InvCard variant="lora">
-      <InvCardHeader>
-        <InvLabel noOfLines={1} wordBreak="break-all">
+    <Card variant="lora">
+      <CardHeader>
+        <Text noOfLines={1} wordBreak="break-all" color="base.200">
           {lora.model_name}
-        </InvLabel>
-        <InvIconButton
+        </Text>
+        <IconButton
           aria-label="Remove LoRA"
           variant="ghost"
           size="sm"
           onClick={handleRemoveLora}
-          icon={<FaTrashCan />}
+          icon={<PiTrashSimpleBold />}
         />
-      </InvCardHeader>
-      <InvCardBody>
-        <InvSlider
+      </CardHeader>
+      <CardBody>
+        <CompositeSlider
           value={lora.weight}
           onChange={handleChange}
           min={-1}
@@ -56,7 +56,7 @@ export const LoRACard = memo((props: LoRACardProps) => {
           marks={marks}
           defaultValue={0.75}
         />
-        <InvNumberInput
+        <CompositeNumberInput
           value={lora.weight}
           onChange={handleChange}
           min={-5}
@@ -66,8 +66,8 @@ export const LoRACard = memo((props: LoRACardProps) => {
           flexShrink={0}
           defaultValue={0.75}
         />
-      </InvCardBody>
-    </InvCard>
+      </CardBody>
+    </Card>
   );
 });
 

@@ -1,7 +1,6 @@
+import type { ComboboxOnChange } from '@invoke-ai/ui';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type { InvSelectOnChange } from 'common/components/InvSelect/types';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { languageChanged } from 'features/system/store/systemSlice';
 import { isLanguage } from 'features/system/store/types';
@@ -14,22 +13,25 @@ export const SettingsLanguageSelect = memo(() => {
   const language = useAppSelector((s) => s.system.language);
   const options = useMemo(
     () => [
-      { label: t('common.langArabic'), value: 'ar' },
-      { label: t('common.langDutch'), value: 'nl' },
-      { label: t('common.langEnglish'), value: 'en' },
-      { label: t('common.langFrench'), value: 'fr' },
-      { label: t('common.langGerman'), value: 'de' },
-      { label: t('common.langHebrew'), value: 'he' },
-      { label: t('common.langItalian'), value: 'it' },
-      { label: t('common.langJapanese'), value: 'ja' },
-      { label: t('common.langKorean'), value: 'ko' },
-      { label: t('common.langPolish'), value: 'pl' },
-      { label: t('common.langBrPortuguese'), value: 'pt_BR' },
-      { label: t('common.langPortuguese'), value: 'pt' },
-      { label: t('common.langRussian'), value: 'ru' },
-      { label: t('common.langSimplifiedChinese'), value: 'zh_CN' },
-      { label: t('common.langSpanish'), value: 'es' },
-      { label: t('common.langUkranian'), value: 'ua' },
+      { label: t('common.langArabic', { lng: 'ar' }), value: 'ar' },
+      { label: t('common.langDutch', { lng: 'nl' }), value: 'nl' },
+      { label: t('common.langEnglish', { lng: 'en' }), value: 'en' },
+      { label: t('common.langFrench', { lng: 'fr' }), value: 'fr' },
+      { label: t('common.langGerman', { lng: 'de' }), value: 'de' },
+      { label: t('common.langHebrew', { lng: 'he' }), value: 'he' },
+      { label: t('common.langItalian', { lng: 'it' }), value: 'it' },
+      { label: t('common.langJapanese', { lng: 'ja' }), value: 'ja' },
+      { label: t('common.langKorean', { lng: 'ko' }), value: 'ko' },
+      { label: t('common.langPolish', { lng: 'pl' }), value: 'pl' },
+      { label: t('common.langBrPortuguese', { lng: 'pt_BR' }), value: 'pt_BR' },
+      { label: t('common.langPortuguese', { lng: 'pt' }), value: 'pt' },
+      { label: t('common.langRussian', { lng: 'ru' }), value: 'ru' },
+      {
+        label: t('common.langSimplifiedChinese', { lng: 'zh_CN' }),
+        value: 'zh_CN',
+      },
+      { label: t('common.langSpanish', { lng: 'es' }), value: 'es' },
+      { label: t('common.langUkranian', { lng: 'ua' }), value: 'ua' },
     ],
     [t]
   );
@@ -41,7 +43,7 @@ export const SettingsLanguageSelect = memo(() => {
     [language, options]
   );
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!isLanguage(v?.value)) {
         return;
@@ -51,12 +53,10 @@ export const SettingsLanguageSelect = memo(() => {
     [dispatch]
   );
   return (
-    <InvControl
-      label={t('common.languagePickerLabel')}
-      isDisabled={!isLocalizationEnabled}
-    >
-      <InvSelect value={value} options={options} onChange={onChange} />
-    </InvControl>
+    <FormControl isDisabled={!isLocalizationEnabled}>
+      <FormLabel>{t('common.languagePickerLabel')}</FormLabel>
+      <Combobox value={value} options={options} onChange={onChange} />
+    </FormControl>
   );
 });
 

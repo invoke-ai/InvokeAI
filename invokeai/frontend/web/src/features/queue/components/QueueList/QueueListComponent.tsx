@@ -1,4 +1,4 @@
-import { Flex, forwardRef } from '@chakra-ui/react';
+import { Flex, forwardRef } from '@invoke-ai/ui';
 import { memo } from 'react';
 import type { Components } from 'react-virtuoso';
 import type { SessionQueueItemDTO } from 'services/api/types';

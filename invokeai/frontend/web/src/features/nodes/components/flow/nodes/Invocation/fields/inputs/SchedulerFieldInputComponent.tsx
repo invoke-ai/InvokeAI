@@ -1,7 +1,6 @@
+import type { ComboboxOnChange } from '@invoke-ai/ui';
+import { Combobox, FormControl } from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type { InvSelectOnChange } from 'common/components/InvSelect/types';
 import { fieldSchedulerValueChanged } from 'features/nodes/store/nodesSlice';
 import type {
   SchedulerFieldInputInstance,
@@ -22,7 +21,7 @@ const SchedulerFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!isParameterScheduler(v?.value)) {
         return;
@@ -44,13 +43,9 @@ const SchedulerFieldInputComponent = (props: Props) => {
   );
 
   return (
-    <InvControl className="nowheel nodrag">
-      <InvSelect
-        value={value}
-        options={SCHEDULER_OPTIONS}
-        onChange={onChange}
-      />
-    </InvControl>
+    <FormControl className="nowheel nodrag">
+      <Combobox value={value} options={SCHEDULER_OPTIONS} onChange={onChange} />
+    </FormControl>
   );
 };
 

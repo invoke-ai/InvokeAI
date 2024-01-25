@@ -1,5 +1,4 @@
-import { Flex, Kbd, Spacer } from '@chakra-ui/react';
-import { InvText } from 'common/components/InvText/wrapper';
+import { Flex, Kbd, Spacer, Text } from '@invoke-ai/ui';
 import { Fragment, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -15,7 +14,7 @@ const HotkeyListItem = (props: HotkeysModalProps) => {
   return (
     <Flex flexDir="column" gap={2} px={2}>
       <Flex lineHeight={1} gap={1} alignItems="center">
-        <InvText fontWeight="semibold">{title}</InvText>
+        <Text fontWeight="semibold">{title}</Text>
         <Spacer />
         {hotkeys.map((hotkey, index) => {
           return (
@@ -29,27 +28,22 @@ const HotkeyListItem = (props: HotkeysModalProps) => {
                     {key}
                   </Kbd>
                   {index !== hotkey.length - 1 && (
-                    <InvText as="span" fontWeight="semibold">
+                    <Text as="span" fontWeight="semibold">
                       +
-                    </InvText>
+                    </Text>
                   )}
                 </>
               ))}
               {index !== hotkeys.length - 1 && (
-                <InvText
-                  as="span"
-                  px={2}
-                  variant="subtext"
-                  fontWeight="semibold"
-                >
+                <Text as="span" px={2} variant="subtext" fontWeight="semibold">
                   {t('common.or')}
-                </InvText>
+                </Text>
               )}
             </Fragment>
           );
         })}
       </Flex>
-      <InvText variant="subtext">{description}</InvText>
+      <Text variant="subtext">{description}</Text>
     </Flex>
   );
 };

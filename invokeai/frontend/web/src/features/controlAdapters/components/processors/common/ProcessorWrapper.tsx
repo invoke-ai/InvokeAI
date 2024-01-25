@@ -1,4 +1,4 @@
-import { Flex } from '@chakra-ui/react';
+import { Flex } from '@invoke-ai/ui';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 

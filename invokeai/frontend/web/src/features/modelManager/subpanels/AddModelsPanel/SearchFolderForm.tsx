@@ -1,9 +1,6 @@
-import { Flex } from '@chakra-ui/react';
+import { Flex, IconButton, Input, Text } from '@invoke-ai/ui';
 import { useForm } from '@mantine/form';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvInput } from 'common/components/InvInput/InvInput';
-import { InvText } from 'common/components/InvText/wrapper';
 import {
   setAdvancedAddScanModel,
   setSearchFolder,
@@ -11,7 +8,11 @@ import {
 import type { CSSProperties } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaSearch, FaSync, FaTrash } from 'react-icons/fa';
+import {
+  PiArrowsCounterClockwiseBold,
+  PiMagnifyingGlassBold,
+  PiTrashSimpleBold,
+} from 'react-icons/pi';
 import { useGetModelsInFolderQuery } from 'services/api/endpoints/models';
 
 type SearchFolderForm = {
@@ -59,16 +60,16 @@ function SearchFolderForm() {
     >
       <Flex w="100%" gap={2} borderRadius={4} alignItems="center">
         <Flex w="100%" alignItems="center" gap={4} minH={12}>
-          <InvText
+          <Text
             fontSize="sm"
             fontWeight="semibold"
             color="base.300"
             minW="max-content"
           >
             {t('common.folder')}
-          </InvText>
+          </Text>
           {!searchFolder ? (
-            <InvInput
+            <Input
               w="100%"
               size="md"
               {...searchFolderForm.getInputProps('folder')}
@@ -90,29 +91,29 @@ function SearchFolderForm() {
 
         <Flex gap={2}>
           {!searchFolder ? (
-            <InvIconButton
+            <IconButton
               aria-label={t('modelManager.findModels')}
               tooltip={t('modelManager.findModels')}
-              icon={<FaSearch />}
+              icon={<PiMagnifyingGlassBold />}
               fontSize={18}
               size="sm"
               type="submit"
             />
           ) : (
-            <InvIconButton
+            <IconButton
               aria-label={t('modelManager.scanAgain')}
               tooltip={t('modelManager.scanAgain')}
-              icon={<FaSync />}
+              icon={<PiArrowsCounterClockwiseBold />}
               onClick={scanAgainHandler}
               fontSize={18}
               size="sm"
             />
           )}
 
-          <InvIconButton
+          <IconButton
             aria-label={t('modelManager.clearCheckpointFolder')}
             tooltip={t('modelManager.clearCheckpointFolder')}
-            icon={<FaTrash />}
+            icon={<PiTrashSimpleBold />}
             size="sm"
             onClick={handleClickClearCheckpointFolder}
             isDisabled={!searchFolder}

@@ -1,10 +1,9 @@
+import { IconButton, Tooltip } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { setShouldConcatSDXLStylePrompt } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaLink, FaUnlink } from 'react-icons/fa';
+import { PiLinkSimpleBold, PiLinkSimpleBreakBold } from 'react-icons/pi';
 
 export const SDXLConcatButton = memo(() => {
   const shouldConcatSDXLStylePrompt = useAppSelector(
@@ -27,16 +26,22 @@ export const SDXLConcatButton = memo(() => {
   );
 
   return (
-    <InvTooltip label={label}>
-      <InvIconButton
+    <Tooltip label={label}>
+      <IconButton
         aria-label={label}
         onClick={handleShouldConcatPromptChange}
-        icon={shouldConcatSDXLStylePrompt ? <FaLink /> : <FaUnlink />}
+        icon={
+          shouldConcatSDXLStylePrompt ? (
+            <PiLinkSimpleBold size={14} />
+          ) : (
+            <PiLinkSimpleBreakBold size={14} />
+          )
+        }
         variant="promptOverlay"
         fontSize={12}
         px={0.5}
       />
-    </InvTooltip>
+    </Tooltip>
   );
 });
 

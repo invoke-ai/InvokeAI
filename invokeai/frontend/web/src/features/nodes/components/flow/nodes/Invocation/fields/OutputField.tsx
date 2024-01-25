@@ -1,7 +1,4 @@
-import { Flex } from '@chakra-ui/react';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvLabel } from 'common/components/InvControl/InvLabel';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { Flex, FormControl, FormLabel, Tooltip } from '@invoke-ai/ui';
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
 import { useFieldOutputInstance } from 'features/nodes/hooks/useFieldOutputInstance';
 import { useFieldOutputTemplate } from 'features/nodes/hooks/useFieldOutputTemplate';
@@ -34,14 +31,14 @@ const OutputField = ({ nodeId, fieldName }: Props) => {
   if (!fieldTemplate || !fieldInstance) {
     return (
       <OutputFieldWrapper shouldDim={shouldDim}>
-        <InvControl
+        <FormControl
           alignItems="stretch"
           justifyContent="space-between"
           gap={2}
           h="full"
           w="full"
         >
-          <InvLabel
+          <FormLabel
             display="flex"
             alignItems="center"
             h="full"
@@ -53,15 +50,15 @@ const OutputField = ({ nodeId, fieldName }: Props) => {
             {t('nodes.unknownOutput', {
               name: fieldTemplate?.title ?? fieldName,
             })}
-          </InvLabel>
-        </InvControl>
+          </FormLabel>
+        </FormControl>
       </OutputFieldWrapper>
     );
   }
 
   return (
     <OutputFieldWrapper shouldDim={shouldDim}>
-      <InvTooltip
+      <Tooltip
         label={
           <FieldTooltipContent
             nodeId={nodeId}
@@ -73,10 +70,10 @@ const OutputField = ({ nodeId, fieldName }: Props) => {
         placement="top"
         shouldWrapChildren
       >
-        <InvControl isDisabled={isConnected} pe={2}>
-          <InvLabel mb={0}>{fieldTemplate?.title}</InvLabel>
-        </InvControl>
-      </InvTooltip>
+        <FormControl isDisabled={isConnected} pe={2}>
+          <FormLabel mb={0}>{fieldTemplate?.title}</FormLabel>
+        </FormControl>
+      </Tooltip>
       <FieldHandle
         fieldTemplate={fieldTemplate}
         handleType="source"

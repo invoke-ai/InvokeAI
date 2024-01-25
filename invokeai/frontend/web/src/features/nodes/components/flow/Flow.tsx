@@ -1,6 +1,5 @@
-import { useToken } from '@chakra-ui/react';
+import { useGlobalMenuClose, useToken } from '@invoke-ai/ui';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useGlobalMenuClose } from 'common/hooks/useGlobalMenuClose';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';

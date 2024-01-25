@@ -1,4 +1,4 @@
-import { Box } from '@chakra-ui/react';
+import { Box, useGlobalModifiersInit } from '@invoke-ai/ui';
 import { useSocketIO } from 'app/hooks/useSocketIO';
 import { useLogger } from 'app/logging/useLogger';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
@@ -8,7 +8,6 @@ import ImageUploadOverlay from 'common/components/ImageUploadOverlay';
 import { useClearStorage } from 'common/hooks/useClearStorage';
 import { useFullscreenDropzone } from 'common/hooks/useFullscreenDropzone';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
-import { useGlobalModifiersInit } from 'common/hooks/useGlobalModifiers';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';

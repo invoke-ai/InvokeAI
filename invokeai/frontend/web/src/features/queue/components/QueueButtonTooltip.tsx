@@ -1,7 +1,6 @@
-import { Divider, Flex, ListItem, UnorderedList } from '@chakra-ui/react';
+import { Divider, Flex, ListItem, Text, UnorderedList } from '@invoke-ai/ui';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvText } from 'common/components/InvText/wrapper';
 import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
@@ -56,33 +55,33 @@ export const QueueButtonTooltip = memo(({ prepend = false }: Props) => {
 
   return (
     <Flex flexDir="column" gap={1}>
-      <InvText fontWeight="semibold">{label}</InvText>
-      <InvText>
+      <Text fontWeight="semibold">{label}</Text>
+      <Text>
         {t('queue.queueCountPrediction', {
           promptsCount,
           iterations,
           count: Math.min(promptsCount * iterations, 10000),
         })}
-      </InvText>
+      </Text>
       {reasons.length > 0 && (
         <>
           <Divider opacity={0.2} borderColor="base.900" />
           <UnorderedList>
             {reasons.map((reason, i) => (
               <ListItem key={`${reason}.${i}`}>
-                <InvText>{reason}</InvText>
+                <Text>{reason}</Text>
               </ListItem>
             ))}
           </UnorderedList>
         </>
       )}
       <Divider opacity={0.2} borderColor="base.900" />
-      <InvText fontStyle="oblique 10deg">
+      <Text fontStyle="oblique 10deg">
         {t('parameters.invoke.addingImagesTo')}{' '}
-        <InvText as="span" fontWeight="semibold">
+        <Text as="span" fontWeight="semibold">
           {autoAddBoardName || t('boards.uncategorized')}
-        </InvText>
-      </InvText>
+        </Text>
+      </Text>
     </Flex>
   );
 });

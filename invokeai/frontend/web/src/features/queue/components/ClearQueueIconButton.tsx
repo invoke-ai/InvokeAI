@@ -1,35 +1,75 @@
-import { useDisclosure } from '@chakra-ui/react';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import type { InvIconButtonProps } from 'common/components/InvIconButton/types';
+import type { IconButtonProps } from '@invoke-ai/ui';
+import { IconButton, useDisclosure, useShiftModifier } from '@invoke-ai/ui';
 import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQueueConfirmationAlertDialog';
+import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
-import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiTrashSimpleBold } from 'react-icons/pi';
+import { PiTrashSimpleBold, PiXBold } from 'react-icons/pi';
 
-type Props = Omit<InvIconButtonProps, 'aria-label'>;
+type ClearQueueButtonProps = Omit<IconButtonProps, 'aria-label'>;
 
-const ClearQueueIconButton = (props: Props) => {
+type ClearQueueIconButtonProps = ClearQueueButtonProps & {
+  onOpen: () => void;
+};
+
+const ClearAllQueueIconButton = ({
+  onOpen,
+  ...props
+}: ClearQueueIconButtonProps) => {
   const { t } = useTranslation();
-  const disclosure = useDisclosure();
   const { isLoading, isDisabled } = useClearQueue();
 
   return (
+    <IconButton
+      isDisabled={isDisabled}
+      isLoading={isLoading}
+      aria-label={t('queue.clear')}
+      tooltip={t('queue.clearTooltip')}
+      icon={<PiTrashSimpleBold size="16px" />}
+      colorScheme="error"
+      onClick={onOpen}
+      data-testid={t('queue.clear')}
+      {...props}
+    />
+  );
+};
+
+const ClearSingleQueueItemIconButton = (props: ClearQueueButtonProps) => {
+  const { t } = useTranslation();
+  const { cancelQueueItem, isLoading, isDisabled } =
+    useCancelCurrentQueueItem();
+
+  return (
+    <IconButton
+      isDisabled={isDisabled}
+      isLoading={isLoading}
+      aria-label={t('queue.cancel')}
+      tooltip={t('queue.cancelTooltip')}
+      icon={<PiXBold size="16px" />}
+      colorScheme="error"
+      onClick={cancelQueueItem}
+      data-testid={t('queue.cancel')}
+      {...props}
+    />
+  );
+};
+
+export const ClearQueueIconButton = (props: ClearQueueButtonProps) => {
+  // Show the single item clear button when shift is pressed
+  // Otherwise show the clear queue button
+  const shift = useShiftModifier();
+  const disclosure = useDisclosure();
+
+  return (
     <>
-      <InvIconButton
-        isDisabled={isDisabled}
-        isLoading={isLoading}
-        aria-label={t('queue.clear')}
-        tooltip={t('queue.clearTooltip')}
-        icon={<PiTrashSimpleBold size="16px" />}
-        colorScheme="error"
-        onClick={disclosure.onOpen}
-        data-testid={t('queue.clear')}
-        {...props}
-      />
+      {shift ? (
+        <ClearAllQueueIconButton {...props} onOpen={disclosure.onOpen} />
+      ) : (
+        <ClearSingleQueueItemIconButton {...props} />
+      )}
       <ClearQueueConfirmationAlertDialog disclosure={disclosure} />
     </>
   );
 };
 
-export default memo(ClearQueueIconButton);
+export default ClearQueueIconButton;

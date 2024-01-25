@@ -1,8 +1,12 @@
-import { SpinnerIcon } from '@chakra-ui/icons';
-import type { SystemStyleObject } from '@chakra-ui/react';
-import { Flex, Portal } from '@chakra-ui/react';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import type { SystemStyleObject } from '@invoke-ai/ui';
+import {
+  ButtonGroup,
+  Flex,
+  Icon,
+  IconButton,
+  Portal,
+  spinAnimation,
+} from '@invoke-ai/ui';
 import CancelCurrentQueueItemIconButton from 'features/queue/components/CancelCurrentQueueItemIconButton';
 import ClearQueueIconButton from 'features/queue/components/ClearQueueIconButton';
 import { QueueButtonTooltip } from 'features/queue/components/QueueButtonTooltip';
@@ -10,10 +14,9 @@ import { useQueueBack } from 'features/queue/hooks/useQueueBack';
 import type { UsePanelReturn } from 'features/ui/hooks/usePanel';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiSlidersHorizontalBold } from 'react-icons/pi';
+import { PiCircleNotchBold, PiSlidersHorizontalBold } from 'react-icons/pi';
 import { RiSparklingFill } from 'react-icons/ri';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
-import { spinAnimationSlow } from 'theme/animations';
 
 const floatingButtonStyles: SystemStyleObject = {
   borderStartRadius: 0,
@@ -32,7 +35,7 @@ const FloatingSidePanelButtons = (props: Props) => {
   const queueButtonIcon = useMemo(
     () =>
       !isDisabled && queueStatus?.processor.is_processing ? (
-        <SpinnerIcon animation={spinAnimationSlow} />
+        <Icon boxSize={6} as={PiCircleNotchBold} animation={spinAnimation} />
       ) : (
         <RiSparklingFill size="16px" />
       ),
@@ -55,15 +58,15 @@ const FloatingSidePanelButtons = (props: Props) => {
         gap={2}
         h={48}
       >
-        <InvButtonGroup orientation="vertical" flexGrow={3}>
-          <InvIconButton
+        <ButtonGroup orientation="vertical" flexGrow={3}>
+          <IconButton
             tooltip={t('accessibility.showOptionsPanel')}
             aria-label={t('accessibility.showOptionsPanel')}
             onClick={props.panelApi.expand}
             sx={floatingButtonStyles}
             icon={<PiSlidersHorizontalBold size="16px" />}
           />
-          <InvIconButton
+          <IconButton
             aria-label={t('queue.queueBack')}
             onClick={queueBack}
             isLoading={isLoading}
@@ -74,7 +77,7 @@ const FloatingSidePanelButtons = (props: Props) => {
             sx={floatingButtonStyles}
           />
           <CancelCurrentQueueItemIconButton sx={floatingButtonStyles} />
-        </InvButtonGroup>
+        </ButtonGroup>
         <ClearQueueIconButton sx={floatingButtonStyles} />
       </Flex>
     </Portal>

@@ -1,6 +1,5 @@
-import { Flex } from '@chakra-ui/react';
+import { Flex, IconButton } from '@invoke-ai/ui';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import {
   canvasImageToControlAdapter,
   canvasMaskToControlAdapter,
@@ -30,14 +29,14 @@ const ControlNetCanvasImageImports = (
 
   return (
     <Flex gap={4}>
-      <InvIconButton
+      <IconButton
         size="sm"
         icon={<PiImageSquareBold />}
         tooltip={t('controlnet.importImageFromCanvas')}
         aria-label={t('controlnet.importImageFromCanvas')}
         onClick={handleImportImageFromCanvas}
       />
-      <InvIconButton
+      <IconButton
         size="sm"
         icon={<PiExcludeBold />}
         tooltip={t('controlnet.importMaskFromCanvas')}

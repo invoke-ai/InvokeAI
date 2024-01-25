@@ -1,4 +1,4 @@
-import type { SystemStyleObject } from '@chakra-ui/react';
+import type { SystemStyleObject } from '@invoke-ai/ui';
 import {
   Box,
   Editable,
@@ -7,13 +7,13 @@ import {
   Flex,
   Icon,
   Image,
-} from '@chakra-ui/react';
+  Text,
+  Tooltip,
+} from '@invoke-ai/ui';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
-import { InvText } from 'common/components/InvText/wrapper';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import SelectionOverlay from 'common/components/SelectionOverlay';
 import type { AddToBoardDropData } from 'features/dnd/types';
 import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
@@ -25,7 +25,7 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaUser } from 'react-icons/fa';
+import { PiImagesSquare } from 'react-icons/pi';
 import {
   useGetBoardAssetsTotalQuery,
   useGetBoardImagesTotalQuery,
@@ -163,7 +163,7 @@ const GalleryBoard = ({
           setBoardToDelete={setBoardToDelete}
         >
           {(ref) => (
-            <InvTooltip label={tooltip} openDelay={1000}>
+            <Tooltip label={tooltip} openDelay={1000}>
               <Flex
                 ref={ref}
                 onClick={handleSelectBoard}
@@ -195,8 +195,8 @@ const GalleryBoard = ({
                     alignItems="center"
                   >
                     <Icon
-                      boxSize={12}
-                      as={FaUser}
+                      boxSize={14}
+                      as={PiImagesSquare}
                       mt={-6}
                       opacity={0.7}
                       color="base.500"
@@ -246,11 +246,11 @@ const GalleryBoard = ({
                 <IAIDroppable
                   data={droppableData}
                   dropLabel={
-                    <InvText fontSize="md">{t('unifiedCanvas.move')}</InvText>
+                    <Text fontSize="md">{t('unifiedCanvas.move')}</Text>
                   }
                 />
               </Flex>
-            </InvTooltip>
+            </Tooltip>
           )}
         </BoardContextMenu>
       </Flex>
