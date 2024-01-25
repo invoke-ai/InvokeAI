@@ -477,7 +477,7 @@ Then type the following commands:
 
 === "AMD System"
     ```bash
-    pip install torch torchvision --force-reinstall --extra-index-url https://download.pytorch.org/whl/rocm5.4.2
+    pip install torch torchvision --force-reinstall --extra-index-url https://download.pytorch.org/whl/rocm5.6
     ```
 
 ### Corrupted configuration file
