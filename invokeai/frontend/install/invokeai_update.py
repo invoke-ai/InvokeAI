@@ -5,8 +5,8 @@ pip install <path_to_git_source>.
 import os
 import platform
 from distutils.version import LooseVersion
+from importlib.metadata import PackageNotFoundError, distribution
 
-import pkg_resources
 import psutil
 import requests
 from rich import box, print
@@ -89,12 +89,11 @@ def welcome(latest_release: str, latest_prerelease: str):
 
 
 def get_extras():
-    extras = ""
     try:
-        _ = pkg_resources.get_distribution("xformers")
+        distribution("xformers")
         extras = "[xformers]"
-    except pkg_resources.DistributionNotFound:
-        pass
+    except PackageNotFoundError:
+        extras = ""
     return extras
 
 
