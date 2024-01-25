@@ -1307,6 +1307,7 @@
         "showProgressInViewer": "Show Progress Images in Viewer",
         "ui": "User Interface",
         "useSlidersForAll": "Use Sliders For All Options",
+        "collapseAdvancedOptions": "Collapse Advanced Options",
         "clearIntermediatesDisabled": "Queue must be empty to clear intermediates",
         "clearIntermediatesDesc1": "Clearing intermediates will reset your Canvas and ControlNet state.",
         "clearIntermediatesDesc2": "Intermediate images are byproducts of generation, different from the result images in the gallery. Clearing intermediates will free disk space.",
@@ -1451,6 +1452,12 @@
             "heading": "Scheduler",
             "paragraphs": [
                 "Scheduler defines how to iteratively add noise to an image or how to update a sample based on a model's output."
+            ]
+        },
+        "collapseAdvancedOptions": {
+            "heading": "Collapse Advanced Options",
+            "paragraphs": [
+                "Collapses options containing advanced generation settings within the UI by default. These options can always be expanded by clicking on them."
             ]
         },
         "compositingBlur": {

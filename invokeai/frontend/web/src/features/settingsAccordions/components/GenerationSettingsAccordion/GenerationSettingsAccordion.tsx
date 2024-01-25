@@ -46,18 +46,22 @@ const badgesSelector = createMemoizedSelector(
   }
 );
 
-export const GenerationSettingsAccordion = memo(() => {
+interface GenerationSettingsAccordionProps {
+  collapseAdvanced: boolean;
+}
+
+export const GenerationSettingsAccordion = memo<GenerationSettingsAccordionProps>(({ collapseAdvanced = false }) => {
   const { t } = useTranslation();
   const { loraTabBadges, accordionBadges } = useAppSelector(badgesSelector);
-  const { isOpen: isOpenExpander, onToggle: onToggleExpander } =
-    useExpanderToggle({
-      id: 'generation-settings-advanced',
-      defaultIsOpen: false,
-    });
   const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } =
     useStandaloneAccordionToggle({
       id: 'generation-settings',
       defaultIsOpen: true,
+    });
+  const { isOpen: isOpenExpander, onToggle: onToggleExpander } =
+    useExpanderToggle({
+      id: 'generation-settings-advanced',
+      defaultIsOpen: !collapseAdvanced,
     });
 
   return (

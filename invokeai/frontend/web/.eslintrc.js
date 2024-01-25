@@ -122,6 +122,12 @@ module.exports = {
         'i18next/no-literal-string': 'off',
       },
     },
+    {
+      files: ['**/*.ts', '**/*.tsx'],
+      rules: {
+        'react/prop-types': 'off',
+      }
+    },
   ],
   settings: {
     react: {

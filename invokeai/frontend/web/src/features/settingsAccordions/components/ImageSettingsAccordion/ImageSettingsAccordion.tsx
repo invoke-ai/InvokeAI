@@ -74,13 +74,17 @@ const scalingLabelProps: FormLabelProps = {
   minW: '4.5rem',
 };
 
-export const ImageSettingsAccordion = memo(() => {
+interface ImageSettingsAccordionProps {
+  collapseAdvanced?: boolean;
+}
+
+export const ImageSettingsAccordion = memo<ImageSettingsAccordionProps>(({ collapseAdvanced = false }) => {
   const { t } = useTranslation();
   const { badges, activeTabName } = useAppSelector(selector);
   const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } =
     useStandaloneAccordionToggle({ id: 'image-settings', defaultIsOpen: true });
   const { isOpen: isOpenExpander, onToggle: onToggleExpander } =
-    useExpanderToggle({ id: 'image-settings-advanced', defaultIsOpen: false });
+    useExpanderToggle({ id: 'image-settings-advanced', defaultIsOpen: !collapseAdvanced });
 
   return (
     <StandaloneAccordion

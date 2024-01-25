@@ -24,6 +24,7 @@ import { useClearIntermediates } from 'features/system/components/SettingsModal/
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import {
   setEnableImageDebugging,
+  setShouldCollapseAdvancedOptions,
   setShouldConfirmOnDelete,
   setShouldEnableInformationalPopovers,
   shouldAntialiasProgressImageChanged,
@@ -126,6 +127,9 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const shouldEnableInformationalPopovers = useAppSelector(
     (s) => s.system.shouldEnableInformationalPopovers
   );
+  const shouldCollapseAdvancedOptions = useAppSelector(
+    (s) => s.system.shouldCollapseAdvancedOptions
+  );
 
   const clearStorage = useClearStorage();
 
@@ -194,6 +198,12 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const handleChangeShouldUseCpuNoise = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(shouldUseCpuNoiseChanged(e.target.checked));
+    },
+    [dispatch]
+  );
+  const handleShouldCollapseAdvancedOptions = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setShouldCollapseAdvancedOptions(e.target.checked));
     },
     [dispatch]
   );
@@ -276,6 +286,18 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
                       <Switch
                         isChecked={shouldUseCpuNoise}
                         onChange={handleChangeShouldUseCpuNoise}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <InformationalPopover
+                        feature="collapseAdvancedOptions"
+                        inPortal={false}
+                      >
+                        <FormLabel>{t('settings.collapseAdvancedOptions')}</FormLabel>
+                      </InformationalPopover>
+                      <Switch
+                        isChecked={shouldCollapseAdvancedOptions}
+                        onChange={handleShouldCollapseAdvancedOptions}
                       />
                     </FormControl>
                     {shouldShowLocalizationToggle && <SettingsLanguageSelect />}

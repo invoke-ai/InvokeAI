@@ -57,6 +57,7 @@ export interface SystemState {
   shouldUseWatermarker: boolean;
   status: SystemStatus;
   shouldEnableInformationalPopovers: boolean;
+  shouldCollapseAdvancedOptions: boolean;
 }
 
 export const STATUS_TRANSLATION_KEYS: Record<SystemStatus, string> = {

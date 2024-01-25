@@ -25,6 +25,9 @@ const ParametersPanel = () => {
   const isSDXL = useAppSelector(
     (s) => s.generation.model?.base_model === 'sdxl'
   );
+  const shouldCollapseAdvancedOptions = useAppSelector(
+    (s) => s.system.shouldCollapseAdvancedOptions
+  );
 
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>
@@ -38,8 +41,8 @@ const ParametersPanel = () => {
           >
             <Flex gap={2} flexDirection="column" h="full" w="full">
               {isSDXL ? <SDXLPrompts /> : <Prompts />}
-              <ImageSettingsAccordion />
-              <GenerationSettingsAccordion />
+              <ImageSettingsAccordion collapseAdvanced={shouldCollapseAdvancedOptions} />
+              <GenerationSettingsAccordion collapseAdvanced={shouldCollapseAdvancedOptions} />
               <ControlSettingsAccordion />
               {activeTabName === 'unifiedCanvas' && (
                 <CompositingSettingsAccordion />
