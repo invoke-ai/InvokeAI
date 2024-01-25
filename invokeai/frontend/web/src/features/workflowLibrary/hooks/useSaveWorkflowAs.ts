@@ -9,7 +9,7 @@ import {
 } from 'features/nodes/store/workflowSlice';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCreateWorkflowMutation } from 'services/api/endpoints/workflows';
+import { useCreateWorkflowMutation, workflowsApi } from 'services/api/endpoints/workflows';
 
 type SaveWorkflowAsArg = {
   name: string;
@@ -59,13 +59,15 @@ export const useSaveWorkflowAs: UseSaveWorkflowAs = () => {
         });
       } catch (e) {
         onError && onError();
-        if (!toast.isActive('auth-error-toast')) {
+        if (!toast.isActive(`auth-error-toast-${workflowsApi.endpoints.updateWorkflow.name}`)) {
           toast.update(toastRef.current, {
             title: t('workflows.problemSavingWorkflow'),
             status: 'error',
             duration: 1000,
             isClosable: true,
           });
+        } else {
+          toast.close(toastRef.current)
         }
       }
     },
