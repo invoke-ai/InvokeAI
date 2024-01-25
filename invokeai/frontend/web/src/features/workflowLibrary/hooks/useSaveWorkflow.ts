@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import {
   useCreateWorkflowMutation,
   useUpdateWorkflowMutation,
+  workflowsApi,
 } from 'services/api/endpoints/workflows';
 import type { O } from 'ts-toolbelt';
 
@@ -60,12 +61,23 @@ export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
         isClosable: true,
       });
     } catch (e) {
-      toast.update(toastRef.current, {
-        title: t('workflows.problemSavingWorkflow'),
-        status: 'error',
-        duration: 1000,
-        isClosable: true,
-      });
+      if (
+        !toast.isActive(
+          `auth-error-toast-${workflowsApi.endpoints.createWorkflow.name}`
+        ) &&
+        !toast.isActive(
+          `auth-error-toast-${workflowsApi.endpoints.updateWorkflow.name}`
+        )
+      ) {
+        toast.update(toastRef.current, {
+          title: t('workflows.problemSavingWorkflow'),
+          status: 'error',
+          duration: 1000,
+          isClosable: true,
+        });
+      } else {
+        toast.close(toastRef.current);
+      }
     }
   }, [updateWorkflow, dispatch, toast, t, createWorkflow]);
   return {
