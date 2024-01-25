@@ -61,7 +61,14 @@ export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
         isClosable: true,
       });
     } catch (e) {
-      if (!toast.isActive(`auth-error-toast-${workflowsApi.endpoints.createWorkflow.name}`) && !toast.isActive(`auth-error-toast-${workflowsApi.endpoints.updateWorkflow.name}`)) {
+      if (
+        !toast.isActive(
+          `auth-error-toast-${workflowsApi.endpoints.createWorkflow.name}`
+        ) &&
+        !toast.isActive(
+          `auth-error-toast-${workflowsApi.endpoints.updateWorkflow.name}`
+        )
+      ) {
         toast.update(toastRef.current, {
           title: t('workflows.problemSavingWorkflow'),
           status: 'error',
@@ -69,7 +76,7 @@ export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
           isClosable: true,
         });
       } else {
-        toast.close(toastRef.current)
+        toast.close(toastRef.current);
       }
     }
   }, [updateWorkflow, dispatch, toast, t, createWorkflow]);

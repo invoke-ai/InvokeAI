@@ -2,7 +2,10 @@ import { useToast } from '@invoke-ai/ui';
 import { useAppToaster } from 'app/components/Toaster';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDeleteWorkflowMutation, workflowsApi } from 'services/api/endpoints/workflows';
+import {
+  useDeleteWorkflowMutation,
+  workflowsApi,
+} from 'services/api/endpoints/workflows';
 
 type UseDeleteLibraryWorkflowOptions = {
   onSuccess?: () => void;
@@ -36,7 +39,11 @@ export const useDeleteLibraryWorkflow: UseDeleteLibraryWorkflow = ({
         });
         onSuccess && onSuccess();
       } catch {
-        if (!toast.isActive(`auth-error-toast-${workflowsApi.endpoints.deleteWorkflow.name}`)) {
+        if (
+          !toast.isActive(
+            `auth-error-toast-${workflowsApi.endpoints.deleteWorkflow.name}`
+          )
+        ) {
           toaster({
             title: t('toast.problemDeletingWorkflow'),
             status: 'error',

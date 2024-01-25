@@ -4,7 +4,10 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLazyGetWorkflowQuery, workflowsApi } from 'services/api/endpoints/workflows';
+import {
+  useLazyGetWorkflowQuery,
+  workflowsApi,
+} from 'services/api/endpoints/workflows';
 
 type UseGetAndLoadLibraryWorkflowOptions = {
   onSuccess?: () => void;
@@ -40,7 +43,11 @@ export const useGetAndLoadLibraryWorkflow: UseGetAndLoadLibraryWorkflow = ({
         // No toast - the listener for this action does that after the workflow is loaded
         onSuccess && onSuccess();
       } catch {
-        if (!toast.isActive(`auth-error-toast-${workflowsApi.endpoints.getWorkflow.name}`)) {
+        if (
+          !toast.isActive(
+            `auth-error-toast-${workflowsApi.endpoints.getWorkflow.name}`
+          )
+        ) {
           toaster({
             title: t('toast.problemRetrievingWorkflow'),
             status: 'error',
