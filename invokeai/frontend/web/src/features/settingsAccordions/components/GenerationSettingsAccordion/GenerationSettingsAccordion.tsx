@@ -47,7 +47,7 @@ const badgesSelector = createMemoizedSelector(
 );
 
 interface GenerationSettingsAccordionProps {
-  collapseAdvanced: boolean;
+  collapseAdvanced?: boolean;
 }
 
 export const GenerationSettingsAccordion =
