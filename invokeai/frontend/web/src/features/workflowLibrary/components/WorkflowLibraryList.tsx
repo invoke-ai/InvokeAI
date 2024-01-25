@@ -61,13 +61,21 @@ const WorkflowLibraryList = () => {
   const [category, setCategory] = useState<WorkflowCategory>('user');
   const [page, setPage] = useState(0);
   const [query, setQuery] = useState('');
-  const [order_by, setOrderBy] = useState<WorkflowRecordOrderBy>('opened_at');
+  const projectId = useStore($projectId);
+  const orderByOptions = useMemo(() => {
+    return projectId
+      ? ORDER_BY_OPTIONS.filter((option) => option.value !== 'opened_at')
+      : ORDER_BY_OPTIONS;
+  }, [projectId]);
+
+  const [order_by, setOrderBy] = useState<WorkflowRecordOrderBy>(
+    orderByOptions[0].value
+  );
   const [direction, setDirection] = useState<SQLiteDirection>('ASC');
   const [debouncedQuery] = useDebounce(query, 500);
-  const projectId = useStore($projectId);
 
   const queryArg = useMemo<Parameters<typeof useListWorkflowsQuery>[0]>(() => {
-    if (category === 'user') {
+    if (category !== 'default') {
       return {
         page,
         per_page: PER_PAGE,
@@ -101,8 +109,8 @@ const WorkflowLibraryList = () => {
     [order_by]
   );
   const valueOrderBy = useMemo(
-    () => ORDER_BY_OPTIONS.find((o) => o.value === order_by),
-    [order_by]
+    () => orderByOptions.find((o) => o.value === order_by),
+    [order_by, orderByOptions]
   );
 
   const onChangeDirection = useCallback<ComboboxOnChange>(
@@ -186,7 +194,7 @@ const WorkflowLibraryList = () => {
               <FormLabel>{t('common.orderBy')}</FormLabel>
               <Combobox
                 value={valueOrderBy}
-                options={ORDER_BY_OPTIONS}
+                options={orderByOptions}
                 onChange={onChangeOrderBy}
               />
             </FormControl>
