@@ -45,7 +45,7 @@ export const useSocketIO = () => {
   const socketOptions = useMemo(() => {
     const options: Partial<ManagerOptions & SocketOptions> = {
       timeout: 60000,
-      path: '/ws/socket.io',
+      path: `${window.location.pathname}ws/socket.io`,
       autoConnect: false, // achtung! removing this breaks the dynamic middleware
       forceNew: true,
     };

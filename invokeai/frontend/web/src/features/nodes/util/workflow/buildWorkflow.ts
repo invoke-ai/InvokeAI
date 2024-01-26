@@ -24,6 +24,7 @@ const workflowKeys = [
   'notes',
   'exposedFields',
   'meta',
+  'id',
 ] satisfies (keyof WorkflowV2)[];
 
 export type BuildWorkflowFunction = (arg: BuildWorkflowArg) => WorkflowV2;
