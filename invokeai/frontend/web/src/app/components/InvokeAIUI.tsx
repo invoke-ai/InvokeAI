@@ -23,6 +23,8 @@ import React, { lazy, memo, useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
 import type { ManagerOptions, SocketOptions } from 'socket.io-client';
+import { WorkflowCategory } from '../../features/nodes/types/workflow';
+import { $workflowCategories } from '../store/nanostores/workflowCategories';
 
 const App = lazy(() => import('./App'));
 const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
@@ -45,6 +47,7 @@ interface Props extends PropsWithChildren {
   socketOptions?: Partial<ManagerOptions & SocketOptions>;
   isDebugging?: boolean;
   logo?: ReactNode;
+  workflowCategories?: WorkflowCategory[];
 }
 
 const InvokeAIUI = ({
@@ -62,6 +65,7 @@ const InvokeAIUI = ({
   socketOptions,
   isDebugging = false,
   logo,
+  workflowCategories,
 }: Props) => {
   useEffect(() => {
     // configure API client token
@@ -155,6 +159,16 @@ const InvokeAIUI = ({
       $logo.set(undefined);
     };
   }, [logo]);
+
+  useEffect(() => {
+    if (workflowCategories) {
+      $workflowCategories.set(workflowCategories);
+    }
+
+    return () => {
+      $workflowCategories.set([]);
+    };
+  }, [workflowCategories]);
 
   useEffect(() => {
     if (socketOptions) {
