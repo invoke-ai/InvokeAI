@@ -27,7 +27,8 @@ export const authToastMiddleware: Middleware =
     if (isRejectedWithValue(action)) {
       try {
         const parsed = zRejectedForbiddenAction.parse(action);
-        if (parsed.meta?.arg?.endpointName === 'getImageDTO') {
+        const endpointName = parsed.meta?.arg?.endpointName;
+        if (endpointName === 'getImageDTO') {
           // do not show toast if problem is image access
           return;
         }
@@ -39,6 +40,7 @@ export const authToastMiddleware: Middleware =
             : undefined;
         dispatch(
           addToast({
+            id: `auth-error-toast-${endpointName}`,
             title: t('common.somethingWentWrong'),
             status: 'error',
             description: customMessage,
