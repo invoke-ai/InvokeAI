@@ -1,8 +1,16 @@
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $isMoveStageKeyHeld } from 'features/canvas/store/canvasNanostore';
-import { setStageCoordinates, setStageScale } from 'features/canvas/store/canvasSlice';
-import { CANVAS_SCALE_BY, MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/canvas/util/constants';
+import {
+  setBrushSize,
+  setStageCoordinates,
+  setStageScale,
+} from 'features/canvas/store/canvasSlice';
+import {
+  CANVAS_SCALE_BY,
+  MAX_CANVAS_SCALE,
+  MIN_CANVAS_SCALE,
+} from 'features/canvas/util/constants';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { clamp } from 'lodash-es';
@@ -13,6 +21,7 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
   const dispatch = useAppDispatch();
   const stageScale = useAppSelector((s) => s.canvas.stageScale);
   const isMoveStageKeyHeld = useStore($isMoveStageKeyHeld);
+  const brushSize = useAppSelector((s) => s.canvas.brushSize);
 
   return useCallback(
     (e: KonvaEventObject<WheelEvent>) => {
@@ -36,10 +45,20 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
 
       let delta = e.evt.deltaY;
 
+      let size = 0;
       // when we zoom on trackpad, e.evt.ctrlKey is true
       // in that case lets revert direction
       if (e.evt.ctrlKey) {
         delta = -delta;
+        if (delta < 0) {
+          if (brushSize - 5 <= 5) {
+            size = Math.max(brushSize - 1, 1);
+          } else {
+            size = Math.max(brushSize - 5, 1);
+          }
+        } else {
+          size = Math.min(brushSize + 5, 500);
+        }
       }
 
       const newScale = clamp(stageScale * CANVAS_SCALE_BY ** delta, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE);
@@ -51,8 +70,9 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
 
       dispatch(setStageScale(newScale));
       dispatch(setStageCoordinates(newCoordinates));
+      dispatch(setBrushSize(size));
     },
-    [stageRef, isMoveStageKeyHeld, stageScale, dispatch]
+    [stageRef, isMoveStageKeyHeld, stageScale, dispatch, brushSize]
   );
 };
 
