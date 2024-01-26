@@ -1,4 +1,4 @@
-import { Editable, EditableInput, EditablePreview, Text } from '@invoke-ai/ui-library';
+import { Text } from '@invoke-ai/ui';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo, useMemo } from 'react';
@@ -13,50 +13,24 @@ const TopCenterPanel = () => {
 
   const displayName = useMemo(() => {
     let _displayName = name || t('workflows.unnamedWorkflow');
-
+    if (isTouched && isWorkflowLibraryEnabled) {
+      _displayName += ` (${t('common.unsaved')})`;
+    }
     return _displayName;
   }, [t, name, isTouched, isWorkflowLibraryEnabled]);
 
   return (
-    <Editable defaultValue={displayName}>
-      <EditablePreview
-        m={2}
-        fontSize="lg"
-        noOfLines={1}
-        wordBreak="break-all"
-        fontWeight="semibold"
-        opacity={0.8}
-      />
-      <EditableInput />
-      {isTouched && isWorkflowLibraryEnabled ? (
-        <Text
-          m={2}
-          fontSize="lg"
-          userSelect="none"
-          noOfLines={1}
-          wordBreak="break-all"
-          fontWeight="semibold"
-          opacity={0.8}
-        >
-          ({t('common.unsaved')})
-        </Text>
-      ) : (
-        ''
-      )}
-    </Editable>
-    // <Text
-    //   m={2}
-    //   fontSize="lg"
-    //   userSelect="none"
-    //   noOfLines={1}
-    //   wordBreak="break-all"
-    //   fontWeight="semibold"
-    //   opacity={0.8}
-    // >
-    //   <Editable
-    //   {displayName}
-    //   {isTouched && isWorkflowLibraryEnabled ? `(${t('common.unsaved')})` : ''}
-    // </Text>
+    <Text
+      m={2}
+      fontSize="lg"
+      userSelect="none"
+      noOfLines={1}
+      wordBreak="break-all"
+      fontWeight="semibold"
+      opacity={0.8}
+    >
+      {displayName}
+    </Text>
   );
 };
 
