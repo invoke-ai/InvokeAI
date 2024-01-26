@@ -1,4 +1,5 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
+import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
 
 function getCircularReplacer() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,9 +27,12 @@ export const receivedOpenAPISchema = createAsyncThunk(
   'nodes/receivedOpenAPISchema',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await fetch(
-        `${window.location.href.replace(/\/$/, '')}/openapi.json`
-      );
+      const openAPISchemaUrl = $openAPISchemaUrl.get();
+
+      const url = openAPISchemaUrl
+        ? openAPISchemaUrl
+        : `${window.location.href.replace(/\/$/, '')}/openapi.json`;
+      const response = await fetch(url);
       const openAPISchema = await response.json();
 
       const schemaJSON = JSON.parse(

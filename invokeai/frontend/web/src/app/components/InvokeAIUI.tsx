@@ -10,6 +10,7 @@ import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { $galleryHeader } from 'app/store/nanostores/galleryHeader';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import { $logo } from 'app/store/nanostores/logo';
+import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
 import { $projectId } from 'app/store/nanostores/projectId';
 import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
 import { $store } from 'app/store/nanostores/store';
@@ -28,6 +29,7 @@ const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
 
 interface Props extends PropsWithChildren {
   apiUrl?: string;
+  openAPISchemaUrl?: string;
   token?: string;
   config?: PartialAppConfig;
   customNavComponent?: ReactNode;
@@ -47,6 +49,7 @@ interface Props extends PropsWithChildren {
 
 const InvokeAIUI = ({
   apiUrl,
+  openAPISchemaUrl,
   token,
   config,
   customNavComponent,
@@ -122,6 +125,16 @@ const InvokeAIUI = ({
       $customNavComponent.set(undefined);
     };
   }, [customNavComponent]);
+
+  useEffect(() => {
+    if (openAPISchemaUrl) {
+      $openAPISchemaUrl.set(openAPISchemaUrl);
+    }
+
+    return () => {
+      $openAPISchemaUrl.set(undefined);
+    };
+  }, [openAPISchemaUrl]);
 
   useEffect(() => {
     if (galleryHeader) {
