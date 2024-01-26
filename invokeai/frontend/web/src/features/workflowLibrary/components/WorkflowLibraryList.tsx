@@ -11,10 +11,10 @@ import {
   Input,
   InputGroup,
   InputRightElement,
-  Spacer,
 } from '@invoke-ai/ui';
 import { useStore } from '@nanostores/react';
 import { $projectId } from 'app/store/nanostores/projectId';
+import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import {
   IAINoContentFallback,
   IAINoContentFallbackWithSpinner,
@@ -34,7 +34,6 @@ import type {
 } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
 import { z } from 'zod';
-import { $workflowCategories } from '../../../app/store/nanostores/workflowCategories';
 
 const PER_PAGE = 10;
 
@@ -170,11 +169,12 @@ const WorkflowLibraryList = () => {
         h={16}
         flexShrink={0}
         flexGrow={0}
-        justifyContent={'space-between'}
+        justifyContent="space-between"
       >
         <ButtonGroup alignSelf="flex-end">
           {workflowCategories.map((category) => (
             <Button
+              key={category}
               variant={selectedCategory === category ? undefined : 'ghost'}
               onClick={handleSetCategory.bind(null, category)}
               isChecked={selectedCategory === category}
