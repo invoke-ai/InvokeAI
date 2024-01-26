@@ -18,13 +18,18 @@ either an Nvidia-based card (with CUDA support) or an AMD card (using the ROCm
 driver).
 
 
-## **[Automated Installer](010_INSTALL_AUTOMATED.md)**
-✅ This is the recommended installation method for first-time users. 
+## **[Automated Installer (Recommended)](010_INSTALL_AUTOMATED.md)**
+ ✅ This is the recommended installation method for first-time users. 
 
   This is a script that will install all of InvokeAI's essential
-  third party libraries and InvokeAI itself. It includes access to a
-  "developer console" which will help us debug problems with you and
-  give you to access experimental features.
+  third party libraries and InvokeAI itself.
+
+🖥️ **Download the latest installer .zip file here** : https://github.com/invoke-ai/InvokeAI/releases/latest
+  
+- *Look for the file labelled "InvokeAI-installer-v3.X.X.zip" at the bottom of the page*
+- If you experience issues, read through the full [installation instructions](010_INSTALL_AUTOMATED.md) to make sure you have met all of the installation requirements. If you need more help, join the [Discord](discord.gg/invoke-ai) or create an issue on [Github](https://github.com/invoke-ai/InvokeAI).
+
+
 
 ## **[Manual Installation](020_INSTALL_MANUAL.md)**
 This method is recommended for experienced users and developers.
