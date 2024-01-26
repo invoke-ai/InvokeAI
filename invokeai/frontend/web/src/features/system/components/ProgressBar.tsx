@@ -1,4 +1,4 @@
-import { Progress } from '@invoke-ai/ui';
+import { Progress } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectSystemSlice } from 'features/system/store/systemSlice';

@@ -4,7 +4,7 @@ import {
   FormControl,
   FormLabel,
   Switch,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type { RequiredHedImageProcessorInvocation } from 'features/controlAdapters/store/types';

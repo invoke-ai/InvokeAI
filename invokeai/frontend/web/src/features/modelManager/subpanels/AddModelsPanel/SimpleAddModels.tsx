@@ -1,4 +1,4 @@
-import type { ComboboxOption } from '@invoke-ai/ui';
+import type { ComboboxOption } from '@invoke-ai/ui-library';
 import {
   Button,
   Combobox,
@@ -6,7 +6,7 @@ import {
   FormControl,
   FormLabel,
   Input,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useForm } from '@mantine/form';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';

@@ -1,4 +1,4 @@
-import { FormControl, FormLabel, Textarea } from '@invoke-ai/ui';
+import { FormControl, FormLabel, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useNodeData } from 'features/nodes/hooks/useNodeData';
 import { nodeNotesChanged } from 'features/nodes/store/nodesSlice';

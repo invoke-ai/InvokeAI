@@ -1,5 +1,5 @@
-import type { SystemStyleObject } from '@invoke-ai/ui';
-import { IconButton, spinAnimation, Tooltip } from '@invoke-ai/ui';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { IconButton, spinAnimation, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useDynamicPromptsModal } from 'features/dynamicPrompts/hooks/useDynamicPromptsModal';
 import { memo } from 'react';

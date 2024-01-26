@@ -1,4 +1,4 @@
-import { MenuItem } from '@invoke-ai/ui';
+import { MenuItem } from '@invoke-ai/ui-library';
 import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadWorkflowFromFile';
 import { memo, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';

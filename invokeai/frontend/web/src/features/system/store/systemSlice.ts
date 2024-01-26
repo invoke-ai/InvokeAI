@@ -1,4 +1,4 @@
-import type { UseToastOptions } from '@invoke-ai/ui';
+import type { UseToastOptions } from '@invoke-ai/ui-library';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';

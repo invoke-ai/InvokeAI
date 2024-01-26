@@ -1,5 +1,5 @@
-import type { SystemStyleObject } from '@invoke-ai/ui';
-import { Box, Skeleton } from '@invoke-ai/ui';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Box, Skeleton } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 
 const skeletonStyles: SystemStyleObject = {

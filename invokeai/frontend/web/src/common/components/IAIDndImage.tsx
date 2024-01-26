@@ -1,5 +1,5 @@
-import type { ChakraProps, FlexProps, SystemStyleObject } from '@invoke-ai/ui';
-import { Flex, Icon, Image } from '@invoke-ai/ui';
+import type { ChakraProps, FlexProps, SystemStyleObject } from '@invoke-ai/ui-library';
+import { Flex, Icon, Image } from '@invoke-ai/ui-library';
 import {
   IAILoadingImageFallback,
   IAINoContentFallback,

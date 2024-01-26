@@ -1,4 +1,4 @@
-import type { FormLabelProps } from '@invoke-ai/ui';
+import type { FormLabelProps } from '@invoke-ai/ui-library';
 import {
   Checkbox,
   Flex,
@@ -10,7 +10,7 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ClearCanvasHistoryButtonModal from 'features/canvas/components/ClearCanvasHistoryButtonModal';
 import {

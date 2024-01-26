@@ -1,4 +1,4 @@
-import { CompositeNumberInput } from '@invoke-ai/ui';
+import { CompositeNumberInput } from '@invoke-ai/ui-library';
 import { NUMPY_RAND_MAX } from 'app/constants';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldNumberValueChanged } from 'features/nodes/store/nodesSlice';

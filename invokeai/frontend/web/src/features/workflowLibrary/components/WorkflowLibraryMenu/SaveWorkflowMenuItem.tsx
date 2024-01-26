@@ -1,4 +1,4 @@
-import { MenuItem } from '@invoke-ai/ui';
+import { MenuItem } from '@invoke-ai/ui-library';
 import { useSaveLibraryWorkflow } from 'features/workflowLibrary/hooks/useSaveWorkflow';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';

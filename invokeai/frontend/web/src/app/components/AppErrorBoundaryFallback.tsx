@@ -1,4 +1,4 @@
-import { Button, Flex, Heading, Link, Text, useToast } from '@invoke-ai/ui';
+import { Button, Flex, Heading, Link, Text, useToast } from '@invoke-ai/ui-library';
 import newGithubIssueUrl from 'new-github-issue-url';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

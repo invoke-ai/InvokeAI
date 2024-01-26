@@ -1,4 +1,4 @@
-import { Select } from '@invoke-ai/ui';
+import { Select } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldEnumModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type {

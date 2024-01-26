@@ -1,4 +1,4 @@
-import { IconButton, Tooltip } from '@invoke-ai/ui';
+import { IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setShouldConcatSDXLStylePrompt } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback, useMemo } from 'react';

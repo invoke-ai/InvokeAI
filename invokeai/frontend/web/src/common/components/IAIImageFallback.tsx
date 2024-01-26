@@ -1,5 +1,5 @@
-import type { As, ChakraProps, FlexProps } from '@invoke-ai/ui';
-import { Flex, Icon, Skeleton, Spinner, Text } from '@invoke-ai/ui';
+import type { As, ChakraProps, FlexProps } from '@invoke-ai/ui-library';
+import { Flex, Icon, Skeleton, Spinner, Text } from '@invoke-ai/ui-library';
 import { memo, useMemo } from 'react';
 import { PiImageBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';

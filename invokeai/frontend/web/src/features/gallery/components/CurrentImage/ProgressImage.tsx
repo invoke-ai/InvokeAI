@@ -1,5 +1,5 @@
-import type { SystemStyleObject } from '@invoke-ai/ui';
-import { Image } from '@invoke-ai/ui';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Image } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo, useMemo } from 'react';
 

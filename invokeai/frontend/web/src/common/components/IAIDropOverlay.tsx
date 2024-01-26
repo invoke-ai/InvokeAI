@@ -1,4 +1,4 @@
-import { Box, Flex } from '@invoke-ai/ui';
+import { Box, Flex } from '@invoke-ai/ui-library';
 import type { AnimationProps } from 'framer-motion';
 import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';

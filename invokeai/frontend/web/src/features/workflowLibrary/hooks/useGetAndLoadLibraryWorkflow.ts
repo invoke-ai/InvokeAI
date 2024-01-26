@@ -1,4 +1,4 @@
-import { useToast } from '@invoke-ai/ui';
+import { useToast } from '@invoke-ai/ui-library';
 import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { workflowLoadRequested } from 'features/nodes/store/actions';

@@ -1,4 +1,4 @@
-import { Flex, Heading } from '@invoke-ai/ui';
+import { Flex, Heading } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';

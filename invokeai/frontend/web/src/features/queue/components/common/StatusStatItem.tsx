@@ -1,5 +1,5 @@
-import type { ChakraProps, StatProps } from '@invoke-ai/ui';
-import { Stat, StatLabel, StatNumber } from '@invoke-ai/ui';
+import type { ChakraProps, StatProps } from '@invoke-ai/ui-library';
+import { Stat, StatLabel, StatNumber } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 
 const sx: ChakraProps['sx'] = {

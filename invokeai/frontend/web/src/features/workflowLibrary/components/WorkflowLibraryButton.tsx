@@ -1,4 +1,4 @@
-import { Button, useDisclosure } from '@invoke-ai/ui';
+import { Button, useDisclosure } from '@invoke-ai/ui-library';
 import { WorkflowLibraryModalContext } from 'features/workflowLibrary/context/WorkflowLibraryModalContext';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';

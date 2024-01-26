@@ -1,4 +1,4 @@
-import { Badge } from '@invoke-ai/ui';
+import { Badge } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { SessionQueueItemStatus } from 'services/api/endpoints/queue';

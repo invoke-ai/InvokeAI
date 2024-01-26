@@ -1,4 +1,4 @@
-import { Text } from '@invoke-ai/ui';
+import { Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo, useMemo } from 'react';

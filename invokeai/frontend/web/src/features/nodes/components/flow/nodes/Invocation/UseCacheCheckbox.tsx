@@ -1,4 +1,4 @@
-import { Checkbox, FormControl, FormLabel } from '@invoke-ai/ui';
+import { Checkbox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useUseCache } from 'features/nodes/hooks/useUseCache';
 import { nodeUseCacheChanged } from 'features/nodes/store/nodesSlice';

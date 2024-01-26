@@ -1,4 +1,4 @@
-import { createStandaloneToast, theme, TOAST_OPTIONS } from '@invoke-ai/ui';
+import { createStandaloneToast, theme, TOAST_OPTIONS } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { zPydanticValidationError } from 'features/system/store/zodSchemas';

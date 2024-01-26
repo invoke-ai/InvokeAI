@@ -1,4 +1,4 @@
-import { Icon, Tooltip } from '@invoke-ai/ui';
+import { Icon, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';

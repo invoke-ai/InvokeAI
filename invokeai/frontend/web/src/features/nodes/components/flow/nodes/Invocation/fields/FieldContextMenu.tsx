@@ -1,5 +1,5 @@
-import type { ContextMenuProps } from '@invoke-ai/ui';
-import { ContextMenu, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui';
+import type { ContextMenuProps } from '@invoke-ai/ui-library';
+import { ContextMenu, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useFieldInputKind } from 'features/nodes/hooks/useFieldInputKind';

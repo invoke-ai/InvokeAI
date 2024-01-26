@@ -1,4 +1,4 @@
-import { FormControlGroup } from '@invoke-ai/ui';
+import { FormControlGroup } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';

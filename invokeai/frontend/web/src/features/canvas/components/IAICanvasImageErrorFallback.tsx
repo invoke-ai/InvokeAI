@@ -1,4 +1,4 @@
-import { useToken } from '@invoke-ai/ui';
+import { useToken } from '@invoke-ai/ui-library';
 import type { CanvasImage } from 'features/canvas/store/canvasTypes';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';

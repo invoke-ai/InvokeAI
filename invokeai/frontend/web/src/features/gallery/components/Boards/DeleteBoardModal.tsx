@@ -9,7 +9,7 @@ import {
   Flex,
   Skeleton,
   Text,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';

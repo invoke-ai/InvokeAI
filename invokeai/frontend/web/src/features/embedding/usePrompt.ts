@@ -1,4 +1,4 @@
-import { useDisclosure } from '@invoke-ai/ui';
+import { useDisclosure } from '@invoke-ai/ui-library';
 import { isNil } from 'lodash-es';
 import type {
   ChangeEventHandler,

@@ -7,7 +7,7 @@ import {
   extendTheme,
   theme as _theme,
   TOAST_OPTIONS,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import type { ReactNode } from 'react';
 import { memo, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

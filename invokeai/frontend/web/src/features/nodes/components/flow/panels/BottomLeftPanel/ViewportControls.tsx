@@ -1,4 +1,4 @@
-import { ButtonGroup, IconButton } from '@invoke-ai/ui';
+import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   // shouldShowFieldTypeLegendChanged,

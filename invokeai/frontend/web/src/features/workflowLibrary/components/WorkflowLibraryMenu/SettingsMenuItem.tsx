@@ -1,4 +1,4 @@
-import { MenuItem } from '@invoke-ai/ui';
+import { MenuItem } from '@invoke-ai/ui-library';
 import WorkflowEditorSettings from 'features/nodes/components/flow/panels/TopRightPanel/WorkflowEditorSettings';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';

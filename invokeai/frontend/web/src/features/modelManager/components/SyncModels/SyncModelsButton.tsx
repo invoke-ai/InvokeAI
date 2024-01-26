@@ -1,5 +1,5 @@
-import type { ButtonProps } from '@invoke-ai/ui';
-import { Button } from '@invoke-ai/ui';
+import type { ButtonProps } from '@invoke-ai/ui-library';
+import { Button } from '@invoke-ai/ui-library';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';

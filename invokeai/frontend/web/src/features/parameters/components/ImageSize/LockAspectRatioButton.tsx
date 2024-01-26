@@ -1,4 +1,4 @@
-import { IconButton } from '@invoke-ai/ui';
+import { IconButton } from '@invoke-ai/ui-library';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

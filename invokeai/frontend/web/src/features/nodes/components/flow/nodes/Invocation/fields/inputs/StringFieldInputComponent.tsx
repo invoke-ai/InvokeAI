@@ -1,4 +1,4 @@
-import { Input, Textarea } from '@invoke-ai/ui';
+import { Input, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldStringValueChanged } from 'features/nodes/store/nodesSlice';
 import type {

@@ -1,4 +1,4 @@
-import type { PopoverProps } from '@invoke-ai/ui';
+import type { PopoverProps } from '@invoke-ai/ui-library';
 
 export type Feature =
   | 'clipSkip'

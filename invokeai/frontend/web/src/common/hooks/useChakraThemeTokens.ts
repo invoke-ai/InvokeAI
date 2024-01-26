@@ -1,4 +1,4 @@
-import { useToken } from '@invoke-ai/ui';
+import { useToken } from '@invoke-ai/ui-library';
 
 export const useChakraThemeTokens = () => {
   const [

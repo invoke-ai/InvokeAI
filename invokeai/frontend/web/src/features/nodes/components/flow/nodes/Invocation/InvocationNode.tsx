@@ -1,4 +1,4 @@
-import { Flex, Grid, GridItem } from '@invoke-ai/ui';
+import { Flex, Grid, GridItem } from '@invoke-ai/ui-library';
 import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import { useAnyOrDirectInputFieldNames } from 'features/nodes/hooks/useAnyOrDirectInputFieldNames';
 import { useConnectionInputFieldNames } from 'features/nodes/hooks/useConnectionInputFieldNames';

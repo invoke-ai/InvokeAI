@@ -1,4 +1,4 @@
-import { Flex, Icon, Text, Tooltip } from '@invoke-ai/ui';
+import { Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
 import { compare } from 'compare-versions';
 import { useNodeData } from 'features/nodes/hooks/useNodeData';
 import { useNodeNeedsUpdate } from 'features/nodes/hooks/useNodeNeedsUpdate';

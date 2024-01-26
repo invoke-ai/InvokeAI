@@ -8,7 +8,7 @@ import {
   MenuItem,
   MenuList,
   useDisclosure,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';

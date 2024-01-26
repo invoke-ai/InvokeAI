@@ -7,7 +7,7 @@ import {
   MenuList,
   useDisclosure,
   useGlobalMenuClose,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import AboutModal from 'features/system/components/AboutModal/AboutModal';
 import HotkeysModal from 'features/system/components/HotkeysModal/HotkeysModal';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';

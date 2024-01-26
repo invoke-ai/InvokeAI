@@ -3,7 +3,7 @@ import {
   CompositeSlider,
   FormControl,
   FormLabel,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setScaledBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';

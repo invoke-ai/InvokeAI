@@ -1,5 +1,5 @@
-import type { SystemStyleObject } from '@invoke-ai/ui';
-import { IconButton } from '@invoke-ai/ui';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
 import type { MouseEvent, ReactElement } from 'react';
 import { memo, useMemo } from 'react';
 

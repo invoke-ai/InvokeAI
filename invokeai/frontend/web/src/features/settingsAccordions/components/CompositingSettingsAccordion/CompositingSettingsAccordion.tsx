@@ -1,4 +1,4 @@
-import type { FormLabelProps } from '@invoke-ai/ui';
+import type { FormLabelProps } from '@invoke-ai/ui-library';
 import {
   Flex,
   FormControlGroup,
@@ -8,7 +8,7 @@ import {
   TabPanel,
   TabPanels,
   Tabs,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import ParamCanvasCoherenceMode from 'features/parameters/components/Canvas/Compositing/CoherencePass/ParamCanvasCoherenceMode';
 import ParamCanvasCoherenceSteps from 'features/parameters/components/Canvas/Compositing/CoherencePass/ParamCanvasCoherenceSteps';
 import ParamCanvasCoherenceStrength from 'features/parameters/components/Canvas/Compositing/CoherencePass/ParamCanvasCoherenceStrength';
