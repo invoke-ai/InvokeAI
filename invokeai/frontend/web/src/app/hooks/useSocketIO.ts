@@ -56,7 +56,7 @@ export const useSocketIO = () => {
     }
 
     return { ...options, ...addlSocketOptions };
-  }, [authToken, addlSocketOptions]);
+  }, [authToken, addlSocketOptions, baseUrl]);
 
   useEffect(() => {
     if ($isSocketInitialized.get()) {
