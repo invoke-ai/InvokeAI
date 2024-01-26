@@ -1,5 +1,5 @@
 // Grid drawing adapted from https://longviewcoder.com/2021/12/08/konva-a-better-grid/
-import { getArbitraryBaseColor } from '@invoke-ai/ui';
+import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';

@@ -1,11 +1,11 @@
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import {
   Combobox,
   ConfirmationAlertDialog,
   Flex,
   FormControl,
   Text,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {

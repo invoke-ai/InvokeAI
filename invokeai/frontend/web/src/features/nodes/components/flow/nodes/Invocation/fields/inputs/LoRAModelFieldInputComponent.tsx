@@ -1,4 +1,4 @@
-import { Combobox, FormControl } from '@invoke-ai/ui';
+import { Combobox, FormControl } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldLoRAModelValueChanged } from 'features/nodes/store/nodesSlice';

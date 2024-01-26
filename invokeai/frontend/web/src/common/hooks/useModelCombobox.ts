@@ -1,4 +1,4 @@
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import type { EntityState } from '@reduxjs/toolkit';
 import { map } from 'lodash-es';
 import { useCallback, useMemo } from 'react';

@@ -1,4 +1,4 @@
-import { Flex, Text } from '@invoke-ai/ui';
+import { Flex, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';

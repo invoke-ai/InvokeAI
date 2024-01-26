@@ -1,4 +1,4 @@
-import { Flex, Text } from '@invoke-ai/ui';
+import { Flex, Text } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 

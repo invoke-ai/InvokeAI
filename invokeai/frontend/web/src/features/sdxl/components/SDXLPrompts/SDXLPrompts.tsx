@@ -1,4 +1,4 @@
-import { Flex } from '@invoke-ai/ui';
+import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { ParamNegativePrompt } from 'features/parameters/components/Core/ParamNegativePrompt';
 import { ParamPositivePrompt } from 'features/parameters/components/Core/ParamPositivePrompt';

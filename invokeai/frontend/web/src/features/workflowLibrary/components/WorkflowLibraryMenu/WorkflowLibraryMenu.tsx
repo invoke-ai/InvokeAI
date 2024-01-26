@@ -6,7 +6,7 @@ import {
   MenuList,
   useDisclosure,
   useGlobalMenuClose,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import DownloadWorkflowMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/DownloadWorkflowMenuItem';
 import NewWorkflowMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/NewWorkflowMenuItem';

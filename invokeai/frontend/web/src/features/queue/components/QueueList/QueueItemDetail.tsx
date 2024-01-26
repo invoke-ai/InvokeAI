@@ -5,7 +5,7 @@ import {
   Heading,
   Spinner,
   Text,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import { useCancelBatch } from 'features/queue/hooks/useCancelBatch';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';

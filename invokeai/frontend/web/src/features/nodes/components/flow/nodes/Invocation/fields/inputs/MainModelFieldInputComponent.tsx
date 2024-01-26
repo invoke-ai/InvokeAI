@@ -1,4 +1,4 @@
-import { Combobox, Flex, FormControl } from '@invoke-ai/ui';
+import { Combobox, Flex, FormControl } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { SyncModelsIconButton } from 'features/modelManager/components/SyncModels/SyncModelsIconButton';

@@ -1,4 +1,4 @@
-import { Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui';
+import { Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import ImportModelsPanel from 'features/modelManager/subpanels/ImportModelsPanel';
 import MergeModelsPanel from 'features/modelManager/subpanels/MergeModelsPanel';
 import ModelManagerPanel from 'features/modelManager/subpanels/ModelManagerPanel';

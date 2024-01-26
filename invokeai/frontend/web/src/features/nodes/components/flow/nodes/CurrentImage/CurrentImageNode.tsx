@@ -1,4 +1,4 @@
-import { Flex, Image, Text } from '@invoke-ai/ui';
+import { Flex, Image, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';

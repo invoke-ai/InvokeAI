@@ -14,7 +14,7 @@ import {
   ModalOverlay,
   Text,
   useDisclosure,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import {
   discordLink,

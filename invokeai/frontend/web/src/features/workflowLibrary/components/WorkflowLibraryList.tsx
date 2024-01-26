@@ -1,4 +1,4 @@
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import {
   Button,
   ButtonGroup,
@@ -12,7 +12,7 @@ import {
   InputGroup,
   InputRightElement,
   Spacer,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $projectId } from 'app/store/nanostores/projectId';
 import {

@@ -1,4 +1,4 @@
-import { Flex, Kbd, Spacer, Text } from '@invoke-ai/ui';
+import { Flex, Kbd, Spacer, Text } from '@invoke-ai/ui-library';
 import { Fragment, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 

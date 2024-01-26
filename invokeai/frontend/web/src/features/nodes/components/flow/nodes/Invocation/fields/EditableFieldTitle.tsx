@@ -1,4 +1,4 @@
-import type { SystemStyleObject } from '@invoke-ai/ui';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import {
   Editable,
   EditableInput,
@@ -7,7 +7,7 @@ import {
   forwardRef,
   Tooltip,
   useEditableControls,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useFieldLabel } from 'features/nodes/hooks/useFieldLabel';
 import { useFieldTemplateTitle } from 'features/nodes/hooks/useFieldTemplateTitle';

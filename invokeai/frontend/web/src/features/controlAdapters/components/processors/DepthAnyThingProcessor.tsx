@@ -1,11 +1,11 @@
-import type { ComboboxOnChange } from '@invoke-ai/ui';
+import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import {
   Combobox,
   CompositeNumberInput,
   CompositeSlider,
   FormControl,
   FormLabel,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type {

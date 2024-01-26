@@ -1,4 +1,4 @@
-import { Box, useGlobalModifiersInit } from '@invoke-ai/ui';
+import { Box, useGlobalModifiersInit } from '@invoke-ai/ui-library';
 import { useSocketIO } from 'app/hooks/useSocketIO';
 import { useLogger } from 'app/logging/useLogger';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';

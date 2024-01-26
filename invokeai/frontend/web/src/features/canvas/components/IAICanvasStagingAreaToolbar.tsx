@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, Flex, IconButton } from '@invoke-ai/ui';
+import { Button, ButtonGroup, Flex, IconButton } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';

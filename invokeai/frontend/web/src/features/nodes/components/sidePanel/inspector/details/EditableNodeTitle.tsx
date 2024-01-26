@@ -1,4 +1,4 @@
-import { Editable, EditableInput, EditablePreview, Flex } from '@invoke-ai/ui';
+import { Editable, EditableInput, EditablePreview, Flex } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useNodeLabel } from 'features/nodes/hooks/useNodeLabel';
 import { useNodeTemplateTitle } from 'features/nodes/hooks/useNodeTemplateTitle';

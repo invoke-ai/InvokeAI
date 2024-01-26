@@ -1,5 +1,5 @@
-import type { SystemStyleObject } from '@invoke-ai/ui';
-import { Box, chakra, Flex } from '@invoke-ai/ui';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Box, chakra, Flex } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import type { PanelResizeHandleProps } from 'react-resizable-panels';
 import { PanelResizeHandle } from 'react-resizable-panels';

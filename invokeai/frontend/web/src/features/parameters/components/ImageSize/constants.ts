@@ -1,4 +1,4 @@
-import type { ComboboxOption } from '@invoke-ai/ui';
+import type { ComboboxOption } from '@invoke-ai/ui-library';
 
 import type { AspectRatioID, AspectRatioState } from './types';
 

@@ -1,4 +1,4 @@
-import { Tooltip } from '@invoke-ai/ui';
+import { Tooltip } from '@invoke-ai/ui-library';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';

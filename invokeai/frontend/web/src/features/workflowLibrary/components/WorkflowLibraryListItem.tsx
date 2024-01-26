@@ -1,4 +1,4 @@
-import { Button, Flex, Heading, Spacer, Text } from '@invoke-ai/ui';
+import { Button, Flex, Heading, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import dateFormat, { masks } from 'dateformat';
 import { useWorkflowLibraryModalContext } from 'features/workflowLibrary/context/useWorkflowLibraryModalContext';

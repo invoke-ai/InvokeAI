@@ -1,4 +1,4 @@
-import { Box, Button, Flex } from '@invoke-ai/ui';
+import { Box, Button, Flex } from '@invoke-ai/ui-library';
 import type { EntityId } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';

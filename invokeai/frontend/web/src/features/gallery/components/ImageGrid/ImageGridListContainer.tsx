@@ -1,5 +1,5 @@
-import type { FlexProps } from '@invoke-ai/ui';
-import { forwardRef, Grid } from '@invoke-ai/ui';
+import type { FlexProps } from '@invoke-ai/ui-library';
+import { forwardRef, Grid } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';

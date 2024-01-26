@@ -1,4 +1,4 @@
-import { Icon, Tooltip } from '@invoke-ai/ui';
+import { Icon, Tooltip } from '@invoke-ai/ui-library';
 import { useNodeClassification } from 'features/nodes/hooks/useNodeClassification';
 import type { Classification } from 'features/nodes/types/common';
 import { memo } from 'react';

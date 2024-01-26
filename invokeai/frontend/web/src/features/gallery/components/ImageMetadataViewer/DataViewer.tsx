@@ -1,4 +1,4 @@
-import { Box, Flex, IconButton, Tooltip } from '@invoke-ai/ui';
+import { Box, Flex, IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { getOverlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { isString } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';

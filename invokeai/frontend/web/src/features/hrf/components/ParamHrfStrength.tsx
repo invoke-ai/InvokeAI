@@ -3,7 +3,7 @@ import {
   CompositeSlider,
   FormControl,
   FormLabel,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setHrfStrength } from 'features/hrf/store/hrfSlice';
 import { memo, useCallback } from 'react';

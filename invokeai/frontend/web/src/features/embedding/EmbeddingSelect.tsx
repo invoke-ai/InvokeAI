@@ -1,5 +1,5 @@
-import type { ChakraProps } from '@invoke-ai/ui';
-import { Combobox, FormControl } from '@invoke-ai/ui';
+import type { ChakraProps } from '@invoke-ai/ui-library';
+import { Combobox, FormControl } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import type { EmbeddingSelectProps } from 'features/embedding/types';

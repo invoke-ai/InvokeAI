@@ -1,4 +1,4 @@
-import type { ComboboxOnChange } from '@invoke-ai/ui';
+import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import {
   ButtonGroup,
   Combobox,
@@ -6,7 +6,7 @@ import {
   FormControl,
   IconButton,
   Tooltip,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';

@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, IconButton } from '@invoke-ai/ui';
+import { Button, ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import type { Dispatch, SetStateAction } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

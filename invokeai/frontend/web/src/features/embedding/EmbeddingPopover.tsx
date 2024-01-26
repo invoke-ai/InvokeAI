@@ -3,7 +3,7 @@ import {
   PopoverAnchor,
   PopoverBody,
   PopoverContent,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { EmbeddingSelect } from 'features/embedding/EmbeddingSelect';
 import type { EmbeddingPopoverProps } from 'features/embedding/types';
 import { memo } from 'react';

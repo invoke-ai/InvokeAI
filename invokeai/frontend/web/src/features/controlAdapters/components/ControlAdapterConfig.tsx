@@ -6,7 +6,7 @@ import {
   Icon,
   IconButton,
   Switch,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';

@@ -1,5 +1,5 @@
-import type { SystemStyleObject } from '@invoke-ai/ui';
-import { chakra, Flex } from '@invoke-ai/ui';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { chakra, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo } from 'react';
 import { MiniMap } from 'reactflow';

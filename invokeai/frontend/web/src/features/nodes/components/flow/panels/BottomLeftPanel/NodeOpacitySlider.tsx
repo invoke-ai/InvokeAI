@@ -1,4 +1,4 @@
-import { CompositeSlider, Flex } from '@invoke-ai/ui';
+import { CompositeSlider, Flex } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { nodeOpacityChanged } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback } from 'react';

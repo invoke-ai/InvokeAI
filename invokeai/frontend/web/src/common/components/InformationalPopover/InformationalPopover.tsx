@@ -11,7 +11,7 @@ import {
   PopoverTrigger,
   Portal,
   Text,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { merge, omit } from 'lodash-es';
 import type { ReactElement } from 'react';

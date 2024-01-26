@@ -1,4 +1,4 @@
-import { Flex } from '@invoke-ai/ui';
+import { Flex } from '@invoke-ai/ui-library';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 

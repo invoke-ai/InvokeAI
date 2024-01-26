@@ -2,8 +2,8 @@ import type {
   ChakraProps,
   ComboboxOnChange,
   ComboboxOption,
-} from '@invoke-ai/ui';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { memo, useCallback, useMemo } from 'react';
 import { useController, type UseControllerProps } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';

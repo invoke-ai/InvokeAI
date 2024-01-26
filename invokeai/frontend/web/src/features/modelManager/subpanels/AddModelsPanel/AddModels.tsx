@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, Flex } from '@invoke-ai/ui';
+import { Button, ButtonGroup, Flex } from '@invoke-ai/ui-library';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 

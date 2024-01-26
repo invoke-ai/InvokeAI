@@ -1,5 +1,5 @@
-import type { UseDisclosureReturn } from '@invoke-ai/ui';
-import { ConfirmationAlertDialog, Text } from '@invoke-ai/ui';
+import type { UseDisclosureReturn } from '@invoke-ai/ui-library';
+import { ConfirmationAlertDialog, Text } from '@invoke-ai/ui-library';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';

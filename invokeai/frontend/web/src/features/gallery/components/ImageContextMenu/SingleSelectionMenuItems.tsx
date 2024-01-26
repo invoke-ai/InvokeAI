@@ -1,4 +1,4 @@
-import { Flex, MenuDivider, MenuItem, Spinner } from '@invoke-ai/ui';
+import { Flex, MenuDivider, MenuItem, Spinner } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppToaster } from 'app/components/Toaster';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';

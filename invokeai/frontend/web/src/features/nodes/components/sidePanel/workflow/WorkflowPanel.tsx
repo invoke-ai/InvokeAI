@@ -1,4 +1,4 @@
-import { Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui';
+import { Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 

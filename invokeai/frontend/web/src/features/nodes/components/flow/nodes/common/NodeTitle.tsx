@@ -1,4 +1,4 @@
-import type { SystemStyleObject } from '@invoke-ai/ui';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import {
   Box,
   Editable,
@@ -6,7 +6,7 @@ import {
   EditablePreview,
   Flex,
   useEditableControls,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useNodeLabel } from 'features/nodes/hooks/useNodeLabel';
 import { useNodeTemplateTitle } from 'features/nodes/hooks/useNodeTemplateTitle';

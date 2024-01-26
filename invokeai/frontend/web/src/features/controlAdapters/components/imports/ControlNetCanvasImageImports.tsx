@@ -1,4 +1,4 @@
-import { Flex, IconButton } from '@invoke-ai/ui';
+import { Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import {
   canvasImageToControlAdapter,

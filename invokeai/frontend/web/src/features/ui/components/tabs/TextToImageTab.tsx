@@ -1,4 +1,4 @@
-import { Box, Flex } from '@invoke-ai/ui';
+import { Box, Flex } from '@invoke-ai/ui-library';
 import CurrentImageDisplay from 'features/gallery/components/CurrentImage/CurrentImageDisplay';
 import { memo } from 'react';
 

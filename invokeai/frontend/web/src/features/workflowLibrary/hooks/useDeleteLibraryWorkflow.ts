@@ -1,4 +1,4 @@
-import { useToast } from '@invoke-ai/ui';
+import { useToast } from '@invoke-ai/ui-library';
 import { useAppToaster } from 'app/components/Toaster';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

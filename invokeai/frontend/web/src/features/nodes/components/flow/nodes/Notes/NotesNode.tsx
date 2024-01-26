@@ -1,4 +1,4 @@
-import { Box, Flex, Textarea } from '@invoke-ai/ui';
+import { Box, Flex, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
 import NodeTitle from 'features/nodes/components/flow/nodes/common/NodeTitle';

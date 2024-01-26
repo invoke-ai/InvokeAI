@@ -1,5 +1,5 @@
-import type { IconButtonProps } from '@invoke-ai/ui';
-import { IconButton, useDisclosure, useShiftModifier } from '@invoke-ai/ui';
+import type { IconButtonProps } from '@invoke-ai/ui-library';
+import { IconButton, useDisclosure, useShiftModifier } from '@invoke-ai/ui-library';
 import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';

@@ -5,7 +5,7 @@ import {
   FormErrorMessage,
   FormLabel,
   Input,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
 import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';

@@ -1,4 +1,4 @@
-import { IconButton } from '@invoke-ai/ui';
+import { IconButton } from '@invoke-ai/ui-library';
 import { useQueueFront } from 'features/queue/hooks/useQueueFront';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';

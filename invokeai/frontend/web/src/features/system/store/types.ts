@@ -1,4 +1,4 @@
-import type { UseToastOptions } from '@invoke-ai/ui';
+import type { UseToastOptions } from '@invoke-ai/ui-library';
 import type { LogLevel } from 'app/logging/logger';
 import type { ProgressImage } from 'services/events/types';
 import { z } from 'zod';

@@ -7,7 +7,7 @@ import {
   FormLabel,
   Input,
   Text,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
 import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVariantSelect';

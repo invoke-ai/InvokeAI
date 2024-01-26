@@ -1,4 +1,4 @@
-import { Flex } from '@invoke-ai/ui';
+import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import { $builtWorkflow } from 'features/nodes/hooks/useWorkflowWatcher';

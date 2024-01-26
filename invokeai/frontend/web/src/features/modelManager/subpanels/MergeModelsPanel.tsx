@@ -1,4 +1,4 @@
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import {
   Button,
   Checkbox,
@@ -14,7 +14,7 @@ import {
   RadioGroup,
   Text,
   Tooltip,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';

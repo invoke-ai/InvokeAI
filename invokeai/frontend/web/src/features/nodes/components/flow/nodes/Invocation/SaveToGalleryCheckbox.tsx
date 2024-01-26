@@ -1,4 +1,4 @@
-import { Checkbox, FormControl, FormLabel } from '@invoke-ai/ui';
+import { Checkbox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useHasImageOutput } from 'features/nodes/hooks/useHasImageOutput';
 import { useIsIntermediate } from 'features/nodes/hooks/useIsIntermediate';

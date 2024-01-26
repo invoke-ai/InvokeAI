@@ -3,7 +3,7 @@ import {
   CompositeSlider,
   FormControl,
   FormLabel,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';

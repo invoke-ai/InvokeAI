@@ -1,4 +1,4 @@
-import type { SystemStyleObject } from '@invoke-ai/ui';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import {
   Badge,
   CircularProgress,
@@ -7,7 +7,7 @@ import {
   Image,
   Text,
   Tooltip,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';

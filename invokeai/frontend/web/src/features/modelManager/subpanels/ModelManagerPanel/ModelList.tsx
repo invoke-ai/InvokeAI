@@ -7,7 +7,7 @@ import {
   Input,
   Spinner,
   Text,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import type { EntityState } from '@reduxjs/toolkit';
 import { forEach } from 'lodash-es';
 import type { ChangeEvent, PropsWithChildren } from 'react';
