@@ -1,4 +1,4 @@
-import { Box, Text } from '@invoke-ai/ui';
+import { Box, Text } from '@invoke-ai/ui-library';
 import { useFieldInstance } from 'features/nodes/hooks/useFieldData';
 import { useFieldTemplate } from 'features/nodes/hooks/useFieldTemplate';
 import {

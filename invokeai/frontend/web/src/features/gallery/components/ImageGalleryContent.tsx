@@ -8,7 +8,7 @@ import {
   Tabs,
   useDisclosure,
   VStack,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $galleryHeader } from 'app/store/nanostores/galleryHeader';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';

@@ -1,4 +1,4 @@
-import { Flex } from '@invoke-ai/ui';
+import { Flex } from '@invoke-ai/ui-library';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import WorkflowLibraryButton from 'features/workflowLibrary/components/WorkflowLibraryButton';
 import WorkflowLibraryMenu from 'features/workflowLibrary/components/WorkflowLibraryMenu/WorkflowLibraryMenu';

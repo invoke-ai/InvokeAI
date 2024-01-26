@@ -1,4 +1,4 @@
-import { Box, Flex, Image, Text, Tooltip } from '@invoke-ai/ui';
+import { Box, Flex, Image, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
 import SelectionOverlay from 'common/components/SelectionOverlay';

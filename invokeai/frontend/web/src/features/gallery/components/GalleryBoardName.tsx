@@ -1,4 +1,4 @@
-import { Button, Flex, Icon, Spacer } from '@invoke-ai/ui';
+import { Button, Flex, Icon, Spacer } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo, useMemo } from 'react';
 import { PiCaretUpBold } from 'react-icons/pi';

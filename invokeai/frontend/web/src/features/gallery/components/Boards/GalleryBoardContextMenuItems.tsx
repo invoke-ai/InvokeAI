@@ -1,4 +1,4 @@
-import { MenuItem } from '@invoke-ai/ui';
+import { MenuItem } from '@invoke-ai/ui-library';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';

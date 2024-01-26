@@ -13,7 +13,7 @@ import {
   ModalHeader,
   ModalOverlay,
   useDisclosure,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import type { HotkeyGroup } from 'features/system/components/HotkeysModal/useHotkeyData';

@@ -1,4 +1,4 @@
-import { Box, Flex } from '@invoke-ai/ui';
+import { Box, Flex } from '@invoke-ai/ui-library';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 

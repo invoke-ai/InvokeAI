@@ -1,4 +1,4 @@
-import type { FormLabelProps } from '@invoke-ai/ui';
+import type { FormLabelProps } from '@invoke-ai/ui-library';
 import {
   Checkbox,
   CompositeSlider,
@@ -12,7 +12,7 @@ import {
   PopoverContent,
   PopoverTrigger,
   Switch,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   autoAssignBoardOnClickChanged,

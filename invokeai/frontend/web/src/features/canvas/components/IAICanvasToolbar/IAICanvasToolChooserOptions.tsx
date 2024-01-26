@@ -11,7 +11,7 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';

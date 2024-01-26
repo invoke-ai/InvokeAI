@@ -1,10 +1,10 @@
-import type { FormLabelProps } from '@invoke-ai/ui';
+import type { FormLabelProps } from '@invoke-ai/ui-library';
 import {
   Expander,
   Flex,
   FormControlGroup,
   StandaloneAccordion,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';

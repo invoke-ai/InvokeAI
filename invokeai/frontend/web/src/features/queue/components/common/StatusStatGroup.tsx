@@ -1,5 +1,5 @@
-import type { StatGroupProps } from '@invoke-ai/ui';
-import { StatGroup } from '@invoke-ai/ui';
+import type { StatGroupProps } from '@invoke-ai/ui-library';
+import { StatGroup } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 
 const StatusStatGroup = ({ children, ...rest }: StatGroupProps) => (

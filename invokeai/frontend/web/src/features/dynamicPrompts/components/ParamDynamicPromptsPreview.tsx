@@ -1,4 +1,4 @@
-import type { ChakraProps } from '@invoke-ai/ui';
+import type { ChakraProps } from '@invoke-ai/ui-library';
 import {
   Flex,
   FormControl,
@@ -7,7 +7,7 @@ import {
   OrderedList,
   Spinner,
   Text,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';

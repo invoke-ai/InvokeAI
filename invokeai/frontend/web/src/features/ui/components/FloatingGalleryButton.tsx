@@ -1,4 +1,4 @@
-import { Flex, IconButton, Portal, Tooltip } from '@invoke-ai/ui';
+import { Flex, IconButton, Portal, Tooltip } from '@invoke-ai/ui-library';
 import type { UsePanelReturn } from 'features/ui/hooks/usePanel';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';

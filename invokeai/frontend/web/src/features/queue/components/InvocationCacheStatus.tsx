@@ -1,4 +1,4 @@
-import { ButtonGroup } from '@invoke-ai/ui';
+import { ButtonGroup } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetInvocationCacheStatusQuery } from 'services/api/endpoints/appInfo';

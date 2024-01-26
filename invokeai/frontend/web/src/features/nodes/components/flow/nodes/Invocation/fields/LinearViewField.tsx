@@ -1,4 +1,4 @@
-import { Flex, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui';
+import { Flex, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';

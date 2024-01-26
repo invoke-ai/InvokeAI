@@ -1,4 +1,4 @@
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import {
   Box,
   Combobox,
@@ -7,7 +7,7 @@ import {
   FormLabel,
   IconButton,
   Text,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';

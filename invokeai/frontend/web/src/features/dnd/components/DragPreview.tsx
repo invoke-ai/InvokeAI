@@ -1,5 +1,5 @@
-import type { ChakraProps } from '@invoke-ai/ui';
-import { Box, Flex, Heading, Image, Text } from '@invoke-ai/ui';
+import type { ChakraProps } from '@invoke-ai/ui-library';
+import { Box, Flex, Heading, Image, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { TypesafeDraggableData } from 'features/dnd/types';
 import { memo } from 'react';

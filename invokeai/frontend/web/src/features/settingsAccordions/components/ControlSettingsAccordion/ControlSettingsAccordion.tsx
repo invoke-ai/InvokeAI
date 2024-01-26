@@ -4,7 +4,7 @@ import {
   Divider,
   Flex,
   StandaloneAccordion,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import ControlAdapterConfig from 'features/controlAdapters/components/ControlAdapterConfig';

@@ -1,4 +1,4 @@
-import { Flex, FormControl, FormLabel } from '@invoke-ai/ui';
+import { Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
 import { useDoesInputHaveValue } from 'features/nodes/hooks/useDoesInputHaveValue';
 import { useFieldInputInstance } from 'features/nodes/hooks/useFieldInputInstance';

@@ -1,4 +1,4 @@
-import type { FormControlProps } from '@invoke-ai/ui';
+import type { FormControlProps } from '@invoke-ai/ui-library';
 import {
   Flex,
   FormControl,
@@ -6,7 +6,7 @@ import {
   FormLabel,
   Input,
   Textarea,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';

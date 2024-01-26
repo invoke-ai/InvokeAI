@@ -1,4 +1,4 @@
-import { Flex, FormControl, FormLabel, Tooltip } from '@invoke-ai/ui';
+import { Flex, FormControl, FormLabel, Tooltip } from '@invoke-ai/ui-library';
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
 import { useFieldOutputInstance } from 'features/nodes/hooks/useFieldOutputInstance';
 import { useFieldOutputTemplate } from 'features/nodes/hooks/useFieldOutputTemplate';

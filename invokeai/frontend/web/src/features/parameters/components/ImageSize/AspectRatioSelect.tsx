@@ -1,5 +1,5 @@
-import type { ComboboxOption, SystemStyleObject } from '@invoke-ai/ui';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
+import type { ComboboxOption, SystemStyleObject } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import type { SingleValue } from 'chakra-react-select';
 import { ASPECT_RATIO_OPTIONS } from 'features/parameters/components/ImageSize/constants';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';

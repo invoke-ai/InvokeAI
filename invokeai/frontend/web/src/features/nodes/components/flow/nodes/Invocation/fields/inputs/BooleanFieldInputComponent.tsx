@@ -1,4 +1,4 @@
-import { Switch } from '@invoke-ai/ui';
+import { Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldBooleanValueChanged } from 'features/nodes/store/nodesSlice';
 import type {

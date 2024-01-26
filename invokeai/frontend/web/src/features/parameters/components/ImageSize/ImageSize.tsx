@@ -1,5 +1,5 @@
-import type { FormLabelProps } from '@invoke-ai/ui';
-import { Flex, FormControlGroup } from '@invoke-ai/ui';
+import type { FormLabelProps } from '@invoke-ai/ui-library';
+import { Flex, FormControlGroup } from '@invoke-ai/ui-library';
 import { AspectRatioPreview } from 'features/parameters/components/ImageSize/AspectRatioPreview';
 import { AspectRatioSelect } from 'features/parameters/components/ImageSize/AspectRatioSelect';
 import type { ImageSizeContextInnerValue } from 'features/parameters/components/ImageSize/ImageSizeContext';

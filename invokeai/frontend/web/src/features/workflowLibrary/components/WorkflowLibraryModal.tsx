@@ -6,7 +6,7 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import WorkflowLibraryContent from 'features/workflowLibrary/components/WorkflowLibraryContent';
 import { useWorkflowLibraryModalContext } from 'features/workflowLibrary/context/useWorkflowLibraryModalContext';
 import { memo } from 'react';

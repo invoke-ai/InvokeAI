@@ -1,6 +1,6 @@
 import 'reactflow/dist/style.css';
 
-import { Flex } from '@invoke-ai/ui';
+import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import TopPanel from 'features/nodes/components/flow/panels/TopPanel/TopPanel';

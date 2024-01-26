@@ -1,4 +1,4 @@
-import { Box } from '@invoke-ai/ui';
+import { Box } from '@invoke-ai/ui-library';
 import InitialImageDisplay from 'features/parameters/components/ImageToImage/InitialImageDisplay';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import TextToImageTabMain from 'features/ui/components/tabs/TextToImageTab';

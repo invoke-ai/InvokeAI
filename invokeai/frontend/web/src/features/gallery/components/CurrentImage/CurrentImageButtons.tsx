@@ -5,7 +5,7 @@ import {
   Menu,
   MenuButton,
   MenuList,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppToaster } from 'app/components/Toaster';

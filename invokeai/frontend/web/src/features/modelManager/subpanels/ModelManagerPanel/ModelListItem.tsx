@@ -7,7 +7,7 @@ import {
   Text,
   Tooltip,
   useDisclosure,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
 import { addToast } from 'features/system/store/systemSlice';

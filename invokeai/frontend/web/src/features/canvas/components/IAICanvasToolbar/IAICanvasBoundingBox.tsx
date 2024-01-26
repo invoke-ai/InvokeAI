@@ -1,4 +1,4 @@
-import { useShiftModifier } from '@invoke-ai/ui';
+import { useShiftModifier } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {

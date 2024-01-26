@@ -1,4 +1,4 @@
-import { CompositeNumberInput } from '@invoke-ai/ui';
+import { CompositeNumberInput } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setIterations } from 'features/parameters/store/generationSlice';

@@ -1,4 +1,4 @@
-import type { FormLabelProps } from '@invoke-ai/ui';
+import type { FormLabelProps } from '@invoke-ai/ui-library';
 import {
   Expander,
   Flex,
@@ -9,7 +9,7 @@ import {
   TabPanel,
   TabPanels,
   Tabs,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { LoRAList } from 'features/lora/components/LoRAList';

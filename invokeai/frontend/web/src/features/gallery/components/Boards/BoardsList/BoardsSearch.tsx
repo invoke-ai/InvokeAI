@@ -3,7 +3,7 @@ import {
   Input,
   InputGroup,
   InputRightElement,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import type { ChangeEvent, KeyboardEvent } from 'react';

@@ -1,10 +1,10 @@
-import type { ChakraProps } from '@invoke-ai/ui';
+import type { ChakraProps } from '@invoke-ai/ui-library';
 import {
   CompositeNumberInput,
   Flex,
   FormControl,
   FormLabel,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import type { CSSProperties } from 'react';
 import { memo, useCallback } from 'react';
 import { RgbaColorPicker } from 'react-colorful';

@@ -1,5 +1,5 @@
-import type { FlexProps } from '@invoke-ai/ui';
-import { Box, forwardRef } from '@invoke-ai/ui';
+import type { FlexProps } from '@invoke-ai/ui-library';
+import { Box, forwardRef } from '@invoke-ai/ui-library';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 

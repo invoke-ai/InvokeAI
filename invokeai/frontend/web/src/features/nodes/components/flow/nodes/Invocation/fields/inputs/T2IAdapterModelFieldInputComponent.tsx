@@ -1,4 +1,4 @@
-import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui';
+import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldT2IAdapterModelValueChanged } from 'features/nodes/store/nodesSlice';

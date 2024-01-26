@@ -1,4 +1,4 @@
-import { MenuDivider, MenuItem } from '@invoke-ai/ui';
+import { MenuDivider, MenuItem } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';

@@ -1,4 +1,4 @@
-import { ListItem, Text, UnorderedList } from '@invoke-ai/ui';
+import { ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { some } from 'lodash-es';
 import { memo } from 'react';

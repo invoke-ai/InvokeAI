@@ -3,7 +3,7 @@ import {
   CompositeSlider,
   FormControl,
   FormLabel,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setRefinerCFGScale } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback, useMemo } from 'react';

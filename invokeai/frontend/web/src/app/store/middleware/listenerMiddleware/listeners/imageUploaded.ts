@@ -1,4 +1,4 @@
-import type { UseToastOptions } from '@invoke-ai/ui';
+import type { UseToastOptions } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
