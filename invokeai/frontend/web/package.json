@@ -19,8 +19,8 @@
     "dist"
   ],
   "scripts": {
-    "dev": "concurrently \"vite dev\" \"pnpm run theme:watch\"",
-    "dev:host": "concurrently \"vite dev --host\" \"pnpm run theme:watch\"",
+    "dev": "vite dev",
+    "dev:host": "vite dev --host",
     "build": "pnpm run lint && vite build",
     "typegen": "node scripts/typegen.js",
     "preview": "vite preview",
@@ -31,8 +31,6 @@
     "lint": "concurrently -g -n eslint,prettier,tsc,madge -c cyan,green,magenta,yellow \"pnpm run lint:eslint\" \"pnpm run lint:prettier\" \"pnpm run lint:tsc\" \"pnpm run lint:madge\"",
     "fix": "eslint --fix . && prettier --log-level warn --write .",
     "preinstall": "npx only-allow pnpm",
-    "theme": "chakra-cli tokens node_modules/@invoke-ai/ui-library",
-    "theme:watch": "chakra-cli tokens node_modules/@invoke-ai/ui-library --watch",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "unimported": "npx unimported"
@@ -106,7 +104,6 @@
     "zod-validation-error": "^3.0.0"
   },
   "peerDependencies": {
-    "@chakra-ui/cli": "^2.4.1",
     "@chakra-ui/react": "^2.8.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -114,7 +111,6 @@
   },
   "devDependencies": {
     "@arthurgeron/eslint-plugin-react-usememo": "^2.2.3",
-    "@chakra-ui/cli": "^2.4.1",
     "@invoke-ai/eslint-config-react": "^0.0.11",
     "@invoke-ai/prettier-config-react": "^0.0.6",
     "@storybook/addon-docs": "^7.6.10",
