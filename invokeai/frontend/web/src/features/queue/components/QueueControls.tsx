@@ -11,14 +11,7 @@ import { QueueActionsMenuButton } from './QueueActionsMenuButton';
 const QueueControls = () => {
   const isPrependEnabled = useFeatureStatus('prependQueue').isFeatureEnabled;
   return (
-    <Flex
-      w="full"
-      position="relative"
-      borderRadius="base"
-      gap={2}
-      pt={2}
-      flexDir="column"
-    >
+    <Flex w="full" position="relative" borderRadius="base" gap={2} pt={2} flexDir="column">
       <ButtonGroup size="lg" isAttached={false}>
         {isPrependEnabled && <QueueFrontButton />}
         <InvokeQueueBackButton />

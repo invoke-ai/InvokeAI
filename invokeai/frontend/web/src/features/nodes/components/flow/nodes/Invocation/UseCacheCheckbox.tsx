@@ -24,11 +24,7 @@ const UseCacheCheckbox = ({ nodeId }: { nodeId: string }) => {
   return (
     <FormControl>
       <FormLabel>{t('invocationCache.useCache')}</FormLabel>
-      <Checkbox
-        className="nopan"
-        onChange={handleChange}
-        isChecked={useCache}
-      />
+      <Checkbox className="nopan" onChange={handleChange} isChecked={useCache} />
     </FormControl>
   );
 };

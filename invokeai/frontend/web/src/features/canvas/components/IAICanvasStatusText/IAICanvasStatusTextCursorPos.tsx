@@ -14,11 +14,7 @@ const IAICanvasStatusTextCursorPos = () => {
     return `(${roundToHundreth(x)}, ${roundToHundreth(y)})`;
   }, [cursorPosition?.x, cursorPosition?.y]);
 
-  return (
-    <Box>{`${t(
-      'unifiedCanvas.cursorPosition'
-    )}: ${cursorCoordinatesString}`}</Box>
-  );
+  return <Box>{`${t('unifiedCanvas.cursorPosition')}: ${cursorCoordinatesString}`}</Box>;
 };
 
 export default memo(IAICanvasStatusTextCursorPos);

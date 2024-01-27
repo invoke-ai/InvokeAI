@@ -45,10 +45,7 @@ const ParamControlAdapterResizeMode = ({ id }: Props) => {
     [id, dispatch]
   );
 
-  const value = useMemo(
-    () => options.find((o) => o.value === resizeMode),
-    [options, resizeMode]
-  );
+  const value = useMemo(() => options.find((o) => o.value === resizeMode), [options, resizeMode]);
 
   if (!resizeMode) {
     return null;
@@ -59,12 +56,7 @@ const ParamControlAdapterResizeMode = ({ id }: Props) => {
       <InformationalPopover feature="controlNetResizeMode">
         <FormLabel>{t('controlnet.resizeMode')}</FormLabel>
       </InformationalPopover>
-      <Combobox
-        value={value}
-        options={options}
-        isDisabled={!isEnabled}
-        onChange={handleResizeModeChange}
-      />
+      <Combobox value={value} options={options} isDisabled={!isEnabled} onChange={handleResizeModeChange} />
     </FormControl>
   );
 };

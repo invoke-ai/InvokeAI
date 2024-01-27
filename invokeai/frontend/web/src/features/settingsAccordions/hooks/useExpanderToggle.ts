@@ -11,11 +11,7 @@ type UseExpanderToggleArg = {
 export const useExpanderToggle = (arg: UseExpanderToggleArg) => {
   const dispatch = useAppDispatch();
   const selectIsOpen = useMemo(
-    () =>
-      createSelector(
-        selectUiSlice,
-        (ui) => ui.expanders[arg.id] ?? arg.defaultIsOpen
-      ),
+    () => createSelector(selectUiSlice, (ui) => ui.expanders[arg.id] ?? arg.defaultIsOpen),
     [arg]
   );
   const isOpen = useAppSelector(selectIsOpen);

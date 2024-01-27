@@ -16,11 +16,7 @@ const QueueListHeader = () => {
       fontSize="sm"
       letterSpacing={1}
     >
-      <Flex
-        w={COLUMN_WIDTHS.number}
-        justifyContent="flex-end"
-        alignItems="center"
-      >
+      <Flex w={COLUMN_WIDTHS.number} justifyContent="flex-end" alignItems="center">
         <Text variant="subtext">#</Text>
       </Flex>
       <Flex ps={0.5} w={COLUMN_WIDTHS.statusBadge} alignItems="center">

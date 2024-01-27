@@ -17,9 +17,7 @@ export const OPTIONS: ComboboxOption[] = [
 const ParamScaleBeforeProcessing = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const boundingBoxScaleMethod = useAppSelector(
-    (s) => s.canvas.boundingBoxScaleMethod
-  );
+  const boundingBoxScaleMethod = useAppSelector((s) => s.canvas.boundingBoxScaleMethod);
   const optimalDimension = useAppSelector(selectOptimalDimension);
 
   const onChange = useCallback<ComboboxOnChange>(
@@ -32,10 +30,7 @@ const ParamScaleBeforeProcessing = () => {
     [dispatch, optimalDimension]
   );
 
-  const value = useMemo(
-    () => OPTIONS.find((o) => o.value === boundingBoxScaleMethod),
-    [boundingBoxScaleMethod]
-  );
+  const value = useMemo(() => OPTIONS.find((o) => o.value === boundingBoxScaleMethod), [boundingBoxScaleMethod]);
 
   return (
     <FormControl>

@@ -1,11 +1,4 @@
-import {
-  Button,
-  ButtonGroup,
-  Flex,
-  Heading,
-  Spinner,
-  Text,
-} from '@invoke-ai/ui-library';
+import { Button, ButtonGroup, Flex, Heading, Spinner, Text } from '@invoke-ai/ui-library';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import { useCancelBatch } from 'features/queue/hooks/useCancelBatch';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
@@ -24,14 +17,9 @@ type Props = {
 const QueueItemComponent = ({ queueItemDTO }: Props) => {
   const { session_id, batch_id, item_id } = queueItemDTO;
   const { t } = useTranslation();
-  const {
-    cancelBatch,
-    isLoading: isLoadingCancelBatch,
-    isCanceled,
-  } = useCancelBatch(batch_id);
+  const { cancelBatch, isLoading: isLoadingCancelBatch, isCanceled } = useCancelBatch(batch_id);
 
-  const { cancelQueueItem, isLoading: isLoadingCancelQueueItem } =
-    useCancelQueueItem(item_id);
+  const { cancelQueueItem, isLoading: isLoadingCancelQueueItem } = useCancelQueueItem(item_id);
 
   const { data: queueItem } = useGetQueueItemQuery(item_id);
 
@@ -42,10 +30,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
     if (!queueItem.completed_at || !queueItem.started_at) {
       return t(`queue.${queueItem.status}`);
     }
-    const seconds = getSecondsFromTimestamps(
-      queueItem.started_at,
-      queueItem.completed_at
-    );
+    const seconds = getSecondsFromTimestamps(queueItem.started_at, queueItem.completed_at);
     if (queueItem.status === 'completed') {
       return `${t('queue.completedIn')} ${seconds}${seconds === 1 ? '' : 's'}`;
     }
@@ -53,14 +38,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
   }, [queueItem, t]);
 
   return (
-    <Flex
-      layerStyle="third"
-      flexDir="column"
-      p={2}
-      pt={0}
-      borderRadius="base"
-      gap={2}
-    >
+    <Flex layerStyle="third" flexDir="column" p={2} pt={0} borderRadius="base" gap={2}>
       <Flex
         layerStyle="second"
         p={2}
@@ -78,11 +56,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
           <Button
             onClick={cancelQueueItem}
             isLoading={isLoadingCancelQueueItem}
-            isDisabled={
-              queueItem
-                ? ['canceled', 'completed', 'failed'].includes(queueItem.status)
-                : true
-            }
+            isDisabled={queueItem ? ['canceled', 'completed', 'failed'].includes(queueItem.status) : true}
             aria-label={t('queue.cancelItem')}
             leftIcon={<PiXBold />}
             colorScheme="error"
@@ -117,19 +91,8 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
           <pre>{queueItem.error}</pre>
         </Flex>
       )}
-      <Flex
-        layerStyle="second"
-        h={512}
-        w="full"
-        borderRadius="base"
-        alignItems="center"
-        justifyContent="center"
-      >
-        {queueItem ? (
-          <DataViewer label="Queue Item" data={queueItem} />
-        ) : (
-          <Spinner opacity={0.5} />
-        )}
+      <Flex layerStyle="second" h={512} w="full" borderRadius="base" alignItems="center" justifyContent="center">
+        {queueItem ? <DataViewer label="Queue Item" data={queueItem} /> : <Spinner opacity={0.5} />}
       </Flex>
     </Flex>
   );
@@ -141,21 +104,8 @@ type QueueItemDataProps = { label: string; data: ReactNode };
 
 const QueueItemData = ({ label, data }: QueueItemDataProps) => {
   return (
-    <Flex
-      flexDir="column"
-      justifyContent="flex-start"
-      p={1}
-      gap={1}
-      overflow="hidden"
-      h="full"
-      w="full"
-    >
-      <Heading
-        size="md"
-        overflow="hidden"
-        textOverflow="ellipsis"
-        whiteSpace="nowrap"
-      >
+    <Flex flexDir="column" justifyContent="flex-start" p={1} gap={1} overflow="hidden" h="full" w="full">
+      <Heading size="md" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
         {label}
       </Heading>
       <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">

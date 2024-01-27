@@ -11,11 +11,7 @@ export const getOptimalDimension = (model?: ModelIdentifier | null): number =>
 const MIN_AREA_FACTOR = 0.8;
 const MAX_AREA_FACTOR = 1.2;
 
-export const getIsSizeTooSmall = (
-  width: number,
-  height: number,
-  optimalDimension: number
-): boolean => {
+export const getIsSizeTooSmall = (width: number, height: number, optimalDimension: number): boolean => {
   const currentArea = width * height;
   const optimalArea = optimalDimension * optimalDimension;
   if (currentArea < optimalArea * MIN_AREA_FACTOR) {
@@ -24,11 +20,7 @@ export const getIsSizeTooSmall = (
   return false;
 };
 
-export const getIsSizeTooLarge = (
-  width: number,
-  height: number,
-  optimalDimension: number
-): boolean => {
+export const getIsSizeTooLarge = (width: number, height: number, optimalDimension: number): boolean => {
   const currentArea = width * height;
   const optimalArea = optimalDimension * optimalDimension;
   if (currentArea > optimalArea * MAX_AREA_FACTOR) {
@@ -45,13 +37,6 @@ export const getIsSizeTooLarge = (
  * @param optimalDimension The optimal dimension
  * @returns Whether the current width and height needs to be resized to the optimal dimension
  */
-export const getIsSizeOptimal = (
-  width: number,
-  height: number,
-  optimalDimension: number
-): boolean => {
-  return (
-    !getIsSizeTooSmall(width, height, optimalDimension) &&
-    !getIsSizeTooLarge(width, height, optimalDimension)
-  );
+export const getIsSizeOptimal = (width: number, height: number, optimalDimension: number): boolean => {
+  return !getIsSizeTooSmall(width, height, optimalDimension) && !getIsSizeTooLarge(width, height, optimalDimension);
 };

@@ -23,10 +23,7 @@ const ParamScheduler = () => {
     [dispatch]
   );
 
-  const value = useMemo(
-    () => SCHEDULER_OPTIONS.find((o) => o.value === scheduler),
-    [scheduler]
-  );
+  const value = useMemo(() => SCHEDULER_OPTIONS.find((o) => o.value === scheduler), [scheduler]);
 
   return (
     <FormControl>

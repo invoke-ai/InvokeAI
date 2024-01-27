@@ -36,10 +36,7 @@ const Toaster = () => {
  */
 export const useAppToaster = () => {
   const dispatch = useAppDispatch();
-  const toaster = useCallback(
-    (arg: MakeToastArg) => dispatch(addToast(makeToast(arg))),
-    [dispatch]
-  );
+  const toaster = useCallback((arg: MakeToastArg) => dispatch(addToast(makeToast(arg))), [dispatch]);
 
   return toaster;
 };

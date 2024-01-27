@@ -16,10 +16,7 @@ const $isFirstConnection = atom(true);
 export const addSocketConnectedEventListener = () => {
   startAppListening({
     actionCreator: socketConnected,
-    effect: async (
-      action,
-      { dispatch, getState, cancelActiveListeners, delay }
-    ) => {
+    effect: async (action, { dispatch, getState, cancelActiveListeners, delay }) => {
       log.debug('Connected');
 
       /**
@@ -86,10 +83,7 @@ export const addSocketConnectedEventListener = () => {
     effect: async (action, { dispatch, getState }) => {
       const { nodeTemplates, config } = getState();
       // We only want to re-fetch the schema if we don't have any node templates
-      if (
-        !size(nodeTemplates.templates) &&
-        !config.disabledTabs.includes('nodes')
-      ) {
+      if (!size(nodeTemplates.templates) && !config.disabledTabs.includes('nodes')) {
         // This request is a createAsyncThunk - resetting API state as in the above listener
         // will not trigger this request, so we need to manually do it.
         dispatch(receivedOpenAPISchema());

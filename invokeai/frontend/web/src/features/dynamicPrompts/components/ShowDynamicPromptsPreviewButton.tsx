@@ -13,19 +13,11 @@ const loadingStyles: SystemStyleObject = {
 export const ShowDynamicPromptsPreviewButton = memo(() => {
   const { t } = useTranslation();
   const isLoading = useAppSelector((s) => s.dynamicPrompts.isLoading);
-  const isError = useAppSelector((s) =>
-    Boolean(s.dynamicPrompts.isError || s.dynamicPrompts.parsingError)
-  );
+  const isError = useAppSelector((s) => Boolean(s.dynamicPrompts.isError || s.dynamicPrompts.parsingError));
   const { isOpen, onOpen } = useDynamicPromptsModal();
 
   return (
-    <Tooltip
-      label={
-        isLoading
-          ? t('dynamicPrompts.loading')
-          : t('dynamicPrompts.showDynamicPrompts')
-      }
-    >
+    <Tooltip label={isLoading ? t('dynamicPrompts.loading') : t('dynamicPrompts.showDynamicPrompts')}>
       <IconButton
         size="sm"
         variant="promptOverlay"

@@ -1,12 +1,4 @@
-import {
-  Button,
-  Checkbox,
-  Flex,
-  FormControl,
-  FormErrorMessage,
-  FormLabel,
-  Input,
-} from '@invoke-ai/ui-library';
+import { Button, Checkbox, Flex, FormControl, FormErrorMessage, FormLabel, Input } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
 import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
@@ -113,10 +105,7 @@ const AdvancedAddCheckpoint = (props: AdvancedAddCheckpointProps) => {
     [getValues, setValue]
   );
 
-  const handleChangeUseCustomConfig = useCallback(
-    () => setUseCustomConfig((prev) => !prev),
-    []
-  );
+  const handleChangeUseCustomConfig = useCallback(() => setUseCustomConfig((prev) => !prev), []);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} style={formStyles}>
@@ -125,30 +114,21 @@ const AdvancedAddCheckpoint = (props: AdvancedAddCheckpointProps) => {
           <FormLabel>{t('modelManager.model')}</FormLabel>
           <Input
             {...register('model_name', {
-              validate: (value) =>
-                value.trim().length > 3 || 'Must be at least 3 characters',
+              validate: (value) => value.trim().length > 3 || 'Must be at least 3 characters',
             })}
           />
-          {errors.model_name?.message && (
-            <FormErrorMessage>{errors.model_name?.message}</FormErrorMessage>
-          )}
+          {errors.model_name?.message && <FormErrorMessage>{errors.model_name?.message}</FormErrorMessage>}
         </FormControl>
-        <BaseModelSelect<CheckpointModelConfig>
-          control={control}
-          name="base_model"
-        />
+        <BaseModelSelect<CheckpointModelConfig> control={control} name="base_model" />
         <FormControl isInvalid={Boolean(errors.path)}>
           <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
           <Input
             {...register('path', {
-              validate: (value) =>
-                value.trim().length > 0 || 'Must provide a path',
+              validate: (value) => value.trim().length > 0 || 'Must provide a path',
               onBlur,
             })}
           />
-          {errors.path?.message && (
-            <FormErrorMessage>{errors.path?.message}</FormErrorMessage>
-          )}
+          {errors.path?.message && <FormErrorMessage>{errors.path?.message}</FormErrorMessage>}
         </FormControl>
         <FormControl>
           <FormLabel>{t('modelManager.description')}</FormLabel>
@@ -158,10 +138,7 @@ const AdvancedAddCheckpoint = (props: AdvancedAddCheckpointProps) => {
           <FormLabel>{t('modelManager.vaeLocation')}</FormLabel>
           <Input {...register('vae')} />
         </FormControl>
-        <ModelVariantSelect<CheckpointModelConfig>
-          control={control}
-          name="variant"
-        />
+        <ModelVariantSelect<CheckpointModelConfig> control={control} name="variant" />
         <Flex flexDirection="column" width="100%" gap={2}>
           {!useCustomConfig ? (
             <CheckpointConfigsSelect control={control} name="config" />
@@ -173,10 +150,7 @@ const AdvancedAddCheckpoint = (props: AdvancedAddCheckpointProps) => {
           )}
           <FormControl>
             <FormLabel>{t('modelManager.useCustomConfig')}</FormLabel>
-            <Checkbox
-              isChecked={useCustomConfig}
-              onChange={handleChangeUseCustomConfig}
-            />
+            <Checkbox isChecked={useCustomConfig} onChange={handleChangeUseCustomConfig} />
           </FormControl>
           <Button mt={2} type="submit">
             {t('modelManager.addModel')}

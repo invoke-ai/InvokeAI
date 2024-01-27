@@ -8,19 +8,10 @@ import WorkflowLibraryMenu from 'features/workflowLibrary/components/WorkflowLib
 import { memo } from 'react';
 
 const TopCenterPanel = () => {
-  const isWorkflowLibraryEnabled =
-    useFeatureStatus('workflowLibrary').isFeatureEnabled;
+  const isWorkflowLibraryEnabled = useFeatureStatus('workflowLibrary').isFeatureEnabled;
 
   return (
-    <Flex
-      gap={2}
-      top={2}
-      left={2}
-      right={2}
-      position="absolute"
-      alignItems="center"
-      pointerEvents="none"
-    >
+    <Flex gap={2} top={2} left={2} right={2} position="absolute" alignItems="center" pointerEvents="none">
       <AddNodeButton />
       <UpdateNodesButton />
       <Spacer />

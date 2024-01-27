@@ -2,10 +2,7 @@ import { Flex, Text } from '@invoke-ai/ui-library';
 import { useFieldInstance } from 'features/nodes/hooks/useFieldData';
 import { useFieldTemplate } from 'features/nodes/hooks/useFieldTemplate';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
-import {
-  isFieldInputInstance,
-  isFieldInputTemplate,
-} from 'features/nodes/types/field';
+import { isFieldInputInstance, isFieldInputTemplate } from 'features/nodes/types/field';
 import { startCase } from 'lodash-es';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

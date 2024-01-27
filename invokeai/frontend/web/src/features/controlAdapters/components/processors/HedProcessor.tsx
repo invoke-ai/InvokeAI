@@ -1,10 +1,4 @@
-import {
-  CompositeNumberInput,
-  CompositeSlider,
-  FormControl,
-  FormLabel,
-  Switch,
-} from '@invoke-ai/ui-library';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type { RequiredHedImageProcessorInvocation } from 'features/controlAdapters/store/types';
@@ -14,8 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './common/ProcessorWrapper';
 
-const DEFAULTS = CONTROLNET_PROCESSORS.hed_image_processor
-  .default as RequiredHedImageProcessorInvocation;
+const DEFAULTS = CONTROLNET_PROCESSORS.hed_image_processor.default as RequiredHedImageProcessorInvocation;
 
 type HedProcessorProps = {
   controlNetId: string;

@@ -23,12 +23,7 @@ const NotesTextarea = ({ nodeId }: { nodeId: string }) => {
   return (
     <FormControl orientation="vertical" h="full">
       <FormLabel>{t('nodes.notes')}</FormLabel>
-      <Textarea
-        value={data?.notes}
-        onChange={handleNotesChanged}
-        rows={10}
-        resize="none"
-      />
+      <Textarea value={data?.notes} onChange={handleNotesChanged} rows={10} resize="none" />
     </FormControl>
   );
 };

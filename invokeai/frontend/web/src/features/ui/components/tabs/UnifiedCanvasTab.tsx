@@ -41,10 +41,7 @@ const UnifiedCanvasTab = () => {
       <IAICanvasToolbar />
       <IAICanvas />
       {isValidDrop(droppableData, active) && (
-        <IAIDropOverlay
-          isOver={isOver}
-          label={t('toast.setCanvasInitialImage')}
-        />
+        <IAIDropOverlay isOver={isOver} label={t('toast.setCanvasInitialImage')} />
       )}
     </Flex>
   );

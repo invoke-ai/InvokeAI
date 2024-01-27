@@ -1,13 +1,4 @@
-import {
-  Button,
-  Divider,
-  Flex,
-  FormControl,
-  FormErrorMessage,
-  FormLabel,
-  Input,
-  Text,
-} from '@invoke-ai/ui-library';
+import { Button, Divider, Flex, FormControl, FormErrorMessage, FormLabel, Input, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
 import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVariantSelect';
@@ -108,37 +99,25 @@ const DiffusersModelEdit = (props: DiffusersModelEditProps) => {
             <FormLabel>{t('modelManager.name')}</FormLabel>
             <Input
               {...register('model_name', {
-                validate: (value) =>
-                  value.trim().length > 3 || 'Must be at least 3 characters',
+                validate: (value) => value.trim().length > 3 || 'Must be at least 3 characters',
               })}
             />
-            {errors.model_name?.message && (
-              <FormErrorMessage>{errors.model_name?.message}</FormErrorMessage>
-            )}
+            {errors.model_name?.message && <FormErrorMessage>{errors.model_name?.message}</FormErrorMessage>}
           </FormControl>
           <FormControl>
             <FormLabel>{t('modelManager.description')}</FormLabel>
             <Input {...register('description')} />
           </FormControl>
-          <BaseModelSelect<DiffusersModelConfig>
-            control={control}
-            name="base_model"
-          />
-          <ModelVariantSelect<DiffusersModelConfig>
-            control={control}
-            name="variant"
-          />
+          <BaseModelSelect<DiffusersModelConfig> control={control} name="base_model" />
+          <ModelVariantSelect<DiffusersModelConfig> control={control} name="variant" />
           <FormControl isInvalid={Boolean(errors.path)}>
             <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
             <Input
               {...register('path', {
-                validate: (value) =>
-                  value.trim().length > 0 || 'Must provide a path',
+                validate: (value) => value.trim().length > 0 || 'Must provide a path',
               })}
             />
-            {errors.path?.message && (
-              <FormErrorMessage>{errors.path?.message}</FormErrorMessage>
-            )}
+            {errors.path?.message && <FormErrorMessage>{errors.path?.message}</FormErrorMessage>}
           </FormControl>
           <FormControl>
             <FormLabel>{t('modelManager.vaeLocation')}</FormLabel>

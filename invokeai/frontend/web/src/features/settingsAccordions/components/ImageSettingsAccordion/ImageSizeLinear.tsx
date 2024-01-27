@@ -3,11 +3,7 @@ import { ParamHeight } from 'features/parameters/components/Core/ParamHeight';
 import { ParamWidth } from 'features/parameters/components/Core/ParamWidth';
 import { ImageSize } from 'features/parameters/components/ImageSize/ImageSize';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
-import {
-  aspectRatioChanged,
-  heightChanged,
-  widthChanged,
-} from 'features/parameters/store/generationSlice';
+import { aspectRatioChanged, heightChanged, widthChanged } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 
 export const ImageSizeLinear = memo(() => {

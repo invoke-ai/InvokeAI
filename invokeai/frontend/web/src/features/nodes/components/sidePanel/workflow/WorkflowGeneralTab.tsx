@@ -1,12 +1,5 @@
 import type { FormControlProps } from '@invoke-ai/ui-library';
-import {
-  Flex,
-  FormControl,
-  FormControlGroup,
-  FormLabel,
-  Input,
-  Textarea,
-} from '@invoke-ai/ui-library';
+import { Flex, FormControl, FormControlGroup, FormLabel, Input, Textarea } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
@@ -39,8 +32,7 @@ const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
 });
 
 const WorkflowGeneralTab = () => {
-  const { author, name, description, tags, version, contact, notes } =
-    useAppSelector(selector);
+  const { author, name, description, tags, version, contact, notes } = useAppSelector(selector);
   const dispatch = useAppDispatch();
 
   const handleChangeName = useCallback(
@@ -92,10 +84,7 @@ const WorkflowGeneralTab = () => {
   return (
     <ScrollableContent>
       <Flex flexDir="column" alignItems="flex-start" gap={2} h="full">
-        <FormControlGroup
-          orientation="vertical"
-          formControlProps={formControlProps}
-        >
+        <FormControlGroup orientation="vertical" formControlProps={formControlProps}>
           <Flex gap={2} w="full">
             <FormControl>
               <FormLabel>{t('nodes.workflowName')}</FormLabel>
@@ -122,23 +111,11 @@ const WorkflowGeneralTab = () => {
           </FormControl>
           <FormControl>
             <FormLabel>{t('nodes.workflowDescription')}</FormLabel>
-            <Textarea
-              onChange={handleChangeDescription}
-              value={description}
-              fontSize="sm"
-              resize="none"
-              rows={3}
-            />
+            <Textarea onChange={handleChangeDescription} value={description} fontSize="sm" resize="none" rows={3} />
           </FormControl>
           <FormControl>
             <FormLabel>{t('nodes.workflowNotes')}</FormLabel>
-            <Textarea
-              onChange={handleChangeNotes}
-              value={notes}
-              fontSize="sm"
-              resize="none"
-              rows={10}
-            />
+            <Textarea onChange={handleChangeNotes} value={notes} fontSize="sm" resize="none" rows={10} />
           </FormControl>
         </FormControlGroup>
       </Flex>

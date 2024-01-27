@@ -1,9 +1,4 @@
-import {
-  CompositeNumberInput,
-  CompositeSlider,
-  FormControl,
-  FormLabel,
-} from '@invoke-ai/ui-library';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setMaskBlur } from 'features/parameters/store/generationSlice';
@@ -17,12 +12,8 @@ const ParamMaskBlur = () => {
   const initial = useAppSelector((s) => s.config.sd.maskBlur.initial);
   const sliderMin = useAppSelector((s) => s.config.sd.maskBlur.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.maskBlur.sliderMax);
-  const numberInputMin = useAppSelector(
-    (s) => s.config.sd.maskBlur.numberInputMin
-  );
-  const numberInputMax = useAppSelector(
-    (s) => s.config.sd.maskBlur.numberInputMax
-  );
+  const numberInputMin = useAppSelector((s) => s.config.sd.maskBlur.numberInputMin);
+  const numberInputMax = useAppSelector((s) => s.config.sd.maskBlur.numberInputMax);
   const coarseStep = useAppSelector((s) => s.config.sd.maskBlur.coarseStep);
   const fineStep = useAppSelector((s) => s.config.sd.maskBlur.fineStep);
 

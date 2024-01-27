@@ -1,10 +1,5 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
-import {
-  Expander,
-  Flex,
-  FormControlGroup,
-  StandaloneAccordion,
-} from '@invoke-ai/ui-library';
+import { Expander, Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
@@ -29,12 +24,7 @@ import { ImageSizeCanvas } from './ImageSizeCanvas';
 import { ImageSizeLinear } from './ImageSizeLinear';
 
 const selector = createMemoizedSelector(
-  [
-    selectGenerationSlice,
-    selectCanvasSlice,
-    selectHrfSlice,
-    activeTabNameSelector,
-  ],
+  [selectGenerationSlice, selectCanvasSlice, selectHrfSlice, activeTabNameSelector],
   (generation, canvas, hrf, activeTabName) => {
     const { shouldRandomizeSeed } = generation;
     const { hrfEnabled } = hrf;
@@ -77,10 +67,14 @@ const scalingLabelProps: FormLabelProps = {
 export const ImageSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const { badges, activeTabName } = useAppSelector(selector);
-  const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } =
-    useStandaloneAccordionToggle({ id: 'image-settings', defaultIsOpen: true });
-  const { isOpen: isOpenExpander, onToggle: onToggleExpander } =
-    useExpanderToggle({ id: 'image-settings-advanced', defaultIsOpen: false });
+  const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } = useStandaloneAccordionToggle({
+    id: 'image-settings',
+    defaultIsOpen: true,
+  });
+  const { isOpen: isOpenExpander, onToggle: onToggleExpander } = useExpanderToggle({
+    id: 'image-settings-advanced',
+    defaultIsOpen: false,
+  });
 
   return (
     <StandaloneAccordion
@@ -90,11 +84,7 @@ export const ImageSettingsAccordion = memo(() => {
       onToggle={onToggleAccordion}
     >
       <Flex px={4} pt={4} w="full" h="full" flexDir="column">
-        {activeTabName === 'unifiedCanvas' ? (
-          <ImageSizeCanvas />
-        ) : (
-          <ImageSizeLinear />
-        )}
+        {activeTabName === 'unifiedCanvas' ? <ImageSizeCanvas /> : <ImageSizeLinear />}
         <Expander isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">
             <Flex gap={4} alignItems="center">
@@ -102,8 +92,7 @@ export const ImageSettingsAccordion = memo(() => {
               <ParamSeedShuffle />
               <ParamSeedRandomize />
             </Flex>
-            {(activeTabName === 'img2img' ||
-              activeTabName === 'unifiedCanvas') && <ImageToImageStrength />}
+            {(activeTabName === 'img2img' || activeTabName === 'unifiedCanvas') && <ImageToImageStrength />}
             {activeTabName === 'img2img' && <ImageToImageFit />}
             {activeTabName === 'txt2img' && <HrfSettings />}
             {activeTabName === 'unifiedCanvas' && (

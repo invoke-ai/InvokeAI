@@ -1,11 +1,6 @@
 import type { BoardId } from 'features/gallery/store/types';
 import type { ParamESRGANModelName } from 'features/parameters/store/postprocessingSlice';
-import type {
-  ESRGANInvocation,
-  Graph,
-  LinearUIOutputInvocation,
-  NonNullableGraph,
-} from 'services/api/types';
+import type { ESRGANInvocation, Graph, LinearUIOutputInvocation, NonNullableGraph } from 'services/api/types';
 
 import { ESRGAN, LINEAR_UI_OUTPUT } from './constants';
 import { addCoreMetadataNode, upsertMetadata } from './metadata';
@@ -16,11 +11,7 @@ type Arg = {
   autoAddBoardId: BoardId;
 };
 
-export const buildAdHocUpscaleGraph = ({
-  image_name,
-  esrganModelName,
-  autoAddBoardId,
-}: Arg): Graph => {
+export const buildAdHocUpscaleGraph = ({ image_name, esrganModelName, autoAddBoardId }: Arg): Graph => {
   const realesrganNode: ESRGANInvocation = {
     id: ESRGAN,
     type: 'esrgan',

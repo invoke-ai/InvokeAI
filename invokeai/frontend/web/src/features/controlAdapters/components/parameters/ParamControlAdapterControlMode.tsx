@@ -58,11 +58,7 @@ const ParamControlAdapterControlMode = ({ id }: Props) => {
       <InformationalPopover feature="controlNetControlMode">
         <FormLabel>{t('controlnet.controlMode')}</FormLabel>
       </InformationalPopover>
-      <Combobox
-        value={value}
-        options={CONTROL_MODE_DATA}
-        onChange={handleControlModeChange}
-      />
+      <Combobox value={value} options={CONTROL_MODE_DATA} onChange={handleControlModeChange} />
     </FormControl>
   );
 };

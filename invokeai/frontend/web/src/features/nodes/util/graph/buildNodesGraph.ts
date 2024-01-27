@@ -38,68 +38,62 @@ export const buildNodesGraph = (nodesState: NodesState): Graph => {
   const filteredNodes = nodes.filter(isInvocationNode);
 
   // Reduce the node editor nodes into invocation graph nodes
-  const parsedNodes = filteredNodes.reduce<NonNullable<Graph['nodes']>>(
-    (nodesAccumulator, node) => {
-      const { id, data } = node;
-      const { type, inputs, isIntermediate } = data;
+  const parsedNodes = filteredNodes.reduce<NonNullable<Graph['nodes']>>((nodesAccumulator, node) => {
+    const { id, data } = node;
+    const { type, inputs, isIntermediate } = data;
 
-      // Transform each node's inputs to simple key-value pairs
-      const transformedInputs = reduce(
-        inputs,
-        (inputsAccumulator, input, name) => {
-          const parsedValue = parseFieldValue(input);
-          inputsAccumulator[name] = parsedValue;
+    // Transform each node's inputs to simple key-value pairs
+    const transformedInputs = reduce(
+      inputs,
+      (inputsAccumulator, input, name) => {
+        const parsedValue = parseFieldValue(input);
+        inputsAccumulator[name] = parsedValue;
 
-          return inputsAccumulator;
-        },
-        {} as Record<Exclude<string, 'id' | 'type'>, unknown>
-      );
+        return inputsAccumulator;
+      },
+      {} as Record<Exclude<string, 'id' | 'type'>, unknown>
+    );
 
-      // add reserved use_cache
-      transformedInputs['use_cache'] = node.data.useCache;
+    // add reserved use_cache
+    transformedInputs['use_cache'] = node.data.useCache;
 
-      // Build this specific node
-      const graphNode = {
-        type,
-        id,
-        ...transformedInputs,
-        is_intermediate: isIntermediate,
-      };
+    // Build this specific node
+    const graphNode = {
+      type,
+      id,
+      ...transformedInputs,
+      is_intermediate: isIntermediate,
+    };
 
-      // Add it to the nodes object
-      Object.assign(nodesAccumulator, {
-        [id]: graphNode,
-      });
+    // Add it to the nodes object
+    Object.assign(nodesAccumulator, {
+      [id]: graphNode,
+    });
 
-      return nodesAccumulator;
-    },
-    {}
-  );
+    return nodesAccumulator;
+  }, {});
 
   // skip out the "dummy" edges between collapsed nodes
   const filteredEdges = edges.filter((n) => n.type !== 'collapsed');
 
   // Reduce the node editor edges into invocation graph edges
-  const parsedEdges = filteredEdges.reduce<NonNullable<Graph['edges']>>(
-    (edgesAccumulator, edge) => {
-      const { source, target, sourceHandle, targetHandle } = edge;
+  const parsedEdges = filteredEdges.reduce<NonNullable<Graph['edges']>>((edgesAccumulator, edge) => {
+    const { source, target, sourceHandle, targetHandle } = edge;
 
-      // Format the edges and add to the edges array
-      edgesAccumulator.push({
-        source: {
-          node_id: source,
-          field: sourceHandle as string,
-        },
-        destination: {
-          node_id: target,
-          field: targetHandle as string,
-        },
-      });
+    // Format the edges and add to the edges array
+    edgesAccumulator.push({
+      source: {
+        node_id: source,
+        field: sourceHandle as string,
+      },
+      destination: {
+        node_id: target,
+        field: targetHandle as string,
+      },
+    });
 
-      return edgesAccumulator;
-    },
-    []
-  );
+    return edgesAccumulator;
+  }, []);
 
   /**
    * Omit all inputs that have edges connected.
@@ -113,10 +107,7 @@ export const buildNodesGraph = (nodesState: NodesState): Graph => {
   parsedEdges.forEach((edge) => {
     const destination_node = parsedNodes[edge.destination.node_id];
     const field = edge.destination.field;
-    parsedNodes[edge.destination.node_id] = omit(
-      destination_node,
-      field
-    ) as AnyInvocation;
+    parsedNodes[edge.destination.node_id] = omit(destination_node, field) as AnyInvocation;
   });
 
   // Assemble!

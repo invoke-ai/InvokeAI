@@ -17,10 +17,7 @@ const ResizeHandle = (props: ResizeHandleProps) => {
     <ChakraPanelResizeHandle {...rest}>
       <Flex sx={sx} data-orientation={orientation}>
         <Box className="resize-handle-inner" data-orientation={orientation} />
-        <Box
-          className="resize-handle-drag-handle"
-          data-orientation={orientation}
-        />
+        <Box className="resize-handle-drag-handle" data-orientation={orientation} />
       </Flex>
     </ChakraPanelResizeHandle>
   );

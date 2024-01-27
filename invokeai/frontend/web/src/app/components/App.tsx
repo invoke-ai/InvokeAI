@@ -45,8 +45,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   useGlobalModifiersInit();
   useGlobalHotkeys();
 
-  const { dropzone, isHandlingUpload, setIsHandlingUpload } =
-    useFullscreenDropzone();
+  const { dropzone, isHandlingUpload, setIsHandlingUpload } = useFullscreenDropzone();
 
   const handleReset = useCallback(() => {
     clearStorage();
@@ -70,10 +69,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   }, [dispatch]);
 
   return (
-    <ErrorBoundary
-      onReset={handleReset}
-      FallbackComponent={AppErrorBoundaryFallback}
-    >
+    <ErrorBoundary onReset={handleReset} FallbackComponent={AppErrorBoundaryFallback}>
       <Box
         id="invoke-app-wrapper"
         w="100vw"
@@ -86,10 +82,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
         <InvokeTabs />
         <AnimatePresence>
           {dropzone.isDragActive && isHandlingUpload && (
-            <ImageUploadOverlay
-              dropzone={dropzone}
-              setIsHandlingUpload={setIsHandlingUpload}
-            />
+            <ImageUploadOverlay dropzone={dropzone} setIsHandlingUpload={setIsHandlingUpload} />
           )}
         </AnimatePresence>
       </Box>

@@ -35,13 +35,9 @@ export const SettingsLanguageSelect = memo(() => {
     ],
     [t]
   );
-  const isLocalizationEnabled =
-    useFeatureStatus('localization').isFeatureEnabled;
+  const isLocalizationEnabled = useFeatureStatus('localization').isFeatureEnabled;
 
-  const value = useMemo(
-    () => options.find((o) => o.value === language),
-    [language, options]
-  );
+  const value = useMemo(() => options.find((o) => o.value === language), [language, options]);
 
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {

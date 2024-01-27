@@ -10,8 +10,7 @@ type Props = {
 
 const CancelCurrentQueueItemIconButton = ({ sx }: Props) => {
   const { t } = useTranslation();
-  const { cancelQueueItem, isLoading, isDisabled } =
-    useCancelCurrentQueueItem();
+  const { cancelQueueItem, isLoading, isDisabled } = useCancelCurrentQueueItem();
 
   return (
     <IconButton

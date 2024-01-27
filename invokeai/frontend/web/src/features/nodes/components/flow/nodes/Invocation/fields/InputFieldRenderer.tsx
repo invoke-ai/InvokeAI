@@ -75,213 +75,70 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
     );
   }
 
-  if (
-    isStringFieldInputInstance(fieldInstance) &&
-    isStringFieldInputTemplate(fieldTemplate)
-  ) {
-    return (
-      <StringFieldInputComponent
-        nodeId={nodeId}
-        field={fieldInstance}
-        fieldTemplate={fieldTemplate}
-      />
-    );
+  if (isStringFieldInputInstance(fieldInstance) && isStringFieldInputTemplate(fieldTemplate)) {
+    return <StringFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+  }
+
+  if (isBooleanFieldInputInstance(fieldInstance) && isBooleanFieldInputTemplate(fieldTemplate)) {
+    return <BooleanFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
   if (
-    isBooleanFieldInputInstance(fieldInstance) &&
-    isBooleanFieldInputTemplate(fieldTemplate)
+    (isIntegerFieldInputInstance(fieldInstance) && isIntegerFieldInputTemplate(fieldTemplate)) ||
+    (isFloatFieldInputInstance(fieldInstance) && isFloatFieldInputTemplate(fieldTemplate))
   ) {
-    return (
-      <BooleanFieldInputComponent
-        nodeId={nodeId}
-        field={fieldInstance}
-        fieldTemplate={fieldTemplate}
-      />
-    );
+    return <NumberFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
-  if (
-    (isIntegerFieldInputInstance(fieldInstance) &&
-      isIntegerFieldInputTemplate(fieldTemplate)) ||
-    (isFloatFieldInputInstance(fieldInstance) &&
-      isFloatFieldInputTemplate(fieldTemplate))
-  ) {
-    return (
-      <NumberFieldInputComponent
-        nodeId={nodeId}
-        field={fieldInstance}
-        fieldTemplate={fieldTemplate}
-      />
-    );
+  if (isEnumFieldInputInstance(fieldInstance) && isEnumFieldInputTemplate(fieldTemplate)) {
+    return <EnumFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
-  if (
-    isEnumFieldInputInstance(fieldInstance) &&
-    isEnumFieldInputTemplate(fieldTemplate)
-  ) {
-    return (
-      <EnumFieldInputComponent
-        nodeId={nodeId}
-        field={fieldInstance}
-        fieldTemplate={fieldTemplate}
-      />
-    );
+  if (isImageFieldInputInstance(fieldInstance) && isImageFieldInputTemplate(fieldTemplate)) {
+    return <ImageFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
-  if (
-    isImageFieldInputInstance(fieldInstance) &&
-    isImageFieldInputTemplate(fieldTemplate)
-  ) {
-    return (
-      <ImageFieldInputComponent
-        nodeId={nodeId}
-        field={fieldInstance}
-        fieldTemplate={fieldTemplate}
-      />
-    );
+  if (isBoardFieldInputInstance(fieldInstance) && isBoardFieldInputTemplate(fieldTemplate)) {
+    return <BoardFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
-  if (
-    isBoardFieldInputInstance(fieldInstance) &&
-    isBoardFieldInputTemplate(fieldTemplate)
-  ) {
-    return (
-      <BoardFieldInputComponent
-        nodeId={nodeId}
-        field={fieldInstance}
-        fieldTemplate={fieldTemplate}
-      />
-    );
+  if (isMainModelFieldInputInstance(fieldInstance) && isMainModelFieldInputTemplate(fieldTemplate)) {
+    return <MainModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
-  if (
-    isMainModelFieldInputInstance(fieldInstance) &&
-    isMainModelFieldInputTemplate(fieldTemplate)
-  ) {
-    return (
-      <MainModelFieldInputComponent
-        nodeId={nodeId}
-        field={fieldInstance}
-        fieldTemplate={fieldTemplate}
-      />
-    );
+  if (isSDXLRefinerModelFieldInputInstance(fieldInstance) && isSDXLRefinerModelFieldInputTemplate(fieldTemplate)) {
+    return <RefinerModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
-  if (
-    isSDXLRefinerModelFieldInputInstance(fieldInstance) &&
-    isSDXLRefinerModelFieldInputTemplate(fieldTemplate)
-  ) {
-    return (
-      <RefinerModelFieldInputComponent
-        nodeId={nodeId}
-        field={fieldInstance}
-        fieldTemplate={fieldTemplate}
-      />
-    );
+  if (isVAEModelFieldInputInstance(fieldInstance) && isVAEModelFieldInputTemplate(fieldTemplate)) {
+    return <VAEModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
-  if (
-    isVAEModelFieldInputInstance(fieldInstance) &&
-    isVAEModelFieldInputTemplate(fieldTemplate)
-  ) {
-    return (
-      <VAEModelFieldInputComponent
-        nodeId={nodeId}
-        field={fieldInstance}
-        fieldTemplate={fieldTemplate}
-      />
-    );
+  if (isLoRAModelFieldInputInstance(fieldInstance) && isLoRAModelFieldInputTemplate(fieldTemplate)) {
+    return <LoRAModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
-  if (
-    isLoRAModelFieldInputInstance(fieldInstance) &&
-    isLoRAModelFieldInputTemplate(fieldTemplate)
-  ) {
-    return (
-      <LoRAModelFieldInputComponent
-        nodeId={nodeId}
-        field={fieldInstance}
-        fieldTemplate={fieldTemplate}
-      />
-    );
+  if (isControlNetModelFieldInputInstance(fieldInstance) && isControlNetModelFieldInputTemplate(fieldTemplate)) {
+    return <ControlNetModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
-  if (
-    isControlNetModelFieldInputInstance(fieldInstance) &&
-    isControlNetModelFieldInputTemplate(fieldTemplate)
-  ) {
-    return (
-      <ControlNetModelFieldInputComponent
-        nodeId={nodeId}
-        field={fieldInstance}
-        fieldTemplate={fieldTemplate}
-      />
-    );
+  if (isIPAdapterModelFieldInputInstance(fieldInstance) && isIPAdapterModelFieldInputTemplate(fieldTemplate)) {
+    return <IPAdapterModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
-  if (
-    isIPAdapterModelFieldInputInstance(fieldInstance) &&
-    isIPAdapterModelFieldInputTemplate(fieldTemplate)
-  ) {
-    return (
-      <IPAdapterModelFieldInputComponent
-        nodeId={nodeId}
-        field={fieldInstance}
-        fieldTemplate={fieldTemplate}
-      />
-    );
+  if (isT2IAdapterModelFieldInputInstance(fieldInstance) && isT2IAdapterModelFieldInputTemplate(fieldTemplate)) {
+    return <T2IAdapterModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+  }
+  if (isColorFieldInputInstance(fieldInstance) && isColorFieldInputTemplate(fieldTemplate)) {
+    return <ColorFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
-  if (
-    isT2IAdapterModelFieldInputInstance(fieldInstance) &&
-    isT2IAdapterModelFieldInputTemplate(fieldTemplate)
-  ) {
-    return (
-      <T2IAdapterModelFieldInputComponent
-        nodeId={nodeId}
-        field={fieldInstance}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-  if (
-    isColorFieldInputInstance(fieldInstance) &&
-    isColorFieldInputTemplate(fieldTemplate)
-  ) {
-    return (
-      <ColorFieldInputComponent
-        nodeId={nodeId}
-        field={fieldInstance}
-        fieldTemplate={fieldTemplate}
-      />
-    );
+  if (isSDXLMainModelFieldInputInstance(fieldInstance) && isSDXLMainModelFieldInputTemplate(fieldTemplate)) {
+    return <SDXLMainModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
-  if (
-    isSDXLMainModelFieldInputInstance(fieldInstance) &&
-    isSDXLMainModelFieldInputTemplate(fieldTemplate)
-  ) {
-    return (
-      <SDXLMainModelFieldInputComponent
-        nodeId={nodeId}
-        field={fieldInstance}
-        fieldTemplate={fieldTemplate}
-      />
-    );
-  }
-
-  if (
-    isSchedulerFieldInputInstance(fieldInstance) &&
-    isSchedulerFieldInputTemplate(fieldTemplate)
-  ) {
-    return (
-      <SchedulerFieldInputComponent
-        nodeId={nodeId}
-        field={fieldInstance}
-        fieldTemplate={fieldTemplate}
-      />
-    );
+  if (isSchedulerFieldInputInstance(fieldInstance) && isSchedulerFieldInputTemplate(fieldTemplate)) {
+    return <SchedulerFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
   if (fieldInstance && fieldTemplate) {

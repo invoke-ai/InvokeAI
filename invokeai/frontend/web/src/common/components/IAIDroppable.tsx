@@ -36,9 +36,7 @@ const IAIDroppable = (props: IAIDroppableProps) => {
       pointerEvents={active ? 'auto' : 'none'}
     >
       <AnimatePresence>
-        {isValidDrop(data, active) && (
-          <IAIDropOverlay isOver={isOver} label={dropLabel} />
-        )}
+        {isValidDrop(data, active) && <IAIDropOverlay isOver={isOver} label={dropLabel} />}
       </AnimatePresence>
     </Box>
   );

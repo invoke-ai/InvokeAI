@@ -9,11 +9,7 @@ const DownloadWorkflowMenuItem = () => {
   const downloadWorkflow = useDownloadWorkflow();
 
   return (
-    <MenuItem
-      as="button"
-      icon={<PiDownloadSimpleBold />}
-      onClick={downloadWorkflow}
-    >
+    <MenuItem as="button" icon={<PiDownloadSimpleBold />} onClick={downloadWorkflow}>
       {t('workflows.downloadWorkflow')}
     </MenuItem>
   );

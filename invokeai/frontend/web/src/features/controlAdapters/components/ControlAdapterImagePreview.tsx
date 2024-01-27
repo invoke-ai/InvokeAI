@@ -13,23 +13,12 @@ import {
   controlAdapterImageChanged,
   selectControlAdaptersSlice,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
-import type {
-  TypesafeDraggableData,
-  TypesafeDroppableData,
-} from 'features/dnd/types';
-import {
-  heightChanged,
-  selectOptimalDimension,
-  widthChanged,
-} from 'features/parameters/store/generationSlice';
+import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
+import { heightChanged, selectOptimalDimension, widthChanged } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  PiArrowCounterClockwiseBold,
-  PiFloppyDiskBold,
-  PiRulerBold,
-} from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiFloppyDiskBold, PiRulerBold } from 'react-icons/pi';
 import {
   useAddImageToBoardMutation,
   useChangeImageIsIntermediateMutation,
@@ -62,13 +51,13 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
-  const { currentData: controlImage, isError: isErrorControlImage } =
-    useGetImageDTOQuery(controlImageName ?? skipToken);
+  const { currentData: controlImage, isError: isErrorControlImage } = useGetImageDTOQuery(
+    controlImageName ?? skipToken
+  );
 
-  const {
-    currentData: processedControlImage,
-    isError: isErrorProcessedControlImage,
-  } = useGetImageDTOQuery(processedControlImageName ?? skipToken);
+  const { currentData: processedControlImage, isError: isErrorProcessedControlImage } = useGetImageDTOQuery(
+    processedControlImageName ?? skipToken
+  );
 
   const [changeIsIntermediate] = useChangeImageIsIntermediateMutation();
   const [addToBoard] = useAddImageToBoardMutation();
@@ -95,13 +84,7 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
     } else {
       removeFromBoard({ imageDTO: processedControlImage });
     }
-  }, [
-    processedControlImage,
-    changeIsIntermediate,
-    autoAddBoardId,
-    addToBoard,
-    removeFromBoard,
-  ]);
+  }, [processedControlImage, changeIsIntermediate, autoAddBoardId, addToBoard, removeFromBoard]);
 
   const handleSetControlImageToDimensions = useCallback(() => {
     if (!controlImage) {
@@ -151,10 +134,7 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
     [id]
   );
 
-  const postUploadAction = useMemo<PostUploadAction>(
-    () => ({ type: 'SET_CONTROL_ADAPTER_IMAGE', id }),
-    [id]
-  );
+  const postUploadAction = useMemo<PostUploadAction>(() => ({ type: 'SET_CONTROL_ADAPTER_IMAGE', id }), [id]);
 
   const shouldShowProcessedImage =
     controlImage &&
@@ -167,12 +147,7 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
     if (isConnected && (isErrorControlImage || isErrorProcessedControlImage)) {
       handleResetControlImage();
     }
-  }, [
-    handleResetControlImage,
-    isConnected,
-    isErrorControlImage,
-    isErrorProcessedControlImage,
-  ]);
+  }, [handleResetControlImage, isConnected, isErrorControlImage, isErrorProcessedControlImage]);
 
   return (
     <Flex
@@ -214,9 +189,7 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
       <>
         <IAIDndImageIcon
           onClick={handleResetControlImage}
-          icon={
-            controlImage ? <PiArrowCounterClockwiseBold size={16} /> : undefined
-          }
+          icon={controlImage ? <PiArrowCounterClockwiseBold size={16} /> : undefined}
           tooltip={t('controlnet.resetControlImage')}
         />
         <IAIDndImageIcon

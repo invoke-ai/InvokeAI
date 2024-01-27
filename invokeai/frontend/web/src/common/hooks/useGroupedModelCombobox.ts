@@ -28,11 +28,8 @@ export const useGroupedModelCombobox = <T extends AnyModelConfigEntity>(
   arg: UseGroupedModelComboboxArg<T>
 ): UseGroupedModelComboboxReturn => {
   const { t } = useTranslation();
-  const base_model = useAppSelector(
-    (s) => s.generation.model?.base_model ?? 'sdxl'
-  );
-  const { modelEntities, selectedModel, getIsDisabled, onChange, isLoading } =
-    arg;
+  const base_model = useAppSelector((s) => s.generation.model?.base_model ?? 'sdxl');
+  const { modelEntities, selectedModel, getIsDisabled, onChange, isLoading } = arg;
   const options = useMemo<GroupBase<ComboboxOption>[]>(() => {
     if (!modelEntities) {
       return [];
@@ -60,11 +57,8 @@ export const useGroupedModelCombobox = <T extends AnyModelConfigEntity>(
 
   const value = useMemo(
     () =>
-      options
-        .flatMap((o) => o.options)
-        .find((m) =>
-          selectedModel ? m.value === getModelId(selectedModel) : false
-        ) ?? null,
+      options.flatMap((o) => o.options).find((m) => (selectedModel ? m.value === getModelId(selectedModel) : false)) ??
+      null,
     [options, selectedModel]
   );
 

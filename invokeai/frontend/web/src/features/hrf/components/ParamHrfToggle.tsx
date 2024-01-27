@@ -12,8 +12,7 @@ const ParamHrfToggle = () => {
   const hrfEnabled = useAppSelector((s) => s.hrf.hrfEnabled);
 
   const handleHrfEnabled = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) =>
-      dispatch(setHrfEnabled(e.target.checked)),
+    (e: ChangeEvent<HTMLInputElement>) => dispatch(setHrfEnabled(e.target.checked)),
     [dispatch]
   );
 

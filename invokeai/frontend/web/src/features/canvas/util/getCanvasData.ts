@@ -1,12 +1,6 @@
 import { logger } from 'app/logging/logger';
-import {
-  $canvasBaseLayer,
-  $canvasStage,
-} from 'features/canvas/store/canvasNanostore';
-import type {
-  CanvasLayerState,
-  Dimensions,
-} from 'features/canvas/store/canvasTypes';
+import { $canvasBaseLayer, $canvasStage } from 'features/canvas/store/canvasNanostore';
+import type { CanvasLayerState, Dimensions } from 'features/canvas/store/canvasTypes';
 import { isCanvasMaskLine } from 'features/canvas/store/canvasTypes';
 import { konvaNodeToImageData } from 'features/canvas/util/konvaNodeToImageData';
 import type { Vector2d } from 'konva/lib/types';
@@ -57,10 +51,7 @@ export const getCanvasData = async (
 
   // For the base layer, use the offset boundingBox
   const baseBlob = await konvaNodeToBlob(clonedBaseLayer, offsetBoundingBox);
-  const baseImageData = await konvaNodeToImageData(
-    clonedBaseLayer,
-    offsetBoundingBox
-  );
+  const baseImageData = await konvaNodeToImageData(clonedBaseLayer, offsetBoundingBox);
 
   // For the mask layer, use the normal boundingBox
   const maskStage = await createMaskStage(

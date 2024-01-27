@@ -1,18 +1,11 @@
 import { Flex, IconButton, Input, Text } from '@invoke-ai/ui-library';
 import { useForm } from '@mantine/form';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  setAdvancedAddScanModel,
-  setSearchFolder,
-} from 'features/modelManager/store/modelManagerSlice';
+import { setAdvancedAddScanModel, setSearchFolder } from 'features/modelManager/store/modelManagerSlice';
 import type { CSSProperties } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  PiArrowsCounterClockwiseBold,
-  PiMagnifyingGlassBold,
-  PiTrashSimpleBold,
-} from 'react-icons/pi';
+import { PiArrowsCounterClockwiseBold, PiMagnifyingGlassBold, PiTrashSimpleBold } from 'react-icons/pi';
 import { useGetModelsInFolderQuery } from 'services/api/endpoints/models';
 
 type SearchFolderForm = {
@@ -52,38 +45,16 @@ function SearchFolderForm() {
   }, [dispatch]);
 
   return (
-    <form
-      onSubmit={searchFolderForm.onSubmit((values) =>
-        searchFolderFormSubmitHandler(values)
-      )}
-      style={formStyles}
-    >
+    <form onSubmit={searchFolderForm.onSubmit((values) => searchFolderFormSubmitHandler(values))} style={formStyles}>
       <Flex w="100%" gap={2} borderRadius={4} alignItems="center">
         <Flex w="100%" alignItems="center" gap={4} minH={12}>
-          <Text
-            fontSize="sm"
-            fontWeight="semibold"
-            color="base.300"
-            minW="max-content"
-          >
+          <Text fontSize="sm" fontWeight="semibold" color="base.300" minW="max-content">
             {t('common.folder')}
           </Text>
           {!searchFolder ? (
-            <Input
-              w="100%"
-              size="md"
-              {...searchFolderForm.getInputProps('folder')}
-            />
+            <Input w="100%" size="md" {...searchFolderForm.getInputProps('folder')} />
           ) : (
-            <Flex
-              w="100%"
-              p={2}
-              px={4}
-              bg="base.700"
-              borderRadius={4}
-              fontSize="sm"
-              fontWeight="bold"
-            >
+            <Flex w="100%" p={2} px={4} bg="base.700" borderRadius={4} fontSize="sm" fontWeight="bold">
               {searchFolder}
             </Flex>
           )}

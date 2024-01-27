@@ -11,9 +11,7 @@ export const addCanvasDownloadedAsImageListener = () => {
   startAppListening({
     actionCreator: canvasDownloadedAsImage,
     effect: async (action, { dispatch, getState }) => {
-      const moduleLog = $logger
-        .get()
-        .child({ namespace: 'canvasSavedToGalleryListener' });
+      const moduleLog = $logger.get().child({ namespace: 'canvasSavedToGalleryListener' });
       const state = getState();
 
       let blob;
@@ -32,9 +30,7 @@ export const addCanvasDownloadedAsImageListener = () => {
       }
 
       downloadBlob(blob, 'canvas.png');
-      dispatch(
-        addToast({ title: t('toast.canvasDownloaded'), status: 'success' })
-      );
+      dispatch(addToast({ title: t('toast.canvasDownloaded'), status: 'success' }));
     },
   });
 };

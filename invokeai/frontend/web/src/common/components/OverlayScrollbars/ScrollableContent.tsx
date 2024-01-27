@@ -13,12 +13,7 @@ type Props = PropsWithChildren & {
 
 const styles: CSSProperties = { height: '100%', width: '100%' };
 
-const ScrollableContent = ({
-  children,
-  maxHeight,
-  overflowX = 'hidden',
-  overflowY = 'scroll',
-}: Props) => {
+const ScrollableContent = ({ children, maxHeight, overflowX = 'hidden', overflowY = 'scroll' }: Props) => {
   const overlayscrollbarsOptions = useMemo(
     () => getOverlayScrollbarsParams(overflowX, overflowY).options,
     [overflowX, overflowY]
@@ -26,11 +21,7 @@ const ScrollableContent = ({
   return (
     <Flex w="full" h="full" maxHeight={maxHeight} position="relative">
       <Box position="absolute" top={0} left={0} right={0} bottom={0}>
-        <OverlayScrollbarsComponent
-          defer
-          style={styles}
-          options={overlayscrollbarsOptions}
-        >
+        <OverlayScrollbarsComponent defer style={styles} options={overlayscrollbarsOptions}>
           {children}
         </OverlayScrollbarsComponent>
       </Box>

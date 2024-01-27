@@ -1,11 +1,4 @@
-import {
-  Box,
-  Flex,
-  FormControl,
-  FormLabel,
-  HStack,
-  Text,
-} from '@invoke-ai/ui-library';
+import { Box, Flex, FormControl, FormLabel, HStack, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
@@ -20,50 +13,33 @@ import { useTranslation } from 'react-i18next';
 
 import EditableNodeTitle from './details/EditableNodeTitle';
 
-const selector = createMemoizedSelector(
-  selectNodesSlice,
-  selectNodeTemplatesSlice,
-  (nodes, nodeTemplates) => {
-    const lastSelectedNodeId =
-      nodes.selectedNodes[nodes.selectedNodes.length - 1];
+const selector = createMemoizedSelector(selectNodesSlice, selectNodeTemplatesSlice, (nodes, nodeTemplates) => {
+  const lastSelectedNodeId = nodes.selectedNodes[nodes.selectedNodes.length - 1];
 
-    const lastSelectedNode = nodes.nodes.find(
-      (node) => node.id === lastSelectedNodeId
-    );
+  const lastSelectedNode = nodes.nodes.find((node) => node.id === lastSelectedNodeId);
 
-    const lastSelectedNodeTemplate = lastSelectedNode
-      ? nodeTemplates.templates[lastSelectedNode.data.type]
-      : undefined;
+  const lastSelectedNodeTemplate = lastSelectedNode ? nodeTemplates.templates[lastSelectedNode.data.type] : undefined;
 
-    if (!isInvocationNode(lastSelectedNode) || !lastSelectedNodeTemplate) {
-      return;
-    }
-
-    return {
-      nodeId: lastSelectedNode.data.id,
-      nodeVersion: lastSelectedNode.data.version,
-      templateTitle: lastSelectedNodeTemplate.title,
-    };
+  if (!isInvocationNode(lastSelectedNode) || !lastSelectedNodeTemplate) {
+    return;
   }
-);
+
+  return {
+    nodeId: lastSelectedNode.data.id,
+    nodeVersion: lastSelectedNode.data.version,
+    templateTitle: lastSelectedNodeTemplate.title,
+  };
+});
 
 const InspectorDetailsTab = () => {
   const data = useAppSelector(selector);
   const { t } = useTranslation();
 
   if (!data) {
-    return (
-      <IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />
-    );
+    return <IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />;
   }
 
-  return (
-    <Content
-      nodeId={data.nodeId}
-      nodeVersion={data.nodeVersion}
-      templateTitle={data.templateTitle}
-    />
-  );
+  return <Content nodeId={data.nodeId} nodeVersion={data.nodeVersion} templateTitle={data.templateTitle} />;
 };
 
 export default memo(InspectorDetailsTab);
@@ -80,14 +56,7 @@ const Content = memo((props: ContentProps) => {
   return (
     <Box position="relative" w="full" h="full">
       <ScrollableContent>
-        <Flex
-          flexDir="column"
-          position="relative"
-          w="full"
-          h="full"
-          p={1}
-          gap={2}
-        >
+        <Flex flexDir="column" position="relative" w="full" h="full" p={1} gap={2}>
           <EditableNodeTitle nodeId={props.nodeId} />
           <HStack>
             <FormControl>

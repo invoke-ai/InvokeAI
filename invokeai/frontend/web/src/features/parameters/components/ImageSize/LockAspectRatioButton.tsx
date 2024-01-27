@@ -18,13 +18,7 @@ export const LockAspectRatioButton = memo(() => {
       onClick={onClick}
       variant={ctx.aspectRatioState.isLocked ? 'outline' : 'ghost'}
       size="sm"
-      icon={
-        ctx.aspectRatioState.isLocked ? (
-          <PiLockSimpleFill />
-        ) : (
-          <PiLockSimpleOpenBold />
-        )
-      }
+      icon={ctx.aspectRatioState.isLocked ? <PiLockSimpleFill /> : <PiLockSimpleOpenBold />}
     />
   );
 });

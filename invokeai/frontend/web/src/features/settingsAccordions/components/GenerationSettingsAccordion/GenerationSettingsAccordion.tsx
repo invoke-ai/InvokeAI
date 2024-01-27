@@ -31,34 +31,28 @@ const formLabelProps: FormLabelProps = {
   minW: '4rem',
 };
 
-const badgesSelector = createMemoizedSelector(
-  selectLoraSlice,
-  selectGenerationSlice,
-  (lora, generation) => {
-    const loraTabBadges = size(lora.loras) ? [size(lora.loras)] : [];
-    const accordionBadges: (string | number)[] = [];
-    if (generation.model) {
-      accordionBadges.push(generation.model.model_name);
-      accordionBadges.push(generation.model.base_model);
-    }
-
-    return { loraTabBadges, accordionBadges };
+const badgesSelector = createMemoizedSelector(selectLoraSlice, selectGenerationSlice, (lora, generation) => {
+  const loraTabBadges = size(lora.loras) ? [size(lora.loras)] : [];
+  const accordionBadges: (string | number)[] = [];
+  if (generation.model) {
+    accordionBadges.push(generation.model.model_name);
+    accordionBadges.push(generation.model.base_model);
   }
-);
+
+  return { loraTabBadges, accordionBadges };
+});
 
 export const GenerationSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const { loraTabBadges, accordionBadges } = useAppSelector(badgesSelector);
-  const { isOpen: isOpenExpander, onToggle: onToggleExpander } =
-    useExpanderToggle({
-      id: 'generation-settings-advanced',
-      defaultIsOpen: false,
-    });
-  const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } =
-    useStandaloneAccordionToggle({
-      id: 'generation-settings',
-      defaultIsOpen: true,
-    });
+  const { isOpen: isOpenExpander, onToggle: onToggleExpander } = useExpanderToggle({
+    id: 'generation-settings-advanced',
+    defaultIsOpen: false,
+  });
+  const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } = useStandaloneAccordionToggle({
+    id: 'generation-settings',
+    defaultIsOpen: true,
+  });
 
   return (
     <StandaloneAccordion
@@ -70,9 +64,7 @@ export const GenerationSettingsAccordion = memo(() => {
       <Tabs variant="collapse">
         <TabList>
           <Tab>{t('accordions.generation.modelTab')}</Tab>
-          <Tab badges={loraTabBadges}>
-            {t('accordions.generation.conceptsTab')}
-          </Tab>
+          <Tab badges={loraTabBadges}>{t('accordions.generation.conceptsTab')}</Tab>
         </TabList>
         <TabPanels>
           <TabPanel overflow="visible" px={4} pt={4}>

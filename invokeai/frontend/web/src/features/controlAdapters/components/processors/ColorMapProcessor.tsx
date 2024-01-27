@@ -1,9 +1,4 @@
-import {
-  CompositeNumberInput,
-  CompositeSlider,
-  FormControl,
-  FormLabel,
-} from '@invoke-ai/ui-library';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type { RequiredColorMapImageProcessorInvocation } from 'features/controlAdapters/store/types';
@@ -12,8 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './common/ProcessorWrapper';
 
-const DEFAULTS = CONTROLNET_PROCESSORS.color_map_image_processor
-  .default as RequiredColorMapImageProcessorInvocation;
+const DEFAULTS = CONTROLNET_PROCESSORS.color_map_image_processor.default as RequiredColorMapImageProcessorInvocation;
 
 type ColorMapProcessorProps = {
   controlNetId: string;

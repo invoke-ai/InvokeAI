@@ -1,10 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { forEach, size } from 'lodash-es';
-import type {
-  CoreMetadataInvocation,
-  LoraLoaderInvocation,
-  NonNullableGraph,
-} from 'services/api/types';
+import type { CoreMetadataInvocation, LoraLoaderInvocation, NonNullableGraph } from 'services/api/types';
 
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
@@ -41,17 +37,10 @@ export const addLoRAsToGraph = (
 
   // Remove modelLoaderNodeId unet connection to feed it to LoRAs
   graph.edges = graph.edges.filter(
-    (e) =>
-      !(
-        e.source.node_id === modelLoaderNodeId &&
-        ['unet'].includes(e.source.field)
-      )
+    (e) => !(e.source.node_id === modelLoaderNodeId && ['unet'].includes(e.source.field))
   );
   // Remove CLIP_SKIP connections to conditionings to feed it through LoRAs
-  graph.edges = graph.edges.filter(
-    (e) =>
-      !(e.source.node_id === CLIP_SKIP && ['clip'].includes(e.source.field))
-  );
+  graph.edges = graph.edges.filter((e) => !(e.source.node_id === CLIP_SKIP && ['clip'].includes(e.source.field)));
 
   // we need to remember the last lora so we can chain from it
   let lastLoraNodeId = '';
@@ -137,10 +126,7 @@ export const addLoRAsToGraph = (
         },
       });
 
-      if (
-        graph.id &&
-        [CANVAS_INPAINT_GRAPH, CANVAS_OUTPAINT_GRAPH].includes(graph.id)
-      ) {
+      if (graph.id && [CANVAS_INPAINT_GRAPH, CANVAS_OUTPAINT_GRAPH].includes(graph.id)) {
         graph.edges.push({
           source: {
             node_id: currentLoraNodeId,

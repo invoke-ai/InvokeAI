@@ -13,10 +13,6 @@ const STATUSES = {
 
 const StatusBadge = ({ status }: { status: SessionQueueItemStatus }) => {
   const { t } = useTranslation();
-  return (
-    <Badge colorScheme={STATUSES[status].colorScheme}>
-      {t(STATUSES[status].translationKey)}
-    </Badge>
-  );
+  return <Badge colorScheme={STATUSES[status].colorScheme}>{t(STATUSES[status].translationKey)}</Badge>;
 };
 export default memo(StatusBadge);

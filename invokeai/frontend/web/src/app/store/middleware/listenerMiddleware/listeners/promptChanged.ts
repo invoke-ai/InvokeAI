@@ -15,21 +15,12 @@ import { socketConnected } from 'services/events/actions';
 
 import { startAppListening } from '..';
 
-const matcher = isAnyOf(
-  setPositivePrompt,
-  combinatorialToggled,
-  maxPromptsChanged,
-  maxPromptsReset,
-  socketConnected
-);
+const matcher = isAnyOf(setPositivePrompt, combinatorialToggled, maxPromptsChanged, maxPromptsReset, socketConnected);
 
 export const addDynamicPromptsListener = () => {
   startAppListening({
     matcher,
-    effect: async (
-      action,
-      { dispatch, getState, cancelActiveListeners, delay }
-    ) => {
+    effect: async (action, { dispatch, getState, cancelActiveListeners, delay }) => {
       cancelActiveListeners();
       const state = getState();
       const { positivePrompt } = state.generation;

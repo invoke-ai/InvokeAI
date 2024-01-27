@@ -3,6 +3,4 @@ import type { ControlAdaptersState } from './types';
 /**
  * ControlNet slice persist denylist
  */
-export const controlAdaptersPersistDenylist: (keyof ControlAdaptersState)[] = [
-  'pendingControlImages',
-];
+export const controlAdaptersPersistDenylist: (keyof ControlAdaptersState)[] = ['pendingControlImages'];

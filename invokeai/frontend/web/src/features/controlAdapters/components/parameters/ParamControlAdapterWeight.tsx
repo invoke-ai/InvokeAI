@@ -1,9 +1,4 @@
-import {
-  CompositeNumberInput,
-  CompositeSlider,
-  FormControl,
-  FormLabel,
-} from '@invoke-ai/ui-library';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
@@ -27,12 +22,8 @@ const ParamControlAdapterWeight = ({ id }: ParamControlAdapterWeightProps) => {
   const initial = useAppSelector((s) => s.config.sd.ca.weight.initial);
   const sliderMin = useAppSelector((s) => s.config.sd.ca.weight.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.ca.weight.sliderMax);
-  const numberInputMin = useAppSelector(
-    (s) => s.config.sd.ca.weight.numberInputMin
-  );
-  const numberInputMax = useAppSelector(
-    (s) => s.config.sd.ca.weight.numberInputMax
-  );
+  const numberInputMin = useAppSelector((s) => s.config.sd.ca.weight.numberInputMin);
+  const numberInputMax = useAppSelector((s) => s.config.sd.ca.weight.numberInputMax);
   const coarseStep = useAppSelector((s) => s.config.sd.ca.weight.coarseStep);
   const fineStep = useAppSelector((s) => s.config.sd.ca.weight.fineStep);
 

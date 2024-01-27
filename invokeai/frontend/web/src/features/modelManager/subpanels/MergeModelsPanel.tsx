@@ -23,10 +23,7 @@ import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_BASE_MODELS } from 'services/api/constants';
-import {
-  useGetMainModelsQuery,
-  useMergeMainModelsMutation,
-} from 'services/api/endpoints/models';
+import { useGetMainModelsQuery, useMergeMainModelsMutation } from 'services/api/endpoints/models';
 import type { BaseModelType, MergeModelConfig } from 'services/api/types';
 
 const baseModelTypeSelectOptions: ComboboxOption[] = [
@@ -34,11 +31,7 @@ const baseModelTypeSelectOptions: ComboboxOption[] = [
   { label: 'Stable Diffusion 2', value: 'sd-2' },
 ];
 
-type MergeInterpolationMethods =
-  | 'weighted_sum'
-  | 'sigmoid'
-  | 'inv_sigmoid'
-  | 'add_difference';
+type MergeInterpolationMethods = 'weighted_sum' | 'sigmoid' | 'inv_sigmoid' | 'add_difference';
 
 const MergeModelsPanel = () => {
   const { t } = useTranslation();
@@ -49,20 +42,15 @@ const MergeModelsPanel = () => {
   const [mergeModels, { isLoading }] = useMergeMainModelsMutation();
 
   const [baseModel, setBaseModel] = useState<BaseModelType>('sd-1');
-  const valueBaseModel = useMemo(
-    () => baseModelTypeSelectOptions.find((o) => o.value === baseModel),
-    [baseModel]
-  );
+  const valueBaseModel = useMemo(() => baseModelTypeSelectOptions.find((o) => o.value === baseModel), [baseModel]);
   const sd1DiffusersModels = pickBy(
     data?.entities,
-    (value, _) =>
-      value?.model_format === 'diffusers' && value?.base_model === 'sd-1'
+    (value, _) => value?.model_format === 'diffusers' && value?.base_model === 'sd-1'
   );
 
   const sd2DiffusersModels = pickBy(
     data?.entities,
-    (value, _) =>
-      value?.model_format === 'diffusers' && value?.base_model === 'sd-2'
+    (value, _) => value?.model_format === 'diffusers' && value?.base_model === 'sd-2'
   );
 
   const modelsMap = useMemo(() => {
@@ -83,15 +71,11 @@ const MergeModelsPanel = () => {
   const [mergedModelName, setMergedModelName] = useState<string>('');
   const [modelMergeAlpha, setModelMergeAlpha] = useState<number>(0.5);
 
-  const [modelMergeInterp, setModelMergeInterp] =
-    useState<MergeInterpolationMethods>('weighted_sum');
+  const [modelMergeInterp, setModelMergeInterp] = useState<MergeInterpolationMethods>('weighted_sum');
 
-  const [modelMergeSaveLocType, setModelMergeSaveLocType] = useState<
-    'root' | 'custom'
-  >('root');
+  const [modelMergeSaveLocType, setModelMergeSaveLocType] = useState<'root' | 'custom'>('root');
 
-  const [modelMergeCustomSaveLoc, setModelMergeCustomSaveLoc] =
-    useState<string>('');
+  const [modelMergeCustomSaveLoc, setModelMergeCustomSaveLoc] = useState<string>('');
 
   const [modelMergeForce, setModelMergeForce] = useState<boolean>(false);
 
@@ -153,14 +137,8 @@ const MergeModelsPanel = () => {
     }
   }, []);
 
-  const valueModelOne = useMemo(
-    () => optionsModelOne.find((o) => o.value === modelOne),
-    [modelOne, optionsModelOne]
-  );
-  const valueModelTwo = useMemo(
-    () => optionsModelTwo.find((o) => o.value === modelTwo),
-    [modelTwo, optionsModelTwo]
-  );
+  const valueModelOne = useMemo(() => optionsModelOne.find((o) => o.value === modelOne), [modelOne, optionsModelOne]);
+  const valueModelTwo = useMemo(() => optionsModelTwo.find((o) => o.value === modelTwo), [modelTwo, optionsModelTwo]);
   const valueModelThree = useMemo(
     () => optionsModelThree.find((o) => o.value === modelThree),
     [modelThree, optionsModelThree]
@@ -170,25 +148,12 @@ const MergeModelsPanel = () => {
     (e: ChangeEvent<HTMLInputElement>) => setMergedModelName(e.target.value),
     []
   );
-  const handleChangeModelMergeAlpha = useCallback(
-    (v: number) => setModelMergeAlpha(v),
-    []
-  );
-  const handleResetModelMergeAlpha = useCallback(
-    () => setModelMergeAlpha(0.5),
-    []
-  );
-  const handleChangeMergeInterp = useCallback(
-    (v: MergeInterpolationMethods) => setModelMergeInterp(v),
-    []
-  );
-  const handleChangeMergeSaveLocType = useCallback(
-    (v: 'root' | 'custom') => setModelMergeSaveLocType(v),
-    []
-  );
+  const handleChangeModelMergeAlpha = useCallback((v: number) => setModelMergeAlpha(v), []);
+  const handleResetModelMergeAlpha = useCallback(() => setModelMergeAlpha(0.5), []);
+  const handleChangeMergeInterp = useCallback((v: MergeInterpolationMethods) => setModelMergeInterp(v), []);
+  const handleChangeMergeSaveLocType = useCallback((v: 'root' | 'custom') => setModelMergeSaveLocType(v), []);
   const handleChangeMergeCustomSaveLoc = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) =>
-      setModelMergeCustomSaveLoc(e.target.value),
+    (e: ChangeEvent<HTMLInputElement>) => setModelMergeCustomSaveLoc(e.target.value),
     []
   );
   const handleChangeModelMergeForce = useCallback(
@@ -210,13 +175,11 @@ const MergeModelsPanel = () => {
 
     const mergeModelsInfo: MergeModelConfig['body'] = {
       model_names: models_names,
-      merged_model_name:
-        mergedModelName !== '' ? mergedModelName : models_names.join('-'),
+      merged_model_name: mergedModelName !== '' ? mergedModelName : models_names.join('-'),
       alpha: modelMergeAlpha,
       interp: modelMergeInterp,
       force: modelMergeForce,
-      merge_dest_directory:
-        modelMergeSaveLocType === 'root' ? undefined : modelMergeCustomSaveLoc,
+      merge_dest_directory: modelMergeSaveLocType === 'root' ? undefined : modelMergeCustomSaveLoc,
     };
 
     mergeModels({
@@ -274,36 +237,19 @@ const MergeModelsPanel = () => {
       <Flex columnGap={4}>
         <FormControl w="full">
           <FormLabel>{t('modelManager.modelType')}</FormLabel>
-          <Combobox
-            options={baseModelTypeSelectOptions}
-            value={valueBaseModel}
-            onChange={onChangeBaseModel}
-          />
+          <Combobox options={baseModelTypeSelectOptions} value={valueBaseModel} onChange={onChangeBaseModel} />
         </FormControl>
         <FormControl w="full">
           <FormLabel>{t('modelManager.modelOne')}</FormLabel>
-          <Combobox
-            options={optionsModelOne}
-            value={valueModelOne}
-            onChange={onChangeModelOne}
-          />
+          <Combobox options={optionsModelOne} value={valueModelOne} onChange={onChangeModelOne} />
         </FormControl>
         <FormControl w="full">
           <FormLabel>{t('modelManager.modelTwo')}</FormLabel>
-          <Combobox
-            options={optionsModelTwo}
-            value={valueModelTwo}
-            onChange={onChangeModelTwo}
-          />
+          <Combobox options={optionsModelTwo} value={valueModelTwo} onChange={onChangeModelTwo} />
         </FormControl>
         <FormControl w="full">
           <FormLabel>{t('modelManager.modelThree')}</FormLabel>
-          <Combobox
-            options={optionsModelThree}
-            value={valueModelThree}
-            onChange={onChangeModelThree}
-            isClearable
-          />
+          <Combobox options={optionsModelThree} value={valueModelThree} onChange={onChangeModelThree} isClearable />
         </FormControl>
       </Flex>
 
@@ -312,13 +258,7 @@ const MergeModelsPanel = () => {
         <Input value={mergedModelName} onChange={handleChangeMergedModelName} />
       </FormControl>
 
-      <Flex
-        flexDirection="column"
-        padding={4}
-        borderRadius="base"
-        gap={4}
-        bg="base.800"
-      >
+      <Flex flexDirection="column" padding={4} borderRadius="base" gap={4} bg="base.800">
         <FormControl>
           <FormLabel>{t('modelManager.alpha')}</FormLabel>
           <CompositeSlider
@@ -338,9 +278,7 @@ const MergeModelsPanel = () => {
             onChange={handleChangeModelMergeAlpha}
             onReset={handleResetModelMergeAlpha}
           />
-          <FormHelperText>
-            {t('modelManager.modelMergeAlphaHelp')}
-          </FormHelperText>
+          <FormHelperText>{t('modelManager.modelMergeAlphaHelp')}</FormHelperText>
         </FormControl>
       </Flex>
 
@@ -364,9 +302,7 @@ const MergeModelsPanel = () => {
               </>
             ) : (
               <Radio value="add_difference">
-                <Tooltip
-                  label={t('modelManager.modelMergeInterpAddDifferenceHelp')}
-                >
+                <Tooltip label={t('modelManager.modelMergeInterpAddDifferenceHelp')}>
                   <Text fontSize="sm">{t('modelManager.addDifference')}</Text>
                 </Tooltip>
               </Radio>
@@ -375,21 +311,12 @@ const MergeModelsPanel = () => {
         </RadioGroup>
       </Flex>
 
-      <Flex
-        flexDirection="column"
-        padding={4}
-        borderRadius="base"
-        gap={4}
-        bg="base.900"
-      >
+      <Flex flexDirection="column" padding={4} borderRadius="base" gap={4} bg="base.900">
         <Flex columnGap={4}>
           <Text fontSize="sm" variant="subtext">
             {t('modelManager.mergedModelSaveLocation')}
           </Text>
-          <RadioGroup
-            value={modelMergeSaveLocType}
-            onChange={handleChangeMergeSaveLocType}
-          >
+          <RadioGroup value={modelMergeSaveLocType} onChange={handleChangeMergeSaveLocType}>
             <Flex columnGap={4}>
               <Radio value="root">
                 <Text fontSize="sm">{t('modelManager.invokeAIFolder')}</Text>
@@ -404,30 +331,18 @@ const MergeModelsPanel = () => {
 
         {modelMergeSaveLocType === 'custom' && (
           <FormControl>
-            <FormLabel>
-              {t('modelManager.mergedModelCustomSaveLocation')}
-            </FormLabel>
-            <Input
-              value={modelMergeCustomSaveLoc}
-              onChange={handleChangeMergeCustomSaveLoc}
-            />
+            <FormLabel>{t('modelManager.mergedModelCustomSaveLocation')}</FormLabel>
+            <Input value={modelMergeCustomSaveLoc} onChange={handleChangeMergeCustomSaveLoc} />
           </FormControl>
         )}
       </Flex>
 
       <FormControl>
         <FormLabel>{t('modelManager.ignoreMismatch')}</FormLabel>
-        <Checkbox
-          isChecked={modelMergeForce}
-          onChange={handleChangeModelMergeForce}
-        />
+        <Checkbox isChecked={modelMergeForce} onChange={handleChangeModelMergeForce} />
       </FormControl>
 
-      <Button
-        onClick={mergeModelsHandler}
-        isLoading={isLoading}
-        isDisabled={modelOne === null || modelTwo === null}
-      >
+      <Button onClick={mergeModelsHandler} isLoading={isLoading} isDisabled={modelOne === null || modelTwo === null}>
         {t('modelManager.merge')}
       </Button>
     </Flex>

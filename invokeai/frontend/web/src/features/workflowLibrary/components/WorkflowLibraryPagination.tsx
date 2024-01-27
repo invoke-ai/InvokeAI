@@ -31,14 +31,8 @@ const WorkflowLibraryPagination = ({ page, setPage, data }: Props) => {
 
   const pages: PageData[] = useMemo(() => {
     const pages = [];
-    let first =
-      data.pages > PAGES_TO_DISPLAY
-        ? Math.max(0, page - Math.floor(PAGES_TO_DISPLAY / 2))
-        : 0;
-    const last =
-      data.pages > PAGES_TO_DISPLAY
-        ? Math.min(data.pages, first + PAGES_TO_DISPLAY)
-        : data.pages;
+    let first = data.pages > PAGES_TO_DISPLAY ? Math.max(0, page - Math.floor(PAGES_TO_DISPLAY / 2)) : 0;
+    const last = data.pages > PAGES_TO_DISPLAY ? Math.min(data.pages, first + PAGES_TO_DISPLAY) : data.pages;
     if (last - first < PAGES_TO_DISPLAY && data.pages > PAGES_TO_DISPLAY) {
       first = last - PAGES_TO_DISPLAY;
     }

@@ -35,9 +35,7 @@ export const addVAEToGraph = (
   const { boundingBoxScaleMethod } = state.canvas;
   const { refinerModel } = state.sdxl;
 
-  const isUsingScaledDimensions = ['auto', 'manual'].includes(
-    boundingBoxScaleMethod
-  );
+  const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);
 
   const isAutoVae = !vae;
 
@@ -159,10 +157,7 @@ export const addVAEToGraph = (
   }
 
   if (refinerModel) {
-    if (
-      graph.id === SDXL_CANVAS_INPAINT_GRAPH ||
-      graph.id === SDXL_CANVAS_OUTPAINT_GRAPH
-    ) {
+    if (graph.id === SDXL_CANVAS_INPAINT_GRAPH || graph.id === SDXL_CANVAS_OUTPAINT_GRAPH) {
       graph.edges.push({
         source: {
           node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,

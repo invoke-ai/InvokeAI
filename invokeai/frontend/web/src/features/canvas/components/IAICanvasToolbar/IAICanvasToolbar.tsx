@@ -1,12 +1,5 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
-import {
-  ButtonGroup,
-  Combobox,
-  Flex,
-  FormControl,
-  IconButton,
-  Tooltip,
-} from '@invoke-ai/ui-library';
+import { ButtonGroup, Combobox, Flex, FormControl, IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
@@ -20,12 +13,7 @@ import {
 } from 'features/canvas/store/actions';
 import { $canvasBaseLayer, $tool } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import {
-  resetCanvas,
-  resetCanvasView,
-  setIsMaskEnabled,
-  setLayer,
-} from 'features/canvas/store/canvasSlice';
+import { resetCanvas, resetCanvasView, setIsMaskEnabled, setLayer } from 'features/canvas/store/canvasSlice';
 import type { CanvasLayer } from 'features/canvas/store/canvasTypes';
 import { LAYER_NAMES_DICT } from 'features/canvas/store/canvasTypes';
 import { memo, useCallback, useMemo } from 'react';
@@ -203,20 +191,13 @@ const IAICanvasToolbar = () => {
     [dispatch, isMaskEnabled]
   );
 
-  const value = useMemo(
-    () => LAYER_NAMES_DICT.filter((o) => o.value === layer)[0],
-    [layer]
-  );
+  const value = useMemo(() => LAYER_NAMES_DICT.filter((o) => o.value === layer)[0], [layer]);
 
   return (
     <Flex alignItems="center" gap={2} flexWrap="wrap">
       <Tooltip label={`${t('unifiedCanvas.layer')} (Q)`}>
         <FormControl isDisabled={isStaging} w="5rem">
-          <Combobox
-            value={value}
-            options={LAYER_NAMES_DICT}
-            onChange={handleChangeLayer}
-          />
+          <Combobox value={value} options={LAYER_NAMES_DICT} onChange={handleChangeLayer} />
         </FormControl>
       </Tooltip>
 

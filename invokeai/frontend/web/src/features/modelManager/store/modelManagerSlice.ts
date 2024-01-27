@@ -27,8 +27,7 @@ export const modelManagerSlice = createSlice({
   },
 });
 
-export const { setSearchFolder, setAdvancedAddScanModel } =
-  modelManagerSlice.actions;
+export const { setSearchFolder, setAdvancedAddScanModel } = modelManagerSlice.actions;
 
 export default modelManagerSlice.reducer;
 

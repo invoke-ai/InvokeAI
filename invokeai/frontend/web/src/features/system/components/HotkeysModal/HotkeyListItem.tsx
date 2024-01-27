@@ -21,10 +21,7 @@ const HotkeyListItem = (props: HotkeysModalProps) => {
             <Fragment key={`${hotkey}-${index}`}>
               {hotkey.map((key, index) => (
                 <>
-                  <Kbd
-                    textTransform="lowercase"
-                    key={`${hotkey}-${key}-${index}`}
-                  >
+                  <Kbd textTransform="lowercase" key={`${hotkey}-${key}-${index}`}>
                     {key}
                   </Kbd>
                   {index !== hotkey.length - 1 && (

@@ -8,9 +8,7 @@ import { useFieldType } from './useFieldType.ts';
 
 const selectIsConnectionInProgress = createSelector(
   selectNodesSlice,
-  (nodes) =>
-    nodes.connectionStartFieldType !== null &&
-    nodes.connectionStartParams !== null
+  (nodes) => nodes.connectionStartFieldType !== null && nodes.connectionStartParams !== null
 );
 
 export type UseConnectionStateProps = {
@@ -19,11 +17,7 @@ export type UseConnectionStateProps = {
   kind: 'input' | 'output';
 };
 
-export const useConnectionState = ({
-  nodeId,
-  fieldName,
-  kind,
-}: UseConnectionStateProps) => {
+export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionStateProps) => {
   const fieldType = useFieldType(nodeId, fieldName, kind);
 
   const selectIsConnected = useMemo(
@@ -33,8 +27,7 @@ export const useConnectionState = ({
           nodes.edges.filter((edge) => {
             return (
               (kind === 'input' ? edge.target : edge.source) === nodeId &&
-              (kind === 'input' ? edge.targetHandle : edge.sourceHandle) ===
-                fieldName
+              (kind === 'input' ? edge.targetHandle : edge.sourceHandle) === fieldName
             );
           }).length
         )
@@ -43,13 +36,7 @@ export const useConnectionState = ({
   );
 
   const selectConnectionError = useMemo(
-    () =>
-      makeConnectionErrorSelector(
-        nodeId,
-        fieldName,
-        kind === 'input' ? 'target' : 'source',
-        fieldType
-      ),
+    () => makeConnectionErrorSelector(nodeId, fieldName, kind === 'input' ? 'target' : 'source', fieldType),
     [nodeId, fieldName, kind, fieldType]
   );
 
@@ -59,8 +46,7 @@ export const useConnectionState = ({
         Boolean(
           nodes.connectionStartParams?.nodeId === nodeId &&
             nodes.connectionStartParams?.handleId === fieldName &&
-            nodes.connectionStartParams?.handleType ===
-              { input: 'target', output: 'source' }[kind]
+            nodes.connectionStartParams?.handleType === { input: 'target', output: 'source' }[kind]
         )
       ),
     [fieldName, kind, nodeId]
@@ -72,10 +58,7 @@ export const useConnectionState = ({
   const connectionError = useAppSelector(selectConnectionError);
 
   const shouldDim = useMemo(
-    () =>
-      Boolean(
-        isConnectionInProgress && connectionError && !isConnectionStartField
-      ),
+    () => Boolean(isConnectionInProgress && connectionError && !isConnectionStartField),
     [connectionError, isConnectionInProgress, isConnectionStartField]
   );
 

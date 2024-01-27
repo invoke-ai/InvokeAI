@@ -28,10 +28,7 @@ const ControlAdapterShouldAutoConfig = ({ id }: Props) => {
   return (
     <FormControl isDisabled={!isEnabled}>
       <FormLabel flexGrow={1}>{t('controlnet.autoConfigure')}</FormLabel>
-      <Switch
-        isChecked={shouldAutoConfig}
-        onChange={handleShouldAutoConfigChanged}
-      />
+      <Switch isChecked={shouldAutoConfig} onChange={handleShouldAutoConfigChanged} />
     </FormControl>
   );
 };

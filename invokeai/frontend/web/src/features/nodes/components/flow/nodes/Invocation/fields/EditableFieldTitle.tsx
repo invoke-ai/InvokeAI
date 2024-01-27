@@ -28,21 +28,13 @@ interface Props {
 }
 
 const EditableFieldTitle = forwardRef((props: Props, ref) => {
-  const {
-    nodeId,
-    fieldName,
-    kind,
-    isMissingInput = false,
-    withTooltip = false,
-  } = props;
+  const { nodeId, fieldName, kind, isMissingInput = false, withTooltip = false } = props;
   const label = useFieldLabel(nodeId, fieldName);
   const fieldTemplateTitle = useFieldTemplateTitle(nodeId, fieldName, kind);
   const { t } = useTranslation();
 
   const dispatch = useAppDispatch();
-  const [localTitle, setLocalTitle] = useState(
-    label || fieldTemplateTitle || t('nodes.unknownField')
-  );
+  const [localTitle, setLocalTitle] = useState(label || fieldTemplateTitle || t('nodes.unknownField'));
 
   const handleSubmit = useCallback(
     async (newTitle: string) => {
@@ -66,15 +58,7 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
 
   return (
     <Tooltip
-      label={
-        withTooltip ? (
-          <FieldTooltipContent
-            nodeId={nodeId}
-            fieldName={fieldName}
-            kind="input"
-          />
-        ) : undefined
-      }
+      label={withTooltip ? <FieldTooltipContent nodeId={nodeId} fieldName={fieldName} kind="input" /> : undefined}
       openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
     >
       <Editable
@@ -143,15 +127,7 @@ const EditableControls = memo(() => {
   }
 
   return (
-    <Flex
-      onClick={handleClick}
-      position="absolute"
-      w="full"
-      h="full"
-      top={0}
-      insetInlineStart={0}
-      cursor="text"
-    />
+    <Flex onClick={handleClick} position="absolute" w="full" h="full" top={0} insetInlineStart={0} cursor="text" />
   );
 });
 

@@ -11,8 +11,7 @@ export const useControlAdapterModel = (id: string) => {
     () =>
       createMemoizedSelector(
         selectControlAdaptersSlice,
-        (controlAdapters) =>
-          selectControlAdapterById(controlAdapters, id)?.model
+        (controlAdapters) => selectControlAdapterById(controlAdapters, id)?.model
       ),
     [id]
   );

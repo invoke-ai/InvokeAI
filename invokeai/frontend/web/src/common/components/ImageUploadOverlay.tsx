@@ -91,9 +91,7 @@ const ImageUploadOverlay = (props: ImageUploadOverlayProps) => {
           ) : (
             <>
               <Heading size="lg">{t('toast.invalidUpload')}</Heading>
-              <Heading size="md">
-                {t('toast.uploadFailedInvalidUploadDesc')}
-              </Heading>
+              <Heading size="md">{t('toast.uploadFailedInvalidUploadDesc')}</Heading>
             </>
           )}
         </Flex>

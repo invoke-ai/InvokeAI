@@ -24,10 +24,7 @@ import { some } from 'lodash-es';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllImageNamesForBoardQuery } from 'services/api/endpoints/boards';
-import {
-  useDeleteBoardAndImagesMutation,
-  useDeleteBoardMutation,
-} from 'services/api/endpoints/images';
+import { useDeleteBoardAndImagesMutation, useDeleteBoardMutation } from 'services/api/endpoints/images';
 import type { BoardDTO } from 'services/api/types';
 
 type Props = {
@@ -38,21 +35,15 @@ type Props = {
 const DeleteBoardModal = (props: Props) => {
   const { boardToDelete, setBoardToDelete } = props;
   const { t } = useTranslation();
-  const canRestoreDeletedImagesFromBin = useAppSelector(
-    (s) => s.config.canRestoreDeletedImagesFromBin
+  const canRestoreDeletedImagesFromBin = useAppSelector((s) => s.config.canRestoreDeletedImagesFromBin);
+  const { currentData: boardImageNames, isFetching: isFetchingBoardNames } = useListAllImageNamesForBoardQuery(
+    boardToDelete?.board_id ?? skipToken
   );
-  const { currentData: boardImageNames, isFetching: isFetchingBoardNames } =
-    useListAllImageNamesForBoardQuery(boardToDelete?.board_id ?? skipToken);
 
   const selectImageUsageSummary = useMemo(
     () =>
       createMemoizedSelector(
-        [
-          selectGenerationSlice,
-          selectCanvasSlice,
-          selectNodesSlice,
-          selectControlAdaptersSlice,
-        ],
+        [selectGenerationSlice, selectCanvasSlice, selectNodesSlice, selectControlAdaptersSlice],
         (generation, canvas, nodes, controlAdapters) => {
           const allImageUsage = (boardImageNames ?? []).map((imageName) =>
             getImageUsage(generation, canvas, nodes, controlAdapters, imageName)
@@ -71,11 +62,9 @@ const DeleteBoardModal = (props: Props) => {
     [boardImageNames]
   );
 
-  const [deleteBoardOnly, { isLoading: isDeleteBoardOnlyLoading }] =
-    useDeleteBoardMutation();
+  const [deleteBoardOnly, { isLoading: isDeleteBoardOnlyLoading }] = useDeleteBoardMutation();
 
-  const [deleteBoardAndImages, { isLoading: isDeleteBoardAndImagesLoading }] =
-    useDeleteBoardAndImagesMutation();
+  const [deleteBoardAndImages, { isLoading: isDeleteBoardAndImagesLoading }] = useDeleteBoardAndImagesMutation();
 
   const imageUsageSummary = useAppSelector(selectImageUsageSummary);
 
@@ -102,15 +91,8 @@ const DeleteBoardModal = (props: Props) => {
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   const isLoading = useMemo(
-    () =>
-      isDeleteBoardAndImagesLoading ||
-      isDeleteBoardOnlyLoading ||
-      isFetchingBoardNames,
-    [
-      isDeleteBoardAndImagesLoading,
-      isDeleteBoardOnlyLoading,
-      isFetchingBoardNames,
-    ]
+    () => isDeleteBoardAndImagesLoading || isDeleteBoardOnlyLoading || isFetchingBoardNames,
+    [isDeleteBoardAndImagesLoading, isDeleteBoardOnlyLoading, isFetchingBoardNames]
   );
 
   if (!boardToDelete) {
@@ -118,12 +100,7 @@ const DeleteBoardModal = (props: Props) => {
   }
 
   return (
-    <AlertDialog
-      isOpen={Boolean(boardToDelete)}
-      onClose={handleClose}
-      leastDestructiveRef={cancelRef}
-      isCentered
-    >
+    <AlertDialog isOpen={Boolean(boardToDelete)} onClose={handleClose} leastDestructiveRef={cancelRef} isCentered>
       <AlertDialogOverlay>
         <AlertDialogContent>
           <AlertDialogHeader fontSize="lg" fontWeight="bold">
@@ -145,9 +122,7 @@ const DeleteBoardModal = (props: Props) => {
               )}
               <Text>{t('boards.deletedBoardsCannotbeRestored')}</Text>
               <Text>
-                {canRestoreDeletedImagesFromBin
-                  ? t('gallery.deleteImageBin')
-                  : t('gallery.deleteImagePermanent')}
+                {canRestoreDeletedImagesFromBin ? t('gallery.deleteImageBin') : t('gallery.deleteImagePermanent')}
               </Text>
             </Flex>
           </AlertDialogBody>
@@ -156,18 +131,10 @@ const DeleteBoardModal = (props: Props) => {
               <Button ref={cancelRef} onClick={handleClose}>
                 {t('boards.cancel')}
               </Button>
-              <Button
-                colorScheme="warning"
-                isLoading={isLoading}
-                onClick={handleDeleteBoardOnly}
-              >
+              <Button colorScheme="warning" isLoading={isLoading} onClick={handleDeleteBoardOnly}>
                 {t('boards.deleteBoardOnly')}
               </Button>
-              <Button
-                colorScheme="error"
-                isLoading={isLoading}
-                onClick={handleDeleteBoardAndImages}
-              >
+              <Button colorScheme="error" isLoading={isLoading} onClick={handleDeleteBoardAndImages}>
                 {t('boards.deleteBoardAndImages')}
               </Button>
             </Flex>

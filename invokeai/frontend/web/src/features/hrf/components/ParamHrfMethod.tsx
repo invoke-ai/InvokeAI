@@ -26,10 +26,7 @@ const ParamHrfMethodSelect = () => {
     [dispatch]
   );
 
-  const value = useMemo(
-    () => options.find((o) => o.value === hrfMethod),
-    [hrfMethod]
-  );
+  const value = useMemo(() => options.find((o) => o.value === hrfMethod), [hrfMethod]);
 
   return (
     <FormControl>
