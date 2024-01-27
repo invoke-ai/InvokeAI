@@ -31,9 +31,8 @@ We thank them for all of their time and hard work.
 * @dunkeroni - Image generation backend
 * @SkunkWorxDark - Image generation backend
 * @keturn (Kevin Turner) - Diffusers
-* @millu (Millun Atluri) - Community Manager, Documentation, Node-wrangler
-* @imic - Community Wizard
-* @glimmerleaf - Community Wizard
+* @millu (Millun Atluri) - Community Wizard, Documentation, Node-wrangler, 
+* @glimmerleaf (Devon Hopkins) - Community Wizard
 * @gogurt enjoyer - Discord moderator and end user support
 * @whosawhatsis - Discord moderator and end user support
 * @dwinrger - Discord moderator and end user support
