@@ -31,7 +31,6 @@
     "lint": "concurrently -g -n eslint,prettier,tsc,madge -c cyan,green,magenta,yellow \"pnpm run lint:eslint\" \"pnpm run lint:prettier\" \"pnpm run lint:tsc\" \"pnpm run lint:madge\"",
     "fix": "eslint --fix . && prettier --log-level warn --write .",
     "preinstall": "npx only-allow pnpm",
-    "postinstall": "pnpm run theme",
     "theme": "chakra-cli tokens node_modules/@invoke-ai/ui-library",
     "theme:watch": "chakra-cli tokens node_modules/@invoke-ai/ui-library --watch",
     "storybook": "storybook dev -p 6006",
