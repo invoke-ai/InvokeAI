@@ -1,5 +1,11 @@
 import type { ChakraProps, CollapseProps } from '@invoke-ai/ui-library';
-import { ButtonGroup, Collapse, Flex, IconButton, Text } from '@invoke-ai/ui-library';
+import {
+  ButtonGroup,
+  Collapse,
+  Flex,
+  IconButton,
+  Text,
+} from '@invoke-ai/ui-library';
 import QueueStatusBadge from 'features/queue/components/common/QueueStatusBadge';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
 import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTimestamps';

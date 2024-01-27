@@ -1,4 +1,8 @@
-import { Button, ConfirmationAlertDialog, useDisclosure } from '@invoke-ai/ui-library';
+import {
+  Button,
+  ConfirmationAlertDialog,
+  useDisclosure,
+} from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { clearCanvasHistory } from 'features/canvas/store/canvasSlice';

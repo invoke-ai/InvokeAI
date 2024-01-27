@@ -1,4 +1,8 @@
-import { CompositeRangeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import {
+  CompositeRangeSlider,
+  FormControl,
+  FormLabel,
+} from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useControlAdapterBeginEndStepPct } from 'features/controlAdapters/hooks/useControlAdapterBeginEndStepPct';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';

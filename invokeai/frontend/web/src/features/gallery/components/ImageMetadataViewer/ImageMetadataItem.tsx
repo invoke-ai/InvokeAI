@@ -1,4 +1,10 @@
-import { ExternalLink, Flex, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
+import {
+  ExternalLink,
+  Flex,
+  IconButton,
+  Text,
+  Tooltip,
+} from '@invoke-ai/ui-library';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IoArrowUndoCircleOutline } from 'react-icons/io5';

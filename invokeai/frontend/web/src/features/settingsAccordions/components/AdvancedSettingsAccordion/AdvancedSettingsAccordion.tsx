@@ -1,5 +1,9 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
-import { Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-library';
+import {
+  Flex,
+  FormControlGroup,
+  StandaloneAccordion,
+} from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import ParamCFGRescaleMultiplier from 'features/parameters/components/Advanced/ParamCFGRescaleMultiplier';

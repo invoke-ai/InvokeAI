@@ -1,4 +1,9 @@
-import { Combobox, FormControl, FormLabel, Tooltip } from '@invoke-ai/ui-library';
+import {
+  Combobox,
+  FormControl,
+  FormLabel,
+  Tooltip,
+} from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
