@@ -11,10 +11,10 @@ import {
   Input,
   InputGroup,
   InputRightElement,
-  Spacer,
 } from '@invoke-ai/ui';
 import { useStore } from '@nanostores/react';
 import { $projectId } from 'app/store/nanostores/projectId';
+import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import {
   IAINoContentFallback,
   IAINoContentFallbackWithSpinner,
@@ -58,10 +58,13 @@ const DIRECTION_OPTIONS: ComboboxOption[] = [
 
 const WorkflowLibraryList = () => {
   const { t } = useTranslation();
-  const [category, setCategory] = useState<WorkflowCategory>('user');
+  const workflowCategories = useStore($workflowCategories);
+  const [selectedCategory, setSelectedCategory] =
+    useState<WorkflowCategory>('user');
   const [page, setPage] = useState(0);
   const [query, setQuery] = useState('');
   const projectId = useStore($projectId);
+
   const orderByOptions = useMemo(() => {
     return projectId
       ? ORDER_BY_OPTIONS.filter((option) => option.value !== 'opened_at')
@@ -75,13 +78,13 @@ const WorkflowLibraryList = () => {
   const [debouncedQuery] = useDebounce(query, 500);
 
   const queryArg = useMemo<Parameters<typeof useListWorkflowsQuery>[0]>(() => {
-    if (category !== 'default') {
+    if (selectedCategory !== 'default') {
       return {
         page,
         per_page: PER_PAGE,
         order_by,
         direction,
-        category,
+        category: selectedCategory,
         query: debouncedQuery,
       };
     }
@@ -90,10 +93,10 @@ const WorkflowLibraryList = () => {
       per_page: PER_PAGE,
       order_by: 'name' as const,
       direction: 'ASC' as const,
-      category,
+      category: selectedCategory,
       query: debouncedQuery,
     };
-  }, [category, debouncedQuery, direction, order_by, page]);
+  }, [selectedCategory, debouncedQuery, direction, order_by, page]);
 
   const { data, isLoading, isError, isFetching } =
     useListWorkflowsQuery(queryArg);
@@ -154,43 +157,43 @@ const WorkflowLibraryList = () => {
   );
 
   const handleSetCategory = useCallback((category: WorkflowCategory) => {
-    setCategory(category);
+    setSelectedCategory(category);
     setPage(0);
   }, []);
 
   return (
     <>
-      <Flex gap={4} alignItems="center" h={10} flexShrink={0} flexGrow={0}>
-        <ButtonGroup>
-          <Button
-            variant={category === 'user' ? undefined : 'ghost'}
-            onClick={handleSetCategory.bind(null, 'user')}
-            isChecked={category === 'user'}
-          >
-            {t('workflows.userWorkflows')}
-          </Button>
-          {projectId ? (
+      <Flex
+        gap={4}
+        alignItems="center"
+        h={16}
+        flexShrink={0}
+        flexGrow={0}
+        justifyContent="space-between"
+      >
+        <ButtonGroup alignSelf="flex-end">
+          {workflowCategories.map((category) => (
             <Button
-              variant={category === 'project' ? undefined : 'ghost'}
-              onClick={handleSetCategory.bind(null, 'project')}
-              isChecked={category === 'project'}
+              key={category}
+              variant={selectedCategory === category ? undefined : 'ghost'}
+              onClick={handleSetCategory.bind(null, category)}
+              isChecked={selectedCategory === category}
             >
-              {t('workflows.projectWorkflows')}
+              {t(`workflows.${category}Workflows`)}
             </Button>
-          ) : (
-            <Button
-              variant={category === 'default' ? undefined : 'ghost'}
-              onClick={handleSetCategory.bind(null, 'default')}
-              isChecked={category === 'default'}
-            >
-              {t('workflows.defaultWorkflows')}
-            </Button>
-          )}
+          ))}
         </ButtonGroup>
-        <Spacer />
-        {category !== 'default' && (
+        {selectedCategory !== 'default' && (
           <>
-            <FormControl isDisabled={isFetching} w={64} minW={56}>
+            <FormControl
+              isDisabled={isFetching}
+              sx={{
+                flexDir: 'column',
+                alignItems: 'flex-start',
+                gap: 1,
+                maxW: 56,
+              }}
+            >
               <FormLabel>{t('common.orderBy')}</FormLabel>
               <Combobox
                 value={valueOrderBy}
@@ -198,7 +201,15 @@ const WorkflowLibraryList = () => {
                 onChange={onChangeOrderBy}
               />
             </FormControl>
-            <FormControl isDisabled={isFetching} w={64} minW={56}>
+            <FormControl
+              isDisabled={isFetching}
+              sx={{
+                flexDir: 'column',
+                alignItems: 'flex-start',
+                gap: 1,
+                maxW: 56,
+              }}
+            >
               <FormLabel>{t('common.direction')}</FormLabel>
               <Combobox
                 value={valueDirection}
@@ -208,7 +219,7 @@ const WorkflowLibraryList = () => {
             </FormControl>
           </>
         )}
-        <InputGroup w="20rem">
+        <InputGroup w="20rem" alignSelf="flex-end">
           <Input
             placeholder={t('workflows.searchWorkflows')}
             value={query}

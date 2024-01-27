@@ -14,10 +14,12 @@ import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
 import { $projectId } from 'app/store/nanostores/projectId';
 import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
 import { $store } from 'app/store/nanostores/store';
+import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import { createStore } from 'app/store/store';
 import type { PartialAppConfig } from 'app/types/invokeai';
 import Loading from 'common/components/Loading/Loading';
 import AppDndContext from 'features/dnd/components/AppDndContext';
+import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import type { PropsWithChildren, ReactNode } from 'react';
 import React, { lazy, memo, useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
@@ -45,6 +47,7 @@ interface Props extends PropsWithChildren {
   socketOptions?: Partial<ManagerOptions & SocketOptions>;
   isDebugging?: boolean;
   logo?: ReactNode;
+  workflowCategories?: WorkflowCategory[];
 }
 
 const InvokeAIUI = ({
@@ -62,6 +65,7 @@ const InvokeAIUI = ({
   socketOptions,
   isDebugging = false,
   logo,
+  workflowCategories,
 }: Props) => {
   useEffect(() => {
     // configure API client token
@@ -155,6 +159,16 @@ const InvokeAIUI = ({
       $logo.set(undefined);
     };
   }, [logo]);
+
+  useEffect(() => {
+    if (workflowCategories) {
+      $workflowCategories.set(workflowCategories);
+    }
+
+    return () => {
+      $workflowCategories.set([]);
+    };
+  }, [workflowCategories]);
 
   useEffect(() => {
     if (socketOptions) {
