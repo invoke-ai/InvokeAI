@@ -9,23 +9,17 @@ export const ParamSeedRandomize = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const shouldRandomizeSeed = useAppSelector(
-    (s) => s.generation.shouldRandomizeSeed
-  );
+  const shouldRandomizeSeed = useAppSelector((s) => s.generation.shouldRandomizeSeed);
 
   const handleChangeShouldRandomizeSeed = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) =>
-      dispatch(setShouldRandomizeSeed(e.target.checked)),
+    (e: ChangeEvent<HTMLInputElement>) => dispatch(setShouldRandomizeSeed(e.target.checked)),
     [dispatch]
   );
 
   return (
     <FormControl w="min-content">
       <FormLabel>{t('common.random')}</FormLabel>
-      <Switch
-        isChecked={shouldRandomizeSeed}
-        onChange={handleChangeShouldRandomizeSeed}
-      />
+      <Switch isChecked={shouldRandomizeSeed} onChange={handleChangeShouldRandomizeSeed} />
     </FormControl>
   );
 });

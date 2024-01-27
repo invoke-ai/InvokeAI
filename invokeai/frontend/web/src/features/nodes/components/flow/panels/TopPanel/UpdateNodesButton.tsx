@@ -19,11 +19,7 @@ const UpdateNodesButton = () => {
   }
 
   return (
-    <Button
-      leftIcon={<PiWarningBold />}
-      onClick={handleClickUpdateNodes}
-      pointerEvents="auto"
-    >
+    <Button leftIcon={<PiWarningBold />} onClick={handleClickUpdateNodes} pointerEvents="auto">
       {t('nodes.updateAllNodes')}
     </Button>
   );

@@ -2,11 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { workflowLoaded } from 'features/nodes/store/actions';
-import {
-  isAnyNodeOrEdgeMutation,
-  nodeEditorReset,
-  nodesDeleted,
-} from 'features/nodes/store/nodesSlice';
+import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesDeleted } from 'features/nodes/store/nodesSlice';
 import type { WorkflowsState as WorkflowState } from 'features/nodes/store/types';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import type { WorkflowV2 } from 'features/nodes/types/workflow';
@@ -35,23 +31,15 @@ const workflowSlice = createSlice({
   name: 'workflow',
   initialState: initialWorkflowState,
   reducers: {
-    workflowExposedFieldAdded: (
-      state,
-      action: PayloadAction<FieldIdentifier>
-    ) => {
+    workflowExposedFieldAdded: (state, action: PayloadAction<FieldIdentifier>) => {
       state.exposedFields = uniqBy(
         state.exposedFields.concat(action.payload),
         (field) => `${field.nodeId}-${field.fieldName}`
       );
       state.isTouched = true;
     },
-    workflowExposedFieldRemoved: (
-      state,
-      action: PayloadAction<FieldIdentifier>
-    ) => {
-      state.exposedFields = state.exposedFields.filter(
-        (field) => !isEqual(field, action.payload)
-      );
+    workflowExposedFieldRemoved: (state, action: PayloadAction<FieldIdentifier>) => {
+      state.exposedFields = state.exposedFields.filter((field) => !isEqual(field, action.payload));
       state.isTouched = true;
     },
     workflowNameChanged: (state, action: PayloadAction<string>) => {
@@ -98,9 +86,7 @@ const workflowSlice = createSlice({
 
     builder.addCase(nodesDeleted, (state, action) => {
       action.payload.forEach((node) => {
-        state.exposedFields = state.exposedFields.filter(
-          (f) => f.nodeId !== node.id
-        );
+        state.exposedFields = state.exposedFields.filter((f) => f.nodeId !== node.id);
       });
     });
 

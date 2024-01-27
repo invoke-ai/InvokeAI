@@ -11,9 +11,7 @@ const invoke = 'Invoke';
 
 export const InvokeQueueBackButton = memo(() => {
   const { queueBack, isLoading, isDisabled } = useQueueBack();
-  const isLoadingDynamicPrompts = useAppSelector(
-    (s) => s.dynamicPrompts.isLoading
-  );
+  const isLoadingDynamicPrompts = useAppSelector((s) => s.dynamicPrompts.isLoading);
 
   return (
     <Flex pos="relative" flexGrow={1} minW="240px">

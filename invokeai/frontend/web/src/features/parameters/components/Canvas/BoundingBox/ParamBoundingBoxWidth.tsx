@@ -1,9 +1,4 @@
-import {
-  CompositeNumberInput,
-  CompositeSlider,
-  FormControl,
-  FormLabel,
-} from '@invoke-ai/ui-library';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
@@ -16,21 +11,11 @@ const ParamBoundingBoxWidth = () => {
   const ctx = useImageSizeContext();
   const isStaging = useAppSelector(isStagingSelector);
   const optimalDimension = useAppSelector(selectOptimalDimension);
-  const sliderMin = useAppSelector(
-    (s) => s.config.sd.boundingBoxWidth.sliderMin
-  );
-  const sliderMax = useAppSelector(
-    (s) => s.config.sd.boundingBoxWidth.sliderMax
-  );
-  const numberInputMin = useAppSelector(
-    (s) => s.config.sd.boundingBoxWidth.numberInputMin
-  );
-  const numberInputMax = useAppSelector(
-    (s) => s.config.sd.boundingBoxWidth.numberInputMax
-  );
-  const coarseStep = useAppSelector(
-    (s) => s.config.sd.boundingBoxWidth.coarseStep
-  );
+  const sliderMin = useAppSelector((s) => s.config.sd.boundingBoxWidth.sliderMin);
+  const sliderMax = useAppSelector((s) => s.config.sd.boundingBoxWidth.sliderMax);
+  const numberInputMin = useAppSelector((s) => s.config.sd.boundingBoxWidth.numberInputMin);
+  const numberInputMax = useAppSelector((s) => s.config.sd.boundingBoxWidth.numberInputMax);
+  const coarseStep = useAppSelector((s) => s.config.sd.boundingBoxWidth.coarseStep);
   const fineStep = useAppSelector((s) => s.config.sd.boundingBoxWidth.fineStep);
   const onChange = useCallback(
     (v: number) => {

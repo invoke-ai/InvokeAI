@@ -12,11 +12,7 @@ const WorkflowLibraryButton = () => {
 
   return (
     <WorkflowLibraryModalContext.Provider value={disclosure}>
-      <Button
-        leftIcon={<PiBooksBold />}
-        onClick={disclosure.onOpen}
-        pointerEvents="auto"
-      >
+      <Button leftIcon={<PiBooksBold />} onClick={disclosure.onOpen} pointerEvents="auto">
         {t('workflows.workflowLibrary')}
       </Button>
       <WorkflowLibraryModal />

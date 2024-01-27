@@ -9,9 +9,7 @@ import { useTranslation } from 'react-i18next';
 const ImageToImageFit = () => {
   const dispatch = useAppDispatch();
 
-  const shouldFitToWidthHeight = useAppSelector(
-    (state: RootState) => state.generation.shouldFitToWidthHeight
-  );
+  const shouldFitToWidthHeight = useAppSelector((state: RootState) => state.generation.shouldFitToWidthHeight);
 
   const handleChangeFit = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {

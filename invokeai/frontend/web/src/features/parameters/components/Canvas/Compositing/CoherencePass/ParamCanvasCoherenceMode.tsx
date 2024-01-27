@@ -9,9 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 const ParamCanvasCoherenceMode = () => {
   const dispatch = useAppDispatch();
-  const canvasCoherenceMode = useAppSelector(
-    (s) => s.generation.canvasCoherenceMode
-  );
+  const canvasCoherenceMode = useAppSelector((s) => s.generation.canvasCoherenceMode);
   const { t } = useTranslation();
 
   const options = useMemo<ComboboxOption[]>(
@@ -34,10 +32,7 @@ const ParamCanvasCoherenceMode = () => {
     [dispatch]
   );
 
-  const value = useMemo(
-    () => options.find((o) => o.value === canvasCoherenceMode),
-    [canvasCoherenceMode, options]
-  );
+  const value = useMemo(() => options.find((o) => o.value === canvasCoherenceMode), [canvasCoherenceMode, options]);
 
   return (
     <FormControl>

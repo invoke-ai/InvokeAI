@@ -16,13 +16,7 @@ const skeletonStyles: SystemStyleObject = {
 const IAIFillSkeleton = () => {
   return (
     <Skeleton sx={skeletonStyles}>
-      <Box
-        position="absolute"
-        top={0}
-        insetInlineStart={0}
-        height="full"
-        width="full"
-      />
+      <Box position="absolute" top={0} insetInlineStart={0} height="full" width="full" />
     </Skeleton>
   );
 };

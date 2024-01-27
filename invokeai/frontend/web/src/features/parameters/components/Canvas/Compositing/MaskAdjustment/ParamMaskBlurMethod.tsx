@@ -30,10 +30,7 @@ const ParamMaskBlurMethod = () => {
     [dispatch]
   );
 
-  const value = useMemo(
-    () => options.find((o) => o.value === maskBlurMethod),
-    [maskBlurMethod, options]
-  );
+  const value = useMemo(() => options.find((o) => o.value === maskBlurMethod), [maskBlurMethod, options]);
 
   return (
     <FormControl>

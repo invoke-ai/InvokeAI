@@ -1,8 +1,4 @@
-import {
-  CompositeRangeSlider,
-  FormControl,
-  FormLabel,
-} from '@invoke-ai/ui-library';
+import { CompositeRangeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useControlAdapterBeginEndStepPct } from 'features/controlAdapters/hooks/useControlAdapterBeginEndStepPct';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
@@ -58,10 +54,7 @@ export const ParamControlAdapterBeginEnd = memo(({ id }: Props) => {
     );
   }, [dispatch, id]);
 
-  const value = useMemo<[number, number]>(
-    () => [stepPcts?.beginStepPct ?? 0, stepPcts?.endStepPct ?? 1],
-    [stepPcts]
-  );
+  const value = useMemo<[number, number]>(() => [stepPcts?.beginStepPct ?? 0, stepPcts?.endStepPct ?? 1], [stepPcts]);
 
   if (!stepPcts) {
     return null;

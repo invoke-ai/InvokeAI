@@ -5,8 +5,7 @@ import WorkflowLibraryMenu from 'features/workflowLibrary/components/WorkflowLib
 import { memo } from 'react';
 
 const TopRightPanel = () => {
-  const isWorkflowLibraryEnabled =
-    useFeatureStatus('workflowLibrary').isFeatureEnabled;
+  const isWorkflowLibraryEnabled = useFeatureStatus('workflowLibrary').isFeatureEnabled;
 
   return (
     <Flex gap={2} position="absolute" top={2} insetInlineEnd={2}>

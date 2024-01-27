@@ -1,17 +1,9 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
-import {
-  CompositeNumberInput,
-  Flex,
-  FormControl,
-  FormLabel,
-} from '@invoke-ai/ui-library';
+import { CompositeNumberInput, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import type { CSSProperties } from 'react';
 import { memo, useCallback } from 'react';
 import { RgbaColorPicker } from 'react-colorful';
-import type {
-  ColorPickerBaseProps,
-  RgbaColor,
-} from 'react-colorful/dist/types';
+import type { ColorPickerBaseProps, RgbaColor } from 'react-colorful/dist/types';
 import { useTranslation } from 'react-i18next';
 
 type IAIColorPickerProps = ColorPickerBaseProps<RgbaColor> & {
@@ -39,30 +31,13 @@ const numberInputWidth: ChakraProps['w'] = '4.2rem';
 const IAIColorPicker = (props: IAIColorPickerProps) => {
   const { color, onChange, withNumberInput, ...rest } = props;
   const { t } = useTranslation();
-  const handleChangeR = useCallback(
-    (r: number) => onChange({ ...color, r }),
-    [color, onChange]
-  );
-  const handleChangeG = useCallback(
-    (g: number) => onChange({ ...color, g }),
-    [color, onChange]
-  );
-  const handleChangeB = useCallback(
-    (b: number) => onChange({ ...color, b }),
-    [color, onChange]
-  );
-  const handleChangeA = useCallback(
-    (a: number) => onChange({ ...color, a }),
-    [color, onChange]
-  );
+  const handleChangeR = useCallback((r: number) => onChange({ ...color, r }), [color, onChange]);
+  const handleChangeG = useCallback((g: number) => onChange({ ...color, g }), [color, onChange]);
+  const handleChangeB = useCallback((b: number) => onChange({ ...color, b }), [color, onChange]);
+  const handleChangeA = useCallback((a: number) => onChange({ ...color, a }), [color, onChange]);
   return (
     <Flex sx={sx}>
-      <RgbaColorPicker
-        color={color}
-        onChange={onChange}
-        style={colorPickerStyles}
-        {...rest}
-      />
+      <RgbaColorPicker color={color} onChange={onChange} style={colorPickerStyles} {...rest} />
       {withNumberInput && (
         <Flex>
           <FormControl>

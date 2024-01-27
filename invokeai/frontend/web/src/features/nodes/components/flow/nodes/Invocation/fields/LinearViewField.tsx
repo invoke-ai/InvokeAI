@@ -19,8 +19,7 @@ type Props = {
 
 const LinearViewField = ({ nodeId, fieldName }: Props) => {
   const dispatch = useAppDispatch();
-  const { isMouseOverNode, handleMouseOut, handleMouseOver } =
-    useMouseOverNode(nodeId);
+  const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
   const { t } = useTranslation();
   const handleRemoveField = useCallback(() => {
     dispatch(workflowExposedFieldRemoved({ nodeId, fieldName }));
@@ -38,20 +37,10 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
       flexDir="column"
     >
       <Flex>
-        <EditableFieldTitle
-          nodeId={nodeId}
-          fieldName={fieldName}
-          kind="input"
-        />
+        <EditableFieldTitle nodeId={nodeId} fieldName={fieldName} kind="input" />
         <Spacer />
         <Tooltip
-          label={
-            <FieldTooltipContent
-              nodeId={nodeId}
-              fieldName={fieldName}
-              kind="input"
-            />
-          }
+          label={<FieldTooltipContent nodeId={nodeId} fieldName={fieldName} kind="input" />}
           openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
           placement="top"
         >

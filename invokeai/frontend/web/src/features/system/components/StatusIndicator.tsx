@@ -10,12 +10,7 @@ const StatusIndicator = () => {
 
   if (!isConnected) {
     return (
-      <Tooltip
-        label={t('common.statusDisconnected')}
-        placement="end"
-        shouldWrapChildren
-        gutter={10}
-      >
+      <Tooltip label={t('common.statusDisconnected')} placement="end" shouldWrapChildren gutter={10}>
         <Icon as={PiWarningBold} color="error.300" />
       </Tooltip>
     );

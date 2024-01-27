@@ -7,9 +7,7 @@ import { Group, Rect, Text } from 'react-konva';
 type IAICanvasImageErrorFallbackProps = {
   canvasImage: CanvasImage;
 };
-const IAICanvasImageErrorFallback = ({
-  canvasImage,
-}: IAICanvasImageErrorFallbackProps) => {
+const IAICanvasImageErrorFallback = ({ canvasImage }: IAICanvasImageErrorFallbackProps) => {
   const [rectFill, textFill] = useToken('colors', ['base.500', 'base.900']);
   const { t } = useTranslation();
   return (

@@ -21,10 +21,7 @@ const NumberFieldInputComponent = (
 ) => {
   const { nodeId, field, fieldTemplate } = props;
   const dispatch = useAppDispatch();
-  const isIntegerField = useMemo(
-    () => fieldTemplate.type.name === 'IntegerField',
-    [fieldTemplate.type]
-  );
+  const isIntegerField = useMemo(() => fieldTemplate.type.name === 'IntegerField', [fieldTemplate.type]);
 
   const handleValueChanged = useCallback(
     (v: number) => {

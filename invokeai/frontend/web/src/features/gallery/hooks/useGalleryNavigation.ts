@@ -29,14 +29,10 @@ import { imagesSelectors } from 'services/api/util';
  */
 const getImagesPerRow = (): number => {
   const widthOfGalleryImage =
-    document
-      .querySelector(`[data-testid="${imageItemContainerTestId}"]`)
-      ?.getBoundingClientRect().width ?? 1;
+    document.querySelector(`[data-testid="${imageItemContainerTestId}"]`)?.getBoundingClientRect().width ?? 1;
 
   const widthOfGalleryGrid =
-    document
-      .querySelector(`[data-testid="${imageListContainerTestId}"]`)
-      ?.getBoundingClientRect().width ?? 0;
+    document.querySelector(`[data-testid="${imageListContainerTestId}"]`)?.getBoundingClientRect().width ?? 0;
 
   const imagesPerRow = Math.round(widthOfGalleryGrid / widthOfGalleryImage);
 
@@ -59,9 +55,7 @@ const scrollToImage = (imageName: string, index: number) => {
     return;
   }
 
-  const imageElement = document.querySelector(
-    `[data-testid="${getGalleryImageDataTestId(imageName)}"]`
-  );
+  const imageElement = document.querySelector(`[data-testid="${getGalleryImageDataTestId(imageName)}"]`);
   const itemRect = imageElement?.getBoundingClientRect();
   const rootRect = root.getBoundingClientRect();
   if (!itemRect || !getIsVisible(itemRect, rootRect)) {
@@ -90,9 +84,7 @@ const getUpImage = (images: ImageDTO[], currentIndex: number) => {
   const imagesPerRow = getImagesPerRow();
   // If we are on the first row, we want to stay on the first row, not go to first image
   const isOnFirstRow = currentIndex < imagesPerRow;
-  const index = isOnFirstRow
-    ? currentIndex
-    : clamp(currentIndex - imagesPerRow, 0, images.length - 1);
+  const index = isOnFirstRow ? currentIndex : clamp(currentIndex - imagesPerRow, 0, images.length - 1);
   const image = images[index];
   return { index, image };
 };
@@ -101,9 +93,7 @@ const getDownImage = (images: ImageDTO[], currentIndex: number) => {
   const imagesPerRow = getImagesPerRow();
   // If there are no images below the current image, we want to stay where we are
   const areImagesBelow = currentIndex < images.length - imagesPerRow;
-  const index = areImagesBelow
-    ? clamp(currentIndex + imagesPerRow, 0, images.length - 1)
-    : currentIndex;
+  const index = areImagesBelow ? clamp(currentIndex + imagesPerRow, 0, images.length - 1) : currentIndex;
   const image = images[index];
   return { index, image };
 };
@@ -137,17 +127,12 @@ export const useGalleryNavigation = (): UseGalleryNavigationReturn => {
   const {
     queryResult: { data },
   } = useGalleryImages();
-  const loadedImagesCount = useMemo(
-    () => data?.ids.length ?? 0,
-    [data?.ids.length]
-  );
+  const loadedImagesCount = useMemo(() => data?.ids.length ?? 0, [data?.ids.length]);
   const lastSelectedImageIndex = useMemo(() => {
     if (!data || !lastSelectedImage) {
       return 0;
     }
-    return imagesSelectors
-      .selectAll(data)
-      .findIndex((i) => i.image_name === lastSelectedImage.image_name);
+    return imagesSelectors.selectAll(data).findIndex((i) => i.image_name === lastSelectedImage.image_name);
   }, [lastSelectedImage, data]);
 
   const handleNavigation = useCallback(
@@ -155,10 +140,7 @@ export const useGalleryNavigation = (): UseGalleryNavigationReturn => {
       if (!data) {
         return;
       }
-      const { index, image } = getImageFuncs[direction](
-        imagesSelectors.selectAll(data),
-        lastSelectedImageIndex
-      );
+      const { index, image } = getImageFuncs[direction](imagesSelectors.selectAll(data), lastSelectedImageIndex);
       if (!image || index === lastSelectedImageIndex) {
         return;
       }
@@ -168,10 +150,7 @@ export const useGalleryNavigation = (): UseGalleryNavigationReturn => {
     [dispatch, lastSelectedImageIndex, data]
   );
 
-  const isOnFirstImage = useMemo(
-    () => lastSelectedImageIndex === 0,
-    [lastSelectedImageIndex]
-  );
+  const isOnFirstImage = useMemo(() => lastSelectedImageIndex === 0, [lastSelectedImageIndex]);
 
   const isOnLastImage = useMemo(
     () => lastSelectedImageIndex === loadedImagesCount - 1,

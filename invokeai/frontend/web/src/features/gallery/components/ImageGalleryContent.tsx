@@ -1,14 +1,4 @@
-import {
-  Box,
-  Button,
-  ButtonGroup,
-  Flex,
-  Tab,
-  TabList,
-  Tabs,
-  useDisclosure,
-  VStack,
-} from '@invoke-ai/ui-library';
+import { Box, Button, ButtonGroup, Flex, Tab, TabList, Tabs, useDisclosure, VStack } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $galleryHeader } from 'app/store/nanostores/galleryHeader';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -30,8 +20,7 @@ const ImageGalleryContent = () => {
   const galleryView = useAppSelector((s) => s.gallery.galleryView);
   const dispatch = useAppDispatch();
   const galleryHeader = useStore($galleryHeader);
-  const { isOpen: isBoardListOpen, onToggle: onToggleBoardList } =
-    useDisclosure({ defaultIsOpen: true });
+  const { isOpen: isBoardListOpen, onToggle: onToggleBoardList } = useDisclosure({ defaultIsOpen: true });
 
   const handleClickImages = useCallback(() => {
     dispatch(galleryViewChanged('images'));
@@ -42,26 +31,11 @@ const ImageGalleryContent = () => {
   }, [dispatch]);
 
   return (
-    <VStack
-      layerStyle="first"
-      flexDirection="column"
-      h="full"
-      w="full"
-      borderRadius="base"
-      p={2}
-    >
+    <VStack layerStyle="first" flexDirection="column" h="full" w="full" borderRadius="base" p={2}>
       {galleryHeader}
       <Box w="full">
-        <Flex
-          ref={resizeObserverRef}
-          alignItems="center"
-          justifyContent="space-between"
-          gap={2}
-        >
-          <GalleryBoardName
-            isOpen={isBoardListOpen}
-            onToggle={onToggleBoardList}
-          />
+        <Flex ref={resizeObserverRef} alignItems="center" justifyContent="space-between" gap={2}>
+          <GalleryBoardName isOpen={isBoardListOpen} onToggle={onToggleBoardList} />
           <GallerySettingsPopover />
         </Flex>
         <Box>
@@ -70,12 +44,7 @@ const ImageGalleryContent = () => {
       </Box>
       <Flex ref={galleryGridRef} direction="column" gap={2} h="full" w="full">
         <Flex alignItems="center" justifyContent="space-between" gap={2}>
-          <Tabs
-            index={galleryView === 'images' ? 0 : 1}
-            variant="unstyled"
-            size="sm"
-            w="full"
-          >
+          <Tabs index={galleryView === 'images' ? 0 : 1} variant="unstyled" size="sm" w="full">
             <TabList>
               <ButtonGroup w="full">
                 <Tab

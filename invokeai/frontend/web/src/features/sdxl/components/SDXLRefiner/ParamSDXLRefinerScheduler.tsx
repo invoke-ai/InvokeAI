@@ -22,10 +22,7 @@ const ParamSDXLRefinerScheduler = () => {
     [dispatch]
   );
 
-  const value = useMemo(
-    () => SCHEDULER_OPTIONS.find((o) => o.value === refinerScheduler),
-    [refinerScheduler]
-  );
+  const value = useMemo(() => SCHEDULER_OPTIONS.find((o) => o.value === refinerScheduler), [refinerScheduler]);
 
   return (
     <FormControl>

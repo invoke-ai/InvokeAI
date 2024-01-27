@@ -19,12 +19,11 @@ export const ParamNegativePrompt = memo(() => {
     },
     [dispatch]
   );
-  const { onChange, isOpen, onClose, onOpen, onSelectEmbedding, onKeyDown } =
-    usePrompt({
-      prompt,
-      textareaRef,
-      onChange: _onChange,
-    });
+  const { onChange, isOpen, onClose, onOpen, onSelectEmbedding, onKeyDown } = usePrompt({
+    prompt,
+    textareaRef,
+    onChange: _onChange,
+  });
 
   return (
     <EmbeddingPopover

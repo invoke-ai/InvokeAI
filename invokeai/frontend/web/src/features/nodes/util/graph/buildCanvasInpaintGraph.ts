@@ -87,9 +87,7 @@ export const buildCanvasInpaintGraph = (
   const is_intermediate = true;
   const fp32 = vaePrecision === 'fp32';
 
-  const isUsingScaledDimensions = ['auto', 'manual'].includes(
-    boundingBoxScaleMethod
-  );
+  const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);
 
   let modelLoaderNodeId = MAIN_MODEL_LOADER;
 
@@ -404,10 +402,8 @@ export const buildCanvasInpaintGraph = (
 
     (graph.nodes[NOISE] as NoiseInvocation).width = scaledWidth;
     (graph.nodes[NOISE] as NoiseInvocation).height = scaledHeight;
-    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).width =
-      scaledWidth;
-    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).height =
-      scaledHeight;
+    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).width = scaledWidth;
+    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).height = scaledHeight;
 
     // Connect Nodes
     graph.edges.push(
@@ -553,9 +549,7 @@ export const buildCanvasInpaintGraph = (
       });
     } else {
       graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] = {
-        ...(graph.nodes[
-          CANVAS_COHERENCE_INPAINT_CREATE_MASK
-        ] as CreateDenoiseMaskInvocation),
+        ...(graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] as CreateDenoiseMaskInvocation),
         image: canvasInitImage,
       };
     }
@@ -575,9 +569,7 @@ export const buildCanvasInpaintGraph = (
         });
       } else {
         graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] = {
-          ...(graph.nodes[
-            CANVAS_COHERENCE_INPAINT_CREATE_MASK
-          ] as CreateDenoiseMaskInvocation),
+          ...(graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] as CreateDenoiseMaskInvocation),
           mask: canvasMaskImage,
         };
       }

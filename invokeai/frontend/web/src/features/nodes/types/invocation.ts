@@ -2,12 +2,7 @@ import type { Edge, Node } from 'reactflow';
 import { z } from 'zod';
 
 import { zClassification, zProgressImage } from './common';
-import {
-  zFieldInputInstance,
-  zFieldInputTemplate,
-  zFieldOutputInstance,
-  zFieldOutputTemplate,
-} from './field';
+import { zFieldInputInstance, zFieldInputTemplate, zFieldOutputInstance, zFieldOutputTemplate } from './field';
 import { zSemVer } from './semver';
 
 // #region InvocationTemplate
@@ -55,11 +50,7 @@ export const zCurrentImageNodeData = z.object({
   label: z.string(),
   isOpen: z.boolean(),
 });
-export const zAnyNodeData = z.union([
-  zInvocationNodeData,
-  zNotesNodeData,
-  zCurrentImageNodeData,
-]);
+export const zAnyNodeData = z.union([zInvocationNodeData, zNotesNodeData, zCurrentImageNodeData]);
 
 export type NotesNodeData = z.infer<typeof zNotesNodeData>;
 export type InvocationNodeData = z.infer<typeof zInvocationNodeData>;
@@ -71,25 +62,16 @@ export type NotesNode = Node<NotesNodeData, 'notes'>;
 export type CurrentImageNode = Node<CurrentImageNodeData, 'current_image'>;
 export type AnyNode = Node<AnyNodeData>;
 
-export const isInvocationNode = (node?: AnyNode): node is InvocationNode =>
-  Boolean(node && node.type === 'invocation');
-export const isNotesNode = (node?: AnyNode): node is NotesNode =>
-  Boolean(node && node.type === 'notes');
+export const isInvocationNode = (node?: AnyNode): node is InvocationNode => Boolean(node && node.type === 'invocation');
+export const isNotesNode = (node?: AnyNode): node is NotesNode => Boolean(node && node.type === 'notes');
 export const isCurrentImageNode = (node?: AnyNode): node is CurrentImageNode =>
   Boolean(node && node.type === 'current_image');
-export const isInvocationNodeData = (
-  node?: AnyNodeData
-): node is InvocationNodeData =>
+export const isInvocationNodeData = (node?: AnyNodeData): node is InvocationNodeData =>
   Boolean(node && !['notes', 'current_image'].includes(node.type)); // node.type may be 'notes', 'current_image', or any invocation type
 // #endregion
 
 // #region NodeExecutionState
-export const zNodeStatus = z.enum([
-  'PENDING',
-  'IN_PROGRESS',
-  'COMPLETED',
-  'FAILED',
-]);
+export const zNodeStatus = z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED']);
 export const zNodeExecutionState = z.object({
   nodeId: z.string().trim().min(1),
   status: zNodeStatus,

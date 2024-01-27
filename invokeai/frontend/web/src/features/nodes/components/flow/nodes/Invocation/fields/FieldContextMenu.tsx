@@ -1,10 +1,5 @@
 import type { ContextMenuProps } from '@invoke-ai/ui-library';
-import {
-  ContextMenu,
-  MenuGroup,
-  MenuItem,
-  MenuList,
-} from '@invoke-ai/ui-library';
+import { ContextMenu, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useFieldInputKind } from 'features/nodes/hooks/useFieldInputKind';
@@ -37,19 +32,12 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
   const selectIsExposed = useMemo(
     () =>
       createSelector(selectWorkflowSlice, (workflow) => {
-        return Boolean(
-          workflow.exposedFields.find(
-            (f) => f.nodeId === nodeId && f.fieldName === fieldName
-          )
-        );
+        return Boolean(workflow.exposedFields.find((f) => f.nodeId === nodeId && f.fieldName === fieldName));
       }),
     [fieldName, nodeId]
   );
 
-  const mayExpose = useMemo(
-    () => input && ['any', 'direct'].includes(input),
-    [input]
-  );
+  const mayExpose = useMemo(() => input && ['any', 'direct'].includes(input), [input]);
 
   const isExposed = useAppSelector(selectIsExposed);
 
@@ -65,46 +53,26 @@ const FieldContextMenu = ({ nodeId, fieldName, kind, children }: Props) => {
     const menuItems: ReactNode[] = [];
     if (mayExpose && !isExposed) {
       menuItems.push(
-        <MenuItem
-          key={`${nodeId}.${fieldName}.expose-field`}
-          icon={<PiPlusBold />}
-          onClick={handleExposeField}
-        >
+        <MenuItem key={`${nodeId}.${fieldName}.expose-field`} icon={<PiPlusBold />} onClick={handleExposeField}>
           {t('nodes.addLinearView')}
         </MenuItem>
       );
     }
     if (mayExpose && isExposed) {
       menuItems.push(
-        <MenuItem
-          key={`${nodeId}.${fieldName}.unexpose-field`}
-          icon={<PiMinusBold />}
-          onClick={handleUnexposeField}
-        >
+        <MenuItem key={`${nodeId}.${fieldName}.unexpose-field`} icon={<PiMinusBold />} onClick={handleUnexposeField}>
           {t('nodes.removeLinearView')}
         </MenuItem>
       );
     }
     return menuItems;
-  }, [
-    fieldName,
-    handleExposeField,
-    handleUnexposeField,
-    isExposed,
-    mayExpose,
-    nodeId,
-    t,
-  ]);
+  }, [fieldName, handleExposeField, handleUnexposeField, isExposed, mayExpose, nodeId, t]);
 
   const renderMenuFunc = useCallback(
     () =>
       !menuItems.length ? null : (
         <MenuList visibility="visible">
-          <MenuGroup
-            title={label || fieldTemplateTitle || t('nodes.unknownField')}
-          >
-            {menuItems}
-          </MenuGroup>
+          <MenuGroup title={label || fieldTemplateTitle || t('nodes.unknownField')}>{menuItems}</MenuGroup>
         </MenuList>
       ),
     [fieldTemplateTitle, label, menuItems, t]

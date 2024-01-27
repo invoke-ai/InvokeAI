@@ -312,20 +312,8 @@ export const useHotkeyData = (): HotkeyGroup[] => {
   );
 
   const hotkeyGroups = useMemo<HotkeyGroup[]>(
-    () => [
-      appHotkeys,
-      generalHotkeys,
-      galleryHotkeys,
-      unifiedCanvasHotkeys,
-      nodesHotkeys,
-    ],
-    [
-      appHotkeys,
-      generalHotkeys,
-      galleryHotkeys,
-      unifiedCanvasHotkeys,
-      nodesHotkeys,
-    ]
+    () => [appHotkeys, generalHotkeys, galleryHotkeys, unifiedCanvasHotkeys, nodesHotkeys],
+    [appHotkeys, generalHotkeys, galleryHotkeys, unifiedCanvasHotkeys, nodesHotkeys]
   );
 
   return hotkeyGroups;

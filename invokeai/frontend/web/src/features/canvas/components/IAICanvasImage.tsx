@@ -13,13 +13,8 @@ type IAICanvasImageProps = {
 };
 const IAICanvasImage = (props: IAICanvasImageProps) => {
   const { x, y, imageName } = props.canvasImage;
-  const { currentData: imageDTO, isError } = useGetImageDTOQuery(
-    imageName ?? skipToken
-  );
-  const [image, status] = useImage(
-    imageDTO?.image_url ?? '',
-    $authToken.get() ? 'use-credentials' : 'anonymous'
-  );
+  const { currentData: imageDTO, isError } = useGetImageDTOQuery(imageName ?? skipToken);
+  const [image, status] = useImage(imageDTO?.image_url ?? '', $authToken.get() ? 'use-credentials' : 'anonymous');
 
   if (isError || status === 'failed') {
     return <IAICanvasImageErrorFallback canvasImage={props.canvasImage} />;

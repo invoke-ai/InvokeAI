@@ -15,14 +15,8 @@ import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
-import type {
-  LoRAModelConfigEntity,
-  MainModelConfigEntity,
-} from 'services/api/endpoints/models';
-import {
-  useDeleteLoRAModelsMutation,
-  useDeleteMainModelsMutation,
-} from 'services/api/endpoints/models';
+import type { LoRAModelConfigEntity, MainModelConfigEntity } from 'services/api/endpoints/models';
+import { useDeleteLoRAModelsMutation, useDeleteMainModelsMutation } from 'services/api/endpoints/models';
 
 type ModelListItemProps = {
   model: MainModelConfigEntity | LoRAModelConfigEntity;
@@ -66,9 +60,7 @@ const ModelListItem = (props: ModelListItemProps) => {
           dispatch(
             addToast(
               makeToast({
-                title: `${t('modelManager.modelDeleteFailed')}: ${
-                  model.model_name
-                }`,
+                title: `${t('modelManager.modelDeleteFailed')}: ${model.model_name}`,
                 status: 'error',
               })
             )
@@ -76,14 +68,7 @@ const ModelListItem = (props: ModelListItemProps) => {
         }
       });
     setSelectedModelId(undefined);
-  }, [
-    deleteMainModel,
-    deleteLoRAModel,
-    model,
-    setSelectedModelId,
-    dispatch,
-    t,
-  ]);
+  }, [deleteMainModel, deleteLoRAModel, model, setSelectedModelId, dispatch, t]);
 
   return (
     <Flex gap={2} alignItems="center" w="full">
@@ -100,11 +85,7 @@ const ModelListItem = (props: ModelListItemProps) => {
       >
         <Flex gap={4} alignItems="center">
           <Badge minWidth={14} p={0.5} fontSize="sm" variant="solid">
-            {
-              MODEL_TYPE_SHORT_MAP[
-                model.base_model as keyof typeof MODEL_TYPE_SHORT_MAP
-              ]
-            }
+            {MODEL_TYPE_SHORT_MAP[model.base_model as keyof typeof MODEL_TYPE_SHORT_MAP]}
           </Badge>
           <Tooltip label={model.description} placement="bottom">
             <Text>{model.model_name}</Text>

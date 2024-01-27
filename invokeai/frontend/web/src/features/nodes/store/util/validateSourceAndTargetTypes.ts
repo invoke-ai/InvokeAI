@@ -7,17 +7,11 @@ import { isEqual } from 'lodash-es';
  * @param targetType The type of the target field.
  * @returns True if the connection is valid, false otherwise.
  */
-export const validateSourceAndTargetTypes = (
-  sourceType: FieldType,
-  targetType: FieldType
-) => {
+export const validateSourceAndTargetTypes = (sourceType: FieldType, targetType: FieldType) => {
   // TODO: There's a bug with Collect -> Iterate nodes:
   // https://github.com/invoke-ai/InvokeAI/issues/3956
   // Once this is resolved, we can remove this check.
-  if (
-    sourceType.name === 'CollectionField' &&
-    targetType.name === 'CollectionField'
-  ) {
+  if (sourceType.name === 'CollectionField' && targetType.name === 'CollectionField') {
     return false;
   }
 
@@ -34,23 +28,18 @@ export const validateSourceAndTargetTypes = (
    * - Any Collection can connect to a Generic Collection
    */
 
-  const isCollectionItemToNonCollection =
-    sourceType.name === 'CollectionItemField' && !targetType.isCollection;
+  const isCollectionItemToNonCollection = sourceType.name === 'CollectionItemField' && !targetType.isCollection;
 
   const isNonCollectionToCollectionItem =
-    targetType.name === 'CollectionItemField' &&
-    !sourceType.isCollection &&
-    !sourceType.isCollectionOrScalar;
+    targetType.name === 'CollectionItemField' && !sourceType.isCollection && !sourceType.isCollectionOrScalar;
 
   const isAnythingToCollectionOrScalarOfSameBaseType =
     targetType.isCollectionOrScalar && sourceType.name === targetType.name;
 
   const isGenericCollectionToAnyCollectionOrCollectionOrScalar =
-    sourceType.name === 'CollectionField' &&
-    (targetType.isCollection || targetType.isCollectionOrScalar);
+    sourceType.name === 'CollectionField' && (targetType.isCollection || targetType.isCollectionOrScalar);
 
-  const isCollectionToGenericCollection =
-    targetType.name === 'CollectionField' && sourceType.isCollection;
+  const isCollectionToGenericCollection = targetType.name === 'CollectionField' && sourceType.isCollection;
 
   const areBothTypesSingle =
     !sourceType.isCollection &&
@@ -58,10 +47,7 @@ export const validateSourceAndTargetTypes = (
     !targetType.isCollection &&
     !targetType.isCollectionOrScalar;
 
-  const isIntToFloat =
-    areBothTypesSingle &&
-    sourceType.name === 'IntegerField' &&
-    targetType.name === 'FloatField';
+  const isIntToFloat = areBothTypesSingle && sourceType.name === 'IntegerField' && targetType.name === 'FloatField';
 
   const isIntOrFloatToString =
     areBothTypesSingle &&

@@ -27,12 +27,7 @@ const IAIDropOverlay = (props: Props) => {
   const { isOver, label = t('gallery.drop') } = props;
   const motionId = useRef(uuidv4());
   return (
-    <motion.div
-      key={motionId.current}
-      initial={initial}
-      animate={animate}
-      exit={exit}
-    >
+    <motion.div key={motionId.current} initial={initial} animate={animate} exit={exit}>
       <Flex position="absolute" top={0} insetInlineStart={0} w="full" h="full">
         <Flex
           position="absolute"

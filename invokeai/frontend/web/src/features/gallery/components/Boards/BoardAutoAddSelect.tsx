@@ -10,9 +10,7 @@ const BoardAutoAddSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
-  const autoAssignBoardOnClick = useAppSelector(
-    (s) => s.gallery.autoAssignBoardOnClick
-  );
+  const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
   const { options, hasBoards } = useListAllBoardsQuery(undefined, {
     selectFromResult: ({ data }) => {
       const options: ComboboxOption[] = [
@@ -43,10 +41,7 @@ const BoardAutoAddSelect = () => {
     [dispatch]
   );
 
-  const value = useMemo(
-    () => options.find((o) => o.value === autoAddBoardId),
-    [options, autoAddBoardId]
-  );
+  const value = useMemo(() => options.find((o) => o.value === autoAddBoardId), [options, autoAddBoardId]);
 
   const noOptionsMessage = useCallback(() => t('boards.noMatching'), [t]);
 

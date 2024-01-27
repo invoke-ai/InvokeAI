@@ -26,9 +26,7 @@ import {
 import { getSDXLStylePrompts } from './getSDXLStylePrompt';
 import { addCoreMetadataNode } from './metadata';
 
-export const buildLinearSDXLTextToImageGraph = (
-  state: RootState
-): NonNullableGraph => {
+export const buildLinearSDXLTextToImageGraph = (state: RootState): NonNullableGraph => {
   const log = logger('nodes');
   const {
     positivePrompt,
@@ -60,8 +58,7 @@ export const buildLinearSDXLTextToImageGraph = (
   const is_intermediate = true;
 
   // Construct Style Prompt
-  const { positiveStylePrompt, negativeStylePrompt } =
-    getSDXLStylePrompts(state);
+  const { positiveStylePrompt, negativeStylePrompt } = getSDXLStylePrompts(state);
 
   // Model Loader ID
   let modelLoaderNodeId = SDXL_MODEL_LOADER;

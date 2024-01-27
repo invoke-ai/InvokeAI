@@ -1,7 +1,4 @@
-import type {
-  CoreMetadataInvocation,
-  NonNullableGraph,
-} from 'services/api/types';
+import type { CoreMetadataInvocation, NonNullableGraph } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
 import { METADATA } from './constants';
@@ -35,9 +32,7 @@ export const upsertMetadata = (
   graph: NonNullableGraph,
   metadata: Partial<CoreMetadataInvocation> | JsonObject
 ): void => {
-  const metadataNode = graph.nodes[METADATA] as
-    | CoreMetadataInvocation
-    | undefined;
+  const metadataNode = graph.nodes[METADATA] as CoreMetadataInvocation | undefined;
 
   if (!metadataNode) {
     return;
@@ -46,13 +41,8 @@ export const upsertMetadata = (
   Object.assign(metadataNode, metadata);
 };
 
-export const removeMetadata = (
-  graph: NonNullableGraph,
-  key: keyof CoreMetadataInvocation
-): void => {
-  const metadataNode = graph.nodes[METADATA] as
-    | CoreMetadataInvocation
-    | undefined;
+export const removeMetadata = (graph: NonNullableGraph, key: keyof CoreMetadataInvocation): void => {
+  const metadataNode = graph.nodes[METADATA] as CoreMetadataInvocation | undefined;
 
   if (!metadataNode) {
     return;
@@ -62,17 +52,12 @@ export const removeMetadata = (
 };
 
 export const getHasMetadata = (graph: NonNullableGraph): boolean => {
-  const metadataNode = graph.nodes[METADATA] as
-    | CoreMetadataInvocation
-    | undefined;
+  const metadataNode = graph.nodes[METADATA] as CoreMetadataInvocation | undefined;
 
   return Boolean(metadataNode);
 };
 
-export const setMetadataReceivingNode = (
-  graph: NonNullableGraph,
-  nodeId: string
-) => {
+export const setMetadataReceivingNode = (graph: NonNullableGraph, nodeId: string) => {
   graph.edges = graph.edges.filter((edge) => edge.source.node_id !== METADATA);
 
   graph.edges.push({

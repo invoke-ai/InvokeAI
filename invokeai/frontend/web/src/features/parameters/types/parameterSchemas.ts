@@ -26,48 +26,35 @@ import { z } from 'zod';
 // #region Positive prompt
 export const zParameterPositivePrompt = z.string();
 export type ParameterPositivePrompt = z.infer<typeof zParameterPositivePrompt>;
-export const isParameterPositivePrompt = (
-  val: unknown
-): val is ParameterPositivePrompt =>
+export const isParameterPositivePrompt = (val: unknown): val is ParameterPositivePrompt =>
   zParameterPositivePrompt.safeParse(val).success;
 // #endregion
 
 // #region Negative prompt
 export const zParameterNegativePrompt = z.string();
 export type ParameterNegativePrompt = z.infer<typeof zParameterNegativePrompt>;
-export const isParameterNegativePrompt = (
-  val: unknown
-): val is ParameterNegativePrompt =>
+export const isParameterNegativePrompt = (val: unknown): val is ParameterNegativePrompt =>
   zParameterNegativePrompt.safeParse(val).success;
 // #endregion
 
 // #region Positive style prompt (SDXL)
 export const zParameterPositiveStylePromptSDXL = z.string();
-export type ParameterPositiveStylePromptSDXL = z.infer<
-  typeof zParameterPositiveStylePromptSDXL
->;
-export const isParameterPositiveStylePromptSDXL = (
-  val: unknown
-): val is ParameterPositiveStylePromptSDXL =>
+export type ParameterPositiveStylePromptSDXL = z.infer<typeof zParameterPositiveStylePromptSDXL>;
+export const isParameterPositiveStylePromptSDXL = (val: unknown): val is ParameterPositiveStylePromptSDXL =>
   zParameterPositiveStylePromptSDXL.safeParse(val).success;
 // #endregion
 
 // #region Positive style prompt (SDXL)
 export const zParameterNegativeStylePromptSDXL = z.string();
-export type ParameterNegativeStylePromptSDXL = z.infer<
-  typeof zParameterNegativeStylePromptSDXL
->;
-export const isParameterNegativeStylePromptSDXL = (
-  val: unknown
-): val is ParameterNegativeStylePromptSDXL =>
+export type ParameterNegativeStylePromptSDXL = z.infer<typeof zParameterNegativeStylePromptSDXL>;
+export const isParameterNegativeStylePromptSDXL = (val: unknown): val is ParameterNegativeStylePromptSDXL =>
   zParameterNegativeStylePromptSDXL.safeParse(val).success;
 // #endregion
 
 // #region Steps
 export const zParameterSteps = z.number().int().min(1);
 export type ParameterSteps = z.infer<typeof zParameterSteps>;
-export const isParameterSteps = (val: unknown): val is ParameterSteps =>
-  zParameterSteps.safeParse(val).success;
+export const isParameterSteps = (val: unknown): val is ParameterSteps => zParameterSteps.safeParse(val).success;
 // #endregion
 
 // #region CFG scale parameter
@@ -79,12 +66,8 @@ export const isParameterCFGScale = (val: unknown): val is ParameterCFGScale =>
 
 // #region CFG Rescale Multiplier
 export const zParameterCFGRescaleMultiplier = z.number().gte(0).lt(1);
-export type ParameterCFGRescaleMultiplier = z.infer<
-  typeof zParameterCFGRescaleMultiplier
->;
-export const isParameterCFGRescaleMultiplier = (
-  val: unknown
-): val is ParameterCFGRescaleMultiplier =>
+export type ParameterCFGRescaleMultiplier = z.infer<typeof zParameterCFGRescaleMultiplier>;
+export const isParameterCFGRescaleMultiplier = (val: unknown): val is ParameterCFGRescaleMultiplier =>
   zParameterCFGRescaleMultiplier.safeParse(val).success;
 // #endregion
 
@@ -98,47 +81,38 @@ export const isParameterScheduler = (val: unknown): val is ParameterScheduler =>
 // #region seed
 export const zParameterSeed = z.number().int().min(0).max(NUMPY_RAND_MAX);
 export type ParameterSeed = z.infer<typeof zParameterSeed>;
-export const isParameterSeed = (val: unknown): val is ParameterSeed =>
-  zParameterSeed.safeParse(val).success;
+export const isParameterSeed = (val: unknown): val is ParameterSeed => zParameterSeed.safeParse(val).success;
 // #endregion
 
 // #region Width
 export const zParameterWidth = z.number().multipleOf(8).min(64);
 export type ParameterWidth = z.infer<typeof zParameterWidth>;
-export const isParameterWidth = (val: unknown): val is ParameterWidth =>
-  zParameterWidth.safeParse(val).success;
+export const isParameterWidth = (val: unknown): val is ParameterWidth => zParameterWidth.safeParse(val).success;
 // #endregion
 
 // #region Height
 export const zParameterHeight = zParameterWidth;
 export type ParameterHeight = z.infer<typeof zParameterHeight>;
-export const isParameterHeight = (val: unknown): val is ParameterHeight =>
-  zParameterHeight.safeParse(val).success;
+export const isParameterHeight = (val: unknown): val is ParameterHeight => zParameterHeight.safeParse(val).success;
 // #endregion
 
 // #region Aspect Ratio
 export const zParameterAspectRatio = z.number().int().min(0).max(6);
 export type ParameterAspectRatio = z.infer<typeof zParameterAspectRatio>;
-export const isParameterAspectRatio = (
-  val: unknown
-): val is ParameterAspectRatio => zParameterAspectRatio.safeParse(val).success;
+export const isParameterAspectRatio = (val: unknown): val is ParameterAspectRatio =>
+  zParameterAspectRatio.safeParse(val).success;
 // #endregion
 
 // #region Model
 export const zParameterModel = zMainModelField;
 export type ParameterModel = z.infer<typeof zParameterModel>;
-export const isParameterModel = (val: unknown): val is ParameterModel =>
-  zParameterModel.safeParse(val).success;
+export const isParameterModel = (val: unknown): val is ParameterModel => zParameterModel.safeParse(val).success;
 // #endregion
 
 // #region SDXL Refiner Model
 export const zParameterSDXLRefinerModel = zSDXLRefinerModelField;
-export type ParameterSDXLRefinerModel = z.infer<
-  typeof zParameterSDXLRefinerModel
->;
-export const isParameterSDXLRefinerModel = (
-  val: unknown
-): val is ParameterSDXLRefinerModel =>
+export type ParameterSDXLRefinerModel = z.infer<typeof zParameterSDXLRefinerModel>;
+export const isParameterSDXLRefinerModel = (val: unknown): val is ParameterSDXLRefinerModel =>
   zParameterSDXLRefinerModel.safeParse(val).success;
 // #endregion
 
@@ -159,29 +133,21 @@ export const isParameterLoRAModel = (val: unknown): val is ParameterLoRAModel =>
 // #region ControlNet Model
 export const zParameterControlNetModel = zControlNetModelField;
 export type ParameterControlNetModel = z.infer<typeof zParameterLoRAModel>;
-export const isParameterControlNetModel = (
-  val: unknown
-): val is ParameterControlNetModel =>
+export const isParameterControlNetModel = (val: unknown): val is ParameterControlNetModel =>
   zParameterControlNetModel.safeParse(val).success;
 // #endregion
 
 // #region IP Adapter Model
 export const zParameterIPAdapterModel = zIPAdapterModelField;
 export type ParameterIPAdapterModel = z.infer<typeof zParameterIPAdapterModel>;
-export const isParameterIPAdapterModel = (
-  val: unknown
-): val is ParameterIPAdapterModel =>
+export const isParameterIPAdapterModel = (val: unknown): val is ParameterIPAdapterModel =>
   zParameterIPAdapterModel.safeParse(val).success;
 // #endregion
 
 // #region T2I Adapter Model
 export const zParameterT2IAdapterModel = zT2IAdapterModelField;
-export type ParameterT2IAdapterModel = z.infer<
-  typeof zParameterT2IAdapterModel
->;
-export const isParameterT2IAdapterModel = (
-  val: unknown
-): val is ParameterT2IAdapterModel =>
+export type ParameterT2IAdapterModel = z.infer<typeof zParameterT2IAdapterModel>;
+export const isParameterT2IAdapterModel = (val: unknown): val is ParameterT2IAdapterModel =>
   zParameterT2IAdapterModel.safeParse(val).success;
 // #endregion
 
@@ -210,19 +176,12 @@ export const isParameterHRFMethod = (val: unknown): val is ParameterHRFMethod =>
 export const zParameterHRFEnabled = z.boolean();
 export type ParameterHRFEnabled = z.infer<typeof zParameterHRFEnabled>;
 export const isParameterHRFEnabled = (val: unknown): val is boolean =>
-  zParameterHRFEnabled.safeParse(val).success &&
-  val !== null &&
-  val !== undefined;
+  zParameterHRFEnabled.safeParse(val).success && val !== null && val !== undefined;
 // #endregion
 
 // #region SDXL Refiner Positive Aesthetic Score
-export const zParameterSDXLRefinerPositiveAestheticScore = z
-  .number()
-  .min(1)
-  .max(10);
-export type ParameterSDXLRefinerPositiveAestheticScore = z.infer<
-  typeof zParameterSDXLRefinerPositiveAestheticScore
->;
+export const zParameterSDXLRefinerPositiveAestheticScore = z.number().min(1).max(10);
+export type ParameterSDXLRefinerPositiveAestheticScore = z.infer<typeof zParameterSDXLRefinerPositiveAestheticScore>;
 export const isParameterSDXLRefinerPositiveAestheticScore = (
   val: unknown
 ): val is ParameterSDXLRefinerPositiveAestheticScore =>
@@ -230,11 +189,8 @@ export const isParameterSDXLRefinerPositiveAestheticScore = (
 // #endregion
 
 // #region SDXL Refiner Negative Aesthetic Score
-export const zParameterSDXLRefinerNegativeAestheticScore =
-  zParameterSDXLRefinerPositiveAestheticScore;
-export type ParameterSDXLRefinerNegativeAestheticScore = z.infer<
-  typeof zParameterSDXLRefinerNegativeAestheticScore
->;
+export const zParameterSDXLRefinerNegativeAestheticScore = zParameterSDXLRefinerPositiveAestheticScore;
+export type ParameterSDXLRefinerNegativeAestheticScore = z.infer<typeof zParameterSDXLRefinerNegativeAestheticScore>;
 export const isParameterSDXLRefinerNegativeAestheticScore = (
   val: unknown
 ): val is ParameterSDXLRefinerNegativeAestheticScore =>
@@ -243,35 +199,21 @@ export const isParameterSDXLRefinerNegativeAestheticScore = (
 
 // #region SDXL Refiner Start
 export const zParameterSDXLRefinerStart = z.number().min(0).max(1);
-export type ParameterSDXLRefinerStart = z.infer<
-  typeof zParameterSDXLRefinerStart
->;
-export const isParameterSDXLRefinerStart = (
-  val: unknown
-): val is ParameterSDXLRefinerStart =>
+export type ParameterSDXLRefinerStart = z.infer<typeof zParameterSDXLRefinerStart>;
+export const isParameterSDXLRefinerStart = (val: unknown): val is ParameterSDXLRefinerStart =>
   zParameterSDXLRefinerStart.safeParse(val).success;
 // #endregion
 
 // #region Mask Blur Method
 export const zParameterMaskBlurMethod = z.enum(['box', 'gaussian']);
 export type ParameterMaskBlurMethod = z.infer<typeof zParameterMaskBlurMethod>;
-export const isParameterMaskBlurMethod = (
-  val: unknown
-): val is ParameterMaskBlurMethod =>
+export const isParameterMaskBlurMethod = (val: unknown): val is ParameterMaskBlurMethod =>
   zParameterMaskBlurMethod.safeParse(val).success;
 // #endregion
 
 // #region Canvas Coherence Mode
-export const zParameterCanvasCoherenceMode = z.enum([
-  'unmasked',
-  'mask',
-  'edge',
-]);
-export type ParameterCanvasCoherenceMode = z.infer<
-  typeof zParameterCanvasCoherenceMode
->;
-export const isParameterCanvasCoherenceMode = (
-  val: unknown
-): val is ParameterCanvasCoherenceMode =>
+export const zParameterCanvasCoherenceMode = z.enum(['unmasked', 'mask', 'edge']);
+export type ParameterCanvasCoherenceMode = z.infer<typeof zParameterCanvasCoherenceMode>;
+export const isParameterCanvasCoherenceMode = (val: unknown): val is ParameterCanvasCoherenceMode =>
   zParameterCanvasCoherenceMode.safeParse(val).success;
 // #endregion

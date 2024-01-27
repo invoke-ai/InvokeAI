@@ -14,13 +14,7 @@ type Props = {
   selected: boolean;
 };
 
-const InvocationNodeUnknownFallback = ({
-  nodeId,
-  isOpen,
-  label,
-  type,
-  selected,
-}: Props) => {
+const InvocationNodeUnknownFallback = ({ nodeId, isOpen, label, type, selected }: Props) => {
   const { t } = useTranslation();
   const nodePack = useNodePack(nodeId);
   return (

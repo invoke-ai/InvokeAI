@@ -6,10 +6,7 @@ import { roundToMultiple } from 'common/util/roundDownToMultiple';
  * @param area The input area
  * @returns The width and height that will fit the given aspect ratio, retaining the input area
  */
-export const calculateNewSize = (
-  ratio: number,
-  area: number
-): { width: number; height: number } => {
+export const calculateNewSize = (ratio: number, area: number): { width: number; height: number } => {
   const exactWidth = Math.sqrt(area * ratio);
   const exactHeight = exactWidth / ratio;
 

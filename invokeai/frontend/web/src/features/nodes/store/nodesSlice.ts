@@ -41,15 +41,8 @@ import {
   zT2IAdapterModelFieldValue,
   zVAEModelFieldValue,
 } from 'features/nodes/types/field';
-import type {
-  AnyNode,
-  NodeExecutionState,
-} from 'features/nodes/types/invocation';
-import {
-  isInvocationNode,
-  isNotesNode,
-  zNodeStatus,
-} from 'features/nodes/types/invocation';
+import type { AnyNode, NodeExecutionState } from 'features/nodes/types/invocation';
+import { isInvocationNode, isNotesNode, zNodeStatus } from 'features/nodes/types/invocation';
 import { cloneDeep, forEach } from 'lodash-es';
 import type {
   Connection,
@@ -153,13 +146,8 @@ const nodesSlice = createSlice({
     nodesChanged: (state, action: PayloadAction<NodeChange[]>) => {
       state.nodes = applyNodeChanges(action.payload, state.nodes);
     },
-    nodeReplaced: (
-      state,
-      action: PayloadAction<{ nodeId: string; node: Node }>
-    ) => {
-      const nodeIndex = state.nodes.findIndex(
-        (n) => n.id === action.payload.nodeId
-      );
+    nodeReplaced: (state, action: PayloadAction<{ nodeId: string; node: Node }>) => {
+      const nodeIndex = state.nodes.findIndex((n) => n.id === action.payload.nodeId);
       if (nodeIndex < 0) {
         return;
       }
@@ -198,12 +186,7 @@ const nodesSlice = createSlice({
 
       if (state.connectionStartParams) {
         const { nodeId, handleId, handleType } = state.connectionStartParams;
-        if (
-          nodeId &&
-          handleId &&
-          handleType &&
-          state.connectionStartFieldType
-        ) {
+        if (nodeId && handleId && handleType && state.connectionStartFieldType) {
           const newConnection = findConnectionToValidHandle(
             node,
             state.nodes,
@@ -214,10 +197,7 @@ const nodesSlice = createSlice({
             state.connectionStartFieldType
           );
           if (newConnection) {
-            state.edges = addEdge(
-              { ...newConnection, type: 'default' },
-              state.edges
-            );
+            state.edges = addEdge({ ...newConnection, type: 'default' }, state.edges);
           }
         }
       }
@@ -234,10 +214,7 @@ const nodesSlice = createSlice({
     edgeAdded: (state, action: PayloadAction<Edge>) => {
       state.edges = addEdge(action.payload, state.edges);
     },
-    edgeUpdated: (
-      state,
-      action: PayloadAction<{ oldEdge: Edge; newConnection: Connection }>
-    ) => {
+    edgeUpdated: (state, action: PayloadAction<{ oldEdge: Edge; newConnection: Connection }>) => {
       const { oldEdge, newConnection } = action.payload;
       state.edges = updateEdge(oldEdge, newConnection, state.edges);
     },
@@ -253,10 +230,7 @@ const nodesSlice = createSlice({
       if (!isInvocationNode(node)) {
         return;
       }
-      const field =
-        handleType === 'source'
-          ? node.data.outputs[handleId]
-          : node.data.inputs[handleId];
+      const field = handleType === 'source' ? node.data.outputs[handleId] : node.data.inputs[handleId];
       state.connectionStartFieldType = field?.type ?? null;
     },
     connectionMade: (state, action: PayloadAction<Connection>) => {
@@ -264,10 +238,7 @@ const nodesSlice = createSlice({
       if (!fieldType) {
         return;
       }
-      state.edges = addEdge(
-        { ...action.payload, type: 'default' },
-        state.edges
-      );
+      state.edges = addEdge({ ...action.payload, type: 'default' }, state.edges);
 
       state.connectionMade = true;
     },
@@ -281,19 +252,11 @@ const nodesSlice = createSlice({
       const { cursorPosition, mouseOverNodeId } = action.payload;
       if (!state.connectionMade) {
         if (mouseOverNodeId) {
-          const nodeIndex = state.nodes.findIndex(
-            (n) => n.id === mouseOverNodeId
-          );
+          const nodeIndex = state.nodes.findIndex((n) => n.id === mouseOverNodeId);
           const mouseOverNode = state.nodes?.[nodeIndex];
           if (mouseOverNode && state.connectionStartParams) {
-            const { nodeId, handleId, handleType } =
-              state.connectionStartParams;
-            if (
-              nodeId &&
-              handleId &&
-              handleType &&
-              state.connectionStartFieldType
-            ) {
+            const { nodeId, handleId, handleType } = state.connectionStartParams;
+            if (nodeId && handleId && handleType && state.connectionStartFieldType) {
               const newConnection = findConnectionToValidHandle(
                 mouseOverNode,
                 state.nodes,
@@ -304,10 +267,7 @@ const nodesSlice = createSlice({
                 state.connectionStartFieldType
               );
               if (newConnection) {
-                state.edges = addEdge(
-                  { ...newConnection, type: 'default' },
-                  state.edges
-                );
+                state.edges = addEdge({ ...newConnection, type: 'default' }, state.edges);
               }
             }
           }
@@ -342,10 +302,7 @@ const nodesSlice = createSlice({
       }
       field.label = label;
     },
-    nodeUseCacheChanged: (
-      state,
-      action: PayloadAction<{ nodeId: string; useCache: boolean }>
-    ) => {
+    nodeUseCacheChanged: (state, action: PayloadAction<{ nodeId: string; useCache: boolean }>) => {
       const { nodeId, useCache } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
 
@@ -356,10 +313,7 @@ const nodesSlice = createSlice({
       }
       node.data.useCache = useCache;
     },
-    nodeIsIntermediateChanged: (
-      state,
-      action: PayloadAction<{ nodeId: string; isIntermediate: boolean }>
-    ) => {
+    nodeIsIntermediateChanged: (state, action: PayloadAction<{ nodeId: string; isIntermediate: boolean }>) => {
       const { nodeId, isIntermediate } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
 
@@ -370,10 +324,7 @@ const nodesSlice = createSlice({
       }
       node.data.isIntermediate = isIntermediate;
     },
-    nodeIsOpenChanged: (
-      state,
-      action: PayloadAction<{ nodeId: string; isOpen: boolean }>
-    ) => {
+    nodeIsOpenChanged: (state, action: PayloadAction<{ nodeId: string; isOpen: boolean }>) => {
       const { nodeId, isOpen } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
 
@@ -406,19 +357,11 @@ const nodesSlice = createSlice({
           }
         });
       } else {
-        const closedIncomers = getIncomers(
-          node,
-          state.nodes,
-          state.edges
-        ).filter(
+        const closedIncomers = getIncomers(node, state.nodes, state.edges).filter(
           (node) => isInvocationNode(node) && node.data.isOpen === false
         );
 
-        const closedOutgoers = getOutgoers(
-          node,
-          state.nodes,
-          state.edges
-        ).filter(
+        const closedOutgoers = getOutgoers(node, state.nodes, state.edges).filter(
           (node) => isInvocationNode(node) && node.data.isOpen === false
         );
 
@@ -426,10 +369,7 @@ const nodesSlice = createSlice({
 
         // hide all edges
         connectedEdges.forEach((edge) => {
-          if (
-            edge.target === nodeId &&
-            closedIncomers.find((node) => node.id === edge.source)
-          ) {
+          if (edge.target === nodeId && closedIncomers.find((node) => node.id === edge.source)) {
             edge.hidden = true;
             const collapsedEdge = collapsedEdgesToCreate.find(
               (e) => e.source === edge.source && e.target === edge.target
@@ -449,10 +389,7 @@ const nodesSlice = createSlice({
               });
             }
           }
-          if (
-            edge.source === nodeId &&
-            closedOutgoers.find((node) => node.id === edge.target)
-          ) {
+          if (edge.source === nodeId && closedOutgoers.find((node) => node.id === edge.target)) {
             const collapsedEdge = collapsedEdgesToCreate.find(
               (e) => e.source === edge.source && e.target === edge.target
             );
@@ -493,10 +430,7 @@ const nodesSlice = createSlice({
         const edgeChanges: EdgeRemoveChange[] = [];
         collapsedEdges.forEach((collapsedEdge) => {
           state.edges.forEach((edge) => {
-            if (
-              edge.source === collapsedEdge.source &&
-              edge.target === collapsedEdge.target
-            ) {
+            if (edge.source === collapsedEdge.source && edge.target === collapsedEdge.target) {
               edgeChanges.push({ id: edge.id, type: 'remove' });
             }
           });
@@ -512,10 +446,7 @@ const nodesSlice = createSlice({
         delete state.nodeExecutionStates[node.id];
       });
     },
-    nodeLabelChanged: (
-      state,
-      action: PayloadAction<{ nodeId: string; label: string }>
-    ) => {
+    nodeLabelChanged: (state, action: PayloadAction<{ nodeId: string; label: string }>) => {
       const { nodeId, label } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
       const node = state.nodes?.[nodeIndex];
@@ -524,10 +455,7 @@ const nodesSlice = createSlice({
       }
       node.data.label = label;
     },
-    nodeNotesChanged: (
-      state,
-      action: PayloadAction<{ nodeId: string; notes: string }>
-    ) => {
+    nodeNotesChanged: (state, action: PayloadAction<{ nodeId: string; notes: string }>) => {
       const { nodeId, notes } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
       const node = state.nodes?.[nodeIndex];
@@ -553,100 +481,52 @@ const nodesSlice = createSlice({
     selectedEdgesChanged: (state, action: PayloadAction<string[]>) => {
       state.selectedEdges = action.payload;
     },
-    fieldStringValueChanged: (
-      state,
-      action: FieldValueAction<StringFieldValue>
-    ) => {
+    fieldStringValueChanged: (state, action: FieldValueAction<StringFieldValue>) => {
       fieldValueReducer(state, action, zStringFieldValue);
     },
-    fieldNumberValueChanged: (
-      state,
-      action: FieldValueAction<IntegerFieldValue | FloatFieldValue>
-    ) => {
+    fieldNumberValueChanged: (state, action: FieldValueAction<IntegerFieldValue | FloatFieldValue>) => {
       fieldValueReducer(state, action, zIntegerFieldValue.or(zFloatFieldValue));
     },
-    fieldBooleanValueChanged: (
-      state,
-      action: FieldValueAction<BooleanFieldValue>
-    ) => {
+    fieldBooleanValueChanged: (state, action: FieldValueAction<BooleanFieldValue>) => {
       fieldValueReducer(state, action, zBooleanFieldValue);
     },
-    fieldBoardValueChanged: (
-      state,
-      action: FieldValueAction<BoardFieldValue>
-    ) => {
+    fieldBoardValueChanged: (state, action: FieldValueAction<BoardFieldValue>) => {
       fieldValueReducer(state, action, zBoardFieldValue);
     },
-    fieldImageValueChanged: (
-      state,
-      action: FieldValueAction<ImageFieldValue>
-    ) => {
+    fieldImageValueChanged: (state, action: FieldValueAction<ImageFieldValue>) => {
       fieldValueReducer(state, action, zImageFieldValue);
     },
-    fieldColorValueChanged: (
-      state,
-      action: FieldValueAction<ColorFieldValue>
-    ) => {
+    fieldColorValueChanged: (state, action: FieldValueAction<ColorFieldValue>) => {
       fieldValueReducer(state, action, zColorFieldValue);
     },
-    fieldMainModelValueChanged: (
-      state,
-      action: FieldValueAction<MainModelFieldValue>
-    ) => {
+    fieldMainModelValueChanged: (state, action: FieldValueAction<MainModelFieldValue>) => {
       fieldValueReducer(state, action, zMainModelFieldValue);
     },
-    fieldRefinerModelValueChanged: (
-      state,
-      action: FieldValueAction<SDXLRefinerModelFieldValue>
-    ) => {
+    fieldRefinerModelValueChanged: (state, action: FieldValueAction<SDXLRefinerModelFieldValue>) => {
       fieldValueReducer(state, action, zSDXLRefinerModelFieldValue);
     },
-    fieldVaeModelValueChanged: (
-      state,
-      action: FieldValueAction<VAEModelFieldValue>
-    ) => {
+    fieldVaeModelValueChanged: (state, action: FieldValueAction<VAEModelFieldValue>) => {
       fieldValueReducer(state, action, zVAEModelFieldValue);
     },
-    fieldLoRAModelValueChanged: (
-      state,
-      action: FieldValueAction<LoRAModelFieldValue>
-    ) => {
+    fieldLoRAModelValueChanged: (state, action: FieldValueAction<LoRAModelFieldValue>) => {
       fieldValueReducer(state, action, zLoRAModelFieldValue);
     },
-    fieldControlNetModelValueChanged: (
-      state,
-      action: FieldValueAction<ControlNetModelFieldValue>
-    ) => {
+    fieldControlNetModelValueChanged: (state, action: FieldValueAction<ControlNetModelFieldValue>) => {
       fieldValueReducer(state, action, zControlNetModelFieldValue);
     },
-    fieldIPAdapterModelValueChanged: (
-      state,
-      action: FieldValueAction<IPAdapterModelFieldValue>
-    ) => {
+    fieldIPAdapterModelValueChanged: (state, action: FieldValueAction<IPAdapterModelFieldValue>) => {
       fieldValueReducer(state, action, zIPAdapterModelFieldValue);
     },
-    fieldT2IAdapterModelValueChanged: (
-      state,
-      action: FieldValueAction<T2IAdapterModelFieldValue>
-    ) => {
+    fieldT2IAdapterModelValueChanged: (state, action: FieldValueAction<T2IAdapterModelFieldValue>) => {
       fieldValueReducer(state, action, zT2IAdapterModelFieldValue);
     },
-    fieldEnumModelValueChanged: (
-      state,
-      action: FieldValueAction<EnumFieldValue>
-    ) => {
+    fieldEnumModelValueChanged: (state, action: FieldValueAction<EnumFieldValue>) => {
       fieldValueReducer(state, action, zEnumFieldValue);
     },
-    fieldSchedulerValueChanged: (
-      state,
-      action: FieldValueAction<SchedulerFieldValue>
-    ) => {
+    fieldSchedulerValueChanged: (state, action: FieldValueAction<SchedulerFieldValue>) => {
       fieldValueReducer(state, action, zSchedulerFieldValue);
     },
-    notesNodeValueChanged: (
-      state,
-      action: PayloadAction<{ nodeId: string; value: string }>
-    ) => {
+    notesNodeValueChanged: (state, action: PayloadAction<{ nodeId: string; value: string }>) => {
       const { nodeId, value } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
       const node = state.nodes?.[nodeIndex];
@@ -712,17 +592,12 @@ const nodesSlice = createSlice({
         });
       }
     },
-    selectionPasted: (
-      state,
-      action: PayloadAction<{ cursorPosition?: XYPosition }>
-    ) => {
+    selectionPasted: (state, action: PayloadAction<{ cursorPosition?: XYPosition }>) => {
       const { cursorPosition } = action.payload;
       const newNodes = state.nodesToCopy.map(cloneDeep);
       const oldNodeIds = newNodes.map((n) => n.data.id);
       const newEdges = state.edgesToCopy
-        .filter(
-          (e) => oldNodeIds.includes(e.source) && oldNodeIds.includes(e.target)
-        )
+        .filter((e) => oldNodeIds.includes(e.source) && oldNodeIds.includes(e.target))
         .map(cloneDeep);
 
       newEdges.forEach((e) => (e.selected = true));
@@ -772,15 +647,9 @@ const nodesSlice = createSlice({
         selected: false,
       }));
 
-      state.nodes = applyNodeChanges(
-        nodeAdditions.concat(nodeSelectionChanges),
-        state.nodes
-      );
+      state.nodes = applyNodeChanges(nodeAdditions.concat(nodeSelectionChanges), state.nodes);
 
-      state.edges = applyEdgeChanges(
-        edgeAdditions.concat(edgeSelectionChanges),
-        state.edges
-      );
+      state.edges = applyEdgeChanges(edgeAdditions.concat(edgeSelectionChanges), state.edges);
 
       newNodes.forEach((node) => {
         state.nodeExecutionStates[node.id] = {
@@ -804,9 +673,7 @@ const nodesSlice = createSlice({
       state.isAddNodePopoverOpen = !state.isAddNodePopoverOpen;
     },
     selectionModeChanged: (state, action: PayloadAction<boolean>) => {
-      state.selectionMode = action.payload
-        ? SelectionMode.Full
-        : SelectionMode.Partial;
+      state.selectionMode = action.payload ? SelectionMode.Full : SelectionMode.Partial;
     },
   },
   extraReducers: (builder) => {
@@ -828,9 +695,7 @@ const nodesSlice = createSlice({
         []
       );
 
-      state.nodeExecutionStates = nodes.reduce<
-        Record<string, NodeExecutionState>
-      >((acc, node) => {
+      state.nodeExecutionStates = nodes.reduce<Record<string, NodeExecutionState>>((acc, node) => {
         acc[node.id] = {
           nodeId: node.id,
           ...initialNodeExecutionState,
@@ -868,8 +733,7 @@ const nodesSlice = createSlice({
       }
     });
     builder.addCase(socketGeneratorProgress, (state, action) => {
-      const { source_node_id, step, total_steps, progress_image } =
-        action.payload.data;
+      const { source_node_id, step, total_steps, progress_image } = action.payload.data;
       const node = state.nodeExecutionStates[source_node_id];
       if (node) {
         node.status = zNodeStatus.enum.IN_PROGRESS;

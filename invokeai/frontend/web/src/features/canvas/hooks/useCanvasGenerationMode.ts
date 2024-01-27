@@ -8,30 +8,16 @@ import { useDebounce } from 'react-use';
 export const useCanvasGenerationMode = () => {
   const layerState = useAppSelector((s) => s.canvas.layerState);
 
-  const boundingBoxCoordinates = useAppSelector(
-    (s) => s.canvas.boundingBoxCoordinates
-  );
-  const boundingBoxDimensions = useAppSelector(
-    (s) => s.canvas.boundingBoxDimensions
-  );
+  const boundingBoxCoordinates = useAppSelector((s) => s.canvas.boundingBoxCoordinates);
+  const boundingBoxDimensions = useAppSelector((s) => s.canvas.boundingBoxDimensions);
   const isMaskEnabled = useAppSelector((s) => s.canvas.isMaskEnabled);
 
-  const shouldPreserveMaskedArea = useAppSelector(
-    (s) => s.canvas.shouldPreserveMaskedArea
-  );
-  const [generationMode, setGenerationMode] = useState<
-    GenerationMode | undefined
-  >();
+  const shouldPreserveMaskedArea = useAppSelector((s) => s.canvas.shouldPreserveMaskedArea);
+  const [generationMode, setGenerationMode] = useState<GenerationMode | undefined>();
 
   useEffect(() => {
     setGenerationMode(undefined);
-  }, [
-    layerState,
-    boundingBoxCoordinates,
-    boundingBoxDimensions,
-    isMaskEnabled,
-    shouldPreserveMaskedArea,
-  ]);
+  }, [layerState, boundingBoxCoordinates, boundingBoxDimensions, isMaskEnabled, shouldPreserveMaskedArea]);
 
   useDebounce(
     async () => {
@@ -51,21 +37,12 @@ export const useCanvasGenerationMode = () => {
       const { baseImageData, maskImageData } = canvasBlobsAndImageData;
 
       // Determine the generation mode
-      const generationMode = getCanvasGenerationMode(
-        baseImageData,
-        maskImageData
-      );
+      const generationMode = getCanvasGenerationMode(baseImageData, maskImageData);
 
       setGenerationMode(generationMode);
     },
     1000,
-    [
-      layerState,
-      boundingBoxCoordinates,
-      boundingBoxDimensions,
-      isMaskEnabled,
-      shouldPreserveMaskedArea,
-    ]
+    [layerState, boundingBoxCoordinates, boundingBoxDimensions, isMaskEnabled, shouldPreserveMaskedArea]
   );
 
   return generationMode;

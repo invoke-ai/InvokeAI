@@ -19,8 +19,7 @@ const GenerationModeStatusText = () => {
 
   return (
     <Box>
-      {t('accessibility.mode')}:{' '}
-      {generationMode ? GENERATION_MODE_NAME_MAP[generationMode] : '...'}
+      {t('accessibility.mode')}: {generationMode ? GENERATION_MODE_NAME_MAP[generationMode] : '...'}
     </Box>
   );
 };

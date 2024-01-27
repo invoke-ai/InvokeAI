@@ -26,9 +26,7 @@ const FieldTitle = forwardRef((props: Props, ref) => {
       h="full"
       w="full"
     >
-      <Text fontWeight={isMissingInput ? 'bold' : 'normal'}>
-        {label || fieldTemplateTitle}
-      </Text>
+      <Text fontWeight={isMissingInput ? 'bold' : 'normal'}>{label || fieldTemplateTitle}</Text>
     </Flex>
   );
 });

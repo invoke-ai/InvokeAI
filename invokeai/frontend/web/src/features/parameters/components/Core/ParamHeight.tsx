@@ -1,9 +1,4 @@
-import {
-  CompositeNumberInput,
-  CompositeSlider,
-  FormControl,
-  FormLabel,
-} from '@invoke-ai/ui-library';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
@@ -16,12 +11,8 @@ export const ParamHeight = memo(() => {
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const sliderMin = useAppSelector((s) => s.config.sd.height.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.height.sliderMax);
-  const numberInputMin = useAppSelector(
-    (s) => s.config.sd.height.numberInputMin
-  );
-  const numberInputMax = useAppSelector(
-    (s) => s.config.sd.height.numberInputMax
-  );
+  const numberInputMin = useAppSelector((s) => s.config.sd.height.numberInputMin);
+  const numberInputMax = useAppSelector((s) => s.config.sd.height.numberInputMax);
   const coarseStep = useAppSelector((s) => s.config.sd.height.coarseStep);
   const fineStep = useAppSelector((s) => s.config.sd.height.fineStep);
 
@@ -32,10 +23,7 @@ export const ParamHeight = memo(() => {
     [ctx]
   );
 
-  const marks = useMemo(
-    () => [sliderMin, optimalDimension, sliderMax],
-    [sliderMin, optimalDimension, sliderMax]
-  );
+  const marks = useMemo(() => [sliderMin, optimalDimension, sliderMax], [sliderMin, optimalDimension, sliderMax]);
 
   return (
     <FormControl>

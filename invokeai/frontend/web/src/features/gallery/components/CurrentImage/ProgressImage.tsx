@@ -4,12 +4,8 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { memo, useMemo } from 'react';
 
 const CurrentImagePreview = () => {
-  const progress_image = useAppSelector(
-    (s) => s.system.denoiseProgress?.progress_image
-  );
-  const shouldAntialiasProgressImage = useAppSelector(
-    (s) => s.system.shouldAntialiasProgressImage
-  );
+  const progress_image = useAppSelector((s) => s.system.denoiseProgress?.progress_image);
+  const shouldAntialiasProgressImage = useAppSelector((s) => s.system.shouldAntialiasProgressImage);
 
   const sx = useMemo<SystemStyleObject>(
     () => ({

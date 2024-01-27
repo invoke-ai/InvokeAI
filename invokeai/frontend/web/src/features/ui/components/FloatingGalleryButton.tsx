@@ -17,13 +17,7 @@ const FloatingGalleryButton = (props: Props) => {
 
   return (
     <Portal>
-      <Flex
-        pos="absolute"
-        transform="translate(0, -50%)"
-        minW={8}
-        top="50%"
-        insetInlineEnd="21px"
-      >
+      <Flex pos="absolute" transform="translate(0, -50%)" minW={8} top="50%" insetInlineEnd="21px">
         <Tooltip label={t('accessibility.showGalleryPanel')} placement="start">
           <IconButton
             aria-label={t('accessibility.showGalleryPanel')}

@@ -20,11 +20,7 @@ const GalleryBoardContextMenuItems = ({ board, setBoardToDelete }: Props) => {
 
   return (
     <>
-      <MenuItem
-        color="error.300"
-        icon={<PiTrashSimpleBold />}
-        onClick={handleDelete}
-      >
+      <MenuItem color="error.300" icon={<PiTrashSimpleBold />} onClick={handleDelete}>
         {t('boards.deleteBoard')}
       </MenuItem>
     </>

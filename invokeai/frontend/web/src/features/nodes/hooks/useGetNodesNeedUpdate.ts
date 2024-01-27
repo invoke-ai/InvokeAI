@@ -5,17 +5,14 @@ import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlic
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
 
-const selector = createSelector(
-  selectNodesSlice,
-  selectNodeTemplatesSlice,
-  (nodes, nodeTemplates) =>
-    nodes.nodes.filter(isInvocationNode).some((node) => {
-      const template = nodeTemplates.templates[node.data.type];
-      if (!template) {
-        return false;
-      }
-      return getNeedsUpdate(node, template);
-    })
+const selector = createSelector(selectNodesSlice, selectNodeTemplatesSlice, (nodes, nodeTemplates) =>
+  nodes.nodes.filter(isInvocationNode).some((node) => {
+    const template = nodeTemplates.templates[node.data.type];
+    if (!template) {
+      return false;
+    }
+    return getNeedsUpdate(node, template);
+  })
 );
 
 export const useGetNodesNeedUpdate = () => {

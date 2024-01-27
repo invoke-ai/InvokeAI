@@ -1,9 +1,6 @@
 import i18n from 'i18next';
 
-import type {
-  ControlAdapterProcessorType,
-  RequiredControlAdapterProcessorNode,
-} from './types';
+import type { ControlAdapterProcessorType, RequiredControlAdapterProcessorNode } from './types';
 
 type ControlNetProcessorsDict = Record<
   ControlAdapterProcessorType,

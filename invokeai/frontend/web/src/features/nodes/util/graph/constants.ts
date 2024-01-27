@@ -35,14 +35,11 @@ export const INPAINT_INFILL_RESIZE_DOWN = 'inpaint_infill_resize_down';
 export const INPAINT_FINAL_IMAGE = 'inpaint_final_image';
 export const INPAINT_CREATE_MASK = 'inpaint_create_mask';
 export const INPAINT_MASK = 'inpaint_mask';
-export const CANVAS_COHERENCE_DENOISE_LATENTS =
-  'canvas_coherence_denoise_latents';
+export const CANVAS_COHERENCE_DENOISE_LATENTS = 'canvas_coherence_denoise_latents';
 export const CANVAS_COHERENCE_NOISE = 'canvas_coherence_noise';
-export const CANVAS_COHERENCE_NOISE_INCREMENT =
-  'canvas_coherence_noise_increment';
+export const CANVAS_COHERENCE_NOISE_INCREMENT = 'canvas_coherence_noise_increment';
 export const CANVAS_COHERENCE_MASK_EDGE = 'canvas_coherence_mask_edge';
-export const CANVAS_COHERENCE_INPAINT_CREATE_MASK =
-  'canvas_coherence_inpaint_create_mask';
+export const CANVAS_COHERENCE_INPAINT_CREATE_MASK = 'canvas_coherence_inpaint_create_mask';
 export const MASK_FROM_ALPHA = 'tomask';
 export const MASK_EDGE = 'mask_edge';
 export const MASK_BLUR = 'mask_blur';
@@ -72,10 +69,8 @@ export const SCALE = 'scale_image';
 export const SDXL_MODEL_LOADER = 'sdxl_model_loader';
 export const SDXL_DENOISE_LATENTS = 'sdxl_denoise_latents';
 export const SDXL_REFINER_MODEL_LOADER = 'sdxl_refiner_model_loader';
-export const SDXL_REFINER_POSITIVE_CONDITIONING =
-  'sdxl_refiner_positive_conditioning';
-export const SDXL_REFINER_NEGATIVE_CONDITIONING =
-  'sdxl_refiner_negative_conditioning';
+export const SDXL_REFINER_POSITIVE_CONDITIONING = 'sdxl_refiner_positive_conditioning';
+export const SDXL_REFINER_NEGATIVE_CONDITIONING = 'sdxl_refiner_negative_conditioning';
 export const SDXL_REFINER_DENOISE_LATENTS = 'sdxl_refiner_denoise_latents';
 export const SDXL_REFINER_INPAINT_CREATE_MASK = 'refiner_inpaint_create_mask';
 export const SEAMLESS = 'seamless';
@@ -116,9 +111,7 @@ export const CANVAS_INPAINT_GRAPH = 'canvas_inpaint_graph';
 export const CANVAS_OUTPAINT_GRAPH = 'canvas_outpaint_graph';
 export const SDXL_TEXT_TO_IMAGE_GRAPH = 'sdxl_text_to_image_graph';
 export const SDXL_IMAGE_TO_IMAGE_GRAPH = 'sxdl_image_to_image_graph';
-export const SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH =
-  'sdxl_canvas_text_to_image_graph';
-export const SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH =
-  'sdxl_canvas_image_to_image_graph';
+export const SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH = 'sdxl_canvas_text_to_image_graph';
+export const SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH = 'sdxl_canvas_image_to_image_graph';
 export const SDXL_CANVAS_INPAINT_GRAPH = 'sdxl_canvas_inpaint_graph';
 export const SDXL_CANVAS_OUTPAINT_GRAPH = 'sdxl_canvas_outpaint_graph';

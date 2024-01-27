@@ -19,12 +19,11 @@ export const ParamSDXLPositiveStylePrompt = memo(() => {
     },
     [dispatch]
   );
-  const { onChange, isOpen, onClose, onOpen, onSelectEmbedding, onKeyDown } =
-    usePrompt({
-      prompt,
-      textareaRef: textareaRef,
-      onChange: handleChange,
-    });
+  const { onChange, isOpen, onClose, onOpen, onSelectEmbedding, onKeyDown } = usePrompt({
+    prompt,
+    textareaRef: textareaRef,
+    onChange: handleChange,
+  });
 
   return (
     <EmbeddingPopover

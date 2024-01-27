@@ -49,10 +49,7 @@ const sdxlSlice = createSlice({
     setShouldConcatSDXLStylePrompt: (state, action: PayloadAction<boolean>) => {
       state.shouldConcatSDXLStylePrompt = action.payload;
     },
-    refinerModelChanged: (
-      state,
-      action: PayloadAction<ParameterSDXLRefinerModel | null>
-    ) => {
+    refinerModelChanged: (state, action: PayloadAction<ParameterSDXLRefinerModel | null>) => {
       state.refinerModel = action.payload;
     },
     setRefinerSteps: (state, action: PayloadAction<number>) => {
@@ -64,16 +61,10 @@ const sdxlSlice = createSlice({
     setRefinerScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
       state.refinerScheduler = action.payload;
     },
-    setRefinerPositiveAestheticScore: (
-      state,
-      action: PayloadAction<number>
-    ) => {
+    setRefinerPositiveAestheticScore: (state, action: PayloadAction<number>) => {
       state.refinerPositiveAestheticScore = action.payload;
     },
-    setRefinerNegativeAestheticScore: (
-      state,
-      action: PayloadAction<number>
-    ) => {
+    setRefinerNegativeAestheticScore: (state, action: PayloadAction<number>) => {
       state.refinerNegativeAestheticScore = action.payload;
     },
     setRefinerStart: (state, action: PayloadAction<number>) => {

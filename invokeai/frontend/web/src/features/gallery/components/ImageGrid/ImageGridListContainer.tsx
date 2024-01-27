@@ -8,9 +8,7 @@ export const imageListContainerTestId = 'image-list-container';
 
 type ListContainerProps = PropsWithChildren & FlexProps;
 const ListContainer = forwardRef((props: ListContainerProps, ref) => {
-  const galleryImageMinimumWidth = useAppSelector(
-    (s) => s.gallery.galleryImageMinimumWidth
-  );
+  const galleryImageMinimumWidth = useAppSelector((s) => s.gallery.galleryImageMinimumWidth);
 
   return (
     <Grid

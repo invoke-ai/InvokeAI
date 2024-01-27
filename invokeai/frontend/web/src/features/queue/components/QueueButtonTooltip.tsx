@@ -1,10 +1,4 @@
-import {
-  Divider,
-  Flex,
-  ListItem,
-  Text,
-  UnorderedList,
-} from '@invoke-ai/ui-library';
+import { Divider, Flex, ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
@@ -20,9 +14,7 @@ const selectPromptsCount = createSelector(
   selectGenerationSlice,
   selectDynamicPromptsSlice,
   (generation, dynamicPrompts) =>
-    getShouldProcessPrompt(generation.positivePrompt)
-      ? dynamicPrompts.prompts.length
-      : 1
+    getShouldProcessPrompt(generation.positivePrompt) ? dynamicPrompts.prompts.length : 1
 );
 
 type Props = {
@@ -32,9 +24,7 @@ type Props = {
 export const QueueButtonTooltip = memo(({ prepend = false }: Props) => {
   const { t } = useTranslation();
   const { isReady, reasons } = useIsReadyToEnqueue();
-  const isLoadingDynamicPrompts = useAppSelector(
-    (s) => s.dynamicPrompts.isLoading
-  );
+  const isLoadingDynamicPrompts = useAppSelector((s) => s.dynamicPrompts.isLoading);
   const promptsCount = useAppSelector(selectPromptsCount);
   const iterations = useAppSelector((s) => s.generation.iterations);
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);

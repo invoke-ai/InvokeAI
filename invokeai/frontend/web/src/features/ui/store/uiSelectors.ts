@@ -14,12 +14,8 @@ export const activeTabNameSelector = createSelector(
   (ui) => (isString(ui.activeTab) ? ui.activeTab : 'txt2img')
 );
 
-export const activeTabIndexSelector = createSelector(
-  selectUiSlice,
-  selectConfigSlice,
-  (ui, config) => {
-    const tabs = tabMap.filter((t) => !config.disabledTabs.includes(t));
-    const idx = tabs.indexOf(ui.activeTab);
-    return idx === -1 ? 0 : idx;
-  }
-);
+export const activeTabIndexSelector = createSelector(selectUiSlice, selectConfigSlice, (ui, config) => {
+  const tabs = tabMap.filter((t) => !config.disabledTabs.includes(t));
+  const idx = tabs.indexOf(ui.activeTab);
+  return idx === -1 ? 0 : idx;
+});

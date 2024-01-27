@@ -48,13 +48,7 @@ const NotesNode = (props: NodeProps<NotesNodeData>) => {
             gap={1}
           >
             <Flex className="nopan" w="full" h="full" flexDir="column">
-              <Textarea
-                value={notes}
-                onChange={handleChange}
-                rows={8}
-                resize="none"
-                fontSize="sm"
-              />
+              <Textarea value={notes} onChange={handleChange} rows={8} resize="none" fontSize="sm" />
             </Flex>
           </Flex>
         </>

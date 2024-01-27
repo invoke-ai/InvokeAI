@@ -31,10 +31,7 @@ export const loraSlice = createSlice({
       const { model_name, id, base_model } = action.payload;
       state.loras[id] = { id, model_name, base_model, ...defaultLoRAConfig };
     },
-    loraRecalled: (
-      state,
-      action: PayloadAction<LoRAModelConfigEntity & { weight: number }>
-    ) => {
+    loraRecalled: (state, action: PayloadAction<LoRAModelConfigEntity & { weight: number }>) => {
       const { model_name, id, base_model, weight } = action.payload;
       state.loras[id] = { id, model_name, base_model, weight };
     },
@@ -45,10 +42,7 @@ export const loraSlice = createSlice({
     lorasCleared: (state) => {
       state.loras = {};
     },
-    loraWeightChanged: (
-      state,
-      action: PayloadAction<{ id: string; weight: number }>
-    ) => {
+    loraWeightChanged: (state, action: PayloadAction<{ id: string; weight: number }>) => {
       const { id, weight } = action.payload;
       const lora = state.loras[id];
       if (!lora) {
@@ -67,14 +61,8 @@ export const loraSlice = createSlice({
   },
 });
 
-export const {
-  loraAdded,
-  loraRemoved,
-  loraWeightChanged,
-  loraWeightReset,
-  lorasCleared,
-  loraRecalled,
-} = loraSlice.actions;
+export const { loraAdded, loraRemoved, loraWeightChanged, loraWeightReset, lorasCleared, loraRecalled } =
+  loraSlice.actions;
 
 export default loraSlice.reducer;
 

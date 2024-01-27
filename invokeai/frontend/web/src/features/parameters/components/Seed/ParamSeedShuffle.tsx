@@ -9,9 +9,7 @@ import { PiShuffleBold } from 'react-icons/pi';
 
 export const ParamSeedShuffle = memo(() => {
   const dispatch = useAppDispatch();
-  const shouldRandomizeSeed = useAppSelector(
-    (s) => s.generation.shouldRandomizeSeed
-  );
+  const shouldRandomizeSeed = useAppSelector((s) => s.generation.shouldRandomizeSeed);
   const { t } = useTranslation();
 
   const handleClickRandomizeSeed = useCallback(

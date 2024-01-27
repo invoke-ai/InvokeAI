@@ -1,9 +1,4 @@
-import {
-  CompositeNumberInput,
-  CompositeSlider,
-  FormControl,
-  FormLabel,
-} from '@invoke-ai/ui-library';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setHrfStrength } from 'features/hrf/store/hrfSlice';
 import { memo, useCallback } from 'react';
@@ -14,12 +9,8 @@ const ParamHrfStrength = () => {
   const initial = useAppSelector((s) => s.config.sd.hrfStrength.initial);
   const sliderMin = useAppSelector((s) => s.config.sd.hrfStrength.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.hrfStrength.sliderMax);
-  const numberInputMin = useAppSelector(
-    (s) => s.config.sd.hrfStrength.numberInputMin
-  );
-  const numberInputMax = useAppSelector(
-    (s) => s.config.sd.hrfStrength.numberInputMax
-  );
+  const numberInputMin = useAppSelector((s) => s.config.sd.hrfStrength.numberInputMin);
+  const numberInputMax = useAppSelector((s) => s.config.sd.hrfStrength.numberInputMax);
   const coarseStep = useAppSelector((s) => s.config.sd.hrfStrength.coarseStep);
   const fineStep = useAppSelector((s) => s.config.sd.hrfStrength.fineStep);
   const dispatch = useAppDispatch();

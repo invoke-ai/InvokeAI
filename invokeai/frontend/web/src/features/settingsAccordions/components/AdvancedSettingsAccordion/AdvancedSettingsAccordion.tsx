@@ -1,9 +1,5 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
-import {
-  Flex,
-  FormControlGroup,
-  StandaloneAccordion,
-} from '@invoke-ai/ui-library';
+import { Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import ParamCFGRescaleMultiplier from 'features/parameters/components/Advanced/ParamCFGRescaleMultiplier';
@@ -25,31 +21,28 @@ const formLabelProps2: FormLabelProps = {
   flexGrow: 1,
 };
 
-const selectBadges = createMemoizedSelector(
-  selectGenerationSlice,
-  (generation) => {
-    const badges: (string | number)[] = [];
-    if (generation.vae) {
-      let vaeBadge = generation.vae.model_name;
-      if (generation.vaePrecision === 'fp16') {
-        vaeBadge += ` ${generation.vaePrecision}`;
-      }
-      badges.push(vaeBadge);
-    } else if (generation.vaePrecision === 'fp16') {
-      badges.push(`VAE ${generation.vaePrecision}`);
+const selectBadges = createMemoizedSelector(selectGenerationSlice, (generation) => {
+  const badges: (string | number)[] = [];
+  if (generation.vae) {
+    let vaeBadge = generation.vae.model_name;
+    if (generation.vaePrecision === 'fp16') {
+      vaeBadge += ` ${generation.vaePrecision}`;
     }
-    if (generation.clipSkip) {
-      badges.push(`Skip ${generation.clipSkip}`);
-    }
-    if (generation.cfgRescaleMultiplier) {
-      badges.push(`Rescale ${generation.cfgRescaleMultiplier}`);
-    }
-    if (generation.seamlessXAxis || generation.seamlessYAxis) {
-      badges.push('seamless');
-    }
-    return badges;
+    badges.push(vaeBadge);
+  } else if (generation.vaePrecision === 'fp16') {
+    badges.push(`VAE ${generation.vaePrecision}`);
   }
-);
+  if (generation.clipSkip) {
+    badges.push(`Skip ${generation.clipSkip}`);
+  }
+  if (generation.cfgRescaleMultiplier) {
+    badges.push(`Rescale ${generation.cfgRescaleMultiplier}`);
+  }
+  if (generation.seamlessXAxis || generation.seamlessYAxis) {
+    badges.push('seamless');
+  }
+  return badges;
+});
 
 export const AdvancedSettingsAccordion = memo(() => {
   const badges = useAppSelector(selectBadges);
@@ -60,12 +53,7 @@ export const AdvancedSettingsAccordion = memo(() => {
   });
 
   return (
-    <StandaloneAccordion
-      label={t('accordions.advanced.title')}
-      badges={badges}
-      isOpen={isOpen}
-      onToggle={onToggle}
-    >
+    <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column">
         <Flex gap={4} w="full">
           <ParamVAEModelSelect />

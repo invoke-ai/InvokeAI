@@ -6,9 +6,7 @@ import { selectLoraSlice } from 'features/lora/store/loraSlice';
 import { map } from 'lodash-es';
 import { memo } from 'react';
 
-const selectLoRAsArray = createMemoizedSelector(selectLoraSlice, (lora) =>
-  map(lora.loras)
-);
+const selectLoRAsArray = createMemoizedSelector(selectLoraSlice, (lora) => map(lora.loras));
 
 export const LoRAList = memo(() => {
   const lorasArray = useAppSelector(selectLoRAsArray);

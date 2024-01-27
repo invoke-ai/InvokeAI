@@ -14,12 +14,7 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { discordLink, githubLink } from 'features/system/store/constants';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  PiBugBeetleBold,
-  PiInfoBold,
-  PiKeyboardBold,
-  PiToggleRightFill,
-} from 'react-icons/pi';
+import { PiBugBeetleBold, PiInfoBold, PiKeyboardBold, PiToggleRightFill } from 'react-icons/pi';
 import { RiDiscordFill, RiGithubFill, RiSettings4Line } from 'react-icons/ri';
 
 import SettingsModal from './SettingsModal';
@@ -45,32 +40,17 @@ const SettingsMenu = () => {
       <MenuList>
         <MenuGroup title={t('common.communityLabel')}>
           {isGithubLinkEnabled && (
-            <MenuItem
-              as="a"
-              href={githubLink}
-              target="_blank"
-              icon={<RiGithubFill />}
-            >
+            <MenuItem as="a" href={githubLink} target="_blank" icon={<RiGithubFill />}>
               {t('common.githubLabel')}
             </MenuItem>
           )}
           {isBugLinkEnabled && (
-            <MenuItem
-              as="a"
-              href={`${githubLink}/issues`}
-              target="_blank"
-              icon={<PiBugBeetleBold />}
-            >
+            <MenuItem as="a" href={`${githubLink}/issues`} target="_blank" icon={<PiBugBeetleBold />}>
               {t('common.reportBugLabel')}
             </MenuItem>
           )}
           {isDiscordLinkEnabled && (
-            <MenuItem
-              as="a"
-              href={discordLink}
-              target="_blank"
-              icon={<RiDiscordFill />}
-            >
+            <MenuItem as="a" href={discordLink} target="_blank" icon={<RiDiscordFill />}>
               {t('common.discordLabel')}
             </MenuItem>
           )}

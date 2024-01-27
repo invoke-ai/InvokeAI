@@ -7,11 +7,7 @@ import type { ReactNode } from 'react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-type ModelManagerTabName =
-  | 'modelManager'
-  | 'importModels'
-  | 'mergeModels'
-  | 'settings';
+type ModelManagerTabName = 'modelManager' | 'importModels' | 'mergeModels' | 'settings';
 
 type ModelManagerTabInfo = {
   id: ModelManagerTabName;
@@ -48,16 +44,7 @@ const ModelManagerTab = () => {
     [t]
   );
   return (
-    <Tabs
-      isLazy
-      variant="line"
-      layerStyle="first"
-      w="full"
-      h="full"
-      p={4}
-      gap={4}
-      borderRadius="base"
-    >
+    <Tabs isLazy variant="line" layerStyle="first" w="full" h="full" p={4} gap={4} borderRadius="base">
       <TabList>
         {tabs.map((tab) => (
           <Tab borderTopRadius="base" key={tab.id}>

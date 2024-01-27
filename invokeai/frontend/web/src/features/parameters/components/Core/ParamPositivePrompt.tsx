@@ -25,15 +25,7 @@ export const ParamPositivePrompt = memo(() => {
     },
     [dispatch]
   );
-  const {
-    onChange,
-    isOpen,
-    onClose,
-    onOpen,
-    onSelectEmbedding,
-    onKeyDown,
-    onFocus,
-  } = usePrompt({
+  const { onChange, isOpen, onClose, onOpen, onSelectEmbedding, onKeyDown, onFocus } = usePrompt({
     prompt,
     textareaRef: textareaRef,
     onChange: handleChange,

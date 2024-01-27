@@ -1,8 +1,4 @@
-import {
-  CompositeNumberInput,
-  FormControl,
-  FormLabel,
-} from '@invoke-ai/ui-library';
+import { CompositeNumberInput, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
@@ -12,18 +8,13 @@ import { useTranslation } from 'react-i18next';
 
 export const ParamSeedNumberInput = memo(() => {
   const seed = useAppSelector((s) => s.generation.seed);
-  const shouldRandomizeSeed = useAppSelector(
-    (s) => s.generation.shouldRandomizeSeed
-  );
+  const shouldRandomizeSeed = useAppSelector((s) => s.generation.shouldRandomizeSeed);
 
   const { t } = useTranslation();
 
   const dispatch = useAppDispatch();
 
-  const handleChangeSeed = useCallback(
-    (v: number) => dispatch(setSeed(v)),
-    [dispatch]
-  );
+  const handleChangeSeed = useCallback((v: number) => dispatch(setSeed(v)), [dispatch]);
 
   return (
     <FormControl flexGrow={1}>

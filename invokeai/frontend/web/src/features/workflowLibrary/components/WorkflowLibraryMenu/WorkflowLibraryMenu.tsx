@@ -23,8 +23,7 @@ const WorkflowLibraryMenu = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   useGlobalMenuClose(onClose);
 
-  const isWorkflowLibraryEnabled =
-    useFeatureStatus('workflowLibrary').isFeatureEnabled;
+  const isWorkflowLibraryEnabled = useFeatureStatus('workflowLibrary').isFeatureEnabled;
 
   return (
     <Menu isOpen={isOpen} onOpen={onOpen} onClose={onClose}>

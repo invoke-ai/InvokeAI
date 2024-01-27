@@ -1,7 +1,4 @@
-import {
-  ASSETS_CATEGORIES,
-  IMAGE_CATEGORIES,
-} from 'features/gallery/store/types';
+import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import type {
   BoardDTO,
   ListBoardsArg,
@@ -23,10 +20,7 @@ export const boardsApi = api.injectEndpoints({
       query: (arg) => ({ url: 'boards/', params: arg }),
       providesTags: (result) => {
         // any list of boards
-        const tags: ApiTagDescription[] = [
-          { type: 'Board', id: LIST_TAG },
-          'FetchOnReconnect',
-        ];
+        const tags: ApiTagDescription[] = [{ type: 'Board', id: LIST_TAG }, 'FetchOnReconnect'];
 
         if (result) {
           // and individual tags for each board
@@ -49,10 +43,7 @@ export const boardsApi = api.injectEndpoints({
       }),
       providesTags: (result) => {
         // any list of boards
-        const tags: ApiTagDescription[] = [
-          { type: 'Board', id: LIST_TAG },
-          'FetchOnReconnect',
-        ];
+        const tags: ApiTagDescription[] = [{ type: 'Board', id: LIST_TAG }, 'FetchOnReconnect'];
 
         if (result) {
           // and individual tags for each board
@@ -72,10 +63,7 @@ export const boardsApi = api.injectEndpoints({
       query: (board_id) => ({
         url: `boards/${board_id}/image_names`,
       }),
-      providesTags: (result, error, arg) => [
-        { type: 'ImageNameList', id: arg },
-        'FetchOnReconnect',
-      ],
+      providesTags: (result, error, arg) => [{ type: 'ImageNameList', id: arg }, 'FetchOnReconnect'],
       keepUnusedDataFor: 0,
     }),
 
@@ -90,10 +78,7 @@ export const boardsApi = api.injectEndpoints({
         }),
         method: 'GET',
       }),
-      providesTags: (result, error, arg) => [
-        { type: 'BoardImagesTotal', id: arg ?? 'none' },
-        'FetchOnReconnect',
-      ],
+      providesTags: (result, error, arg) => [{ type: 'BoardImagesTotal', id: arg ?? 'none' }, 'FetchOnReconnect'],
       transformResponse: (response: OffsetPaginatedResults_ImageDTO_) => {
         return { total: response.total };
       },
@@ -110,10 +95,7 @@ export const boardsApi = api.injectEndpoints({
         }),
         method: 'GET',
       }),
-      providesTags: (result, error, arg) => [
-        { type: 'BoardAssetsTotal', id: arg ?? 'none' },
-        'FetchOnReconnect',
-      ],
+      providesTags: (result, error, arg) => [{ type: 'BoardAssetsTotal', id: arg ?? 'none' }, 'FetchOnReconnect'],
       transformResponse: (response: OffsetPaginatedResults_ImageDTO_) => {
         return { total: response.total };
       },
@@ -138,9 +120,7 @@ export const boardsApi = api.injectEndpoints({
         method: 'PATCH',
         body: changes,
       }),
-      invalidatesTags: (result, error, arg) => [
-        { type: 'Board', id: arg.board_id },
-      ],
+      invalidatesTags: (result, error, arg) => [{ type: 'Board', id: arg.board_id }],
     }),
   }),
 });

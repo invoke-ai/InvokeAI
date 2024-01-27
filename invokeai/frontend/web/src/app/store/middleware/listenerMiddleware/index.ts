@@ -1,9 +1,4 @@
-import type {
-  ListenerEffect,
-  TypedAddListener,
-  TypedStartListening,
-  UnknownAction,
-} from '@reduxjs/toolkit';
+import type { ListenerEffect, TypedAddListener, TypedStartListening, UnknownAction } from '@reduxjs/toolkit';
 import { addListener, createListenerMiddleware } from '@reduxjs/toolkit';
 import { addGalleryImageClickedListener } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
 import type { AppDispatch, RootState } from 'app/store/store';
@@ -47,10 +42,7 @@ import {
 import { addImagesStarredListener } from './listeners/imagesStarred';
 import { addImagesUnstarredListener } from './listeners/imagesUnstarred';
 import { addImageToDeleteSelectedListener } from './listeners/imageToDeleteSelected';
-import {
-  addImageUploadedFulfilledListener,
-  addImageUploadedRejectedListener,
-} from './listeners/imageUploaded';
+import { addImageUploadedFulfilledListener, addImageUploadedRejectedListener } from './listeners/imageUploaded';
 import { addInitialImageSelectedListener } from './listeners/initialImageSelected';
 import { addModelSelectedListener } from './listeners/modelSelected';
 import { addModelsLoadedListener } from './listeners/modelsLoaded';
@@ -78,19 +70,11 @@ export const listenerMiddleware = createListenerMiddleware();
 
 export type AppStartListening = TypedStartListening<RootState, AppDispatch>;
 
-export const startAppListening =
-  listenerMiddleware.startListening as AppStartListening;
+export const startAppListening = listenerMiddleware.startListening as AppStartListening;
 
-export const addAppListener = addListener as TypedAddListener<
-  RootState,
-  AppDispatch
->;
+export const addAppListener = addListener as TypedAddListener<RootState, AppDispatch>;
 
-export type AppListenerEffect = ListenerEffect<
-  UnknownAction,
-  RootState,
-  AppDispatch
->;
+export type AppListenerEffect = ListenerEffect<UnknownAction, RootState, AppDispatch>;
 
 /**
  * The RTK listener middleware is a lightweight alternative sagas/observables.

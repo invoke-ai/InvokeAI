@@ -14,12 +14,7 @@ type Props = Omit<StatProps, 'children'> & {
   isDisabled?: boolean;
 };
 
-const StatusStatItem = ({
-  label,
-  value,
-  isDisabled = false,
-  ...rest
-}: Props) => (
+const StatusStatItem = ({ label, value, isDisabled = false, ...rest }: Props) => (
   <Stat
     flexGrow={1}
     textOverflow="ellipsis"

@@ -30,143 +30,59 @@ const ControlAdapterProcessorComponent = ({ id }: Props) => {
   }
 
   if (processorNode.type === 'canny_image_processor') {
-    return (
-      <CannyProcessor
-        controlNetId={id}
-        processorNode={processorNode}
-        isEnabled={isEnabled}
-      />
-    );
+    return <CannyProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
   }
 
   if (processorNode.type === 'color_map_image_processor') {
-    return (
-      <ColorMapProcessor
-        controlNetId={id}
-        processorNode={processorNode}
-        isEnabled={isEnabled}
-      />
-    );
+    return <ColorMapProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
   }
 
   if (processorNode.type === 'depth_anything_image_processor') {
-    return (
-      <DepthAnyThingProcessor
-        controlNetId={id}
-        processorNode={processorNode}
-        isEnabled={isEnabled}
-      />
-    );
+    return <DepthAnyThingProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
   }
 
   if (processorNode.type === 'hed_image_processor') {
-    return (
-      <HedProcessor
-        controlNetId={id}
-        processorNode={processorNode}
-        isEnabled={isEnabled}
-      />
-    );
+    return <HedProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
   }
 
   if (processorNode.type === 'lineart_image_processor') {
-    return (
-      <LineartProcessor
-        controlNetId={id}
-        processorNode={processorNode}
-        isEnabled={isEnabled}
-      />
-    );
+    return <LineartProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
   }
 
   if (processorNode.type === 'content_shuffle_image_processor') {
-    return (
-      <ContentShuffleProcessor
-        controlNetId={id}
-        processorNode={processorNode}
-        isEnabled={isEnabled}
-      />
-    );
+    return <ContentShuffleProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
   }
 
   if (processorNode.type === 'lineart_anime_image_processor') {
-    return (
-      <LineartAnimeProcessor
-        controlNetId={id}
-        processorNode={processorNode}
-        isEnabled={isEnabled}
-      />
-    );
+    return <LineartAnimeProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
   }
 
   if (processorNode.type === 'mediapipe_face_processor') {
-    return (
-      <MediapipeFaceProcessor
-        controlNetId={id}
-        processorNode={processorNode}
-        isEnabled={isEnabled}
-      />
-    );
+    return <MediapipeFaceProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
   }
 
   if (processorNode.type === 'midas_depth_image_processor') {
-    return (
-      <MidasDepthProcessor
-        controlNetId={id}
-        processorNode={processorNode}
-        isEnabled={isEnabled}
-      />
-    );
+    return <MidasDepthProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
   }
 
   if (processorNode.type === 'mlsd_image_processor') {
-    return (
-      <MlsdImageProcessor
-        controlNetId={id}
-        processorNode={processorNode}
-        isEnabled={isEnabled}
-      />
-    );
+    return <MlsdImageProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
   }
 
   if (processorNode.type === 'normalbae_image_processor') {
-    return (
-      <NormalBaeProcessor
-        controlNetId={id}
-        processorNode={processorNode}
-        isEnabled={isEnabled}
-      />
-    );
+    return <NormalBaeProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
   }
 
   if (processorNode.type === 'openpose_image_processor') {
-    return (
-      <OpenposeProcessor
-        controlNetId={id}
-        processorNode={processorNode}
-        isEnabled={isEnabled}
-      />
-    );
+    return <OpenposeProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
   }
 
   if (processorNode.type === 'pidi_image_processor') {
-    return (
-      <PidiProcessor
-        controlNetId={id}
-        processorNode={processorNode}
-        isEnabled={isEnabled}
-      />
-    );
+    return <PidiProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
   }
 
   if (processorNode.type === 'zoe_depth_image_processor') {
-    return (
-      <ZoeDepthProcessor
-        controlNetId={id}
-        processorNode={processorNode}
-        isEnabled={isEnabled}
-      />
-    );
+    return <ZoeDepthProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
   }
 
   return null;

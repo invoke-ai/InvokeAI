@@ -1,11 +1,5 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
-import {
-  Combobox,
-  ConfirmationAlertDialog,
-  Flex,
-  FormControl,
-  Text,
-} from '@invoke-ai/ui-library';
+import { Combobox, ConfirmationAlertDialog, Flex, FormControl, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
@@ -16,10 +10,7 @@ import {
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
-import {
-  useAddImagesToBoardMutation,
-  useRemoveImagesFromBoardMutation,
-} from 'services/api/endpoints/images';
+import { useAddImagesToBoardMutation, useRemoveImagesFromBoardMutation } from 'services/api/endpoints/images';
 
 const selectImagesToChange = createMemoizedSelector(
   selectChangeBoardModalSlice,
@@ -45,10 +36,7 @@ const ChangeBoardModal = () => {
     );
   }, [boards, t]);
 
-  const value = useMemo(
-    () => options.find((o) => o.value === selectedBoard),
-    [options, selectedBoard]
-  );
+  const value = useMemo(() => options.find((o) => o.value === selectedBoard), [options, selectedBoard]);
 
   const handleClose = useCallback(() => {
     dispatch(changeBoardReset());
@@ -70,13 +58,7 @@ const ChangeBoardModal = () => {
     }
     setSelectedBoard(null);
     dispatch(changeBoardReset());
-  }, [
-    addImagesToBoard,
-    dispatch,
-    imagesToChange,
-    removeImagesFromBoard,
-    selectedBoard,
-  ]);
+  }, [addImagesToBoard, dispatch, imagesToChange, removeImagesFromBoard, selectedBoard]);
 
   const onChange = useCallback<ComboboxOnChange>((v) => {
     if (!v) {
@@ -103,9 +85,7 @@ const ChangeBoardModal = () => {
         </Text>
         <FormControl isDisabled={isFetching}>
           <Combobox
-            placeholder={
-              isFetching ? t('boards.loading') : t('boards.selectBoard')
-            }
+            placeholder={isFetching ? t('boards.loading') : t('boards.selectBoard')}
             onChange={onChange}
             value={value}
             options={options}

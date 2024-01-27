@@ -27,14 +27,7 @@ export const useModelCombobox = <T extends AnyModelConfigEntity>(
   arg: UseModelComboboxArg<T>
 ): UseModelComboboxReturn => {
   const { t } = useTranslation();
-  const {
-    modelEntities,
-    selectedModel,
-    getIsDisabled,
-    onChange,
-    isLoading,
-    optionsFilter = () => true,
-  } = arg;
+  const { modelEntities, selectedModel, getIsDisabled, onChange, isLoading, optionsFilter = () => true } = arg;
   const options = useMemo<ComboboxOption[]>(() => {
     if (!modelEntities) {
       return [];
@@ -49,10 +42,7 @@ export const useModelCombobox = <T extends AnyModelConfigEntity>(
   }, [optionsFilter, getIsDisabled, modelEntities]);
 
   const value = useMemo(
-    () =>
-      options.find((m) =>
-        selectedModel ? m.value === getModelId(selectedModel) : false
-      ),
+    () => options.find((m) => (selectedModel ? m.value === getModelId(selectedModel) : false)),
     [options, selectedModel]
   );
 

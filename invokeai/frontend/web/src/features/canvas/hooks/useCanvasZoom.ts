@@ -1,15 +1,8 @@
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $isMoveStageKeyHeld } from 'features/canvas/store/canvasNanostore';
-import {
-  setStageCoordinates,
-  setStageScale,
-} from 'features/canvas/store/canvasSlice';
-import {
-  CANVAS_SCALE_BY,
-  MAX_CANVAS_SCALE,
-  MIN_CANVAS_SCALE,
-} from 'features/canvas/util/constants';
+import { setStageCoordinates, setStageScale } from 'features/canvas/store/canvasSlice';
+import { CANVAS_SCALE_BY, MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/canvas/util/constants';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { clamp } from 'lodash-es';
@@ -49,11 +42,7 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
         delta = -delta;
       }
 
-      const newScale = clamp(
-        stageScale * CANVAS_SCALE_BY ** delta,
-        MIN_CANVAS_SCALE,
-        MAX_CANVAS_SCALE
-      );
+      const newScale = clamp(stageScale * CANVAS_SCALE_BY ** delta, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE);
 
       const newCoordinates = {
         x: cursorPos.x - mousePointTo.x * newScale,

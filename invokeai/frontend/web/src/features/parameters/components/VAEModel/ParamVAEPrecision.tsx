@@ -28,10 +28,7 @@ const ParamVAEModelSelect = () => {
     [dispatch]
   );
 
-  const value = useMemo(
-    () => options.find((o) => o.value === vaePrecision),
-    [vaePrecision]
-  );
+  const value = useMemo(() => options.find((o) => o.value === vaePrecision), [vaePrecision]);
 
   return (
     <FormControl w="14rem" flexShrink={0}>

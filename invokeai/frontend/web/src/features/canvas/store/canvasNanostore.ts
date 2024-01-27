@@ -16,8 +16,7 @@ export const $isTransformingBoundingBox = atom<boolean>(false);
 export const $isMouseOverBoundingBoxOutline = atom<boolean>(false);
 export const $isModifyingBoundingBox = computed(
   [$isTransformingBoundingBox, $isMovingBoundingBox],
-  (isTransformingBoundingBox, isMovingBoundingBox) =>
-    isTransformingBoundingBox || isMovingBoundingBox
+  (isTransformingBoundingBox, isMovingBoundingBox) => isTransformingBoundingBox || isMovingBoundingBox
 );
 
 export const resetCanvasInteractionState = () => {

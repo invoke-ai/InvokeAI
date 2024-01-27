@@ -1,11 +1,4 @@
-import {
-  ConfirmationAlertDialog,
-  FormControl,
-  FormLabel,
-  Input,
-  MenuItem,
-  useDisclosure,
-} from '@invoke-ai/ui-library';
+import { ConfirmationAlertDialog, FormControl, FormLabel, Input, MenuItem, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useSaveWorkflowAs } from 'features/workflowLibrary/hooks/useSaveWorkflowAs';
 import { getWorkflowCopyName } from 'features/workflowLibrary/util/getWorkflowCopyName';
@@ -50,12 +43,7 @@ const SaveWorkflowAsButton = () => {
       >
         <FormControl>
           <FormLabel>{t('workflows.workflowName')}</FormLabel>
-          <Input
-            ref={inputRef}
-            value={name}
-            onChange={onChange}
-            placeholder={t('workflows.workflowName')}
-          />
+          <Input ref={inputRef} value={name} onChange={onChange} placeholder={t('workflows.workflowName')} />
         </FormControl>
       </ConfirmationAlertDialog>
     </>

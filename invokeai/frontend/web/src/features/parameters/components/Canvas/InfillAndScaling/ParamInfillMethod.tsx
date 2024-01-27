@@ -33,10 +33,7 @@ const ParamInfillMethod = () => {
     [dispatch, options]
   );
 
-  const value = useMemo(
-    () => options.find((o) => o.value === infillMethod),
-    [options, infillMethod]
-  );
+  const value = useMemo(() => options.find((o) => o.value === infillMethod), [options, infillMethod]);
 
   return (
     <FormControl isDisabled={options.length === 0}>

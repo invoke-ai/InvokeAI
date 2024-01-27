@@ -9,12 +9,10 @@ import AdvancedAddDiffusers from './AdvancedAddDiffusers';
 
 export const zManualAddMode = z.enum(['diffusers', 'checkpoint']);
 export type ManualAddMode = z.infer<typeof zManualAddMode>;
-export const isManualAddMode = (v: unknown): v is ManualAddMode =>
-  zManualAddMode.safeParse(v).success;
+export const isManualAddMode = (v: unknown): v is ManualAddMode => zManualAddMode.safeParse(v).success;
 
 const AdvancedAddModels = () => {
-  const [advancedAddMode, setAdvancedAddMode] =
-    useState<ManualAddMode>('diffusers');
+  const [advancedAddMode, setAdvancedAddMode] = useState<ManualAddMode>('diffusers');
 
   const { t } = useTranslation();
   const handleChange: ComboboxOnChange = useCallback((v) => {
@@ -32,10 +30,7 @@ const AdvancedAddModels = () => {
     [t]
   );
 
-  const value = useMemo(
-    () => options.find((o) => o.value === advancedAddMode),
-    [options, advancedAddMode]
-  );
+  const value = useMemo(() => options.find((o) => o.value === advancedAddMode), [options, advancedAddMode]);
 
   return (
     <Flex flexDirection="column" gap={4} width="100%">

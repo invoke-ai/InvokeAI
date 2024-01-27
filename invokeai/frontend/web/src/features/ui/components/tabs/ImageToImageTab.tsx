@@ -37,25 +37,11 @@ const ImageToImageTab = () => {
         style={panelGroupStyles}
         storage={panelStorage}
       >
-        <Panel
-          id="imageTab.content.initImage"
-          order={0}
-          defaultSize={50}
-          minSize={25}
-          style={panelStyles}
-        >
+        <Panel id="imageTab.content.initImage" order={0} defaultSize={50} minSize={25} style={panelStyles}>
           <InitialImageDisplay />
         </Panel>
-        <ResizeHandle
-          orientation="vertical"
-          onDoubleClick={handleDoubleClickHandle}
-        />
-        <Panel
-          id="imageTab.content.selectedImage"
-          order={1}
-          defaultSize={50}
-          minSize={25}
-        >
+        <ResizeHandle orientation="vertical" onDoubleClick={handleDoubleClickHandle} />
+        <Panel id="imageTab.content.selectedImage" order={1} defaultSize={50} minSize={25}>
           <TextToImageTabMain />
         </Panel>
       </PanelGroup>

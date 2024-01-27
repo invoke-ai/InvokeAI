@@ -6,10 +6,8 @@ import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback } from 'react';
 
-const selectZoom = createSelector(
-  [selectNodesSlice, activeTabNameSelector],
-  (nodes, activeTabName) =>
-    activeTabName === 'nodes' ? nodes.viewport.zoom : 1
+const selectZoom = createSelector([selectNodesSlice, activeTabNameSelector], (nodes, activeTabName) =>
+  activeTabName === 'nodes' ? nodes.viewport.zoom : 1
 );
 
 /**

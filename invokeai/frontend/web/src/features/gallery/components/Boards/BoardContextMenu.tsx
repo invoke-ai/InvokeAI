@@ -1,16 +1,8 @@
 import type { ContextMenuProps } from '@invoke-ai/ui-library';
-import {
-  ContextMenu,
-  MenuGroup,
-  MenuItem,
-  MenuList,
-} from '@invoke-ai/ui-library';
+import { ContextMenu, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  autoAddBoardIdChanged,
-  selectGallerySlice,
-} from 'features/gallery/store/gallerySlice';
+import { autoAddBoardIdChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { BoardId } from 'features/gallery/store/types';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { addToast } from 'features/system/store/systemSlice';
@@ -30,30 +22,18 @@ type Props = {
   setBoardToDelete?: (board?: BoardDTO) => void;
 };
 
-const BoardContextMenu = ({
-  board,
-  board_id,
-  setBoardToDelete,
-  children,
-}: Props) => {
+const BoardContextMenu = ({ board, board_id, setBoardToDelete, children }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const autoAssignBoardOnClick = useAppSelector(
-    (s) => s.gallery.autoAssignBoardOnClick
-  );
+  const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
   const selectIsSelectedForAutoAdd = useMemo(
-    () =>
-      createSelector(
-        selectGallerySlice,
-        (gallery) => board && board.board_id === gallery.autoAddBoardId
-      ),
+    () => createSelector(selectGallerySlice, (gallery) => board && board.board_id === gallery.autoAddBoardId),
     [board]
   );
 
   const isSelectedForAutoAdd = useAppSelector(selectIsSelectedForAutoAdd);
   const boardName = useBoardName(board_id);
-  const isBulkDownloadEnabled =
-    useFeatureStatus('bulkDownload').isFeatureEnabled;
+  const isBulkDownloadEnabled = useFeatureStatus('bulkDownload').isFeatureEnabled;
 
   const [bulkDownload] = useBulkDownloadImagesMutation();
 
@@ -103,19 +83,11 @@ const BoardContextMenu = ({
             {t('boards.menuItemAutoAdd')}
           </MenuItem>
           {isBulkDownloadEnabled && (
-            <MenuItem
-              icon={<PiDownloadBold />}
-              onClickCapture={handleBulkDownload}
-            >
+            <MenuItem icon={<PiDownloadBold />} onClickCapture={handleBulkDownload}>
               {t('boards.downloadBoard')}
             </MenuItem>
           )}
-          {board && (
-            <GalleryBoardContextMenuItems
-              board={board}
-              setBoardToDelete={setBoardToDelete}
-            />
-          )}
+          {board && <GalleryBoardContextMenuItems board={board} setBoardToDelete={setBoardToDelete} />}
         </MenuGroup>
       </MenuList>
     ),

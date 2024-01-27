@@ -9,19 +9,12 @@ export const workflowsApi = api.injectEndpoints({
       string
     >({
       query: (workflow_id) => `workflows/i/${workflow_id}`,
-      providesTags: (result, error, workflow_id) => [
-        { type: 'Workflow', id: workflow_id },
-        'FetchOnReconnect',
-      ],
+      providesTags: (result, error, workflow_id) => [{ type: 'Workflow', id: workflow_id }, 'FetchOnReconnect'],
       onQueryStarted: async (arg, api) => {
         const { dispatch, queryFulfilled } = api;
         try {
           await queryFulfilled;
-          dispatch(
-            workflowsApi.util.invalidateTags([
-              { type: 'WorkflowsRecent', id: LIST_TAG },
-            ])
-          );
+          dispatch(workflowsApi.util.invalidateTags([{ type: 'WorkflowsRecent', id: LIST_TAG }]));
         } catch {
           // no-op
         }

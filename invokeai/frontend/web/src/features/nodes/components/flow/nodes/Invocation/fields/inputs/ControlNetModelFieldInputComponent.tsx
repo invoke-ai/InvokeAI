@@ -2,20 +2,14 @@ import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldControlNetModelValueChanged } from 'features/nodes/store/nodesSlice';
-import type {
-  ControlNetModelFieldInputInstance,
-  ControlNetModelFieldInputTemplate,
-} from 'features/nodes/types/field';
+import type { ControlNetModelFieldInputInstance, ControlNetModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
 import type { ControlNetModelConfigEntity } from 'services/api/endpoints/models';
 import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 
 import type { FieldComponentProps } from './types';
 
-type Props = FieldComponentProps<
-  ControlNetModelFieldInputInstance,
-  ControlNetModelFieldInputTemplate
->;
+type Props = FieldComponentProps<ControlNetModelFieldInputInstance, ControlNetModelFieldInputTemplate>;
 
 const ControlNetModelFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
@@ -38,15 +32,12 @@ const ControlNetModelFieldInputComponent = (props: Props) => {
     [dispatch, field.name, nodeId]
   );
 
-  const { options, value, onChange, placeholder, noOptionsMessage } =
-    useGroupedModelCombobox({
-      modelEntities: data,
-      onChange: _onChange,
-      selectedModel: field.value
-        ? { ...field.value, model_type: 'controlnet' }
-        : undefined,
-      isLoading,
-    });
+  const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
+    modelEntities: data,
+    onChange: _onChange,
+    selectedModel: field.value ? { ...field.value, model_type: 'controlnet' } : undefined,
+    isLoading,
+  });
 
   return (
     <Tooltip label={value?.description}>

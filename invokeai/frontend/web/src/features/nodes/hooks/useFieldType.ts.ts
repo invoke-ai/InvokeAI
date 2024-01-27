@@ -5,11 +5,7 @@ import { KIND_MAP } from 'features/nodes/types/constants';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { useMemo } from 'react';
 
-export const useFieldType = (
-  nodeId: string,
-  fieldName: string,
-  kind: 'input' | 'output'
-) => {
+export const useFieldType = (nodeId: string, fieldName: string, kind: 'input' | 'output') => {
   const selector = useMemo(
     () =>
       createMemoizedSelector(selectNodesSlice, (nodes) => {

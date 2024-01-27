@@ -53,8 +53,4 @@ export interface GenerationState {
   aspectRatio: AspectRatioState;
 }
 
-export type PayloadActionWithOptimalDimension<T = void> = PayloadAction<
-  T,
-  string,
-  { optimalDimension: number }
->;
+export type PayloadActionWithOptimalDimension<T = void> = PayloadAction<T, string, { optimalDimension: number }>;

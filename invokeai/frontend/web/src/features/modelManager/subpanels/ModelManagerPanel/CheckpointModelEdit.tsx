@@ -22,10 +22,7 @@ import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import type { CheckpointModelConfigEntity } from 'services/api/endpoints/models';
-import {
-  useGetCheckpointConfigsQuery,
-  useUpdateMainModelsMutation,
-} from 'services/api/endpoints/models';
+import { useGetCheckpointConfigsQuery, useUpdateMainModelsMutation } from 'services/api/endpoints/models';
 import type { CheckpointModelConfig } from 'services/api/types';
 
 import ModelConvert from './ModelConvert';
@@ -72,10 +69,7 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
     mode: 'onChange',
   });
 
-  const handleChangeUseCustomConfig = useCallback(
-    () => setUseCustomConfig((prev) => !prev),
-    []
-  );
+  const handleChangeUseCustomConfig = useCallback(() => setUseCustomConfig((prev) => !prev), []);
 
   const onSubmit = useCallback<SubmitHandler<CheckpointModelConfig>>(
     (values) => {
@@ -133,50 +127,32 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
       </Flex>
       <Divider />
 
-      <Flex
-        flexDirection="column"
-        maxHeight={window.innerHeight - 270}
-        overflowY="scroll"
-      >
+      <Flex flexDirection="column" maxHeight={window.innerHeight - 270} overflowY="scroll">
         <form onSubmit={handleSubmit(onSubmit)}>
           <Flex flexDirection="column" overflowY="scroll" gap={4}>
             <FormControl isInvalid={Boolean(errors.model_name)}>
               <FormLabel>{t('modelManager.name')}</FormLabel>
               <Input
                 {...register('model_name', {
-                  validate: (value) =>
-                    value.trim().length > 3 || 'Must be at least 3 characters',
+                  validate: (value) => value.trim().length > 3 || 'Must be at least 3 characters',
                 })}
               />
-              {errors.model_name?.message && (
-                <FormErrorMessage>
-                  {errors.model_name?.message}
-                </FormErrorMessage>
-              )}
+              {errors.model_name?.message && <FormErrorMessage>{errors.model_name?.message}</FormErrorMessage>}
             </FormControl>
             <FormControl>
               <FormLabel>{t('modelManager.description')}</FormLabel>
               <Input {...register('description')} />
             </FormControl>
-            <BaseModelSelect<CheckpointModelConfig>
-              control={control}
-              name="base_model"
-            />
-            <ModelVariantSelect<CheckpointModelConfig>
-              control={control}
-              name="variant"
-            />
+            <BaseModelSelect<CheckpointModelConfig> control={control} name="base_model" />
+            <ModelVariantSelect<CheckpointModelConfig> control={control} name="variant" />
             <FormControl isInvalid={Boolean(errors.path)}>
               <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
               <Input
                 {...register('path', {
-                  validate: (value) =>
-                    value.trim().length > 0 || 'Must provide a path',
+                  validate: (value) => value.trim().length > 0 || 'Must provide a path',
                 })}
               />
-              {errors.path?.message && (
-                <FormErrorMessage>{errors.path?.message}</FormErrorMessage>
-              )}
+              {errors.path?.message && <FormErrorMessage>{errors.path?.message}</FormErrorMessage>}
             </FormControl>
             <FormControl>
               <FormLabel>{t('modelManager.vaeLocation')}</FormLabel>
@@ -194,10 +170,7 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
               )}
               <FormControl>
                 <FormLabel>{t('modelManager.useCustomConfig')}</FormLabel>
-                <Checkbox
-                  isChecked={useCustomConfig}
-                  onChange={handleChangeUseCustomConfig}
-                />
+                <Checkbox isChecked={useCustomConfig} onChange={handleChangeUseCustomConfig} />
               </FormControl>
             </Flex>
 
