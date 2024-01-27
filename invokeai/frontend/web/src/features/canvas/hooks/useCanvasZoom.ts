@@ -1,3 +1,4 @@
+import { $ctrl } from '@invoke-ai/ui';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $isMoveStageKeyHeld } from 'features/canvas/store/canvasNanostore';
@@ -45,12 +46,15 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
 
       let delta = e.evt.deltaY;
 
-      let size = 0;
+      let size = brushSize;
       // when we zoom on trackpad, e.evt.ctrlKey is true
       // in that case lets revert direction
       if (e.evt.ctrlKey) {
         delta = -delta;
-        if (delta < 0) {
+      }
+
+      if ($ctrl.get()) {
+        if (delta > 0) {
           if (brushSize - 5 <= 5) {
             size = Math.max(brushSize - 1, 1);
           } else {
