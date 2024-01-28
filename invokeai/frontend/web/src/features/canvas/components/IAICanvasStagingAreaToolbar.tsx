@@ -107,6 +107,17 @@ const IAICanvasStagingAreaToolbar = () => {
     );
   }, [dispatch, imageDTO]);
 
+  useHotkeys(
+    ['shift+s'],
+    () => {
+      shouldShowStagingImage && handleSaveToGallery();
+    },
+    {
+      preventDefault: true,
+    },
+    [shouldShowStagingImage, handleSaveToGallery]
+  );
+
   const handleDiscardStagingArea = useCallback(() => {
     dispatch(discardStagedImages());
   }, [dispatch]);
@@ -167,7 +178,7 @@ const IAICanvasStagingAreaToolbar = () => {
           colorScheme="invokeBlue"
         />
         <IconButton
-          tooltip={t('unifiedCanvas.saveToGallery')}
+          tooltip={`${t('unifiedCanvas.saveToGallery')} (Shift+S)`}
           aria-label={t('unifiedCanvas.saveToGallery')}
           isDisabled={!imageDTO || !imageDTO.is_intermediate}
           icon={<PiFloppyDiskBold />}

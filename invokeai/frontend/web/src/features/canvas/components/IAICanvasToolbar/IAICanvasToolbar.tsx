@@ -88,13 +88,13 @@ const IAICanvasToolbar = () => {
   useHotkeys(
     ['shift+s'],
     () => {
-      handleSaveToGallery();
+      !isStaging && handleSaveToGallery();
     },
     {
-      enabled: () => !isStaging,
+      enabled: true,
       preventDefault: true,
     },
-    []
+    [isStaging]
   );
 
   useHotkeys(
