@@ -79,6 +79,16 @@ const IAICanvasStagingAreaToolbar = () => {
     preventDefault: true,
   });
 
+  useHotkeys(
+    ['esc'],
+    () => {
+      handleDiscardStagingArea();
+    },
+    {
+      preventDefault: true,
+    }
+  );
+
   const { data: imageDTO } = useGetImageDTOQuery(currentStagingAreaImage?.imageName ?? skipToken);
 
   const handleToggleShouldShowStagingImage = useCallback(() => {
@@ -165,7 +175,7 @@ const IAICanvasStagingAreaToolbar = () => {
           colorScheme="invokeBlue"
         />
         <IconButton
-          tooltip={t('unifiedCanvas.discardAll')}
+          tooltip={`${t('unifiedCanvas.discardAll')} (Esc)`}
           aria-label={t('unifiedCanvas.discardAll')}
           icon={<PiXBold />}
           onClick={handleDiscardStagingArea}
