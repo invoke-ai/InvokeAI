@@ -63,7 +63,7 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
         } else {
           size = Math.min(brushSize + 5, 500);
         }
-      }
+      }else{
 
       const newScale = clamp(stageScale * CANVAS_SCALE_BY ** delta, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE);
 
@@ -74,6 +74,7 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
 
       dispatch(setStageScale(newScale));
       dispatch(setStageCoordinates(newCoordinates));
+    }
       dispatch(setBrushSize(size));
     },
     [stageRef, isMoveStageKeyHeld, stageScale, dispatch, brushSize]
