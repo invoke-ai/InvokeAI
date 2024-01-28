@@ -71,7 +71,7 @@ export const LoRACard = memo((props: LoRACardProps) => {
       </CardHeader>
       <CardBody>
         <CompositeSlider
-          value={lora.weight}
+          value={isEnabled ? lora.weight : prevWeight}
           onChange={handleChange}
           min={-1}
           max={2}
@@ -80,7 +80,7 @@ export const LoRACard = memo((props: LoRACardProps) => {
           defaultValue={0.75}
         />
         <CompositeNumberInput
-          value={lora.weight}
+          value={isEnabled ? lora.weight : prevWeight}
           onChange={handleChange}
           min={-5}
           max={5}
