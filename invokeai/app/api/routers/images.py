@@ -1,6 +1,6 @@
 import io
 import traceback
-from typing import Optional
+from typing import Optional, cast
 
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
@@ -13,6 +13,7 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID, WorkflowWithoutIDValidator
+from invokeai.app.util.misc import uuid_string
 
 from ..dependencies import ApiDependencies
 
@@ -377,6 +378,7 @@ class ImagesDownloaded(BaseModel):
     response: Optional[str] = Field(
         description="If defined, the message to display to the user when images begin downloading"
     )
+    bulk_download_item_name: str = Field(description="The bulk download item name of the bulk download item")
 
 
 @images_router.post(
@@ -384,15 +386,31 @@ class ImagesDownloaded(BaseModel):
 )
 async def download_images_from_list(
     background_tasks: BackgroundTasks,
-    image_names: list[str] = Body(description="The list of names of images to download", embed=True),
+    image_names: Optional[list[str]] = Body(
+        default=None, description="The list of names of images to download", embed=True
+    ),
     board_id: Optional[str] = Body(
         default=None, description="The board from which image should be downloaded from", embed=True
     ),
 ) -> ImagesDownloaded:
     if (image_names is None or len(image_names) == 0) and board_id is None:
         raise HTTPException(status_code=400, detail="No images or board id specified.")
-    background_tasks.add_task(ApiDependencies.invoker.services.bulk_download.handler, image_names, board_id)
-    return ImagesDownloaded(response="Your images are preparing to be downloaded")
+    bulk_download_item_id: str = uuid_string() if board_id is None else board_id
+    board_name: str = (
+        "" if board_id is None else ApiDependencies.invoker.services.board_records.get(board_id).board_name
+    )
+
+    # Type narrowing handled above ^, we know that image_names is not None, trying to keep null checks at the boundaries
+    background_tasks.add_task(
+        ApiDependencies.invoker.services.bulk_download.handler,
+        cast(list[str], image_names),
+        board_id,
+        bulk_download_item_id,
+    )
+    return ImagesDownloaded(
+        response="Your images are preparing to be downloaded",
+        bulk_download_item_name=bulk_download_item_id if board_id is None else board_name + ".zip",
+    )
 
 
 @images_router.api_route(
@@ -410,7 +428,7 @@ async def download_images_from_list(
 )
 async def get_bulk_download_item(
     background_tasks: BackgroundTasks,
-    bulk_download_item_name: str = Path(description="The bulk_download_item_id of the bulk download item to get"),
+    bulk_download_item_name: str = Path(description="The bulk_download_item_name of the bulk download item to get"),
 ) -> FileResponse:
     """Gets a bulk download zip file"""
     try:
