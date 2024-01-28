@@ -74,7 +74,7 @@ const IAICanvasStagingAreaToolbar = () => {
     preventDefault: true,
   });
 
-  useHotkeys(['enter'], () => handleAccept, {
+  useHotkeys(['enter'], handleAccept, {
     enabled: () => true,
     preventDefault: true,
   });
