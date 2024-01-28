@@ -125,7 +125,7 @@ def test_handler_image_names(tmp_path: Path, monkeypatch: Any, mock_image_dto: I
 
     bulk_download_service = BulkDownloadService(tmp_path)
     bulk_download_service.start(mock_invoker)
-    bulk_download_service.handler([mock_image_dto.image_name], None)
+    bulk_download_service.handler([mock_image_dto.image_name], None, None)
 
     assert_handler_success(
         expected_zip_path, expected_image_path, mock_image_contents, tmp_path, mock_invoker.services.events
@@ -151,7 +151,7 @@ def test_handler_board_id(tmp_path: Path, monkeypatch: Any, mock_image_dto: Imag
 
     bulk_download_service = BulkDownloadService(tmp_path)
     bulk_download_service.start(mock_invoker)
-    bulk_download_service.handler([], "test")
+    bulk_download_service.handler([], "test", None)
 
     assert_handler_success(
         expected_zip_path, expected_image_path, mock_image_contents, tmp_path, mock_invoker.services.events
@@ -173,7 +173,31 @@ def test_handler_board_id_default(tmp_path: Path, monkeypatch: Any, mock_image_d
 
     bulk_download_service = BulkDownloadService(tmp_path)
     bulk_download_service.start(mock_invoker)
-    bulk_download_service.handler([], "none")
+    bulk_download_service.handler([], "none", None)
+
+    assert_handler_success(
+        expected_zip_path, expected_image_path, mock_image_contents, tmp_path, mock_invoker.services.events
+    )
+
+
+def test_handler_bulk_download__item_id_given(
+    tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker
+):
+    """Test that the handler creates the zip file correctly when given a pregenerated bulk download item id."""
+
+    _, expected_image_path, mock_image_contents = prepare_handler_test(
+        tmp_path, monkeypatch, mock_image_dto, mock_invoker
+    )
+    expected_zip_path: Path = tmp_path / "bulk_downloads" / "test_id.zip"
+
+    def mock_get_many(*args, **kwargs):
+        return OffsetPaginatedResults(limit=-1, total=1, offset=0, items=[mock_image_dto])
+
+    monkeypatch.setattr(mock_invoker.services.images, "get_many", mock_get_many)
+
+    bulk_download_service = BulkDownloadService(tmp_path)
+    bulk_download_service.start(mock_invoker)
+    bulk_download_service.handler([mock_image_dto.image_name], None, "test_id")
 
     assert_handler_success(
         expected_zip_path, expected_image_path, mock_image_contents, tmp_path, mock_invoker.services.events
@@ -242,20 +266,6 @@ def assert_handler_success(
     assert event_bus.events[1].payload["bulk_download_item_name"] == os.path.basename(expected_zip_path)
 
 
-def test_stop(tmp_path: Path) -> None:
-    """Test that the stop method removes the bulk_downloads directory."""
-
-    bulk_download_service = BulkDownloadService(tmp_path)
-
-    mock_file: Path = tmp_path / "bulk_downloads" / "test.zip"
-    mock_file.write_text("contents")
-
-    bulk_download_service.stop()
-
-    assert (tmp_path / "bulk_downloads").exists()
-    assert len(os.listdir(tmp_path / "bulk_downloads")) == 0
-
-
 def test_handler_on_image_not_found(tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker):
     """Test that the handler emits an error event when the image is not found."""
     exception: Exception = ImageRecordNotFoundException("Image not found")
@@ -309,7 +319,7 @@ def execute_handler_test_on_error(
 ):
     bulk_download_service = BulkDownloadService(tmp_path)
     bulk_download_service.start(mock_invoker)
-    bulk_download_service.handler([mock_image_dto.image_name], None)
+    bulk_download_service.handler([mock_image_dto.image_name], None, None)
 
     event_bus: DummyEventService = mock_invoker.services.events
 
@@ -317,6 +327,35 @@ def execute_handler_test_on_error(
     assert event_bus.events[0].event_name == "bulk_download_started"
     assert event_bus.events[1].event_name == "bulk_download_failed"
     assert event_bus.events[1].payload["error"] == error.__str__()
+
+
+def test_get_board_name(tmp_path: Path, monkeypatch: Any, mock_invoker: Invoker):
+    """Test that the get_board_name function returns the correct board name."""
+
+    expected_board_name = "board1"
+
+    def mock_get(*args, **kwargs):
+        return BoardRecord(board_id="12345", board_name=expected_board_name, created_at="None", updated_at="None")
+
+    monkeypatch.setattr(mock_invoker.services.board_records, "get", mock_get)
+
+    bulk_download_service = BulkDownloadService(tmp_path)
+    bulk_download_service.start(mock_invoker)
+    board_name = bulk_download_service.get_board_name("12345")
+
+    assert board_name == expected_board_name
+
+
+def test_get_board_name_default(tmp_path: Path, mock_invoker: Invoker):
+    """Test that the get_board_name function returns the correct board name."""
+
+    expected_board_name = "Uncategorized"
+
+    bulk_download_service = BulkDownloadService(tmp_path)
+    bulk_download_service.start(mock_invoker)
+    board_name = bulk_download_service.get_board_name("none")
+
+    assert board_name == expected_board_name
 
 
 def test_delete(tmp_path: Path):
@@ -332,8 +371,9 @@ def test_delete(tmp_path: Path):
     assert (tmp_path / "bulk_downloads").exists()
     assert len(os.listdir(tmp_path / "bulk_downloads")) == 0
 
+
 def test_stop(tmp_path: Path):
-    """Test that the delete method removes the bulk download file."""
+    """Test that the stop method removes the bulk download file and not any directories."""
 
     bulk_download_service = BulkDownloadService(tmp_path)
 
@@ -342,7 +382,6 @@ def test_stop(tmp_path: Path):
 
     mock_dir: Path = tmp_path / "bulk_downloads" / "test"
     mock_dir.mkdir(parents=True, exist_ok=True)
-
 
     bulk_download_service.stop()
 
