@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
+from invokeai.app.services.board_records.board_records_common import BoardRecord
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
@@ -70,17 +71,32 @@ class MockApiDependencies(ApiDependencies):
 def test_download_images_from_list(monkeypatch: Any, mock_invoker: Invoker) -> None:
     prepare_download_images_test(monkeypatch, mock_invoker)
 
-    response = client.post("/api/v1/images/download", json={"image_names": ["test.png"]})
+    def mock_uuid_string():
+        return "test"
 
+    # You have to patch the function within the module it's being imported into. This is strange, but it works.
+    # See http://www.gregreda.com/2021/06/28/mocking-imported-module-function-python/
+    monkeypatch.setattr("invokeai.app.api.routers.images.uuid_string", mock_uuid_string)
+
+    response = client.post("/api/v1/images/download", json={"image_names": ["test.png"]})
+    json_response = response.json()
     assert response.status_code == 202
+    assert json_response["bulk_download_item_name"] == "test"
 
 
 def test_download_images_from_board_id_empty_image_name_list(monkeypatch: Any, mock_invoker: Invoker) -> None:
+    expected_board_name = "test"
+
+    def mock_get(*args, **kwargs):
+        return BoardRecord(board_id="12345", board_name=expected_board_name, created_at="None", updated_at="None")
+
+    monkeypatch.setattr(mock_invoker.services.board_records, "get", mock_get)
     prepare_download_images_test(monkeypatch, mock_invoker)
 
-    response = client.post("/api/v1/images/download", json={"image_names": [], "board_id": "test"})
-
+    response = client.post("/api/v1/images/download", json={"board_id": "test"})
+    json_response = response.json()
     assert response.status_code == 202
+    assert json_response["bulk_download_item_name"] == "test.zip"
 
 
 def prepare_download_images_test(monkeypatch: Any, mock_invoker: Invoker) -> None:
