@@ -26,7 +26,7 @@ class BulkDownloadBase(ABC):
         """
 
     @abstractmethod
-    def handler(self, image_names: list[str], board_id: Optional[str]) -> None:
+    def handler(self, image_names: list[str], board_id: Optional[str], bulk_download_item_id: Optional[str]) -> None:
         """
         Starts a a bulk download job.
 
@@ -42,6 +42,15 @@ class BulkDownloadBase(ABC):
 
         :param bulk_download_item_name: The name of the bulk download item.
         :return: The path to the bulk download file.
+        """
+
+    @abstractmethod
+    def get_board_name(self, board_id: str) -> str:
+        """
+        Get the name of the board.
+
+        :param board_id: The ID of the board.
+        :return: The name of the board.
         """
 
     @abstractmethod
