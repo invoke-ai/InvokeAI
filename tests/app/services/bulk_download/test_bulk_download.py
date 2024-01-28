@@ -319,7 +319,7 @@ def execute_handler_test_on_error(
     assert event_bus.events[1].payload["error"] == error.__str__()
 
 
-def test_delete(tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker):
+def test_delete(tmp_path: Path):
     """Test that the delete method removes the bulk download file."""
 
     bulk_download_service = BulkDownloadService(tmp_path)
@@ -331,3 +331,21 @@ def test_delete(tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock
 
     assert (tmp_path / "bulk_downloads").exists()
     assert len(os.listdir(tmp_path / "bulk_downloads")) == 0
+
+def test_stop(tmp_path: Path):
+    """Test that the delete method removes the bulk download file."""
+
+    bulk_download_service = BulkDownloadService(tmp_path)
+
+    mock_file: Path = tmp_path / "bulk_downloads" / "test.zip"
+    mock_file.write_text("contents")
+
+    mock_dir: Path = tmp_path / "bulk_downloads" / "test"
+    mock_dir.mkdir(parents=True, exist_ok=True)
+
+
+    bulk_download_service.stop()
+
+    assert (tmp_path / "bulk_downloads").exists()
+    assert mock_dir.exists()
+    assert len(os.listdir(tmp_path / "bulk_downloads")) == 1
