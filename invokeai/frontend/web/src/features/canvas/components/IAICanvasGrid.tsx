@@ -76,11 +76,11 @@ const IAICanvasGrid = () => {
     };
 
     const // find the x & y size of the grid
-      xSize = gridFullRect.x2 - gridFullRect.x1,
-      ySize = gridFullRect.y2 - gridFullRect.y1,
-      // compute the number of steps required on each axis.
-      xSteps = Math.round(xSize / gridSpacing) + 1,
-      ySteps = Math.round(ySize / gridSpacing) + 1;
+      xSize = gridFullRect.x2 - gridFullRect.x1;
+    const ySize = gridFullRect.y2 - gridFullRect.y1;
+    // compute the number of steps required on each axis.
+    const xSteps = Math.round(xSize / gridSpacing) + 1;
+    const ySteps = Math.round(ySize / gridSpacing) + 1;
 
     const strokeWidth = unscale(1);
 
