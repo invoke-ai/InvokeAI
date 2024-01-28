@@ -45,7 +45,7 @@ class BulkDownloadBase(ABC):
         """
 
     @abstractmethod
-    def get_board_name(self, board_id: str) -> str:
+    def get_clean_board_name(self, board_id: str) -> str:
         """
         Get the name of the board.
 
