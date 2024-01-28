@@ -38,7 +38,7 @@ class BulkDownloadService(BulkDownloadBase):
         self.__bulk_downloads_folder = self.__output_folder / "bulk_downloads"
         self.__bulk_downloads_folder.mkdir(parents=True, exist_ok=True)
 
-    def handler(self, image_names: list[str], board_id: Optional[str]) -> None:
+    def handler(self, image_names: list[str], board_id: Optional[str], bulk_download_item_id: Optional[str]) -> None:
         """
         Create a zip file containing the images specified by the given image names or board id.
 
@@ -47,7 +47,8 @@ class BulkDownloadService(BulkDownloadBase):
         """
 
         bulk_download_id: str = DEFAULT_BULK_DOWNLOAD_ID
-        bulk_download_item_id: str = uuid_string() if board_id is None else board_id
+        if bulk_download_item_id is None:
+            bulk_download_item_id = uuid_string() if board_id is None else board_id
 
         self._signal_job_started(bulk_download_id, bulk_download_item_id)
 
@@ -56,7 +57,7 @@ class BulkDownloadService(BulkDownloadBase):
             image_dtos: list[ImageDTO] = []
 
             if board_id:
-                board_name = self._get_board_name(board_id)
+                board_name = self.get_board_name(board_id)
                 board_name = self._clean_string_to_path_safe(board_name)
 
                 # -1 is the default value for limit, which means no limit, is_intermediate only gives us completed images
@@ -79,7 +80,7 @@ class BulkDownloadService(BulkDownloadBase):
             self.__invoker.services.logger.error("Problem bulk downloading images.")
             raise e
 
-    def _get_board_name(self, board_id: str) -> str:
+    def get_board_name(self, board_id: str) -> str:
         if board_id == "none":
             return "Uncategorized"
 
