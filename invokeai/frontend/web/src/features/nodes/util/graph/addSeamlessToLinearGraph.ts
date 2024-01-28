@@ -96,7 +96,7 @@ export const addSeamlessToLinearGraph = (
   );
 
   if (
-    graph.id == CANVAS_INPAINT_GRAPH ||
+    graph.id === CANVAS_INPAINT_GRAPH ||
     graph.id === CANVAS_OUTPAINT_GRAPH ||
     graph.id === SDXL_CANVAS_INPAINT_GRAPH ||
     graph.id === SDXL_CANVAS_OUTPAINT_GRAPH

@@ -13,10 +13,10 @@ const AddModels = () => {
   return (
     <Flex flexDirection="column" width="100%" overflow="scroll" maxHeight={window.innerHeight - 250} gap={4}>
       <ButtonGroup>
-        <Button size="sm" isChecked={addModelMode == 'simple'} onClick={handleAddModelSimple}>
+        <Button size="sm" isChecked={addModelMode === 'simple'} onClick={handleAddModelSimple}>
           {t('common.simple')}
         </Button>
-        <Button size="sm" isChecked={addModelMode == 'advanced'} onClick={handleAddModelAdvanced}>
+        <Button size="sm" isChecked={addModelMode === 'advanced'} onClick={handleAddModelAdvanced}>
           {t('common.advanced')}
         </Button>
       </ButtonGroup>

@@ -70,7 +70,7 @@ export const addVAEToGraph = (
     graph.id === CANVAS_TEXT_TO_IMAGE_GRAPH ||
     graph.id === CANVAS_IMAGE_TO_IMAGE_GRAPH ||
     graph.id === SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH ||
-    graph.id == SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH
+    graph.id === SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH
   ) {
     graph.edges.push({
       source: {

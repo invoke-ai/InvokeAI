@@ -50,16 +50,16 @@ export const findConnectionToValidHandle = (
     return null;
   }
 
-  const handles = handleCurrentType == 'source' ? node.data.inputs : node.data.outputs;
+  const handles = handleCurrentType === 'source' ? node.data.inputs : node.data.outputs;
 
   //Prioritize handles whos name matches the node we're coming from
   if (handles[handleCurrentName]) {
     const handle = handles[handleCurrentName];
 
-    const sourceID = handleCurrentType == 'source' ? handleCurrentNodeId : node.id;
-    const targetID = handleCurrentType == 'source' ? node.id : handleCurrentNodeId;
-    const sourceHandle = handleCurrentType == 'source' ? handleCurrentName : handle.name;
-    const targetHandle = handleCurrentType == 'source' ? handle.name : handleCurrentName;
+    const sourceID = handleCurrentType === 'source' ? handleCurrentNodeId : node.id;
+    const targetID = handleCurrentType === 'source' ? node.id : handleCurrentNodeId;
+    const sourceHandle = handleCurrentType === 'source' ? handleCurrentName : handle.name;
+    const targetHandle = handleCurrentType === 'source' ? handle.name : handleCurrentName;
 
     const isGraphAcyclic = getIsGraphAcyclic(sourceID, targetID, nodes, edges);
 
@@ -78,10 +78,10 @@ export const findConnectionToValidHandle = (
   for (const handleName in handles) {
     const handle = handles[handleName];
 
-    const sourceID = handleCurrentType == 'source' ? handleCurrentNodeId : node.id;
-    const targetID = handleCurrentType == 'source' ? node.id : handleCurrentNodeId;
-    const sourceHandle = handleCurrentType == 'source' ? handleCurrentName : handle.name;
-    const targetHandle = handleCurrentType == 'source' ? handle.name : handleCurrentName;
+    const sourceID = handleCurrentType === 'source' ? handleCurrentNodeId : node.id;
+    const targetID = handleCurrentType === 'source' ? node.id : handleCurrentNodeId;
+    const sourceHandle = handleCurrentType === 'source' ? handleCurrentName : handle.name;
+    const targetHandle = handleCurrentType === 'source' ? handle.name : handleCurrentName;
 
     const isGraphAcyclic = getIsGraphAcyclic(sourceID, targetID, nodes, edges);
 

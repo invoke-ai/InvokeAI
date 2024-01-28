@@ -175,7 +175,7 @@ export const addHrfToGraph = (state: RootState, graph: NonNullableGraph): void =
     width: width,
     height: height,
   };
-  if (hrfMethod == 'ESRGAN') {
+  if (hrfMethod === 'ESRGAN') {
     let model_name: ESRGANInvocation['model_name'] = 'RealESRGAN_x2plus.pth';
     if ((width * height) / (hrfWidth * hrfHeight) > 2) {
       model_name = 'RealESRGAN_x4plus.pth';

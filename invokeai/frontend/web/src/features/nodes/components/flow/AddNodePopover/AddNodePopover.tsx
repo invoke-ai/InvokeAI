@@ -58,11 +58,11 @@ const AddNodePopover = () => {
     // If we have a connection in progress, we need to filter the node choices
     const filteredNodeTemplates = fieldFilter
       ? filter(nodeTemplates.templates, (template) => {
-          const handles = handleFilter == 'source' ? template.inputs : template.outputs;
+          const handles = handleFilter === 'source' ? template.inputs : template.outputs;
 
           return some(handles, (handle) => {
-            const sourceType = handleFilter == 'source' ? fieldFilter : handle.type;
-            const targetType = handleFilter == 'target' ? fieldFilter : handle.type;
+            const sourceType = handleFilter === 'source' ? fieldFilter : handle.type;
+            const targetType = handleFilter === 'target' ? fieldFilter : handle.type;
 
             return validateSourceAndTargetTypes(sourceType, targetType);
           });
