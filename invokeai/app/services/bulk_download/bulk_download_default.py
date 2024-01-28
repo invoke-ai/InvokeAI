@@ -143,8 +143,8 @@ class BulkDownloadService(BulkDownloadBase):
 
     def stop(self, *args, **kwargs):
         """Stop the bulk download service and delete the files in the bulk download folder."""
-        # Get all the files in the bulk downloads folder
-        files = self.__bulk_downloads_folder.glob("*")
+        # Get all the files in the bulk downloads folder, only .zip files
+        files = self.__bulk_downloads_folder.glob("*.zip")
 
         # Delete all the files
         for file in files:
