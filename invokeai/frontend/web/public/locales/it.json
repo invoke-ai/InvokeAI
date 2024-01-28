@@ -1254,8 +1254,7 @@
         "large": "Grande",
         "small": "Piccolo",
         "depthAnythingDescription": "Generazione di mappe di profondità utilizzando la tecnica Depth Anything",
-        "modelSize": "Dimensioni del modello",
-        "base": ""
+        "modelSize": "Dimensioni del modello"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
