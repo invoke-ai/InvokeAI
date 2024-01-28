@@ -397,7 +397,7 @@ async def download_images_from_list(
         raise HTTPException(status_code=400, detail="No images or board id specified.")
     bulk_download_item_id: str = uuid_string() if board_id is None else board_id
     board_name: str = (
-        "" if board_id is None else ApiDependencies.invoker.services.board_records.get(board_id).board_name
+        "" if board_id is None else ApiDependencies.invoker.services.bulk_download.get_clean_board_name(board_id)
     )
 
     # Type narrowing handled above ^, we know that image_names is not None, trying to keep null checks at the boundaries
