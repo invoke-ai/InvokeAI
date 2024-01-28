@@ -111,7 +111,7 @@
   },
   "devDependencies": {
     "@arthurgeron/eslint-plugin-react-usememo": "^2.2.3",
-    "@invoke-ai/eslint-config-react": "^0.0.11",
+    "@invoke-ai/eslint-config-react": "^0.0.12",
     "@invoke-ai/prettier-config-react": "^0.0.6",
     "@storybook/addon-docs": "^7.6.10",
     "@storybook/addon-essentials": "^7.6.10",
