@@ -23,6 +23,7 @@ theme:
   icon:
     repo: fontawesome/brands/github
     edit: material/file-document-edit-outline
+  favicon: img/favicon.ico
   palette:
     # - media: '(prefers-color-scheme: light)'
     #   scheme: default

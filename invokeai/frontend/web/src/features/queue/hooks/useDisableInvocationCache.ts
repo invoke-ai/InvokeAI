@@ -2,10 +2,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  useDisableInvocationCacheMutation,
-  useGetInvocationCacheStatusQuery,
-} from 'services/api/endpoints/appInfo';
+import { useDisableInvocationCacheMutation, useGetInvocationCacheStatusQuery } from 'services/api/endpoints/appInfo';
 
 export const useDisableInvocationCache = () => {
   const { t } = useTranslation();

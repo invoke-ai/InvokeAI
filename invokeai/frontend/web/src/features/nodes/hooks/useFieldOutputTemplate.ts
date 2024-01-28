@@ -8,18 +8,14 @@ import { useMemo } from 'react';
 export const useFieldOutputTemplate = (nodeId: string, fieldName: string) => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(
-        selectNodesSlice,
-        selectNodeTemplatesSlice,
-        (nodes, nodeTemplates) => {
-          const node = nodes.nodes.find((node) => node.id === nodeId);
-          if (!isInvocationNode(node)) {
-            return;
-          }
-          const nodeTemplate = nodeTemplates.templates[node?.data.type ?? ''];
-          return nodeTemplate?.outputs[fieldName];
+      createMemoizedSelector(selectNodesSlice, selectNodeTemplatesSlice, (nodes, nodeTemplates) => {
+        const node = nodes.nodes.find((node) => node.id === nodeId);
+        if (!isInvocationNode(node)) {
+          return;
         }
-      ),
+        const nodeTemplate = nodeTemplates.templates[node?.data.type ?? ''];
+        return nodeTemplate?.outputs[fieldName];
+      }),
     [fieldName, nodeId]
   );
 

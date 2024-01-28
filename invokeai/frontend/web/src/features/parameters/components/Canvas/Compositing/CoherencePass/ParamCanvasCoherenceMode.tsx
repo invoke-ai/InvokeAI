@@ -1,5 +1,5 @@
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setCanvasCoherenceMode } from 'features/parameters/store/generationSlice';
@@ -9,9 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 const ParamCanvasCoherenceMode = () => {
   const dispatch = useAppDispatch();
-  const canvasCoherenceMode = useAppSelector(
-    (s) => s.generation.canvasCoherenceMode
-  );
+  const canvasCoherenceMode = useAppSelector((s) => s.generation.canvasCoherenceMode);
   const { t } = useTranslation();
 
   const options = useMemo<ComboboxOption[]>(
@@ -34,10 +32,7 @@ const ParamCanvasCoherenceMode = () => {
     [dispatch]
   );
 
-  const value = useMemo(
-    () => options.find((o) => o.value === canvasCoherenceMode),
-    [canvasCoherenceMode, options]
-  );
+  const value = useMemo(() => options.find((o) => o.value === canvasCoherenceMode), [canvasCoherenceMode, options]);
 
   return (
     <FormControl>

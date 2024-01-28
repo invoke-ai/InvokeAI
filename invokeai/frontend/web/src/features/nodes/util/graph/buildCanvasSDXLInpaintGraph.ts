@@ -90,17 +90,14 @@ export const buildCanvasSDXLInpaintGraph = (
 
   const fp32 = vaePrecision === 'fp32';
   const is_intermediate = true;
-  const isUsingScaledDimensions = ['auto', 'manual'].includes(
-    boundingBoxScaleMethod
-  );
+  const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);
 
   let modelLoaderNodeId = SDXL_MODEL_LOADER;
 
   const use_cpu = shouldUseCpuNoise;
 
   // Construct Style Prompt
-  const { positiveStylePrompt, negativeStylePrompt } =
-    getSDXLStylePrompts(state);
+  const { positiveStylePrompt, negativeStylePrompt } = getSDXLStylePrompts(state);
 
   const graph: NonNullableGraph = {
     id: SDXL_CANVAS_INPAINT_GRAPH,
@@ -155,9 +152,7 @@ export const buildCanvasSDXLInpaintGraph = (
         steps: steps,
         cfg_scale: cfg_scale,
         scheduler: scheduler,
-        denoising_start: refinerModel
-          ? Math.min(refinerStart, 1 - strength)
-          : 1 - strength,
+        denoising_start: refinerModel ? Math.min(refinerStart, 1 - strength) : 1 - strength,
         denoising_end: refinerModel ? refinerStart : 1,
       },
       [CANVAS_COHERENCE_NOISE]: {
@@ -415,10 +410,8 @@ export const buildCanvasSDXLInpaintGraph = (
 
     (graph.nodes[NOISE] as NoiseInvocation).width = scaledWidth;
     (graph.nodes[NOISE] as NoiseInvocation).height = scaledHeight;
-    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).width =
-      scaledWidth;
-    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).height =
-      scaledHeight;
+    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).width = scaledWidth;
+    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).height = scaledHeight;
 
     // Connect Nodes
     graph.edges.push(
@@ -564,9 +557,7 @@ export const buildCanvasSDXLInpaintGraph = (
       });
     } else {
       graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] = {
-        ...(graph.nodes[
-          CANVAS_COHERENCE_INPAINT_CREATE_MASK
-        ] as CreateDenoiseMaskInvocation),
+        ...(graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] as CreateDenoiseMaskInvocation),
         image: canvasInitImage,
       };
     }
@@ -586,9 +577,7 @@ export const buildCanvasSDXLInpaintGraph = (
         });
       } else {
         graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] = {
-          ...(graph.nodes[
-            CANVAS_COHERENCE_INPAINT_CREATE_MASK
-          ] as CreateDenoiseMaskInvocation),
+          ...(graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] as CreateDenoiseMaskInvocation),
           mask: canvasMaskImage,
         };
       }

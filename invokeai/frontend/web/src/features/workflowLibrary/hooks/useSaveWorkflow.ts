@@ -1,19 +1,12 @@
-import type { ToastId } from '@invoke-ai/ui';
-import { useToast } from '@invoke-ai/ui';
+import type { ToastId } from '@invoke-ai/ui-library';
+import { useToast } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { $builtWorkflow } from 'features/nodes/hooks/useWorkflowWatcher';
-import {
-  workflowIDChanged,
-  workflowSaved,
-} from 'features/nodes/store/workflowSlice';
+import { workflowIDChanged, workflowSaved } from 'features/nodes/store/workflowSlice';
 import type { WorkflowV2 } from 'features/nodes/types/workflow';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  useCreateWorkflowMutation,
-  useUpdateWorkflowMutation,
-  workflowsApi,
-} from 'services/api/endpoints/workflows';
+import { useCreateWorkflowMutation, useUpdateWorkflowMutation, workflowsApi } from 'services/api/endpoints/workflows';
 import type { O } from 'ts-toolbelt';
 
 type UseSaveLibraryWorkflowReturn = {
@@ -24,9 +17,7 @@ type UseSaveLibraryWorkflowReturn = {
 
 type UseSaveLibraryWorkflow = () => UseSaveLibraryWorkflowReturn;
 
-const isWorkflowWithID = (
-  workflow: WorkflowV2
-): workflow is O.Required<WorkflowV2, 'id'> => Boolean(workflow.id);
+const isWorkflowWithID = (workflow: WorkflowV2): workflow is O.Required<WorkflowV2, 'id'> => Boolean(workflow.id);
 
 export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
   const { t } = useTranslation();
@@ -62,12 +53,8 @@ export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
       });
     } catch (e) {
       if (
-        !toast.isActive(
-          `auth-error-toast-${workflowsApi.endpoints.createWorkflow.name}`
-        ) &&
-        !toast.isActive(
-          `auth-error-toast-${workflowsApi.endpoints.updateWorkflow.name}`
-        )
+        !toast.isActive(`auth-error-toast-${workflowsApi.endpoints.createWorkflow.name}`) &&
+        !toast.isActive(`auth-error-toast-${workflowsApi.endpoints.updateWorkflow.name}`)
       ) {
         toast.update(toastRef.current, {
           title: t('workflows.problemSavingWorkflow'),

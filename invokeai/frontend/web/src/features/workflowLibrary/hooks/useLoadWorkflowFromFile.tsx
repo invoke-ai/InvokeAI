@@ -11,13 +11,9 @@ type useLoadWorkflowFromFileOptions = {
   resetRef: RefObject<() => void>;
 };
 
-type UseLoadWorkflowFromFile = (
-  options: useLoadWorkflowFromFileOptions
-) => (file: File | null) => void;
+type UseLoadWorkflowFromFile = (options: useLoadWorkflowFromFileOptions) => (file: File | null) => void;
 
-export const useLoadWorkflowFromFile: UseLoadWorkflowFromFile = ({
-  resetRef,
-}) => {
+export const useLoadWorkflowFromFile: UseLoadWorkflowFromFile = ({ resetRef }) => {
   const dispatch = useAppDispatch();
   const logger = useLogger('nodes');
   const { t } = useTranslation();
@@ -32,9 +28,7 @@ export const useLoadWorkflowFromFile: UseLoadWorkflowFromFile = ({
 
         try {
           const parsedJSON = JSON.parse(String(rawJSON));
-          dispatch(
-            workflowLoadRequested({ workflow: parsedJSON, asCopy: true })
-          );
+          dispatch(workflowLoadRequested({ workflow: parsedJSON, asCopy: true }));
         } catch (e) {
           // There was a problem reading the file
           logger.error(t('nodes.unableToLoadWorkflow'));

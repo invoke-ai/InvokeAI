@@ -1,5 +1,5 @@
-import type { ComboboxOnChange } from '@invoke-ai/ui';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
+import type { ComboboxOnChange } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { languageChanged } from 'features/system/store/systemSlice';
@@ -35,13 +35,9 @@ export const SettingsLanguageSelect = memo(() => {
     ],
     [t]
   );
-  const isLocalizationEnabled =
-    useFeatureStatus('localization').isFeatureEnabled;
+  const isLocalizationEnabled = useFeatureStatus('localization').isFeatureEnabled;
 
-  const value = useMemo(
-    () => options.find((o) => o.value === language),
-    [language, options]
-  );
+  const value = useMemo(() => options.find((o) => o.value === language), [language, options]);
 
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {

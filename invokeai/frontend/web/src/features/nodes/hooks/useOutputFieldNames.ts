@@ -10,22 +10,18 @@ import { useMemo } from 'react';
 export const useOutputFieldNames = (nodeId: string) => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(
-        selectNodesSlice,
-        selectNodeTemplatesSlice,
-        (nodes, nodeTemplates) => {
-          const node = nodes.nodes.find((node) => node.id === nodeId);
-          if (!isInvocationNode(node)) {
-            return [];
-          }
-          const nodeTemplate = nodeTemplates.templates[node.data.type];
-          if (!nodeTemplate) {
-            return [];
-          }
-
-          return getSortedFilteredFieldNames(map(nodeTemplate.outputs));
+      createMemoizedSelector(selectNodesSlice, selectNodeTemplatesSlice, (nodes, nodeTemplates) => {
+        const node = nodes.nodes.find((node) => node.id === nodeId);
+        if (!isInvocationNode(node)) {
+          return [];
         }
-      ),
+        const nodeTemplate = nodeTemplates.templates[node.data.type];
+        if (!nodeTemplate) {
+          return [];
+        }
+
+        return getSortedFilteredFieldNames(map(nodeTemplate.outputs));
+      }),
     [nodeId]
   );
 

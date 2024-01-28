@@ -1,12 +1,5 @@
-import type { ComboboxOption } from '@invoke-ai/ui';
-import {
-  Button,
-  Combobox,
-  Flex,
-  FormControl,
-  FormLabel,
-  Input,
-} from '@invoke-ai/ui';
+import type { ComboboxOption } from '@invoke-ai/ui-library';
+import { Button, Combobox, Flex, FormControl, FormLabel, Input } from '@invoke-ai/ui-library';
 import { useForm } from '@mantine/form';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
@@ -44,8 +37,7 @@ const SimpleAddModels = () => {
   const handleAddModelSubmit = (values: ExtendedImportModelConfig) => {
     const importModelResponseBody = {
       location: values.location,
-      prediction_type:
-        values.prediction_type === 'none' ? undefined : values.prediction_type,
+      prediction_type: values.prediction_type === 'none' ? undefined : values.prediction_type,
     };
 
     importMainModel({ body: importModelResponseBody })
@@ -76,26 +68,15 @@ const SimpleAddModels = () => {
   };
 
   return (
-    <form
-      onSubmit={addModelForm.onSubmit((v) => handleAddModelSubmit(v))}
-      style={formStyles}
-    >
+    <form onSubmit={addModelForm.onSubmit((v) => handleAddModelSubmit(v))} style={formStyles}>
       <Flex flexDirection="column" width="100%" gap={4}>
         <FormControl>
           <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
-          <Input
-            placeholder={t('modelManager.simpleModelDesc')}
-            w="100%"
-            {...addModelForm.getInputProps('location')}
-          />
+          <Input placeholder={t('modelManager.simpleModelDesc')} w="100%" {...addModelForm.getInputProps('location')} />
         </FormControl>
         <FormControl>
           <FormLabel>{t('modelManager.predictionType')}</FormLabel>
-          <Combobox
-            options={options}
-            defaultValue={options[0]}
-            {...addModelForm.getInputProps('prediction_type')}
-          />
+          <Combobox options={options} defaultValue={options[0]} {...addModelForm.getInputProps('prediction_type')} />
         </FormControl>
         <Button type="submit" isLoading={isLoading}>
           {t('modelManager.addModel')}

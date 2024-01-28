@@ -4,11 +4,7 @@ import { dndDropped } from 'app/store/middleware/listenerMiddleware/listeners/im
 import { useAppDispatch } from 'app/store/storeHooks';
 import { parseify } from 'common/util/serialize';
 import DndOverlay from 'features/dnd/components/DndOverlay';
-import type {
-  DragEndEvent,
-  DragStartEvent,
-  TypesafeDraggableData,
-} from 'features/dnd/types';
+import type { DragEndEvent, DragStartEvent, TypesafeDraggableData } from 'features/dnd/types';
 import { customPointerWithin } from 'features/dnd/util/customPointerWithin';
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useState } from 'react';
@@ -16,18 +12,14 @@ import { memo, useCallback, useState } from 'react';
 import { DndContextTypesafe } from './DndContextTypesafe';
 
 const AppDndContext = (props: PropsWithChildren) => {
-  const [activeDragData, setActiveDragData] =
-    useState<TypesafeDraggableData | null>(null);
+  const [activeDragData, setActiveDragData] = useState<TypesafeDraggableData | null>(null);
   const log = logger('images');
 
   const dispatch = useAppDispatch();
 
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
-      log.trace(
-        { dragData: parseify(event.active.data.current) },
-        'Drag started'
-      );
+      log.trace({ dragData: parseify(event.active.data.current) }, 'Drag started');
       const activeData = event.active.data.current;
       if (!activeData) {
         return;
@@ -39,10 +31,7 @@ const AppDndContext = (props: PropsWithChildren) => {
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
-      log.trace(
-        { dragData: parseify(event.active.data.current) },
-        'Drag ended'
-      );
+      log.trace({ dragData: parseify(event.active.data.current) }, 'Drag ended');
       const overData = event.over?.data.current;
       if (!activeDragData || !overData) {
         return;

@@ -17,10 +17,7 @@ export const useLogger = (namespace: LoggerNamespace) => {
       localStorage.setItem('ROARR_LOG', 'true');
 
       // Use a filter to show only logs of the given level
-      localStorage.setItem(
-        'ROARR_FILTER',
-        `context.logLevel:>=${LOG_LEVEL_MAP[consoleLogLevel]}`
-      );
+      localStorage.setItem('ROARR_FILTER', `context.logLevel:>=${LOG_LEVEL_MAP[consoleLogLevel]}`);
     } else {
       // Disable console log output
       localStorage.setItem('ROARR_LOG', 'false');

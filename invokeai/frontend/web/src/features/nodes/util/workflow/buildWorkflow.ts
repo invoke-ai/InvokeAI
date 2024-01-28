@@ -29,11 +29,7 @@ const workflowKeys = [
 
 export type BuildWorkflowFunction = (arg: BuildWorkflowArg) => WorkflowV2;
 
-export const buildWorkflowFast: BuildWorkflowFunction = ({
-  nodes,
-  edges,
-  workflow,
-}: BuildWorkflowArg): WorkflowV2 => {
+export const buildWorkflowFast: BuildWorkflowFunction = ({ nodes, edges, workflow }: BuildWorkflowArg): WorkflowV2 => {
   const clonedWorkflow = pick(cloneDeep(workflow), workflowKeys);
 
   const newWorkflow: WorkflowV2 = {
@@ -87,11 +83,7 @@ export const buildWorkflowFast: BuildWorkflowFunction = ({
   return newWorkflow;
 };
 
-export const buildWorkflowWithValidation = ({
-  nodes,
-  edges,
-  workflow,
-}: BuildWorkflowArg): WorkflowV2 | null => {
+export const buildWorkflowWithValidation = ({ nodes, edges, workflow }: BuildWorkflowArg): WorkflowV2 | null => {
   // builds what really, really should be a valid workflow
   const workflowToValidate = buildWorkflowFast({ nodes, edges, workflow });
 

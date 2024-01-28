@@ -1,5 +1,5 @@
-import type { ComboboxOnChange } from '@invoke-ai/ui';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
+import type { ComboboxOnChange } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { isLogLevel, zLogLevel } from 'app/logging/logger';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { consoleLogLevelChanged } from 'features/system/store/systemSlice';
@@ -11,15 +11,9 @@ export const SettingsLogLevelSelect = memo(() => {
   const dispatch = useAppDispatch();
   const consoleLogLevel = useAppSelector((s) => s.system.consoleLogLevel);
   const shouldLogToConsole = useAppSelector((s) => s.system.shouldLogToConsole);
-  const options = useMemo(
-    () => zLogLevel.options.map((o) => ({ label: o, value: o })),
-    []
-  );
+  const options = useMemo(() => zLogLevel.options.map((o) => ({ label: o, value: o })), []);
 
-  const value = useMemo(
-    () => options.find((o) => o.value === consoleLogLevel),
-    [consoleLogLevel, options]
-  );
+  const value = useMemo(() => options.find((o) => o.value === consoleLogLevel), [consoleLogLevel, options]);
 
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {

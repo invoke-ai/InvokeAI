@@ -1,10 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
-import type {
-  ImageResizeInvocation,
-  ImageToLatentsInvocation,
-  NonNullableGraph,
-} from 'services/api/types';
+import type { ImageResizeInvocation, ImageToLatentsInvocation, NonNullableGraph } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
@@ -33,9 +29,7 @@ import { addCoreMetadataNode } from './metadata';
 /**
  * Builds the Image to Image tab graph.
  */
-export const buildLinearImageToImageGraph = (
-  state: RootState
-): NonNullableGraph => {
+export const buildLinearImageToImageGraph = (state: RootState): NonNullableGraph => {
   const log = logger('nodes');
   const {
     positivePrompt,
@@ -246,10 +240,7 @@ export const buildLinearImageToImageGraph = (
   };
 
   // handle `fit`
-  if (
-    shouldFitToWidthHeight &&
-    (initialImage.width !== width || initialImage.height !== height)
-  ) {
+  if (shouldFitToWidthHeight && (initialImage.width !== width || initialImage.height !== height)) {
     // The init image needs to be resized to the specified width and height before being passed to `IMAGE_TO_LATENTS`
 
     // Create a resize node, explicitly setting its image

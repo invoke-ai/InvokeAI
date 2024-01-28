@@ -27,15 +27,7 @@ const selector = createMemoizedSelector(
     selectDynamicPromptsSlice,
     activeTabNameSelector,
   ],
-  (
-    controlAdapters,
-    generation,
-    system,
-    nodes,
-    nodeTemplates,
-    dynamicPrompts,
-    activeTabName
-  ) => {
+  (controlAdapters, generation, system, nodes, nodeTemplates, dynamicPrompts, activeTabName) => {
     const { initialImage, model, positivePrompt } = generation;
 
     const { isConnected } = system;
@@ -75,8 +67,7 @@ const selector = createMemoizedSelector(
           forEach(node.data.inputs, (field) => {
             const fieldTemplate = nodeTemplate.inputs[field.name];
             const hasConnection = connectedEdges.some(
-              (edge) =>
-                edge.target === node.id && edge.targetHandle === field.name
+              (edge) => edge.target === node.id && edge.targetHandle === field.name
             );
 
             if (!fieldTemplate) {
@@ -84,11 +75,7 @@ const selector = createMemoizedSelector(
               return;
             }
 
-            if (
-              fieldTemplate.required &&
-              field.value === undefined &&
-              !hasConnection
-            ) {
+            if (fieldTemplate.required && field.value === undefined && !hasConnection) {
               reasons.push(
                 i18n.t('parameters.invoke.missingInputForField', {
                   nodeLabel: node.data.label || nodeTemplate.title,
@@ -101,10 +88,7 @@ const selector = createMemoizedSelector(
         });
       }
     } else {
-      if (
-        dynamicPrompts.prompts.length === 0 &&
-        getShouldProcessPrompt(positivePrompt)
-      ) {
+      if (dynamicPrompts.prompts.length === 0 && getShouldProcessPrompt(positivePrompt)) {
         reasons.push(i18n.t('parameters.invoke.noPrompts'));
       }
 
@@ -134,9 +118,7 @@ const selector = createMemoizedSelector(
 
         if (
           !ca.controlImage ||
-          (isControlNetOrT2IAdapter(ca) &&
-            !ca.processedControlImage &&
-            ca.processorType !== 'none')
+          (isControlNetOrT2IAdapter(ca) && !ca.processedControlImage && ca.processorType !== 'none')
         ) {
           reasons.push(
             i18n.t('parameters.invoke.noControlImageForControlAdapter', {

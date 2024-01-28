@@ -1,8 +1,5 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  aspectRatioChanged,
-  setBoundingBoxDimensions,
-} from 'features/canvas/store/canvasSlice';
+import { aspectRatioChanged, setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import ParamBoundingBoxHeight from 'features/parameters/components/Canvas/BoundingBox/ParamBoundingBoxHeight';
 import ParamBoundingBoxWidth from 'features/parameters/components/Canvas/BoundingBox/ParamBoundingBoxWidth';
 import { ImageSize } from 'features/parameters/components/ImageSize/ImageSize';
@@ -12,9 +9,7 @@ import { memo, useCallback } from 'react';
 
 export const ImageSizeCanvas = memo(() => {
   const dispatch = useAppDispatch();
-  const { width, height } = useAppSelector(
-    (s) => s.canvas.boundingBoxDimensions
-  );
+  const { width, height } = useAppSelector((s) => s.canvas.boundingBoxDimensions);
   const aspectRatioState = useAppSelector((s) => s.canvas.aspectRatio);
   const optimalDimension = useAppSelector(selectOptimalDimension);
 

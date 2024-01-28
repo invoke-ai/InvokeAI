@@ -12,14 +12,8 @@ export const useGalleryHotkeys = () => {
     queryResult: { isFetching },
   } = useGalleryImages();
 
-  const {
-    handleLeftImage,
-    handleRightImage,
-    handleUpImage,
-    handleDownImage,
-    isOnLastImage,
-    areImagesBelowCurrent,
-  } = useGalleryNavigation();
+  const { handleLeftImage, handleRightImage, handleUpImage, handleDownImage, isOnLastImage, areImagesBelowCurrent } =
+    useGalleryNavigation();
 
   useHotkeys(
     'left',
@@ -40,13 +34,7 @@ export const useGalleryHotkeys = () => {
         handleRightImage();
       }
     },
-    [
-      isOnLastImage,
-      areMoreImagesAvailable,
-      handleLoadMoreImages,
-      isFetching,
-      handleRightImage,
-    ]
+    [isOnLastImage, areMoreImagesAvailable, handleLoadMoreImages, isFetching, handleRightImage]
   );
 
   useHotkeys(
@@ -68,12 +56,6 @@ export const useGalleryHotkeys = () => {
       handleDownImage();
     },
     { preventDefault: true },
-    [
-      areImagesBelowCurrent,
-      areMoreImagesAvailable,
-      handleLoadMoreImages,
-      isFetching,
-      handleDownImage,
-    ]
+    [areImagesBelowCurrent, areMoreImagesAvailable, handleLoadMoreImages, isFetching, handleDownImage]
   );
 };

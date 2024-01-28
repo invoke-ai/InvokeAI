@@ -1,10 +1,5 @@
-import type { FormLabelProps } from '@invoke-ai/ui';
-import {
-  Flex,
-  FormControlGroup,
-  StandaloneAccordion,
-  Text,
-} from '@invoke-ai/ui';
+import type { FormLabelProps } from '@invoke-ai/ui-library';
+import { Flex, FormControlGroup, StandaloneAccordion, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import ParamSDXLRefinerCFGScale from 'features/sdxl/components/SDXLRefiner/ParamSDXLRefinerCFGScale';
@@ -29,9 +24,7 @@ const stepsScaleLabelProps: FormLabelProps = {
   minW: '5rem',
 };
 
-const selectBadges = createMemoizedSelector(selectSdxlSlice, (sdxl) =>
-  sdxl.refinerModel ? ['Enabled'] : undefined
-);
+const selectBadges = createMemoizedSelector(selectSdxlSlice, (sdxl) => (sdxl.refinerModel ? ['Enabled'] : undefined));
 
 export const RefinerSettingsAccordion: React.FC = memo(() => {
   const { t } = useTranslation();
@@ -43,17 +36,8 @@ export const RefinerSettingsAccordion: React.FC = memo(() => {
   });
 
   return (
-    <StandaloneAccordion
-      label={t('sdxl.refiner')}
-      badges={badges}
-      isOpen={isOpen}
-      onToggle={onToggle}
-    >
-      {isRefinerAvailable ? (
-        <RefinerSettingsAccordionContent />
-      ) : (
-        <RefinerSettingsAccordionNoRefiner />
-      )}
+    <StandaloneAccordion label={t('sdxl.refiner')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
+      {isRefinerAvailable ? <RefinerSettingsAccordionContent /> : <RefinerSettingsAccordionNoRefiner />}
     </StandaloneAccordion>
   );
 });
@@ -71,31 +55,22 @@ const RefinerSettingsAccordionNoRefiner: React.FC = memo(() => {
   );
 });
 
-RefinerSettingsAccordionNoRefiner.displayName =
-  'RefinerSettingsAccordionNoRefiner';
+RefinerSettingsAccordionNoRefiner.displayName = 'RefinerSettingsAccordionNoRefiner';
 
 const RefinerSettingsAccordionContent: React.FC = memo(() => {
-  const isRefinerModelSelected = useAppSelector(
-    (state) => !isNil(state.sdxl.refinerModel)
-  );
+  const isRefinerModelSelected = useAppSelector((state) => !isNil(state.sdxl.refinerModel));
 
   return (
     <FormControlGroup isDisabled={!isRefinerModelSelected}>
       <Flex p={4} gap={4} flexDir="column">
         <ParamSDXLRefinerModelSelect />
-        <FormControlGroup
-          formLabelProps={stepsScaleLabelProps}
-          isDisabled={!isRefinerModelSelected}
-        >
+        <FormControlGroup formLabelProps={stepsScaleLabelProps} isDisabled={!isRefinerModelSelected}>
           <ParamSDXLRefinerScheduler />
           <ParamSDXLRefinerSteps />
           <ParamSDXLRefinerCFGScale />
           <ParamSDXLRefinerStart />
         </FormControlGroup>
-        <FormControlGroup
-          formLabelProps={aestheticLabelProps}
-          isDisabled={!isRefinerModelSelected}
-        >
+        <FormControlGroup formLabelProps={aestheticLabelProps} isDisabled={!isRefinerModelSelected}>
           <ParamSDXLRefinerPositiveAestheticScore />
           <ParamSDXLRefinerNegativeAestheticScore />
         </FormControlGroup>

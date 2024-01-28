@@ -1,9 +1,5 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  $cursorPosition,
-  $isDrawing,
-  $tool,
-} from 'features/canvas/store/canvasNanostore';
+import { $cursorPosition, $isDrawing, $tool } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { addPointToCurrentLine } from 'features/canvas/store/canvasSlice';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
@@ -49,17 +45,8 @@ const useCanvasMouseMove = (
     }
 
     didMouseMoveRef.current = true;
-    dispatch(
-      addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
-    );
-  }, [
-    didMouseMoveRef,
-    dispatch,
-    isStaging,
-    lastCursorPositionRef,
-    stageRef,
-    updateColorUnderCursor,
-  ]);
+    dispatch(addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y]));
+  }, [didMouseMoveRef, dispatch, isStaging, lastCursorPositionRef, stageRef, updateColorUnderCursor]);
 };
 
 export default useCanvasMouseMove;

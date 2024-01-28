@@ -1,4 +1,4 @@
-import { Combobox, Flex, FormControl } from '@invoke-ai/ui';
+import { Combobox, Flex, FormControl } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { SyncModelsIconButton } from 'features/modelManager/components/SyncModels/SyncModelsIconButton';
@@ -14,10 +14,7 @@ import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 
 import type { FieldComponentProps } from './types';
 
-type Props = FieldComponentProps<
-  SDXLRefinerModelFieldInputInstance,
-  SDXLRefinerModelFieldInputTemplate
->;
+type Props = FieldComponentProps<SDXLRefinerModelFieldInputInstance, SDXLRefinerModelFieldInputTemplate>;
 
 const RefinerModelFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
@@ -38,21 +35,16 @@ const RefinerModelFieldInputComponent = (props: Props) => {
     },
     [dispatch, field.name, nodeId]
   );
-  const { options, value, onChange, placeholder, noOptionsMessage } =
-    useGroupedModelCombobox({
-      modelEntities: data,
-      onChange: _onChange,
-      isLoading,
-      selectedModel: field.value,
-    });
+  const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
+    modelEntities: data,
+    onChange: _onChange,
+    isLoading,
+    selectedModel: field.value,
+  });
 
   return (
     <Flex w="full" alignItems="center" gap={2}>
-      <FormControl
-        className="nowheel nodrag"
-        isDisabled={!options.length}
-        isInvalid={!value}
-      >
+      <FormControl className="nowheel nodrag" isDisabled={!options.length} isInvalid={!value}>
         <Combobox
           value={value}
           placeholder={placeholder}

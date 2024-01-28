@@ -7,10 +7,7 @@ import { selectOptimalDimension } from 'features/parameters/store/generationSlic
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { t } from 'i18next';
 import { useCallback, useEffect } from 'react';
-import {
-  useGetImageDTOQuery,
-  useGetImageMetadataQuery,
-} from 'services/api/endpoints/images';
+import { useGetImageDTOQuery, useGetImageMetadataQuery } from 'services/api/endpoints/images';
 
 import { useRecallParameters } from './useRecallParameters';
 
@@ -23,13 +20,9 @@ export const usePreselectedImage = (selectedImage?: {
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const toaster = useAppToaster();
 
-  const { currentData: selectedImageDto } = useGetImageDTOQuery(
-    selectedImage?.imageName ?? skipToken
-  );
+  const { currentData: selectedImageDto } = useGetImageDTOQuery(selectedImage?.imageName ?? skipToken);
 
-  const { currentData: selectedImageMetadata } = useGetImageMetadataQuery(
-    selectedImage?.imageName ?? skipToken
-  );
+  const { currentData: selectedImageMetadata } = useGetImageMetadataQuery(selectedImage?.imageName ?? skipToken);
 
   const handleSendToCanvas = useCallback(() => {
     if (selectedImageDto) {

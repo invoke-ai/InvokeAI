@@ -1,9 +1,6 @@
-import { Flex, IconButton } from '@invoke-ai/ui';
+import { Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import {
-  canvasImageToControlAdapter,
-  canvasMaskToControlAdapter,
-} from 'features/canvas/store/actions';
+import { canvasImageToControlAdapter, canvasMaskToControlAdapter } from 'features/canvas/store/actions';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiExcludeBold, PiImageSquareBold } from 'react-icons/pi';
@@ -12,9 +9,7 @@ type ControlNetCanvasImageImportsProps = {
   id: string;
 };
 
-const ControlNetCanvasImageImports = (
-  props: ControlNetCanvasImageImportsProps
-) => {
+const ControlNetCanvasImageImports = (props: ControlNetCanvasImageImportsProps) => {
   const { id } = props;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();

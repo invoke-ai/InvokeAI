@@ -1,19 +1,7 @@
-import {
-  Button,
-  Divider,
-  Flex,
-  FormControl,
-  FormErrorMessage,
-  FormLabel,
-  Input,
-  Text,
-} from '@invoke-ai/ui';
+import { Button, Divider, Flex, FormControl, FormErrorMessage, FormLabel, Input, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
-import {
-  LORA_MODEL_FORMAT_MAP,
-  MODEL_TYPE_MAP,
-} from 'features/parameters/types/constants';
+import { LORA_MODEL_FORMAT_MAP, MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback } from 'react';
@@ -97,8 +85,8 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
           {model.model_name}
         </Text>
         <Text fontSize="sm" color="base.400">
-          {MODEL_TYPE_MAP[model.base_model]} {t('modelManager.model')} ⋅{' '}
-          {LORA_MODEL_FORMAT_MAP[model.model_format]} {t('common.format')}
+          {MODEL_TYPE_MAP[model.base_model]} {t('modelManager.model')} ⋅ {LORA_MODEL_FORMAT_MAP[model.model_format]}{' '}
+          {t('common.format')}
         </Text>
       </Flex>
       <Divider />
@@ -109,34 +97,25 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
             <FormLabel>{t('modelManager.name')}</FormLabel>
             <Input
               {...register('model_name', {
-                validate: (value) =>
-                  value.trim().length > 3 || 'Must be at least 3 characters',
+                validate: (value) => value.trim().length > 3 || 'Must be at least 3 characters',
               })}
             />
-            {errors.model_name?.message && (
-              <FormErrorMessage>{errors.model_name?.message}</FormErrorMessage>
-            )}
+            {errors.model_name?.message && <FormErrorMessage>{errors.model_name?.message}</FormErrorMessage>}
           </FormControl>
           <FormControl>
             <FormLabel>{t('modelManager.description')}</FormLabel>
             <Input {...register('description')} />
           </FormControl>
-          <BaseModelSelect<LoRAModelConfig>
-            control={control}
-            name="base_model"
-          />
+          <BaseModelSelect<LoRAModelConfig> control={control} name="base_model" />
 
           <FormControl isInvalid={Boolean(errors.path)}>
             <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
             <Input
               {...register('path', {
-                validate: (value) =>
-                  value.trim().length > 0 || 'Must provide a path',
+                validate: (value) => value.trim().length > 0 || 'Must provide a path',
               })}
             />
-            {errors.path?.message && (
-              <FormErrorMessage>{errors.path?.message}</FormErrorMessage>
-            )}
+            {errors.path?.message && <FormErrorMessage>{errors.path?.message}</FormErrorMessage>}
           </FormControl>
           <Button type="submit" isLoading={isLoading}>
             {t('modelManager.updateModel')}

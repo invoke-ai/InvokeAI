@@ -1,19 +1,13 @@
-import { Flex, MenuDivider, MenuItem, Spinner } from '@invoke-ai/ui';
+import { Flex, MenuDivider, MenuItem, Spinner } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppToaster } from 'app/components/Toaster';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
-import {
-  imagesToChangeSelected,
-  isModalOpenChanged,
-} from 'features/changeBoardModal/store/slice';
+import { imagesToChangeSelected, isModalOpenChanged } from 'features/changeBoardModal/store/slice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
-import {
-  sentImageToCanvas,
-  sentImageToImg2Img,
-} from 'features/gallery/store/actions';
+import { sentImageToCanvas, sentImageToImg2Img } from 'features/gallery/store/actions';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
@@ -37,10 +31,7 @@ import {
   PiStarFill,
   PiTrashSimpleBold,
 } from 'react-icons/pi';
-import {
-  useStarImagesMutation,
-  useUnstarImagesMutation,
-} from 'services/api/endpoints/images';
+import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 import type { ImageDTO } from 'services/api/types';
 
@@ -57,12 +48,9 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
   const customStarUi = useStore($customStarUI);
 
-  const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(
-    imageDTO?.image_name
-  );
+  const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(imageDTO?.image_name);
 
-  const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } =
-    useGetAndLoadEmbeddedWorkflow({});
+  const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } = useGetAndLoadEmbeddedWorkflow({});
 
   const handleLoadWorkflow = useCallback(() => {
     getAndLoadEmbeddedWorkflow(imageDTO.image_name);
@@ -71,8 +59,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const [starImages] = useStarImagesMutation();
   const [unstarImages] = useUnstarImagesMutation();
 
-  const { isClipboardAPIAvailable, copyImageToClipboard } =
-    useCopyImageToClipboard();
+  const { isClipboardAPIAvailable, copyImageToClipboard } = useCopyImageToClipboard();
 
   const handleDelete = useCallback(() => {
     if (!imageDTO) {
@@ -81,8 +68,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     dispatch(imagesToDeleteSelected([imageDTO]));
   }, [dispatch, imageDTO]);
 
-  const { recallBothPrompts, recallSeed, recallAllParameters } =
-    useRecallParameters();
+  const { recallBothPrompts, recallSeed, recallAllParameters } = useRecallParameters();
 
   // Recall parameters handlers
   const handleRecallPrompt = useCallback(() => {
@@ -159,12 +145,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
 
   return (
     <>
-      <MenuItem
-        as="a"
-        href={imageDTO.image_url}
-        target="_blank"
-        icon={<PiShareFatBold />}
-      >
+      <MenuItem as="a" href={imageDTO.image_url} target="_blank" icon={<PiShareFatBold />}>
         {t('common.openInNewTab')}
       </MenuItem>
       {isClipboardAPIAvailable && (
@@ -184,27 +165,17 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       </MenuItem>
       <MenuDivider />
       <MenuItem
-        icon={
-          getAndLoadEmbeddedWorkflowResult.isLoading ? (
-            <SpinnerIcon />
-          ) : (
-            <PiFlowArrowBold />
-          )
-        }
+        icon={getAndLoadEmbeddedWorkflowResult.isLoading ? <SpinnerIcon /> : <PiFlowArrowBold />}
         onClickCapture={handleLoadWorkflow}
         isDisabled={!imageDTO.has_workflow}
       >
         {t('nodes.loadWorkflow')}
       </MenuItem>
       <MenuItem
-        icon={
-          isLoadingMetadata ? <SpinnerIcon /> : <PiArrowsCounterClockwiseBold />
-        }
+        icon={isLoadingMetadata ? <SpinnerIcon /> : <PiArrowsCounterClockwiseBold />}
         onClickCapture={handleRemixImage}
         isDisabled={
-          isLoadingMetadata ||
-          (metadata?.positive_prompt === undefined &&
-            metadata?.negative_prompt === undefined)
+          isLoadingMetadata || (metadata?.positive_prompt === undefined && metadata?.negative_prompt === undefined)
         }
       >
         {t('parameters.remixImage')}
@@ -213,9 +184,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         icon={isLoadingMetadata ? <SpinnerIcon /> : <PiQuotesBold />}
         onClickCapture={handleRecallPrompt}
         isDisabled={
-          isLoadingMetadata ||
-          (metadata?.positive_prompt === undefined &&
-            metadata?.negative_prompt === undefined)
+          isLoadingMetadata || (metadata?.positive_prompt === undefined && metadata?.negative_prompt === undefined)
         }
       >
         {t('parameters.usePrompt')}
@@ -235,19 +204,11 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         {t('parameters.useAll')}
       </MenuItem>
       <MenuDivider />
-      <MenuItem
-        icon={<PiShareFatBold />}
-        onClickCapture={handleSendToImageToImage}
-        id="send-to-img2img"
-      >
+      <MenuItem icon={<PiShareFatBold />} onClickCapture={handleSendToImageToImage} id="send-to-img2img">
         {t('parameters.sendToImg2Img')}
       </MenuItem>
       {isCanvasEnabled && (
-        <MenuItem
-          icon={<PiShareFatBold />}
-          onClickCapture={handleSendToCanvas}
-          id="send-to-canvas"
-        >
+        <MenuItem icon={<PiShareFatBold />} onClickCapture={handleSendToCanvas} id="send-to-canvas">
           {t('parameters.sendToUnifiedCanvas')}
         </MenuItem>
       )}
@@ -256,26 +217,16 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         {t('boards.changeBoard')}
       </MenuItem>
       {imageDTO.starred ? (
-        <MenuItem
-          icon={customStarUi ? customStarUi.off.icon : <PiStarFill />}
-          onClickCapture={handleUnstarImage}
-        >
+        <MenuItem icon={customStarUi ? customStarUi.off.icon : <PiStarFill />} onClickCapture={handleUnstarImage}>
           {customStarUi ? customStarUi.off.text : t('gallery.unstarImage')}
         </MenuItem>
       ) : (
-        <MenuItem
-          icon={customStarUi ? customStarUi.on.icon : <PiStarBold />}
-          onClickCapture={handleStarImage}
-        >
+        <MenuItem icon={customStarUi ? customStarUi.on.icon : <PiStarBold />} onClickCapture={handleStarImage}>
           {customStarUi ? customStarUi.on.text : t('gallery.starImage')}
         </MenuItem>
       )}
       <MenuDivider />
-      <MenuItem
-        color="error.300"
-        icon={<PiTrashSimpleBold />}
-        onClickCapture={handleDelete}
-      >
+      <MenuItem color="error.300" icon={<PiTrashSimpleBold />} onClickCapture={handleDelete}>
         {t('gallery.deleteImage')}
       </MenuItem>
     </>

@@ -1,12 +1,5 @@
-import type { SystemStyleObject } from '@invoke-ai/ui';
-import {
-  ButtonGroup,
-  Flex,
-  Icon,
-  IconButton,
-  Portal,
-  spinAnimation,
-} from '@invoke-ai/ui';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { ButtonGroup, Flex, Icon, IconButton, Portal, spinAnimation } from '@invoke-ai/ui-library';
 import CancelCurrentQueueItemIconButton from 'features/queue/components/CancelCurrentQueueItemIconButton';
 import ClearQueueIconButton from 'features/queue/components/ClearQueueIconButton';
 import { QueueButtonTooltip } from 'features/queue/components/QueueButtonTooltip';

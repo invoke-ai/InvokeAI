@@ -1,4 +1,4 @@
-import { Flex, Icon, Text, Tooltip } from '@invoke-ai/ui';
+import { Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
 import { compare } from 'compare-versions';
 import { useNodeData } from 'features/nodes/hooks/useNodeData';
 import { useNodeNeedsUpdate } from 'features/nodes/hooks/useNodeNeedsUpdate';
@@ -16,18 +16,8 @@ const InvocationNodeInfoIcon = ({ nodeId }: Props) => {
   const needsUpdate = useNodeNeedsUpdate(nodeId);
 
   return (
-    <Tooltip
-      label={<TooltipContent nodeId={nodeId} />}
-      placement="top"
-      shouldWrapChildren
-    >
-      <Icon
-        as={PiInfoBold}
-        display="block"
-        boxSize={4}
-        w={8}
-        color={needsUpdate ? 'error.400' : 'base.400'}
-      />
+    <Tooltip label={<TooltipContent nodeId={nodeId} />} placement="top" shouldWrapChildren>
+      <Icon as={PiInfoBold} display="block" boxSize={4} w={8} color={needsUpdate ? 'error.400' : 'base.400'} />
     </Tooltip>
   );
 };

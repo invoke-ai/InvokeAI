@@ -384,7 +384,11 @@
             "desc": "Apre e chiude le opzioni e i pannelli della galleria",
             "title": "Attiva/disattiva le Opzioni e la Galleria"
         },
-        "clearSearch": "Cancella ricerca"
+        "clearSearch": "Cancella ricerca",
+        "remixImage": {
+            "desc": "Utilizza tutti i parametri tranne il seme dell'immagine corrente",
+            "title": "Remixa l'immagine"
+        }
     },
     "modelManager": {
         "modelManager": "Gestione Modelli",
@@ -670,7 +674,8 @@
         "aspect": "Aspetto",
         "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (potrebbe essere troppo grande)",
         "boxBlur": "Box",
-        "gaussianBlur": "Gaussian"
+        "gaussianBlur": "Gaussian",
+        "remixImage": "Remixa l'immagine"
     },
     "settings": {
         "models": "Modelli",
@@ -1245,7 +1250,11 @@
         "scribble": "Scarabocchio",
         "amult": "Angolo di illuminazione",
         "coarse": "Approssimativo",
-        "resizeSimple": "Ridimensiona (semplice)"
+        "resizeSimple": "Ridimensiona (semplice)",
+        "large": "Grande",
+        "small": "Piccolo",
+        "depthAnythingDescription": "Generazione di mappe di profondità utilizzando la tecnica Depth Anything",
+        "modelSize": "Dimensioni del modello"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -1677,7 +1686,9 @@
         "userWorkflows": "I miei flussi di lavoro",
         "newWorkflowCreated": "Nuovo flusso di lavoro creato",
         "downloadWorkflow": "Salva su file",
-        "uploadWorkflow": "Carica da file"
+        "uploadWorkflow": "Carica da file",
+        "projectWorkflows": "Flussi di lavoro del progetto",
+        "noWorkflows": "Nessun flusso di lavoro"
     },
     "app": {
         "storeNotInitialized": "Il negozio non è inizializzato"

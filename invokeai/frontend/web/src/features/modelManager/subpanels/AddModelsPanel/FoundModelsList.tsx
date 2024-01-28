@@ -1,11 +1,4 @@
-import {
-  Button,
-  Flex,
-  FormControl,
-  FormLabel,
-  Input,
-  Text,
-} from '@invoke-ai/ui';
+import { Button, Flex, FormControl, FormLabel, Input, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
@@ -31,26 +24,25 @@ const FoundModelsList = () => {
   const { data: installedModels } = useGetMainModelsQuery(ALL_BASE_MODELS);
 
   // Get all model paths from a given directory
-  const { foundModels, alreadyInstalled, filteredModels } =
-    useGetModelsInFolderQuery(
-      {
-        search_path: searchFolder ? searchFolder : '',
+  const { foundModels, alreadyInstalled, filteredModels } = useGetModelsInFolderQuery(
+    {
+      search_path: searchFolder ? searchFolder : '',
+    },
+    {
+      selectFromResult: ({ data }) => {
+        const installedModelValues = values(installedModels?.entities);
+        const installedModelPaths = map(installedModelValues, 'path');
+        // Only select models those that aren't already installed to Invoke
+        const notInstalledModels = difference(data, installedModelPaths);
+        const alreadyInstalled = intersection(data, installedModelPaths);
+        return {
+          foundModels: data,
+          alreadyInstalled: foundModelsFilter(alreadyInstalled, nameFilter),
+          filteredModels: foundModelsFilter(notInstalledModels, nameFilter),
+        };
       },
-      {
-        selectFromResult: ({ data }) => {
-          const installedModelValues = values(installedModels?.entities);
-          const installedModelPaths = map(installedModelValues, 'path');
-          // Only select models those that aren't already installed to Invoke
-          const notInstalledModels = difference(data, installedModelPaths);
-          const alreadyInstalled = intersection(data, installedModelPaths);
-          return {
-            foundModels: data,
-            alreadyInstalled: foundModelsFilter(alreadyInstalled, nameFilter),
-            filteredModels: foundModelsFilter(notInstalledModels, nameFilter),
-          };
-        },
-      }
-    );
+    }
+  );
 
   const [importMainModel, { isLoading }] = useImportMainModelsMutation();
   const dispatch = useAppDispatch();
@@ -95,28 +87,12 @@ const FoundModelsList = () => {
     setNameFilter(e.target.value);
   }, []);
 
-  const handleClickSetAdvanced = useCallback(
-    (model: string) => dispatch(setAdvancedAddScanModel(model)),
-    [dispatch]
-  );
+  const handleClickSetAdvanced = useCallback((model: string) => dispatch(setAdvancedAddScanModel(model)), [dispatch]);
 
-  const renderModels = ({
-    models,
-    showActions = true,
-  }: {
-    models: string[];
-    showActions?: boolean;
-  }) => {
+  const renderModels = ({ models, showActions = true }: { models: string[]; showActions?: boolean }) => {
     return models.map((model) => {
       return (
-        <Flex
-          key={model}
-          p={4}
-          gap={4}
-          alignItems="center"
-          borderRadius={4}
-          bg="base.800"
-        >
+        <Flex key={model} p={4} gap={4} alignItems="center" borderRadius={4} bg="base.800">
           <Flex w="full" minW="25%" flexDir="column">
             <Text fontWeight="semibold">{model.split('\\').slice(-1)[0]}</Text>
             <Text fontSize="sm" color="base.400">
@@ -125,28 +101,15 @@ const FoundModelsList = () => {
           </Flex>
           {showActions ? (
             <Flex gap={2}>
-              <Button
-                id={model}
-                onClick={quickAddHandler}
-                isLoading={isLoading}
-              >
+              <Button id={model} onClick={quickAddHandler} isLoading={isLoading}>
                 {t('modelManager.quickAdd')}
               </Button>
-              <Button
-                onClick={handleClickSetAdvanced.bind(null, model)}
-                isLoading={isLoading}
-              >
+              <Button onClick={handleClickSetAdvanced.bind(null, model)} isLoading={isLoading}>
                 {t('modelManager.advanced')}
               </Button>
             </Flex>
           ) : (
-            <Text
-              fontWeight="semibold"
-              p={2}
-              borderRadius={4}
-              color="invokeBlue.100"
-              bg="invokeBlue.600"
-            >
+            <Text fontWeight="semibold" p={2} borderRadius={4} color="invokeBlue.100" bg="invokeBlue.600">
               {t('common.installed')}
             </Text>
           )}
@@ -162,15 +125,7 @@ const FoundModelsList = () => {
 
     if (!foundModels || foundModels.length === 0) {
       return (
-        <Flex
-          w="full"
-          h="full"
-          justifyContent="center"
-          alignItems="center"
-          height={96}
-          userSelect="none"
-          bg="base.900"
-        >
+        <Flex w="full" h="full" justifyContent="center" alignItems="center" height={96} userSelect="none" bg="base.900">
           <Text variant="subtext">{t('modelManager.noModels')}</Text>
         </Flex>
       );
@@ -204,10 +159,7 @@ const FoundModelsList = () => {
   return renderFoundModels();
 };
 
-const foundModelsFilter = (
-  data: SearchFolderResponse | undefined,
-  nameFilter: string
-) => {
+const foundModelsFilter = (data: SearchFolderResponse | undefined, nameFilter: string) => {
   const filteredModels: SearchFolderResponse = [];
   forEach(data, (model) => {
     if (!model) {

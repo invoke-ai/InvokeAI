@@ -35,8 +35,7 @@ export const actionSanitizer = <A extends UnknownAction>(action: A): A => {
   if (socketGeneratorProgress.match(action)) {
     const sanitized = cloneDeep(action);
     if (sanitized.payload.data.progress_image) {
-      sanitized.payload.data.progress_image.dataURL =
-        '<Progress image omitted>';
+      sanitized.payload.data.progress_image.dataURL = '<Progress image omitted>';
     }
     return sanitized;
   }

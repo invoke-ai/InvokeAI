@@ -1,11 +1,5 @@
-import type { ComboboxOnChange } from '@invoke-ai/ui';
-import {
-  Combobox,
-  CompositeNumberInput,
-  CompositeSlider,
-  FormControl,
-  FormLabel,
-} from '@invoke-ai/ui';
+import type { ComboboxOnChange } from '@invoke-ai/ui-library';
+import { Combobox, CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type {
@@ -55,10 +49,7 @@ const DepthAnythingProcessor = (props: Props) => {
     [t]
   );
 
-  const value = useMemo(
-    () => options.filter((o) => o.value === model_size)[0],
-    [options, model_size]
-  );
+  const value = useMemo(() => options.filter((o) => o.value === model_size)[0], [options, model_size]);
 
   const handleResolutionChange = useCallback(
     (v: number) => {

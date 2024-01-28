@@ -7,8 +7,6 @@ import { CANVAS_TAB_TESTID } from 'features/canvas/store/constants';
  * it's safer to check the canvas tab and grab its parent.
  */
 export const isElChildOfCanvasTab = (el: HTMLElement) => {
-  const canvasContainerEl = document.querySelector(
-    `[data-testid="${CANVAS_TAB_TESTID}"]`
-  );
+  const canvasContainerEl = document.querySelector(`[data-testid="${CANVAS_TAB_TESTID}"]`);
   return Boolean(canvasContainerEl?.parentElement?.contains(el));
 };

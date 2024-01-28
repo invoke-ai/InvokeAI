@@ -1,11 +1,4 @@
-import {
-  Button,
-  Flex,
-  FormControl,
-  FormErrorMessage,
-  FormLabel,
-  Input,
-} from '@invoke-ai/ui';
+import { Button, Flex, FormControl, FormErrorMessage, FormLabel, Input } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
 import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
@@ -114,30 +107,21 @@ const AdvancedAddDiffusers = (props: AdvancedAddDiffusersProps) => {
           <FormLabel>{t('modelManager.name')}</FormLabel>
           <Input
             {...register('model_name', {
-              validate: (value) =>
-                value.trim().length > 3 || 'Must be at least 3 characters',
+              validate: (value) => value.trim().length > 3 || 'Must be at least 3 characters',
             })}
           />
-          {errors.model_name?.message && (
-            <FormErrorMessage>{errors.model_name?.message}</FormErrorMessage>
-          )}
+          {errors.model_name?.message && <FormErrorMessage>{errors.model_name?.message}</FormErrorMessage>}
         </FormControl>
-        <BaseModelSelect<DiffusersModelConfig>
-          control={control}
-          name="base_model"
-        />
+        <BaseModelSelect<DiffusersModelConfig> control={control} name="base_model" />
         <FormControl isInvalid={Boolean(errors.path)}>
           <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
           <Input
             {...register('path', {
-              validate: (value) =>
-                value.trim().length > 0 || 'Must provide a path',
+              validate: (value) => value.trim().length > 0 || 'Must provide a path',
               onBlur,
             })}
           />
-          {errors.path?.message && (
-            <FormErrorMessage>{errors.path?.message}</FormErrorMessage>
-          )}
+          {errors.path?.message && <FormErrorMessage>{errors.path?.message}</FormErrorMessage>}
         </FormControl>
         <FormControl>
           <FormLabel>{t('modelManager.description')}</FormLabel>
@@ -147,10 +131,7 @@ const AdvancedAddDiffusers = (props: AdvancedAddDiffusersProps) => {
           <FormLabel>{t('modelManager.vaeLocation')}</FormLabel>
           <Input {...register('vae')} />
         </FormControl>
-        <ModelVariantSelect<DiffusersModelConfig>
-          control={control}
-          name="variant"
-        />
+        <ModelVariantSelect<DiffusersModelConfig> control={control} name="variant" />
 
         <Button mt={2} type="submit">
           {t('modelManager.addModel')}

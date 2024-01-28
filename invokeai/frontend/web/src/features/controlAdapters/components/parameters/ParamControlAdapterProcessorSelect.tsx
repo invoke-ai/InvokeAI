@@ -1,5 +1,5 @@
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
@@ -23,18 +23,9 @@ const selectOptions = createMemoizedSelector(configSelector, (config) => {
   }))
     .sort((a, b) =>
       // sort 'none' to the top
-      a.value === 'none'
-        ? -1
-        : b.value === 'none'
-          ? 1
-          : a.label.localeCompare(b.label)
+      a.value === 'none' ? -1 : b.value === 'none' ? 1 : a.label.localeCompare(b.label)
     )
-    .filter(
-      (d) =>
-        !config.sd.disabledControlNetProcessors.includes(
-          d.value as ControlAdapterProcessorType
-        )
-    );
+    .filter((d) => !config.sd.disabledControlNetProcessors.includes(d.value as ControlAdapterProcessorType));
 
   return options;
 });
@@ -60,10 +51,7 @@ const ParamControlAdapterProcessorSelect = ({ id }: Props) => {
     },
     [id, dispatch]
   );
-  const value = useMemo(
-    () => options.find((o) => o.value === processorNode?.type),
-    [options, processorNode]
-  );
+  const value = useMemo(() => options.find((o) => o.value === processorNode?.type), [options, processorNode]);
 
   if (!processorNode) {
     return null;

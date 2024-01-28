@@ -22,10 +22,8 @@ const changeBoardModal = createSlice({
   },
 });
 
-export const { isModalOpenChanged, imagesToChangeSelected, changeBoardReset } =
-  changeBoardModal.actions;
+export const { isModalOpenChanged, imagesToChangeSelected, changeBoardReset } = changeBoardModal.actions;
 
 export default changeBoardModal.reducer;
 
-export const selectChangeBoardModalSlice = (state: RootState) =>
-  state.changeBoardModal;
+export const selectChangeBoardModalSlice = (state: RootState) => state.changeBoardModal;

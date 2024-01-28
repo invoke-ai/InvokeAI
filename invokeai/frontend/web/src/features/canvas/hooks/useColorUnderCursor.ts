@@ -1,13 +1,6 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import {
-  $canvasBaseLayer,
-  $canvasStage,
-  $tool,
-} from 'features/canvas/store/canvasNanostore';
-import {
-  commitColorPickerColor,
-  setColorPickerColor,
-} from 'features/canvas/store/canvasSlice';
+import { $canvasBaseLayer, $canvasStage, $tool } from 'features/canvas/store/canvasNanostore';
+import { commitColorPickerColor, setColorPickerColor } from 'features/canvas/store/canvasSlice';
 import Konva from 'konva';
 import { useCallback } from 'react';
 
@@ -31,19 +24,9 @@ const useColorPicker = () => {
 
     const [r, g, b, a] = canvasBaseLayer
       .getContext()
-      .getImageData(
-        position.x * pixelRatio,
-        position.y * pixelRatio,
-        1,
-        1
-      ).data;
+      .getImageData(position.x * pixelRatio, position.y * pixelRatio, 1, 1).data;
 
-    if (
-      r === undefined ||
-      g === undefined ||
-      b === undefined ||
-      a === undefined
-    ) {
+    if (r === undefined || g === undefined || b === undefined || a === undefined) {
       return;
     }
 

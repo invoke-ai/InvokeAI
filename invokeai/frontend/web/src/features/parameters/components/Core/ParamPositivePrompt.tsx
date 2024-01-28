@@ -1,4 +1,4 @@
-import { Box, Textarea } from '@invoke-ai/ui';
+import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/components/ShowDynamicPromptsPreviewButton';
 import { AddEmbeddingButton } from 'features/embedding/AddEmbeddingButton';
@@ -25,15 +25,7 @@ export const ParamPositivePrompt = memo(() => {
     },
     [dispatch]
   );
-  const {
-    onChange,
-    isOpen,
-    onClose,
-    onOpen,
-    onSelectEmbedding,
-    onKeyDown,
-    onFocus,
-  } = usePrompt({
+  const { onChange, isOpen, onClose, onOpen, onSelectEmbedding, onKeyDown, onFocus } = usePrompt({
     prompt,
     textareaRef: textareaRef,
     onChange: handleChange,

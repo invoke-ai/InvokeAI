@@ -1,4 +1,4 @@
-import { Button } from '@invoke-ai/ui';
+import { Button } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

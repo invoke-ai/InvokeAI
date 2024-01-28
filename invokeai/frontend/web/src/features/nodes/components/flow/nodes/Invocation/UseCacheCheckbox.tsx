@@ -1,4 +1,4 @@
-import { Checkbox, FormControl, FormLabel } from '@invoke-ai/ui';
+import { Checkbox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useUseCache } from 'features/nodes/hooks/useUseCache';
 import { nodeUseCacheChanged } from 'features/nodes/store/nodesSlice';
@@ -24,11 +24,7 @@ const UseCacheCheckbox = ({ nodeId }: { nodeId: string }) => {
   return (
     <FormControl>
       <FormLabel>{t('invocationCache.useCache')}</FormLabel>
-      <Checkbox
-        className="nopan"
-        onChange={handleChange}
-        isChecked={useCache}
-      />
+      <Checkbox className="nopan" onChange={handleChange} isChecked={useCache} />
     </FormControl>
   );
 };

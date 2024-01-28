@@ -13,7 +13,7 @@ import {
   ModalOverlay,
   Switch,
   useDisclosure,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ReloadNodeTemplatesButton from 'features/nodes/components/flow/panels/TopRightPanel/ReloadSchemaButton';
@@ -31,13 +31,7 @@ import { useTranslation } from 'react-i18next';
 import { SelectionMode } from 'reactflow';
 
 const selector = createMemoizedSelector(selectNodesSlice, (nodes) => {
-  const {
-    shouldAnimateEdges,
-    shouldValidateGraph,
-    shouldSnapToGrid,
-    shouldColorEdges,
-    selectionMode,
-  } = nodes;
+  const { shouldAnimateEdges, shouldValidateGraph, shouldSnapToGrid, shouldColorEdges, selectionMode } = nodes;
   return {
     shouldAnimateEdges,
     shouldValidateGraph,
@@ -54,13 +48,8 @@ type Props = {
 const WorkflowEditorSettings = ({ children }: Props) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const dispatch = useAppDispatch();
-  const {
-    shouldAnimateEdges,
-    shouldValidateGraph,
-    shouldSnapToGrid,
-    shouldColorEdges,
-    selectionModeIsChecked,
-  } = useAppSelector(selector);
+  const { shouldAnimateEdges, shouldValidateGraph, shouldSnapToGrid, shouldColorEdges, selectionModeIsChecked } =
+    useAppSelector(selector);
 
   const handleChangeShouldValidate = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -113,53 +102,34 @@ const WorkflowEditorSettings = ({ children }: Props) => {
               <Heading size="sm">{t('parameters.general')}</Heading>
               <FormControl>
                 <FormLabel>{t('nodes.animatedEdges')}</FormLabel>
-                <Switch
-                  onChange={handleChangeShouldAnimate}
-                  isChecked={shouldAnimateEdges}
-                />
+                <Switch onChange={handleChangeShouldAnimate} isChecked={shouldAnimateEdges} />
                 <FormHelperText>{t('nodes.animatedEdgesHelp')}</FormHelperText>
               </FormControl>
               <Divider />
               <FormControl>
                 <FormLabel>{t('nodes.snapToGrid')}</FormLabel>
-                <Switch
-                  isChecked={shouldSnapToGrid}
-                  onChange={handleChangeShouldSnap}
-                />
+                <Switch isChecked={shouldSnapToGrid} onChange={handleChangeShouldSnap} />
                 <FormHelperText>{t('nodes.snapToGridHelp')}</FormHelperText>
               </FormControl>
               <Divider />
               <FormControl>
                 <FormLabel>{t('nodes.colorCodeEdges')}</FormLabel>
-                <Switch
-                  isChecked={shouldColorEdges}
-                  onChange={handleChangeShouldColor}
-                />
+                <Switch isChecked={shouldColorEdges} onChange={handleChangeShouldColor} />
                 <FormHelperText>{t('nodes.colorCodeEdgesHelp')}</FormHelperText>
               </FormControl>
               <Divider />
               <FormControl>
                 <FormLabel>{t('nodes.fullyContainNodes')}</FormLabel>
-                <Switch
-                  isChecked={selectionModeIsChecked}
-                  onChange={handleChangeSelectionMode}
-                />
-                <FormHelperText>
-                  {t('nodes.fullyContainNodesHelp')}
-                </FormHelperText>
+                <Switch isChecked={selectionModeIsChecked} onChange={handleChangeSelectionMode} />
+                <FormHelperText>{t('nodes.fullyContainNodesHelp')}</FormHelperText>
               </FormControl>
               <Heading size="sm" pt={4}>
                 {t('common.advanced')}
               </Heading>
               <FormControl>
                 <FormLabel>{t('nodes.validateConnections')}</FormLabel>
-                <Switch
-                  isChecked={shouldValidateGraph}
-                  onChange={handleChangeShouldValidate}
-                />
-                <FormHelperText>
-                  {t('nodes.validateConnectionsHelp')}
-                </FormHelperText>
+                <Switch isChecked={shouldValidateGraph} onChange={handleChangeShouldValidate} />
+                <FormHelperText>{t('nodes.validateConnectionsHelp')}</FormHelperText>
               </FormControl>
               <ReloadNodeTemplatesButton />
             </Flex>

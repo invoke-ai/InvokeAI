@@ -11,8 +11,7 @@ export const useControlAdapterWeight = (id: string) => {
     () =>
       createSelector(
         selectControlAdaptersSlice,
-        (controlAdapters) =>
-          selectControlAdapterById(controlAdapters, id)?.weight
+        (controlAdapters) => selectControlAdapterById(controlAdapters, id)?.weight
       ),
     [id]
   );

@@ -1,9 +1,5 @@
 module.exports = {
-  trailingComma: 'es5',
-  tabWidth: 2,
-  semi: true,
-  singleQuote: true,
-  endOfLine: 'auto',
+  ...require('@invoke-ai/prettier-config-react'),
   overrides: [
     {
       files: ['public/locales/*.json'],

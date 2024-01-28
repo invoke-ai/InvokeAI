@@ -13,21 +13,14 @@ import {
   ModalHeader,
   ModalOverlay,
   useDisclosure,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import type { HotkeyGroup } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useHotkeyData } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import type { ChangeEventHandler, ReactElement } from 'react';
-import {
-  cloneElement,
-  Fragment,
-  memo,
-  useCallback,
-  useMemo,
-  useState,
-} from 'react';
+import { cloneElement, Fragment, memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 
@@ -43,10 +36,7 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
   const { t } = useTranslation();
   const [hotkeyFilter, setHotkeyFilter] = useState('');
   const clearHotkeyFilter = useCallback(() => setHotkeyFilter(''), []);
-  const onChange = useCallback<ChangeEventHandler<HTMLInputElement>>(
-    (e) => setHotkeyFilter(e.target.value),
-    []
-  );
+  const onChange = useCallback<ChangeEventHandler<HTMLInputElement>>((e) => setHotkeyFilter(e.target.value), []);
   const hotkeyGroups = useHotkeyData();
   const filteredHotkeyGroups = useMemo(() => {
     if (!hotkeyFilter.trim().length) {
@@ -63,11 +53,7 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
         if (
           item.title.toLowerCase().includes(trimmedHotkeyFilter) ||
           item.desc.toLowerCase().includes(trimmedHotkeyFilter) ||
-          item.hotkeys.some((hotkey) =>
-            hotkey.some((key) =>
-              key.toLowerCase().includes(trimmedHotkeyFilter)
-            )
-          )
+          item.hotkeys.some((hotkey) => hotkey.some((key) => key.toLowerCase().includes(trimmedHotkeyFilter)))
         ) {
           filteredGroup.hotkeyListItems.push(item);
         }
@@ -91,11 +77,7 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
           <ModalCloseButton />
           <ModalBody display="flex" flexDir="column" gap={4}>
             <InputGroup>
-              <Input
-                placeholder={t('hotkeys.searchHotkeys')}
-                value={hotkeyFilter}
-                onChange={onChange}
-              />
+              <Input placeholder={t('hotkeys.searchHotkeys')} value={hotkeyFilter} onChange={onChange} />
               {hotkeyFilter.length && (
                 <InputRightElement h="full" pe={2}>
                   <IconButton
@@ -116,21 +98,14 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
                   <StickyScrollable key={group.title} title={group.title}>
                     {group.hotkeyListItems.map((hotkey, i) => (
                       <Fragment key={i}>
-                        <HotkeyListItem
-                          title={hotkey.title}
-                          description={hotkey.desc}
-                          hotkeys={hotkey.hotkeys}
-                        />
+                        <HotkeyListItem title={hotkey.title} description={hotkey.desc} hotkeys={hotkey.hotkeys} />
                         {i < group.hotkeyListItems.length - 1 && <Divider />}
                       </Fragment>
                     ))}
                   </StickyScrollable>
                 ))}
                 {!filteredHotkeyGroups.length && (
-                  <IAINoContentFallback
-                    label={t('hotkeys.noHotkeysFound')}
-                    icon={null}
-                  />
+                  <IAINoContentFallback label={t('hotkeys.noHotkeysFound')} icon={null} />
                 )}
               </Flex>
             </ScrollableContent>

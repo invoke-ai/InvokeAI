@@ -1,4 +1,4 @@
-import { Button } from '@invoke-ai/ui';
+import { Button } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useGetNodesNeedUpdate } from 'features/nodes/hooks/useGetNodesNeedUpdate';
 import { updateAllNodesRequested } from 'features/nodes/store/actions';
@@ -19,11 +19,7 @@ const UpdateNodesButton = () => {
   }
 
   return (
-    <Button
-      leftIcon={<PiWarningBold />}
-      onClick={handleClickUpdateNodes}
-      pointerEvents="auto"
-    >
+    <Button leftIcon={<PiWarningBold />} onClick={handleClickUpdateNodes} pointerEvents="auto">
       {t('nodes.updateAllNodes')}
     </Button>
   );

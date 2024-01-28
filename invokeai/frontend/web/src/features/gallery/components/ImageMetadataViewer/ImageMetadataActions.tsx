@@ -147,25 +147,19 @@ const ImageMetadataActions = (props: Props) => {
 
   const validControlNets: ControlNetMetadataItem[] = useMemo(() => {
     return metadata?.controlnets
-      ? metadata.controlnets.filter((controlnet) =>
-          isParameterControlNetModel(controlnet.control_model)
-        )
+      ? metadata.controlnets.filter((controlnet) => isParameterControlNetModel(controlnet.control_model))
       : [];
   }, [metadata?.controlnets]);
 
   const validIPAdapters: IPAdapterMetadataItem[] = useMemo(() => {
     return metadata?.ipAdapters
-      ? metadata.ipAdapters.filter((ipAdapter) =>
-          isParameterControlNetModel(ipAdapter.ip_adapter_model)
-        )
+      ? metadata.ipAdapters.filter((ipAdapter) => isParameterControlNetModel(ipAdapter.ip_adapter_model))
       : [];
   }, [metadata?.ipAdapters]);
 
   const validT2IAdapters: T2IAdapterMetadataItem[] = useMemo(() => {
     return metadata?.t2iAdapters
-      ? metadata.t2iAdapters.filter((t2iAdapter) =>
-          isParameterT2IAdapterModel(t2iAdapter.t2i_adapter_model)
-        )
+      ? metadata.t2iAdapters.filter((t2iAdapter) => isParameterT2IAdapterModel(t2iAdapter.t2i_adapter_model))
       : [];
   }, [metadata?.t2iAdapters]);
 
@@ -175,17 +169,9 @@ const ImageMetadataActions = (props: Props) => {
 
   return (
     <>
-      {metadata.created_by && (
-        <ImageMetadataItem
-          label={t('metadata.createdBy')}
-          value={metadata.created_by}
-        />
-      )}
+      {metadata.created_by && <ImageMetadataItem label={t('metadata.createdBy')} value={metadata.created_by} />}
       {metadata.generation_mode && (
-        <ImageMetadataItem
-          label={t('metadata.generationMode')}
-          value={metadata.generation_mode}
-        />
+        <ImageMetadataItem label={t('metadata.generationMode')} value={metadata.generation_mode} />
       )}
       {metadata.positive_prompt && (
         <ImageMetadataItem
@@ -220,41 +206,19 @@ const ImageMetadataActions = (props: Props) => {
         />
       )}
       {metadata.seed !== undefined && metadata.seed !== null && (
-        <ImageMetadataItem
-          label={t('metadata.seed')}
-          value={metadata.seed}
-          onClick={handleRecallSeed}
-        />
+        <ImageMetadataItem label={t('metadata.seed')} value={metadata.seed} onClick={handleRecallSeed} />
       )}
-      {metadata.model !== undefined &&
-        metadata.model !== null &&
-        metadata.model.model_name && (
-          <ImageMetadataItem
-            label={t('metadata.model')}
-            value={metadata.model.model_name}
-            onClick={handleRecallModel}
-          />
-        )}
+      {metadata.model !== undefined && metadata.model !== null && metadata.model.model_name && (
+        <ImageMetadataItem label={t('metadata.model')} value={metadata.model.model_name} onClick={handleRecallModel} />
+      )}
       {metadata.width && (
-        <ImageMetadataItem
-          label={t('metadata.width')}
-          value={metadata.width}
-          onClick={handleRecallWidth}
-        />
+        <ImageMetadataItem label={t('metadata.width')} value={metadata.width} onClick={handleRecallWidth} />
       )}
       {metadata.height && (
-        <ImageMetadataItem
-          label={t('metadata.height')}
-          value={metadata.height}
-          onClick={handleRecallHeight}
-        />
+        <ImageMetadataItem label={t('metadata.height')} value={metadata.height} onClick={handleRecallHeight} />
       )}
       {metadata.scheduler && (
-        <ImageMetadataItem
-          label={t('metadata.scheduler')}
-          value={metadata.scheduler}
-          onClick={handleRecallScheduler}
-        />
+        <ImageMetadataItem label={t('metadata.scheduler')} value={metadata.scheduler} onClick={handleRecallScheduler} />
       )}
       <ImageMetadataItem
         label={t('metadata.vae')}
@@ -262,33 +226,20 @@ const ImageMetadataActions = (props: Props) => {
         onClick={handleRecallVaeModel}
       />
       {metadata.steps && (
-        <ImageMetadataItem
-          label={t('metadata.steps')}
-          value={metadata.steps}
-          onClick={handleRecallSteps}
-        />
+        <ImageMetadataItem label={t('metadata.steps')} value={metadata.steps} onClick={handleRecallSteps} />
       )}
       {metadata.cfg_scale !== undefined && metadata.cfg_scale !== null && (
+        <ImageMetadataItem label={t('metadata.cfgScale')} value={metadata.cfg_scale} onClick={handleRecallCfgScale} />
+      )}
+      {metadata.cfg_rescale_multiplier !== undefined && metadata.cfg_rescale_multiplier !== null && (
         <ImageMetadataItem
-          label={t('metadata.cfgScale')}
-          value={metadata.cfg_scale}
-          onClick={handleRecallCfgScale}
+          label={t('metadata.cfgRescaleMultiplier')}
+          value={metadata.cfg_rescale_multiplier}
+          onClick={handleRecallCfgRescaleMultiplier}
         />
       )}
-      {metadata.cfg_rescale_multiplier !== undefined &&
-        metadata.cfg_rescale_multiplier !== null && (
-          <ImageMetadataItem
-            label={t('metadata.cfgRescaleMultiplier')}
-            value={metadata.cfg_rescale_multiplier}
-            onClick={handleRecallCfgRescaleMultiplier}
-          />
-        )}
       {metadata.strength && (
-        <ImageMetadataItem
-          label={t('metadata.strength')}
-          value={metadata.strength}
-          onClick={handleRecallStrength}
-        />
+        <ImageMetadataItem label={t('metadata.strength')} value={metadata.strength} onClick={handleRecallStrength} />
       )}
       {metadata.hrf_enabled && (
         <ImageMetadataItem

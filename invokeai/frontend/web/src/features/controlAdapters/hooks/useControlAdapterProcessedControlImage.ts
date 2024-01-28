@@ -13,9 +13,7 @@ export const useControlAdapterProcessedControlImage = (id: string) => {
       createSelector(selectControlAdaptersSlice, (controlAdapters) => {
         const ca = selectControlAdapterById(controlAdapters, id);
 
-        return ca && isControlNetOrT2IAdapter(ca)
-          ? ca.processedControlImage
-          : undefined;
+        return ca && isControlNetOrT2IAdapter(ca) ? ca.processedControlImage : undefined;
       }),
     [id]
   );

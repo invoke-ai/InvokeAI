@@ -1,4 +1,4 @@
-import type { MenuItemProps } from '@invoke-ai/ui';
+import type { MenuItemProps } from '@invoke-ai/ui-library';
 import { atom } from 'nanostores';
 
 export type CustomStarUi = {

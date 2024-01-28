@@ -9,10 +9,7 @@ export const addInvocationStartedEventListener = () => {
   startAppListening({
     actionCreator: socketInvocationStarted,
     effect: (action) => {
-      log.debug(
-        action.payload,
-        `Invocation started (${action.payload.data.node.type})`
-      );
+      log.debug(action.payload, `Invocation started (${action.payload.data.node.type})`);
     },
   });
 };

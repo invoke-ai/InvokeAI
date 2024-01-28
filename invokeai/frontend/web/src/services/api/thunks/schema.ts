@@ -23,25 +23,18 @@ function getCircularReplacer() {
   };
 }
 
-export const receivedOpenAPISchema = createAsyncThunk(
-  'nodes/receivedOpenAPISchema',
-  async (_, { rejectWithValue }) => {
-    try {
-      const openAPISchemaUrl = $openAPISchemaUrl.get();
+export const receivedOpenAPISchema = createAsyncThunk('nodes/receivedOpenAPISchema', async (_, { rejectWithValue }) => {
+  try {
+    const openAPISchemaUrl = $openAPISchemaUrl.get();
 
-      const url = openAPISchemaUrl
-        ? openAPISchemaUrl
-        : `${window.location.href.replace(/\/$/, '')}/openapi.json`;
-      const response = await fetch(url);
-      const openAPISchema = await response.json();
+    const url = openAPISchemaUrl ? openAPISchemaUrl : `${window.location.href.replace(/\/$/, '')}/openapi.json`;
+    const response = await fetch(url);
+    const openAPISchema = await response.json();
 
-      const schemaJSON = JSON.parse(
-        JSON.stringify(openAPISchema, getCircularReplacer())
-      );
+    const schemaJSON = JSON.parse(JSON.stringify(openAPISchema, getCircularReplacer()));
 
-      return schemaJSON;
-    } catch (error) {
-      return rejectWithValue({ error });
-    }
+    return schemaJSON;
+  } catch (error) {
+    return rejectWithValue({ error });
   }
-);
+});

@@ -21,14 +21,7 @@ const InvocationDefaultEdge = ({
   targetHandleId,
 }: EdgeProps) => {
   const selector = useMemo(
-    () =>
-      makeEdgeSelector(
-        source,
-        sourceHandleId,
-        target,
-        targetHandleId,
-        selected
-      ),
+    () => makeEdgeSelector(source, sourceHandleId, target, targetHandleId, selected),
     [source, sourceHandleId, target, targetHandleId, selected]
   );
 

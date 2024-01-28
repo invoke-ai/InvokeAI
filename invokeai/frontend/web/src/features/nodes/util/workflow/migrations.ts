@@ -1,8 +1,5 @@
 import { $store } from 'app/store/nanostores/store';
-import {
-  WorkflowMigrationError,
-  WorkflowVersionError,
-} from 'features/nodes/types/error';
+import { WorkflowMigrationError, WorkflowVersionError } from 'features/nodes/types/error';
 import type { FieldType } from 'features/nodes/types/field';
 import type { InvocationNodeData } from 'features/nodes/types/invocation';
 import { zSemVer } from 'features/nodes/types/semver';
@@ -45,27 +42,20 @@ const migrateV1toV2 = (workflowToMigrate: WorkflowV1): WorkflowV2 => {
       forEach(node.data.inputs, (input) => {
         const newFieldType = FIELD_TYPE_V1_TO_FIELD_TYPE_V2_MAPPING[input.type];
         if (!newFieldType) {
-          throw new WorkflowMigrationError(
-            t('nodes.unknownFieldType', { type: input.type })
-          );
+          throw new WorkflowMigrationError(t('nodes.unknownFieldType', { type: input.type }));
         }
         (input.type as unknown as FieldType) = newFieldType;
       });
       forEach(node.data.outputs, (output) => {
-        const newFieldType =
-          FIELD_TYPE_V1_TO_FIELD_TYPE_V2_MAPPING[output.type];
+        const newFieldType = FIELD_TYPE_V1_TO_FIELD_TYPE_V2_MAPPING[output.type];
         if (!newFieldType) {
-          throw new WorkflowMigrationError(
-            t('nodes.unknownFieldType', { type: output.type })
-          );
+          throw new WorkflowMigrationError(t('nodes.unknownFieldType', { type: output.type }));
         }
         (output.type as unknown as FieldType) = newFieldType;
       });
       // Add node pack
       const invocationTemplate = invocationTemplates[node.data.type];
-      const nodePack = invocationTemplate
-        ? invocationTemplate.nodePack
-        : t('common.unknown');
+      const nodePack = invocationTemplate ? invocationTemplate.nodePack : t('common.unknown');
 
       (node.data as unknown as InvocationNodeData).nodePack = nodePack;
       // Fallback to 1.0.0 if not specified - this matches the behavior of the backend
@@ -101,7 +91,5 @@ export const parseAndMigrateWorkflow = (data: unknown): WorkflowV2 => {
     return zWorkflowV2.parse(data);
   }
 
-  throw new WorkflowVersionError(
-    t('nodes.unrecognizedWorkflowVersion', { version })
-  );
+  throw new WorkflowVersionError(t('nodes.unrecognizedWorkflowVersion', { version }));
 };

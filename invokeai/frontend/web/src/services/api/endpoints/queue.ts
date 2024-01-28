@@ -1,8 +1,4 @@
-import type {
-  EntityState,
-  ThunkDispatch,
-  UnknownAction,
-} from '@reduxjs/toolkit';
+import type { EntityState, ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { createEntityAdapter } from '@reduxjs/toolkit';
 import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
 import { $queueId } from 'app/store/nanostores/queueId';
@@ -13,9 +9,7 @@ import type { components, paths } from 'services/api/schema';
 import type { ApiTagDescription } from '..';
 import { api } from '..';
 
-const getListQueueItemsUrl = (
-  queryArgs?: paths['/api/v1/queue/{queue_id}/list']['get']['parameters']['query']
-) => {
+const getListQueueItemsUrl = (queryArgs?: paths['/api/v1/queue/{queue_id}/list']['get']['parameters']['query']) => {
   const query = queryArgs
     ? queryString.stringify(queryArgs, {
         arrayFormat: 'none',
@@ -30,15 +24,10 @@ const getListQueueItemsUrl = (
 };
 
 export type SessionQueueItemStatus = NonNullable<
-  NonNullable<
-    paths['/api/v1/queue/{queue_id}/list']['get']['parameters']['query']
-  >['status']
+  NonNullable<paths['/api/v1/queue/{queue_id}/list']['get']['parameters']['query']>['status']
 >;
 
-export const queueItemsAdapter = createEntityAdapter<
-  components['schemas']['SessionQueueItemDTO'],
-  string
->({
+export const queueItemsAdapter = createEntityAdapter<components['schemas']['SessionQueueItemDTO'], string>({
   selectId: (queueItem) => String(queueItem.item_id),
   sortComparer: (a, b) => {
     // Sort by priority in descending order
@@ -60,10 +49,7 @@ export const queueItemsAdapter = createEntityAdapter<
     return 0;
   },
 });
-export const queueItemsAdapterSelectors = queueItemsAdapter.getSelectors(
-  undefined,
-  getSelectorsOptions
-);
+export const queueItemsAdapterSelectors = queueItemsAdapter.getSelectors(undefined, getSelectorsOptions);
 
 export const queueApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -76,11 +62,7 @@ export const queueApi = api.injectEndpoints({
         body: arg,
         method: 'POST',
       }),
-      invalidatesTags: [
-        'SessionQueueStatus',
-        'CurrentSessionQueueItem',
-        'NextSessionQueueItem',
-      ],
+      invalidatesTags: ['SessionQueueStatus', 'CurrentSessionQueueItem', 'NextSessionQueueItem'],
       onQueryStarted: async (arg, api) => {
         const { dispatch, queryFulfilled } = api;
         try {
@@ -164,10 +146,7 @@ export const queueApi = api.injectEndpoints({
         method: 'GET',
       }),
       providesTags: (result) => {
-        const tags: ApiTagDescription[] = [
-          'CurrentSessionQueueItem',
-          'FetchOnReconnect',
-        ];
+        const tags: ApiTagDescription[] = ['CurrentSessionQueueItem', 'FetchOnReconnect'];
         if (result) {
           tags.push({ type: 'SessionQueueItem', id: result.item_id });
         }
@@ -183,10 +162,7 @@ export const queueApi = api.injectEndpoints({
         method: 'GET',
       }),
       providesTags: (result) => {
-        const tags: ApiTagDescription[] = [
-          'NextSessionQueueItem',
-          'FetchOnReconnect',
-        ];
+        const tags: ApiTagDescription[] = ['NextSessionQueueItem', 'FetchOnReconnect'];
         if (result) {
           tags.push({ type: 'SessionQueueItem', id: result.item_id });
         }
@@ -247,20 +223,16 @@ export const queueApi = api.injectEndpoints({
         try {
           const { data } = await queryFulfilled;
           dispatch(
-            queueApi.util.updateQueryData(
-              'listQueueItems',
-              undefined,
-              (draft) => {
-                queueItemsAdapter.updateOne(draft, {
-                  id: String(item_id),
-                  changes: {
-                    status: data.status,
-                    completed_at: data.completed_at,
-                    updated_at: data.updated_at,
-                  },
-                });
-              }
-            )
+            queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
+              queueItemsAdapter.updateOne(draft, {
+                id: String(item_id),
+                changes: {
+                  status: data.status,
+                  completed_at: data.completed_at,
+                  updated_at: data.updated_at,
+                },
+              });
+            })
           );
         } catch {
           // no-op
@@ -309,9 +281,7 @@ export const queueApi = api.injectEndpoints({
       serializeQueryArgs: () => {
         return `queue/${$queueId.get()}/list`;
       },
-      transformResponse: (
-        response: components['schemas']['CursorPaginatedResults_SessionQueueItemDTO_']
-      ) =>
+      transformResponse: (response: components['schemas']['CursorPaginatedResults_SessionQueueItemDTO_']) =>
         queueItemsAdapter.addMany(
           queueItemsAdapter.getInitialState({
             has_more: response.has_more,
@@ -319,10 +289,7 @@ export const queueApi = api.injectEndpoints({
           response.items
         ),
       merge: (cache, response) => {
-        queueItemsAdapter.addMany(
-          cache,
-          queueItemsAdapterSelectors.selectAll(response)
-        );
+        queueItemsAdapter.addMany(cache, queueItemsAdapterSelectors.selectAll(response));
         cache.has_more = response.has_more;
       },
       forceRefetch: ({ currentArg, previousArg }) => currentArg !== previousArg,

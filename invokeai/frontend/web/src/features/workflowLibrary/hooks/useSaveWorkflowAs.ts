@@ -1,18 +1,11 @@
-import type { ToastId } from '@invoke-ai/ui';
-import { useToast } from '@invoke-ai/ui';
+import type { ToastId } from '@invoke-ai/ui-library';
+import { useToast } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { $builtWorkflow } from 'features/nodes/hooks/useWorkflowWatcher';
-import {
-  workflowIDChanged,
-  workflowNameChanged,
-  workflowSaved,
-} from 'features/nodes/store/workflowSlice';
+import { workflowIDChanged, workflowNameChanged, workflowSaved } from 'features/nodes/store/workflowSlice';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  useCreateWorkflowMutation,
-  workflowsApi,
-} from 'services/api/endpoints/workflows';
+import { useCreateWorkflowMutation, workflowsApi } from 'services/api/endpoints/workflows';
 
 type SaveWorkflowAsArg = {
   name: string;
@@ -62,11 +55,7 @@ export const useSaveWorkflowAs: UseSaveWorkflowAs = () => {
         });
       } catch (e) {
         onError && onError();
-        if (
-          !toast.isActive(
-            `auth-error-toast-${workflowsApi.endpoints.createWorkflow.name}`
-          )
-        ) {
+        if (!toast.isActive(`auth-error-toast-${workflowsApi.endpoints.createWorkflow.name}`)) {
           toast.update(toastRef.current, {
             title: t('workflows.problemSavingWorkflow'),
             status: 'error',
