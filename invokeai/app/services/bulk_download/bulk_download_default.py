@@ -1,4 +1,5 @@
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Optional, Union
 from zipfile import ZipFile
 
@@ -19,6 +20,7 @@ from .bulk_download_base import BulkDownloadBase
 
 class BulkDownloadService(BulkDownloadBase):
     __output_folder: Path
+    __temp_directory: TemporaryDirectory
     __bulk_downloads_folder: Path
     __event_bus: EventServiceBase
     __invoker: Invoker
@@ -35,7 +37,8 @@ class BulkDownloadService(BulkDownloadBase):
         Initialize the downloader object.
         """
         self.__output_folder: Path = output_folder if isinstance(output_folder, Path) else Path(output_folder)
-        self.__bulk_downloads_folder = self.__output_folder / "bulk_downloads"
+        self.__temp_directory = TemporaryDirectory(dir=self.__output_folder)
+        self.__bulk_downloads_folder = Path(self.__temp_directory.name) / "bulk_downloads"
         self.__bulk_downloads_folder.mkdir(parents=True, exist_ok=True)
 
     def handler(self, image_names: list[str], board_id: Optional[str], bulk_download_item_id: Optional[str]) -> None:
@@ -57,8 +60,7 @@ class BulkDownloadService(BulkDownloadBase):
             image_dtos: list[ImageDTO] = []
 
             if board_id:
-                board_name = self.get_board_name(board_id)
-                board_name = self._clean_string_to_path_safe(board_name)
+                board_name = self.get_clean_board_name(board_id)
 
                 # -1 is the default value for limit, which means no limit, is_intermediate only gives us completed images
                 image_dtos = self.__invoker.services.images.get_many(
@@ -80,11 +82,11 @@ class BulkDownloadService(BulkDownloadBase):
             self.__invoker.services.logger.error("Problem bulk downloading images.")
             raise e
 
-    def get_board_name(self, board_id: str) -> str:
+    def get_clean_board_name(self, board_id: str) -> str:
         if board_id == "none":
             return "Uncategorized"
 
-        return self.__invoker.services.board_records.get(board_id).board_name
+        return self._clean_string_to_path_safe(self.__invoker.services.board_records.get(board_id).board_name)
 
     def _create_zip_file(self, image_dtos: list[ImageDTO], bulk_download_item_id: str) -> str:
         """
@@ -145,11 +147,7 @@ class BulkDownloadService(BulkDownloadBase):
     def stop(self, *args, **kwargs):
         """Stop the bulk download service and delete the files in the bulk download folder."""
         # Get all the files in the bulk downloads folder, only .zip files
-        files = self.__bulk_downloads_folder.glob("*.zip")
-
-        # Delete all the files
-        for file in files:
-            file.unlink()
+        self.__temp_directory.cleanup()
 
     def delete(self, bulk_download_item_name: str) -> None:
         """
