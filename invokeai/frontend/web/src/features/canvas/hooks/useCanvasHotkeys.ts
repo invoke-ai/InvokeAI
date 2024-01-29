@@ -1,5 +1,4 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { isInputElement } from 'common/util/isInputElement';
 import {
   $canvasStage,
   $tool,
@@ -14,6 +13,7 @@ import {
   setShouldShowBoundingBox,
   setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
+import { isInteractiveTarget } from 'features/canvas/util/isInteractiveTarget';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -93,7 +93,7 @@ const useInpaintingCanvasHotkeys = () => {
 
   const onKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.repeat || e.key !== ' ' || isInputElement(e.target as HTMLElement) || activeTabName !== 'unifiedCanvas') {
+      if (e.repeat || e.key !== ' ' || isInteractiveTarget(e.target) || activeTabName !== 'unifiedCanvas') {
         return;
       }
       if ($toolStash.get() || $tool.get() === 'move') {
@@ -108,7 +108,7 @@ const useInpaintingCanvasHotkeys = () => {
   );
   const onKeyUp = useCallback(
     (e: KeyboardEvent) => {
-      if (e.repeat || e.key !== ' ' || isInputElement(e.target as HTMLElement) || activeTabName !== 'unifiedCanvas') {
+      if (e.repeat || e.key !== ' ' || isInteractiveTarget(e.target) || activeTabName !== 'unifiedCanvas') {
         return;
       }
       if (!$toolStash.get() || $tool.get() !== 'move') {
