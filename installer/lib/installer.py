@@ -21,10 +21,6 @@ OS = platform.uname().system
 ARCH = platform.uname().machine
 VERSION = "latest"
 
-# Install the wheel packaged with the installer
-FF_USE_LOCAL_WHEEL = True
-
-
 class Installer:
     """
     Deploys an InvokeAI installation into a given path
@@ -265,27 +261,7 @@ class InvokeAiInstance:
             version = self.version
             pre = None
 
-        ## TODO: only local wheel will be installed as of now; support for --version arg is TODO
-        if FF_USE_LOCAL_WHEEL:
-            # if no wheel, try to do a source install before giving up
-            try:
-                src = str(next(Path(__file__).parent.glob("InvokeAI-*.whl")))
-            except StopIteration:
-                try:
-                    src = Path(__file__).parents[1].expanduser().resolve()
-                    # if the above directory contains one of these files, we'll do a source install
-                    next(src.glob("pyproject.toml"))
-                    next(src.glob("invokeai"))
-                except StopIteration:
-                    print("Unable to find a wheel or perform a source install. Giving up.")
-                    src = ""
-
-        elif version == "source":
-            # this makes an assumption about the location of the installer package in the source tree
-            src = Path(__file__).parents[1].expanduser().resolve()
-        else:
-            # will install from PyPi
-            src = f"invokeai=={version}" if version is not None else "invokeai"
+        src = f"invokeai=={version}" if version is not None else "invokeai"
 
         from plumbum import FG, local  # type: ignore
 
