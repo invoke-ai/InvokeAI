@@ -4,6 +4,7 @@ import {
   Grid,
   GridItem,
   Heading,
+  IconButton,
   Image,
   Modal,
   ModalBody,
@@ -12,7 +13,9 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
+  Spacer,
   Text,
+  Tooltip,
   useDisclosure,
 } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
@@ -20,8 +23,9 @@ import { discordLink, githubLink, websiteLink } from 'features/system/store/cons
 import { map } from 'lodash-es';
 import InvokeLogoYellow from 'public/assets/images/invoke-tag-lrg.svg';
 import type { ReactElement } from 'react';
-import { cloneElement, memo } from 'react';
+import { cloneElement, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiCopyBold } from 'react-icons/pi';
 import { useGetAppDepsQuery, useGetAppVersionQuery } from 'services/api/endpoints/appInfo';
 
 type AboutModalProps = {
@@ -32,12 +36,17 @@ type AboutModalProps = {
 const AboutModal = ({ children }: AboutModalProps) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { t } = useTranslation();
-  const { deps } = useGetAppDepsQuery(undefined, {
+  const { depsArray, depsObject } = useGetAppDepsQuery(undefined, {
     selectFromResult: ({ data }) => ({
-      deps: data ? map(data, (version, name) => ({ name, version })) : [],
+      depsObject: data,
+      depsArray: data ? map(data, (version, name) => ({ name, version })) : [],
     }),
   });
   const { data: appVersion } = useGetAppVersionQuery();
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(JSON.stringify(depsObject, null, 2));
+  }, [depsObject]);
 
   return (
     <>
@@ -46,17 +55,27 @@ const AboutModal = ({ children }: AboutModalProps) => {
       })}
       <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl">
         <ModalOverlay />
-        <ModalContent maxH="80vh" h="33rem">
+        <ModalContent maxH="80vh" h="34rem">
           <ModalHeader>{t('accessibility.about')}</ModalHeader>
           <ModalCloseButton />
           <ModalBody display="flex" flexDir="column" gap={4}>
             <Grid templateColumns="repeat(2, 1fr)" h="full">
               <GridItem backgroundColor="base.750" borderRadius="base" p="4" h="full">
                 <ScrollableContent>
-                  <Heading position="sticky" top="0" backgroundColor="base.750" size="md" p="1">
-                    {t('common.localSystem')}
-                  </Heading>
-                  {deps.map(({ name, version }, i) => (
+                  <Flex position="sticky" top="0" backgroundColor="base.750" p={1} alignItems="center">
+                    <Heading size="md">{t('common.localSystem')}</Heading>
+                    <Spacer />
+                    <Tooltip label={t('common.copy')}>
+                      <IconButton
+                        onClick={handleCopy}
+                        isDisabled={!depsObject}
+                        aria-label={t('common.copy')}
+                        icon={<PiCopyBold />}
+                        variant="ghost"
+                      />
+                    </Tooltip>
+                  </Flex>
+                  {depsArray.map(({ name, version }, i) => (
                     <Grid key={i} py="2" px="1" w="full" templateColumns="repeat(2, 1fr)">
                       <Text>{name}</Text>
                       <Text>{version ? version : t('common.notInstalled')}</Text>
