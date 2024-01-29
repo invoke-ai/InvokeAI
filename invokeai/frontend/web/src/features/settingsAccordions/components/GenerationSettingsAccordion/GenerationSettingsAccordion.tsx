@@ -14,7 +14,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
-import { selectLoraSlice } from 'features/lora/store/loraSlice';
+import { selectNonZeroWeightLoraSlice } from 'features/lora/store/loraSlice';
 import { SyncModelsIconButton } from 'features/modelManager/components/SyncModels/SyncModelsIconButton';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
@@ -31,7 +31,7 @@ const formLabelProps: FormLabelProps = {
   minW: '4rem',
 };
 
-const badgesSelector = createMemoizedSelector(selectLoraSlice, selectGenerationSlice, (lora, generation) => {
+const badgesSelector = createMemoizedSelector(selectNonZeroWeightLoraSlice, selectGenerationSlice, (lora, generation) => {
   const loraTabBadges = size(lora.loras) ? [size(lora.loras)] : [];
   const accordionBadges: (string | number)[] = [];
   if (generation.model) {

@@ -68,6 +68,17 @@ export default loraSlice.reducer;
 
 export const selectLoraSlice = (state: RootState) => state.lora;
 
+export const selectNonZeroWeightLoraSlice = (state: RootState) => {
+  const nonZeroWeightLoras = Object.entries(state.lora.loras)
+    .filter(([, value]: [string, LoRA]) => value.weight !== 0)
+    .reduce((obj: { [key: string]: LoRA }, [key, value]: [string, LoRA]) => {
+      obj[key] = value
+      return obj
+    }, {});
+
+  return {...state.lora, loras: nonZeroWeightLoras};
+}
+
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 export const migrateLoRAState = (state: any): any => {
   if (!('_version' in state)) {
