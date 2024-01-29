@@ -11,7 +11,7 @@ import sys
 import venv
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Union
+from typing import Optional, Tuple
 
 SUPPORTED_PYTHON = ">=3.10.0,<=3.11.100"
 INSTALLER_REQS = ["rich", "semver", "requests", "plumbum", "prompt-toolkit"]
@@ -78,7 +78,7 @@ class Installer:
 
         return venv_dir
 
-    def bootstrap(self, verbose: bool = False) -> TemporaryDirectory:
+    def bootstrap(self, verbose: bool = False) -> TemporaryDirectory | None:
         """
         Bootstrap the installer venv with packages required at install time
 
@@ -102,7 +102,7 @@ class Installer:
         except subprocess.CalledProcessError as e:
             print(e)
 
-    def app_venv(self, path: str = None):
+    def app_venv(self, path: Optional[str] = None) -> Path:
         """
         Create a virtualenv for the InvokeAI installation
         """
@@ -115,6 +115,7 @@ class Installer:
 
         # experimental / testing
         elif not FF_VENV_IN_RUNTIME:
+            venv_dir_parent = ""
             if OS == "Windows":
                 venv_dir_parent = os.getenv("APPDATA", "~/AppData/Roaming")
             elif OS == "Darwin":
@@ -141,7 +142,7 @@ class Installer:
         return venv_dir
 
     def install(
-        self, root: str = "~/invokeai", version: str = "latest", yes_to_all=False, find_links: Path = None
+        self, root: str = "~/invokeai", version: str = "latest", yes_to_all=False, find_links: Optional[Path] = None
     ) -> None:
         """
         Install the InvokeAI application into the given runtime path
@@ -160,8 +161,11 @@ class Installer:
 
         messages.welcome()
 
-        default_path = os.environ.get("INVOKEAI_ROOT") or Path(root).expanduser().resolve()
+        default_path = Path(os.environ.get("INVOKEAI_ROOT") or Path(root).expanduser().resolve())
         self.dest = default_path if yes_to_all else messages.dest_path(root)
+        if self.dest is None:
+            print("Could not find or create the destination directory. Installation cancelled.")
+            sys.exit(0)
 
         # create the venv for the app
         self.venv = self.app_venv()
@@ -233,7 +237,7 @@ class InvokeAiInstance:
         Install PyTorch
         """
 
-        from plumbum import FG, local
+        from plumbum import FG, local  # type: ignore
 
         pip = local[self.pip]
 
@@ -292,6 +296,7 @@ class InvokeAiInstance:
                     next(src.glob("invokeai"))
                 except StopIteration:
                     print("Unable to find a wheel or perform a source install. Giving up.")
+                    src = ""
 
         elif version == "source":
             # this makes an assumption about the location of the installer package in the source tree
@@ -300,7 +305,7 @@ class InvokeAiInstance:
             # will install from PyPi
             src = f"invokeai=={version}" if version is not None else "invokeai"
 
-        from plumbum import FG, local
+        from plumbum import FG, local  # type: ignore
 
         pip = local[self.pip]
 
@@ -431,7 +436,7 @@ def set_sys_path(venv_path: Path) -> None:
     sys.path.append(str(Path(venv_path, lib, "site-packages").expanduser().resolve()))
 
 
-def get_torch_source() -> (Union[str, None], str):
+def get_torch_source() -> Tuple[str | None, str | None]:
     """
     Determine the extra index URL for pip to use for torch installation.
     This depends on the OS and the graphics accelerator in use.

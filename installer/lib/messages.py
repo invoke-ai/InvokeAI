@@ -109,7 +109,7 @@ def user_wants_auto_configuration() -> bool:
     return choice.lower().startswith("a")
 
 
-def dest_path(dest=None) -> Path:
+def dest_path(dest=None) -> Path | None:
     """
     Prompt the user for the destination path and create the path
 
@@ -137,7 +137,7 @@ def dest_path(dest=None) -> Path:
         path_completer = PathCompleter(
             only_directories=True,
             expanduser=True,
-            get_paths=lambda: [browse_start],  # noqa: B023
+            get_paths=lambda: [str(browse_start)],  # noqa: B023
             # get_paths=lambda: [".."].extend(list(browse_start.iterdir()))
         )
 
@@ -217,6 +217,7 @@ def graphical_accelerator():
         "idk",
     )
 
+    options = []
     if OS == "Windows":
         options = [nvidia, nvidia_with_dml, cpu]
     if OS == "Linux":
@@ -230,7 +231,7 @@ def graphical_accelerator():
         return options[0][1]
 
     # "I don't know" is always added the last option
-    options.append(idk)
+    options.append(idk) # type: ignore
 
     options = {str(i): opt for i, opt in enumerate(options, 1)}
 
@@ -291,7 +292,7 @@ def windows_long_paths_registry() -> None:
     """
 
     with open(str(Path(__file__).parent / "WinLongPathsEnabled.reg"), "r", encoding="utf-16le") as code:
-        syntax = Syntax(code.read(), line_numbers=True)
+        syntax = Syntax(code.read(), line_numbers=True, lexer="regedit")
 
     console.print(
         Panel(
@@ -301,7 +302,7 @@ def windows_long_paths_registry() -> None:
                         "We will now apply a registry fix to enable long paths on Windows. InvokeAI needs this to function correctly. We are asking your permission to modify the Windows Registry on your behalf.",
                         "",
                         "This is the change that will be applied:",
-                        syntax,
+                        str(syntax),
                     ]
                 )
             ),
@@ -340,7 +341,7 @@ def introduction() -> None:
     console.line(2)
 
 
-def _platform_specific_help() -> str:
+def _platform_specific_help() -> Text:
     if OS == "Darwin":
         text = Text.from_markup(
             """[b wheat1]macOS Users![/]\n\nPlease be sure you have the [b wheat1]Xcode command-line tools[/] installed before continuing.\nIf not, cancel with [i]Control-C[/] and follow the Xcode install instructions at [deep_sky_blue1]https://www.freecodecamp.org/news/install-xcode-command-line-tools/[/]."""
@@ -354,5 +355,5 @@ def _platform_specific_help() -> str:
      [deep_sky_blue1]https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170[/]"""
         )
     else:
-        text = ""
+        text = Text()
     return text
