@@ -202,41 +202,8 @@ class InvokeAiInstance:
 
         import messages
 
-        # install torch first to ensure the correct version gets installed.
-        # works with either source or wheel install with negligible impact on installation times.
-        messages.simple_banner("Installing PyTorch :fire:")
-        self.install_torch(extra_index_url, find_links)
-
         messages.simple_banner("Installing the InvokeAI Application :art:")
         self.install_app(extra_index_url, optional_modules, find_links)
-
-    def install_torch(self, extra_index_url=None, find_links=None):
-        """
-        Install PyTorch
-        """
-
-        from plumbum import FG, local  # type: ignore
-
-        pip = local[self.pip]
-
-        (
-            pip[
-                "install",
-                "--require-virtualenv",
-                "numpy==1.26.3",  # choose versions that won't be uninstalled during phase 2
-                "urllib3~=1.26.0",
-                "requests~=2.28.0",
-                "torch==2.1.2",
-                "torchmetrics==0.11.4",
-                "torchvision==0.16.2",
-                "--force-reinstall",
-                "--find-links" if find_links is not None else None,
-                find_links,
-                "--extra-index-url" if extra_index_url is not None else None,
-                extra_index_url,
-            ]
-            & FG
-        )
 
     def install_app(self, extra_index_url=None, optional_modules=None, find_links=None):
         """
