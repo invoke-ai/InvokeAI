@@ -33,28 +33,14 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
 
       e.evt.preventDefault();
 
-      const cursorPos = stageRef.current.getPointerPosition();
-
-      if (!cursorPos) {
-        return;
-      }
-
-      const mousePointTo = {
-        x: (cursorPos.x - stageRef.current.x()) / stageScale,
-        y: (cursorPos.y - stageRef.current.y()) / stageScale,
-      };
-
       let delta = e.evt.deltaY;
 
-      let size = brushSize;
-      // when we zoom on trackpad, e.evt.ctrlKey is true
-      // in that case lets revert direction
-      if (e.evt.ctrlKey) {
-        delta = -delta;
-      }
-
+      // checking for ctrl key is pressed or not, 
+      // so that brush size can be controlled using ctrl + scroll up/down
       if ($ctrl.get()) {
-        if (delta > 0) {
+        let size = brushSize;
+
+        if (delta < 0) {
           if (brushSize - 5 <= 5) {
             size = Math.max(brushSize - 1, 1);
           } else {
@@ -63,19 +49,39 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
         } else {
           size = Math.min(brushSize + 5, 500);
         }
-      }else{
 
-      const newScale = clamp(stageScale * CANVAS_SCALE_BY ** delta, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE);
+        dispatch(setBrushSize(size));
+      } else {
+        const cursorPos = stageRef.current.getPointerPosition();
 
-      const newCoordinates = {
-        x: cursorPos.x - mousePointTo.x * newScale,
-        y: cursorPos.y - mousePointTo.y * newScale,
-      };
+        if (!cursorPos) {
+          return;
+        }
 
-      dispatch(setStageScale(newScale));
-      dispatch(setStageCoordinates(newCoordinates));
-    }
-      dispatch(setBrushSize(size));
+        const mousePointTo = {
+          x: (cursorPos.x - stageRef.current.x()) / stageScale,
+          y: (cursorPos.y - stageRef.current.y()) / stageScale,
+        };
+        // when we zoom on trackpad, e.evt.ctrlKey is true
+        // in that case lets revert direction
+        if (e.evt.ctrlKey) {
+          delta = -delta;
+        }
+
+        const newScale = clamp(
+          stageScale * CANVAS_SCALE_BY ** delta,
+          MIN_CANVAS_SCALE,
+          MAX_CANVAS_SCALE
+        );
+
+        const newCoordinates = {
+          x: cursorPos.x - mousePointTo.x * newScale,
+          y: cursorPos.y - mousePointTo.y * newScale,
+        };
+
+        dispatch(setStageScale(newScale));
+        dispatch(setStageCoordinates(newCoordinates));
+      }
     },
     [stageRef, isMoveStageKeyHeld, stageScale, dispatch, brushSize]
   );
