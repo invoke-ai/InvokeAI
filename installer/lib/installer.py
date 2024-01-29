@@ -21,10 +21,6 @@ OS = platform.uname().system
 ARCH = platform.uname().machine
 VERSION = "latest"
 
-### Feature flags
-# Install the virtualenv into the runtime dir
-FF_VENV_IN_RUNTIME = True
-
 # Install the wheel packaged with the installer
 FF_USE_LOCAL_WHEEL = True
 
@@ -113,20 +109,6 @@ class Installer:
         if path is not None:
             venv_dir = Path(path)
 
-        # experimental / testing
-        elif not FF_VENV_IN_RUNTIME:
-            venv_dir_parent = ""
-            if OS == "Windows":
-                venv_dir_parent = os.getenv("APPDATA", "~/AppData/Roaming")
-            elif OS == "Darwin":
-                # there is no environment variable on macOS to find this
-                # TODO: confirm this is working as expected
-                venv_dir_parent = "~/Library/Application Support"
-            elif OS == "Linux":
-                venv_dir_parent = os.getenv("XDG_DATA_DIR", "~/.local/share")
-            venv_dir = Path(venv_dir_parent).expanduser().resolve() / f"InvokeAI/{VERSION}/venv"
-
-        # stable / current
         else:
             venv_dir = self.dest / ".venv"
 
