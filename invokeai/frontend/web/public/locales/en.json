@@ -86,6 +86,7 @@
         "back": "Back",
         "batch": "Batch Manager",
         "cancel": "Cancel",
+        "copy": "Copy",
         "copyError": "$t(gallery.copy) Error",
         "close": "Close",
         "on": "On",
