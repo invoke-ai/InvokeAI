@@ -34,10 +34,10 @@ interface Props extends PropsWithChildren {
   openAPISchemaUrl?: string;
   token?: string;
   config?: PartialAppConfig;
-  customNavComponent?: ReactNode;
+  customNavComponent?: () => JSX.Element;
   middleware?: Middleware[];
   projectId?: string;
-  galleryHeader?: ReactNode;
+  galleryHeader?: () => JSX.Element;
   queueId?: string;
   selectedImage?: {
     imageName: string;
@@ -46,7 +46,7 @@ interface Props extends PropsWithChildren {
   customStarUi?: CustomStarUi;
   socketOptions?: Partial<ManagerOptions & SocketOptions>;
   isDebugging?: boolean;
-  logo?: ReactNode;
+  logo?: () => JSX.Element;
   workflowCategories?: WorkflowCategory[];
 }
 

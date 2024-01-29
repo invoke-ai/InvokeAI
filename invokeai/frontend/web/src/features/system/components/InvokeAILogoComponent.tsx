@@ -18,7 +18,7 @@ const InvokeAILogoComponent = () => {
   }, [appVersion]);
 
   if (logoOverride) {
-    return logoOverride;
+    return logoOverride();
   }
 
   return (

@@ -1,4 +1,14 @@
-import { Flex, IconButton, Spacer, Tab, TabList, TabPanel, TabPanels, Tabs, Tooltip } from '@invoke-ai/ui-library';
+import {
+  Flex,
+  IconButton,
+  Spacer,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
+  Tooltip,
+} from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
@@ -15,14 +25,23 @@ import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import type { InvokeTabName } from 'features/ui/store/tabMap';
-import { activeTabIndexSelector, activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import {
+  activeTabIndexSelector,
+  activeTabNameSelector,
+} from 'features/ui/store/uiSelectors';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import type { CSSProperties, MouseEvent, ReactElement, ReactNode } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiFlowArrowBold } from 'react-icons/pi';
-import { RiBox2Line, RiBrushLine, RiImage2Line, RiInputMethodLine, RiPlayList2Fill } from 'react-icons/ri';
+import {
+  RiBox2Line,
+  RiBrushLine,
+  RiImage2Line,
+  RiInputMethodLine,
+  RiPlayList2Fill,
+} from 'react-icons/ri';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
@@ -81,8 +100,9 @@ const tabs: InvokeTabInfo[] = [
   },
 ];
 
-const enabledTabsSelector = createMemoizedSelector(selectConfigSlice, (config) =>
-  tabs.filter((tab) => !config.disabledTabs.includes(tab.id))
+const enabledTabsSelector = createMemoizedSelector(
+  selectConfigSlice,
+  (config) => tabs.filter((tab) => !config.disabledTabs.includes(tab.id))
 );
 
 export const NO_GALLERY_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
@@ -108,8 +128,14 @@ const InvokeTabs = () => {
       e.target.blur();
     }
   }, []);
-  const shouldShowOptionsPanel = useMemo(() => !NO_OPTIONS_PANEL_TABS.includes(activeTabName), [activeTabName]);
-  const shouldShowGalleryPanel = useMemo(() => !NO_GALLERY_PANEL_TABS.includes(activeTabName), [activeTabName]);
+  const shouldShowOptionsPanel = useMemo(
+    () => !NO_OPTIONS_PANEL_TABS.includes(activeTabName),
+    [activeTabName]
+  );
+  const shouldShowGalleryPanel = useMemo(
+    () => !NO_GALLERY_PANEL_TABS.includes(activeTabName),
+    [activeTabName]
+  );
 
   const tabs = useMemo(
     () =>
@@ -133,7 +159,8 @@ const InvokeTabs = () => {
   );
 
   const tabPanels = useMemo(
-    () => enabledTabs.map((tab) => <TabPanel key={tab.id}>{tab.content}</TabPanel>),
+    () =>
+      enabledTabs.map((tab) => <TabPanel key={tab.id}>{tab.content}</TabPanel>),
     [enabledTabs]
   );
 
@@ -227,7 +254,7 @@ const InvokeTabs = () => {
         </TabList>
         <Spacer />
         <StatusIndicator />
-        {customNavComponent ? customNavComponent : <SettingsMenu />}
+        {customNavComponent ? customNavComponent() : <SettingsMenu />}
       </Flex>
       <PanelGroup
         ref={panelGroupRef}
@@ -249,7 +276,11 @@ const InvokeTabs = () => {
               onExpand={optionsPanel.onExpand}
               collapsible
             >
-              {activeTabName === 'nodes' ? <NodeEditorPanelGroup /> : <ParametersPanel />}
+              {activeTabName === 'nodes' ? (
+                <NodeEditorPanelGroup />
+              ) : (
+                <ParametersPanel />
+              )}
             </Panel>
             <ResizeHandle
               id="options-main-handle"
@@ -285,8 +316,12 @@ const InvokeTabs = () => {
           </>
         )}
       </PanelGroup>
-      {shouldShowOptionsPanel && <FloatingParametersPanelButtons panelApi={optionsPanel} />}
-      {shouldShowGalleryPanel && <FloatingGalleryButton panelApi={galleryPanel} />}
+      {shouldShowOptionsPanel && (
+        <FloatingParametersPanelButtons panelApi={optionsPanel} />
+      )}
+      {shouldShowGalleryPanel && (
+        <FloatingGalleryButton panelApi={galleryPanel} />
+      )}
     </Tabs>
   );
 };
