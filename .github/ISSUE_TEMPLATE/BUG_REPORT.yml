@@ -6,10 +6,6 @@ title: '[bug]: '
 
 labels: ['bug']
 
-# assignees:
-#   - moderator_bot
-#   - lstein
-
 body:
   - type: markdown
     attributes:
@@ -18,10 +14,9 @@ body:
 
   - type: checkboxes
     attributes:
-      label: Is there an existing issue for this?
+      label: Is there an existing issue for this problem?
       description: |
-        Please use the [search function](https://github.com/invoke-ai/InvokeAI/issues?q=is%3Aissue+is%3Aopen+label%3Abug)
-        irst to see if an issue already exists for the bug you encountered.
+        Please [search](https://github.com/invoke-ai/InvokeAI/issues) first to see if an issue already exists for the problem.
       options:
         - label: I have searched the existing issues
           required: true
@@ -33,80 +28,119 @@ body:
   - type: dropdown
     id: os_dropdown
     attributes:
-      label: OS
-      description: Which operating System did you use when the bug occured
+      label: Operating system
+      description: Your computer's operating system.
       multiple: false
       options:
         - 'Linux'
         - 'Windows'
         - 'macOS'
+        - 'other'
     validations:
       required: true
 
   - type: dropdown
     id: gpu_dropdown
     attributes:
-      label: GPU
-      description: Which kind of Graphic-Adapter is your System using
+      label: GPU vendor
+      description: Your GPU's vendor.
       multiple: false
       options:
-        - 'cuda'
-        - 'amd'
-        - 'mps'
-        - 'cpu'
+        - 'Nvidia (CUDA)'
+        - 'AMD (ROCm)'
+        - 'Apple Silicon (MPS)'
+        - 'None (CPU)'
     validations:
       required: true
+
+  - type: input
+    id: gpu_model
+    attributes:
+      label: GPU model
+      description: Your GPU's model. If on Apple Silicon, this is your Mac's chip. Leave blank if on CPU.
+      placeholder: ex. RTX 2080 Ti, Mac M1 Pro
+    validations:
+      required: false
 
   - type: input
     id: vram
     attributes:
-      label: VRAM
-      description: Size of the VRAM if known
+      label: GPU VRAM
+      description: Your GPU's VRAM. If on Apple Silicon, this is your Mac's unified memory. Leave blank if on CPU.
       placeholder: 8GB
     validations:
       required: false
-      
+
   - type: input
     id: version-number
     attributes:
-      label: What version did you experience this issue on?
+      label: Version number
       description: |
-        Please share the version of Invoke AI that you experienced the issue on. If this is not the latest version, please update first to confirm the issue still exists. If you are testing main, please include the commit hash instead.
-      placeholder: X.X.X
+        The version of Invoke you have installed. If it is not the latest version, please update and try again to confirm the issue still exists. If you are testing main, please include the commit hash instead.
+      placeholder: ex. 3.6.1
     validations:
       required: true
+
+  - type: input
+    id: browser-version
+    attributes:
+      label: Browser
+      description: Your web browser and version.
+      placeholder: ex. Firefox 123.0b3
+    validations:
+      required: true
+
+  - type: textarea
+    id: python-deps
+    attributes:
+      label: Python dependencies
+      description: |
+        If the problem occurred during image generation, click the gear icon at the bottom left corner, click "About", click the copy button and then paste here.
+    validations:
+      required: false
 
   - type: textarea
     id: what-happened
     attributes:
-      label: What happened?
+      label: What happened
       description: |
-        Briefly describe what happened, what you expected to happen and how to reproduce this bug.
-      placeholder: When using the webinterface and right-clicking on button X instead of the popup-menu there error Y appears
+        Describe what happened. Include any relevant error messages, stack traces and screenshots here.
+      placeholder: I clicked button X and then Y happened.
     validations:
       required: true
 
   - type: textarea
+    id: what-you-expected
     attributes:
-      label: Screenshots
-      description: If applicable, add screenshots to help explain your problem
-      placeholder: this is what the result looked like <screenshot>
+      label: What you expected to happen
+      description: Describe what you expected to happen.
+      placeholder: I expected Z to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: how-to-repro
+    attributes:
+      label: How to reproduce the problem
+      description: List steps to reproduce the problem.
+      placeholder: Start the app, generate an image with these settings, then click button X.
     validations:
       required: false
 
   - type: textarea
+    id: additional-context
     attributes:
       label: Additional context
-      description: Add any other context about the problem here
+      description: Any other context that might help us to understand the problem.
       placeholder: Only happens when there is full moon and Friday the 13th on Christmas Eve 🎅🏻
     validations:
       required: false
 
   - type: input
-    id: contact
+    id: discord-username
     attributes:
-      label: Contact Details
-      description: __OPTIONAL__ How can we get in touch with you if we need more info (besides this issue)?
-      placeholder: ex. email@example.com, discordname, twitter, ...
+      label: Discord username
+      description: If you are on the Invoke discord and would prefer to be contacted there, please provide your username.
+      placeholder: supercoolusername123
     validations:
       required: false
