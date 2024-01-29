@@ -28,7 +28,7 @@ export const packageConfig: UserConfig = {
           react: 'React',
           'react-dom': 'ReactDOM',
           '@emotion/react': 'EmotionReact',
-          '@invoke-ai/ui-library': 'UiLibrary'
+          '@invoke-ai/ui-library': 'UiLibrary',
         },
       },
     },
