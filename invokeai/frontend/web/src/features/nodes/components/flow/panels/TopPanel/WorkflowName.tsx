@@ -6,15 +6,7 @@ const TopCenterPanel = () => {
   const name = useAppSelector((s) => s.workflow.name);
 
   return (
-    <Text
-      m={2}
-      fontSize="lg"
-      userSelect="none"
-      noOfLines={1}
-      wordBreak="break-all"
-      fontWeight="semibold"
-      opacity={0.8}
-    >
+    <Text m={2} fontSize="lg" userSelect="none" noOfLines={1} wordBreak="break-all" fontWeight="semibold" opacity={0.8}>
       {name}
     </Text>
   );

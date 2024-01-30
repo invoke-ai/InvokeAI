@@ -17,7 +17,8 @@ type UseSaveLibraryWorkflowReturn = {
 
 type UseSaveLibraryWorkflow = () => UseSaveLibraryWorkflowReturn;
 
-const isWorkflowWithID = (workflow: WorkflowV2): workflow is O.Required<WorkflowV2, 'id'> => Boolean(workflow.id);
+export const isWorkflowWithID = (workflow: WorkflowV2): workflow is O.Required<WorkflowV2, 'id'> =>
+  Boolean(workflow.id);
 
 export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
   const { t } = useTranslation();
@@ -28,6 +29,7 @@ export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
   const toastRef = useRef<ToastId | undefined>();
   const saveWorkflow = useCallback(async () => {
     const workflow = $builtWorkflow.get();
+    console.log({ workflow });
     if (!workflow) {
       return;
     }
