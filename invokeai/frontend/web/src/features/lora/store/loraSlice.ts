@@ -7,6 +7,7 @@ import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
 export type LoRA = ParameterLoRAModel & {
   id: string;
   weight: number;
+  disabled?: boolean;
 };
 
 export const defaultLoRAConfig = {
@@ -58,25 +59,33 @@ export const loraSlice = createSlice({
       }
       lora.weight = defaultLoRAConfig.weight;
     },
+    loraToggle: (state, action: PayloadAction<{ id: string; disabled: boolean }>) => {
+      const { id, disabled } = action.payload;
+      const lora = state.loras[id];
+      if (!lora) {
+        return;
+      }
+      lora.disabled = disabled;
+    },
   },
 });
 
-export const { loraAdded, loraRemoved, loraWeightChanged, loraWeightReset, lorasCleared, loraRecalled } =
+export const { loraAdded, loraRemoved, loraWeightChanged, loraWeightReset, loraToggle, lorasCleared, loraRecalled } =
   loraSlice.actions;
 
 export default loraSlice.reducer;
 
 export const selectLoraSlice = (state: RootState) => state.lora;
 
-export const selectNonZeroWeightLoraSlice = (state: RootState) => {
-  const nonZeroWeightLoras = Object.entries(state.lora.loras)
-    .filter(([, value]: [string, LoRA]) => value.weight !== 0)
+export const selectNonDisabledLoraSlice = (state: RootState) => {
+  const nonDisabledLoras = Object.entries(state.lora.loras)
+    .filter(([, value]: [string, LoRA]) => value.disabled !== true)
     .reduce((obj: { [key: string]: LoRA }, [key, value]: [string, LoRA]) => {
       obj[key] = value;
       return obj;
     }, {});
 
-  return { ...state.lora, loras: nonZeroWeightLoras };
+  return { ...state.lora, loras: nonDisabledLoras };
 };
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
