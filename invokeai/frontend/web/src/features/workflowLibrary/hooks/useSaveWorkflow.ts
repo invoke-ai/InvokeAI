@@ -29,7 +29,6 @@ export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
   const toastRef = useRef<ToastId | undefined>();
   const saveWorkflow = useCallback(async () => {
     const workflow = $builtWorkflow.get();
-    console.log({ workflow });
     if (!workflow) {
       return;
     }
