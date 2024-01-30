@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Generic, Optional, TypeVar
+from typing import Callable, Generic, TypeVar
 
 from pydantic import BaseModel
 
@@ -23,11 +23,6 @@ class ItemStorageABC(ABC, Generic[T]):
     @abstractmethod
     def get(self, item_id: str) -> T:
         """Gets the item, parsing it into a Pydantic model"""
-        pass
-
-    @abstractmethod
-    def get_raw(self, item_id: str) -> Optional[str]:
-        """Gets the raw item as a string, skipping Pydantic parsing"""
         pass
 
     @abstractmethod
