@@ -1,17 +1,9 @@
-import { $ctrl } from '@invoke-ai/ui';
+import { $ctrl } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $isMoveStageKeyHeld } from 'features/canvas/store/canvasNanostore';
-import {
-  setBrushSize,
-  setStageCoordinates,
-  setStageScale,
-} from 'features/canvas/store/canvasSlice';
-import {
-  CANVAS_SCALE_BY,
-  MAX_CANVAS_SCALE,
-  MIN_CANVAS_SCALE,
-} from 'features/canvas/util/constants';
+import { setBrushSize, setStageCoordinates, setStageScale } from 'features/canvas/store/canvasSlice';
+import { CANVAS_SCALE_BY, MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/canvas/util/constants';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { clamp } from 'lodash-es';
@@ -33,26 +25,21 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
 
       e.evt.preventDefault();
 
-      let delta = e.evt.deltaY;
-
-      // checking for ctrl key is pressed or not, 
+      // checking for ctrl key is pressed or not,
       // so that brush size can be controlled using ctrl + scroll up/down
+
       if ($ctrl.get()) {
-        let size = brushSize;
+        // This equation was derived by fitting a curve to the desired brush sizes and deltas
+        const targetDelta = Math.sign(e.evt.deltaY) * 0.7363 * Math.pow(1.0394, brushSize);
+        // This needs to be clamped to prevent the delta from getting too large
+        const finalDelta = clamp(targetDelta, -20, 20);
+        // The new brush size is also clamped to prevent it from getting too large or small
+        const newBrushSize = clamp(brushSize + finalDelta, 1, 500);
 
-        if (delta < 0) {
-          if (brushSize - 5 <= 5) {
-            size = Math.max(brushSize - 1, 1);
-          } else {
-            size = Math.max(brushSize - 5, 1);
-          }
-        } else {
-          size = Math.min(brushSize + 5, 500);
-        }
-
-        dispatch(setBrushSize(size));
+        dispatch(setBrushSize(newBrushSize));
       } else {
         const cursorPos = stageRef.current.getPointerPosition();
+        let delta = e.evt.deltaY;
 
         if (!cursorPos) {
           return;
@@ -68,11 +55,7 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
           delta = -delta;
         }
 
-        const newScale = clamp(
-          stageScale * CANVAS_SCALE_BY ** delta,
-          MIN_CANVAS_SCALE,
-          MAX_CANVAS_SCALE
-        );
+        const newScale = clamp(stageScale * CANVAS_SCALE_BY ** delta, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE);
 
         const newCoordinates = {
           x: cursorPos.x - mousePointTo.x * newScale,
