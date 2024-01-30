@@ -42,6 +42,8 @@ class Profiler:
         self.profile_id: Optional[str] = None
 
     def new(self, profile_id: str) -> None:
+        with suppress(RuntimeError):
+            self.disable()
         self.profiler = cProfile.Profile()
         self.profile_id = profile_id
 
