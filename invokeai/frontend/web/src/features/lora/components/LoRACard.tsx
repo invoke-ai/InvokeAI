@@ -33,7 +33,8 @@ export const LoRACard = memo((props: LoRACardProps) => {
   const handleSetDisabled = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       dispatch(loraToggle({ id: lora.id, disabled: !e.target.checked }));
-    }, [dispatch, lora.id]
+    },
+    [dispatch, lora.id]
   );
 
   const handleRemoveLora = useCallback(() => {

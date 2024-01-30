@@ -31,20 +31,16 @@ const formLabelProps: FormLabelProps = {
   minW: '4rem',
 };
 
-const badgesSelector = createMemoizedSelector(
-  selectNonDisabledLoraSlice,
-  selectGenerationSlice,
-  (lora, generation) => {
-    const loraTabBadges = size(lora.loras) ? [size(lora.loras)] : [];
-    const accordionBadges: (string | number)[] = [];
-    if (generation.model) {
-      accordionBadges.push(generation.model.model_name);
-      accordionBadges.push(generation.model.base_model);
-    }
-
-    return { loraTabBadges, accordionBadges };
+const badgesSelector = createMemoizedSelector(selectNonDisabledLoraSlice, selectGenerationSlice, (lora, generation) => {
+  const loraTabBadges = size(lora.loras) ? [size(lora.loras)] : [];
+  const accordionBadges: (string | number)[] = [];
+  if (generation.model) {
+    accordionBadges.push(generation.model.model_name);
+    accordionBadges.push(generation.model.base_model);
   }
-);
+
+  return { loraTabBadges, accordionBadges };
+});
 
 export const GenerationSettingsAccordion = memo(() => {
   const { t } = useTranslation();
