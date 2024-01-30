@@ -254,6 +254,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     # Development
     dev_reload          : bool = Field(default=False, description="Automatically reload when Python sources are changed.", json_schema_extra=Categories.Development)
     profile_graphs      : bool = Field(default=False, description="Enable graph profiling", json_schema_extra=Categories.Development)
+    profile_prefix      : Optional[str] = Field(default=None, description="An optional prefix for profile output files.", json_schema_extra=Categories.Development)
     profiles_dir        : Path = Field(default=Path('profiles'), description="Directory for graph profiles", json_schema_extra=Categories.Development)
 
     version             : bool = Field(default=False, description="Show InvokeAI version and exit", json_schema_extra=Categories.Other)

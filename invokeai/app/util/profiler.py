@@ -1,4 +1,5 @@
 import cProfile
+from contextlib import suppress
 from logging import Logger
 from pathlib import Path
 from typing import Optional
@@ -34,12 +35,13 @@ class Profiler:
     ```
     """
 
-    def __init__(self, logger: Logger, output_dir: Path) -> None:
+    def __init__(self, logger: Logger, output_dir: Path, prefix: Optional[str] = None) -> None:
         self.logger = logger
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.profiler: Optional[cProfile.Profile] = None
         self.profile_id: Optional[str] = None
+        self.prefix = prefix
 
     def new(self, profile_id: str) -> None:
         with suppress(RuntimeError):
@@ -65,5 +67,10 @@ class Profiler:
         """Dump the profile to disk."""
         if not self.profiler:
             raise RuntimeError("Profiler not initialized. Call Profiler.new() first.")
-        self.profiler.dump_stats(self.output_dir / f"{self.profile_id}.prof")
-        self.logger.info(f"Dumped profile for {self.profile_id}.")
+        basename = f"{self.prefix}_{self.profile_id}" if self.prefix else self.profile_id
+        self.profiler.dump_stats(self.output_dir / f"{basename}.prof")
+        msg = f"Dumped profile for {self.profile_id}"
+        if self.prefix:
+            msg += f' with prefix "{self.prefix}"'
+        msg += "."
+        self.logger.info(msg)

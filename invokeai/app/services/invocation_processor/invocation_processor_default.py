@@ -44,6 +44,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                 Profiler(
                     logger=self.__invoker.services.logger,
                     output_dir=self.__invoker.services.configuration.profiles_path,
+                    prefix=self.__invoker.services.configuration.profile_prefix,
                 )
                 if self.__invoker.services.configuration.profile_graphs
                 else None
