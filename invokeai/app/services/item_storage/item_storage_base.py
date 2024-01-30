@@ -31,6 +31,11 @@ class ItemStorageABC(ABC, Generic[T]):
         pass
 
     @abstractmethod
+    def delete(self, item_id: str) -> None:
+        """Deletes the item"""
+        pass
+
+    @abstractmethod
     def list(self, page: int = 0, per_page: int = 10) -> PaginatedResults[T]:
         """Gets a paginated list of items"""
         pass
