@@ -4,20 +4,25 @@ import ClearFlowButton from 'features/nodes/components/flow/panels/TopPanel/Clea
 import SaveWorkflowButton from 'features/nodes/components/flow/panels/TopPanel/SaveWorkflowButton';
 import UpdateNodesButton from 'features/nodes/components/flow/panels/TopPanel/UpdateNodesButton';
 import WorkflowName from 'features/nodes/components/flow/panels/TopPanel/WorkflowName';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import WorkflowLibraryButton from 'features/workflowLibrary/components/WorkflowLibraryButton';
 import WorkflowLibraryMenu from 'features/workflowLibrary/components/WorkflowLibraryMenu/WorkflowLibraryMenu';
 import { memo } from 'react';
 
 const TopCenterPanel = () => {
-  const isWorkflowLibraryEnabled = useFeatureStatus('workflowLibrary').isFeatureEnabled;
-
   return (
-    <Flex gap={2} top={2} left={2} right={2} position="absolute" alignItems="flex-start" pointerEvents="none">
+    <Flex
+      gap={2}
+      top={2}
+      left={2}
+      right={2}
+      position="absolute"
+      alignItems="flex-start"
+      pointerEvents="none"
+    >
       <Flex flexDir="column" gap="2">
         <Flex gap="2">
           <AddNodeButton />
-          {isWorkflowLibraryEnabled && <WorkflowLibraryButton />}
+          <WorkflowLibraryButton />
         </Flex>
         <UpdateNodesButton />
       </Flex>

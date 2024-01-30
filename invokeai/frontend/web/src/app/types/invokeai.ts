@@ -23,9 +23,7 @@ export type AppFeature =
   | 'resumeQueue'
   | 'prependQueue'
   | 'invocationCache'
-  | 'bulkDownload'
-  | 'workflowLibrary';
-
+  | 'bulkDownload';
 /**
  * A disable-able Stable Diffusion feature
  */
