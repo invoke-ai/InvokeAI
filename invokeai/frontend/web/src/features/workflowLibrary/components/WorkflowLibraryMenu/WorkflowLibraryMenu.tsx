@@ -23,7 +23,8 @@ const WorkflowLibraryMenu = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   useGlobalMenuClose(onClose);
 
-  const isWorkflowLibraryEnabled = useFeatureStatus('workflowLibrary').isFeatureEnabled;
+  const isWorkflowLibraryEnabled =
+    useFeatureStatus('workflowLibrary').isFeatureEnabled;
 
   return (
     <Menu isOpen={isOpen} onOpen={onOpen} onClose={onClose}>
@@ -34,11 +35,12 @@ const WorkflowLibraryMenu = () => {
         pointerEvents="auto"
       />
       <MenuList pointerEvents="auto">
+        <NewWorkflowMenuItem />
+        <UploadWorkflowMenuItem />
+        <MenuDivider />
         {isWorkflowLibraryEnabled && <SaveWorkflowMenuItem />}
         {isWorkflowLibraryEnabled && <SaveWorkflowAsMenuItem />}
         <DownloadWorkflowMenuItem />
-        <UploadWorkflowMenuItem />
-        <NewWorkflowMenuItem />
         <MenuDivider />
         <SettingsMenuItem />
       </MenuList>
