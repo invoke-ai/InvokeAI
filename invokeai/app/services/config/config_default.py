@@ -251,7 +251,10 @@ class InvokeAIAppConfig(InvokeAISettings):
     log_level           : Literal["debug", "info", "warning", "error", "critical"] = Field(default="info", description="Emit logging messages at this level or  higher", json_schema_extra=Categories.Logging)
     log_sql             : bool = Field(default=False, description="Log SQL queries", json_schema_extra=Categories.Logging)
 
+    # Development
     dev_reload          : bool = Field(default=False, description="Automatically reload when Python sources are changed.", json_schema_extra=Categories.Development)
+    profile_graphs      : bool = Field(default=False, description="Enable graph profiling", json_schema_extra=Categories.Development)
+    profiles_dir        : Path = Field(default=Path('profiles'), description="Directory for graph profiles", json_schema_extra=Categories.Development)
 
     version             : bool = Field(default=False, description="Show InvokeAI version and exit", json_schema_extra=Categories.Other)
 
@@ -448,6 +451,11 @@ class InvokeAIAppConfig(InvokeAISettings):
         """Return true if enable_xformers is false (reversed logic) and attention type is not set to xformers."""
         disabled_in_config = not self.xformers_enabled
         return disabled_in_config and self.attention_type != "xformers"
+
+    @property
+    def profiles_path(self) -> Path:
+        """Path to the graph profiles directory."""
+        return self._resolve(self.profiles_dir)
 
     @staticmethod
     def find_root() -> Path:
