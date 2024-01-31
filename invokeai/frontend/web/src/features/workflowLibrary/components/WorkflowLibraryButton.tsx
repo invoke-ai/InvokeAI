@@ -1,4 +1,4 @@
-import { Button, useDisclosure } from '@invoke-ai/ui-library';
+import { IconButton, useDisclosure } from '@invoke-ai/ui-library';
 import { WorkflowLibraryModalContext } from 'features/workflowLibrary/context/WorkflowLibraryModalContext';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,9 +12,13 @@ const WorkflowLibraryButton = () => {
 
   return (
     <WorkflowLibraryModalContext.Provider value={disclosure}>
-      <Button leftIcon={<PiBooksBold />} onClick={disclosure.onOpen} pointerEvents="auto">
-        {t('workflows.workflowLibrary')}
-      </Button>
+      <IconButton
+        aria-label={t('workflows.workflowLibrary')}
+        tooltip={t('workflows.workflowLibrary')}
+        icon={<PiBooksBold />}
+        onClick={disclosure.onOpen}
+        pointerEvents="auto"
+      />
       <WorkflowLibraryModal />
     </WorkflowLibraryModalContext.Provider>
   );

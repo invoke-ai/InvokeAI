@@ -5,7 +5,7 @@ import { workflowLoaded } from 'features/nodes/store/actions';
 import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesDeleted } from 'features/nodes/store/nodesSlice';
 import type { WorkflowsState as WorkflowState } from 'features/nodes/store/types';
 import type { FieldIdentifier } from 'features/nodes/types/field';
-import type { WorkflowV2 } from 'features/nodes/types/workflow';
+import type { WorkflowCategory, WorkflowV2 } from 'features/nodes/types/workflow';
 import { cloneDeep, isEqual, uniqBy } from 'lodash-es';
 
 export const blankWorkflow: Omit<WorkflowV2, 'nodes' | 'edges'> = {
@@ -45,6 +45,11 @@ const workflowSlice = createSlice({
     workflowNameChanged: (state, action: PayloadAction<string>) => {
       state.name = action.payload;
       state.isTouched = true;
+    },
+    workflowCategoryChanged: (state, action: PayloadAction<WorkflowCategory | undefined>) => {
+      if (action.payload) {
+        state.meta.category = action.payload;
+      }
     },
     workflowDescriptionChanged: (state, action: PayloadAction<string>) => {
       state.description = action.payload;
@@ -102,6 +107,7 @@ export const {
   workflowExposedFieldAdded,
   workflowExposedFieldRemoved,
   workflowNameChanged,
+  workflowCategoryChanged,
   workflowDescriptionChanged,
   workflowTagsChanged,
   workflowAuthorChanged,

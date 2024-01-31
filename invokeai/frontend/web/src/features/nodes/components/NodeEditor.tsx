@@ -4,6 +4,7 @@ import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import TopPanel from 'features/nodes/components/flow/panels/TopPanel/TopPanel';
+import { SaveWorkflowAsDialog } from 'features/workflowLibrary/components/SaveWorkflowAsDialog/SaveWorkflowAsDialog';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { CSSProperties } from 'react';
@@ -59,6 +60,7 @@ const NodeEditor = () => {
             <TopPanel />
             <BottomLeftPanel />
             <MinimapPanel />
+            <SaveWorkflowAsDialog />
           </motion.div>
         )}
       </AnimatePresence>
