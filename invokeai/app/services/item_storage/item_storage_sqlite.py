@@ -1,5 +1,3 @@
-import sqlite3
-import threading
 from typing import Generic, Optional, TypeVar, get_args
 
 from pydantic import BaseModel, TypeAdapter
@@ -12,13 +10,6 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class SqliteItemStorage(ItemStorageABC, Generic[T]):
-    _table_name: str
-    _conn: sqlite3.Connection
-    _cursor: sqlite3.Cursor
-    _id_field: str
-    _lock: threading.RLock
-    _validator: Optional[TypeAdapter[T]]
-
     def __init__(self, db: SqliteDatabase, table_name: str, id_field: str = "id"):
         super().__init__()
 
