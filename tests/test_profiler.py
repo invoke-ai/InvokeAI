@@ -34,6 +34,7 @@ def test_profiler_profiles():
         profiler.stop()
         assert (Path(tempdir) / "test.prof").exists()
 
+
 def test_profiler_profiles_with_prefix():
     with TemporaryDirectory() as tempdir:
         profiler = Profiler(logger=Logger("test_profiler"), output_dir=Path(tempdir), prefix="prefix")
