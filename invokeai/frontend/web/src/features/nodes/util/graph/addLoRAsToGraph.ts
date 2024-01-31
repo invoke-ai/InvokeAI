@@ -1,5 +1,5 @@
 import type { RootState } from 'app/store/store';
-import { forEach, size } from 'lodash-es';
+import { filter, size } from 'lodash-es';
 import type { CoreMetadataInvocation, LoraLoaderInvocation, NonNullableGraph } from 'services/api/types';
 
 import {
@@ -28,8 +28,8 @@ export const addLoRAsToGraph = (
    * So we need to inject a LoRA chain into the graph.
    */
 
-  const { loras } = state.lora;
-  const loraCount = size(loras);
+  const enabledLoRAs = filter(state.lora.loras, (l) => l.isEnabled ?? false);
+  const loraCount = size(enabledLoRAs);
 
   if (loraCount === 0) {
     return;
@@ -47,7 +47,7 @@ export const addLoRAsToGraph = (
   let currentLoraIndex = 0;
   const loraMetadata: CoreMetadataInvocation['loras'] = [];
 
-  forEach(loras, (lora) => {
+  enabledLoRAs.forEach((lora) => {
     const { model_name, base_model, weight } = lora;
     const currentLoraNodeId = `${LORA_LOADER}_${model_name.replace('.', '_')}`;
 
