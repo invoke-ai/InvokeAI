@@ -51,7 +51,7 @@ class Profiler:
         self._profiler.enable()
         self._logger.info(f"Started profiling {self.profile_id}.")
 
-    def stop(self) -> None:
+    def stop(self) -> Path:
         if not self._profiler:
             raise RuntimeError("Profiler not initialized. Call Profiler.start() first.")
         self._profiler.disable()
@@ -63,3 +63,5 @@ class Profiler:
         self._logger.info(f"Stopped profiling, profile dumped to {path}.")
         self._profiler = None
         self.profile_id = None
+
+        return path
