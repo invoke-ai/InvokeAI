@@ -1,5 +1,4 @@
 import cProfile
-from contextlib import suppress
 from logging import Logger
 from pathlib import Path
 from typing import Optional
@@ -12,7 +11,7 @@ class Profiler:
     Usage
     ```
       # Create a profiler
-      profiler = Profiler(logger, output_dir)
+      profiler = Profiler(logger, output_dir, "testing_sql_queries")
       # Start a new profile
       profiler.new("my_profile")
       profiler.enable()
@@ -44,34 +43,25 @@ class Profiler:
 
         self.profile_id: Optional[str] = None
 
-    def new(self, profile_id: str) -> None:
-        with suppress(RuntimeError):
-            self.disable()
-        self._profiler = cProfile.Profile()
+    def start(self, profile_id: str) -> None:
+        if self._profiler:
+            self.stop()
+
         self.profile_id = profile_id
 
-    def enable(self) -> None:
-        """Start profiling."""
-        if not self._profiler:
-            raise RuntimeError("Profiler not initialized. Call Profiler.new() first.")
+        self._profiler = cProfile.Profile()
         self._profiler.enable()
-        self._logger.info(f"Started profiling {self.profile_id}.")
+        self._logger.info(f"Started profiling {self.profile_id} ({self._prefix}).")
 
-    def disable(self) -> None:
-        """Stop profiling."""
+    def stop(self) -> None:
         if not self._profiler:
-            raise RuntimeError("Profiler not initialized. Call Profiler.new() first.")
+            raise RuntimeError("Profiler not initialized. Call Profiler.start() first.")
         self._profiler.disable()
-        self._logger.info(f"Stopped profiling {self.profile_id}.")
 
-    def dump(self) -> None:
-        """Dump the profile to disk."""
-        if not self._profiler:
-            raise RuntimeError("Profiler not initialized. Call Profiler.new() first.")
-        basename = f"{self._prefix}_{self.profile_id}" if self._prefix else self.profile_id
-        self._profiler.dump_stats(self._output_dir / f"{basename}.prof")
-        msg = f"Dumped profile for {self.profile_id}"
-        if self._prefix:
-            msg += f' with prefix "{self._prefix}"'
-        msg += "."
-        self._logger.info(msg)
+        filename = f"{self._prefix}_{self.profile_id}.prof" if self._prefix else f"{self.profile_id}.prof"
+        path = Path(self._output_dir, filename)
+
+        self._profiler.dump_stats(path)
+        self._logger.info(f"Stopped profiling, profile dumped to {path}.")
+        self._profiler = None
+        self.profile_id = None

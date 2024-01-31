@@ -62,8 +62,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     continue
 
                 if profiler and profiler.profile_id != queue_item.graph_execution_state_id:
-                    profiler.new(profile_id=queue_item.graph_execution_state_id)
-                    profiler.enable()
+                    profiler.start(profile_id=queue_item.graph_execution_state_id)
 
                 try:
                     graph_execution_state = self.__invoker.services.graph_execution_manager.get(
@@ -218,8 +217,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         graph_execution_state_id=graph_execution_state.id,
                     )
                     if profiler:
-                        profiler.disable()
-                        profiler.dump()
+                        profiler.stop()
 
         except KeyboardInterrupt:
             pass  # Log something? KeyboardInterrupt is probably not going to be seen by the processor
