@@ -4,7 +4,6 @@ from typing import Generic, Optional, TypeVar, get_args
 
 from pydantic import BaseModel, TypeAdapter
 
-from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 from .item_storage_base import ItemStorageABC
@@ -89,46 +88,3 @@ class SqliteItemStorage(ItemStorageABC, Generic[T]):
         finally:
             self._lock.release()
         self._on_deleted(id)
-
-    def list(self, page: int = 0, per_page: int = 10) -> PaginatedResults[T]:
-        try:
-            self._lock.acquire()
-            self._cursor.execute(
-                f"""SELECT item FROM {self._table_name} LIMIT ? OFFSET ?;""",
-                (per_page, page * per_page),
-            )
-            result = self._cursor.fetchall()
-
-            items = [self._parse_item(r[0]) for r in result]
-
-            self._cursor.execute(f"""SELECT count(*) FROM {self._table_name};""")
-            count = self._cursor.fetchone()[0]
-        finally:
-            self._lock.release()
-
-        pageCount = int(count / per_page) + 1
-
-        return PaginatedResults[T](items=items, page=page, pages=pageCount, per_page=per_page, total=count)
-
-    def search(self, query: str, page: int = 0, per_page: int = 10) -> PaginatedResults[T]:
-        try:
-            self._lock.acquire()
-            self._cursor.execute(
-                f"""SELECT item FROM {self._table_name} WHERE item LIKE ? LIMIT ? OFFSET ?;""",
-                (f"%{query}%", per_page, page * per_page),
-            )
-            result = self._cursor.fetchall()
-
-            items = [self._parse_item(r[0]) for r in result]
-
-            self._cursor.execute(
-                f"""SELECT count(*) FROM {self._table_name} WHERE item LIKE ?;""",
-                (f"%{query}%",),
-            )
-            count = self._cursor.fetchone()[0]
-        finally:
-            self._lock.release()
-
-        pageCount = int(count / per_page) + 1
-
-        return PaginatedResults[T](items=items, page=page, pages=pageCount, per_page=per_page, total=count)

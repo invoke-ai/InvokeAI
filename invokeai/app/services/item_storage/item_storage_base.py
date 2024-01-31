@@ -3,8 +3,6 @@ from typing import Callable, Generic, TypeVar
 
 from pydantic import BaseModel
 
-from invokeai.app.services.shared.pagination import PaginatedResults
-
 T = TypeVar("T", bound=BaseModel)
 
 
@@ -33,15 +31,6 @@ class ItemStorageABC(ABC, Generic[T]):
     @abstractmethod
     def delete(self, item_id: str) -> None:
         """Deletes the item"""
-        pass
-
-    @abstractmethod
-    def list(self, page: int = 0, per_page: int = 10) -> PaginatedResults[T]:
-        """Gets a paginated list of items"""
-        pass
-
-    @abstractmethod
-    def search(self, query: str, page: int = 0, per_page: int = 10) -> PaginatedResults[T]:
         pass
 
     def on_changed(self, on_changed: Callable[[T], None]) -> None:

@@ -28,22 +28,6 @@ def test_sqlite_service_can_create_and_get(db: SqliteItemStorage[TestModel]):
     assert db.get("1") == TestModel(id="1", name="Test")
 
 
-def test_sqlite_service_can_list(db: SqliteItemStorage[TestModel]):
-    db.set(TestModel(id="1", name="Test"))
-    db.set(TestModel(id="2", name="Test"))
-    db.set(TestModel(id="3", name="Test"))
-    results = db.list()
-    assert results.page == 0
-    assert results.pages == 1
-    assert results.per_page == 10
-    assert results.total == 3
-    assert results.items == [
-        TestModel(id="1", name="Test"),
-        TestModel(id="2", name="Test"),
-        TestModel(id="3", name="Test"),
-    ]
-
-
 def test_sqlite_service_can_delete(db: SqliteItemStorage[TestModel]):
     db.set(TestModel(id="1", name="Test"))
     db.delete("1")
@@ -73,67 +57,3 @@ def test_sqlite_service_calls_delete_callback(db: SqliteItemStorage[TestModel]):
     db.set(TestModel(id="1", name="Test"))
     db.delete("1")
     assert called
-
-
-def test_sqlite_service_can_list_with_pagination(db: SqliteItemStorage[TestModel]):
-    db.set(TestModel(id="1", name="Test"))
-    db.set(TestModel(id="2", name="Test"))
-    db.set(TestModel(id="3", name="Test"))
-    results = db.list(page=0, per_page=2)
-    assert results.page == 0
-    assert results.pages == 2
-    assert results.per_page == 2
-    assert results.total == 3
-    assert results.items == [TestModel(id="1", name="Test"), TestModel(id="2", name="Test")]
-
-
-def test_sqlite_service_can_list_with_pagination_and_offset(db: SqliteItemStorage[TestModel]):
-    db.set(TestModel(id="1", name="Test"))
-    db.set(TestModel(id="2", name="Test"))
-    db.set(TestModel(id="3", name="Test"))
-    results = db.list(page=1, per_page=2)
-    assert results.page == 1
-    assert results.pages == 2
-    assert results.per_page == 2
-    assert results.total == 3
-    assert results.items == [TestModel(id="3", name="Test")]
-
-
-def test_sqlite_service_can_search(db: SqliteItemStorage[TestModel]):
-    db.set(TestModel(id="1", name="Test"))
-    db.set(TestModel(id="2", name="Test"))
-    db.set(TestModel(id="3", name="Test"))
-    results = db.search(query="Test")
-    assert results.page == 0
-    assert results.pages == 1
-    assert results.per_page == 10
-    assert results.total == 3
-    assert results.items == [
-        TestModel(id="1", name="Test"),
-        TestModel(id="2", name="Test"),
-        TestModel(id="3", name="Test"),
-    ]
-
-
-def test_sqlite_service_can_search_with_pagination(db: SqliteItemStorage[TestModel]):
-    db.set(TestModel(id="1", name="Test"))
-    db.set(TestModel(id="2", name="Test"))
-    db.set(TestModel(id="3", name="Test"))
-    results = db.search(query="Test", page=0, per_page=2)
-    assert results.page == 0
-    assert results.pages == 2
-    assert results.per_page == 2
-    assert results.total == 3
-    assert results.items == [TestModel(id="1", name="Test"), TestModel(id="2", name="Test")]
-
-
-def test_sqlite_service_can_search_with_pagination_and_offset(db: SqliteItemStorage[TestModel]):
-    db.set(TestModel(id="1", name="Test"))
-    db.set(TestModel(id="2", name="Test"))
-    db.set(TestModel(id="3", name="Test"))
-    results = db.search(query="Test", page=1, per_page=2)
-    assert results.page == 1
-    assert results.pages == 2
-    assert results.per_page == 2
-    assert results.total == 3
-    assert results.items == [TestModel(id="3", name="Test")]
