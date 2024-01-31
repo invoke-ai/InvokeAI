@@ -141,7 +141,7 @@ class StableDiffusionXLModel(DiffusersModel):
                 version=base_model,
                 model_config=config,
                 output_path=output_path,
-                use_safetensors=False,  # corrupts sdxl models for some reason
+                use_safetensors=True,
                 **kwargs,
             )
         else:
