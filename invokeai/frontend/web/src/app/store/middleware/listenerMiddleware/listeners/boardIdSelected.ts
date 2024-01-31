@@ -36,10 +36,11 @@ export const addBoardIdSelectedListener = () => {
         const { data: boardImagesData } = imagesApi.endpoints.listImages.select(queryArgs)(getState());
 
         if (boardImagesData && boardIdSelected.match(action) && action.payload.selectedImageName) {
-          const firstImage = imagesSelectors.selectAll(boardImagesData)[0];
           const selectedImage = imagesSelectors.selectById(boardImagesData, action.payload.selectedImageName);
-
-          dispatch(imageSelected(selectedImage || firstImage || null));
+          dispatch(imageSelected(selectedImage || null));
+        } else if (boardImagesData) {
+          const firstImage = imagesSelectors.selectAll(boardImagesData)[0];
+          dispatch(imageSelected(firstImage || null));
         } else {
           // board has no images - deselect
           dispatch(imageSelected(null));
