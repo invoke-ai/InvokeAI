@@ -71,8 +71,15 @@ export const loraSlice = createSlice({
   },
 });
 
-export const { loraAdded, loraRemoved, loraWeightChanged, loraWeightReset, loraIsEnabledChanged, lorasCleared, loraRecalled } =
-  loraSlice.actions;
+export const {
+  loraAdded,
+  loraRemoved,
+  loraWeightChanged,
+  loraWeightReset,
+  loraIsEnabledChanged,
+  lorasCleared,
+  loraRecalled,
+} = loraSlice.actions;
 
 export default loraSlice.reducer;
 
