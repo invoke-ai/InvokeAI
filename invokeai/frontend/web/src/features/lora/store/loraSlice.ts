@@ -60,7 +60,7 @@ export const loraSlice = createSlice({
       }
       lora.weight = defaultLoRAConfig.weight;
     },
-    loraToggled: (state, action: PayloadAction<Pick<LoRA, 'id' | 'isEnabled'>>) => {
+    loraIsEnabledChanged: (state, action: PayloadAction<Pick<LoRA, 'id' | 'isEnabled'>>) => {
       const { id, isEnabled } = action.payload;
       const lora = state.loras[id];
       if (!lora) {
@@ -71,7 +71,7 @@ export const loraSlice = createSlice({
   },
 });
 
-export const { loraAdded, loraRemoved, loraWeightChanged, loraWeightReset, loraToggled, lorasCleared, loraRecalled } =
+export const { loraAdded, loraRemoved, loraWeightChanged, loraWeightReset, loraIsEnabledChanged, lorasCleared, loraRecalled } =
   loraSlice.actions;
 
 export default loraSlice.reducer;

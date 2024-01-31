@@ -28,7 +28,6 @@ export const addLoRAsToGraph = (
    * So we need to inject a LoRA chain into the graph.
    */
 
-  // const { loras } = state.lora;
   const enabledLoRAs = filter(state.lora.loras, (l) => l.isEnabled ?? false);
   const loraCount = size(enabledLoRAs);
 

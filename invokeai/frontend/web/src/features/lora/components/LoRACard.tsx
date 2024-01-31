@@ -11,7 +11,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import type { LoRA } from 'features/lora/store/loraSlice';
-import { loraRemoved, loraToggled, loraWeightChanged } from 'features/lora/store/loraSlice';
+import { loraIsEnabledChanged, loraRemoved, loraWeightChanged } from 'features/lora/store/loraSlice';
 import { memo, useCallback } from 'react';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 
@@ -31,7 +31,7 @@ export const LoRACard = memo((props: LoRACardProps) => {
   );
 
   const handleSetLoraToggle = useCallback(() => {
-    dispatch(loraToggled({ id: lora.id, isEnabled: !lora.isEnabled }));
+    dispatch(loraIsEnabledChanged({ id: lora.id, isEnabled: !lora.isEnabled }));
   }, [dispatch, lora.id, lora.isEnabled]);
 
   const handleRemoveLora = useCallback(() => {
