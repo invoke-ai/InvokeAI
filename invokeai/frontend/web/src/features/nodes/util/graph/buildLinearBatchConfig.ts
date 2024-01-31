@@ -40,6 +40,12 @@ export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, 
         items: seeds,
       });
     }
+  } else {
+    // seedBehaviour = SeedBehaviour.PerRun
+    const seeds = generateSeeds({
+      count: iterations,
+      start: shouldRandomizeSeed ? undefined : seed,
+    });
 
     if (graph.nodes[NOISE]) {
       secondBatchDatumList.push({
@@ -49,6 +55,7 @@ export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, 
       });
     }
 
+    // add to metadata
     if (getHasMetadata(graph)) {
       removeMetadata(graph, 'seed');
       secondBatchDatumList.push({
