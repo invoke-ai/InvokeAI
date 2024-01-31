@@ -657,10 +657,6 @@
         "workflowLoaded": "İş Akışı Yüklendi",
         "problemDeletingWorkflow": "İş Akışını Silmede Sorun"
     },
-    "metadata": {
-        "generationMode": "",
-        "workflow": ""
-    },
     "parameters": {
         "invoke": {
             "noPrompts": "İstem oluşturulmadı"
