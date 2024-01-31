@@ -35,7 +35,7 @@ class Profiler:
     """
 
     def __init__(self, logger: Logger, output_dir: Path, prefix: Optional[str] = None) -> None:
-        self._logger = logger
+        self._logger = logger.getChild(f"profiler.{prefix}" if prefix else "profiler")
         self._output_dir = output_dir
         self._output_dir.mkdir(parents=True, exist_ok=True)
         self._profiler: Optional[cProfile.Profile] = None
@@ -51,7 +51,7 @@ class Profiler:
 
         self._profiler = cProfile.Profile()
         self._profiler.enable()
-        self._logger.info(f"Started profiling {self.profile_id} ({self._prefix}).")
+        self._logger.info(f"Started profiling {self.profile_id}.")
 
     def stop(self) -> None:
         if not self._profiler:
