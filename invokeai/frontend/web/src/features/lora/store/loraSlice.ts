@@ -7,10 +7,12 @@ import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
 export type LoRA = ParameterLoRAModel & {
   id: string;
   weight: number;
+  isEnabled?: boolean;
 };
 
-export const defaultLoRAConfig = {
+export const defaultLoRAConfig: Pick<LoRA, 'weight' | 'isEnabled'> = {
   weight: 0.75,
+  isEnabled: true,
 };
 
 export type LoraState = {
@@ -58,11 +60,26 @@ export const loraSlice = createSlice({
       }
       lora.weight = defaultLoRAConfig.weight;
     },
+    loraIsEnabledChanged: (state, action: PayloadAction<Pick<LoRA, 'id' | 'isEnabled'>>) => {
+      const { id, isEnabled } = action.payload;
+      const lora = state.loras[id];
+      if (!lora) {
+        return;
+      }
+      lora.isEnabled = isEnabled;
+    },
   },
 });
 
-export const { loraAdded, loraRemoved, loraWeightChanged, loraWeightReset, lorasCleared, loraRecalled } =
-  loraSlice.actions;
+export const {
+  loraAdded,
+  loraRemoved,
+  loraWeightChanged,
+  loraWeightReset,
+  loraIsEnabledChanged,
+  lorasCleared,
+  loraRecalled,
+} = loraSlice.actions;
 
 export default loraSlice.reducer;
 

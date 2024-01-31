@@ -152,7 +152,7 @@
     "storybook": "^7.6.10",
     "ts-toolbelt": "^9.6.0",
     "typescript": "^5.3.3",
-    "vite": "^5.0.11",
+    "vite": "^5.0.12",
     "vite-plugin-css-injected-by-js": "^3.3.1",
     "vite-plugin-dts": "^3.7.1",
     "vite-plugin-eslint": "^1.8.1",
