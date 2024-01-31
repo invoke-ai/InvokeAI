@@ -125,7 +125,8 @@
         "localSystem": "Sistema locale",
         "green": "Verde",
         "blue": "Blu",
-        "alpha": "Alfa"
+        "alpha": "Alfa",
+        "copy": "Copia"
     },
     "gallery": {
         "generations": "Generazioni",

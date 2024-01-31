@@ -74,10 +74,20 @@ const IAICanvasStagingAreaToolbar = () => {
     preventDefault: true,
   });
 
-  useHotkeys(['enter'], () => handleAccept, {
+  useHotkeys(['enter'], handleAccept, {
     enabled: () => true,
     preventDefault: true,
   });
+
+  useHotkeys(
+    ['esc'],
+    () => {
+      handleDiscardStagingArea();
+    },
+    {
+      preventDefault: true,
+    }
+  );
 
   const { data: imageDTO } = useGetImageDTOQuery(currentStagingAreaImage?.imageName ?? skipToken);
 
@@ -96,6 +106,17 @@ const IAICanvasStagingAreaToolbar = () => {
       })
     );
   }, [dispatch, imageDTO]);
+
+  useHotkeys(
+    ['shift+s'],
+    () => {
+      shouldShowStagingImage && handleSaveToGallery();
+    },
+    {
+      preventDefault: true,
+    },
+    [shouldShowStagingImage, handleSaveToGallery]
+  );
 
   const handleDiscardStagingArea = useCallback(() => {
     dispatch(discardStagedImages());
@@ -157,7 +178,7 @@ const IAICanvasStagingAreaToolbar = () => {
           colorScheme="invokeBlue"
         />
         <IconButton
-          tooltip={t('unifiedCanvas.saveToGallery')}
+          tooltip={`${t('unifiedCanvas.saveToGallery')} (Shift+S)`}
           aria-label={t('unifiedCanvas.saveToGallery')}
           isDisabled={!imageDTO || !imageDTO.is_intermediate}
           icon={<PiFloppyDiskBold />}
@@ -165,7 +186,7 @@ const IAICanvasStagingAreaToolbar = () => {
           colorScheme="invokeBlue"
         />
         <IconButton
-          tooltip={t('unifiedCanvas.discardAll')}
+          tooltip={`${t('unifiedCanvas.discardAll')} (Esc)`}
           aria-label={t('unifiedCanvas.discardAll')}
           icon={<PiXBold />}
           onClick={handleDiscardStagingArea}
