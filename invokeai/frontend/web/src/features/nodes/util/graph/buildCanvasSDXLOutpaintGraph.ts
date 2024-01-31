@@ -252,6 +252,16 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'mask1',
         },
       },
+      {
+        source: {
+          node_id: MASK_COMBINE,
+          field: 'image',
+        },
+        destination: {
+          node_id: MASK_BLUR,
+          field: 'image',
+        },
+      },
       // Connect Everything To Inpaint
       {
         source: {
