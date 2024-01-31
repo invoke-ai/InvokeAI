@@ -53,7 +53,7 @@ class Profiler:
 
     def stop(self) -> Path:
         if not self._profiler:
-            raise RuntimeError("Profiler not initialized. Call Profiler.start() first.")
+            raise RuntimeError("Profiler not initialized. Call start() first.")
         self._profiler.disable()
 
         filename = f"{self._prefix}_{self.profile_id}.prof" if self._prefix else f"{self.profile_id}.prof"
