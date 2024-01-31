@@ -330,7 +330,6 @@ class ModelInstall(object):
         with TemporaryDirectory(dir=self.config.models_path) as staging:
             CIVITAI_RE = r".*civitai.com.*"
             civit_url = re.match(CIVITAI_RE, url, re.IGNORECASE)
-            print(civit_url)
             location = download_with_resume(url, Path(staging), access_token=self.civit_api_key if civit_url else None)
             if not location:
                 logger.error(f"Unable to download {url}. Skipping.")
