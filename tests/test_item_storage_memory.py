@@ -19,7 +19,6 @@ def item_storage_memory():
 def test_item_storage_memory_initializes():
     item_storage_memory = ItemStorageMemory()
     assert item_storage_memory._items == {}
-    assert item_storage_memory._item_ids == set()
     assert item_storage_memory._id_field == "id"
     assert item_storage_memory._max_items == 10
 
@@ -37,18 +36,15 @@ def test_item_storage_memory_sets(item_storage_memory: ItemStorageMemory[MockIte
     item_1 = MockItemModel(id="1", value=1)
     item_storage_memory.set(item_1)
     assert item_storage_memory._items == {"1": item_1}
-    assert item_storage_memory._item_ids == {"1"}
 
     item_2 = MockItemModel(id="2", value=2)
     item_storage_memory.set(item_2)
     assert item_storage_memory._items == {"1": item_1, "2": item_2}
-    assert item_storage_memory._item_ids == {"1", "2"}
 
     # Updating value of existing item
     item_2_updated = MockItemModel(id="2", value=9001)
     item_storage_memory.set(item_2_updated)
     assert item_storage_memory._items == {"1": item_1, "2": item_2_updated}
-    assert item_storage_memory._item_ids == {"1", "2"}
 
 
 def test_item_storage_memory_gets(item_storage_memory: ItemStorageMemory[MockItemModel]):
@@ -74,14 +70,17 @@ def test_item_storage_memory_deletes(item_storage_memory: ItemStorageMemory[Mock
 
     item_storage_memory.delete("2")
     assert item_storage_memory._items == {"1": item_1}
-    assert item_storage_memory._item_ids == {"1"}
 
 
 def test_item_storage_memory_respects_max():
     item_storage_memory = ItemStorageMemory(max_items=3)
     for i in range(10):
         item_storage_memory.set(MockItemModel(id=str(i), value=i))
-    assert len(item_storage_memory._items) == 3
+    assert item_storage_memory._items == {
+        "7": MockItemModel(id="7", value=7),
+        "8": MockItemModel(id="8", value=8),
+        "9": MockItemModel(id="9", value=9),
+    }
 
 
 def test_item_storage_memory_calls_set_callback(item_storage_memory: ItemStorageMemory[MockItemModel]):
