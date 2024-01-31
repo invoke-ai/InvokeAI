@@ -104,14 +104,14 @@ class ModelInstall(object):
         prediction_type_helper: Optional[Callable[[Path], SchedulerPredictionType]] = None,
         model_manager: Optional[ModelManager] = None,
         access_token: Optional[str] = None,
-        civit_api_key: Optional[str] = None,
+        civitai_api_key: Optional[str] = None,
     ):
         self.config = config
         self.mgr = model_manager or ModelManager(config.model_conf_path)
         self.datasets = OmegaConf.load(Dataset_path)
         self.prediction_helper = prediction_type_helper
         self.access_token = access_token or HfFolder.get_token()
-        self.civit_api_key = civit_api_key or config.civit_api_key
+        self.civitai_api_key = civitai_api_key or config.civitai_api_key
         self.reverse_paths = self._reverse_paths(self.datasets)
 
     def all_models(self) -> Dict[str, ModelLoadInfo]:
@@ -330,7 +330,7 @@ class ModelInstall(object):
         with TemporaryDirectory(dir=self.config.models_path) as staging:
             CIVITAI_RE = r".*civitai.com.*"
             civit_url = re.match(CIVITAI_RE, url, re.IGNORECASE)
-            location = download_with_resume(url, Path(staging), access_token=self.civit_api_key if civit_url else None)
+            location = download_with_resume(url, Path(staging), access_token=self.civitai_api_key if civit_url else None)
             if not location:
                 logger.error(f"Unable to download {url}. Skipping.")
             info = ModelProbe().heuristic_probe(location, self.prediction_helper)

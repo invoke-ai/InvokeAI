@@ -285,7 +285,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     node_cache_size     : int = Field(default=512, description="How many cached nodes to keep in memory", json_schema_extra=Categories.Nodes)
 
     # MODEL IMPORT
-    civit_api_key       : Optional[str] = Field(default=os.environ.get("CIVIT_API_KEY"), description="API key for Civit", json_schema_extra=Categories.Other)
+    civitai_api_key       : Optional[str] = Field(default=os.environ.get("CIVITAI_API_KEY"), description="API key for CivitAI", json_schema_extra=Categories.Other)
 
     # DEPRECATED FIELDS - STILL HERE IN ORDER TO OBTAN VALUES FROM PRE-3.1 CONFIG FILES
     always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", json_schema_extra=Categories.MemoryPerformance)
