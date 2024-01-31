@@ -179,6 +179,7 @@ const AddNodePopover = () => {
       closeOnBlur={true}
       returnFocusOnClose={true}
       initialFocusRef={inputRef}
+      isLazy
     >
       <PopoverAnchor>
         <Flex position="absolute" top="15%" insetInlineStart="50%" pointerEvents="none" />
