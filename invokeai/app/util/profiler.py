@@ -36,41 +36,42 @@ class Profiler:
     """
 
     def __init__(self, logger: Logger, output_dir: Path, prefix: Optional[str] = None) -> None:
-        self.logger = logger
-        self.output_dir = output_dir
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.profiler: Optional[cProfile.Profile] = None
+        self._logger = logger
+        self._output_dir = output_dir
+        self._output_dir.mkdir(parents=True, exist_ok=True)
+        self._profiler: Optional[cProfile.Profile] = None
+        self._prefix = prefix
+
         self.profile_id: Optional[str] = None
-        self.prefix = prefix
 
     def new(self, profile_id: str) -> None:
         with suppress(RuntimeError):
             self.disable()
-        self.profiler = cProfile.Profile()
+        self._profiler = cProfile.Profile()
         self.profile_id = profile_id
 
     def enable(self) -> None:
         """Start profiling."""
-        if not self.profiler:
+        if not self._profiler:
             raise RuntimeError("Profiler not initialized. Call Profiler.new() first.")
-        self.profiler.enable()
-        self.logger.info(f"Started profiling {self.profile_id}.")
+        self._profiler.enable()
+        self._logger.info(f"Started profiling {self.profile_id}.")
 
     def disable(self) -> None:
         """Stop profiling."""
-        if not self.profiler:
+        if not self._profiler:
             raise RuntimeError("Profiler not initialized. Call Profiler.new() first.")
-        self.profiler.disable()
-        self.logger.info(f"Stopped profiling {self.profile_id}.")
+        self._profiler.disable()
+        self._logger.info(f"Stopped profiling {self.profile_id}.")
 
     def dump(self) -> None:
         """Dump the profile to disk."""
-        if not self.profiler:
+        if not self._profiler:
             raise RuntimeError("Profiler not initialized. Call Profiler.new() first.")
-        basename = f"{self.prefix}_{self.profile_id}" if self.prefix else self.profile_id
-        self.profiler.dump_stats(self.output_dir / f"{basename}.prof")
+        basename = f"{self._prefix}_{self.profile_id}" if self._prefix else self.profile_id
+        self._profiler.dump_stats(self._output_dir / f"{basename}.prof")
         msg = f"Dumped profile for {self.profile_id}"
-        if self.prefix:
-            msg += f' with prefix "{self.prefix}"'
+        if self._prefix:
+            msg += f' with prefix "{self._prefix}"'
         msg += "."
-        self.logger.info(msg)
+        self._logger.info(msg)
