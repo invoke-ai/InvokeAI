@@ -116,7 +116,7 @@ class SchedulerInvocation(BaseInvocation):
     title="Create Denoise Mask",
     tags=["mask", "denoise"],
     category="latents",
-    version="1.0.0",
+    version="1.1.0",
 )
 class CreateDenoiseMaskInvocation(BaseInvocation):
     """Creates mask for denoising model run."""
@@ -130,6 +130,7 @@ class CreateDenoiseMaskInvocation(BaseInvocation):
         description=FieldDescriptions.fp32,
         ui_order=4,
     )
+    gradient: bool = InputField(default=False, description="Use gradient mask", ui_order=5)
 
     def prep_mask_tensor(self, mask_image):
         if mask_image.mode != "L":
@@ -178,6 +179,7 @@ class CreateDenoiseMaskInvocation(BaseInvocation):
             denoise_mask=DenoiseMaskField(
                 mask_name=mask_name,
                 masked_latents_name=masked_latents_name,
+                is_gradient=self.gradient,
             ),
         )
 
@@ -686,6 +688,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 seed = 0
 
             mask, masked_latents = self.prep_inpaint_mask(context, latents)
+            is_gradient = self.denoise_mask.is_gradient if self.denoise_mask is not None else False
 
             # TODO(ryand): I have hard-coded `do_classifier_free_guidance=True` to mirror the behaviour of ControlNets,
             # below. Investigate whether this is appropriate.
@@ -778,6 +781,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     seed=seed,
                     mask=mask,
                     masked_latents=masked_latents,
+                    use_gradient_mask=is_gradient,
                     num_inference_steps=num_inference_steps,
                     conditioning_data=conditioning_data,
                     control_data=controlnet_data,
