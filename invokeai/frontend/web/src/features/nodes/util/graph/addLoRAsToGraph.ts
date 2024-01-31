@@ -29,7 +29,7 @@ export const addLoRAsToGraph = (
    */
 
   // const { loras } = state.lora;
-  const enabledLoRAs = filter(state.lora.loras, (l) => l.isEnabled);
+  const enabledLoRAs = filter(state.lora.loras, (l) => l.isEnabled ?? false);
   const loraCount = size(enabledLoRAs);
 
   if (loraCount === 0) {
