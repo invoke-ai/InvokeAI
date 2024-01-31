@@ -19,11 +19,6 @@ import { addT2IAdaptersToLinearGraph } from './addT2IAdapterToLinearGraph';
 import { addVAEToGraph } from './addVAEToGraph';
 import { addWatermarkerToGraph } from './addWatermarkerToGraph';
 import {
-  CANVAS_COHERENCE_DENOISE_LATENTS,
-  CANVAS_COHERENCE_INPAINT_CREATE_MASK,
-  CANVAS_COHERENCE_MASK_EDGE,
-  CANVAS_COHERENCE_NOISE,
-  CANVAS_COHERENCE_NOISE_INCREMENT,
   CANVAS_OUTPAINT_GRAPH,
   CANVAS_OUTPUT,
   CLIP_SKIP,
@@ -36,6 +31,7 @@ import {
   INPAINT_INFILL_RESIZE_DOWN,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
+  MASK_BLUR,
   MASK_COMBINE,
   MASK_FROM_ALPHA,
   MASK_RESIZE_DOWN,
@@ -66,16 +62,14 @@ export const buildCanvasOutpaintGraph = (
     seed,
     vaePrecision,
     shouldUseCpuNoise,
-    maskBlur,
-    canvasCoherenceMode,
-    canvasCoherenceSteps,
-    canvasCoherenceStrength,
     infillTileSize,
     infillPatchmatchDownscaleSize,
     infillMethod,
     clipSkip,
     seamlessXAxis,
     seamlessYAxis,
+    maskBlur,
+    maskBlurMethod,
   } = state.generation;
 
   if (!model) {
@@ -136,6 +130,13 @@ export const buildCanvasOutpaintGraph = (
         is_intermediate,
         mask2: canvasMaskImage,
       },
+      [MASK_BLUR]: {
+        type: 'img_blur',
+        id: MASK_BLUR,
+        is_intermediate,
+        radius: maskBlur,
+        blur_type: maskBlurMethod,
+      },
       [INPAINT_IMAGE]: {
         type: 'i2l',
         id: INPAINT_IMAGE,
@@ -163,29 +164,6 @@ export const buildCanvasOutpaintGraph = (
         cfg_scale: cfg_scale,
         scheduler: scheduler,
         denoising_start: 1 - strength,
-        denoising_end: 1,
-      },
-      [CANVAS_COHERENCE_NOISE]: {
-        type: 'noise',
-        id: CANVAS_COHERENCE_NOISE,
-        use_cpu,
-        seed: seed + 1,
-        is_intermediate,
-      },
-      [CANVAS_COHERENCE_NOISE_INCREMENT]: {
-        type: 'add',
-        id: CANVAS_COHERENCE_NOISE_INCREMENT,
-        b: 1,
-        is_intermediate,
-      },
-      [CANVAS_COHERENCE_DENOISE_LATENTS]: {
-        type: 'denoise_latents',
-        id: CANVAS_COHERENCE_DENOISE_LATENTS,
-        is_intermediate,
-        steps: canvasCoherenceSteps,
-        cfg_scale: cfg_scale,
-        scheduler: scheduler,
-        denoising_start: 1 - canvasCoherenceStrength,
         denoising_end: 1,
       },
       [LATENTS_TO_IMAGE]: {
@@ -266,6 +244,16 @@ export const buildCanvasOutpaintGraph = (
           field: 'mask1',
         },
       },
+      {
+        source: {
+          node_id: MASK_COMBINE,
+          field: 'image',
+        },
+        destination: {
+          node_id: MASK_BLUR,
+          field: 'image',
+        },
+      },
       // Plug Everything Into Inpaint Node
       {
         source: {
@@ -310,7 +298,17 @@ export const buildCanvasOutpaintGraph = (
       // Create Inpaint Mask
       {
         source: {
-          node_id: isUsingScaledDimensions ? MASK_RESIZE_UP : MASK_COMBINE,
+          node_id: INPAINT_INFILL,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: isUsingScaledDimensions ? MASK_RESIZE_UP : MASK_BLUR,
           field: 'image',
         },
         destination: {
@@ -328,71 +326,10 @@ export const buildCanvasOutpaintGraph = (
           field: 'denoise_mask',
         },
       },
-      // Canvas Refine
-      {
-        source: {
-          node_id: modelLoaderNodeId,
-          field: 'unet',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-          field: 'unet',
-        },
-      },
-      {
-        source: {
-          node_id: POSITIVE_CONDITIONING,
-          field: 'conditioning',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-          field: 'positive_conditioning',
-        },
-      },
-      {
-        source: {
-          node_id: NEGATIVE_CONDITIONING,
-          field: 'conditioning',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-          field: 'negative_conditioning',
-        },
-      },
-      {
-        source: {
-          node_id: CANVAS_COHERENCE_NOISE,
-          field: 'noise',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-          field: 'noise',
-        },
-      },
-      {
-        source: {
-          node_id: DENOISE_LATENTS,
-          field: 'latents',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-          field: 'latents',
-        },
-      },
-      {
-        source: {
-          node_id: INPAINT_INFILL,
-          field: 'image',
-        },
-        destination: {
-          node_id: INPAINT_CREATE_MASK,
-          field: 'image',
-        },
-      },
       // Decode the result from Inpaint
       {
         source: {
-          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
+          node_id: DENOISE_LATENTS,
           field: 'latents',
         },
         destination: {
@@ -483,8 +420,6 @@ export const buildCanvasOutpaintGraph = (
 
     (graph.nodes[NOISE] as NoiseInvocation).width = scaledWidth;
     (graph.nodes[NOISE] as NoiseInvocation).height = scaledHeight;
-    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).width = scaledWidth;
-    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).height = scaledHeight;
 
     // Connect Nodes
     graph.edges.push(
@@ -502,7 +437,7 @@ export const buildCanvasOutpaintGraph = (
       // Take combined mask and resize and then blur
       {
         source: {
-          node_id: MASK_COMBINE,
+          node_id: MASK_BLUR,
           field: 'image',
         },
         destination: {
@@ -510,7 +445,6 @@ export const buildCanvasOutpaintGraph = (
           field: 'image',
         },
       },
-
       // Resize Results Down
       {
         source: {
@@ -583,8 +517,6 @@ export const buildCanvasOutpaintGraph = (
 
     (graph.nodes[NOISE] as NoiseInvocation).width = width;
     (graph.nodes[NOISE] as NoiseInvocation).height = height;
-    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).width = width;
-    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).height = height;
 
     graph.nodes[INPAINT_IMAGE] = {
       ...(graph.nodes[INPAINT_IMAGE] as ImageToLatentsInvocation),
@@ -615,7 +547,7 @@ export const buildCanvasOutpaintGraph = (
       },
       {
         source: {
-          node_id: MASK_COMBINE,
+          node_id: MASK_BLUR,
           field: 'image',
         },
         destination: {
@@ -624,115 +556,6 @@ export const buildCanvasOutpaintGraph = (
         },
       }
     );
-  }
-
-  // Handle Coherence Mode
-  if (canvasCoherenceMode !== 'unmasked') {
-    graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] = {
-      type: 'create_denoise_mask',
-      id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
-      is_intermediate,
-      fp32,
-    };
-
-    // Handle Image Input For Mask Creation
-    graph.edges.push({
-      source: {
-        node_id: INPAINT_INFILL,
-        field: 'image',
-      },
-      destination: {
-        node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
-        field: 'image',
-      },
-    });
-
-    // Create Mask If Coherence Mode Is Mask
-    if (canvasCoherenceMode === 'mask') {
-      if (isUsingScaledDimensions) {
-        graph.edges.push({
-          source: {
-            node_id: MASK_RESIZE_UP,
-            field: 'image',
-          },
-          destination: {
-            node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
-            field: 'mask',
-          },
-        });
-      } else {
-        graph.edges.push({
-          source: {
-            node_id: MASK_COMBINE,
-            field: 'image',
-          },
-          destination: {
-            node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
-            field: 'mask',
-          },
-        });
-      }
-    }
-
-    if (canvasCoherenceMode === 'edge') {
-      graph.nodes[CANVAS_COHERENCE_MASK_EDGE] = {
-        type: 'mask_edge',
-        id: CANVAS_COHERENCE_MASK_EDGE,
-        is_intermediate,
-        edge_blur: maskBlur,
-        edge_size: maskBlur * 2,
-        low_threshold: 100,
-        high_threshold: 200,
-      };
-
-      // Handle Scaled Dimensions For Mask Edge
-      if (isUsingScaledDimensions) {
-        graph.edges.push({
-          source: {
-            node_id: MASK_RESIZE_UP,
-            field: 'image',
-          },
-          destination: {
-            node_id: CANVAS_COHERENCE_MASK_EDGE,
-            field: 'image',
-          },
-        });
-      } else {
-        graph.edges.push({
-          source: {
-            node_id: MASK_COMBINE,
-            field: 'image',
-          },
-          destination: {
-            node_id: CANVAS_COHERENCE_MASK_EDGE,
-            field: 'image',
-          },
-        });
-      }
-
-      graph.edges.push({
-        source: {
-          node_id: CANVAS_COHERENCE_MASK_EDGE,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
-          field: 'mask',
-        },
-      });
-    }
-
-    // Plug Denoise Mask To Coherence Denoise Latents
-    graph.edges.push({
-      source: {
-        node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
-        field: 'denoise_mask',
-      },
-      destination: {
-        node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-        field: 'denoise_mask',
-      },
-    });
   }
 
   // Add Seamless To Graph

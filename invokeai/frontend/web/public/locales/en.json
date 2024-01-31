@@ -71,7 +71,8 @@
         "compositing": {
             "title": "Compositing",
             "coherenceTab": "Coherence Pass",
-            "infillTab": "Infill"
+            "infillTab": "Infill",
+            "maskSettings": "Mask Settings"
         }
     },
     "common": {

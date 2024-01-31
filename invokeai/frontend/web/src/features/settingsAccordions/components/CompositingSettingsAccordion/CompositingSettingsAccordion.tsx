@@ -9,9 +9,6 @@ import {
   TabPanels,
   Tabs,
 } from '@invoke-ai/ui-library';
-import ParamCanvasCoherenceMode from 'features/parameters/components/Canvas/Compositing/CoherencePass/ParamCanvasCoherenceMode';
-import ParamCanvasCoherenceSteps from 'features/parameters/components/Canvas/Compositing/CoherencePass/ParamCanvasCoherenceSteps';
-import ParamCanvasCoherenceStrength from 'features/parameters/components/Canvas/Compositing/CoherencePass/ParamCanvasCoherenceStrength';
 import ParamMaskBlur from 'features/parameters/components/Canvas/Compositing/MaskAdjustment/ParamMaskBlur';
 import ParamMaskBlurMethod from 'features/parameters/components/Canvas/Compositing/MaskAdjustment/ParamMaskBlurMethod';
 import ParamInfillMethod from 'features/parameters/components/Canvas/InfillAndScaling/ParamInfillMethod';
@@ -35,16 +32,13 @@ export const CompositingSettingsAccordion = memo(() => {
     <StandaloneAccordion isOpen={isOpen} onToggle={onToggle} label={t('accordions.compositing.title')}>
       <Tabs variant="collapse">
         <TabList>
-          <Tab>{t('accordions.compositing.coherenceTab')}</Tab>
+          <Tab>{t('accordions.compositing.maskSettings')}</Tab>
           <Tab>{t('accordions.compositing.infillTab')}</Tab>
         </TabList>
         <TabPanels>
           <TabPanel>
             <Flex gap={4} p={4} flexDir="column">
               <FormControlGroup formLabelProps={coherenceLabelProps}>
-                <ParamCanvasCoherenceMode />
-                <ParamCanvasCoherenceSteps />
-                <ParamCanvasCoherenceStrength />
                 <ParamMaskBlurMethod />
                 <ParamMaskBlur />
               </FormControlGroup>
