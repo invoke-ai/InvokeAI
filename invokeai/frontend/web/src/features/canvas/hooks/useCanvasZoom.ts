@@ -30,6 +30,7 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
 
       if ($ctrl.get() || $meta.get()) {
         // This equation was derived by fitting a curve to the desired brush sizes and deltas
+        // see https://github.com/invoke-ai/InvokeAI/pull/5542#issuecomment-1915847565
         const targetDelta = Math.sign(e.evt.deltaY) * 0.7363 * Math.pow(1.0394, brushSize);
         // This needs to be clamped to prevent the delta from getting too large
         const finalDelta = clamp(targetDelta, -20, 20);
