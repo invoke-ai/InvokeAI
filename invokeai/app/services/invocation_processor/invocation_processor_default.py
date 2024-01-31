@@ -1,11 +1,15 @@
 import time
 import traceback
+from contextlib import suppress
 from threading import BoundedSemaphore, Event, Thread
 from typing import Optional
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.invocations.baseinvocation import InvocationContext
 from invokeai.app.services.invocation_queue.invocation_queue_common import InvocationQueueItem
+from invokeai.app.services.invocation_stats.invocation_stats_common import (
+    GESStatsNotFoundError,
+)
 from invokeai.app.util.profiler import Profiler
 
 from ..invoker import Invoker
@@ -152,7 +156,8 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     pass
 
                 except CanceledException:
-                    self.__invoker.services.performance_statistics.reset_stats(graph_execution_state.id)
+                    with suppress(GESStatsNotFoundError):
+                        self.__invoker.services.performance_statistics.reset_stats(graph_execution_state.id)
                     pass
 
                 except Exception as e:
@@ -177,7 +182,8 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         error_type=e.__class__.__name__,
                         error=error,
                     )
-                    self.__invoker.services.performance_statistics.reset_stats(graph_execution_state.id)
+                    with suppress(GESStatsNotFoundError):
+                        self.__invoker.services.performance_statistics.reset_stats(graph_execution_state.id)
                     pass
 
                 # Check queue to see if this is canceled, and skip if so
@@ -209,15 +215,21 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                             error=traceback.format_exc(),
                         )
                 elif is_complete:
-                    self.__invoker.services.performance_statistics.log_stats(graph_execution_state.id)
-                    self.__invoker.services.events.emit_graph_execution_complete(
-                        queue_batch_id=queue_item.session_queue_batch_id,
-                        queue_item_id=queue_item.session_queue_item_id,
-                        queue_id=queue_item.session_queue_id,
-                        graph_execution_state_id=graph_execution_state.id,
-                    )
-                    if profiler:
-                        profiler.stop()
+                    with suppress(GESStatsNotFoundError):
+                        self.__invoker.services.performance_statistics.log_stats(graph_execution_state.id)
+                        self.__invoker.services.events.emit_graph_execution_complete(
+                            queue_batch_id=queue_item.session_queue_batch_id,
+                            queue_item_id=queue_item.session_queue_item_id,
+                            queue_id=queue_item.session_queue_id,
+                            graph_execution_state_id=graph_execution_state.id,
+                        )
+                        if profiler:
+                            profile_path = profiler.stop()
+                            stats_path = profile_path.with_suffix(".json")
+                            self.__invoker.services.performance_statistics.dump_stats(
+                                graph_execution_state_id=graph_execution_state.id, output_path=stats_path
+                            )
+                        self.__invoker.services.performance_statistics.reset_stats(graph_execution_state.id)
 
         except KeyboardInterrupt:
             pass  # Log something? KeyboardInterrupt is probably not going to be seen by the processor
