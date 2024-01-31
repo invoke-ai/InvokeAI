@@ -6,6 +6,7 @@ from typing import Optional
 import invokeai.backend.util.logging as logger
 from invokeai.app.invocations.baseinvocation import InvocationContext
 from invokeai.app.services.invocation_queue.invocation_queue_common import InvocationQueueItem
+from invokeai.app.util.profiler import Profiler
 
 from ..invoker import Invoker
 from .invocation_processor_base import InvocationProcessorABC
@@ -18,7 +19,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
     __invoker: Invoker
     __threadLimit: BoundedSemaphore
 
-    def start(self, invoker) -> None:
+    def start(self, invoker: Invoker) -> None:
         # if we do want multithreading at some point, we could make this configurable
         self.__threadLimit = BoundedSemaphore(1)
         self.__invoker = invoker
@@ -39,6 +40,16 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
             self.__threadLimit.acquire()
             queue_item: Optional[InvocationQueueItem] = None
 
+            profiler = (
+                Profiler(
+                    logger=self.__invoker.services.logger,
+                    output_dir=self.__invoker.services.configuration.profiles_path,
+                    prefix=self.__invoker.services.configuration.profile_prefix,
+                )
+                if self.__invoker.services.configuration.profile_graphs
+                else None
+            )
+
             while not stop_event.is_set():
                 try:
                     queue_item = self.__invoker.services.queue.get()
@@ -49,6 +60,10 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     # do not hammer the queue
                     time.sleep(0.5)
                     continue
+
+                if profiler and profiler.profile_id != queue_item.graph_execution_state_id:
+                    profiler.start(profile_id=queue_item.graph_execution_state_id)
+
                 try:
                     graph_execution_state = self.__invoker.services.graph_execution_manager.get(
                         queue_item.graph_execution_state_id
@@ -201,6 +216,8 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         queue_id=queue_item.session_queue_id,
                         graph_execution_state_id=graph_execution_state.id,
                     )
+                    if profiler:
+                        profiler.stop()
 
         except KeyboardInterrupt:
             pass  # Log something? KeyboardInterrupt is probably not going to be seen by the processor

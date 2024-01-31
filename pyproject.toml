@@ -109,7 +109,7 @@ dependencies = [
   "mkdocs-git-revision-date-localized-plugin",
   "mkdocs-redirects==1.2.0",
 ]
-"dev" = ["jurigged", "pudb"]
+"dev" = ["jurigged", "pudb", "snakeviz", "gprof2dot"]
 "test" = [
   "ruff==0.1.11",
   "ruff-lsp",
