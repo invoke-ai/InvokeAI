@@ -1,11 +1,10 @@
-import { NUMPY_RAND_MAX } from 'app/constants';
 import type { RootState } from 'app/store/store';
 import { generateSeeds } from 'common/util/generateSeeds';
 import { range } from 'lodash-es';
 import type { components } from 'services/api/schema';
 import type { Batch, BatchConfig, NonNullableGraph } from 'services/api/types';
 
-import { CANVAS_COHERENCE_NOISE, METADATA, NOISE, POSITIVE_CONDITIONING } from './constants';
+import { METADATA, NOISE, POSITIVE_CONDITIONING } from './constants';
 import { getHasMetadata, removeMetadata } from './metadata';
 
 export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, prepend: boolean): BatchConfig => {
@@ -42,20 +41,6 @@ export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, 
       });
     }
 
-    if (graph.nodes[CANVAS_COHERENCE_NOISE]) {
-      firstBatchDatumList.push({
-        node_path: CANVAS_COHERENCE_NOISE,
-        field_name: 'seed',
-        items: seeds.map((seed) => (seed + 1) % NUMPY_RAND_MAX),
-      });
-    }
-  } else {
-    // seedBehaviour = SeedBehaviour.PerRun
-    const seeds = generateSeeds({
-      count: iterations,
-      start: shouldRandomizeSeed ? undefined : seed,
-    });
-
     if (graph.nodes[NOISE]) {
       secondBatchDatumList.push({
         node_path: NOISE,
@@ -64,7 +49,6 @@ export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, 
       });
     }
 
-    // add to metadata
     if (getHasMetadata(graph)) {
       removeMetadata(graph, 'seed');
       secondBatchDatumList.push({
@@ -74,13 +58,6 @@ export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, 
       });
     }
 
-    if (graph.nodes[CANVAS_COHERENCE_NOISE]) {
-      secondBatchDatumList.push({
-        node_path: CANVAS_COHERENCE_NOISE,
-        field_name: 'seed',
-        items: seeds.map((seed) => (seed + 1) % NUMPY_RAND_MAX),
-      });
-    }
     data.push(secondBatchDatumList);
   }
 
