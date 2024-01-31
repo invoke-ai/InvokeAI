@@ -1,4 +1,4 @@
-import { $ctrl } from '@invoke-ai/ui-library';
+import { $ctrl, $meta } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $isMoveStageKeyHeld } from 'features/canvas/store/canvasNanostore';
@@ -28,7 +28,7 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
       // checking for ctrl key is pressed or not,
       // so that brush size can be controlled using ctrl + scroll up/down
 
-      if ($ctrl.get()) {
+      if ($ctrl.get() || $meta.get()) {
         // This equation was derived by fitting a curve to the desired brush sizes and deltas
         const targetDelta = Math.sign(e.evt.deltaY) * 0.7363 * Math.pow(1.0394, brushSize);
         // This needs to be clamped to prevent the delta from getting too large
