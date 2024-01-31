@@ -30,8 +30,10 @@ writes to the system log is stored in InvocationServices.performance_statistics.
 
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
+from pathlib import Path
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation
+from invokeai.app.services.invocation_stats.invocation_stats_common import InvocationStatsSummary
 
 
 class InvocationStatsServiceBase(ABC):
@@ -61,8 +63,9 @@ class InvocationStatsServiceBase(ABC):
     @abstractmethod
     def reset_stats(self, graph_execution_state_id: str):
         """
-        Reset all statistics for the indicated graph
-        :param graph_execution_state_id
+        Reset all statistics for the indicated graph.
+        :param graph_execution_state_id: The id of the session whose stats to reset.
+        :raises GESStatsNotFoundError: if the graph isn't tracked in the stats.
         """
         pass
 
@@ -70,5 +73,26 @@ class InvocationStatsServiceBase(ABC):
     def log_stats(self, graph_execution_state_id: str):
         """
         Write out the accumulated statistics to the log or somewhere else.
+        :param graph_execution_state_id: The id of the session whose stats to log.
+        :raises GESStatsNotFoundError: if the graph isn't tracked in the stats.
+        """
+        pass
+
+    @abstractmethod
+    def get_stats(self, graph_execution_state_id: str) -> InvocationStatsSummary:
+        """
+        Gets the accumulated statistics for the indicated graph.
+        :param graph_execution_state_id: The id of the session whose stats to get.
+        :raises GESStatsNotFoundError: if the graph isn't tracked in the stats.
+        """
+        pass
+
+    @abstractmethod
+    def dump_stats(self, graph_execution_state_id: str, output_path: Path) -> None:
+        """
+        Write out the accumulated statistics to the indicated path as JSON.
+        :param graph_execution_state_id: The id of the session whose stats to dump.
+        :param output_path: The file to write the stats to.
+        :raises GESStatsNotFoundError: if the graph isn't tracked in the stats.
         """
         pass
