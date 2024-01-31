@@ -1,4 +1,5 @@
-import { MenuItem, useDisclosure } from '@invoke-ai/ui-library';
+import { MenuItem } from '@invoke-ai/ui-library';
+import { useSaveWorkflowAsDialog } from 'features/workflowLibrary/components/SaveWorkflowAsDialog/useSaveWorkflowAsDialog';
 import { isWorkflowWithID, useSaveLibraryWorkflow } from 'features/workflowLibrary/hooks/useSaveWorkflow';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -6,12 +7,11 @@ import { PiFloppyDiskBold } from 'react-icons/pi';
 
 import { useAppSelector } from '../../../../app/store/storeHooks';
 import { $builtWorkflow } from '../../../nodes/hooks/useWorkflowWatcher';
-import { SaveWorkflowAsDialog } from './SaveWorkflowAsDialog';
 
-const SaveLibraryWorkflowMenuItem = () => {
+const SaveWorkflowMenuItem = () => {
   const { t } = useTranslation();
   const { saveWorkflow } = useSaveLibraryWorkflow();
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { onOpen } = useSaveWorkflowAsDialog();
   const isTouched = useAppSelector((s) => s.workflow.isTouched);
 
   const handleClickSave = useCallback(async () => {
@@ -28,14 +28,10 @@ const SaveLibraryWorkflowMenuItem = () => {
   }, [onOpen, saveWorkflow]);
 
   return (
-    <>
-      <MenuItem as="button" isDisabled={!isTouched} icon={<PiFloppyDiskBold />} onClick={handleClickSave}>
-        {t('workflows.saveWorkflow')}
-      </MenuItem>
-
-      <SaveWorkflowAsDialog isOpen={isOpen} onClose={onClose} />
-    </>
+    <MenuItem as="button" isDisabled={!isTouched} icon={<PiFloppyDiskBold />} onClick={handleClickSave}>
+      {t('workflows.saveWorkflow')}
+    </MenuItem>
   );
 };
 
-export default memo(SaveLibraryWorkflowMenuItem);
+export default memo(SaveWorkflowMenuItem);

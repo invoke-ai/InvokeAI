@@ -13,19 +13,17 @@ import {
   Input,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { useSaveWorkflowAsDialog } from 'features/workflowLibrary/components/SaveWorkflowAsDialog/useSaveWorkflowAsDialog';
 import { t } from 'i18next';
 import type { ChangeEvent } from 'react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 
 import { $workflowCategories } from '../../../../app/store/nanostores/workflowCategories';
-import { useAppSelector } from '../../../../app/store/storeHooks';
 import { useSaveWorkflowAs } from '../../hooks/useSaveWorkflowAs';
-import { getWorkflowCopyName } from '../../util/getWorkflowCopyName';
 
-export const SaveWorkflowAsDialog = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
-  const currentName = useAppSelector((s) => s.workflow.name);
-  const [name, setName] = useState(currentName.length ? getWorkflowCopyName(currentName) : '');
-  const [saveToProject, setSaveToProject] = useState(false);
+export const SaveWorkflowAsDialog = () => {
+  const { isOpen, onClose, workflowName, setWorkflowName, shouldSaveToProject, setShouldSaveToProject } =
+    useSaveWorkflowAsDialog();
 
   const workflowCategories = useStore($workflowCategories);
 
@@ -34,29 +32,33 @@ export const SaveWorkflowAsDialog = ({ isOpen, onClose }: { isOpen: boolean; onC
   const cancelRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const onChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    setName(e.target.value);
-  }, []);
+  const onChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      setWorkflowName(e.target.value);
+    },
+    [setWorkflowName]
+  );
 
-  const onChangeCheckbox = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    setSaveToProject(e.target.checked);
-  }, []);
+  const onChangeCheckbox = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      setShouldSaveToProject(e.target.checked);
+    },
+    [setShouldSaveToProject]
+  );
 
   const clearAndClose = useCallback(() => {
     onClose();
-    setName('');
-    setSaveToProject(false);
   }, [onClose]);
 
   const onSave = useCallback(async () => {
-    const category = saveToProject ? 'project' : 'user';
+    const category = shouldSaveToProject ? 'project' : 'user';
     await saveWorkflowAs({
-      name,
+      name: workflowName,
       category,
       onSuccess: clearAndClose,
       onError: clearAndClose,
     });
-  }, [name, saveWorkflowAs, saveToProject, clearAndClose]);
+  }, [workflowName, saveWorkflowAs, shouldSaveToProject, clearAndClose]);
 
   return (
     <AlertDialog isOpen={isOpen} onClose={onClose} leastDestructiveRef={cancelRef} isCentered={true}>
@@ -70,9 +72,14 @@ export const SaveWorkflowAsDialog = ({ isOpen, onClose }: { isOpen: boolean; onC
             <FormControl alignItems="flex-start">
               <FormLabel mt="2">{t('workflows.workflowName')}</FormLabel>
               <Flex flexDir="column" width="full" gap="2">
-                <Input ref={inputRef} value={name} onChange={onChange} placeholder={t('workflows.workflowName')} />
+                <Input
+                  ref={inputRef}
+                  value={workflowName}
+                  onChange={onChange}
+                  placeholder={t('workflows.workflowName')}
+                />
                 {workflowCategories.includes('project') && (
-                  <Checkbox isChecked={saveToProject} onChange={onChangeCheckbox}>
+                  <Checkbox isChecked={shouldSaveToProject} onChange={onChangeCheckbox}>
                     <FormLabel>{t('workflows.saveWorkflowToProject')}</FormLabel>
                   </Checkbox>
                 )}
@@ -84,7 +91,7 @@ export const SaveWorkflowAsDialog = ({ isOpen, onClose }: { isOpen: boolean; onC
             <Button ref={cancelRef} onClick={clearAndClose}>
               {t('common.cancel')}
             </Button>
-            <Button colorScheme="invokeBlue" onClick={onSave} ml={3} isDisabled={!name || !name.length}>
+            <Button colorScheme="invokeBlue" onClick={onSave} ml={3} isDisabled={!workflowName || !workflowName.length}>
               {t('common.saveAs')}
             </Button>
           </AlertDialogFooter>
