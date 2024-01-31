@@ -293,6 +293,8 @@ class InvokeAIAppConfig(InvokeAISettings):
     lora_dir            : Optional[Path] = Field(default=None, description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', json_schema_extra=Categories.Paths)
     embedding_dir       : Optional[Path] = Field(default=None, description='Path to a directory of Textual Inversion embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
     controlnet_dir      : Optional[Path] = Field(default=None, description='Path to a directory of ControlNet embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
+
+    civit_api_key       : Optional[str] = Field(default=os.environ.get("CIVIT_API_KEY"), description="API key for Civit", json_schema_extra=Categories.Other)
     # this is not referred to in the source code and can be removed entirely
     #free_gpu_mem        : Optional[bool] = Field(default=None, description="If true, purge model from GPU after each generation.", json_schema_extra=Categories.MemoryPerformance)
 

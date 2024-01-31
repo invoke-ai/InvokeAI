@@ -111,7 +111,7 @@ class ModelInstall(object):
         self.datasets = OmegaConf.load(Dataset_path)
         self.prediction_helper = prediction_type_helper
         self.access_token = access_token or HfFolder.get_token()
-        self.civit_api_key = civit_api_key or os.environ.get("CIVIT_API_KEY")
+        self.civit_api_key = civit_api_key or config.civit_api_key
         self.reverse_paths = self._reverse_paths(self.datasets)
 
     def all_models(self) -> Dict[str, ModelLoadInfo]:
