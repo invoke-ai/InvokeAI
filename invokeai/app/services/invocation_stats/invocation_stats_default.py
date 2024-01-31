@@ -106,7 +106,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
             del self._cache_stats[graph_execution_state_id]
         except KeyError as e:
             msg = f"Attempted to clear statistics for unknown graph {graph_execution_state_id}: {e}."
-            logger.warning(msg)
+            logger.error(msg)
             raise GESStatsNotFoundError(msg) from e
 
     def get_stats(self, graph_execution_state_id: str) -> InvocationStatsSummary:
@@ -136,7 +136,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
             cache_stats = self._cache_stats[graph_execution_state_id]
         except KeyError as e:
             msg = f"Attempted to get model cache statistics for unknown graph {graph_execution_state_id}: {e}."
-            logger.warning(msg)
+            logger.error(msg)
             raise GESStatsNotFoundError(msg) from e
 
         return ModelCacheStatsSummary(
@@ -154,7 +154,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
             graph_stats = self._stats[graph_execution_state_id]
         except KeyError as e:
             msg = f"Attempted to get graph statistics for unknown graph {graph_execution_state_id}: {e}."
-            logger.warning(msg)
+            logger.error(msg)
             raise GESStatsNotFoundError(msg) from e
 
         return graph_stats.get_graph_stats_summary(graph_execution_state_id)
@@ -164,7 +164,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
             graph_stats = self._stats[graph_execution_state_id]
         except KeyError as e:
             msg = f"Attempted to get node statistics for unknown graph {graph_execution_state_id}: {e}."
-            logger.warning(msg)
+            logger.error(msg)
             raise GESStatsNotFoundError(msg) from e
 
         return graph_stats.get_node_stats_summaries()
