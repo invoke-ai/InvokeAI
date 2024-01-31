@@ -31,7 +31,7 @@ export const LoRACard = memo((props: LoRACardProps) => {
   );
 
   const handleSetLoraToggle = useCallback(() => {
-    dispatch(loraToggled({ id: lora.id, isEnabled: !lora.isEnabled}));
+    dispatch(loraToggled({ id: lora.id, isEnabled: !lora.isEnabled }));
   }, [dispatch, lora.id, lora.isEnabled]);
 
   const handleRemoveLora = useCallback(() => {
