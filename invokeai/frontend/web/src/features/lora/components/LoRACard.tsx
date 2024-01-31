@@ -4,12 +4,14 @@ import {
   CardHeader,
   CompositeNumberInput,
   CompositeSlider,
+  Flex,
   IconButton,
+  Switch,
   Text,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import type { LoRA } from 'features/lora/store/loraSlice';
-import { loraRemoved, loraWeightChanged } from 'features/lora/store/loraSlice';
+import { loraIsEnabledChanged, loraRemoved, loraWeightChanged } from 'features/lora/store/loraSlice';
 import { memo, useCallback } from 'react';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 
@@ -28,6 +30,10 @@ export const LoRACard = memo((props: LoRACardProps) => {
     [dispatch, lora.id]
   );
 
+  const handleSetLoraToggle = useCallback(() => {
+    dispatch(loraIsEnabledChanged({ id: lora.id, isEnabled: !lora.isEnabled }));
+  }, [dispatch, lora.id, lora.isEnabled]);
+
   const handleRemoveLora = useCallback(() => {
     dispatch(loraRemoved(lora.id));
   }, [dispatch, lora.id]);
@@ -35,16 +41,21 @@ export const LoRACard = memo((props: LoRACardProps) => {
   return (
     <Card variant="lora">
       <CardHeader>
-        <Text noOfLines={1} wordBreak="break-all" color="base.200">
-          {lora.model_name}
-        </Text>
-        <IconButton
-          aria-label="Remove LoRA"
-          variant="ghost"
-          size="sm"
-          onClick={handleRemoveLora}
-          icon={<PiTrashSimpleBold />}
-        />
+        <Flex alignItems="center" justifyContent="space-between" width="100%" gap={2}>
+          <Text noOfLines={1} wordBreak="break-all" color={lora.isEnabled ? 'base.200' : 'base.500'}>
+            {lora.model_name}
+          </Text>
+          <Flex alignItems="center" gap={2}>
+            <Switch size="sm" onChange={handleSetLoraToggle} isChecked={lora.isEnabled} />
+            <IconButton
+              aria-label="Remove LoRA"
+              variant="ghost"
+              size="sm"
+              onClick={handleRemoveLora}
+              icon={<PiTrashSimpleBold />}
+            />
+          </Flex>
+        </Flex>
       </CardHeader>
       <CardBody>
         <CompositeSlider
@@ -55,6 +66,7 @@ export const LoRACard = memo((props: LoRACardProps) => {
           step={0.01}
           marks={marks}
           defaultValue={0.75}
+          isDisabled={!lora.isEnabled}
         />
         <CompositeNumberInput
           value={lora.weight}
@@ -65,6 +77,7 @@ export const LoRACard = memo((props: LoRACardProps) => {
           w={20}
           flexShrink={0}
           defaultValue={0.75}
+          isDisabled={!lora.isEnabled}
         />
       </CardBody>
     </Card>
