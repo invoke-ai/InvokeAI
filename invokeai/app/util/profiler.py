@@ -11,13 +11,11 @@ class Profiler:
     Usage
     ```
       # Create a profiler
-      profiler = Profiler(logger, output_dir, "testing_sql_queries")
+      profiler = Profiler(logger, output_dir, "sql_query_perf")
       # Start a new profile
-      profiler.new("my_profile")
-      profiler.enable()
+      profiler.start("my_profile")
       # Do stuff
-      profiler.disable()
-      profiler.dump()
+      profiler.stop()
     ```
 
     Visualize a profile as a flamegraph with [snakeviz](https://jiffyclub.github.io/snakeviz/)
