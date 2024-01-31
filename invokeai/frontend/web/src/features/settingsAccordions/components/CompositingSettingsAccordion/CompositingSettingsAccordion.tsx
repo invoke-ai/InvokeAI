@@ -17,7 +17,7 @@ import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const coherenceLabelProps: FormLabelProps = {
+const compositingLabelProps: FormLabelProps = {
   minW: '4.5rem',
 };
 
@@ -38,7 +38,7 @@ export const CompositingSettingsAccordion = memo(() => {
         <TabPanels>
           <TabPanel>
             <Flex gap={4} p={4} flexDir="column">
-              <FormControlGroup formLabelProps={coherenceLabelProps}>
+              <FormControlGroup formLabelProps={compositingLabelProps}>
                 <ParamMaskBlurMethod />
                 <ParamMaskBlur />
               </FormControlGroup>
@@ -46,7 +46,7 @@ export const CompositingSettingsAccordion = memo(() => {
           </TabPanel>
           <TabPanel>
             <Flex gap={4} p={4} flexDir="column">
-              <FormControlGroup formLabelProps={coherenceLabelProps}>
+              <FormControlGroup formLabelProps={compositingLabelProps}>
                 <ParamInfillMethod />
                 <ParamInfillOptions />
               </FormControlGroup>
