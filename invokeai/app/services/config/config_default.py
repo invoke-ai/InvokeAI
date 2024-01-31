@@ -284,6 +284,9 @@ class InvokeAIAppConfig(InvokeAISettings):
     deny_nodes          : Optional[List[str]] = Field(default=None, description="List of nodes to deny. Omit to deny none.", json_schema_extra=Categories.Nodes)
     node_cache_size     : int = Field(default=512, description="How many cached nodes to keep in memory", json_schema_extra=Categories.Nodes)
 
+    # MODEL IMPORT
+    civit_api_key       : Optional[str] = Field(default=os.environ.get("CIVIT_API_KEY"), description="API key for Civit", json_schema_extra=Categories.Other)
+
     # DEPRECATED FIELDS - STILL HERE IN ORDER TO OBTAN VALUES FROM PRE-3.1 CONFIG FILES
     always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", json_schema_extra=Categories.MemoryPerformance)
     max_cache_size      : Optional[float] = Field(default=None, gt=0, description="Maximum memory amount used by model cache for rapid switching", json_schema_extra=Categories.MemoryPerformance)
@@ -294,7 +297,6 @@ class InvokeAIAppConfig(InvokeAISettings):
     embedding_dir       : Optional[Path] = Field(default=None, description='Path to a directory of Textual Inversion embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
     controlnet_dir      : Optional[Path] = Field(default=None, description='Path to a directory of ControlNet embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
 
-    civit_api_key       : Optional[str] = Field(default=os.environ.get("CIVIT_API_KEY"), description="API key for Civit", json_schema_extra=Categories.Other)
     # this is not referred to in the source code and can be removed entirely
     #free_gpu_mem        : Optional[bool] = Field(default=None, description="If true, purge model from GPU after each generation.", json_schema_extra=Categories.MemoryPerformance)
 
