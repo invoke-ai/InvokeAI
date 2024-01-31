@@ -14,7 +14,8 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
-import { selectNonDisabledLoraSlice } from 'features/lora/store/loraSlice';
+import type { LoRA} from 'features/lora/store/loraSlice';
+import { selectLoraSlice } from 'features/lora/store/loraSlice';
 import { SyncModelsIconButton } from 'features/modelManager/components/SyncModels/SyncModelsIconButton';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
@@ -23,7 +24,7 @@ import ParamMainModelSelect from 'features/parameters/components/MainModel/Param
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import { size } from 'lodash-es';
+import { filter, size } from 'lodash-es';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -31,8 +32,9 @@ const formLabelProps: FormLabelProps = {
   minW: '4rem',
 };
 
-const badgesSelector = createMemoizedSelector(selectNonDisabledLoraSlice, selectGenerationSlice, (lora, generation) => {
-  const loraTabBadges = size(lora.loras) ? [size(lora.loras)] : [];
+const badgesSelector = createMemoizedSelector(selectLoraSlice, selectGenerationSlice, (lora, generation) => {
+  const enabledLoRAsCount = filter(lora.loras, (l: LoRA) => !!l.isEnabled).length;
+  const loraTabBadges = size(lora.loras) ? [enabledLoRAsCount] : [];
   const accordionBadges: (string | number)[] = [];
   if (generation.model) {
     accordionBadges.push(generation.model.model_name);

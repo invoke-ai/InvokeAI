@@ -11,7 +11,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import type { LoRA } from 'features/lora/store/loraSlice';
-import { loraRemoved, loraToggle, loraWeightChanged } from 'features/lora/store/loraSlice';
+import { loraRemoved, loraToggled, loraWeightChanged } from 'features/lora/store/loraSlice';
 import { memo, useCallback } from 'react';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 
@@ -30,12 +30,9 @@ export const LoRACard = memo((props: LoRACardProps) => {
     [dispatch, lora.id]
   );
 
-  const handleSetDisabled = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      dispatch(loraToggle({ id: lora.id, disabled: !e.target.checked }));
-    },
-    [dispatch, lora.id]
-  );
+  const handleSetLoraToggle = useCallback(() => {
+    dispatch(loraToggled({ id: lora.id, isEnabled: !lora.isEnabled}));
+  }, [dispatch, lora.id, lora.isEnabled]);
 
   const handleRemoveLora = useCallback(() => {
     dispatch(loraRemoved(lora.id));
@@ -45,11 +42,11 @@ export const LoRACard = memo((props: LoRACardProps) => {
     <Card variant="lora">
       <CardHeader>
         <Flex alignItems="center" justifyContent="space-between" width="100%" gap={2}>
-          <Text noOfLines={1} wordBreak="break-all" color={!lora.disabled ? 'base.200' : 'base.500'}>
+          <Text noOfLines={1} wordBreak="break-all" color={lora.isEnabled ? 'base.200' : 'base.500'}>
             {lora.model_name}
           </Text>
           <Flex alignItems="center" gap={2}>
-            <Switch size="sm" onChange={handleSetDisabled} isChecked={!lora.disabled} />
+            <Switch size="sm" onChange={handleSetLoraToggle} isChecked={lora.isEnabled} />
             <IconButton
               aria-label="Remove LoRA"
               variant="ghost"
@@ -69,6 +66,7 @@ export const LoRACard = memo((props: LoRACardProps) => {
           step={0.01}
           marks={marks}
           defaultValue={0.75}
+          isDisabled={!lora.isEnabled}
         />
         <CompositeNumberInput
           value={lora.weight}
@@ -79,6 +77,7 @@ export const LoRACard = memo((props: LoRACardProps) => {
           w={20}
           flexShrink={0}
           defaultValue={0.75}
+          isDisabled={!lora.isEnabled}
         />
       </CardBody>
     </Card>
