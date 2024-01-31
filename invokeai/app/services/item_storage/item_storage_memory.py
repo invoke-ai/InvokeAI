@@ -3,7 +3,6 @@ from typing import Generic, Optional, TypeVar
 from pydantic import BaseModel
 
 from invokeai.app.services.item_storage.item_storage_base import ItemStorageABC
-from invokeai.app.services.shared.pagination import PaginatedResults
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -27,16 +26,3 @@ class ItemStorageMemory(ItemStorageABC, Generic[T]):
             self._on_deleted(item_id)
         except KeyError:
             pass
-
-    def list(self, page: int = 0, per_page: int = 10) -> PaginatedResults[T]:
-        # TODO: actually paginate?
-        return PaginatedResults(
-            items=list(self._items.values()), page=page, per_page=per_page, pages=1, total=len(self._items)
-        )
-
-    def search(self, query: str, page: int = 0, per_page: int = 10) -> PaginatedResults[T]:
-        # TODO: actually paginate?
-        # TODO: actually search?
-        return PaginatedResults(
-            items=list(self._items.values()), page=page, per_page=per_page, pages=1, total=len(self._items)
-        )
