@@ -172,11 +172,12 @@ two configs are kept in separate sections of the config file:
 from __future__ import annotations
 
 import os
+from functools import lru_cache
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Literal, Optional, Union, get_type_hints
+from typing import Any, ClassVar, Dict, List, Literal, Optional, TypeVar, Union, get_type_hints
 
 from omegaconf import DictConfig, OmegaConf
-from pydantic import Field, TypeAdapter
+from pydantic import Field, TypeAdapter as PyTypeAdapter
 from pydantic.config import JsonDict
 from pydantic_settings import SettingsConfigDict
 
@@ -186,6 +187,13 @@ INIT_FILE = Path("invokeai.yaml")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 DEFAULT_MAX_VRAM = 0.5
+
+_T = TypeVar("_T")
+
+
+@lru_cache
+def TypeAdapter(type_: type[_T]) -> PyTypeAdapter:
+    return PyTypeAdapter(type_)
 
 
 class Categories(object):
