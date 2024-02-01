@@ -44,6 +44,7 @@ jobs:
             github-env: $env:GITHUB_ENV
     name: ${{ matrix.pytorch }} on ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30 # expected run time: <10 min, depending on platform
     env:
       PIP_USE_PEP517: '1'
     steps:
