@@ -1,4 +1,5 @@
-# adapted from bloc97's CrossAttentionControl colab# https://github.com/bloc97/CrossAttentionControl
+# adapted from bloc97's CrossAttentionControl colab
+# https://github.com/bloc97/CrossAttentionControl
 
 
 import enum
