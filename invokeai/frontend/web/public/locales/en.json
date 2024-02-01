@@ -1376,6 +1376,7 @@
         "problemCopyingCanvasDesc": "Unable to export base layer",
         "problemCopyingImage": "Unable to Copy Image",
         "problemCopyingImageLink": "Unable to Copy Image Link",
+        "problemDownloadingImage": "Unable to Download Image",
         "problemDownloadingCanvas": "Problem Downloading Canvas",
         "problemDownloadingCanvasDesc": "Unable to export base layer",
         "problemImportingMask": "Problem Importing Mask",
