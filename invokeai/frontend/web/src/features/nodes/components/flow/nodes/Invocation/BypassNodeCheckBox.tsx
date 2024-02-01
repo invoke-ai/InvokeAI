@@ -23,9 +23,9 @@ const BypassNodeCheckbox = ({ nodeId }: { nodeId: string }) => {
   const { t } = useTranslation();
 
   return (
-    <FormControl>
-      <FormLabel>{t('invocationCache.bypassNode')}</FormLabel>
+    <FormControl gap={2}>
       <Checkbox className="nopan" onChange={handleChange} isChecked={useBypass} />
+      <FormLabel>{t('invocationCache.bypassNode')}</FormLabel>
     </FormControl>
   );
 };

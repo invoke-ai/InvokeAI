@@ -31,9 +31,11 @@ const InvocationNodeFooter = ({ nodeId }: Props) => {
       justifyContent="space-between"
     >
       <FormControlGroup formControlProps={props} formLabelProps={props}>
-        {isCacheEnabled && <UseCacheCheckbox nodeId={nodeId} />}
-        <BypassNodeCheckBox nodeId={nodeId} />
-        {hasImageOutput && <SaveToGalleryCheckbox nodeId={nodeId} />}
+        <Flex>
+          {isCacheEnabled && <UseCacheCheckbox nodeId={nodeId} />}
+          <BypassNodeCheckBox nodeId={nodeId} />
+        </Flex>
+        <Flex>{hasImageOutput && <SaveToGalleryCheckbox nodeId={nodeId} />}</Flex>
       </FormControlGroup>
     </Flex>
   );
