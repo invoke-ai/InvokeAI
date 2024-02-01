@@ -303,7 +303,6 @@ class InvokeAiInstance:
 
         ext = "bat" if OS == "Windows" else "sh"
 
-        # scripts = ['invoke', 'update']
         scripts = ["invoke"]
 
         for script in scripts:
