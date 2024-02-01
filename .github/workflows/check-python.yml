@@ -13,6 +13,7 @@ on:
 jobs:
   check-backend:
     runs-on: ubuntu-latest
+    timeout-minutes: 5 # expected run time: <1 min
     steps:
       - uses: actions/checkout@v4
 
