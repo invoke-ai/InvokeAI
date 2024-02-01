@@ -1,5 +1,4 @@
-# adapted from bloc97's CrossAttentionControl colab
-# https://github.com/bloc97/CrossAttentionControl
+# adapted from bloc97's CrossAttentionControl colab# https://github.com/bloc97/CrossAttentionControl
 
 
 import enum
@@ -12,7 +11,7 @@ import psutil
 import torch
 from compel.cross_attention_control import Arguments
 from diffusers.models.attention_processor import Attention, AttentionProcessor, AttnProcessor, SlicedAttnProcessor
-from diffusers.models.unet_2d_condition import UNet2DConditionModel
+from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from torch import nn
 
 import invokeai.backend.util.logging as logger
