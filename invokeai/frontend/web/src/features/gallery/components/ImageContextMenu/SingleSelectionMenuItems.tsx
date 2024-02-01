@@ -4,6 +4,7 @@ import { useAppToaster } from 'app/components/Toaster';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
+import { useDownloadImage } from 'common/hooks/useDownloadImage';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { imagesToChangeSelected, isModalOpenChanged } from 'features/changeBoardModal/store/slice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
@@ -47,7 +48,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const toaster = useAppToaster();
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
   const customStarUi = useStore($customStarUI);
-
+  const { downloadImage } = useDownloadImage();
   const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(imageDTO?.image_name);
 
   const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } = useGetAndLoadEmbeddedWorkflow({});
@@ -143,6 +144,10 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     }
   }, [unstarImages, imageDTO]);
 
+  const handleDownloadImage = useCallback(() => {
+    downloadImage(imageDTO.image_url, imageDTO.image_name);
+  }, [downloadImage, imageDTO.image_name, imageDTO.image_url]);
+
   return (
     <>
       <MenuItem as="a" href={imageDTO.image_url} target="_blank" icon={<PiShareFatBold />}>
@@ -153,14 +158,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
           {t('parameters.copyImage')}
         </MenuItem>
       )}
-      <MenuItem
-        as="a"
-        download={true}
-        href={imageDTO.image_url}
-        target="_blank"
-        icon={<PiDownloadSimpleBold />}
-        w="100%"
-      >
+      <MenuItem icon={<PiDownloadSimpleBold />} onClickCapture={handleDownloadImage}>
         {t('parameters.downloadImage')}
       </MenuItem>
       <MenuDivider />
