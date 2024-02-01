@@ -313,6 +313,17 @@ const nodesSlice = createSlice({
       }
       node.data.useCache = useCache;
     },
+    nodeBypassNodeChanged: (state, action: PayloadAction<{ nodeId: string; bypass: boolean }>) => {
+      const { nodeId, bypass } = action.payload;
+      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
+
+      const node = state.nodes?.[nodeIndex];
+
+      if (!isInvocationNode(node)) {
+        return;
+      }
+      node.data.bypass = bypass;
+    },
     nodeIsIntermediateChanged: (state, action: PayloadAction<{ nodeId: string; isIntermediate: boolean }>) => {
       const { nodeId, isIntermediate } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
@@ -798,6 +809,7 @@ export const {
   nodesChanged,
   nodesDeleted,
   nodeUseCacheChanged,
+  nodeBypassNodeChanged,
   notesNodeValueChanged,
   selectedAll,
   selectedEdgesChanged,
@@ -847,6 +859,7 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   nodesChanged,
   nodesDeleted,
   nodeUseCacheChanged,
+  nodeBypassNodeChanged,
   notesNodeValueChanged,
   selectionPasted,
   edgeAdded

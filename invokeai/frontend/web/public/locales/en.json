@@ -400,7 +400,8 @@
         "disable": "Disable",
         "disableSucceeded": "Invocation Cache Disabled",
         "disableFailed": "Problem Disabling Invocation Cache",
-        "useCache": "Use Cache"
+        "useCache": "Use Cache",
+        "bypassNode": "Bypass"
     },
     "gallery": {
         "allImagesLoaded": "All Images Loaded",

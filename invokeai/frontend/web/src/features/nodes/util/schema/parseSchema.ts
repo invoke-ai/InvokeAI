@@ -211,6 +211,7 @@ export const parseSchema = (
     );
 
     const useCache = schema.properties.use_cache.default;
+    const bypass = schema.properties.bypass.default;
 
     const invocation: InvocationTemplate = {
       title,
@@ -222,6 +223,7 @@ export const parseSchema = (
       inputs,
       outputs,
       useCache,
+      bypass,
       nodePack,
       classification,
     };

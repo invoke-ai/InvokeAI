@@ -150,7 +150,17 @@ class ImageProcessorInvocation(BaseInvocation, WithMetadata):
         return image
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        if self.bypass:
+            image_dto = context.services.images.get_dto(self.image.image_name)
+            bypassed_image = ImageField(image_name=self.image.image_name)
+            return ImageOutput(
+                image=bypassed_image,
+                width=image_dto.width,
+                height=image_dto.height,
+            )
+
         raw_image = context.services.images.get_pil_image(self.image.image_name)
+
         # image type should be PIL.PngImagePlugin.PngImageFile ?
         processed_image = self.run_processor(raw_image)
 

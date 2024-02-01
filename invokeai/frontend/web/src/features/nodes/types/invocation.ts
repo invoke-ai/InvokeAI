@@ -16,6 +16,7 @@ export const zInvocationTemplate = z.object({
   outputType: z.string().min(1),
   version: zSemVer,
   useCache: z.boolean(),
+  bypass: z.boolean(),
   nodePack: z.string().min(1).nullish(),
   classification: zClassification,
 });
@@ -31,6 +32,7 @@ export const zInvocationNodeData = z.object({
   notes: z.string(),
   isIntermediate: z.boolean(),
   useCache: z.boolean(),
+  bypass: z.boolean(),
   version: zSemVer,
   nodePack: z.string().min(1).nullish(),
   inputs: z.record(zFieldInputInstance),

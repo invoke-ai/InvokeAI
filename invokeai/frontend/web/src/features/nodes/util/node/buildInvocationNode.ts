@@ -57,6 +57,7 @@ export const buildInvocationNode = (position: XYPosition, template: InvocationTe
       isOpen: true,
       isIntermediate: type === 'save_image' ? false : true,
       useCache: template.useCache,
+      bypass: template.bypass,
       inputs,
       outputs,
     },

@@ -648,6 +648,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * A
        * @description The first number
        * @default 0
@@ -910,6 +916,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Width
        * @description The width of the image
        * @default 512
@@ -967,6 +979,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description Latents tensor */
       latents_a?: components["schemas"]["LatentsField"];
       /** @description Latents tensor */
@@ -1261,6 +1279,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Collection
        * @description The collection of boolean values
        * @default []
@@ -1312,6 +1336,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Value
        * @description The boolean value
@@ -1460,6 +1490,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to infill */
       image?: components["schemas"]["ImageField"];
       /**
@@ -1491,6 +1527,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Image Width
        * @description The image width, in pixels, to calculate tiles for.
@@ -1551,6 +1593,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Image Width
        * @description The image width, in pixels, to calculate tiles for.
        * @default 1024
@@ -1609,6 +1657,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Image Width
        * @description The image width, in pixels, to calculate tiles for.
@@ -1695,6 +1749,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
@@ -1738,6 +1798,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to crop */
       image?: components["schemas"]["ImageField"];
       /**
@@ -1952,6 +2018,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * CLIP
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
@@ -2008,6 +2080,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Collection Item
        * @description The item to collect (all inputs must be of the same type)
@@ -2082,6 +2160,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to color-correct */
       image?: components["schemas"]["ImageField"];
       /** @description Reference image for color-correction */
@@ -2150,6 +2234,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * @description The color value
        * @default {
        *   "r": 0,
@@ -2190,6 +2280,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
@@ -2248,6 +2344,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Prompt
        * @description Prompt to be parsed by Compel to create a conditioning tensor
        * @default
@@ -2287,6 +2389,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Collection
        * @description The collection of conditioning tensors
@@ -2350,6 +2458,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description Conditioning tensor */
       conditioning?: components["schemas"]["ConditioningField"];
       /**
@@ -2397,6 +2511,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
@@ -2594,6 +2714,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The control image */
       image?: components["schemas"]["ImageField"];
       /** @description ControlNet model to load */
@@ -2732,6 +2858,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Generation Mode
        * @description The generation mode that output this image
@@ -2923,6 +3055,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description VAE */
       vae?: components["schemas"]["VaeField"];
       /** @description Image which will be masked */
@@ -2971,6 +3109,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description Latents tensor */
       latents?: components["schemas"]["LatentsField"];
       /**
@@ -3042,6 +3186,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to inpaint */
       image?: components["schemas"]["ImageField"];
       /** @description The mask to use when inpainting */
@@ -3098,6 +3248,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description Positive conditioning tensor */
       positive_conditioning?: components["schemas"]["ConditioningField"];
       /** @description Negative conditioning tensor */
@@ -3223,6 +3379,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
@@ -3272,6 +3434,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * A
        * @description The first number
@@ -3402,6 +3570,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Prompt
        * @description The prompt to parse with dynamicprompts
        */
@@ -3456,6 +3630,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The input image */
       image?: components["schemas"]["ImageField"];
       /**
@@ -3554,6 +3734,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description Image to face detect */
       image?: components["schemas"]["ImageField"];
       /**
@@ -3599,6 +3785,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description Image to face detect */
       image?: components["schemas"]["ImageField"];
       /**
@@ -3694,6 +3886,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description Image for face detection */
       image?: components["schemas"]["ImageField"];
       /**
@@ -3798,6 +3996,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Collection
        * @description The collection of float values
        * @default []
@@ -3850,6 +4054,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Value
        * @description The float value
        * @default 0
@@ -3884,6 +4094,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Start
        * @description The first value of the range
@@ -3931,6 +4147,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Operation
        * @description The operation to perform
@@ -3996,6 +4218,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Value
        * @description The value to round
@@ -4077,6 +4305,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * UNet
        * @description UNet (scheduler, LoRAs)
        */
@@ -4124,7 +4358,7 @@ export type components = {
        * @description The nodes in this graph
        */
       nodes?: {
-        [key: string]: components["schemas"]["LatentConsistencyInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["LinearUIOutputInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["DepthAnythingImageProcessorInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["LeresImageProcessorInvocation"];
+        [key: string]: components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ONNXTextToLatentsInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["OpenposeImageProcessorInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["GraphInvocation"] | components["schemas"]["LatentConsistencyInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["ONNXPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ONNXLatentsToImageInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["LinearUIOutputInvocation"] | components["schemas"]["DepthAnythingImageProcessorInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["OnnxModelLoaderInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["AddInvocation"];
       };
       /**
        * Edges
@@ -4161,7 +4395,7 @@ export type components = {
        * @description The results of node executions
        */
       results: {
-        [key: string]: components["schemas"]["ColorCollectionOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["SDXLLoraLoaderOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["GraphInvocationOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["ClipSkipInvocationOutput"] | components["schemas"]["ONNXModelLoaderOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["String2Output"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["ImageOutput"];
+        [key: string]: components["schemas"]["UNetOutput"] | components["schemas"]["String2Output"] | components["schemas"]["LatentsOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["SDXLLoraLoaderOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["GraphInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["ONNXModelLoaderOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["ClipSkipInvocationOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SchedulerOutput"];
       };
       /**
        * Errors
@@ -4207,6 +4441,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The graph to run */
       graph?: components["schemas"]["Graph"];
       /**
@@ -4276,6 +4516,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
@@ -4446,6 +4692,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Image
        * @description The IP-Adapter image prompt(s).
        */
@@ -4574,6 +4826,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Width
        * @description Final image width
        * @default 1024
@@ -4646,6 +4904,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to blur */
       image?: components["schemas"]["ImageField"];
       /**
@@ -4704,6 +4968,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to get the channel from */
       image?: components["schemas"]["ImageField"];
       /**
@@ -4744,6 +5014,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to adjust */
       image?: components["schemas"]["ImageField"];
       /**
@@ -4795,6 +5071,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to adjust */
       image?: components["schemas"]["ImageField"];
       /**
@@ -4838,6 +5120,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Collection
        * @description The collection of image values
@@ -4891,6 +5179,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to convert */
       image?: components["schemas"]["ImageField"];
       /**
@@ -4931,6 +5225,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to crop */
       image?: components["schemas"]["ImageField"];
       /**
@@ -5079,6 +5379,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to adjust */
       image?: components["schemas"]["ImageField"];
       /**
@@ -5118,6 +5424,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to lerp */
       image?: components["schemas"]["ImageField"];
       /**
@@ -5161,6 +5473,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to load */
       image?: components["schemas"]["ImageField"];
       /**
@@ -5194,6 +5512,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to lerp */
       image?: components["schemas"]["ImageField"];
       /**
@@ -5239,6 +5563,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The first image to multiply */
       image1?: components["schemas"]["ImageField"];
       /** @description The second image to multiply */
@@ -5274,6 +5604,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to check */
       image?: components["schemas"]["ImageField"];
       /**
@@ -5331,6 +5667,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The base image */
       base_image?: components["schemas"]["ImageField"];
       /** @description The image to paste */
@@ -5416,6 +5758,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to resize */
       image?: components["schemas"]["ImageField"];
       /**
@@ -5468,6 +5816,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to scale */
       image?: components["schemas"]["ImageField"];
       /**
@@ -5512,6 +5866,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to encode */
       image?: components["schemas"]["ImageField"];
       /** @description VAE */
@@ -5580,6 +5940,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to check */
       image?: components["schemas"]["ImageField"];
       /**
@@ -5635,6 +6001,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to infill */
       image?: components["schemas"]["ImageField"];
       /**
@@ -5678,6 +6050,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to infill */
       image?: components["schemas"]["ImageField"];
       /**
@@ -5724,6 +6102,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to infill */
       image?: components["schemas"]["ImageField"];
       /**
@@ -5773,6 +6157,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Collection
        * @description The collection of integer values
@@ -5826,6 +6216,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Value
        * @description The integer value
        * @default 0
@@ -5860,6 +6256,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Operation
        * @description The operation to perform
@@ -5954,6 +6356,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Collection
        * @description The list of items to iterate over
        * @default []
@@ -6024,6 +6432,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to infill */
       image?: components["schemas"]["ImageField"];
       /**
@@ -6055,6 +6469,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Prompt
        * @description The prompt to use
@@ -6146,6 +6566,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Collection
        * @description The collection of latents tensors
        */
@@ -6212,6 +6638,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The latents tensor */
       latents?: components["schemas"]["LatentsField"];
       /**
@@ -6269,6 +6701,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description Latents tensor */
       latents?: components["schemas"]["LatentsField"];
       /** @description VAE */
@@ -6316,6 +6754,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
@@ -6405,6 +6849,12 @@ export type components = {
        * @default false
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /** @description The board to save the image to */
@@ -6440,6 +6890,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
@@ -6485,6 +6941,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
@@ -6671,6 +7133,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * LoRA
        * @description LoRA model to load
@@ -6880,6 +7348,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description Main model (UNet, VAE, CLIP) to load */
       model: components["schemas"]["MainModelField"];
       /**
@@ -6913,6 +7387,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The first mask to combine */
       mask1?: components["schemas"]["ImageField"];
       /** @description The second image to combine */
@@ -6948,6 +7428,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to apply the mask to */
       image?: components["schemas"]["ImageField"];
       /**
@@ -7001,6 +7487,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to create the mask from */
       image?: components["schemas"]["ImageField"];
       /**
@@ -7040,6 +7532,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
@@ -7088,6 +7586,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Collection
        * @description Collection of Metadata
@@ -7157,6 +7661,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Tiles With Images
        * @description A list of tile images with tile properties.
        */
@@ -7210,6 +7720,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Items
        * @description A single metadata item or collection of metadata items
        */
@@ -7256,6 +7772,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Label
        * @description Label for this metadata item
@@ -7322,6 +7844,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
@@ -7367,6 +7895,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
@@ -7583,6 +8117,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * A
        * @description The first number
        * @default 0
@@ -7641,6 +8181,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Seed
        * @description Seed for random number generation
@@ -7720,6 +8266,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
@@ -7765,6 +8317,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description Denoised latents tensor */
       latents?: components["schemas"]["LatentsField"];
       /** @description VAE */
@@ -7827,6 +8385,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Prompt
        * @description Raw prompt text (no parsing)
@@ -8045,6 +8609,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description Positive conditioning tensor */
       positive_conditioning?: components["schemas"]["ConditioningField"];
       /** @description Negative conditioning tensor */
@@ -8174,6 +8744,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description ONNX Main model (UNet, VAE, CLIP) to load */
       model: components["schemas"]["OnnxModelField"];
       /**
@@ -8207,6 +8783,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
@@ -8312,6 +8894,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The tile image. */
       image?: components["schemas"]["ImageField"];
       /** @description The tile properties. */
@@ -8358,6 +8946,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
@@ -8413,6 +9007,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * File Path
        * @description Path to prompt text file
@@ -8481,6 +9081,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Low
        * @description The inclusive low value
        * @default 0
@@ -8528,6 +9134,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Low
        * @description The inclusive low value
        * @default 0
@@ -8568,6 +9180,12 @@ export type components = {
        * @default false
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Low
        * @description The inclusive low value
@@ -8622,6 +9240,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Start
        * @description The start of the range
        * @default 0
@@ -8668,6 +9292,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Start
        * @description The start of the range
@@ -8751,6 +9381,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description Latents tensor */
       latents?: components["schemas"]["LatentsField"];
       /**
@@ -8816,6 +9452,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Value
        * @description The float value
        * @default 0
@@ -8856,6 +9498,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Prompt
        * @description Prompt to be parsed by Compel to create a conditioning tensor
@@ -8938,6 +9586,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * LoRA
        * @description LoRA model to load
        */
@@ -9019,6 +9673,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load */
       model: components["schemas"]["MainModelField"];
       /**
@@ -9083,6 +9743,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Style
        * @description Prompt to be parsed by Compel to create a conditioning tensor
        * @default
@@ -9145,6 +9811,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load */
       model: components["schemas"]["MainModelField"];
       /**
@@ -9210,6 +9882,12 @@ export type components = {
        * @default false
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /** @description The board to save the image to */
@@ -9243,6 +9921,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description Latents tensor */
       latents?: components["schemas"]["LatentsField"];
       /**
@@ -9292,6 +9976,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * Scheduler
        * @description Scheduler to use during inference
@@ -9343,6 +10033,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * UNet
        * @description UNet (scheduler, LoRAs)
@@ -9418,6 +10114,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
@@ -9659,6 +10361,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to show */
       image?: components["schemas"]["ImageField"];
       /**
@@ -9847,6 +10555,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Easing
        * @description The easing function to use
        * @default Linear
@@ -9957,6 +10671,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Collection
        * @description The collection of string values
        * @default []
@@ -10009,6 +10729,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * Value
        * @description The string value
        * @default
@@ -10043,6 +10769,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * String Left
        * @description String Left
@@ -10084,6 +10816,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * String Left
        * @description String Left
@@ -10171,6 +10909,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * String
        * @description String to work on
        * @default
@@ -10224,6 +10968,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * String
        * @description String to split
        * @default
@@ -10265,6 +11015,12 @@ export type components = {
        */
       use_cache?: boolean;
       /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
+      /**
        * String
        * @description String to split
        * @default
@@ -10304,6 +11060,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * A
        * @description The first number
@@ -10377,6 +11139,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The IP-Adapter image prompt. */
       image?: components["schemas"]["ImageField"];
       /**
@@ -10613,6 +11381,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
@@ -10650,6 +11424,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The tile to split into properties. */
       tile?: components["schemas"]["Tile"];
       /**
@@ -10802,6 +11582,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to use */
       image?: components["schemas"]["ImageField"];
       /**
@@ -10990,6 +11776,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /**
        * VAE
        * @description VAE model to load
@@ -11270,6 +12062,12 @@ export type components = {
        * @default true
        */
       use_cache?: boolean;
+      /**
+       * Bypass
+       * @description Whether to bypass the node or not
+       * @default false
+       */
+      bypass?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
       /**
@@ -11509,23 +12307,23 @@ export type components = {
      */
     StableDiffusionXLModelFormat: "checkpoint" | "diffusers";
     /**
-     * CLIPVisionModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    CLIPVisionModelFormat: "diffusers";
-    /**
      * ControlNetModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     ControlNetModelFormat: "checkpoint" | "diffusers";
     /**
-     * T2IAdapterModelFormat
+     * IPAdapterModelFormat
      * @description An enumeration.
      * @enum {string}
      */
-    T2IAdapterModelFormat: "diffusers";
+    IPAdapterModelFormat: "invokeai";
+    /**
+     * CLIPVisionModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    CLIPVisionModelFormat: "diffusers";
     /**
      * StableDiffusion1ModelFormat
      * @description An enumeration.
@@ -11539,17 +12337,17 @@ export type components = {
      */
     StableDiffusion2ModelFormat: "checkpoint" | "diffusers";
     /**
+     * T2IAdapterModelFormat
+     * @description An enumeration.
+     * @enum {string}
+     */
+    T2IAdapterModelFormat: "diffusers";
+    /**
      * StableDiffusionOnnxModelFormat
      * @description An enumeration.
      * @enum {string}
      */
     StableDiffusionOnnxModelFormat: "olive" | "onnx";
-    /**
-     * IPAdapterModelFormat
-     * @description An enumeration.
-     * @enum {string}
-     */
-    IPAdapterModelFormat: "invokeai";
   };
   responses: never;
   parameters: never;

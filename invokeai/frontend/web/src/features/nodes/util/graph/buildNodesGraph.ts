@@ -56,6 +56,7 @@ export const buildNodesGraph = (nodesState: NodesState): Graph => {
 
     // add reserved use_cache
     transformedInputs['use_cache'] = node.data.useCache;
+    transformedInputs['bypass'] = node.data.bypass;
 
     // Build this specific node
     const graphNode = {

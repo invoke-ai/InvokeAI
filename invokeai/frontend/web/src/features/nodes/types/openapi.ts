@@ -23,6 +23,9 @@ export type InvocationSchemaExtra = InvocationJSONSchemaExtra & {
     use_cache: Omit<OpenAPIV3_1.SchemaObject, 'default'> & {
       default: boolean;
     };
+    bypass: Omit<OpenAPIV3_1.SchemaObject, 'default'> & {
+      default: boolean;
+    };
   };
 };
 

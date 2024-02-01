@@ -615,6 +615,7 @@ const zInvocationNodeData = z.object({
   embedWorkflow: z.boolean(),
   isIntermediate: z.boolean(),
   useCache: z.boolean().default(true),
+  bypass: z.boolean().default(false),
   version: zSemVer.optional(),
 });
 
