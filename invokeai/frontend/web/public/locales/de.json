@@ -98,7 +98,7 @@
         "outputs": "Ausgabe",
         "data": "Daten",
         "safetensors": "Safetensors",
-        "outpaint": "outpaint",
+        "outpaint": "Ausmalen",
         "details": "Details",
         "format": "Format",
         "unknown": "Unbekannt",
@@ -131,7 +131,8 @@
         "localSystem": "Lokales System",
         "orderBy": "Ordnen nach",
         "saveAs": "Speicher als",
-        "updated": "Aktualisiert"
+        "updated": "Aktualisiert",
+        "copy": "Kopieren"
     },
     "gallery": {
         "generations": "Erzeugungen",
@@ -161,7 +162,13 @@
         "currentlyInUse": "Dieses Bild wird derzeit in den folgenden Funktionen verwendet:",
         "deleteImagePermanent": "Gelöschte Bilder können nicht wiederhergestellt werden.",
         "autoAssignBoardOnClick": "Board per Klick automatisch zuweisen",
-        "noImageSelected": "Kein Bild ausgewählt"
+        "noImageSelected": "Kein Bild ausgewählt",
+        "problemDeletingImagesDesc": "Eins oder mehr Bilder könnten nicht gelöscht werden",
+        "starImage": "Bild markieren",
+        "assets": "Ressourcen",
+        "unstarImage": "Markierung Entfernen",
+        "image": "Bild",
+        "deleteSelection": "Lösche markierte"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tastenkürzel",
@@ -365,7 +372,13 @@
         "addNodes": {
             "title": "Knotenpunkt hinzufügen",
             "desc": "Öffnet das Menü zum Hinzufügen von Knoten"
-        }
+        },
+        "cancelAndClear": {
+            "title": "Abbruch und leeren"
+        },
+        "noHotkeysFound": "Kein Hotkey gefunden",
+        "searchHotkeys": "Hotkeys durchsuchen",
+        "clearSearch": "Suche leeren"
     },
     "modelManager": {
         "modelAdded": "Model hinzugefügt",
@@ -832,7 +845,13 @@
         "hedDescription": "Ganzheitlich verschachtelte Kantenerkennung",
         "scribble": "Scribble",
         "maxFaces": "Maximal Anzahl Gesichter",
-        "resizeSimple": "Größe ändern (einfach)"
+        "resizeSimple": "Größe ändern (einfach)",
+        "large": "Groß",
+        "modelSize": "Modell Größe",
+        "small": "Klein",
+        "base": "Basis",
+        "depthAnything": "Depth Anything",
+        "depthAnythingDescription": "Erstellung einer Tiefenkarte mit der Depth Anything-Technik"
     },
     "queue": {
         "status": "Status",
@@ -865,7 +884,7 @@
         "item": "Auftrag",
         "notReady": "Warteschlange noch nicht bereit",
         "batchValues": "Stapel Werte",
-        "queueCountPrediction": "{{predicted}} zur Warteschlange hinzufügen",
+        "queueCountPrediction": "{{promptsCount}} Prompts × {{iterations}} Iterationen -> {{count}} Generationen",
         "queuedCount": "{{pending}} wartenden Elemente",
         "clearQueueAlertDialog": "Die Warteschlange leeren, stoppt den aktuellen Prozess und leert die Warteschlange komplett.",
         "completedIn": "Fertig in",
@@ -887,7 +906,9 @@
         "back": "Hinten",
         "resumeSucceeded": "Prozessor wieder aufgenommen",
         "resumeTooltip": "Prozessor wieder aufnehmen",
-        "time": "Zeit"
+        "time": "Zeit",
+        "batchQueuedDesc_one": "{{count}} Eintrage ans {{direction}} der Wartschlange hinzugefügt",
+        "batchQueuedDesc_other": "{{count}} Einträge ans {{direction}} der Wartschlange hinzugefügt"
     },
     "metadata": {
         "negativePrompt": "Negativ Beschreibung",
@@ -956,7 +977,8 @@
         "enable": "Aktivieren",
         "clear": "Leeren",
         "maxCacheSize": "Maximale Cache Größe",
-        "cacheSize": "Cache Größe"
+        "cacheSize": "Cache Größe",
+        "useCache": "Benutze Cache"
     },
     "embedding": {
         "noMatchingEmbedding": "Keine passenden Embeddings",
@@ -1042,7 +1064,8 @@
         },
         "compositing": {
             "coherenceTab": "Kohärenzpass",
-            "infillTab": "Füllung"
+            "infillTab": "Füllung",
+            "title": "Compositing"
         }
     }
 }
