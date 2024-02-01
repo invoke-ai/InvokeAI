@@ -13,13 +13,12 @@ import {
   Input,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import { useSaveWorkflowAsDialog } from 'features/workflowLibrary/components/SaveWorkflowAsDialog/useSaveWorkflowAsDialog';
+import { useSaveWorkflowAs } from 'features/workflowLibrary/hooks/useSaveWorkflowAs';
 import { t } from 'i18next';
 import type { ChangeEvent } from 'react';
 import { useCallback, useRef } from 'react';
-
-import { $workflowCategories } from '../../../../app/store/nanostores/workflowCategories';
-import { useSaveWorkflowAs } from '../../hooks/useSaveWorkflowAs';
 
 export const SaveWorkflowAsDialog = () => {
   const { isOpen, onClose, workflowName, setWorkflowName, shouldSaveToProject, setShouldSaveToProject } =
