@@ -178,8 +178,8 @@ devDependencies:
     specifier: ^2.2.3
     version: 2.2.3
   '@invoke-ai/eslint-config-react':
-    specifier: ^0.0.12
-    version: 0.0.12(@typescript-eslint/eslint-plugin@6.19.0)(@typescript-eslint/parser@6.19.0)(eslint-config-prettier@9.1.0)(eslint-plugin-i18next@6.0.3)(eslint-plugin-import@2.29.1)(eslint-plugin-react-hooks@4.6.0)(eslint-plugin-react-refresh@0.4.5)(eslint-plugin-react@7.33.2)(eslint-plugin-simple-import-sort@10.0.0)(eslint-plugin-storybook@0.6.15)(eslint-plugin-unused-imports@3.0.0)(eslint@8.56.0)
+    specifier: ^0.0.13
+    version: 0.0.13(@typescript-eslint/eslint-plugin@6.19.0)(@typescript-eslint/parser@6.19.0)(eslint-config-prettier@9.1.0)(eslint-plugin-import@2.29.1)(eslint-plugin-react-hooks@4.6.0)(eslint-plugin-react-refresh@0.4.5)(eslint-plugin-react@7.33.2)(eslint-plugin-simple-import-sort@10.0.0)(eslint-plugin-storybook@0.6.15)(eslint-plugin-unused-imports@3.0.0)(eslint@8.56.0)
   '@invoke-ai/prettier-config-react':
     specifier: ^0.0.6
     version: 0.0.6(prettier@3.2.4)
@@ -3551,14 +3551,13 @@ packages:
       '@swc/helpers': 0.5.3
     dev: false
 
-  /@invoke-ai/eslint-config-react@0.0.12(@typescript-eslint/eslint-plugin@6.19.0)(@typescript-eslint/parser@6.19.0)(eslint-config-prettier@9.1.0)(eslint-plugin-i18next@6.0.3)(eslint-plugin-import@2.29.1)(eslint-plugin-react-hooks@4.6.0)(eslint-plugin-react-refresh@0.4.5)(eslint-plugin-react@7.33.2)(eslint-plugin-simple-import-sort@10.0.0)(eslint-plugin-storybook@0.6.15)(eslint-plugin-unused-imports@3.0.0)(eslint@8.56.0):
-    resolution: {integrity: sha512-6IXENcSa7vv+YPO/TYmC8qXXJFQt3JqDY+Yc1AMf4/d3b3o+CA7/mqepXIhydG9Gqo5jTRknXdDmjSaLxgCJ/g==}
+  /@invoke-ai/eslint-config-react@0.0.13(@typescript-eslint/eslint-plugin@6.19.0)(@typescript-eslint/parser@6.19.0)(eslint-config-prettier@9.1.0)(eslint-plugin-import@2.29.1)(eslint-plugin-react-hooks@4.6.0)(eslint-plugin-react-refresh@0.4.5)(eslint-plugin-react@7.33.2)(eslint-plugin-simple-import-sort@10.0.0)(eslint-plugin-storybook@0.6.15)(eslint-plugin-unused-imports@3.0.0)(eslint@8.56.0):
+    resolution: {integrity: sha512-dfo9k+wPHdvpy1z6ABoYXR/Ttzs1FAnbC46ttIxVhZuqDq8K5cLWznivrOfl7f0hJb8Cb8HiuQb4pHDxhHBDqA==}
     peerDependencies:
       '@typescript-eslint/eslint-plugin': ^6.19.0
       '@typescript-eslint/parser': ^6.19.0
       eslint: ^8.56.0
       eslint-config-prettier: ^9.1.0
-      eslint-plugin-i18next: ^6.0.3
       eslint-plugin-import: ^2.29.1
       eslint-plugin-react: ^7.33.2
       eslint-plugin-react-hooks: ^4.6.0
@@ -3571,7 +3570,6 @@ packages:
       '@typescript-eslint/parser': 6.19.0(eslint@8.56.0)(typescript@5.3.3)
       eslint: 8.56.0
       eslint-config-prettier: 9.1.0(eslint@8.56.0)
-      eslint-plugin-i18next: 6.0.3
       eslint-plugin-import: 2.29.1(@typescript-eslint/parser@6.19.0)(eslint@8.56.0)
       eslint-plugin-react: 7.33.2(eslint@8.56.0)
       eslint-plugin-react-hooks: 4.6.0(eslint@8.56.0)
