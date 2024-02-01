@@ -12,7 +12,7 @@ type ClearQueueIconButtonProps = ClearQueueButtonProps & {
   onOpen: () => void;
 };
 
-const ClearAllQueueIconButton = ({ onOpen, ...props }: ClearQueueIconButtonProps) => {
+export const ClearAllQueueIconButton = ({ onOpen, ...props }: ClearQueueIconButtonProps) => {
   const { t } = useTranslation();
   const { isLoading, isDisabled } = useClearQueue();
 

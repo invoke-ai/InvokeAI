@@ -1,10 +1,10 @@
 {
     "accessibility": {
-        "invokeProgressBar": "Invoke ilerleme durumu",
-        "nextImage": "Sonraki İmaj",
+        "invokeProgressBar": "Invoke durum çubuğu",
+        "nextImage": "Sonraki Görsel",
         "useThisParameter": "Bu ayarları kullan",
-        "copyMetadataJson": "Metadata verilerini kopyala (JSON)",
-        "exitViewer": "Görüntüleme Modundan Çık",
+        "copyMetadataJson": "Üstveriyi kopyala (JSON)",
+        "exitViewer": "Görüntüleyiciden Çık",
         "zoomIn": "Yakınlaştır",
         "zoomOut": "Uzaklaştır",
         "rotateCounterClockwise": "Saat yönünün tersine döndür",
@@ -17,8 +17,8 @@
         "showOptionsPanel": "Yan Paneli Göster",
         "modelSelect": "Model Seçimi",
         "reset": "Resetle",
-        "uploadImage": "İmaj Yükle",
-        "previousImage": "Önceki İmaj",
+        "uploadImage": "Görsel Yükle",
+        "previousImage": "Önceki Görsel",
         "menu": "Menü",
         "about": "Hakkında",
         "mode": "Kip",
@@ -48,18 +48,18 @@
         "langSimplifiedChinese": "Çince (Basit)",
         "langUkranian": "Ukraynaca",
         "langSpanish": "İspanyolca",
-        "txt2img": "Yazıdan İmaj",
-        "img2img": "İmajdan İmaj",
+        "txt2img": "Yazıdan Görsel",
+        "img2img": "Görselden Görsel",
         "linear": "Doğrusal",
-        "nodes": "İş Akış Düzenleyici",
+        "nodes": "İş Akışı Düzenleyici",
         "postprocessing": "Rötuş",
         "postProcessing": "Rötuş",
         "postProcessDesc2": "Daha gelişmiş iş akışlarına olanak sağlayacak özel bir arayüz yakında yayınlanacaktır.",
-        "postProcessDesc3": "Invoke AI Komut Satırı Arayüzü, Embiggen dahil birçok yeni özellik sunmaktadır.",
+        "postProcessDesc3": "Invoke AI Komut Satırı Arayüzü, içlerinde Embiggen da bulunan birçok özellik sunmaktadır.",
         "langKorean": "Korece",
-        "unifiedCanvas": "Akıllı Tuval",
-        "nodesDesc": "İmaj oluşturmak için hazırladığımız çizge tabanlı sistem şu an geliştirme aşamasındadır. Bu harika özellik hakkındaki gelişmeler için bizi takip etmeye devam edin.",
-        "postProcessDesc1": "Invoke AI birçok rötuş (post-process) aracı sağlar. İmaj büyütme ve yüz iyileştirme halihazırda WebUI üzerinden kullanılabilir. Bunlara Yazıdan İmaj ve İmajdan İmaj sekmelerindeki Gelişmiş Ayarlar menüsünden ulaşabilirsiniz. İsterseniz mevcut görüntü ekranının üzerindeki veya görüntüleyicideki imajı doğrudan üstteki tuşlar yardımıyla düzenleyebilirsiniz.",
+        "unifiedCanvas": "Tuval",
+        "nodesDesc": "Görsel oluşturmaya yardımcı çizge tabanlı sistem şimdilik geliştirme aşamasındadır. Bu süper özellik hakkındaki gelişmeler için kulağınız bizde olsun.",
+        "postProcessDesc1": "Invoke AI birçok rötuş (post-process) aracı sağlar. Görsel büyütme ve yüz iyileştirme WebUI üzerinden kullanıma uygun durumdadır. Bunlara Yazıdan Görsel ve Görselden Görsel sekmelerindeki Gelişmiş Ayarlar menüsünden ulaşabilirsiniz. Ayrıca var olan görseli üzerindeki düğmeler yardımıyla düzenleyebilirsiniz.",
         "batch": "Toplu İş Yöneticisi",
         "accept": "Onayla",
         "cancel": "Vazgeç",
@@ -94,7 +94,7 @@
         "save": "Kaydet",
         "statusMergingModels": "Modeller Birleştiriliyor",
         "statusGenerating": "Oluşturuluyor",
-        "statusGenerationComplete": "Oluşturma Tamamlandı",
+        "statusGenerationComplete": "Oluşturma Bitti",
         "statusGeneratingOutpainting": "Dışboyama Oluşturuluyor",
         "statusLoadingModel": "Model Yükleniyor",
         "random": "Rastgele",
@@ -111,20 +111,20 @@
         "statusRestoringFacesGFPGAN": "Yüzler İyileştiriliyor (GFPGAN)",
         "template": "Şablon",
         "saveAs": "Farklı Kaydet",
-        "statusProcessingComplete": "İşlem Tamamlandı",
-        "statusSavingImage": "İmaj Kaydediliyor",
+        "statusProcessingComplete": "İşlem Bitti",
+        "statusSavingImage": "Görsel Kaydediliyor",
         "somethingWentWrong": "Bir sorun oluştu",
         "statusConvertingModel": "Model Dönüştürülüyor",
         "statusDisconnected": "Bağlantı Kesildi",
         "statusError": "Hata",
-        "statusGeneratingImageToImage": "İmajdan İmaj Oluşturuluyor",
+        "statusGeneratingImageToImage": "Görselden Görsel Oluşturuluyor",
         "statusGeneratingInpainting": "İçboyama Oluşturuluyor",
         "statusRestoringFaces": "Yüzler İyileştiriliyor",
         "statusUpscaling": "Büyütme",
         "statusUpscalingESRGAN": "Büyütme (ESRGAN)",
         "training": "Eğitim",
-        "statusGeneratingTextToImage": "Yazıdan İmaj Oluşturuluyor",
-        "imagePrompt": "Resim İstemi",
+        "statusGeneratingTextToImage": "Yazıdan Görsel Oluşturuluyor",
+        "imagePrompt": "Görsel İstemi",
         "unknown": "Bilinmeyen",
         "green": "Yeşil",
         "red": "Kırmızı",
@@ -137,8 +137,8 @@
         "error": "Hata",
         "generate": "Oluştur",
         "free": "Serbest",
-        "imageFailedToLoad": "İmaj Yüklenemedi",
-        "safetensors": "Safetensor",
+        "imageFailedToLoad": "Görsel Yüklenemedi",
+        "safetensors": "Safetensors",
         "upload": "Yükle",
         "nextPage": "Sonraki Sayfa",
         "prevPage": "Önceki Sayfa",
@@ -147,16 +147,22 @@
         "direction": "Yön",
         "darkMode": "Koyu Tema",
         "unsaved": "Kaydedilmemiş",
-        "unknownError": "Bilinmeyen Hata"
+        "unknownError": "Bilinmeyen Hata",
+        "installed": "Yüklü",
+        "data": "Veri",
+        "input": "Giriş",
+        "copy": "Kopyala",
+        "created": "Yaratma",
+        "updated": "Güncelleme"
     },
     "accordions": {
         "generation": {
             "title": "Oluşturma",
             "modelTab": "Model",
-            "conceptsTab": "Konseptler"
+            "conceptsTab": "Kavramlar"
         },
         "image": {
-            "title": "İmaj"
+            "title": "Görsel"
         },
         "advanced": {
             "title": "Gelişmiş"
@@ -167,7 +173,7 @@
             "infillTab": "Doldurma"
         },
         "control": {
-            "ipTab": "Resim İstemleri"
+            "ipTab": "Görsel İstemleri"
         }
     },
     "boards": {
@@ -179,25 +185,25 @@
         "myBoard": "Panom",
         "selectBoard": "Bir Pano Seç",
         "addBoard": "Pano Ekle",
-        "deleteBoardAndImages": "Panoyu ve İmajları Sil",
+        "deleteBoardAndImages": "Panoyu ve Görselleri Sil",
         "deleteBoardOnly": "Sadece Panoyu Sil",
         "deletedBoardsCannotbeRestored": "Silinen panolar geri getirilemez",
         "menuItemAutoAdd": "Bu panoya otomatik olarak ekle",
         "move": "Taşı",
-        "movingImagesToBoard_one": "{{count}} imajı şu panoya taşı:",
-        "movingImagesToBoard_other": "{{count}} imajı şu panoya taşı:",
+        "movingImagesToBoard_one": "{{count}} görseli şu panoya taşı:",
+        "movingImagesToBoard_other": "{{count}} görseli şu panoya taşı:",
         "noMatching": "Eşleşen pano yok",
         "searchBoard": "Pano Ara...",
-        "topMessage": "Bu pano, şu özelliklerde kullanılan imajlar içeriyor:",
+        "topMessage": "Bu pano, şuralarda kullanılan görseller içeriyor:",
         "downloadBoard": "Panoyu İndir",
         "uncategorized": "Kategorisiz",
         "changeBoard": "Panoyu Değiştir",
-        "bottomMessage": "Bu panoyu ve imajları silmek, bunları kullanan özelliklerin resetlemesine neden olacaktır."
+        "bottomMessage": "Bu panoyu ve görselleri silmek, bunları kullanan özelliklerin resetlemesine neden olacaktır."
     },
     "controlnet": {
         "balanced": "Dengeli",
-        "contentShuffle": "İçerik Karma",
-        "contentShuffleDescription": "İmajın içeriğini karıştırır",
+        "contentShuffle": "İçerik Karıştırma",
+        "contentShuffleDescription": "Görselin içeriğini karıştırır",
         "depthZoe": "Derinlik (Zoe)",
         "depthZoeDescription": "Zoe kullanarak derinlik haritası oluşturma",
         "resizeMode": "Boyutlandırma Kipi",
@@ -216,9 +222,9 @@
         "noneDescription": "Hiçbir işlem uygulanmamış",
         "selectModel": "Model seçin",
         "showAdvanced": "Gelişmiş Ayarları Göster",
-        "controlNetT2IMutexDesc": "$t(common.controlNet) ve $t(common.t2iAdapter)'nün beraber kullanımı henüz desteklenmiyor.",
+        "controlNetT2IMutexDesc": "$t(common.controlNet) ve $t(common.t2iAdapter)'nün birlikte kullanımı şimdilik desteklenmiyor.",
         "canny": "Canny",
-        "colorMapDescription": "İmajdan bir renk haritası oluşturur",
+        "colorMapDescription": "Görselden renk haritası oluşturur",
         "handAndFace": "El ve Yüz",
         "processor": "İşlemci",
         "prompt": "İstem",
@@ -233,26 +239,26 @@
         "cannyDescription": "Canny kenar algılama",
         "fill": "Doldur",
         "highThreshold": "Üst Eşik",
-        "imageResolution": "İmaj Çözünürlüğü",
+        "imageResolution": "Görsel Çözünürlüğü",
         "colorMapTileSize": "Karo Boyutu",
-        "importImageFromCanvas": "Tuvalden İmajı içe Aktar",
+        "importImageFromCanvas": "Tuvaldeki Görseli Al",
         "importMaskFromCanvas": "Tuvalden Maskeyi İçe Aktar",
         "lowThreshold": "Alt Eşik",
         "base": "Taban",
-        "depthAnythingDescription": "Depth Anything tekniği ile derinlik haritası oluşturma"
+        "depthAnythingDescription": "Depth Anything yöntemi ile derinlik haritası oluşturma"
     },
     "queue": {
         "queuedCount": "{{pending}} Sırada",
         "resumeSucceeded": "İşlem Sürdürüldü",
         "openQueue": "Sırayı Göster",
-        "cancelSucceeded": "Öğeden Vazgeçildi",
-        "cancelFailed": "Öğeden Vazgeçmede Sorun",
+        "cancelSucceeded": "İş Geri Çekildi",
+        "cancelFailed": "İşi Geri Çekmede Sorun",
         "prune": "Arındır",
         "pruneTooltip": "{{item_count}} Bitmiş İşi Sil",
         "resumeFailed": "İşlemi Sürdürmede Sorun",
         "pauseFailed": "İşlemi Duraklatmada Sorun",
         "cancelBatchSucceeded": "Toplu İşten Vazgeçildi",
-        "pruneSucceeded": "{{item_count}} Bitmiş İş Sıradan Kaldırıldı",
+        "pruneSucceeded": "{{item_count}} Bitmiş İş Sıradan Silindi",
         "in_progress": "İşleniyor",
         "completed": "Bitti",
         "canceled": "Vazgeçildi",
@@ -269,34 +275,36 @@
         "resume": "Sürdür",
         "queueTotal": "Toplam {{total}}",
         "queueEmpty": "Sıra Boş",
-        "clearQueueAlertDialog": "Sırayı boşaltma tuşu halihazırdaki işlemi durdurur ve sırayı tamamen boşaltır.",
-        "current": "Şu Anki",
+        "clearQueueAlertDialog": "Sırayı boşaltma düğmesi geçerli işlemi durdurur ve sırayı boşaltır.",
+        "current": "Şimdiki",
         "time": "Süre",
         "pause": "Duraklat",
         "pauseTooltip": "İşlemi Duraklat",
         "pruneFailed": "Sırayı Arındırmada Sorun",
-        "clearTooltip": "Vazgeç ve Tüm Öğeleri Sil",
+        "clearTooltip": "Vazgeç ve Tüm İşleri Sil",
         "clear": "Boşalt",
         "cancelBatchFailed": "Toplu İşten Vazgeçmede Sorun",
         "next": "Sonraki",
         "status": "Durum",
         "failed": "Başarısız",
-        "item": "Öğe",
+        "item": "İş",
         "enqueueing": "Toplu İş Sıraya Alınıyor",
         "pauseSucceeded": "İşlem Duraklatıldı",
         "cancel": "Vazgeç",
-        "cancelTooltip": "Şu Anki Öğeden Vazgeç",
+        "cancelTooltip": "Bu İşi Geri Çek",
         "clearSucceeded": "Sıra Boşaltıldı",
         "clearFailed": "Sırayı Boşaltmada Sorun",
         "cancelBatch": "Toplu İşten Vazgeç",
-        "cancelItem": "Öğeden Vazgeç",
+        "cancelItem": "İşi Geri Çek",
         "total": "Toplam",
         "pending": "Sırada",
         "completedIn": "'de bitirildi",
         "batch": "Toplu İş",
         "session": "Oturum",
         "batchQueued": "Toplu İş Sıraya Alındı",
-        "notReady": "Sıraya Alınamadı"
+        "notReady": "Sıraya Alınamadı",
+        "batchFieldValues": "Toplu İş Değişkenleri",
+        "queueMaxExceeded": "Sıra sınırı {{max_queue_size}} aşıldı, {{skip}} atlanıyor"
     },
     "invocationCache": {
         "cacheSize": "Önbellek Boyutu",
@@ -307,8 +315,8 @@
         "enable": "Aç"
     },
     "gallery": {
-        "deleteImageBin": "Silinen imajlar işletim sisteminin çöp kutusuna gönderilir.",
-        "deleteImagePermanent": "Silinen imajlar geri getirilemez.",
+        "deleteImageBin": "Silinen görseller işletim sisteminin çöp kutusuna gönderilir.",
+        "deleteImagePermanent": "Silinen görseller geri getirilemez.",
         "assets": "Özkaynaklar",
         "autoAssignBoardOnClick": "Tıklanan Panoya Otomatik Atama",
         "loading": "Yükleniyor",
@@ -316,28 +324,32 @@
         "download": "İndir",
         "deleteSelection": "Seçileni Sil",
         "preparingDownloadFailed": "İndirme Hazırlanırken Sorun",
-        "problemDeletingImages": "İmaj Silmede Sorun",
-        "featuresWillReset": "Bu imajı silerseniz, o özellikler resetlenecektir.",
+        "problemDeletingImages": "Görsel Silmede Sorun",
+        "featuresWillReset": "Bu görseli silerseniz, o özellikler resetlenecektir.",
         "galleryImageResetSize": "Boyutu Resetle",
-        "noImageSelected": "İmaj Seçili Değil",
+        "noImageSelected": "Görsel Seçilmedi",
         "unstarImage": "Yıldızı Kaldır",
         "uploads": "Yüklemeler",
-        "problemDeletingImagesDesc": "Bir ya da daha çok imaj silinemedi",
+        "problemDeletingImagesDesc": "Bir ya da daha çok görsel silinemedi",
         "gallerySettings": "Galeri Ayarları",
-        "image": "imaj",
-        "galleryImageSize": "İmaj Boyutu",
-        "allImagesLoaded": "Bütün İmajlar Yüklendi",
+        "image": "görsel",
+        "galleryImageSize": "Görsel Boyutu",
+        "allImagesLoaded": "Tüm Görseller Yüklendi",
         "copy": "Kopyala",
-        "noImagesInGallery": "Gösterilecek İmaj Yok",
-        "autoSwitchNewImages": "Yeni İmajı Biter Bitmez Gör",
+        "noImagesInGallery": "Gösterilecek Görsel Yok",
+        "autoSwitchNewImages": "Yeni Görseli Biter Bitmez Gör",
         "maintainAspectRatio": "En-Boy Oranını Koru",
-        "currentlyInUse": "Bu imaj şu an bu bölümlerde kullanımda:",
-        "deleteImage": "İmajı Sil",
+        "currentlyInUse": "Bu görsel şurada kullanımda:",
+        "deleteImage": "Görseli Sil",
         "loadMore": "Daha Getir",
-        "setCurrentImage": "Çalışma İmajı Yap",
+        "setCurrentImage": "Çalışma Görseli Yap",
         "unableToLoad": "Galeri Yüklenemedi",
         "downloadSelection": "Seçileni İndir",
-        "preparingDownload": "İndirmeye Hazırlanıyor"
+        "preparingDownload": "İndirmeye Hazırlanıyor",
+        "singleColumnLayout": "Tek Sütun Düzen",
+        "generations": "Çıktılar",
+        "showUploads": "Yüklenenleri Göster",
+        "showGenerations": "Çıktıları Göster"
     },
     "hrf": {
         "hrf": "Yüksek Çözünürlük Kürü",
@@ -350,17 +362,317 @@
             "method": "Yüksek Çözünürlük Kürü Yöntemi"
         },
         "upscaleMethod": "Büyütme Yöntemi",
-        "enableHrfTooltip": "Daha düşük bir başlangıç çözünürlüğüyle oluşturup ana çözünürlüğe büyütür ve İmajdan İmaj yapar."
+        "enableHrfTooltip": "Daha düşük bir çözünürlükle oluşturmaya başlar, ana çözünürlüğe büyütür ve Görselden Görsel'i çalıştırır."
     },
     "hotkeys": {
         "noHotkeysFound": "Kısayol Tuşu Bulanamadı",
         "searchHotkeys": "Kısayol Tuşlarında Ara",
-        "clearSearch": "Aramayı Sil"
+        "clearSearch": "Aramayı Sil",
+        "colorPicker": {
+            "title": "Renk Seçici",
+            "desc": "Tuvalde renk seçiciye geçer"
+        },
+        "consoleToggle": {
+            "title": "Konsolu Aç-Kapat",
+            "desc": "Konsolu aç-kapat"
+        },
+        "hideMask": {
+            "desc": "Maskeyi gizle-göster",
+            "title": "Maskeyi Gizle"
+        },
+        "focusPrompt": {
+            "title": "İsteme Odaklan",
+            "desc": "Görsel istemi alanına odaklanır"
+        },
+        "keyboardShortcuts": "Kısayol Tuşları",
+        "nextImage": {
+            "title": "Sonraki Görsel",
+            "desc": "Galerideki sonraki görseli göster"
+        },
+        "maximizeWorkSpace": {
+            "desc": "Panelleri kapat ve çalışma alanını genişlet",
+            "title": "Çalışma Alanını Genişlet"
+        },
+        "pinOptions": {
+            "desc": "Ayar panelini iğnele",
+            "title": "Ayarları İğnele"
+        },
+        "nodesHotkeys": "Çizgeler",
+        "quickToggleMove": {
+            "desc": "Geçici olarak Kayma Aracına geçer",
+            "title": "Geçici Kayma"
+        },
+        "showHideBoundingBox": {
+            "title": "Sınırlayıcı Kutuyu Gizle/Göster",
+            "desc": "Sınırlayıcı kutunun görünürlüğünü değiştir"
+        },
+        "showInfo": {
+            "desc": "Seçili görselin üstverisini göster",
+            "title": "Bilgileri Göster"
+        },
+        "nextStagingImage": {
+            "desc": "Sonraki Görsel Parçayı Göster",
+            "title": "Sonraki Görsel Parça"
+        },
+        "acceptStagingImage": {
+            "desc": "Geçiçi Görsel Parçasını Onayla",
+            "title": "Geçiçi Görsel Parçasını Onayla"
+        },
+        "changeTabs": {
+            "desc": "Çalışma alanını değiştir",
+            "title": "Sekmeyi değiştir"
+        },
+        "closePanels": {
+            "title": "Panelleri Kapat",
+            "desc": "Açık panelleri kapat"
+        },
+        "decreaseBrushOpacity": {
+            "title": "Fırça Saydamlığını Artır",
+            "desc": "Tuval fırçasının saydamlığını artırır"
+        },
+        "clearMask": {
+            "title": "Maskeyi Sil",
+            "desc": "Tüm maskeyi sil"
+        },
+        "decreaseGalleryThumbSize": {
+            "desc": "Galerideki küçük görsel boyutunu düşürür",
+            "title": "Küçük Görsel Boyutunu Düşür"
+        },
+        "deleteImage": {
+            "desc": "Seçili görseli sil",
+            "title": "Görseli Sil"
+        },
+        "invoke": {
+            "desc": "Görsel Oluştur",
+            "title": "Invoke"
+        },
+        "increaseGalleryThumbSize": {
+            "title": "Küçük Görsel Boyutunu Artır",
+            "desc": "Galerideki küçük görsel boyutunu artırır"
+        },
+        "setParameters": {
+            "title": "Değişkenleri Kullan",
+            "desc": "Seçili görselin tüm değişkenlerini kullan"
+        },
+        "setPrompt": {
+            "desc": "Seçili görselin istemini kullan",
+            "title": "İstemi Kullan"
+        },
+        "toggleLayer": {
+            "desc": "Maske/Taban katmanları arasında geçiş yapar",
+            "title": "Katmanı Gizle-Göster"
+        },
+        "upscale": {
+            "title": "Büyüt",
+            "desc": "Seçili görseli büyüt"
+        },
+        "setSeed": {
+            "title": "Tohumu Kullan",
+            "desc": "Seçili görselin tohumunu kullan"
+        },
+        "appHotkeys": "Uygulama",
+        "cancel": {
+            "desc": "Geçerli İşi Sil",
+            "title": "Vazgeç"
+        },
+        "sendToImageToImage": {
+            "title": "Görselden Görsel'e Gönder",
+            "desc": "Seçili görseli Görselden Görsel'e gönder"
+        },
+        "fillBoundingBox": {
+            "title": "Sınırlayıcı Kutuyu Doldur",
+            "desc": "Sınırlayıcı kutuyu fırçadaki renkle doldurur"
+        },
+        "moveTool": {
+            "desc": "Tuvalde kaymayı sağlar",
+            "title": "Kayma Aracı"
+        },
+        "redoStroke": {
+            "desc": "Fırça vuruşunu yinele",
+            "title": "Vuruşu Yinele"
+        },
+        "increaseBrushOpacity": {
+            "title": "Fırçanın Saydamlığını Düşür",
+            "desc": "Tuval fırçasının saydamlığını düşürür"
+        },
+        "selectEraser": {
+            "desc": "Tuval silgisini kullan",
+            "title": "Silgiyi Kullan"
+        },
+        "toggleOptions": {
+            "desc": "Ayarlar panelini aç-kapat",
+            "title": "Ayarları Aç-Kapat"
+        },
+        "copyToClipboard": {
+            "desc": "Tuval içeriğini kopyala",
+            "title": "Kopyala"
+        },
+        "galleryHotkeys": "Galeri",
+        "generalHotkeys": "Genel",
+        "mergeVisible": {
+            "desc": "Tuvalin görünür tüm katmanlarını birleştir",
+            "title": "Katmanları Birleştir"
+        },
+        "toggleGallery": {
+            "title": "Galeriyi Aç-Kapat",
+            "desc": "Galeri panelini aç-kapat"
+        },
+        "downloadImage": {
+            "title": "Görseli İndir",
+            "desc": "Tuval içeriğini indir"
+        },
+        "previousStagingImage": {
+            "title": "Önceki Görsel Parça",
+            "desc": "Önceki Görsel Parçayı Göster"
+        },
+        "increaseBrushSize": {
+            "title": "Fırça Boyutunu Artır",
+            "desc": "Tuval fırçasının/silgisinin boyutunu artırır"
+        },
+        "previousImage": {
+            "desc": "Galerideki önceki görseli göster",
+            "title": "Önceki Görsel"
+        },
+        "toggleOptionsAndGallery": {
+            "title": "Ayarları ve Galeriyi Aç-Kapat",
+            "desc": "Ayarlar ve galeri panellerini aç-kapat"
+        },
+        "toggleSnap": {
+            "desc": "Kılavuza Uydur",
+            "title": "Kılavuza Uydur"
+        },
+        "resetView": {
+            "desc": "Tuval Görüşünü Resetle",
+            "title": "Görüşü Resetle"
+        },
+        "cancelAndClear": {
+            "desc": "Geçerli işi geri çek ve sıradaki tüm işleri sil",
+            "title": "Vazgeç ve Sil"
+        },
+        "decreaseBrushSize": {
+            "title": "Fırça Boyutunu Düşür",
+            "desc": "Tuval fırçasının/silgisinin boyutunu düşürür"
+        },
+        "resetOptionsAndGallery": {
+            "desc": "Ayarlar ve galeri panellerini resetler",
+            "title": "Ayarları ve Galeriyi Resetle"
+        },
+        "remixImage": {
+            "desc": "Seçili görselin tohumu hariç tüm değişkenlerini kullan",
+            "title": "Benzerini Türet"
+        },
+        "undoStroke": {
+            "title": "Vuruşu Geri Al",
+            "desc": "Fırça vuruşunu geri al"
+        },
+        "saveToGallery": {
+            "title": "Galeriye Gönder",
+            "desc": "Tuval içeriğini galeriye gönder"
+        },
+        "unifiedCanvasHotkeys": "Tuval",
+        "addNodes": {
+            "desc": "Çizge ekleme menüsünü açar",
+            "title": "Çizge Ekle"
+        },
+        "eraseBoundingBox": {
+            "desc": "Sınırlayıcı kutunun içini boşaltır",
+            "title": "Sınırlayıcı Kutuyu Boşalt"
+        },
+        "selectBrush": {
+            "desc": "Tuval fırçasını kullan",
+            "title": "Fırçayı Kullan"
+        }
     },
     "embedding": {
         "incompatibleModel": "Uyumsuz ana model:"
     },
     "unifiedCanvas": {
-        "accept": "Onayla"
+        "accept": "Onayla",
+        "emptyTempImagesFolderMessage": "Geçici görsel klasörünü boşaltmak Tuvali resetler. Yineleme ve geri alma geçmişi, görsel parçası bölümü ve tuval taban katmanı da dolayısıla resetlenir.",
+        "clearCanvasHistoryMessage": "Tuval geçmişini silmek tuvale dokunmaz, ancak yineleme ve geri alma geçmişini geri dönülemez bir biçimde siler."
+    },
+    "nodes": {
+        "unableToValidateWorkflow": "İş Akışı Doğrulanamadı",
+        "workflowContact": "İletişim",
+        "loadWorkflow": "İş Akışı Yükle",
+        "workflowNotes": "Notlar",
+        "workflow": "İş Akışı",
+        "notesDescription": "İş akışınız hakkında not düşün",
+        "workflowTags": "Etiketler",
+        "workflowDescription": "Kısa Tanım",
+        "workflowValidation": "İş Akışı Doğrulama Sorunu",
+        "workflowVersion": "Sürüm",
+        "newWorkflow": "Yeni İş Akışı",
+        "currentImageDescription": "İşlemdeki görseli Çizge Düzenleyicide gösterir",
+        "workflowAuthor": "Yaratıcı",
+        "workflowName": "Ad",
+        "workflowSettings": "İş Akışı Düzenleyici Ayarları",
+        "currentImage": "İşlemdeki Görsel",
+        "noWorkflow": "İş Akışı Yok",
+        "newWorkflowDesc": "Yeni iş akışı?",
+        "problemReadingWorkflow": "Görselden iş akışı çağrılamadı",
+        "downloadWorkflow": "İş Akışını İndir (JSON)",
+        "unableToMigrateWorkflow": "İş Akışı Aktarılamadı",
+        "unknownErrorValidatingWorkflow": "İş akışını doğrulamada bilinmeyen bir sorun",
+        "unableToGetWorkflowVersion": "İş akışı sürümüne ulaşılamadı",
+        "unrecognizedWorkflowVersion": "Tanınmayan iş akışı sürümü {{version}}",
+        "newWorkflowDesc2": "Geçerli iş akışında kaydedilmemiş değişiklikler var.",
+        "unableToLoadWorkflow": "İş Akışı Yüklenemedi"
+    },
+    "workflows": {
+        "searchWorkflows": "İş Akışlarında Ara",
+        "workflowName": "İş Akışı Adı",
+        "problemSavingWorkflow": "İş Akışını Kaydetmede Sorun",
+        "saveWorkflow": "İş Akışını Kaydet",
+        "uploadWorkflow": "Dosyadan Yükle",
+        "newWorkflowCreated": "Yeni İş Akışı Yaratıldı",
+        "problemLoading": "İş Akışlarını Yüklemede Sorun",
+        "loading": "İş Akışları Yükleniyor",
+        "noDescription": "Tanımsız",
+        "workflowIsOpen": "İş Akışı Açık",
+        "clearWorkflowSearchFilter": "İş Akışı Aramasını Resetle",
+        "workflowEditorMenu": "İş Akışı Düzenleyici Menüsü",
+        "downloadWorkflow": "İndir",
+        "saveWorkflowAs": "İş Akışını Farklı Kaydet",
+        "savingWorkflow": "İş Akışı Kaydediliyor...",
+        "userWorkflows": "İş Akışlarım",
+        "defaultWorkflows": "Varsayılan İş Akışları",
+        "workflows": "İş Akışları",
+        "workflowLibrary": "Depo",
+        "deleteWorkflow": "İş Akışını Sil",
+        "unnamedWorkflow": "Adsız İş Akışı",
+        "noWorkflows": "İş Akışı Yok",
+        "workflowSaved": "İş Akışı Kaydedildi"
+    },
+    "toast": {
+        "problemDownloadingCanvasDesc": "Taban katman indirilemedi",
+        "problemSavingMaskDesc": "Maske kaydedilemedi",
+        "problemSavingCanvasDesc": "Taban katman kaydedilemedi",
+        "problemRetrievingWorkflow": "İş Akışını Getirmede Sorun",
+        "workflowDeleted": "İş Akışı Silindi",
+        "loadedWithWarnings": "İş Akışı Yüklendi Ancak Uyarılar Var",
+        "problemImportingMaskDesc": "Maske aktarılamadı",
+        "problemMergingCanvasDesc": "Taban katman aktarılamadı",
+        "problemCopyingCanvasDesc": "Taban katman aktarılamadı",
+        "workflowLoaded": "İş Akışı Yüklendi",
+        "problemDeletingWorkflow": "İş Akışını Silmede Sorun"
+    },
+    "parameters": {
+        "invoke": {
+            "noPrompts": "İstem oluşturulmadı"
+        }
+    },
+    "modelManager": {
+        "baseModel": "Ana Model"
+    },
+    "dynamicPrompts": {
+        "loading": "Devimsel İstemler Oluşturuluyor...",
+        "combinatorial": "Birleşimsel Oluşturma"
+    },
+    "models": {
+        "incompatibleBaseModel": "Uyumsuz ana model"
+    },
+    "settings": {
+        "generation": "Oluşturma"
     }
 }

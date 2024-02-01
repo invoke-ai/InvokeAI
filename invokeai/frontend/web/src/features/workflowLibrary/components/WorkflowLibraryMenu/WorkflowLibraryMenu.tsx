@@ -7,7 +7,6 @@ import {
   useDisclosure,
   useGlobalMenuClose,
 } from '@invoke-ai/ui-library';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import DownloadWorkflowMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/DownloadWorkflowMenuItem';
 import NewWorkflowMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/NewWorkflowMenuItem';
 import SaveWorkflowAsMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/SaveWorkflowAsMenuItem';
@@ -22,9 +21,6 @@ const WorkflowLibraryMenu = () => {
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
   useGlobalMenuClose(onClose);
-
-  const isWorkflowLibraryEnabled = useFeatureStatus('workflowLibrary').isFeatureEnabled;
-
   return (
     <Menu isOpen={isOpen} onOpen={onOpen} onClose={onClose}>
       <MenuButton
@@ -34,11 +30,12 @@ const WorkflowLibraryMenu = () => {
         pointerEvents="auto"
       />
       <MenuList pointerEvents="auto">
-        {isWorkflowLibraryEnabled && <SaveWorkflowMenuItem />}
-        {isWorkflowLibraryEnabled && <SaveWorkflowAsMenuItem />}
-        <DownloadWorkflowMenuItem />
-        <UploadWorkflowMenuItem />
         <NewWorkflowMenuItem />
+        <UploadWorkflowMenuItem />
+        <MenuDivider />
+        <SaveWorkflowMenuItem />
+        <SaveWorkflowAsMenuItem />
+        <DownloadWorkflowMenuItem />
         <MenuDivider />
         <SettingsMenuItem />
       </MenuList>
