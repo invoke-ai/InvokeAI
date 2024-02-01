@@ -1,3 +1,4 @@
+import { Text } from '@chakra-ui/react';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, useShiftModifier } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
@@ -144,6 +145,15 @@ const GalleryImage = (props: HoverableImageProps) => {
           onMouseOver={handleMouseOver}
           onMouseOut={handleMouseOut}
         >
+          <Text
+            position="absolute"
+            background="white"
+            color="black"
+            fontSize="12px"
+            bottom={0}
+            right={0}
+            px={2}
+          >{`${imageDTO.width}x${imageDTO.height}`}</Text>
           <>
             <IAIDndImageIcon onClick={toggleStarredState} icon={starIcon} tooltip={starTooltip} />
 
