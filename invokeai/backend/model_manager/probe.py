@@ -18,9 +18,9 @@ from .config import (
     InvalidModelConfigException,
     ModelConfigFactory,
     ModelFormat,
+    ModelRepoVariant,
     ModelType,
     ModelVariantType,
-    ModelRepoVariant,
     SchedulerPredictionType,
 )
 from .hash import FastModelHash
@@ -483,8 +483,8 @@ class FolderProbeBase(ProbeBase):
 
     def get_repo_variant(self) -> ModelRepoVariant:
         # get all files ending in .bin or .safetensors
-        weight_files = list(self.model_path.glob('**/*.safetensors'))
-        weight_files.extend(list(self.model_path.glob('**/*.bin')))
+        weight_files = list(self.model_path.glob("**/*.safetensors"))
+        weight_files.extend(list(self.model_path.glob("**/*.bin")))
         for x in weight_files:
             if ".fp16" in x.suffixes:
                 return ModelRepoVariant.FP16
@@ -495,6 +495,7 @@ class FolderProbeBase(ProbeBase):
             if x.suffix == ".onnx":
                 return ModelRepoVariant.ONNX
         return ModelRepoVariant.DEFAULT
+
 
 class PipelineFolderProbe(FolderProbeBase):
     def get_base_type(self) -> BaseModelType:
@@ -540,7 +541,6 @@ class PipelineFolderProbe(FolderProbeBase):
         except Exception:
             pass
         return ModelVariantType.Normal
-        
 
 
 class VaeFolderProbe(FolderProbeBase):
