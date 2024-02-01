@@ -1,12 +1,11 @@
 import { ConfirmationAlertDialog, Flex, IconButton, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
+import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleFill } from 'react-icons/pi';
-
-import { addToast } from '../../../../../system/store/systemSlice';
-import { makeToast } from '../../../../../system/util/makeToast';
-import { nodeEditorReset } from '../../../../store/nodesSlice';
 
 const ClearFlowButton = () => {
   const dispatch = useAppDispatch();
