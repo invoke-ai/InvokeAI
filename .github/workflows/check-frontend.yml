@@ -15,6 +15,7 @@ defaults:
 jobs:
   check-frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 10 # expected run time: <2 min
     steps:
       - uses: actions/checkout@v4
 
