@@ -9,18 +9,15 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import signature
 from types import UnionType
-from typing import (TYPE_CHECKING, Any, Callable, ClassVar, Iterable, Literal,
-                    Optional, Type, TypeVar, Union, cast)
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterable, Literal, Optional, Type, TypeVar, Union, cast
 
 import semver
-from pydantic import (BaseModel, ConfigDict, Field, RootModel, TypeAdapter,
-                      create_model)
+from pydantic import BaseModel, ConfigDict, Field, RootModel, TypeAdapter, create_model
 from pydantic.fields import FieldInfo, _Unset
 from pydantic_core import PydanticUndefined
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.workflow_records.workflow_records_common import \
-    WorkflowWithoutID
+from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.metaenum import MetaEnum
 from invokeai.app.util.misc import uuid_string
