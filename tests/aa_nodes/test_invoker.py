@@ -3,8 +3,7 @@ import logging
 import pytest
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.backend.util.logging import InvokeAILogger
-from tests.fixtures.sqlite_database import create_mock_sqlite_database
+from invokeai.app.services.item_storage.item_storage_memory import ItemStorageMemory
 
 # This import must happen before other invoke imports or test in other files(!!) break
 from .test_nodes import (  # isort: split
@@ -22,7 +21,6 @@ from invokeai.app.services.invocation_queue.invocation_queue_memory import Memor
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.item_storage.item_storage_sqlite import SqliteItemStorage
 from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState, GraphInvocation
 
@@ -53,11 +51,6 @@ def graph_with_subgraph():
 @pytest.fixture
 def mock_services() -> InvocationServices:
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
-    logger = InvokeAILogger.get_logger()
-    db = create_mock_sqlite_database(configuration, logger)
-
-    # NOTE: none of these are actually called by the test invocations
-    graph_execution_manager = SqliteItemStorage[GraphExecutionState](db=db, table_name="graph_executions")
     return InvocationServices(
         board_image_records=None,  # type: ignore
         board_images=None,  # type: ignore
@@ -65,7 +58,7 @@ def mock_services() -> InvocationServices:
         boards=None,  # type: ignore
         configuration=configuration,
         events=TestEventService(),
-        graph_execution_manager=graph_execution_manager,
+        graph_execution_manager=ItemStorageMemory[GraphExecutionState](),
         image_files=None,  # type: ignore
         image_records=None,  # type: ignore
         images=None,  # type: ignore
