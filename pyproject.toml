@@ -38,7 +38,7 @@ dependencies = [
   "clip_anytorch==2.5.2",       # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel==2.0.2",
   "controlnet-aux==0.0.7",
-  "diffusers[torch]==0.25.1",
+  "diffusers[torch]==0.26.0",
   "invisible-watermark==0.2.0", # needed to install SDXL base and refiner using their repo_ids
   "mediapipe==0.10.7",          # needed for "mediapipeface" controlnet model
   "numpy==1.26.3",              # >1.24.0 is needed to use the 'strict' argument to np.testing.assert_array_equal()
@@ -137,8 +137,10 @@ dependencies = [
 # full commands
 "invokeai-configure" = "invokeai.frontend.install.invokeai_configure:invokeai_configure"
 "invokeai-merge" = "invokeai.frontend.merge:invokeai_merge_diffusers"
+"invokeai-merge2" = "invokeai.frontend.merge.merge_diffusers2:main"
 "invokeai-ti" = "invokeai.frontend.training:invokeai_textual_inversion"
 "invokeai-model-install" = "invokeai.frontend.install.model_install:main"
+"invokeai-model-install2" = "invokeai.frontend.install.model_install2:main"  # will eventually be renamed to invokeai-model-install
 "invokeai-migrate3" = "invokeai.backend.install.migrate_to_3:main"
 "invokeai-update" = "invokeai.frontend.install.invokeai_update:main"
 "invokeai-metadata" = "invokeai.backend.image_util.invoke_metadata:main"
