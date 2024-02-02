@@ -47,8 +47,8 @@ const selectShouldDisableToolbarButtons = createSelector(
 );
 
 export const ViewerToolbar = memo(() => {
-const dispatch = useAppDispatch();
-const isConnected = useAppSelector((s) => s.system.isConnected);
+  const dispatch = useAppDispatch();
+  const isConnected = useAppSelector((s) => s.system.isConnected);
   const lastSelectedImage = useAppSelector(selectLastSelectedImage);
   const shouldDisableToolbarButtons = useAppSelector(selectShouldDisableToolbarButtons);
   const viewerMode = useAppSelector((s) => s.viewer.viewerMode);

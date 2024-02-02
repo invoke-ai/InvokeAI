@@ -11,13 +11,7 @@ export const Viewer = memo(() => {
   const viewerMode = useAppSelector((s) => s.viewer.viewerMode);
 
   return (
-    <Flex
-      position="relative"
-      flexDirection="column"
-      height="full"
-      width="full"
-      gap={4}
-    >
+    <Flex position="relative" flexDirection="column" height="full" width="full" gap={4}>
       <ViewerToolbar />
       <Flex height="full" width="full">
         {viewerMode === 'image' && <ViewerImage />}
