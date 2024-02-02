@@ -43,7 +43,6 @@ from diffusers.schedulers import (
     UnCLIPScheduler,
 )
 from diffusers.utils import is_accelerate_available
-from diffusers.utils.import_utils import BACKENDS_MAPPING
 from picklescan.scanner import scan_file_path
 from transformers import (
     AutoFeatureExtractor,
@@ -62,12 +61,9 @@ from invokeai.backend.util.logging import InvokeAILogger
 
 from .models import BaseModelType, ModelVariantType
 
-omegaconf_available = False
 try:
     from omegaconf import OmegaConf
     from omegaconf.dictconfig import DictConfig
-
-    omegaconf_available = True
 except ImportError:
     raise ImportError(
         "OmegaConf is required to convert the LDM checkpoints. Please install it with `pip install OmegaConf`."
@@ -79,10 +75,6 @@ if is_accelerate_available():
 
 logger = InvokeAILogger.get_logger(__name__)
 CONVERT_MODEL_ROOT = InvokeAIAppConfig.get_config().models_path / "core/convert"
-
-
-def is_omegaconf_available() -> bool:
-    return omegaconf_available
 
 
 def shave_segments(path, n_shave_prefix_segments=1):
@@ -1218,9 +1210,6 @@ def download_from_original_stable_diffusion_ckpt(
     if prediction_type == "v-prediction":
         prediction_type = "v_prediction"
 
-    if not is_omegaconf_available():
-        raise ValueError(BACKENDS_MAPPING["omegaconf"][1])
-
     if from_safetensors:
         from safetensors.torch import load_file as safe_load
 
@@ -1654,11 +1643,6 @@ def download_controlnet_from_original_ckpt(
     cross_attention_dim: Optional[bool] = None,
     scan_needed: bool = False,
 ) -> DiffusionPipeline:
-    if not is_omegaconf_available():
-        raise ValueError(BACKENDS_MAPPING["omegaconf"][1])
-
-    from omegaconf import OmegaConf
-
     if from_safetensors:
         from safetensors import safe_open
 
