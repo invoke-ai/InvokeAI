@@ -32,20 +32,14 @@ export const queueSlice = createSlice({
       state.listCursor = undefined;
       state.listPriority = undefined;
     },
-    queueItemSelectionToggled: (
-      state,
-      action: PayloadAction<string | undefined>
-    ) => {
+    queueItemSelectionToggled: (state, action: PayloadAction<string | undefined>) => {
       if (state.selectedQueueItem === action.payload) {
         state.selectedQueueItem = undefined;
       } else {
         state.selectedQueueItem = action.payload;
       }
     },
-    resumeProcessorOnEnqueueChanged: (
-      state,
-      action: PayloadAction<boolean>
-    ) => {
+    resumeProcessorOnEnqueueChanged: (state, action: PayloadAction<boolean>) => {
       state.resumeProcessorOnEnqueue = action.payload;
     },
   },

@@ -1,4 +1,4 @@
-import { MenuItem } from '@invoke-ai/ui';
+import { MenuItem } from '@invoke-ai/ui-library';
 import { useDownloadWorkflow } from 'features/workflowLibrary/hooks/useDownloadWorkflow';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,11 +9,7 @@ const DownloadWorkflowMenuItem = () => {
   const downloadWorkflow = useDownloadWorkflow();
 
   return (
-    <MenuItem
-      as="button"
-      icon={<PiDownloadSimpleBold />}
-      onClick={downloadWorkflow}
-    >
+    <MenuItem as="button" icon={<PiDownloadSimpleBold />} onClick={downloadWorkflow}>
       {t('workflows.downloadWorkflow')}
     </MenuItem>
   );

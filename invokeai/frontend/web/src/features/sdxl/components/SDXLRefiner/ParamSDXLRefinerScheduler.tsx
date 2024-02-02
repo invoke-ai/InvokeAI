@@ -1,5 +1,5 @@
-import type { ComboboxOnChange } from '@invoke-ai/ui';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
+import type { ComboboxOnChange } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { SCHEDULER_OPTIONS } from 'features/parameters/types/constants';
 import { isParameterScheduler } from 'features/parameters/types/parameterSchemas';
@@ -22,10 +22,7 @@ const ParamSDXLRefinerScheduler = () => {
     [dispatch]
   );
 
-  const value = useMemo(
-    () => SCHEDULER_OPTIONS.find((o) => o.value === refinerScheduler),
-    [refinerScheduler]
-  );
+  const value = useMemo(() => SCHEDULER_OPTIONS.find((o) => o.value === refinerScheduler), [refinerScheduler]);
 
   return (
     <FormControl>

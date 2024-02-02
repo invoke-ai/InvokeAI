@@ -30,20 +30,11 @@ export type LoggerNamespace =
   | 'queue'
   | 'dnd';
 
-export const logger = (namespace: LoggerNamespace) =>
-  $logger.get().child({ namespace });
+export const logger = (namespace: LoggerNamespace) => $logger.get().child({ namespace });
 
-export const zLogLevel = z.enum([
-  'trace',
-  'debug',
-  'info',
-  'warn',
-  'error',
-  'fatal',
-]);
+export const zLogLevel = z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']);
 export type LogLevel = z.infer<typeof zLogLevel>;
-export const isLogLevel = (v: unknown): v is LogLevel =>
-  zLogLevel.safeParse(v).success;
+export const isLogLevel = (v: unknown): v is LogLevel => zLogLevel.safeParse(v).success;
 
 // Translate human-readable log levels to numbers, used for log filtering
 export const LOG_LEVEL_MAP: Record<LogLevel, number> = {

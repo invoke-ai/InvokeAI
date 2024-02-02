@@ -1,4 +1,4 @@
-import { Badge, Flex } from '@invoke-ai/ui';
+import { Badge, Flex } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 

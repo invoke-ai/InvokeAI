@@ -1,4 +1,4 @@
-import { Box, Button, Flex } from '@invoke-ai/ui';
+import { Box, Button, Flex } from '@invoke-ai/ui-library';
 import type { EntityId } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
@@ -11,12 +11,7 @@ import type { CSSProperties } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImageBold, PiWarningCircleBold } from 'react-icons/pi';
-import type {
-  GridComponents,
-  ItemContent,
-  ListRange,
-  VirtuosoGridHandle,
-} from 'react-virtuoso';
+import type { GridComponents, ItemContent, ListRange, VirtuosoGridHandle } from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
 import { useBoardTotal } from 'services/api/hooks/useBoardTotal';
 
@@ -35,9 +30,7 @@ const GalleryImageGrid = () => {
   const { t } = useTranslation();
   const rootRef = useRef<HTMLDivElement>(null);
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
-  const [initialize, osInstance] = useOverlayScrollbars(
-    overlayScrollbarsParams
-  );
+  const [initialize, osInstance] = useOverlayScrollbars(overlayScrollbarsParams);
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const { currentViewTotal } = useBoardTotal(selectedBoardId);
   const virtuosoRangeRef = useRef<ListRange | null>(null);
@@ -49,13 +42,7 @@ const GalleryImageGrid = () => {
   } = useGalleryImages();
   useGalleryHotkeys();
   const itemContentFunc: ItemContent<EntityId, void> = useCallback(
-    (index, imageName) => (
-      <GalleryImage
-        key={imageName}
-        index={index}
-        imageName={imageName as string}
-      />
-    ),
+    (index, imageName) => <GalleryImage key={imageName} index={index} imageName={imageName as string} />,
     []
   );
 
@@ -95,10 +82,7 @@ const GalleryImageGrid = () => {
   if (isSuccess && currentData?.ids.length === 0) {
     return (
       <Flex w="full" h="full" alignItems="center" justifyContent="center">
-        <IAINoContentFallback
-          label={t('gallery.noImagesInGallery')}
-          icon={PiImageBold}
-        />
+        <IAINoContentFallback label={t('gallery.noImagesInGallery')} icon={PiImageBold} />
       </Flex>
     );
   }
@@ -135,10 +119,7 @@ const GalleryImageGrid = () => {
   if (isError) {
     return (
       <Box w="full" h="full">
-        <IAINoContentFallback
-          label={t('gallery.unableToLoad')}
-          icon={PiWarningCircleBold}
-        />
+        <IAINoContentFallback label={t('gallery.unableToLoad')} icon={PiWarningCircleBold} />
       </Box>
     );
   }

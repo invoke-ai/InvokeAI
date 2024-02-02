@@ -1,12 +1,8 @@
-import { Button, Flex, Heading, Link, Text, useToast } from '@invoke-ai/ui';
+import { Button, Flex, Heading, Link, Text, useToast } from '@invoke-ai/ui-library';
 import newGithubIssueUrl from 'new-github-issue-url';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  PiArrowCounterClockwiseBold,
-  PiArrowSquareOutBold,
-  PiCopyBold,
-} from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiArrowSquareOutBold, PiCopyBold } from 'react-icons/pi';
 import { serializeError } from 'serialize-error';
 
 type Props = {
@@ -37,22 +33,8 @@ const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
     [error.message, error.name]
   );
   return (
-    <Flex
-      layerStyle="body"
-      w="100vw"
-      h="100vh"
-      alignItems="center"
-      justifyContent="center"
-      p={4}
-    >
-      <Flex
-        layerStyle="first"
-        flexDir="column"
-        borderRadius="base"
-        justifyContent="center"
-        gap={8}
-        p={16}
-      >
+    <Flex layerStyle="body" w="100vw" h="100vh" alignItems="center" justifyContent="center" p={4}>
+      <Flex layerStyle="first" flexDir="column" borderRadius="base" justifyContent="center" gap={8} p={16}>
         <Heading>{t('common.somethingWentWrong')}</Heading>
         <Flex
           layerStyle="second"
@@ -68,19 +50,14 @@ const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
           </Text>
         </Flex>
         <Flex gap={4}>
-          <Button
-            leftIcon={<PiArrowCounterClockwiseBold />}
-            onClick={resetErrorBoundary}
-          >
+          <Button leftIcon={<PiArrowCounterClockwiseBold />} onClick={resetErrorBoundary}>
             {t('accessibility.resetUI')}
           </Button>
           <Button leftIcon={<PiCopyBold />} onClick={handleCopy}>
             {t('common.copyError')}
           </Button>
           <Link href={url} isExternal>
-            <Button leftIcon={<PiArrowSquareOutBold />}>
-              {t('accessibility.createIssue')}
-            </Button>
+            <Button leftIcon={<PiArrowSquareOutBold />}>{t('accessibility.createIssue')}</Button>
           </Link>
         </Flex>
       </Flex>

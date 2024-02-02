@@ -1,4 +1,5 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
+import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
 
 function getCircularReplacer() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -22,21 +23,18 @@ function getCircularReplacer() {
   };
 }
 
-export const receivedOpenAPISchema = createAsyncThunk(
-  'nodes/receivedOpenAPISchema',
-  async (_, { rejectWithValue }) => {
-    try {
-      const url = [window.location.origin, 'openapi.json'].join('/');
-      const response = await fetch(url);
-      const openAPISchema = await response.json();
+export const receivedOpenAPISchema = createAsyncThunk('nodes/receivedOpenAPISchema', async (_, { rejectWithValue }) => {
+  try {
+    const openAPISchemaUrl = $openAPISchemaUrl.get();
 
-      const schemaJSON = JSON.parse(
-        JSON.stringify(openAPISchema, getCircularReplacer())
-      );
+    const url = openAPISchemaUrl ? openAPISchemaUrl : `${window.location.href.replace(/\/$/, '')}/openapi.json`;
+    const response = await fetch(url);
+    const openAPISchema = await response.json();
 
-      return schemaJSON;
-    } catch (error) {
-      return rejectWithValue({ error });
-    }
+    const schemaJSON = JSON.parse(JSON.stringify(openAPISchema, getCircularReplacer()));
+
+    return schemaJSON;
+  } catch (error) {
+    return rejectWithValue({ error });
   }
-);
+});

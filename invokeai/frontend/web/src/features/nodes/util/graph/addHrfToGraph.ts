@@ -42,10 +42,7 @@ function copyConnectionsToDenoiseLatentsHrf(graph: NonNullableGraph): void {
 
   // Loop through the existing edges connected to DENOISE_LATENTS
   graph.edges.forEach((edge: Edge) => {
-    if (
-      edge.destination.node_id === DENOISE_LATENTS &&
-      destinationFields.includes(edge.destination.field)
-    ) {
+    if (edge.destination.node_id === DENOISE_LATENTS && destinationFields.includes(edge.destination.field)) {
       // Add a similar connection to DENOISE_LATENTS_HRF
       newEdges.push({
         source: {
@@ -103,15 +100,9 @@ function calculateHrfRes(
 }
 
 // Adds the high-res fix feature to the given graph.
-export const addHrfToGraph = (
-  state: RootState,
-  graph: NonNullableGraph
-): void => {
+export const addHrfToGraph = (state: RootState, graph: NonNullableGraph): void => {
   // Double check hrf is enabled.
-  if (
-    !state.hrf.hrfEnabled ||
-    state.config.disabledSDFeatures.includes('hrf')
-  ) {
+  if (!state.hrf.hrfEnabled || state.config.disabledSDFeatures.includes('hrf')) {
     return;
   }
   const log = logger('txt2img');
@@ -122,20 +113,12 @@ export const addHrfToGraph = (
   const width = state.generation.width;
   const height = state.generation.height;
   const optimalDimension = selectOptimalDimension(state);
-  const { newWidth: hrfWidth, newHeight: hrfHeight } = calculateHrfRes(
-    optimalDimension,
-    width,
-    height
-  );
+  const { newWidth: hrfWidth, newHeight: hrfHeight } = calculateHrfRes(optimalDimension, width, height);
 
   // Pre-existing (original) graph nodes.
-  const originalDenoiseLatentsNode = graph.nodes[DENOISE_LATENTS] as
-    | DenoiseLatentsInvocation
-    | undefined;
+  const originalDenoiseLatentsNode = graph.nodes[DENOISE_LATENTS] as DenoiseLatentsInvocation | undefined;
   const originalNoiseNode = graph.nodes[NOISE] as NoiseInvocation | undefined;
-  const originalLatentsToImageNode = graph.nodes[LATENTS_TO_IMAGE] as
-    | LatentsToImageInvocation
-    | undefined;
+  const originalLatentsToImageNode = graph.nodes[LATENTS_TO_IMAGE] as LatentsToImageInvocation | undefined;
   if (!originalDenoiseLatentsNode) {
     log.error('originalDenoiseLatentsNode is undefined');
     return;
@@ -192,7 +175,7 @@ export const addHrfToGraph = (
     width: width,
     height: height,
   };
-  if (hrfMethod == 'ESRGAN') {
+  if (hrfMethod === 'ESRGAN') {
     let model_name: ESRGANInvocation['model_name'] = 'RealESRGAN_x2plus.pth';
     if ((width * height) / (hrfWidth * hrfHeight) > 2) {
       model_name = 'RealESRGAN_x4plus.pth';

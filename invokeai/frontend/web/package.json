@@ -19,8 +19,8 @@
     "dist"
   ],
   "scripts": {
-    "dev": "concurrently \"vite dev\" \"pnpm run theme:watch\"",
-    "dev:host": "concurrently \"vite dev --host\" \"pnpm run theme:watch\"",
+    "dev": "vite dev",
+    "dev:host": "vite dev --host",
     "build": "pnpm run lint && vite build",
     "typegen": "node scripts/typegen.js",
     "preview": "vite preview",
@@ -31,9 +31,6 @@
     "lint": "concurrently -g -n eslint,prettier,tsc,madge -c cyan,green,magenta,yellow \"pnpm run lint:eslint\" \"pnpm run lint:prettier\" \"pnpm run lint:tsc\" \"pnpm run lint:madge\"",
     "fix": "eslint --fix . && prettier --log-level warn --write .",
     "preinstall": "npx only-allow pnpm",
-    "postinstall": "pnpm run theme",
-    "theme": "chakra-cli tokens node_modules/@invoke-ai/ui",
-    "theme:watch": "chakra-cli tokens node_modules/@invoke-ai/ui --watch",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "unimported": "npx unimported"
@@ -52,21 +49,12 @@
     }
   },
   "dependencies": {
-    "@chakra-ui/anatomy": "^2.2.2",
-    "@chakra-ui/icons": "^2.1.1",
-    "@chakra-ui/layout": "^2.3.1",
-    "@chakra-ui/portal": "^2.1.0",
-    "@chakra-ui/react": "^2.8.2",
     "@chakra-ui/react-use-size": "^2.1.0",
-    "@chakra-ui/styled-system": "^2.9.2",
-    "@chakra-ui/theme-tools": "^2.1.2",
     "@dagrejs/graphlib": "^2.1.13",
     "@dnd-kit/core": "^6.1.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "@emotion/react": "^11.11.3",
-    "@emotion/styled": "^11.11.0",
     "@fontsource-variable/inter": "^5.0.16",
-    "@invoke-ai/ui": "0.0.10",
+    "@invoke-ai/ui-library": "^0.0.18",
     "@mantine/form": "6.0.21",
     "@nanostores/react": "^0.7.1",
     "@reduxjs/toolkit": "2.0.1",
@@ -116,7 +104,6 @@
     "zod-validation-error": "^3.0.0"
   },
   "peerDependencies": {
-    "@chakra-ui/cli": "^2.4.1",
     "@chakra-ui/react": "^2.8.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -124,7 +111,8 @@
   },
   "devDependencies": {
     "@arthurgeron/eslint-plugin-react-usememo": "^2.2.3",
-    "@chakra-ui/cli": "^2.4.1",
+    "@invoke-ai/eslint-config-react": "^0.0.13",
+    "@invoke-ai/prettier-config-react": "^0.0.6",
     "@storybook/addon-docs": "^7.6.10",
     "@storybook/addon-essentials": "^7.6.10",
     "@storybook/addon-interactions": "^7.6.10",
@@ -164,7 +152,7 @@
     "storybook": "^7.6.10",
     "ts-toolbelt": "^9.6.0",
     "typescript": "^5.3.3",
-    "vite": "^5.0.11",
+    "vite": "^5.0.12",
     "vite-plugin-css-injected-by-js": "^3.3.1",
     "vite-plugin-dts": "^3.7.1",
     "vite-plugin-eslint": "^1.8.1",

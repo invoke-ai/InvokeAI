@@ -16,10 +16,7 @@ import {
   socketQueueItemStatusChanged,
   socketSessionRetrievalError,
 } from 'services/events/actions';
-import type {
-  ClientToServerEvents,
-  ServerToClientEvents,
-} from 'services/events/types';
+import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
 
 type SetEventListenersArg = {
@@ -41,9 +38,7 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
 
   socket.on('connect_error', (error) => {
     if (error && error.message) {
-      const data: string | undefined = (
-        error as unknown as { data: string | undefined }
-      ).data;
+      const data: string | undefined = (error as unknown as { data: string | undefined }).data;
       if (data === 'ERR_UNAUTHENTICATED') {
         dispatch(
           addToast(

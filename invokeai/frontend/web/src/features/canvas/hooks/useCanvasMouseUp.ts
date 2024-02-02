@@ -1,10 +1,6 @@
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  $isDrawing,
-  $isMovingStage,
-  $tool,
-} from 'features/canvas/store/canvasNanostore';
+import { $isDrawing, $isMovingStage, $tool } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { addPointToCurrentLine } from 'features/canvas/store/canvasSlice';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
@@ -39,9 +35,7 @@ const useCanvasMouseUp = (
        * the line's existing points. This allows the line to render as a circle
        * centered on that point.
        */
-      dispatch(
-        addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
-      );
+      dispatch(addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y]));
     } else {
       didMouseMoveRef.current = false;
     }

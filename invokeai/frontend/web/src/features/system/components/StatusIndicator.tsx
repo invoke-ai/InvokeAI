@@ -1,4 +1,4 @@
-import { Icon, Tooltip } from '@invoke-ai/ui';
+import { Icon, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,12 +10,7 @@ const StatusIndicator = () => {
 
   if (!isConnected) {
     return (
-      <Tooltip
-        label={t('common.statusDisconnected')}
-        placement="end"
-        shouldWrapChildren
-        gutter={10}
-      >
+      <Tooltip label={t('common.statusDisconnected')} placement="end" shouldWrapChildren gutter={10}>
         <Icon as={PiWarningBold} color="error.300" />
       </Tooltip>
     );

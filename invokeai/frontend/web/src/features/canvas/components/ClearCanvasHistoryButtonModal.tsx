@@ -1,4 +1,4 @@
-import { Button, ConfirmationAlertDialog, useDisclosure } from '@invoke-ai/ui';
+import { Button, ConfirmationAlertDialog, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { clearCanvasHistory } from 'features/canvas/store/canvasSlice';
@@ -11,19 +11,11 @@ const ClearCanvasHistoryButtonModal = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const acceptCallback = useCallback(
-    () => dispatch(clearCanvasHistory()),
-    [dispatch]
-  );
+  const acceptCallback = useCallback(() => dispatch(clearCanvasHistory()), [dispatch]);
 
   return (
     <>
-      <Button
-        onClick={onOpen}
-        size="sm"
-        leftIcon={<PiTrashSimpleFill />}
-        isDisabled={isStaging}
-      >
+      <Button onClick={onOpen} size="sm" leftIcon={<PiTrashSimpleFill />} isDisabled={isStaging}>
         {t('unifiedCanvas.clearCanvasHistory')}
       </Button>
       <ConfirmationAlertDialog

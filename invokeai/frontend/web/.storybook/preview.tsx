@@ -6,7 +6,6 @@ import { Provider } from 'react-redux';
 import ThemeLocaleProvider from '../src/app/components/ThemeLocaleProvider';
 import { $baseUrl } from '../src/app/store/nanostores/baseUrl';
 import { createStore } from '../src/app/store/store';
-import { Container } from '@chakra-ui/react';
 // TODO: Disabled for IDE performance issues with our translation JSON
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore

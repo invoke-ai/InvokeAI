@@ -1,9 +1,4 @@
-import {
-  Popover,
-  PopoverAnchor,
-  PopoverBody,
-  PopoverContent,
-} from '@invoke-ai/ui';
+import { Popover, PopoverAnchor, PopoverBody, PopoverContent } from '@invoke-ai/ui-library';
 import { EmbeddingSelect } from 'features/embedding/EmbeddingSelect';
 import type { EmbeddingPopoverProps } from 'features/embedding/types';
 import { memo } from 'react';

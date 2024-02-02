@@ -1,9 +1,4 @@
-import {
-  IconButton,
-  Input,
-  InputGroup,
-  InputRightElement,
-} from '@invoke-ai/ui';
+import { IconButton, Input, InputGroup, InputRightElement } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import type { ChangeEvent, KeyboardEvent } from 'react';
@@ -58,7 +53,7 @@ const BoardsSearch = () => {
           <IconButton
             onClick={clearBoardSearch}
             size="sm"
-            variant="ghost"
+            variant="link"
             aria-label={t('boards.clearSearch')}
             icon={<PiXBold />}
           />

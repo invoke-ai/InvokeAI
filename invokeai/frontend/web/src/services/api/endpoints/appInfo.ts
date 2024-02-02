@@ -1,9 +1,5 @@
 import type { paths } from 'services/api/schema';
-import type {
-  AppConfig,
-  AppDependencyVersions,
-  AppVersion,
-} from 'services/api/types';
+import type { AppConfig, AppDependencyVersions, AppVersion } from 'services/api/types';
 
 import { api } from '..';
 

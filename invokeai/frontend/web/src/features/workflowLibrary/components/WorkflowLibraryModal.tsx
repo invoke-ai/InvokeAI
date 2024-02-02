@@ -6,7 +6,7 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import WorkflowLibraryContent from 'features/workflowLibrary/components/WorkflowLibraryContent';
 import { useWorkflowLibraryModalContext } from 'features/workflowLibrary/context/useWorkflowLibraryModalContext';
 import { memo } from 'react';
@@ -18,14 +18,7 @@ const WorkflowLibraryModal = () => {
   return (
     <Modal isOpen={isOpen} onClose={onClose} isCentered>
       <ModalOverlay />
-      <ModalContent
-        w="80%"
-        h="80%"
-        minW="unset"
-        minH="unset"
-        maxW="1200px"
-        maxH="664px"
-      >
+      <ModalContent w="80%" h="80%" minW="unset" minH="unset" maxW="1200px" maxH="664px">
         <ModalHeader>{t('workflows.workflowLibrary')}</ModalHeader>
         <ModalCloseButton />
         <ModalBody>

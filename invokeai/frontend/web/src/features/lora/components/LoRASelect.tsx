@@ -1,5 +1,5 @@
-import type { ChakraProps } from '@invoke-ai/ui';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
+import type { ChakraProps } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
@@ -9,19 +9,14 @@ import { useTranslation } from 'react-i18next';
 import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
 
-const selectAddedLoRAs = createMemoizedSelector(
-  selectLoraSlice,
-  (lora) => lora.loras
-);
+const selectAddedLoRAs = createMemoizedSelector(selectLoraSlice, (lora) => lora.loras);
 
 const LoRASelect = () => {
   const dispatch = useAppDispatch();
   const { data, isLoading } = useGetLoRAModelsQuery();
   const { t } = useTranslation();
   const addedLoRAs = useAppSelector(selectAddedLoRAs);
-  const currentBaseModel = useAppSelector(
-    (s) => s.generation.model?.base_model
-  );
+  const currentBaseModel = useAppSelector((s) => s.generation.model?.base_model);
 
   const getIsDisabled = (lora: LoRAModelConfigEntity): boolean => {
     const isCompatible = currentBaseModel === lora.base_model;

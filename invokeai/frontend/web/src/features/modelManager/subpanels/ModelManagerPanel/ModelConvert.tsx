@@ -12,7 +12,7 @@ import {
   Tooltip,
   UnorderedList,
   useDisclosure,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
@@ -34,8 +34,7 @@ const ModelConvert = (props: ModelConvertProps) => {
   const { t } = useTranslation();
   const [convertModel, { isLoading }] = useConvertMainModelsMutation();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const [saveLocation, setSaveLocation] =
-    useState<SaveLocation>('InvokeAIRoot');
+  const [saveLocation, setSaveLocation] = useState<SaveLocation>('InvokeAIRoot');
   const [customSaveLocation, setCustomSaveLocation] = useState<string>('');
 
   useEffect(() => {
@@ -49,19 +48,15 @@ const ModelConvert = (props: ModelConvertProps) => {
   const handleChangeSaveLocation = useCallback((v: string) => {
     setSaveLocation(v as SaveLocation);
   }, []);
-  const handleChangeCustomSaveLocation = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      setCustomSaveLocation(e.target.value);
-    },
-    []
-  );
+  const handleChangeCustomSaveLocation = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setCustomSaveLocation(e.target.value);
+  }, []);
 
   const modelConvertHandler = useCallback(() => {
     const queryArg = {
       base_model: model.base_model,
       model_name: model.model_name,
-      convert_dest_directory:
-        saveLocation === 'Custom' ? customSaveLocation : undefined,
+      convert_dest_directory: saveLocation === 'Custom' ? customSaveLocation : undefined,
     };
 
     if (saveLocation === 'Custom' && customSaveLocation === '') {
@@ -79,9 +74,7 @@ const ModelConvert = (props: ModelConvertProps) => {
     dispatch(
       addToast(
         makeToast({
-          title: `${t('modelManager.convertingModelBegin')}: ${
-            model.model_name
-          }`,
+          title: `${t('modelManager.convertingModelBegin')}: ${model.model_name}`,
           status: 'info',
         })
       )
@@ -103,23 +96,13 @@ const ModelConvert = (props: ModelConvertProps) => {
         dispatch(
           addToast(
             makeToast({
-              title: `${t('modelManager.modelConversionFailed')}: ${
-                model.model_name
-              }`,
+              title: `${t('modelManager.modelConversionFailed')}: ${model.model_name}`,
               status: 'error',
             })
           )
         );
       });
-  }, [
-    convertModel,
-    customSaveLocation,
-    dispatch,
-    model.base_model,
-    model.model_name,
-    saveLocation,
-    t,
-  ]);
+  }, [convertModel, customSaveLocation, dispatch, model.base_model, model.model_name, saveLocation, t]);
 
   return (
     <>
@@ -153,13 +136,8 @@ const ModelConvert = (props: ModelConvertProps) => {
 
         <Flex flexDir="column" gap={2}>
           <Flex marginTop={4} flexDir="column" gap={2}>
-            <Text fontWeight="semibold">
-              {t('modelManager.convertToDiffusersSaveLocation')}
-            </Text>
-            <RadioGroup
-              value={saveLocation}
-              onChange={handleChangeSaveLocation}
-            >
+            <Text fontWeight="semibold">{t('modelManager.convertToDiffusersSaveLocation')}</Text>
+            <RadioGroup value={saveLocation} onChange={handleChangeSaveLocation}>
               <Flex gap={4}>
                 <Radio value="InvokeAIRoot">
                   <Tooltip label="Save converted model in the InvokeAI root folder">
@@ -167,9 +145,7 @@ const ModelConvert = (props: ModelConvertProps) => {
                   </Tooltip>
                 </Radio>
                 <Radio value="Custom">
-                  <Tooltip label="Save converted model in a custom folder">
-                    {t('modelManager.custom')}
-                  </Tooltip>
+                  <Tooltip label="Save converted model in a custom folder">{t('modelManager.custom')}</Tooltip>
                 </Radio>
               </Flex>
             </RadioGroup>
@@ -177,11 +153,7 @@ const ModelConvert = (props: ModelConvertProps) => {
           {saveLocation === 'Custom' && (
             <FormControl>
               <FormLabel>{t('modelManager.customSaveLocation')}</FormLabel>
-              <Input
-                width="full"
-                value={customSaveLocation}
-                onChange={handleChangeCustomSaveLocation}
-              />
+              <Input width="full" value={customSaveLocation} onChange={handleChangeCustomSaveLocation} />
             </FormControl>
           )}
         </Flex>

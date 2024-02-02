@@ -27,10 +27,7 @@ export const postprocessingSlice = createSlice({
   name: 'postprocessing',
   initialState: initialPostprocessingState,
   reducers: {
-    esrganModelNameChanged: (
-      state,
-      action: PayloadAction<ParamESRGANModelName>
-    ) => {
+    esrganModelNameChanged: (state, action: PayloadAction<ParamESRGANModelName>) => {
       state.esrganModelName = action.payload;
     },
   },
@@ -40,8 +37,7 @@ export const { esrganModelNameChanged } = postprocessingSlice.actions;
 
 export default postprocessingSlice.reducer;
 
-export const selectPostprocessingSlice = (state: RootState) =>
-  state.postprocessing;
+export const selectPostprocessingSlice = (state: RootState) => state.postprocessing;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 export const migratePostprocessingState = (state: any): any => {

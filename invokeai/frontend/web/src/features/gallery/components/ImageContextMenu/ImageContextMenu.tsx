@@ -1,5 +1,5 @@
-import type { ContextMenuProps } from '@invoke-ai/ui';
-import { ContextMenu, MenuList } from '@invoke-ai/ui';
+import type { ContextMenuProps } from '@invoke-ai/ui-library';
+import { ContextMenu, MenuList } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
 import type { ImageDTO } from 'services/api/types';

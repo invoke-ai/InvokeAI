@@ -1,4 +1,4 @@
-import { FormControl, FormLabel, Switch } from '@invoke-ai/ui';
+import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterShouldAutoConfig } from 'features/controlAdapters/hooks/useControlAdapterShouldAutoConfig';
@@ -28,10 +28,7 @@ const ControlAdapterShouldAutoConfig = ({ id }: Props) => {
   return (
     <FormControl isDisabled={!isEnabled}>
       <FormLabel flexGrow={1}>{t('controlnet.autoConfigure')}</FormLabel>
-      <Switch
-        isChecked={shouldAutoConfig}
-        onChange={handleShouldAutoConfigChanged}
-      />
+      <Switch isChecked={shouldAutoConfig} onChange={handleShouldAutoConfigChanged} />
     </FormControl>
   );
 };

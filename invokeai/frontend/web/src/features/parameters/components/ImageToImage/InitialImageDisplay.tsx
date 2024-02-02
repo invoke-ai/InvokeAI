@@ -1,28 +1,18 @@
-import { Flex, IconButton, Spacer, Text } from '@invoke-ai/ui';
+import { Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
-import {
-  clearInitialImage,
-  selectGenerationSlice,
-} from 'features/parameters/store/generationSlice';
+import { clearInitialImage, selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import {
-  PiArrowCounterClockwiseBold,
-  PiRulerBold,
-  PiUploadSimpleBold,
-} from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiRulerBold, PiUploadSimpleBold } from 'react-icons/pi';
 import type { PostUploadAction } from 'services/api/types';
 
 import InitialImage from './InitialImage';
 
-const selectInitialImage = createMemoizedSelector(
-  selectGenerationSlice,
-  (generation) => generation.initialImage
-);
+const selectInitialImage = createMemoizedSelector(selectGenerationSlice, (generation) => generation.initialImage);
 
 const postUploadAction: PostUploadAction = {
   type: 'SET_INITIAL_IMAGE',
@@ -63,13 +53,7 @@ const InitialImageDisplay = () => {
       p={2}
       gap={4}
     >
-      <Flex
-        w="full"
-        flexWrap="wrap"
-        justifyContent="center"
-        alignItems="center"
-        gap={2}
-      >
+      <Flex w="full" flexWrap="wrap" justifyContent="center" alignItems="center" gap={2}>
         <Text ps={2} fontWeight="semibold" userSelect="none" color="base.200">
           {t('metadata.initImage')}
         </Text>

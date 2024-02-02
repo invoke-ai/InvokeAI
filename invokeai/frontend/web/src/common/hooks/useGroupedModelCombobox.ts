@@ -1,4 +1,4 @@
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import type { EntityState } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { GroupBase } from 'chakra-react-select';
@@ -28,11 +28,8 @@ export const useGroupedModelCombobox = <T extends AnyModelConfigEntity>(
   arg: UseGroupedModelComboboxArg<T>
 ): UseGroupedModelComboboxReturn => {
   const { t } = useTranslation();
-  const base_model = useAppSelector(
-    (s) => s.generation.model?.base_model ?? 'sdxl'
-  );
-  const { modelEntities, selectedModel, getIsDisabled, onChange, isLoading } =
-    arg;
+  const base_model = useAppSelector((s) => s.generation.model?.base_model ?? 'sdxl');
+  const { modelEntities, selectedModel, getIsDisabled, onChange, isLoading } = arg;
   const options = useMemo<GroupBase<ComboboxOption>[]>(() => {
     if (!modelEntities) {
       return [];
@@ -60,11 +57,8 @@ export const useGroupedModelCombobox = <T extends AnyModelConfigEntity>(
 
   const value = useMemo(
     () =>
-      options
-        .flatMap((o) => o.options)
-        .find((m) =>
-          selectedModel ? m.value === getModelId(selectedModel) : false
-        ) ?? null,
+      options.flatMap((o) => o.options).find((m) => (selectedModel ? m.value === getModelId(selectedModel) : false)) ??
+      null,
     [options, selectedModel]
   );
 

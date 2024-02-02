@@ -5,8 +5,7 @@ import { z } from 'zod';
 
 export const zSeedBehaviour = z.enum(['PER_ITERATION', 'PER_PROMPT']);
 export type SeedBehaviour = z.infer<typeof zSeedBehaviour>;
-export const isSeedBehaviour = (v: unknown): v is SeedBehaviour =>
-  zSeedBehaviour.safeParse(v).success;
+export const isSeedBehaviour = (v: unknown): v is SeedBehaviour => zSeedBehaviour.safeParse(v).success;
 
 export interface DynamicPromptsState {
   _version: 1;
@@ -47,11 +46,9 @@ export const dynamicPromptsSlice = createSlice({
     },
     promptsChanged: (state, action: PayloadAction<string[]>) => {
       state.prompts = action.payload;
+      state.isLoading = false;
     },
-    parsingErrorChanged: (
-      state,
-      action: PayloadAction<string | null | undefined>
-    ) => {
+    parsingErrorChanged: (state, action: PayloadAction<string | null | undefined>) => {
       state.parsingError = action.payload;
     },
     isErrorChanged: (state, action: PayloadAction<boolean>) => {
@@ -79,8 +76,7 @@ export const {
 
 export default dynamicPromptsSlice.reducer;
 
-export const selectDynamicPromptsSlice = (state: RootState) =>
-  state.dynamicPrompts;
+export const selectDynamicPromptsSlice = (state: RootState) => state.dynamicPrompts;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 export const migrateDynamicPromptsState = (state: any): any => {

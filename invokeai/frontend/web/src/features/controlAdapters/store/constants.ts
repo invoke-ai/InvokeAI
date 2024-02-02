@@ -1,9 +1,6 @@
 import i18n from 'i18next';
 
-import type {
-  ControlAdapterProcessorType,
-  RequiredControlAdapterProcessorNode,
-} from './types';
+import type { ControlAdapterProcessorType, RequiredControlAdapterProcessorNode } from './types';
 
 type ControlNetProcessorsDict = Record<
   ControlAdapterProcessorType,
@@ -81,6 +78,22 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
       h: 512,
       w: 512,
       f: 256,
+    },
+  },
+  depth_anything_image_processor: {
+    type: 'depth_anything_image_processor',
+    get label() {
+      return i18n.t('controlnet.depthAnything');
+    },
+    get description() {
+      return i18n.t('controlnet.depthAnythingDescription');
+    },
+    default: {
+      id: 'depth_anything_image_processor',
+      type: 'depth_anything_image_processor',
+      model_size: 'small',
+      resolution: 512,
+      offload: false,
     },
   },
   hed_image_processor: {
@@ -245,7 +258,7 @@ export const CONTROLNET_MODEL_DEFAULT_PROCESSORS: {
 } = {
   canny: 'canny_image_processor',
   mlsd: 'mlsd_image_processor',
-  depth: 'midas_depth_image_processor',
+  depth: 'depth_anything_image_processor',
   bae: 'normalbae_image_processor',
   sketch: 'pidi_image_processor',
   scribble: 'lineart_image_processor',

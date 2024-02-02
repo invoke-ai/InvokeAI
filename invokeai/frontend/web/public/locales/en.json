@@ -86,6 +86,7 @@
         "back": "Back",
         "batch": "Batch Manager",
         "cancel": "Cancel",
+        "copy": "Copy",
         "copyError": "$t(gallery.copy) Error",
         "close": "Close",
         "on": "On",
@@ -224,6 +225,7 @@
         "amult": "a_mult",
         "autoConfigure": "Auto configure processor",
         "balanced": "Balanced",
+        "base": "Base",
         "beginEndStepPercent": "Begin / End Step Percentage",
         "bgth": "bg_th",
         "canny": "Canny",
@@ -237,6 +239,8 @@
         "controlMode": "Control Mode",
         "crop": "Crop",
         "delete": "Delete",
+        "depthAnything": "Depth Anything",
+        "depthAnythingDescription": "Depth map generation using the Depth Anything technique",
         "depthMidas": "Depth (Midas)",
         "depthMidasDescription": "Depth map generation using Midas",
         "depthZoe": "Depth (Zoe)",
@@ -256,6 +260,7 @@
         "colorMapTileSize": "Tile Size",
         "importImageFromCanvas": "Import Image From Canvas",
         "importMaskFromCanvas": "Import Mask From Canvas",
+        "large": "Large",
         "lineart": "Lineart",
         "lineartAnime": "Lineart Anime",
         "lineartAnimeDescription": "Anime-style lineart processing",
@@ -268,6 +273,7 @@
         "minConfidence": "Min Confidence",
         "mlsd": "M-LSD",
         "mlsdDescription": "Minimalist Line Segment Detector",
+        "modelSize": "Model Size",
         "none": "None",
         "noneDescription": "No processing applied",
         "normalBae": "Normal BAE",
@@ -288,6 +294,7 @@
         "selectModel": "Select a model",
         "setControlImageDimensions": "Set Control Image Dimensions To W/H",
         "showAdvanced": "Show Advanced",
+        "small": "Small",
         "toggleControlNet": "Toggle this ControlNet",
         "w": "W",
         "weight": "Weight",
@@ -599,6 +606,10 @@
         "sendToImageToImage": {
             "desc": "Send current image to Image to Image",
             "title": "Send To Image To Image"
+        },
+        "remixImage": {
+            "desc": "Use all parameters except seed from the current image",
+            "title": "Remix image"
         },
         "setParameters": {
             "desc": "Use all parameters of the current image",
@@ -1003,6 +1014,9 @@
         "newWorkflow": "New Workflow",
         "newWorkflowDesc": "Create a new workflow?",
         "newWorkflowDesc2": "Your current workflow has unsaved changes.",
+        "clearWorkflow": "Clear Workflow",
+        "clearWorkflowDesc": "Clear this workflow and start a new one?",
+        "clearWorkflowDesc2": "Your current workflow has unsaved changes.",
         "scheduler": "Scheduler",
         "schedulerDescription": "TODO",
         "sDXLMainModelField": "SDXL Model",
@@ -1216,6 +1230,7 @@
         "useCpuNoise": "Use CPU Noise",
         "cpuNoise": "CPU Noise",
         "gpuNoise": "GPU Noise",
+        "remixImage": "Remix Image",
         "useInitImg": "Use Initial Image",
         "usePrompt": "Use Prompt",
         "useSeed": "Use Seed",
@@ -1361,6 +1376,7 @@
         "problemCopyingCanvasDesc": "Unable to export base layer",
         "problemCopyingImage": "Unable to Copy Image",
         "problemCopyingImageLink": "Unable to Copy Image Link",
+        "problemDownloadingImage": "Unable to Download Image",
         "problemDownloadingCanvas": "Problem Downloading Canvas",
         "problemDownloadingCanvasDesc": "Unable to export base layer",
         "problemImportingMask": "Problem Importing Mask",
@@ -1452,9 +1468,7 @@
         },
         "compositingCoherencePass": {
             "heading": "Coherence Pass",
-            "paragraphs": [
-                "A second round of denoising helps to composite the Inpainted/Outpainted image."
-            ]
+            "paragraphs": ["A second round of denoising helps to composite the Inpainted/Outpainted image."]
         },
         "compositingCoherenceMode": {
             "heading": "Mode",
@@ -1462,10 +1476,7 @@
         },
         "compositingCoherenceSteps": {
             "heading": "Steps",
-            "paragraphs": [
-                "Number of denoising steps used in the Coherence Pass.",
-                "Same as the main Steps parameter."
-            ]
+            "paragraphs": ["Number of denoising steps used in the Coherence Pass.", "Same as the main Steps parameter."]
         },
         "compositingStrength": {
             "heading": "Strength",
@@ -1487,15 +1498,11 @@
         },
         "controlNetControlMode": {
             "heading": "Control Mode",
-            "paragraphs": [
-                "Lends more weight to either the prompt or ControlNet."
-            ]
+            "paragraphs": ["Lends more weight to either the prompt or ControlNet."]
         },
         "controlNetResizeMode": {
             "heading": "Resize Mode",
-            "paragraphs": [
-                "How the ControlNet image will be fit to the image output size."
-            ]
+            "paragraphs": ["How the ControlNet image will be fit to the image output size."]
         },
         "controlNet": {
             "heading": "ControlNet",
@@ -1505,9 +1512,7 @@
         },
         "controlNetWeight": {
             "heading": "Weight",
-            "paragraphs": [
-                "How strongly the ControlNet will impact the generated image."
-            ]
+            "paragraphs": ["How strongly the ControlNet will impact the generated image."]
         },
         "dynamicPrompts": {
             "heading": "Dynamic Prompts",
@@ -1519,9 +1524,7 @@
         },
         "dynamicPromptsMaxPrompts": {
             "heading": "Max Prompts",
-            "paragraphs": [
-                "Limits the number of prompts that can be generated by Dynamic Prompts."
-            ]
+            "paragraphs": ["Limits the number of prompts that can be generated by Dynamic Prompts."]
         },
         "dynamicPromptsSeedBehaviour": {
             "heading": "Seed Behaviour",
@@ -1538,9 +1541,7 @@
         },
         "lora": {
             "heading": "LoRA Weight",
-            "paragraphs": [
-                "Higher LoRA weight will lead to larger impacts on the final image."
-            ]
+            "paragraphs": ["Higher LoRA weight will lead to larger impacts on the final image."]
         },
         "noiseUseCPU": {
             "heading": "Use CPU Noise",
@@ -1552,9 +1553,7 @@
         },
         "paramCFGScale": {
             "heading": "CFG Scale",
-            "paragraphs": [
-                "Controls how much your prompt influences the generation process."
-            ]
+            "paragraphs": ["Controls how much your prompt influences the generation process."]
         },
         "paramCFGRescaleMultiplier": {
             "heading": "CFG Rescale Multiplier",
@@ -1606,9 +1605,7 @@
         },
         "paramVAE": {
             "heading": "VAE",
-            "paragraphs": [
-                "Model used for translating AI output into the final image."
-            ]
+            "paragraphs": ["Model used for translating AI output into the final image."]
         },
         "paramVAEPrecision": {
             "heading": "VAE Precision",
@@ -1697,6 +1694,7 @@
         "workflowLibrary": "Library",
         "userWorkflows": "My Workflows",
         "defaultWorkflows": "Default Workflows",
+        "projectWorkflows": "Project Workflows",
         "openWorkflow": "Open Workflow",
         "uploadWorkflow": "Load from File",
         "deleteWorkflow": "Delete Workflow",
@@ -1704,11 +1702,13 @@
         "downloadWorkflow": "Save to File",
         "saveWorkflow": "Save Workflow",
         "saveWorkflowAs": "Save Workflow As",
+        "saveWorkflowToProject": "Save Workflow to Project",
         "savingWorkflow": "Saving Workflow...",
         "problemSavingWorkflow": "Problem Saving Workflow",
         "workflowSaved": "Workflow Saved",
         "noRecentWorkflows": "No Recent Workflows",
         "noUserWorkflows": "No User Workflows",
+        "noWorkflows": "No Workflows",
         "noSystemWorkflows": "No System Workflows",
         "problemLoading": "Problem Loading Workflows",
         "loading": "Loading Workflows",
@@ -1717,6 +1717,7 @@
         "clearWorkflowSearchFilter": "Clear Workflow Search Filter",
         "workflowName": "Workflow Name",
         "newWorkflowCreated": "New Workflow Created",
+        "workflowCleared": "Workflow Cleared",
         "workflowEditorMenu": "Workflow Editor Menu",
         "workflowIsOpen": "Workflow is Open"
     },

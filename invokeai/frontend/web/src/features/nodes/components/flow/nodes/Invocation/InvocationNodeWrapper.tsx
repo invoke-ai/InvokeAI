@@ -13,10 +13,7 @@ const InvocationNodeWrapper = (props: NodeProps<InvocationNodeData>) => {
   const { id: nodeId, type, isOpen, label } = data;
 
   const hasTemplateSelector = useMemo(
-    () =>
-      createSelector(selectNodeTemplatesSlice, (nodeTemplates) =>
-        Boolean(nodeTemplates.templates[type])
-      ),
+    () => createSelector(selectNodeTemplatesSlice, (nodeTemplates) => Boolean(nodeTemplates.templates[type])),
     [type]
   );
 
@@ -24,25 +21,11 @@ const InvocationNodeWrapper = (props: NodeProps<InvocationNodeData>) => {
 
   if (!hasTemplate) {
     return (
-      <InvocationNodeUnknownFallback
-        nodeId={nodeId}
-        isOpen={isOpen}
-        label={label}
-        type={type}
-        selected={selected}
-      />
+      <InvocationNodeUnknownFallback nodeId={nodeId} isOpen={isOpen} label={label} type={type} selected={selected} />
     );
   }
 
-  return (
-    <InvocationNode
-      nodeId={nodeId}
-      isOpen={isOpen}
-      label={label}
-      type={type}
-      selected={selected}
-    />
-  );
+  return <InvocationNode nodeId={nodeId} isOpen={isOpen} label={label} type={type} selected={selected} />;
 };
 
 export default memo(InvocationNodeWrapper);

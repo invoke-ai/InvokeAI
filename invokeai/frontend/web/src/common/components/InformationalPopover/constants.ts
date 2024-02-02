@@ -1,4 +1,4 @@
-import type { PopoverProps } from '@invoke-ai/ui';
+import type { PopoverProps } from '@invoke-ai/ui-library';
 
 export type Feature =
   | 'clipSkip'
@@ -95,6 +95,4 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
 
 export const OPEN_DELAY = 1000; // in milliseconds
 
-export const POPPER_MODIFIERS: PopoverProps['modifiers'] = [
-  { name: 'preventOverflow', options: { padding: 10 } },
-];
+export const POPPER_MODIFIERS: PopoverProps['modifiers'] = [{ name: 'preventOverflow', options: { padding: 10 } }];

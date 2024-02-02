@@ -13,46 +13,69 @@ We thank them for all of their time and hard work.
 
 - [Lincoln D. Stein](mailto:lincoln.stein@gmail.com)
 
-## **Current core team**
+## **Current Core Team**
 
 * @lstein (Lincoln Stein) - Co-maintainer
 * @blessedcoolant - Co-maintainer
 * @hipsterusername (Kent Keirsey) - Co-maintainer, CEO, Positive Vibes
 * @psychedelicious (Spencer Mabrito) - Web Team Leader
-* @Kyle0654 (Kyle Schouviller) - Node Architect and General Backend Wizard
-* @damian0815 - Attention Systems and Compel Maintainer
-* @ebr (Eugene Brodsky) - Cloud/DevOps/Sofware engineer; your friendly neighbourhood cluster-autoscaler
-* @genomancer (Gregg Helt) - Controlnet support
-* @StAlKeR7779 (Sergey Borisov) - Torch stack, ONNX, model management, optimization
+* @chainchompa (Jennifer Player) - Web Development & Chain-Chomping
+* @josh is toast (Josh Corbett) - Web Development
 * @cheerio (Mary Rogers) - Lead Engineer & Web App Development
+* @ebr (Eugene Brodsky) - Cloud/DevOps/Sofware engineer; your friendly neighbourhood cluster-autoscaler
+* @sunija - Standalone version
+* @genomancer (Gregg Helt) - Controlnet support
 * @brandon (Brandon Rising) - Platform, Infrastructure, Backend Systems
 * @ryanjdick (Ryan Dick) - Machine Learning & Training
-* @millu (Millun Atluri) - Community Manager, Documentation, Node-wrangler
-* @chainchompa (Jennifer Player) - Web Development & Chain-Chomping
+* @JPPhoto - Core image generation nodes
+* @dunkeroni - Image generation backend
+* @SkunkWorxDark - Image generation backend
 * @keturn (Kevin Turner) - Diffusers
+* @millu (Millun Atluri) - Community Wizard, Documentation, Node-wrangler, 
+* @glimmerleaf (Devon Hopkins) - Community Wizard
 * @gogurt enjoyer - Discord moderator and end user support
 * @whosawhatsis - Discord moderator and end user support
 * @dwinrger - Discord moderator and end user support
 * @526christian - Discord moderator and end user support
+* @harvester62 -  Discord moderator and end user support
+
+
+## **Honored Team Alumni**
+
+* @StAlKeR7779 (Sergey Borisov) - Torch stack, ONNX, model management, optimization
+* @damian0815 - Attention Systems and Compel Maintainer
+* @netsvetaev (Artur) - Localization support
+* @Kyle0654 (Kyle Schouviller) - Node Architect and General Backend Wizard
+* @tildebyte - Installation and configuration
+* @mauwii (Matthias Wilde) - Installation, release, continuous integration
+
 
 ## **Full List of Contributors by Commit Name**
 
+- 이승석
 - AbdBarho
 - ablattmann
 - AdamOStark
 - Adam Rice
 - Airton Silva
+- Aldo Hoeben
 - Alexander Eichhorn
 - Alexandre D. Roberge
+- Alexandre Macabies
+- Alfie John
 - Andreas Rozek
 - Andre LaBranche
 - Andy Bearman
 - Andy Luhrs
 - Andy Pilate
+- Anonymous
+- Anthony Monthe
 - Any-Winter-4079
 - apolinario
+- Ar7ific1al
 - ArDiouscuros
 - Armando C. Santisbon
+- Arnold Cordewiner
 - Arthur Holstvoogd
 - artmen1516
 - Artur
@@ -64,13 +87,16 @@ We thank them for all of their time and hard work.
 - blhook
 - BlueAmulet
 - Bouncyknighter
+- Brandon
 - Brandon Rising
 - Brent Ozar
 - Brian Racer
 - bsilvereagle
 - c67e708d
+- camenduru
 - CapableWeb
 - Carson Katri
+- chainchompa
 - Chloe
 - Chris Dawson
 - Chris Hayes
@@ -86,30 +112,45 @@ We thank them for all of their time and hard work.
 - cpacker
 - Cragin Godley
 - creachec
+- CrypticWit
+- d8ahazard
+- damian
+- damian0815
+- Damian at mba
 - Damian Stewart
 - Daniel Manzke
 - Danny Beer
 - Dan Sully
+- Darren Ringer
 - David Burnett
 - David Ford
 - David Regla
+- David Sisco
 - David Wager
 - Daya Adianto
 - db3000
+- DekitaRPG
 - Denis Olshin
 - Dennis
+- dependabot[bot]
+- Dmitry Parnas
+- Dobrynia100
 - Dominic Letz
 - DrGunnarMallon
+- Drun555
+- dunkeroni
 - Edward Johan
 - elliotsayes
 - Elrik
 - ElrikUnderlake
 - Eric Khun
 - Eric Wolf
+- Eugene
 - Eugene Brodsky
 - ExperimentalCyborg
 - Fabian Bahl
 - Fabio 'MrWHO' Torchetti
+- Fattire
 - fattire
 - Felipe Nogueira
 - Félix Sanz
@@ -118,8 +159,12 @@ We thank them for all of their time and hard work.
 - gabrielrotbart
 - gallegonovato
 - Gérald LONLAS
+- Gille
 - GitHub Actions Bot
+- glibesyck
 - gogurtenjoyer
+- Gohsuke Shimada
+- greatwolf
 - greentext2
 - Gregg Helt
 - H4rk
@@ -131,6 +176,7 @@ We thank them for all of their time and hard work.
 - Hosted Weblate
 - Iman Karim
 - ismail ihsan bülbül
+- ItzAttila
 - Ivan Efimov
 - jakehl
 - Jakub Kolčář
@@ -141,6 +187,7 @@ We thank them for all of their time and hard work.
 - Jason Toffaletti
 - Jaulustus
 - Jeff Mahoney
+- Jennifer Player
 - jeremy
 - Jeremy Clark
 - JigenD
@@ -148,19 +195,26 @@ We thank them for all of their time and hard work.
 - Johan Roxendal
 - Johnathon Selstad
 - Jonathan
+- Jordan Hewitt
 - Joseph Dries III
+- Josh Corbett
 - JPPhoto
 - jspraul
+- junzi
 - Justin Wong
 - Juuso V
 - Kaspar Emanuel
 - Katsuyuki-Karasawa
+- Keerigan45
 - Kent Keirsey
+- Kevin Brack
 - Kevin Coakley
 - Kevin Gibbons
 - Kevin Schaul
 - Kevin Turner
+- Kieran Klaassen
 - krummrey
+- Kyle
 - Kyle Lacy
 - Kyle Schouviller
 - Lawrence Norton
@@ -171,10 +225,15 @@ We thank them for all of their time and hard work.
 - Lynne Whitehorn
 - majick
 - Marco Labarile
+- Marta Nahorniuk
 - Martin Kristiansen
+- Mary Hipp
+- maryhipp
 - Mary Hipp Rogers
+- mastercaster
 - mastercaster9000
 - Matthias Wild
+- mauwii
 - michaelk71
 - mickr777
 - Mihai
@@ -182,11 +241,15 @@ We thank them for all of their time and hard work.
 - Mikhail Tishin
 - Millun Atluri
 - Minjune Song
+- Mitchell Allain
 - mitien
 - mofuzz
 - Muhammad Usama
 - Name
 - _nderscore
+- Neil Wang
+- nekowaiz
+- nemuruibai
 - Netzer R
 - Nicholas Koh
 - Nicholas Körfer
@@ -197,9 +260,11 @@ We thank them for all of their time and hard work.
 - ofirkris
 - Olivier Louvignes
 - owenvincent
+- pand4z31
 - Patrick Esser
 - Patrick Tien
 - Patrick von Platen
+- Paul Curry
 - Paul Sajna
 - pejotr
 - Peter Baylies
@@ -207,6 +272,7 @@ We thank them for all of their time and hard work.
 - plucked
 - prixt
 - psychedelicious
+- psychedelicious@windows
 - Rainer Bernhardt
 - Riccardo Giovanetti
 - Rich Jones
@@ -215,17 +281,22 @@ We thank them for all of their time and hard work.
 - Robert Bolender
 - Robin Rombach
 - Rohan Barar
-- rohinish404
+- Rohinish
 - rpagliuca
 - rromb
 - Rupesh Sreeraman
+- Ryan
 - Ryan Cao
+- Ryan Dick
 - Saifeddine
 - Saifeddine ALOUI
+- Sam
 - SammCheese
+- Sam McLeod
 - Sammy
 - sammyf
 - Samuel Husso
+- Saurav Maheshkar
 - Scott Lahteine
 - Sean McLellan
 - Sebastian Aigner
@@ -233,16 +304,21 @@ We thank them for all of their time and hard work.
 - Sergey Krashevich
 - Shapor Naghibzadeh
 - Shawn Zhong
+- Simona Liliac
 - Simon Vans-Colina
 - skunkworxdark
 - slashtechno
+- SoheilRezaei
+- Song, Pengcheng
 - spezialspezial
 - ssantos
 - StAlKeR7779
+- Stefan Tobler
 - Stephan Koglin-Fischer
 - SteveCaruso
 - Steve Martinelli
 - Steven Frank
+- Surisen
 - System X - Files
 - Taylor Kems
 - techicode
@@ -261,26 +337,34 @@ We thank them for all of their time and hard work.
 - tyler
 - unknown
 - user1
+- vedant-3010
 - Vedant Madane
 - veprogames
 - wa.code
 - wfng92
+- whjms
 - whosawhatsis
 - Will
 - William Becher
 - William Chong
+- Wilson E. Alvarez
+- woweenie
+- Wubbbi
 - xra
 - Yeung Yiu Hung
 - ymgenesis
 - Yorzaren
 - Yosuke Shinya
 - yun saki
+- ZachNagengast
 - Zadagu
 - zeptofine
+- Zerdoumi
+- Васянатор
 - 冯不游
 - 唐澤 克幸
 
-## **Original CompVis Authors**
+## **Original CompVis (Stable Diffusion) Authors**
 
 - [Robin Rombach](https://github.com/rromb)
 - [Patrick von Platen](https://github.com/patrickvonplaten)

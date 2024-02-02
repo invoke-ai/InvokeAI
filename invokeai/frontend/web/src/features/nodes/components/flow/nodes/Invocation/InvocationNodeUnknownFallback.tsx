@@ -1,4 +1,4 @@
-import { Flex, Text } from '@invoke-ai/ui';
+import { Flex, Text } from '@invoke-ai/ui-library';
 import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
 import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import { useNodePack } from 'features/nodes/hooks/useNodePack';
@@ -14,13 +14,7 @@ type Props = {
   selected: boolean;
 };
 
-const InvocationNodeUnknownFallback = ({
-  nodeId,
-  isOpen,
-  label,
-  type,
-  selected,
-}: Props) => {
+const InvocationNodeUnknownFallback = ({ nodeId, isOpen, label, type, selected }: Props) => {
   const { t } = useTranslation();
   const nodePack = useNodePack(nodeId);
   return (

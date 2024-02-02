@@ -1,8 +1,10 @@
+import type { FormLabelProps } from '@invoke-ai/ui-library';
 import {
   Checkbox,
   CompositeSlider,
   Flex,
   FormControl,
+  FormControlGroup,
   FormLabel,
   IconButton,
   Popover,
@@ -10,7 +12,7 @@ import {
   PopoverContent,
   PopoverTrigger,
   Switch,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   autoAssignBoardOnClickChanged,
@@ -24,16 +26,16 @@ import { RiSettings4Fill } from 'react-icons/ri';
 
 import BoardAutoAddSelect from './Boards/BoardAutoAddSelect';
 
+const formLabelProps: FormLabelProps = {
+  flexGrow: 1,
+};
+
 const GallerySettingsPopover = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const galleryImageMinimumWidth = useAppSelector(
-    (s) => s.gallery.galleryImageMinimumWidth
-  );
+  const galleryImageMinimumWidth = useAppSelector((s) => s.gallery.galleryImageMinimumWidth);
   const shouldAutoSwitch = useAppSelector((s) => s.gallery.shouldAutoSwitch);
-  const autoAssignBoardOnClick = useAppSelector(
-    (s) => s.gallery.autoAssignBoardOnClick
-  );
+  const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
 
   const handleChangeGalleryImageMinimumWidth = useCallback(
     (v: number) => {
@@ -50,8 +52,7 @@ const GallerySettingsPopover = () => {
   );
 
   const handleChangeAutoAssignBoardOnClick = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) =>
-      dispatch(autoAssignBoardOnClickChanged(e.target.checked)),
+    (e: ChangeEvent<HTMLInputElement>) => dispatch(autoAssignBoardOnClickChanged(e.target.checked)),
     [dispatch]
   );
 
@@ -78,20 +79,16 @@ const GallerySettingsPopover = () => {
                 defaultValue={90}
               />
             </FormControl>
-            <FormControl>
-              <FormLabel>{t('gallery.autoSwitchNewImages')}</FormLabel>
-              <Switch
-                isChecked={shouldAutoSwitch}
-                onChange={handleChangeAutoSwitch}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>{t('gallery.autoAssignBoardOnClick')}</FormLabel>
-              <Checkbox
-                isChecked={autoAssignBoardOnClick}
-                onChange={handleChangeAutoAssignBoardOnClick}
-              />
-            </FormControl>
+            <FormControlGroup formLabelProps={formLabelProps}>
+              <FormControl>
+                <FormLabel>{t('gallery.autoSwitchNewImages')}</FormLabel>
+                <Switch isChecked={shouldAutoSwitch} onChange={handleChangeAutoSwitch} />
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('gallery.autoAssignBoardOnClick')}</FormLabel>
+                <Checkbox isChecked={autoAssignBoardOnClick} onChange={handleChangeAutoAssignBoardOnClick} />
+              </FormControl>
+            </FormControlGroup>
             <BoardAutoAddSelect />
           </Flex>
         </PopoverBody>

@@ -1,5 +1,5 @@
-import type { ComboboxOnChange } from '@invoke-ai/ui';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
+import type { ComboboxOnChange } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { vaePrecisionChanged } from 'features/parameters/store/generationSlice';
@@ -28,10 +28,7 @@ const ParamVAEModelSelect = () => {
     [dispatch]
   );
 
-  const value = useMemo(
-    () => options.find((o) => o.value === vaePrecision),
-    [vaePrecision]
-  );
+  const value = useMemo(() => options.find((o) => o.value === vaePrecision), [vaePrecision]);
 
   return (
     <FormControl w="14rem" flexShrink={0}>

@@ -98,7 +98,7 @@
         "outputs": "Ausgabe",
         "data": "Daten",
         "safetensors": "Safetensors",
-        "outpaint": "outpaint",
+        "outpaint": "Ausmalen",
         "details": "Details",
         "format": "Format",
         "unknown": "Unbekannt",
@@ -110,7 +110,29 @@
         "somethingWentWrong": "Etwas ist schief gelaufen",
         "copyError": "$t(gallery.copy) Fehler",
         "input": "Eingabe",
-        "notInstalled": "Nicht $t(common.installed)"
+        "notInstalled": "Nicht $t(common.installed)",
+        "advancedOptions": "Erweiterte Einstellungen",
+        "alpha": "Alpha",
+        "red": "Rot",
+        "green": "Grün",
+        "blue": "Blau",
+        "delete": "Löschen",
+        "or": "oder",
+        "direction": "Richtung",
+        "free": "Frei",
+        "save": "Speichern",
+        "preferencesLabel": "Präferenzen",
+        "created": "Erstellt",
+        "prevPage": "Vorherige Seite",
+        "nextPage": "Nächste Seite",
+        "unknownError": "Unbekannter Fehler",
+        "unsaved": "Nicht gespeichert",
+        "aboutDesc": "Verwenden Sie Invoke für die Arbeit? Dann siehe hier:",
+        "localSystem": "Lokales System",
+        "orderBy": "Ordnen nach",
+        "saveAs": "Speicher als",
+        "updated": "Aktualisiert",
+        "copy": "Kopieren"
     },
     "gallery": {
         "generations": "Erzeugungen",
@@ -140,7 +162,13 @@
         "currentlyInUse": "Dieses Bild wird derzeit in den folgenden Funktionen verwendet:",
         "deleteImagePermanent": "Gelöschte Bilder können nicht wiederhergestellt werden.",
         "autoAssignBoardOnClick": "Board per Klick automatisch zuweisen",
-        "noImageSelected": "Kein Bild ausgewählt"
+        "noImageSelected": "Kein Bild ausgewählt",
+        "problemDeletingImagesDesc": "Eins oder mehr Bilder könnten nicht gelöscht werden",
+        "starImage": "Bild markieren",
+        "assets": "Ressourcen",
+        "unstarImage": "Markierung Entfernen",
+        "image": "Bild",
+        "deleteSelection": "Lösche markierte"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tastenkürzel",
@@ -344,7 +372,13 @@
         "addNodes": {
             "title": "Knotenpunkt hinzufügen",
             "desc": "Öffnet das Menü zum Hinzufügen von Knoten"
-        }
+        },
+        "cancelAndClear": {
+            "title": "Abbruch und leeren"
+        },
+        "noHotkeysFound": "Kein Hotkey gefunden",
+        "searchHotkeys": "Hotkeys durchsuchen",
+        "clearSearch": "Suche leeren"
     },
     "modelManager": {
         "modelAdded": "Model hinzugefügt",
@@ -701,7 +735,8 @@
         "invokeProgressBar": "Invoke Fortschrittsanzeige",
         "mode": "Modus",
         "resetUI": "$t(accessibility.reset) von UI",
-        "createIssue": "Ticket erstellen"
+        "createIssue": "Ticket erstellen",
+        "about": "Über"
     },
     "boards": {
         "autoAddBoard": "Automatisches Hinzufügen zum Ordner",
@@ -809,7 +844,14 @@
         "canny": "Canny",
         "hedDescription": "Ganzheitlich verschachtelte Kantenerkennung",
         "scribble": "Scribble",
-        "maxFaces": "Maximal Anzahl Gesichter"
+        "maxFaces": "Maximal Anzahl Gesichter",
+        "resizeSimple": "Größe ändern (einfach)",
+        "large": "Groß",
+        "modelSize": "Modell Größe",
+        "small": "Klein",
+        "base": "Basis",
+        "depthAnything": "Depth Anything",
+        "depthAnythingDescription": "Erstellung einer Tiefenkarte mit der Depth Anything-Technik"
     },
     "queue": {
         "status": "Status",
@@ -842,7 +884,7 @@
         "item": "Auftrag",
         "notReady": "Warteschlange noch nicht bereit",
         "batchValues": "Stapel Werte",
-        "queueCountPrediction": "{{predicted}} zur Warteschlange hinzufügen",
+        "queueCountPrediction": "{{promptsCount}} Prompts × {{iterations}} Iterationen -> {{count}} Generationen",
         "queuedCount": "{{pending}} wartenden Elemente",
         "clearQueueAlertDialog": "Die Warteschlange leeren, stoppt den aktuellen Prozess und leert die Warteschlange komplett.",
         "completedIn": "Fertig in",
@@ -864,7 +906,9 @@
         "back": "Hinten",
         "resumeSucceeded": "Prozessor wieder aufgenommen",
         "resumeTooltip": "Prozessor wieder aufnehmen",
-        "time": "Zeit"
+        "time": "Zeit",
+        "batchQueuedDesc_one": "{{count}} Eintrage ans {{direction}} der Wartschlange hinzugefügt",
+        "batchQueuedDesc_other": "{{count}} Einträge ans {{direction}} der Wartschlange hinzugefügt"
     },
     "metadata": {
         "negativePrompt": "Negativ Beschreibung",
@@ -933,7 +977,8 @@
         "enable": "Aktivieren",
         "clear": "Leeren",
         "maxCacheSize": "Maximale Cache Größe",
-        "cacheSize": "Cache Größe"
+        "cacheSize": "Cache Größe",
+        "useCache": "Benutze Cache"
     },
     "embedding": {
         "noMatchingEmbedding": "Keine passenden Embeddings",
@@ -999,5 +1044,28 @@
         "selectLoRA": "Wählen ein LoRA aus",
         "esrganModel": "ESRGAN Modell",
         "addLora": "LoRA hinzufügen"
+    },
+    "accordions": {
+        "generation": {
+            "title": "Erstellung",
+            "modelTab": "Modell",
+            "conceptsTab": "Konzepte"
+        },
+        "image": {
+            "title": "Bild"
+        },
+        "advanced": {
+            "title": "Erweitert"
+        },
+        "control": {
+            "title": "Kontrolle",
+            "controlAdaptersTab": "Kontroll Adapter",
+            "ipTab": "Bild Beschreibung"
+        },
+        "compositing": {
+            "coherenceTab": "Kohärenzpass",
+            "infillTab": "Füllung",
+            "title": "Compositing"
+        }
     }
 }

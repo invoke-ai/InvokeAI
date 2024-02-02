@@ -1,5 +1,5 @@
 /* eslint-disable i18next/no-literal-string */
-import { Image, Text, Tooltip } from '@invoke-ai/ui';
+import { Image, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $logo } from 'app/store/nanostores/logo';
 import InvokeLogoYellow from 'public/assets/images/invoke-symbol-ylw-lrg.svg';

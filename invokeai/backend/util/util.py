@@ -286,7 +286,7 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
     open_mode = "wb"
     exist_size = 0
 
-    resp = requests.get(url, header, stream=True)
+    resp = requests.get(url, headers=header, stream=True, allow_redirects=True)
     content_length = int(resp.headers.get("content-length", 0))
 
     if dest.is_dir():

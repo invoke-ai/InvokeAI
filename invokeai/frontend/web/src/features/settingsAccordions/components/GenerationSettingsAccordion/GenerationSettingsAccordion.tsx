@@ -1,4 +1,4 @@
-import type { FormLabelProps } from '@invoke-ai/ui';
+import type { FormLabelProps } from '@invoke-ai/ui-library';
 import {
   Expander,
   Flex,
@@ -9,7 +9,7 @@ import {
   TabPanel,
   TabPanels,
   Tabs,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { LoRAList } from 'features/lora/components/LoRAList';
@@ -23,7 +23,7 @@ import ParamMainModelSelect from 'features/parameters/components/MainModel/Param
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import { size } from 'lodash-es';
+import { filter, size } from 'lodash-es';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -31,34 +31,29 @@ const formLabelProps: FormLabelProps = {
   minW: '4rem',
 };
 
-const badgesSelector = createMemoizedSelector(
-  selectLoraSlice,
-  selectGenerationSlice,
-  (lora, generation) => {
-    const loraTabBadges = size(lora.loras) ? [size(lora.loras)] : [];
-    const accordionBadges: (string | number)[] = [];
-    if (generation.model) {
-      accordionBadges.push(generation.model.model_name);
-      accordionBadges.push(generation.model.base_model);
-    }
-
-    return { loraTabBadges, accordionBadges };
+const badgesSelector = createMemoizedSelector(selectLoraSlice, selectGenerationSlice, (lora, generation) => {
+  const enabledLoRAsCount = filter(lora.loras, (l) => !!l.isEnabled).length;
+  const loraTabBadges = size(lora.loras) ? [enabledLoRAsCount] : [];
+  const accordionBadges: (string | number)[] = [];
+  if (generation.model) {
+    accordionBadges.push(generation.model.model_name);
+    accordionBadges.push(generation.model.base_model);
   }
-);
+
+  return { loraTabBadges, accordionBadges };
+});
 
 export const GenerationSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const { loraTabBadges, accordionBadges } = useAppSelector(badgesSelector);
-  const { isOpen: isOpenExpander, onToggle: onToggleExpander } =
-    useExpanderToggle({
-      id: 'generation-settings-advanced',
-      defaultIsOpen: false,
-    });
-  const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } =
-    useStandaloneAccordionToggle({
-      id: 'generation-settings',
-      defaultIsOpen: true,
-    });
+  const { isOpen: isOpenExpander, onToggle: onToggleExpander } = useExpanderToggle({
+    id: 'generation-settings-advanced',
+    defaultIsOpen: false,
+  });
+  const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } = useStandaloneAccordionToggle({
+    id: 'generation-settings',
+    defaultIsOpen: true,
+  });
 
   return (
     <StandaloneAccordion
@@ -70,9 +65,7 @@ export const GenerationSettingsAccordion = memo(() => {
       <Tabs variant="collapse">
         <TabList>
           <Tab>{t('accordions.generation.modelTab')}</Tab>
-          <Tab badges={loraTabBadges}>
-            {t('accordions.generation.conceptsTab')}
-          </Tab>
+          <Tab badges={loraTabBadges}>{t('accordions.generation.conceptsTab')}</Tab>
         </TabList>
         <TabPanels>
           <TabPanel overflow="visible" px={4} pt={4}>

@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, Flex } from '@invoke-ai/ui';
+import { Button, ButtonGroup, Flex } from '@invoke-ai/ui-library';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -17,27 +17,16 @@ const ImportModelsPanel = () => {
   return (
     <Flex flexDirection="column" gap={4} h="full">
       <ButtonGroup>
-        <Button
-          onClick={handleClickAddTab}
-          isChecked={addModelTab == 'add'}
-          size="sm"
-          width="100%"
-        >
+        <Button onClick={handleClickAddTab} isChecked={addModelTab === 'add'} size="sm" width="100%">
           {t('modelManager.addModel')}
         </Button>
-        <Button
-          onClick={handleClickScanTab}
-          isChecked={addModelTab == 'scan'}
-          size="sm"
-          width="100%"
-          isDisabled
-        >
+        <Button onClick={handleClickScanTab} isChecked={addModelTab === 'scan'} size="sm" width="100%" isDisabled>
           {t('modelManager.scanForModels')}
         </Button>
       </ButtonGroup>
 
-      {addModelTab == 'add' && <AddModels />}
-      {addModelTab == 'scan' && <ScanModels />}
+      {addModelTab === 'add' && <AddModels />}
+      {addModelTab === 'scan' && <ScanModels />}
     </Flex>
   );
 };

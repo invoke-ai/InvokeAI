@@ -1,13 +1,5 @@
-import type { ChakraProps } from '@invoke-ai/ui';
-import {
-  Flex,
-  FormControl,
-  FormLabel,
-  ListItem,
-  OrderedList,
-  Spinner,
-  Text,
-} from '@invoke-ai/ui';
+import type { ChakraProps } from '@invoke-ai/ui-library';
+import { Flex, FormControl, FormLabel, ListItem, OrderedList, Spinner, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
@@ -18,10 +10,7 @@ import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiWarningCircleBold } from 'react-icons/pi';
 
-const selectPrompts = createMemoizedSelector(
-  selectDynamicPromptsSlice,
-  (dynamicPrompts) => dynamicPrompts.prompts
-);
+const selectPrompts = createMemoizedSelector(selectDynamicPromptsSlice, (dynamicPrompts) => dynamicPrompts.prompts);
 
 const listItemStyles: ChakraProps['sx'] = {
   '&::marker': { color: 'base.500' },
@@ -44,43 +33,22 @@ const ParamDynamicPromptsPreview = () => {
 
   if (isError) {
     return (
-      <Flex
-        w="full"
-        h="full"
-        layerStyle="second"
-        alignItems="center"
-        justifyContent="center"
-        p={8}
-      >
-        <IAINoContentFallback
-          icon={PiWarningCircleBold}
-          label="Problem generating prompts"
-        />
+      <Flex w="full" h="full" layerStyle="second" alignItems="center" justifyContent="center" p={8}>
+        <IAINoContentFallback icon={PiWarningCircleBold} label="Problem generating prompts" />
       </Flex>
     );
   }
 
   return (
-    <FormControl orientation="vertical" w="full" h="full">
+    <FormControl orientation="vertical" w="full" h="full" isInvalid={Boolean(parsingError || isError)}>
       <InformationalPopover feature="dynamicPrompts" inPortal={false}>
         <FormLabel>{label}</FormLabel>
       </InformationalPopover>
-      <Flex
-        w="full"
-        h="full"
-        pos="relative"
-        layerStyle="first"
-        p={4}
-        borderRadius="base"
-      >
+      <Flex w="full" h="full" pos="relative" layerStyle="first" p={4} borderRadius="base">
         <ScrollableContent>
           <OrderedList stylePosition="inside" ms={0}>
             {prompts.map((prompt, i) => (
-              <ListItem
-                fontSize="sm"
-                key={`${prompt}.${i}`}
-                sx={listItemStyles}
-              >
+              <ListItem fontSize="sm" key={`${prompt}.${i}`} sx={listItemStyles}>
                 <Text as="span">{prompt}</Text>
               </ListItem>
             ))}

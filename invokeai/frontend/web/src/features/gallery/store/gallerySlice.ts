@@ -41,10 +41,7 @@ export const gallerySlice = createSlice({
     autoAssignBoardOnClickChanged: (state, action: PayloadAction<boolean>) => {
       state.autoAssignBoardOnClick = action.payload;
     },
-    boardIdSelected: (
-      state,
-      action: PayloadAction<{ boardId: BoardId; selectedImageName?: string }>
-    ) => {
+    boardIdSelected: (state, action: PayloadAction<{ boardId: BoardId; selectedImageName?: string }>) => {
       state.selectedBoardId = action.payload.boardId;
       state.galleryView = 'images';
       state.offset = 0;
@@ -86,19 +83,16 @@ export const gallerySlice = createSlice({
         state.autoAddBoardId = 'none';
       }
     });
-    builder.addMatcher(
-      boardsApi.endpoints.listAllBoards.matchFulfilled,
-      (state, action) => {
-        const boards = action.payload;
-        if (!state.autoAddBoardId) {
-          return;
-        }
-
-        if (!boards.map((b) => b.board_id).includes(state.autoAddBoardId)) {
-          state.autoAddBoardId = 'none';
-        }
+    builder.addMatcher(boardsApi.endpoints.listAllBoards.matchFulfilled, (state, action) => {
+      const boards = action.payload;
+      if (!state.autoAddBoardId) {
+        return;
       }
-    );
+
+      if (!boards.map((b) => b.board_id).includes(state.autoAddBoardId)) {
+        state.autoAddBoardId = 'none';
+      }
+    });
   },
 });
 

@@ -1,11 +1,4 @@
-import {
-  ButtonGroup,
-  Flex,
-  IconButton,
-  Menu,
-  MenuButton,
-  MenuList,
-} from '@invoke-ai/ui';
+import { ButtonGroup, Flex, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppToaster } from 'app/components/Toaster';
@@ -23,15 +16,13 @@ import { initialImageSelected } from 'features/parameters/store/actions';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
-import {
-  setShouldShowImageDetails,
-  setShouldShowProgressInViewer,
-} from 'features/ui/store/uiSlice';
+import { setShouldShowImageDetails, setShouldShowProgressInViewer } from 'features/ui/store/uiSlice';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
+  PiArrowsCounterClockwiseBold,
   PiAsteriskBold,
   PiDotsThreeOutlineFill,
   PiFlowArrowBold,
@@ -57,39 +48,23 @@ const selectShouldDisableToolbarButtons = createSelector(
 const CurrentImageButtons = () => {
   const dispatch = useAppDispatch();
   const isConnected = useAppSelector((s) => s.system.isConnected);
-  const shouldShowImageDetails = useAppSelector(
-    (s) => s.ui.shouldShowImageDetails
-  );
-  const shouldShowProgressInViewer = useAppSelector(
-    (s) => s.ui.shouldShowProgressInViewer
-  );
+  const shouldShowImageDetails = useAppSelector((s) => s.ui.shouldShowImageDetails);
+  const shouldShowProgressInViewer = useAppSelector((s) => s.ui.shouldShowProgressInViewer);
   const lastSelectedImage = useAppSelector(selectLastSelectedImage);
-  const shouldDisableToolbarButtons = useAppSelector(
-    selectShouldDisableToolbarButtons
-  );
+  const shouldDisableToolbarButtons = useAppSelector(selectShouldDisableToolbarButtons);
 
   const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
   const isQueueMutationInProgress = useIsQueueMutationInProgress();
   const toaster = useAppToaster();
   const { t } = useTranslation();
 
-  const {
-    recallBothPrompts,
-    recallSeed,
-    recallWidthAndHeight,
-    recallAllParameters,
-  } = useRecallParameters();
+  const { recallBothPrompts, recallSeed, recallWidthAndHeight, recallAllParameters } = useRecallParameters();
 
-  const { currentData: imageDTO } = useGetImageDTOQuery(
-    lastSelectedImage?.image_name ?? skipToken
-  );
+  const { currentData: imageDTO } = useGetImageDTOQuery(lastSelectedImage?.image_name ?? skipToken);
 
-  const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(
-    lastSelectedImage?.image_name
-  );
+  const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(lastSelectedImage?.image_name);
 
-  const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } =
-    useGetAndLoadEmbeddedWorkflow({});
+  const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } = useGetAndLoadEmbeddedWorkflow({});
 
   const handleLoadWorkflow = useCallback(() => {
     if (!lastSelectedImage || !lastSelectedImage.has_workflow) {
@@ -129,6 +104,16 @@ const CurrentImageButtons = () => {
 
   useHotkeys('p', handleUsePrompt, [metadata]);
 
+  const handleRemixImage = useCallback(() => {
+    // Recalls all metadata parameters except seed
+    recallAllParameters({
+      ...metadata,
+      seed: undefined,
+    });
+  }, [metadata, recallAllParameters]);
+
+  useHotkeys('r', handleRemixImage, [metadata]);
+
   const handleUseSize = useCallback(() => {
     recallWidthAndHeight(metadata?.width, metadata?.height);
   }, [metadata?.width, metadata?.height, recallWidthAndHeight]);
@@ -162,10 +147,7 @@ const CurrentImageButtons = () => {
       handleClickUpscale();
     },
     {
-      enabled: () =>
-        Boolean(
-          isUpscalingEnabled && !shouldDisableToolbarButtons && isConnected
-        ),
+      enabled: () => Boolean(isUpscalingEnabled && !shouldDisableToolbarButtons && isConnected),
     },
     [isUpscalingEnabled, imageDTO, shouldDisableToolbarButtons, isConnected]
   );
@@ -216,9 +198,7 @@ const CurrentImageButtons = () => {
               isDisabled={!imageDTO}
               icon={<PiDotsThreeOutlineFill />}
             />
-            <MenuList>
-              {imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}
-            </MenuList>
+            <MenuList>{imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}</MenuList>
           </Menu>
         </ButtonGroup>
 
@@ -230,6 +210,14 @@ const CurrentImageButtons = () => {
             isDisabled={!imageDTO?.has_workflow}
             onClick={handleLoadWorkflow}
             isLoading={getAndLoadEmbeddedWorkflowResult.isLoading}
+          />
+          <IconButton
+            isLoading={isLoadingMetadata}
+            icon={<PiArrowsCounterClockwiseBold />}
+            tooltip={`${t('parameters.remixImage')} (R)`}
+            aria-label={`${t('parameters.remixImage')} (R)`}
+            isDisabled={!metadata?.positive_prompt}
+            onClick={handleRemixImage}
           />
           <IconButton
             isLoading={isLoadingMetadata}

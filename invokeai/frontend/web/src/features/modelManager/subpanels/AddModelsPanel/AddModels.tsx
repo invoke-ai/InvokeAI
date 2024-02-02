@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, Flex } from '@invoke-ai/ui';
+import { Button, ButtonGroup, Flex } from '@invoke-ai/ui-library';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -7,35 +7,16 @@ import SimpleAddModels from './SimpleAddModels';
 
 const AddModels = () => {
   const { t } = useTranslation();
-  const [addModelMode, setAddModelMode] = useState<'simple' | 'advanced'>(
-    'simple'
-  );
+  const [addModelMode, setAddModelMode] = useState<'simple' | 'advanced'>('simple');
   const handleAddModelSimple = useCallback(() => setAddModelMode('simple'), []);
-  const handleAddModelAdvanced = useCallback(
-    () => setAddModelMode('advanced'),
-    []
-  );
+  const handleAddModelAdvanced = useCallback(() => setAddModelMode('advanced'), []);
   return (
-    <Flex
-      flexDirection="column"
-      width="100%"
-      overflow="scroll"
-      maxHeight={window.innerHeight - 250}
-      gap={4}
-    >
+    <Flex flexDirection="column" width="100%" overflow="scroll" maxHeight={window.innerHeight - 250} gap={4}>
       <ButtonGroup>
-        <Button
-          size="sm"
-          isChecked={addModelMode == 'simple'}
-          onClick={handleAddModelSimple}
-        >
+        <Button size="sm" isChecked={addModelMode === 'simple'} onClick={handleAddModelSimple}>
           {t('common.simple')}
         </Button>
-        <Button
-          size="sm"
-          isChecked={addModelMode == 'advanced'}
-          onClick={handleAddModelAdvanced}
-        >
+        <Button size="sm" isChecked={addModelMode === 'advanced'} onClick={handleAddModelAdvanced}>
           {t('common.advanced')}
         </Button>
       </ButtonGroup>

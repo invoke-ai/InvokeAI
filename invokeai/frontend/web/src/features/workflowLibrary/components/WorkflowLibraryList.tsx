@@ -1,5 +1,4 @@
-import { CloseIcon } from '@chakra-ui/icons';
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import {
   Button,
   ButtonGroup,
@@ -12,12 +11,11 @@ import {
   Input,
   InputGroup,
   InputRightElement,
-  Spacer,
-} from '@invoke-ai/ui';
-import {
-  IAINoContentFallback,
-  IAINoContentFallbackWithSpinner,
-} from 'common/components/IAIImageFallback';
+} from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
+import { $projectId } from 'app/store/nanostores/projectId';
+import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
+import { IAINoContentFallback, IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import WorkflowLibraryListItem from 'features/workflowLibrary/components/WorkflowLibraryListItem';
@@ -25,11 +23,9 @@ import WorkflowLibraryPagination from 'features/workflowLibrary/components/Workf
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiXBold } from 'react-icons/pi';
 import { useListWorkflowsQuery } from 'services/api/endpoints/workflows';
-import type {
-  SQLiteDirection,
-  WorkflowRecordOrderBy,
-} from 'services/api/types';
+import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
 import { z } from 'zod';
 
@@ -47,8 +43,7 @@ const ORDER_BY_OPTIONS: ComboboxOption[] = [
 
 const zDirection = z.enum(['ASC', 'DESC']);
 type Direction = z.infer<typeof zDirection>;
-const isDirection = (v: unknown): v is Direction =>
-  zDirection.safeParse(v).success;
+const isDirection = (v: unknown): v is Direction => zDirection.safeParse(v).success;
 const DIRECTION_OPTIONS: ComboboxOption[] = [
   { value: 'ASC', label: 'Ascending' },
   { value: 'DESC', label: 'Descending' },
@@ -56,21 +51,28 @@ const DIRECTION_OPTIONS: ComboboxOption[] = [
 
 const WorkflowLibraryList = () => {
   const { t } = useTranslation();
-  const [category, setCategory] = useState<WorkflowCategory>('user');
+  const workflowCategories = useStore($workflowCategories);
+  const [selectedCategory, setSelectedCategory] = useState<WorkflowCategory>('user');
   const [page, setPage] = useState(0);
   const [query, setQuery] = useState('');
-  const [order_by, setOrderBy] = useState<WorkflowRecordOrderBy>('opened_at');
+  const projectId = useStore($projectId);
+
+  const orderByOptions = useMemo(() => {
+    return projectId ? ORDER_BY_OPTIONS.filter((option) => option.value !== 'opened_at') : ORDER_BY_OPTIONS;
+  }, [projectId]);
+
+  const [order_by, setOrderBy] = useState<WorkflowRecordOrderBy>(orderByOptions[0]?.value as WorkflowRecordOrderBy);
   const [direction, setDirection] = useState<SQLiteDirection>('ASC');
   const [debouncedQuery] = useDebounce(query, 500);
 
   const queryArg = useMemo<Parameters<typeof useListWorkflowsQuery>[0]>(() => {
-    if (category === 'user') {
+    if (selectedCategory !== 'default') {
       return {
         page,
         per_page: PER_PAGE,
         order_by,
         direction,
-        category,
+        category: selectedCategory,
         query: debouncedQuery,
       };
     }
@@ -79,13 +81,12 @@ const WorkflowLibraryList = () => {
       per_page: PER_PAGE,
       order_by: 'name' as const,
       direction: 'ASC' as const,
-      category,
+      category: selectedCategory,
       query: debouncedQuery,
     };
-  }, [category, debouncedQuery, direction, order_by, page]);
+  }, [selectedCategory, debouncedQuery, direction, order_by, page]);
 
-  const { data, isLoading, isError, isFetching } =
-    useListWorkflowsQuery(queryArg);
+  const { data, isLoading, isError, isFetching } = useListWorkflowsQuery(queryArg);
 
   const onChangeOrderBy = useCallback<ComboboxOnChange>(
     (v) => {
@@ -97,10 +98,7 @@ const WorkflowLibraryList = () => {
     },
     [order_by]
   );
-  const valueOrderBy = useMemo(
-    () => ORDER_BY_OPTIONS.find((o) => o.value === order_by),
-    [order_by]
-  );
+  const valueOrderBy = useMemo(() => orderByOptions.find((o) => o.value === order_by), [order_by, orderByOptions]);
 
   const onChangeDirection = useCallback<ComboboxOnChange>(
     (v) => {
@@ -112,10 +110,7 @@ const WorkflowLibraryList = () => {
     },
     [direction]
   );
-  const valueDirection = useMemo(
-    () => DIRECTION_OPTIONS.find((o) => o.value === direction),
-    [direction]
-  );
+  const valueDirection = useMemo(() => DIRECTION_OPTIONS.find((o) => o.value === direction), [direction]);
 
   const resetFilterText = useCallback(() => {
     setQuery('');
@@ -134,65 +129,60 @@ const WorkflowLibraryList = () => {
     [resetFilterText]
   );
 
-  const handleChangeFilterText = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      setQuery(e.target.value);
-      setPage(0);
-    },
-    []
-  );
-
-  const handleSetUserCategory = useCallback(() => {
-    setCategory('user');
+  const handleChangeFilterText = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setQuery(e.target.value);
     setPage(0);
   }, []);
 
-  const handleSetDefaultCategory = useCallback(() => {
-    setCategory('default');
+  const handleSetCategory = useCallback((category: WorkflowCategory) => {
+    setSelectedCategory(category);
     setPage(0);
   }, []);
 
   return (
     <>
-      <Flex gap={4} alignItems="center" h={10} flexShrink={0} flexGrow={0}>
-        <ButtonGroup>
-          <Button
-            variant={category === 'user' ? undefined : 'ghost'}
-            onClick={handleSetUserCategory}
-            isChecked={category === 'user'}
-          >
-            {t('workflows.userWorkflows')}
-          </Button>
-          <Button
-            variant={category === 'default' ? undefined : 'ghost'}
-            onClick={handleSetDefaultCategory}
-            isChecked={category === 'default'}
-          >
-            {t('workflows.defaultWorkflows')}
-          </Button>
+      <Flex gap={4} alignItems="center" h={16} flexShrink={0} flexGrow={0} justifyContent="space-between">
+        <ButtonGroup alignSelf="flex-end">
+          {workflowCategories.map((category) => (
+            <Button
+              key={category}
+              variant={selectedCategory === category ? undefined : 'ghost'}
+              onClick={handleSetCategory.bind(null, category)}
+              isChecked={selectedCategory === category}
+            >
+              {t(`workflows.${category}Workflows`)}
+            </Button>
+          ))}
         </ButtonGroup>
-        <Spacer />
-        {category === 'user' && (
+        {selectedCategory !== 'default' && (
           <>
-            <FormControl isDisabled={isFetching} w={64} minW={56}>
+            <FormControl
+              isDisabled={isFetching}
+              sx={{
+                flexDir: 'column',
+                alignItems: 'flex-start',
+                gap: 1,
+                maxW: 56,
+              }}
+            >
               <FormLabel>{t('common.orderBy')}</FormLabel>
-              <Combobox
-                value={valueOrderBy}
-                options={ORDER_BY_OPTIONS}
-                onChange={onChangeOrderBy}
-              />
+              <Combobox value={valueOrderBy} options={orderByOptions} onChange={onChangeOrderBy} />
             </FormControl>
-            <FormControl isDisabled={isFetching} w={64} minW={56}>
+            <FormControl
+              isDisabled={isFetching}
+              sx={{
+                flexDir: 'column',
+                alignItems: 'flex-start',
+                gap: 1,
+                maxW: 56,
+              }}
+            >
               <FormLabel>{t('common.direction')}</FormLabel>
-              <Combobox
-                value={valueDirection}
-                options={DIRECTION_OPTIONS}
-                onChange={onChangeDirection}
-              />
+              <Combobox value={valueDirection} options={DIRECTION_OPTIONS} onChange={onChangeDirection} />
             </FormControl>
           </>
         )}
-        <InputGroup w="20rem">
+        <InputGroup w="20rem" alignSelf="flex-end">
           <Input
             placeholder={t('workflows.searchWorkflows')}
             value={query}
@@ -202,14 +192,13 @@ const WorkflowLibraryList = () => {
             minW={64}
           />
           {query.trim().length && (
-            <InputRightElement>
+            <InputRightElement h="full" pe={2}>
               <IconButton
                 onClick={resetFilterText}
-                size="xs"
-                variant="ghost"
+                size="sm"
+                variant="link"
                 aria-label={t('workflows.clearWorkflowSearchFilter')}
-                opacity={0.5}
-                icon={<CloseIcon boxSize={2} />}
+                icon={<PiXBold />}
               />
             </InputRightElement>
           )}
@@ -229,16 +218,12 @@ const WorkflowLibraryList = () => {
           </Flex>
         </ScrollableContent>
       ) : (
-        <IAINoContentFallback label={t('workflows.noUserWorkflows')} />
+        <IAINoContentFallback label={t('workflows.noWorkflows')} />
       )}
       <Divider />
       {data && (
         <Flex w="full" justifyContent="space-around">
-          <WorkflowLibraryPagination
-            data={data}
-            page={page}
-            setPage={setPage}
-          />
+          <WorkflowLibraryPagination data={data} page={page} setPage={setPage} />
         </Flex>
       )}
     </>

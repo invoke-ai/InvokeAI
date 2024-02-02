@@ -1,4 +1,4 @@
-import { FormControl, FormLabel, Switch } from '@invoke-ai/ui';
+import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setSeamlessYAxis } from 'features/parameters/store/generationSlice';
 import type { ChangeEvent } from 'react';

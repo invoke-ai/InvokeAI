@@ -7,7 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
   useDisclosure,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useIsAllowedToUpscale } from 'features/parameters/hooks/useIsAllowedToUpscale';

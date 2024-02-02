@@ -1,9 +1,4 @@
-import {
-  CompositeNumberInput,
-  CompositeSlider,
-  FormControl,
-  FormLabel,
-} from '@invoke-ai/ui';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setClipSkip } from 'features/parameters/store/generationSlice';
@@ -15,9 +10,7 @@ const ParamClipSkip = () => {
   const clipSkip = useAppSelector((s) => s.generation.clipSkip);
   const initial = useAppSelector((s) => s.config.sd.clipSkip.initial);
   const sliderMin = useAppSelector((s) => s.config.sd.clipSkip.sliderMin);
-  const numberInputMin = useAppSelector(
-    (s) => s.config.sd.clipSkip.numberInputMin
-  );
+  const numberInputMin = useAppSelector((s) => s.config.sd.clipSkip.numberInputMin);
   const coarseStep = useAppSelector((s) => s.config.sd.clipSkip.coarseStep);
   const fineStep = useAppSelector((s) => s.config.sd.clipSkip.fineStep);
   const { model } = useAppSelector((s) => s.generation);

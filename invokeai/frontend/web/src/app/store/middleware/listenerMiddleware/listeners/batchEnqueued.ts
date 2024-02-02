@@ -1,4 +1,4 @@
-import { createStandaloneToast, theme, TOAST_OPTIONS } from '@invoke-ai/ui';
+import { createStandaloneToast, theme, TOAST_OPTIONS } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { zPydanticValidationError } from 'features/system/store/zodSchemas';
@@ -20,10 +20,7 @@ export const addBatchEnqueuedListener = () => {
     effect: async (action) => {
       const response = action.payload;
       const arg = action.meta.arg.originalArgs;
-      logger('queue').debug(
-        { enqueueResult: parseify(response) },
-        'Batch enqueued'
-      );
+      logger('queue').debug({ enqueueResult: parseify(response) }, 'Batch enqueued');
 
       if (!toast.isActive('batch-queued')) {
         toast({
@@ -53,10 +50,7 @@ export const addBatchEnqueuedListener = () => {
           status: 'error',
           description: 'Unknown Error',
         });
-        logger('queue').error(
-          { batchConfig: parseify(arg), error: parseify(response) },
-          t('queue.batchFailedToQueue')
-        );
+        logger('queue').error({ batchConfig: parseify(arg), error: parseify(response) }, t('queue.batchFailedToQueue'));
         return;
       }
 
@@ -81,10 +75,7 @@ export const addBatchEnqueuedListener = () => {
           status: 'error',
         });
       }
-      logger('queue').error(
-        { batchConfig: parseify(arg), error: parseify(response) },
-        t('queue.batchFailedToQueue')
-      );
+      logger('queue').error({ batchConfig: parseify(arg), error: parseify(response) }, t('queue.batchFailedToQueue'));
     },
   });
 };

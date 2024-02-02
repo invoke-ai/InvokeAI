@@ -1,17 +1,10 @@
 import type { ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
-import {
-  autoBatchEnhancer,
-  combineReducers,
-  configureStore,
-} from '@reduxjs/toolkit';
+import { autoBatchEnhancer, combineReducers, configureStore } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { idbKeyValDriver } from 'app/store/enhancers/reduxRemember/driver';
 import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
 import { canvasPersistDenylist } from 'features/canvas/store/canvasPersistDenylist';
-import canvasReducer, {
-  initialCanvasState,
-  migrateCanvasState,
-} from 'features/canvas/store/canvasSlice';
+import canvasReducer, { initialCanvasState, migrateCanvasState } from 'features/canvas/store/canvasSlice';
 import changeBoardModalReducer from 'features/changeBoardModal/store/slice';
 import { controlAdaptersPersistDenylist } from 'features/controlAdapters/store/controlAdaptersPersistDenylist';
 import controlAdaptersReducer, {
@@ -25,32 +18,17 @@ import dynamicPromptsReducer, {
   migrateDynamicPromptsState,
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { galleryPersistDenylist } from 'features/gallery/store/galleryPersistDenylist';
-import galleryReducer, {
-  initialGalleryState,
-  migrateGalleryState,
-} from 'features/gallery/store/gallerySlice';
-import hrfReducer, {
-  initialHRFState,
-  migrateHRFState,
-} from 'features/hrf/store/hrfSlice';
-import loraReducer, {
-  initialLoraState,
-  migrateLoRAState,
-} from 'features/lora/store/loraSlice';
+import galleryReducer, { initialGalleryState, migrateGalleryState } from 'features/gallery/store/gallerySlice';
+import hrfReducer, { initialHRFState, migrateHRFState } from 'features/hrf/store/hrfSlice';
+import loraReducer, { initialLoraState, migrateLoRAState } from 'features/lora/store/loraSlice';
 import modelmanagerReducer, {
   initialModelManagerState,
   migrateModelManagerState,
 } from 'features/modelManager/store/modelManagerSlice';
 import { nodesPersistDenylist } from 'features/nodes/store/nodesPersistDenylist';
-import nodesReducer, {
-  initialNodesState,
-  migrateNodesState,
-} from 'features/nodes/store/nodesSlice';
+import nodesReducer, { initialNodesState, migrateNodesState } from 'features/nodes/store/nodesSlice';
 import nodeTemplatesReducer from 'features/nodes/store/nodeTemplatesSlice';
-import workflowReducer, {
-  initialWorkflowState,
-  migrateWorkflowState,
-} from 'features/nodes/store/workflowSlice';
+import workflowReducer, { initialWorkflowState, migrateWorkflowState } from 'features/nodes/store/workflowSlice';
 import { generationPersistDenylist } from 'features/parameters/store/generationPersistDenylist';
 import generationReducer, {
   initialGenerationState,
@@ -62,21 +40,12 @@ import postprocessingReducer, {
   migratePostprocessingState,
 } from 'features/parameters/store/postprocessingSlice';
 import queueReducer from 'features/queue/store/queueSlice';
-import sdxlReducer, {
-  initialSDXLState,
-  migrateSDXLState,
-} from 'features/sdxl/store/sdxlSlice';
+import sdxlReducer, { initialSDXLState, migrateSDXLState } from 'features/sdxl/store/sdxlSlice';
 import configReducer from 'features/system/store/configSlice';
 import { systemPersistDenylist } from 'features/system/store/systemPersistDenylist';
-import systemReducer, {
-  initialSystemState,
-  migrateSystemState,
-} from 'features/system/store/systemSlice';
+import systemReducer, { initialSystemState, migrateSystemState } from 'features/system/store/systemSlice';
 import { uiPersistDenylist } from 'features/ui/store/uiPersistDenylist';
-import uiReducer, {
-  initialUIState,
-  migrateUIState,
-} from 'features/ui/store/uiSlice';
+import uiReducer, { initialUIState, migrateUIState } from 'features/ui/store/uiSlice';
 import { diff } from 'jsondiffpatch';
 import { defaultsDeep, keys, omit, pick } from 'lodash-es';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
@@ -206,10 +175,7 @@ const unserialize: UnserializeFunction = (data, key) => {
     );
     return transformed;
   } catch (err) {
-    log.warn(
-      { error: serializeError(err) },
-      `Error rehydrating slice "${key}", falling back to default initial state`
-    );
+    log.warn({ error: serializeError(err) }, `Error rehydrating slice "${key}", falling back to default initial state`);
     return config.initialState;
   }
 };
@@ -229,10 +195,7 @@ const serializationDenylist: {
 };
 
 export const serialize: SerializeFunction = (data, key) => {
-  const result = omit(
-    data,
-    serializationDenylist[key as keyof typeof serializationDenylist] ?? []
-  );
+  const result = omit(data, serializationDenylist[key as keyof typeof serializationDenylist] ?? []);
   return JSON.stringify(result);
 };
 
@@ -256,9 +219,7 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
             persistDebounce: 300,
             serialize,
             unserialize,
-            prefix: uniqueStoreKey
-              ? `${STORAGE_PREFIX}${uniqueStoreKey}-`
-              : STORAGE_PREFIX,
+            prefix: uniqueStoreKey ? `${STORAGE_PREFIX}${uniqueStoreKey}-` : STORAGE_PREFIX,
             errorHandler,
           })
         );
@@ -278,9 +239,7 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
     },
   });
 
-export type AppGetState = ReturnType<
-  ReturnType<typeof createStore>['getState']
->;
+export type AppGetState = ReturnType<ReturnType<typeof createStore>['getState']>;
 export type RootState = ReturnType<ReturnType<typeof createStore>['getState']>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AppThunkDispatch = ThunkDispatch<RootState, any, UnknownAction>;

@@ -1,13 +1,5 @@
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
-import {
-  Box,
-  Combobox,
-  Flex,
-  FormControl,
-  FormLabel,
-  IconButton,
-  Text,
-} from '@invoke-ai/ui';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { Box, Combobox, Flex, FormControl, FormLabel, IconButton, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
@@ -20,9 +12,7 @@ import type { ManualAddMode } from './AdvancedAddModels';
 import { isManualAddMode } from './AdvancedAddModels';
 
 const ScanAdvancedAddModels = () => {
-  const advancedAddScanModel = useAppSelector(
-    (s) => s.modelmanager.advancedAddScanModel
-  );
+  const advancedAddScanModel = useAppSelector((s) => s.modelmanager.advancedAddScanModel);
 
   const { t } = useTranslation();
 
@@ -34,26 +24,19 @@ const ScanAdvancedAddModels = () => {
     [t]
   );
 
-  const [advancedAddMode, setAdvancedAddMode] =
-    useState<ManualAddMode>('diffusers');
+  const [advancedAddMode, setAdvancedAddMode] = useState<ManualAddMode>('diffusers');
 
   const [isCheckpoint, setIsCheckpoint] = useState<boolean>(true);
 
   useEffect(() => {
-    advancedAddScanModel &&
-    ['.ckpt', '.safetensors', '.pth', '.pt'].some((ext) =>
-      advancedAddScanModel.endsWith(ext)
-    )
+    advancedAddScanModel && ['.ckpt', '.safetensors', '.pth', '.pt'].some((ext) => advancedAddScanModel.endsWith(ext))
       ? setAdvancedAddMode('checkpoint')
       : setAdvancedAddMode('diffusers');
   }, [advancedAddScanModel, setAdvancedAddMode, isCheckpoint]);
 
   const dispatch = useAppDispatch();
 
-  const handleClickSetAdvanced = useCallback(
-    () => dispatch(setAdvancedAddScanModel(null)),
-    [dispatch]
-  );
+  const handleClickSetAdvanced = useCallback(() => dispatch(setAdvancedAddScanModel(null)), [dispatch]);
 
   const handleChangeAddMode = useCallback<ComboboxOnChange>((v) => {
     if (!isManualAddMode(v?.value)) {
@@ -67,10 +50,7 @@ const ScanAdvancedAddModels = () => {
     }
   }, []);
 
-  const value = useMemo(
-    () => options.find((o) => o.value === advancedAddMode),
-    [options, advancedAddMode]
-  );
+  const value = useMemo(() => options.find((o) => o.value === advancedAddMode), [options, advancedAddMode]);
 
   if (!advancedAddScanModel) {
     return null;
@@ -90,9 +70,7 @@ const ScanAdvancedAddModels = () => {
     >
       <Flex justifyContent="space-between" alignItems="center">
         <Text size="xl" fontWeight="semibold">
-          {isCheckpoint || advancedAddMode === 'checkpoint'
-            ? 'Add Checkpoint Model'
-            : 'Add Diffusers Model'}
+          {isCheckpoint || advancedAddMode === 'checkpoint' ? 'Add Checkpoint Model' : 'Add Diffusers Model'}
         </Text>
         <IconButton
           icon={<PiXBold />}
@@ -103,22 +81,12 @@ const ScanAdvancedAddModels = () => {
       </Flex>
       <FormControl>
         <FormLabel>{t('modelManager.modelType')}</FormLabel>
-        <Combobox
-          value={value}
-          options={options}
-          onChange={handleChangeAddMode}
-        />
+        <Combobox value={value} options={options} onChange={handleChangeAddMode} />
       </FormControl>
       {isCheckpoint ? (
-        <AdvancedAddCheckpoint
-          key={advancedAddScanModel}
-          model_path={advancedAddScanModel}
-        />
+        <AdvancedAddCheckpoint key={advancedAddScanModel} model_path={advancedAddScanModel} />
       ) : (
-        <AdvancedAddDiffusers
-          key={advancedAddScanModel}
-          model_path={advancedAddScanModel}
-        />
+        <AdvancedAddDiffusers key={advancedAddScanModel} model_path={advancedAddScanModel} />
       )}
     </Box>
   );

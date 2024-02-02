@@ -1,16 +1,19 @@
+import type { FormLabelProps } from '@invoke-ai/ui-library';
 import {
   Box,
   Button,
+  ButtonGroup,
   Checkbox,
   Flex,
   FormControl,
+  FormControlGroup,
   FormLabel,
   IconButton,
   Popover,
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import { canvasMaskSavedToGallery } from 'features/canvas/store/actions';
@@ -27,11 +30,11 @@ import { memo, useCallback } from 'react';
 import type { RgbaColor } from 'react-colorful';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import {
-  PiExcludeBold,
-  PiFloppyDiskBackFill,
-  PiTrashSimpleFill,
-} from 'react-icons/pi';
+import { PiExcludeBold, PiFloppyDiskBackFill, PiTrashSimpleFill } from 'react-icons/pi';
+
+const formLabelProps: FormLabelProps = {
+  flexGrow: 1,
+};
 
 const IAICanvasMaskOptions = () => {
   const dispatch = useAppDispatch();
@@ -39,9 +42,7 @@ const IAICanvasMaskOptions = () => {
   const layer = useAppSelector((s) => s.canvas.layer);
   const maskColor = useAppSelector((s) => s.canvas.maskColor);
   const isMaskEnabled = useAppSelector((s) => s.canvas.isMaskEnabled);
-  const shouldPreserveMaskedArea = useAppSelector(
-    (s) => s.canvas.shouldPreserveMaskedArea
-  );
+  const shouldPreserveMaskedArea = useAppSelector((s) => s.canvas.shouldPreserveMaskedArea);
   const isStaging = useAppSelector(isStagingSelector);
 
   useHotkeys(
@@ -124,40 +125,27 @@ const IAICanvasMaskOptions = () => {
       <PopoverContent>
         <PopoverBody>
           <Flex direction="column" gap={2}>
-            <FormControl>
-              <FormLabel>{`${t('unifiedCanvas.enableMask')} (H)`}</FormLabel>
-              <Checkbox
-                isChecked={isMaskEnabled}
-                onChange={handleToggleEnableMask}
-              />
-            </FormControl>
-            <FormControl>
-              <FormLabel>{t('unifiedCanvas.preserveMaskedArea')}</FormLabel>
-              <Checkbox
-                isChecked={shouldPreserveMaskedArea}
-                onChange={handleChangePreserveMaskedArea}
-              />
-            </FormControl>
+            <FormControlGroup formLabelProps={formLabelProps}>
+              <FormControl>
+                <FormLabel>{`${t('unifiedCanvas.enableMask')} (H)`}</FormLabel>
+                <Checkbox isChecked={isMaskEnabled} onChange={handleToggleEnableMask} />
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('unifiedCanvas.preserveMaskedArea')}</FormLabel>
+                <Checkbox isChecked={shouldPreserveMaskedArea} onChange={handleChangePreserveMaskedArea} />
+              </FormControl>
+            </FormControlGroup>
             <Box pt={2} pb={2}>
-              <IAIColorPicker
-                color={maskColor}
-                onChange={handleChangeMaskColor}
-              />
+              <IAIColorPicker color={maskColor} onChange={handleChangeMaskColor} />
             </Box>
-            <Button
-              size="sm"
-              leftIcon={<PiFloppyDiskBackFill />}
-              onClick={handleSaveMask}
-            >
-              {t('unifiedCanvas.saveMask')}
-            </Button>
-            <Button
-              size="sm"
-              leftIcon={<PiTrashSimpleFill />}
-              onClick={handleClearMask}
-            >
-              {t('unifiedCanvas.clearMask')}
-            </Button>
+            <ButtonGroup isAttached={false}>
+              <Button size="sm" leftIcon={<PiFloppyDiskBackFill />} onClick={handleSaveMask}>
+                {t('unifiedCanvas.saveMask')}
+              </Button>
+              <Button size="sm" leftIcon={<PiTrashSimpleFill />} onClick={handleClearMask}>
+                {t('unifiedCanvas.clearMask')}
+              </Button>
+            </ButtonGroup>
           </Flex>
         </PopoverBody>
       </PopoverContent>

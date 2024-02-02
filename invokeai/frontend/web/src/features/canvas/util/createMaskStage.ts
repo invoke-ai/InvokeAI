@@ -44,8 +44,7 @@ const createMaskStage = async (
         lineCap: 'round',
         lineJoin: 'round',
         shadowForStrokeEnabled: false,
-        globalCompositeOperation:
-          line.tool === 'brush' ? 'source-over' : 'destination-out',
+        globalCompositeOperation: line.tool === 'brush' ? 'source-over' : 'destination-out',
       })
     )
   );

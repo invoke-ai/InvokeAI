@@ -1,11 +1,8 @@
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { GroupBase } from 'chakra-react-select';
-import {
-  esrganModelNameChanged,
-  isParamESRGANModelName,
-} from 'features/parameters/store/postprocessingSlice';
+import { esrganModelNameChanged, isParamESRGANModelName } from 'features/parameters/store/postprocessingSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -26,8 +23,7 @@ const options: GroupBase<ComboboxOption>[] = [
       {
         label: 'RealESRGAN x4 Plus',
         value: 'RealESRGAN_x4plus.pth',
-        description:
-          'Best for photos and highly detailed images, medium smoothing',
+        description: 'Best for photos and highly detailed images, medium smoothing',
       },
       {
         label: 'RealESRGAN x4 Plus (anime 6B)',
@@ -46,9 +42,7 @@ const options: GroupBase<ComboboxOption>[] = [
 const ParamESRGANModel = () => {
   const { t } = useTranslation();
 
-  const esrganModelName = useAppSelector(
-    (s) => s.postprocessing.esrganModelName
-  );
+  const esrganModelName = useAppSelector((s) => s.postprocessing.esrganModelName);
 
   const dispatch = useAppDispatch();
 
@@ -63,10 +57,7 @@ const ParamESRGANModel = () => {
   );
 
   const value = useMemo(
-    () =>
-      options
-        .flatMap((o) => o.options)
-        .find((m) => m.value === esrganModelName),
+    () => options.flatMap((o) => o.options).find((m) => m.value === esrganModelName),
     [esrganModelName]
   );
 

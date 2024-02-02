@@ -5,10 +5,7 @@ import {
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { modelSelected } from 'features/parameters/store/actions';
-import {
-  modelChanged,
-  vaeSelected,
-} from 'features/parameters/store/generationSlice';
+import { modelChanged, vaeSelected } from 'features/parameters/store/generationSlice';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
@@ -27,18 +24,14 @@ export const addModelSelectedListener = () => {
       const result = zParameterModel.safeParse(action.payload);
 
       if (!result.success) {
-        log.error(
-          { error: result.error.format() },
-          'Failed to parse main model'
-        );
+        log.error({ error: result.error.format() }, 'Failed to parse main model');
         return;
       }
 
       const newModel = result.data;
 
-      const { base_model } = newModel;
-      const didBaseModelChange =
-        state.generation.model?.base_model !== base_model;
+      const newBaseModel = newModel.base_model;
+      const didBaseModelChange = state.generation.model?.base_model !== newBaseModel;
 
       if (didBaseModelChange) {
         // we may need to reset some incompatible submodels
@@ -46,7 +39,7 @@ export const addModelSelectedListener = () => {
 
         // handle incompatible loras
         forEach(state.lora.loras, (lora, id) => {
-          if (lora.base_model !== base_model) {
+          if (lora.base_model !== newBaseModel) {
             dispatch(loraRemoved(id));
             modelsCleared += 1;
           }
@@ -54,17 +47,15 @@ export const addModelSelectedListener = () => {
 
         // handle incompatible vae
         const { vae } = state.generation;
-        if (vae && vae.base_model !== base_model) {
+        if (vae && vae.base_model !== newBaseModel) {
           dispatch(vaeSelected(null));
           modelsCleared += 1;
         }
 
         // handle incompatible controlnets
         selectControlAdapterAll(state.controlAdapters).forEach((ca) => {
-          if (ca.model?.base_model !== base_model) {
-            dispatch(
-              controlAdapterIsEnabledChanged({ id: ca.id, isEnabled: false })
-            );
+          if (ca.model?.base_model !== newBaseModel) {
+            dispatch(controlAdapterIsEnabledChanged({ id: ca.id, isEnabled: false }));
             modelsCleared += 1;
           }
         });

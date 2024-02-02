@@ -2,9 +2,7 @@ import { logger } from 'app/logging/logger';
 import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 
-export const modelIdToMainModelParam = (
-  mainModelId: string
-): ParameterModel | undefined => {
+export const modelIdToMainModelParam = (mainModelId: string): ParameterModel | undefined => {
   const log = logger('models');
   const [base_model, model_type, model_name] = mainModelId.split('/');
 
