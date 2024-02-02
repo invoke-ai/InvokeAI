@@ -28,25 +28,11 @@ class Installer:
 
     def __init__(self) -> None:
         self.reqs = INSTALLER_REQS
-        self.preflight()
         if os.getenv("VIRTUAL_ENV") is not None:
             print("A virtual environment is already activated. Please 'deactivate' before installation.")
             sys.exit(-1)
         self.bootstrap()
 
-    def preflight(self) -> None:
-        """
-        Preflight checks
-        """
-
-        # TODO
-        # verify python version
-        # on macOS verify XCode tools are present
-        # verify libmesa, libglx on linux
-        # check that the system arch is not i386 (?)
-        # check that the system has a GPU, and the type of GPU
-
-        pass
 
     def mktemp_venv(self) -> TemporaryDirectory:
         """
