@@ -336,6 +336,7 @@ class InvokeAIAppConfig(InvokeAISettings):
         super().parse_args(argv)
 
         if self.singleton_init and not clobber:
+            # When setting values in this way, set validate_assignment to true if you want to validate the value.
             for k, v in self.singleton_init.items():
                 setattr(self, k, v)
 
