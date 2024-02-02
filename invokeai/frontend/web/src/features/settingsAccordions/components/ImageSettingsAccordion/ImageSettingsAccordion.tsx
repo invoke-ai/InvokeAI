@@ -26,7 +26,7 @@ import { ImageSizeLinear } from './ImageSizeLinear';
 const selector = createMemoizedSelector(
   [selectGenerationSlice, selectCanvasSlice, selectHrfSlice, activeTabNameSelector],
   (generation, canvas, hrf, activeTabName) => {
-    const { shouldRandomizeSeed } = generation;
+    const { shouldRandomizeSeed, model } = generation;
     const { hrfEnabled } = hrf;
     const badges: string[] = [];
 
@@ -56,7 +56,7 @@ const selector = createMemoizedSelector(
     if (hrfEnabled) {
       badges.push('HiRes Fix');
     }
-    return { badges, activeTabName };
+    return { badges, activeTabName, isSDXL: model?.base_model === 'sdxl' };
   }
 );
 
@@ -66,7 +66,7 @@ const scalingLabelProps: FormLabelProps = {
 
 export const ImageSettingsAccordion = memo(() => {
   const { t } = useTranslation();
-  const { badges, activeTabName } = useAppSelector(selector);
+  const { badges, activeTabName, isSDXL } = useAppSelector(selector);
   const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } = useStandaloneAccordionToggle({
     id: 'image-settings',
     defaultIsOpen: true,
@@ -94,7 +94,7 @@ export const ImageSettingsAccordion = memo(() => {
             </Flex>
             {(activeTabName === 'img2img' || activeTabName === 'unifiedCanvas') && <ImageToImageStrength />}
             {activeTabName === 'img2img' && <ImageToImageFit />}
-            {activeTabName === 'txt2img' && <HrfSettings />}
+            {activeTabName === 'txt2img' && !isSDXL && <HrfSettings />}
             {activeTabName === 'unifiedCanvas' && (
               <>
                 <ParamScaleBeforeProcessing />
