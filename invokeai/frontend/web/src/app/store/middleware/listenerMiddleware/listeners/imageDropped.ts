@@ -37,10 +37,10 @@ export const addImageDroppedListener = () => {
       }
 
       /**
-       * Image dropped on current image
+       * Image dropped on viewer
        */
       if (
-        overData.actionType === 'SET_CURRENT_IMAGE' &&
+        overData.actionType === 'SET_VIEWER_IMAGE' &&
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {

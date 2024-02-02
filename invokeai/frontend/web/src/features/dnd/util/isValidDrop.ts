@@ -13,7 +13,7 @@ export const isValidDrop = (overData: TypesafeDroppableData | undefined, active:
   }
 
   switch (actionType) {
-    case 'SET_CURRENT_IMAGE':
+    case 'SET_VIEWER_IMAGE':
       return payloadType === 'IMAGE_DTO';
     case 'SET_INITIAL_IMAGE':
       return payloadType === 'IMAGE_DTO';

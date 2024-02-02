@@ -1,5 +1,6 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { ViewerDroppable } from 'features/viewer/components/ViewerDroppable';
 import { ViewerImage } from 'features/viewer/components/ViewerImage';
 import { ViewerInfo } from 'features/viewer/components/ViewerInfo';
 import { ViewerProgress } from 'features/viewer/components/ViewerProgress';
@@ -23,6 +24,7 @@ export const Viewer = memo(() => {
         {viewerMode === 'info' && <ViewerInfo />}
         {viewerMode === 'progress' && <ViewerProgress />}
       </Flex>
+      <ViewerDroppable />
     </Flex>
   );
 });

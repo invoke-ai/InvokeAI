@@ -18,8 +18,8 @@ type BaseDropData = {
   id: string;
 };
 
-export type CurrentImageDropData = BaseDropData & {
-  actionType: 'SET_CURRENT_IMAGE';
+export type ViewerImageDropData = BaseDropData & {
+  actionType: 'SET_VIEWER_IMAGE';
 };
 
 export type InitialImageDropData = BaseDropData & {
@@ -59,13 +59,13 @@ export type RemoveFromBoardDropData = BaseDropData & {
 };
 
 export type TypesafeDroppableData =
-  | CurrentImageDropData
   | InitialImageDropData
   | ControlAdapterDropData
   | CanvasInitialImageDropData
   | NodesImageDropData
   | AddToBoardDropData
-  | RemoveFromBoardDropData;
+  | RemoveFromBoardDropData
+  | ViewerImageDropData;
 
 type BaseDragData = {
   id: string;

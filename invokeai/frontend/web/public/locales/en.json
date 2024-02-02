@@ -1612,7 +1612,8 @@
     "viewer": {
         "viewerModeImage": "Image",
         "viewerModeInfo": "Info",
-        "viewerModeProgress": "Progress"
+        "viewerModeProgress": "Progress",
+        "dropLabel": "View Image"
     },
     "unifiedCanvas": {
         "accept": "Accept",

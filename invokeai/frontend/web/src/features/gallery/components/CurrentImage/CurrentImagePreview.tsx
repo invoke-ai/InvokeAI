@@ -4,7 +4,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
+import type { TypesafeDraggableData } from 'features/dnd/types';
 import ProgressImage from 'features/gallery/components/CurrentImage/ProgressImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
@@ -40,14 +40,6 @@ const CurrentImagePreview = () => {
     }
   }, [imageDTO]);
 
-  const droppableData = useMemo<TypesafeDroppableData | undefined>(
-    () => ({
-      id: 'current-image',
-      actionType: 'SET_CURRENT_IMAGE',
-    }),
-    []
-  );
-
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
 
@@ -81,7 +73,6 @@ const CurrentImagePreview = () => {
       ) : (
         <IAIDndImage
           imageDTO={imageDTO}
-          droppableData={droppableData}
           draggableData={draggableData}
           isUploadDisabled={true}
           fitContainer
