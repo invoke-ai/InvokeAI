@@ -12,6 +12,7 @@ import type {
 } from '@dnd-kit/core';
 import type { BoardId } from 'features/gallery/store/types';
 import type { FieldInputInstance, FieldInputTemplate } from 'features/nodes/types/field';
+import type { ViewerMode } from 'features/viewer/store/viewerSlice';
 import type { ImageDTO } from 'services/api/types';
 
 type BaseDropData = {
@@ -20,6 +21,10 @@ type BaseDropData = {
 
 export type ViewerImageDropData = BaseDropData & {
   actionType: 'SET_VIEWER_IMAGE';
+  context: {
+    viewerMode: ViewerMode;
+    currentImageName?: string | null;
+  };
 };
 
 export type InitialImageDropData = BaseDropData & {

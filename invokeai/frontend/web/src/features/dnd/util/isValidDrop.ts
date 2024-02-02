@@ -14,7 +14,10 @@ export const isValidDrop = (overData: TypesafeDroppableData | undefined, active:
 
   switch (actionType) {
     case 'SET_VIEWER_IMAGE':
-      return payloadType === 'IMAGE_DTO';
+      return (
+        payloadType === 'IMAGE_DTO' &&
+        overData.context.currentImageName !== active.data.current.payload.imageDTO.image_name
+      );
     case 'SET_INITIAL_IMAGE':
       return payloadType === 'IMAGE_DTO';
     case 'SET_CONTROL_ADAPTER_IMAGE':
