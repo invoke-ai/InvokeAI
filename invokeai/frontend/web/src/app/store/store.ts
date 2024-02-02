@@ -25,6 +25,7 @@ import { sdxlPersistConfig, sdxlSlice } from 'features/sdxl/store/sdxlSlice';
 import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';
 import { uiPersistConfig, uiSlice } from 'features/ui/store/uiSlice';
+import { viewerPersistConfig, viewerSlice } from 'features/viewer/store/viewerSlice';
 import { diff } from 'jsondiffpatch';
 import { defaultsDeep, keys, omit, pick } from 'lodash-es';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
@@ -61,6 +62,7 @@ const allReducers = {
   [queueSlice.name]: queueSlice.reducer,
   [workflowSlice.name]: workflowSlice.reducer,
   [hrfSlice.name]: hrfSlice.reducer,
+  [viewerSlice.name]: viewerSlice.reducer,
   [api.reducerPath]: api.reducer,
 };
 
@@ -105,6 +107,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [loraPersistConfig.name]: loraPersistConfig,
   [modelManagerPersistConfig.name]: modelManagerPersistConfig,
   [hrfPersistConfig.name]: hrfPersistConfig,
+  [viewerPersistConfig.name]: viewerPersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {
