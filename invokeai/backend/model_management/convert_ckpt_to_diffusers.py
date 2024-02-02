@@ -42,7 +42,7 @@ from diffusers.schedulers import (
     PNDMScheduler,
     UnCLIPScheduler,
 )
-from diffusers.utils import is_accelerate_available, is_omegaconf_available
+from diffusers.utils import is_accelerate_available
 from diffusers.utils.import_utils import BACKENDS_MAPPING
 from picklescan.scanner import scan_file_path
 from transformers import (
@@ -62,9 +62,12 @@ from invokeai.backend.util.logging import InvokeAILogger
 
 from .models import BaseModelType, ModelVariantType
 
+omegaconf_available = False
 try:
     from omegaconf import OmegaConf
     from omegaconf.dictconfig import DictConfig
+
+    omegaconf_available = True
 except ImportError:
     raise ImportError(
         "OmegaConf is required to convert the LDM checkpoints. Please install it with `pip install OmegaConf`."
@@ -76,6 +79,10 @@ if is_accelerate_available():
 
 logger = InvokeAILogger.get_logger(__name__)
 CONVERT_MODEL_ROOT = InvokeAIAppConfig.get_config().models_path / "core/convert"
+
+
+def is_omegaconf_available() -> bool:
+    return omegaconf_available
 
 
 def shave_segments(path, n_shave_prefix_segments=1):
