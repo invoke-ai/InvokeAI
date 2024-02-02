@@ -21,6 +21,7 @@ OS = platform.uname().system
 ARCH = platform.uname().machine
 VERSION = "latest"
 
+
 class Installer:
     """
     Deploys an InvokeAI installation into a given path
@@ -59,9 +60,6 @@ class Installer:
     def bootstrap(self, verbose: bool = False) -> TemporaryDirectory | None:
         """
         Bootstrap the installer venv with packages required at install time
-
-        :return: path to the virtual environment directory that was bootstrapped
-        :rtype: TemporaryDirectory
         """
 
         print("Initializing the installer. This may take a minute - please wait...")
@@ -73,9 +71,17 @@ class Installer:
         cmd.extend(self.reqs)
 
         try:
-            res = subprocess.check_output(cmd).decode()
+            # upgrade pip to the latest version to avoid a confusing message
+            res = subprocess.check_output([pip, "install", "--upgrade", "pip"]).decode()
             if verbose:
                 print(res)
+
+            # run the install prerequisites installation
+            res = subprocess.check_output(cmd).decode()
+
+            if verbose:
+                print(res)
+
             return venv_dir
         except subprocess.CalledProcessError as e:
             print(e)
