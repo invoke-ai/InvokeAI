@@ -14,6 +14,7 @@ To use a community workflow, download the the `.json` node graph file and load i
 
 - Community Nodes
     + [Adapters-Linked](#adapters-linked-nodes)
+    + [Autostereogram](#autostereogram-nodes)
     + [Average Images](#average-images)
     + [Clean Image Artifacts After Cut](#clean-image-artifacts-after-cut)
     + [Close Color Mask](#close-color-mask) 
@@ -66,6 +67,17 @@ To use a community workflow, download the the `.json` node graph file and load i
 Note: These are inherited from the core nodes so any update to the core nodes should be reflected in these. 
 
 **Node Link:** https://github.com/skunkworxdark/adapters-linked-nodes
+
+--------------------------------
+### Autostereogram Nodes
+
+**Description:** Generate autostereogram images from a depth map. This is not a very practically useful node but more a 90s nostalgic indulgence as I used to love these images as a kid.
+
+**Node Link:** https://github.com/skunkworxdark/autostereogram_nodes
+
+**Example Usage:**
+</br>
+<img src="https://github.com/skunkworxdark/autostereogram_nodes/blob/main/images/spider.png" width="200" /> -> <img src="https://github.com/skunkworxdark/autostereogram_nodes/blob/main/images/spider-depth.png" width="200" /> -> <img src="https://github.com/skunkworxdark/autostereogram_nodes/raw/main/images/spider-dots.png" width="200" /> <img src="https://github.com/skunkworxdark/autostereogram_nodes/raw/main/images/spider-pattern.png" width="200" />
 
 --------------------------------
 ### Average Images
