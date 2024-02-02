@@ -172,12 +172,11 @@ two configs are kept in separate sections of the config file:
 from __future__ import annotations
 
 import os
-from functools import lru_cache
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Literal, Optional, TypeVar, Union, get_type_hints
+from typing import Any, ClassVar, Dict, List, Literal, Optional, Union
 
 from omegaconf import DictConfig, OmegaConf
-from pydantic import Field, TypeAdapter as PyTypeAdapter
+from pydantic import Field
 from pydantic.config import JsonDict
 from pydantic_settings import SettingsConfigDict
 
@@ -187,13 +186,6 @@ INIT_FILE = Path("invokeai.yaml")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 DEFAULT_MAX_VRAM = 0.5
-
-_T = TypeVar("_T")
-
-
-@lru_cache
-def TypeAdapter(type_: type[_T]) -> PyTypeAdapter:
-    return PyTypeAdapter(type_)
 
 
 class Categories(object):
@@ -344,13 +336,8 @@ class InvokeAIAppConfig(InvokeAISettings):
         super().parse_args(argv)
 
         if self.singleton_init and not clobber:
-            hints = get_type_hints(self.__class__)
-            for k in self.singleton_init:
-                setattr(
-                    self,
-                    k,
-                    TypeAdapter(hints[k]).validate_python(self.singleton_init[k]),
-                )
+            for k, v in self.singleton_init.items():
+                setattr(self, k, v)
 
     @classmethod
     def get_config(cls, **kwargs: Any) -> InvokeAIAppConfig:
