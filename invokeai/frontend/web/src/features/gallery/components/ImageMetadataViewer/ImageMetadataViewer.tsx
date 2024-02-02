@@ -28,12 +28,11 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
     <Flex
       layerStyle="first"
       padding={4}
-      gap={1}
+      gap={4}
       flexDirection="column"
       width="full"
       height="full"
       borderRadius="base"
-      position="absolute"
       overflow="hidden"
     >
       <ExternalLink href={image.image_url} label={image.image_name} />
