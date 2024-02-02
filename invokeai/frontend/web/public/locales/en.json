@@ -1613,7 +1613,8 @@
         "viewerModeImage": "Image",
         "viewerModeInfo": "Info",
         "viewerModeProgress": "Progress",
-        "dropLabel": "View Image"
+        "dropLabel": "View Image",
+        "noProgress": "Nothing in Progress"
     },
     "unifiedCanvas": {
         "accept": "Accept",
