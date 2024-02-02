@@ -8,11 +8,10 @@ import {
   workflowNameChanged,
   workflowSaved,
 } from 'features/nodes/store/workflowSlice';
+import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCreateWorkflowMutation, workflowsApi } from 'services/api/endpoints/workflows';
-
-import type { WorkflowCategory } from '../../nodes/types/workflow';
 
 type SaveWorkflowAsArg = {
   name: string;
