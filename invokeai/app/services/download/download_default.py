@@ -208,7 +208,6 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 job = self._queue.get(timeout=1)
             except Empty:
                 continue
-
             try:
                 job.job_started = get_iso_timestamp()
                 self._do_download(job)
