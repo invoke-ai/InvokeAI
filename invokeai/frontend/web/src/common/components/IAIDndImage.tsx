@@ -179,7 +179,9 @@ const IAIDndImage = (props: IAIDndImageProps) => {
             <IAIDraggable data={draggableData} disabled={isDragDisabled || !imageDTO} onClick={onClick} />
           )}
           {children}
-          {!isDropDisabled && <IAIDroppable data={droppableData} disabled={isDropDisabled} dropLabel={dropLabel} />}
+          {!isDropDisabled && droppableData && (
+            <IAIDroppable data={droppableData} disabled={isDropDisabled} dropLabel={dropLabel} />
+          )}
         </Flex>
       )}
     </ImageContextMenu>
