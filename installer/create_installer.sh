@@ -17,8 +17,16 @@ function git_show {
     git show -s --format='%h %s' $1
 }
 
+if [[ -v "VIRTUAL_ENV" ]]; then
+    # we can't just call 'deactivate' because this function is not exported
+    # to the environment of this script from the bash process that runs the script
+    echo -e "${BRED}A virtual environment is activated. Please deactivate it before proceeding.${RESET}"
+    exit -1
+fi
+
 cd "$(dirname "$0")"
 
+echo
 echo -e "${BYELLOW}This script must be run from the installer directory!${RESET}"
 echo "The current working directory is $(pwd)"
 read -p "If that looks right, press any key to proceed, or CTRL-C to exit..."
@@ -30,13 +38,6 @@ if ! is_bin_in_path python && is_bin_in_path python3; then
     function python {
         python3 "$@"
     }
-fi
-
-if [[ -v "VIRTUAL_ENV" ]]; then
-    # we can't just call 'deactivate' because this function is not exported
-    # to the environment of this script from the bash process that runs the script
-    echo -e "${BRED}A virtual environment is activated. Please deactivate it before proceeding.${RESET}"
-    exit -1
 fi
 
 VERSION=$(
