@@ -1,49 +1,35 @@
 # Invocations for ControlNet image preprocessors
 # initial implementation by Gregg Helt, 2023
 # heavily leverages controlnet_aux package: https://github.com/patrickvonplaten/controlnet_aux
+import gc
 from builtins import bool, float
 from typing import Dict, List, Literal, Union
 
 import cv2
 import numpy as np
-from controlnet_aux import (
-    CannyDetector,
-    ContentShuffleDetector,
-    HEDdetector,
-    LeresDetector,
-    LineartAnimeDetector,
-    LineartDetector,
-    MediapipeFaceDetector,
-    MidasDetector,
-    MLSDdetector,
-    NormalBaeDetector,
-    OpenposeDetector,
-    PidiNetDetector,
-    SamDetector,
-    ZoeDetector,
-)
+from controlnet_aux import (CannyDetector, ContentShuffleDetector, HEDdetector,
+                            LeresDetector, LineartAnimeDetector,
+                            LineartDetector, MediapipeFaceDetector,
+                            MidasDetector, MLSDdetector, NormalBaeDetector,
+                            OpenposeDetector, PidiNetDetector, SamDetector,
+                            ZoeDetector)
 from controlnet_aux.util import HWC3, ade_palette
 from PIL import Image
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (BaseModel, ConfigDict, Field, field_validator,
+                      model_validator)
 
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
-from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.invocations.util import (validate_begin_end_step,
+                                           validate_weights)
+from invokeai.app.services.image_records.image_records_common import (
+    ImageCategory, ResourceOrigin)
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.backend.image_util.depth_anything import DepthAnythingDetector
 
 from ...backend.model_management import BaseModelType
-from .baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    Input,
-    InputField,
-    InvocationContext,
-    OutputField,
-    WithMetadata,
-    invocation,
-    invocation_output,
-)
+from .baseinvocation import (BaseInvocation, BaseInvocationOutput, Input,
+                             InputField, InvocationContext, OutputField,
+                             WithMetadata, invocation, invocation_output)
 
 CONTROLNET_MODE_VALUES = Literal["balanced", "more_prompt", "more_control", "unbalanced"]
 CONTROLNET_RESIZE_VALUES = Literal[
@@ -606,6 +592,7 @@ class ColorMapImageProcessorInvocation(ImageProcessorInvocation):
 
 
 DEPTH_ANYTHING_MODEL_SIZES = Literal["large", "base", "small"]
+depth_anything_detector = None
 
 
 @invocation(
@@ -625,11 +612,18 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
     offload: bool = InputField(default=False)
 
     def run_processor(self, image):
-        depth_anything_detector = DepthAnythingDetector()
-        depth_anything_detector.load_model(model_size=self.model_size)
+        global depth_anything_detector
+        if not depth_anything_detector:
+            depth_anything_detector = DepthAnythingDetector()
+            depth_anything_detector.load_model(model_size=self.model_size)
 
         if image.mode == "RGBA":
             image = image.convert("RGB")
 
-        processed_image = depth_anything_detector(image=image, resolution=self.resolution, offload=self.offload)
+        processed_image = depth_anything_detector(image=image, resolution=self.resolution)
+
+        if self.offload:
+            depth_anything_detector = None
+            gc.collect()
+
         return processed_image
