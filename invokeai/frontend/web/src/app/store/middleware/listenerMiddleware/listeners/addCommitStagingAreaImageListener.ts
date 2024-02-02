@@ -1,25 +1,25 @@
-import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import { canvasBatchIdsReset, commitStagingAreaImage, discardStagedImages } from 'features/canvas/store/canvasSlice';
+import { matchAnyStagingAreaDismissed } from 'features/canvas/store/canvasSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
 
 import { startAppListening } from '..';
 
-const matcher = isAnyOf(commitStagingAreaImage, discardStagedImages);
-
 export const addCommitStagingAreaImageListener = () => {
   startAppListening({
-    matcher,
+    matcher: matchAnyStagingAreaDismissed,
     effect: async (_, { dispatch, getState }) => {
       const log = logger('canvas');
       const state = getState();
-      const { batchIds } = state.canvas;
+      const { canvasBatchIds } = state.progress;
 
       try {
         const req = dispatch(
-          queueApi.endpoints.cancelByBatchIds.initiate({ batch_ids: batchIds }, { fixedCacheKey: 'cancelByBatchIds' })
+          queueApi.endpoints.cancelByBatchIds.initiate(
+            { batch_ids: canvasBatchIds },
+            { fixedCacheKey: 'cancelByBatchIds' }
+          )
         );
         const { canceled } = await req.unwrap();
         req.reset();
@@ -32,7 +32,6 @@ export const addCommitStagingAreaImageListener = () => {
             })
           );
         }
-        dispatch(canvasBatchIdsReset());
       } catch {
         log.error('Failed to cancel canvas batches');
         dispatch(

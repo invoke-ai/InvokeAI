@@ -9,13 +9,12 @@ import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
 import { sentImageToImg2Img } from 'features/gallery/store/actions';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
-import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import ParamUpscalePopover from 'features/parameters/components/Upscale/ParamUpscaleSettings';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
+import { selectProgressSlice } from 'features/progress/store/progressSlice';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { viewerModeChanged } from 'features/viewer/store/viewerSlice';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
 import { memo, useCallback } from 'react';
@@ -37,11 +36,10 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 
 const selectShouldDisableToolbarButtons = createSelector(
-  selectSystemSlice,
-  selectGallerySlice,
+  selectProgressSlice,
   selectLastSelectedImage,
-  (system, gallery, lastSelectedImage) => {
-    const hasProgressImage = Boolean(system.denoiseProgress?.progress_image);
+  (progress, lastSelectedImage) => {
+    const hasProgressImage = Boolean(progress.linearDenoiseProgress?.progress_image);
     return hasProgressImage || !lastSelectedImage;
   }
 );

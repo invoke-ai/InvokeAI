@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { imageSelected, selectionChanged } from 'features/gallery/store/gallerySlice';
 
 export type ViewerMode = 'image' | 'info' | 'progress';
 
@@ -24,6 +25,14 @@ export const viewerSlice = createSlice({
     viewerModeChanged: (state, action: PayloadAction<ViewerMode>) => {
       state.viewerMode = action.payload;
     },
+  },
+  extraReducers: (builder) => {
+    builder.addMatcher(isAnyOf(imageSelected, selectionChanged), (state) => {
+      // When a gallery image is selected and we are in progress mode, switch to image mode
+      if (state.viewerMode === 'progress') {
+        // state.viewerMode = 'image';
+      }
+    });
   },
 });
 

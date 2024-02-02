@@ -13,7 +13,7 @@ export const Viewer = memo(() => {
   return (
     <Flex position="relative" flexDirection="column" height="full" width="full" gap={4}>
       <ViewerToolbar />
-      <Flex height="full" width="full">
+      <Flex height="full" width="full" alignItems="center" justifyContent="center">
         {viewerMode === 'image' && <ViewerImage />}
         {viewerMode === 'info' && <ViewerInfo />}
         {viewerMode === 'progress' && <ViewerProgress />}

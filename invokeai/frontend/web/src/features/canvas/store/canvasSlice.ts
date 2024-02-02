@@ -1,5 +1,5 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import calculateCoordinates from 'features/canvas/util/calculateCoordinates';
@@ -15,9 +15,7 @@ import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { clamp, cloneDeep } from 'lodash-es';
 import type { RgbaColor } from 'react-colorful';
-import { queueApi } from 'services/api/endpoints/queue';
 import type { ImageDTO } from 'services/api/types';
-import { socketQueueItemStatusChanged } from 'services/events/actions';
 
 import type {
   BoundingBoxScaleMethod,
@@ -79,7 +77,6 @@ export const initialCanvasState: CanvasState = {
   stageCoordinates: { x: 0, y: 0 },
   stageDimensions: { width: 0, height: 0 },
   stageScale: 1,
-  batchIds: [],
   aspectRatio: {
     id: '1:1',
     value: 1,
@@ -180,7 +177,6 @@ export const canvasSlice = createSlice({
           ],
         };
         state.futureLayerStates = [];
-        state.batchIds = [];
 
         const newScale = calculateScale(
           stageDimensions.width,
@@ -237,12 +233,6 @@ export const canvasSlice = createSlice({
     setShouldShowBoundingBox: (state, action: PayloadAction<boolean>) => {
       state.shouldShowBoundingBox = action.payload;
     },
-    canvasBatchIdAdded: (state, action: PayloadAction<string>) => {
-      state.batchIds.push(action.payload);
-    },
-    canvasBatchIdsReset: (state) => {
-      state.batchIds = [];
-    },
     stagingAreaInitialized: (
       state,
       action: PayloadAction<{
@@ -293,7 +283,6 @@ export const canvasSlice = createSlice({
       state.futureLayerStates = [];
       state.shouldShowStagingOutline = true;
       state.shouldShowStagingImage = true;
-      state.batchIds = [];
     },
     addFillRect: (state) => {
       const { boundingBoxCoordinates, boundingBoxDimensions, brushColor } = state;
@@ -426,7 +415,6 @@ export const canvasSlice = createSlice({
       state.pastLayerStates.push(cloneDeep(state.layerState));
       state.layerState = cloneDeep(initialLayerState);
       state.futureLayerStates = [];
-      state.batchIds = [];
       state.boundingBoxCoordinates = {
         ...initialCanvasState.boundingBoxCoordinates,
       };
@@ -536,7 +524,6 @@ export const canvasSlice = createSlice({
       state.futureLayerStates = [];
       state.shouldShowStagingOutline = true;
       state.shouldShowStagingImage = true;
-      state.batchIds = [];
     },
     setBoundingBoxScaleMethod: {
       reducer: (state, action: PayloadActionWithOptimalDimension<BoundingBoxScaleMethod>) => {
@@ -644,23 +631,6 @@ export const canvasSlice = createSlice({
         optimalDimension
       );
     });
-
-    builder.addCase(socketQueueItemStatusChanged, (state, action) => {
-      const batch_status = action.payload.data.batch_status;
-      if (!state.batchIds.includes(batch_status.batch_id)) {
-        return;
-      }
-
-      if (batch_status.in_progress === 0 && batch_status.pending === 0) {
-        state.batchIds = state.batchIds.filter((id) => id !== batch_status.batch_id);
-      }
-    });
-    builder.addMatcher(queueApi.endpoints.clearQueue.matchFulfilled, (state) => {
-      state.batchIds = [];
-    });
-    builder.addMatcher(queueApi.endpoints.cancelByBatchIds.matchFulfilled, (state, action) => {
-      state.batchIds = state.batchIds.filter((id) => !action.meta.arg.originalArgs.batch_ids.includes(id));
-    });
   },
 });
 
@@ -713,8 +683,6 @@ export const {
   stagingAreaInitialized,
   setShouldAntialias,
   canvasResized,
-  canvasBatchIdAdded,
-  canvasBatchIdsReset,
   aspectRatioChanged,
   scaledBoundingBoxDimensionsReset,
 } = canvasSlice.actions;
@@ -736,3 +704,5 @@ export const canvasPersistConfig: PersistConfig<CanvasState> = {
   migrate: migrateCanvasState,
   persistDenylist: [],
 };
+
+export const matchAnyStagingAreaDismissed = isAnyOf(commitStagingAreaImage, discardStagedImages);

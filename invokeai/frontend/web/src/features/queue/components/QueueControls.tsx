@@ -1,7 +1,7 @@
 import { ButtonGroup, Flex, Spacer } from '@invoke-ai/ui-library';
+import ProgressBar from 'features/progress/components/ProgressBar';
 import ClearQueueIconButton from 'features/queue/components/ClearQueueIconButton';
 import QueueFrontButton from 'features/queue/components/QueueFrontButton';
-import ProgressBar from 'features/system/components/ProgressBar';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 

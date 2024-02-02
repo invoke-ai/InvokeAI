@@ -5,6 +5,7 @@ import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gal
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { isImageOutput } from 'features/nodes/types/common';
 import { LINEAR_UI_OUTPUT, nodeIDDenyList } from 'features/nodes/util/graph/constants';
+import { imageInvocationComplete } from 'features/progress/store/progressSlice';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import { imagesAdapter } from 'services/api/util';
@@ -29,7 +30,7 @@ export const addInvocationCompleteEventListener = () => {
       // This complete event has an associated image output
       if (isImageOutput(result) && !nodeTypeDenylist.includes(node.type) && !nodeIDDenyList.includes(source_node_id)) {
         const { image_name } = result.image;
-        const { canvas, gallery } = getState();
+        const { gallery, progress } = getState();
 
         // This populates the `getImageDTO` cache
         const imageDTORequest = dispatch(
@@ -41,8 +42,10 @@ export const addInvocationCompleteEventListener = () => {
         const imageDTO = await imageDTORequest.unwrap();
         imageDTORequest.unsubscribe();
 
+        dispatch(imageInvocationComplete({ data, imageDTO }));
+
         // Add canvas images to the staging area
-        if (canvas.batchIds.includes(queue_batch_id) && [LINEAR_UI_OUTPUT].includes(data.source_node_id)) {
+        if (progress.canvasBatchIds.includes(queue_batch_id) && [LINEAR_UI_OUTPUT].includes(data.source_node_id)) {
           dispatch(addImageToStagingArea(imageDTO));
         }
 

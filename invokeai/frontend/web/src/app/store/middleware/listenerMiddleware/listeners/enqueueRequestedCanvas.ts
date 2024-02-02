@@ -2,13 +2,14 @@ import { logger } from 'app/logging/logger';
 import { enqueueRequested } from 'app/store/actions';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { parseify } from 'common/util/serialize';
-import { canvasBatchIdAdded, stagingAreaInitialized } from 'features/canvas/store/canvasSlice';
+import { stagingAreaInitialized } from 'features/canvas/store/canvasSlice';
 import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
 import { getCanvasGenerationMode } from 'features/canvas/util/getCanvasGenerationMode';
 import { canvasGraphBuilt } from 'features/nodes/store/actions';
 import { buildCanvasGraph } from 'features/nodes/util/graph/buildCanvasGraph';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
+import { canvasBatchEnqueued } from 'features/progress/store/progressSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { ImageDTO } from 'services/api/types';
@@ -121,8 +122,6 @@ export const addEnqueueRequestedCanvasListener = () => {
         const enqueueResult = await req.unwrap();
         req.reset();
 
-        const batchId = enqueueResult.batch.batch_id as string; // we know the is a string, backend provides it
-
         // Prep the canvas staging area if it is not yet initialized
         if (!state.canvas.layerState.stagingArea.boundingBox) {
           dispatch(
@@ -135,8 +134,9 @@ export const addEnqueueRequestedCanvasListener = () => {
           );
         }
 
-        // Associate the session with the canvas session ID
-        dispatch(canvasBatchIdAdded(batchId));
+        if (enqueueResult.batch.batch_id) {
+          dispatch(canvasBatchEnqueued(enqueueResult.batch.batch_id));
+        }
       } catch {
         // no-op
       }

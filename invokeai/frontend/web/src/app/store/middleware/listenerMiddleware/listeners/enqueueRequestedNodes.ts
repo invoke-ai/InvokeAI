@@ -1,6 +1,7 @@
 import { enqueueRequested } from 'app/store/actions';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
 import { buildWorkflowWithValidation } from 'features/nodes/util/workflow/buildWorkflow';
+import { workflowBatchEnqueued } from 'features/progress/store/progressSlice';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig } from 'services/api/types';
 
@@ -35,12 +36,20 @@ export const addEnqueueRequestedNodes = () => {
         prepend: action.payload.prepend,
       };
 
-      const req = dispatch(
-        queueApi.endpoints.enqueueBatch.initiate(batchConfig, {
-          fixedCacheKey: 'enqueueBatch',
-        })
-      );
-      req.reset();
+      try {
+        const req = dispatch(
+          queueApi.endpoints.enqueueBatch.initiate(batchConfig, {
+            fixedCacheKey: 'enqueueBatch',
+          })
+        );
+        const enqueueResult = await req.unwrap();
+        req.reset();
+        if (enqueueResult.batch.batch_id) {
+          dispatch(workflowBatchEnqueued(enqueueResult.batch.batch_id));
+        }
+      } catch {
+        // no-op
+      }
     },
   });
 };

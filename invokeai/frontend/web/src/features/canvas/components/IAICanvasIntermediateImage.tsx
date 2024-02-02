@@ -1,17 +1,13 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
-import { selectSystemSlice } from 'features/system/store/systemSlice';
+import { selectProgressSlice } from 'features/progress/store/progressSlice';
 import { memo, useEffect, useState } from 'react';
 import { Image as KonvaImage } from 'react-konva';
 
-const progressImageSelector = createMemoizedSelector([selectSystemSlice, selectCanvasSlice], (system, canvas) => {
-  const { denoiseProgress } = system;
-  const { batchIds } = canvas;
-
+const progressImageSelector = createMemoizedSelector([selectProgressSlice, selectCanvasSlice], (progress, canvas) => {
   return {
-    progressImage:
-      denoiseProgress && batchIds.includes(denoiseProgress.batch_id) ? denoiseProgress.progress_image : undefined,
+    progressImage: progress.canvasDenoiseProgress?.progress_image,
     boundingBox: canvas.layerState.stagingArea.boundingBox,
   };
 });

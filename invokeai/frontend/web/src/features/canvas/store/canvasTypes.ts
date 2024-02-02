@@ -142,7 +142,6 @@ export interface CanvasState {
   stageDimensions: Dimensions;
   stageScale: number;
   generationMode?: GenerationMode;
-  batchIds: string[];
   aspectRatio: AspectRatioState;
 }
 
