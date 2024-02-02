@@ -220,10 +220,11 @@ class InvokeAiInstance:
 
         pip = local[self.pip]
 
-        (
+        _ = (
             pip[
                 "install",
                 "--require-virtualenv",
+                "--force-reinstall",
                 "--use-pep517",
                 str(src) + (optional_modules if optional_modules else ""),
                 "--find-links" if find_links is not None else None,
