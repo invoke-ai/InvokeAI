@@ -215,25 +215,32 @@ class InvokeAiInstance:
 
         src = f"invokeai=={version}" if version is not None else "invokeai"
 
-        from plumbum import FG, local  # type: ignore
+        from plumbum import FG, ProcessExecutionError, local  # type: ignore
 
         pip = local[self.pip]
+        _ = pip["install", "--upgrade", "pip"] & FG
 
-        _ = (
-            pip[
-                "install",
-                "--require-virtualenv",
-                "--force-reinstall",
-                "--use-pep517",
-                str(src) + (optional_modules if optional_modules else ""),
-                "--find-links" if find_links is not None else None,
-                find_links,
-                "--extra-index-url" if extra_index_url is not None else None,
-                extra_index_url,
-                pre,
-            ]
-            & FG
-        )
+        pipeline = pip[
+            "install",
+            "--require-virtualenv",
+            "--force-reinstall",
+            "--use-pep517",
+            str(src) + (optional_modules if optional_modules else ""),
+            "--find-links" if find_links is not None else None,
+            find_links,
+            "--extra-index-url" if extra_index_url is not None else None,
+            extra_index_url,
+            pre,
+        ]
+
+        try:
+            _ = pipeline & FG
+        except ProcessExecutionError as e:
+            print(f"Error: {e}")
+            print(
+                "Could not install InvokeAI. Please try downloading the latest version of the installer and install again."
+            )
+            sys.exit(1)
 
     def configure(self):
         """
