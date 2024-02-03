@@ -1,5 +1,5 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice, isAnyOf } from '@reduxjs/toolkit';
+import { createAction, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { uniqBy } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
@@ -134,3 +134,10 @@ export const galleryPersistConfig: PersistConfig<GalleryState> = {
   migrate: migrateGalleryState,
   persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'offset', 'limit'],
 };
+
+export const galleryImageClicked = createAction<{
+  imageDTO: ImageDTO;
+  shiftKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+}>(`${gallerySlice.name}/galleryImageClicked`);

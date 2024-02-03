@@ -1,7 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { galleryImageClicked } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { imageSelectionChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
+import { galleryImageClicked, imageSelectionChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import type { MouseEvent } from 'react';
 import { useCallback, useMemo } from 'react';

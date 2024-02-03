@@ -1,18 +1,9 @@
-import { createAction } from '@reduxjs/toolkit';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { imageSelectionChanged } from 'features/gallery/store/gallerySlice';
+import { galleryImageClicked, imageSelectionChanged } from 'features/gallery/store/gallerySlice';
 import { imagesApi } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
 import { imagesSelectors } from 'services/api/util';
 
 import { startAppListening } from '..';
-
-export const galleryImageClicked = createAction<{
-  imageDTO: ImageDTO;
-  shiftKey: boolean;
-  ctrlKey: boolean;
-  metaKey: boolean;
-}>('gallery/imageClicked');
 
 /**
  * This listener handles the logic for selecting images in the gallery.
