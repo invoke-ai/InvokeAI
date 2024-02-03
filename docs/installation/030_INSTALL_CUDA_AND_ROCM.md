@@ -134,7 +134,7 @@ recipes are available
 
 When installing torch and torchvision manually with `pip`, remember to provide
 the argument `--extra-index-url
-https://download.pytorch.org/whl/rocm5.4.2` as described in the [Manual
+https://download.pytorch.org/whl/rocm5.6` as described in the [Manual
 Installation Guide](020_INSTALL_MANUAL.md).
 
 This will be done automatically for you if you use the installer

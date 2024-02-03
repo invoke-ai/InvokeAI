@@ -1,4 +1,4 @@
-import { Flex, FormControl, FormLabel } from '@invoke-ai/ui';
+import { Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
 import { useDoesInputHaveValue } from 'features/nodes/hooks/useDoesInputHaveValue';
 import { useFieldInputInstance } from 'features/nodes/hooks/useFieldInputInstance';
@@ -23,13 +23,8 @@ const InputField = ({ nodeId, fieldName }: Props) => {
   const fieldInstance = useFieldInputInstance(nodeId, fieldName);
   const doesFieldHaveValue = useDoesInputHaveValue(nodeId, fieldName);
 
-  const {
-    isConnected,
-    isConnectionInProgress,
-    isConnectionStartField,
-    connectionError,
-    shouldDim,
-  } = useConnectionState({ nodeId, fieldName, kind: 'input' });
+  const { isConnected, isConnectionInProgress, isConnectionStartField, connectionError, shouldDim } =
+    useConnectionState({ nodeId, fieldName, kind: 'input' });
 
   const isMissingInput = useMemo(() => {
     if (!fieldTemplate) {
@@ -44,11 +39,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
       return true;
     }
 
-    if (
-      !doesFieldHaveValue &&
-      !isConnected &&
-      fieldTemplate.input !== 'connection'
-    ) {
+    if (!doesFieldHaveValue && !isConnected && fieldTemplate.input !== 'connection') {
       return true;
     }
 
@@ -58,22 +49,8 @@ const InputField = ({ nodeId, fieldName }: Props) => {
   if (!fieldTemplate || !fieldInstance) {
     return (
       <InputFieldWrapper shouldDim={shouldDim}>
-        <FormControl
-          alignItems="stretch"
-          justifyContent="space-between"
-          flexDir="column"
-          gap={2}
-          h="full"
-          w="full"
-        >
-          <FormLabel
-            display="flex"
-            alignItems="center"
-            mb={0}
-            px={1}
-            gap={2}
-            h="full"
-          >
+        <FormControl alignItems="stretch" justifyContent="space-between" flexDir="column" gap={2} h="full" w="full">
+          <FormLabel display="flex" alignItems="center" mb={0} px={1} gap={2} h="full">
             {t('nodes.unknownInput', {
               name: fieldInstance?.label ?? fieldTemplate?.title ?? fieldName,
             })}
@@ -109,12 +86,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
 
   return (
     <InputFieldWrapper shouldDim={shouldDim}>
-      <FormControl
-        isInvalid={isMissingInput}
-        isDisabled={isConnected}
-        orientation="vertical"
-        px={2}
-      >
+      <FormControl isInvalid={isMissingInput} isDisabled={isConnected} orientation="vertical" px={2}>
         <Flex flexDir="column" w="full" gap={1}>
           <FieldContextMenu nodeId={nodeId} fieldName={fieldName} kind="input">
             {(ref) => (
@@ -151,24 +123,22 @@ type InputFieldWrapperProps = PropsWithChildren<{
   shouldDim: boolean;
 }>;
 
-const InputFieldWrapper = memo(
-  ({ shouldDim, children }: InputFieldWrapperProps) => {
-    return (
-      <Flex
-        position="relative"
-        minH={8}
-        py={0.5}
-        alignItems="center"
-        opacity={shouldDim ? 0.5 : 1}
-        transitionProperty="opacity"
-        transitionDuration="0.1s"
-        w="full"
-        h="full"
-      >
-        {children}
-      </Flex>
-    );
-  }
-);
+const InputFieldWrapper = memo(({ shouldDim, children }: InputFieldWrapperProps) => {
+  return (
+    <Flex
+      position="relative"
+      minH={8}
+      py={0.5}
+      alignItems="center"
+      opacity={shouldDim ? 0.5 : 1}
+      transitionProperty="opacity"
+      transitionDuration="0.1s"
+      w="full"
+      h="full"
+    >
+      {children}
+    </Flex>
+  );
+});
 
 InputFieldWrapper.displayName = 'InputFieldWrapper';

@@ -1,4 +1,4 @@
-import { ButtonGroup, IconButton } from '@invoke-ai/ui';
+import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   // shouldShowFieldTypeLegendChanged,
@@ -21,9 +21,7 @@ const ViewportControls = () => {
   // const shouldShowFieldTypeLegend = useAppSelector(
   //   (s) => s.nodes.shouldShowFieldTypeLegend
   // );
-  const shouldShowMinimapPanel = useAppSelector(
-    (s) => s.nodes.shouldShowMinimapPanel
-  );
+  const shouldShowMinimapPanel = useAppSelector((s) => s.nodes.shouldShowMinimapPanel);
 
   const handleClickedZoomIn = useCallback(() => {
     zoomIn();
@@ -80,16 +78,8 @@ const ViewportControls = () => {
         />
       </Tooltip> */}
       <IconButton
-        tooltip={
-          shouldShowMinimapPanel
-            ? t('nodes.hideMinimapnodes')
-            : t('nodes.showMinimapnodes')
-        }
-        aria-label={
-          shouldShowMinimapPanel
-            ? t('nodes.hideMinimapnodes')
-            : t('nodes.showMinimapnodes')
-        }
+        tooltip={shouldShowMinimapPanel ? t('nodes.hideMinimapnodes') : t('nodes.showMinimapnodes')}
+        aria-label={shouldShowMinimapPanel ? t('nodes.hideMinimapnodes') : t('nodes.showMinimapnodes')}
         isChecked={shouldShowMinimapPanel}
         onClick={handleClickedToggleMiniMapPanel}
         icon={<PiMapPinBold />}

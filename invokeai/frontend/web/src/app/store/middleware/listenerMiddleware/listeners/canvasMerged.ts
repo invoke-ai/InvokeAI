@@ -13,9 +13,7 @@ export const addCanvasMergedListener = () => {
   startAppListening({
     actionCreator: canvasMerged,
     effect: async (action, { dispatch }) => {
-      const moduleLog = $logger
-        .get()
-        .child({ namespace: 'canvasCopiedToClipboardListener' });
+      const moduleLog = $logger.get().child({ namespace: 'canvasCopiedToClipboardListener' });
       const blob = await getFullBaseLayerBlob();
 
       if (!blob) {

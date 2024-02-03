@@ -1,17 +1,10 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
-import {
-  boardIdSelected,
-  galleryViewChanged,
-  imageSelected,
-} from 'features/gallery/store/gallerySlice';
+import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { isImageOutput } from 'features/nodes/types/common';
-import {
-  LINEAR_UI_OUTPUT,
-  nodeIDDenyList,
-} from 'features/nodes/util/graph/constants';
+import { LINEAR_UI_OUTPUT, nodeIDDenyList } from 'features/nodes/util/graph/constants';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import { imagesAdapter } from 'services/api/util';
@@ -29,19 +22,12 @@ export const addInvocationCompleteEventListener = () => {
     actionCreator: socketInvocationComplete,
     effect: async (action, { dispatch, getState }) => {
       const { data } = action.payload;
-      log.debug(
-        { data: parseify(data) },
-        `Invocation complete (${action.payload.data.node.type})`
-      );
+      log.debug({ data: parseify(data) }, `Invocation complete (${action.payload.data.node.type})`);
 
       const { result, node, queue_batch_id, source_node_id } = data;
 
       // This complete event has an associated image output
-      if (
-        isImageOutput(result) &&
-        !nodeTypeDenylist.includes(node.type) &&
-        !nodeIDDenyList.includes(source_node_id)
-      ) {
+      if (isImageOutput(result) && !nodeTypeDenylist.includes(node.type) && !nodeIDDenyList.includes(source_node_id)) {
         const { image_name } = result.image;
         const { canvas, gallery } = getState();
 
@@ -56,10 +42,7 @@ export const addInvocationCompleteEventListener = () => {
         imageDTORequest.unsubscribe();
 
         // Add canvas images to the staging area
-        if (
-          canvas.batchIds.includes(queue_batch_id) &&
-          [LINEAR_UI_OUTPUT].includes(data.source_node_id)
-        ) {
+        if (canvas.batchIds.includes(queue_batch_id) && [LINEAR_UI_OUTPUT].includes(data.source_node_id)) {
           dispatch(addImageToStagingArea(imageDTO));
         }
 
@@ -84,21 +67,13 @@ export const addInvocationCompleteEventListener = () => {
 
           // update the total images for the board
           dispatch(
-            boardsApi.util.updateQueryData(
-              'getBoardImagesTotal',
-              imageDTO.board_id ?? 'none',
-              (draft) => {
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                draft.total += 1;
-              }
-            )
+            boardsApi.util.updateQueryData('getBoardImagesTotal', imageDTO.board_id ?? 'none', (draft) => {
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              draft.total += 1;
+            })
           );
 
-          dispatch(
-            imagesApi.util.invalidateTags([
-              { type: 'Board', id: imageDTO.board_id ?? 'none' },
-            ])
-          );
+          dispatch(imagesApi.util.invalidateTags([{ type: 'Board', id: imageDTO.board_id ?? 'none' }]));
 
           const { shouldAutoSwitch } = gallery;
 
@@ -109,10 +84,7 @@ export const addInvocationCompleteEventListener = () => {
               dispatch(galleryViewChanged('images'));
             }
 
-            if (
-              imageDTO.board_id &&
-              imageDTO.board_id !== gallery.selectedBoardId
-            ) {
+            if (imageDTO.board_id && imageDTO.board_id !== gallery.selectedBoardId) {
               dispatch(
                 boardIdSelected({
                   boardId: imageDTO.board_id,

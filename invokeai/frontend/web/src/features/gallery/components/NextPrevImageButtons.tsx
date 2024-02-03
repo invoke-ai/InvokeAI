@@ -1,14 +1,10 @@
-import type { ChakraProps } from '@invoke-ai/ui';
-import { Box, Flex, IconButton, Spinner } from '@invoke-ai/ui';
+import type { ChakraProps } from '@invoke-ai/ui-library';
+import { Box, Flex, IconButton, Spinner } from '@invoke-ai/ui-library';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  PiCaretDoubleRightBold,
-  PiCaretLeftBold,
-  PiCaretRightBold,
-} from 'react-icons/pi';
+import { PiCaretDoubleRightBold, PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 
 const nextPrevButtonStyles: ChakraProps['sx'] = {
   color: 'base.100',
@@ -18,8 +14,7 @@ const nextPrevButtonStyles: ChakraProps['sx'] = {
 const NextPrevImageButtons = () => {
   const { t } = useTranslation();
 
-  const { handleLeftImage, handleRightImage, isOnFirstImage, isOnLastImage } =
-    useGalleryNavigation();
+  const { handleLeftImage, handleRightImage, isOnFirstImage, isOnLastImage } = useGalleryNavigation();
 
   const {
     areMoreImagesAvailable,
@@ -29,12 +24,7 @@ const NextPrevImageButtons = () => {
 
   return (
     <Box pos="relative" h="full" w="full">
-      <Box
-        pos="absolute"
-        top="50%"
-        transform="translate(0, -50%)"
-        insetInlineStart={1}
-      >
+      <Box pos="absolute" top="50%" transform="translate(0, -50%)" insetInlineStart={1}>
         {!isOnFirstImage && (
           <IconButton
             aria-label={t('accessibility.previousImage')}
@@ -46,12 +36,7 @@ const NextPrevImageButtons = () => {
           />
         )}
       </Box>
-      <Box
-        pos="absolute"
-        top="50%"
-        transform="translate(0, -50%)"
-        insetInlineEnd={6}
-      >
+      <Box pos="absolute" top="50%" transform="translate(0, -50%)" insetInlineEnd={6}>
         {!isOnLastImage && (
           <IconButton
             aria-label={t('accessibility.nextImage')}

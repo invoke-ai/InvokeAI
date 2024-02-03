@@ -1,4 +1,4 @@
-import { ListItem, Text, UnorderedList } from '@invoke-ai/ui';
+import { ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { some } from 'lodash-es';
 import { memo } from 'react';
@@ -29,18 +29,10 @@ const ImageUsageMessage = (props: Props) => {
     <>
       <Text>{topMessage}</Text>
       <UnorderedList paddingInlineStart={6}>
-        {imageUsage.isInitialImage && (
-          <ListItem>{t('common.img2img')}</ListItem>
-        )}
-        {imageUsage.isCanvasImage && (
-          <ListItem>{t('common.unifiedCanvas')}</ListItem>
-        )}
-        {imageUsage.isControlImage && (
-          <ListItem>{t('common.controlNet')}</ListItem>
-        )}
-        {imageUsage.isNodesImage && (
-          <ListItem>{t('common.nodeEditor')}</ListItem>
-        )}
+        {imageUsage.isInitialImage && <ListItem>{t('common.img2img')}</ListItem>}
+        {imageUsage.isCanvasImage && <ListItem>{t('common.unifiedCanvas')}</ListItem>}
+        {imageUsage.isControlImage && <ListItem>{t('common.controlNet')}</ListItem>}
+        {imageUsage.isNodesImage && <ListItem>{t('common.nodeEditor')}</ListItem>}
       </UnorderedList>
       <Text>{bottomMessage}</Text>
     </>

@@ -1,5 +1,5 @@
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setInfillMethod } from 'features/parameters/store/generationSlice';
@@ -33,10 +33,7 @@ const ParamInfillMethod = () => {
     [dispatch, options]
   );
 
-  const value = useMemo(
-    () => options.find((o) => o.value === infillMethod),
-    [options, infillMethod]
-  );
+  const value = useMemo(() => options.find((o) => o.value === infillMethod), [options, infillMethod]);
 
   return (
     <FormControl isDisabled={options.length === 0}>

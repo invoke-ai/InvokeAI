@@ -3,9 +3,7 @@ import type { AppFeature, SDFeature } from 'app/types/invokeai';
 import type { InvokeTabName } from 'features/ui/store/tabMap';
 import { useMemo } from 'react';
 
-export const useFeatureStatus = (
-  feature: AppFeature | SDFeature | InvokeTabName
-) => {
+export const useFeatureStatus = (feature: AppFeature | SDFeature | InvokeTabName) => {
   const disabledTabs = useAppSelector((s) => s.config.disabledTabs);
 
   const disabledFeatures = useAppSelector((s) => s.config.disabledFeatures);

@@ -1,4 +1,4 @@
-import { Icon, IconButton } from '@invoke-ai/ui';
+import { Icon, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { nodeIsOpenChanged } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback } from 'react';

@@ -1,5 +1,4 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { isInputElement } from 'common/util/isInputElement';
 import {
   $canvasStage,
   $tool,
@@ -14,7 +13,7 @@ import {
   setShouldShowBoundingBox,
   setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
-import { isElChildOfCanvasTab } from 'features/canvas/util/isElChildOfCanvasTab';
+import { isInteractiveTarget } from 'features/canvas/util/isInteractiveTarget';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -22,9 +21,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 const useInpaintingCanvasHotkeys = () => {
   const dispatch = useAppDispatch();
   const activeTabName = useAppSelector(activeTabNameSelector);
-  const shouldShowBoundingBox = useAppSelector(
-    (s) => s.canvas.shouldShowBoundingBox
-  );
+  const shouldShowBoundingBox = useAppSelector((s) => s.canvas.shouldShowBoundingBox);
   const isStaging = useAppSelector(isStagingSelector);
   const isMaskEnabled = useAppSelector((s) => s.canvas.isMaskEnabled);
   const shouldSnapToGrid = useAppSelector((s) => s.canvas.shouldSnapToGrid);
@@ -44,8 +41,7 @@ const useInpaintingCanvasHotkeys = () => {
     []
   );
 
-  const handleToggleEnableMask = () =>
-    dispatch(setIsMaskEnabled(!isMaskEnabled));
+  const handleToggleEnableMask = () => dispatch(setIsMaskEnabled(!isMaskEnabled));
 
   useHotkeys(
     ['h'],
@@ -95,39 +91,35 @@ const useInpaintingCanvasHotkeys = () => {
     [activeTabName, shouldShowBoundingBox]
   );
 
-  const onKeyDown = useCallback((e: KeyboardEvent) => {
-    if (
-      e.repeat ||
-      e.key !== ' ' ||
-      isInputElement(e.target as HTMLElement) ||
-      !isElChildOfCanvasTab(e.target as HTMLElement)
-    ) {
-      return;
-    }
-    if ($toolStash.get() || $tool.get() === 'move') {
-      return;
-    }
-    $canvasStage.get()?.container().focus();
-    $toolStash.set($tool.get());
-    $tool.set('move');
-    resetToolInteractionState();
-  }, []);
-  const onKeyUp = useCallback((e: KeyboardEvent) => {
-    if (
-      e.repeat ||
-      e.key !== ' ' ||
-      isInputElement(e.target as HTMLElement) ||
-      !isElChildOfCanvasTab(e.target as HTMLElement)
-    ) {
-      return;
-    }
-    if (!$toolStash.get() || $tool.get() !== 'move') {
-      return;
-    }
-    $canvasStage.get()?.container().focus();
-    $tool.set($toolStash.get() ?? 'move');
-    $toolStash.set(null);
-  }, []);
+  const onKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.repeat || e.key !== ' ' || isInteractiveTarget(e.target) || activeTabName !== 'unifiedCanvas') {
+        return;
+      }
+      if ($toolStash.get() || $tool.get() === 'move') {
+        return;
+      }
+      $canvasStage.get()?.container().focus();
+      $toolStash.set($tool.get());
+      $tool.set('move');
+      resetToolInteractionState();
+    },
+    [activeTabName]
+  );
+  const onKeyUp = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.repeat || e.key !== ' ' || isInteractiveTarget(e.target) || activeTabName !== 'unifiedCanvas') {
+        return;
+      }
+      if (!$toolStash.get() || $tool.get() !== 'move') {
+        return;
+      }
+      $canvasStage.get()?.container().focus();
+      $tool.set($toolStash.get() ?? 'move');
+      $toolStash.set(null);
+    },
+    [activeTabName]
+  );
 
   useEffect(() => {
     window.addEventListener('keydown', onKeyDown);

@@ -6,7 +6,7 @@ import {
   ModalContent,
   ModalHeader,
   ModalOverlay,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useDynamicPromptsModal } from 'features/dynamicPrompts/hooks/useDynamicPromptsModal';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';

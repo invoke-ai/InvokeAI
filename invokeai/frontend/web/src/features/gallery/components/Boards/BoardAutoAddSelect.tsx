@@ -1,5 +1,5 @@
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -10,9 +10,7 @@ const BoardAutoAddSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
-  const autoAssignBoardOnClick = useAppSelector(
-    (s) => s.gallery.autoAssignBoardOnClick
-  );
+  const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
   const { options, hasBoards } = useListAllBoardsQuery(undefined, {
     selectFromResult: ({ data }) => {
       const options: ComboboxOption[] = [
@@ -43,10 +41,7 @@ const BoardAutoAddSelect = () => {
     [dispatch]
   );
 
-  const value = useMemo(
-    () => options.find((o) => o.value === autoAddBoardId),
-    [options, autoAddBoardId]
-  );
+  const value = useMemo(() => options.find((o) => o.value === autoAddBoardId), [options, autoAddBoardId]);
 
   const noOptionsMessage = useCallback(() => t('boards.noMatching'), [t]);
 

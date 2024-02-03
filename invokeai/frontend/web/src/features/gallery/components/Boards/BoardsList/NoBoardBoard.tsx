@@ -1,21 +1,15 @@
-import { Box, Flex, Image, Text, Tooltip } from '@invoke-ai/ui';
+import { Box, Flex, Image, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
 import SelectionOverlay from 'common/components/SelectionOverlay';
 import type { RemoveFromBoardDropData } from 'features/dnd/types';
 import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
-import {
-  autoAddBoardIdChanged,
-  boardIdSelected,
-} from 'features/gallery/store/gallerySlice';
+import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
 import InvokeLogoSVG from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  useGetBoardAssetsTotalQuery,
-  useGetBoardImagesTotalQuery,
-} from 'services/api/endpoints/boards';
+import { useGetBoardAssetsTotalQuery, useGetBoardImagesTotalQuery } from 'services/api/endpoints/boards';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 interface Props {
@@ -25,9 +19,7 @@ interface Props {
 const NoBoardBoard = memo(({ isSelected }: Props) => {
   const dispatch = useAppDispatch();
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
-  const autoAssignBoardOnClick = useAppSelector(
-    (s) => s.gallery.autoAssignBoardOnClick
-  );
+  const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
   const boardName = useBoardName('none');
   const handleSelectBoard = useCallback(() => {
     dispatch(boardIdSelected({ boardId: 'none' }));
@@ -92,12 +84,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                 cursor="pointer"
                 bg="base.800"
               >
-                <Flex
-                  w="full"
-                  h="full"
-                  justifyContent="center"
-                  alignItems="center"
-                >
+                <Flex w="full" h="full" justifyContent="center" alignItems="center">
                   <Image
                     src={InvokeLogoSVG}
                     alt="invoke-ai-logo"
@@ -130,16 +117,8 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                 >
                   {boardName}
                 </Flex>
-                <SelectionOverlay
-                  isSelected={isSelected}
-                  isHovered={isHovered}
-                />
-                <IAIDroppable
-                  data={droppableData}
-                  dropLabel={
-                    <Text fontSize="md">{t('unifiedCanvas.move')}</Text>
-                  }
-                />
+                <SelectionOverlay isSelected={isSelected} isHovered={isHovered} />
+                <IAIDroppable data={droppableData} dropLabel={<Text fontSize="md">{t('unifiedCanvas.move')}</Text>} />
               </Flex>
             </Tooltip>
           )}

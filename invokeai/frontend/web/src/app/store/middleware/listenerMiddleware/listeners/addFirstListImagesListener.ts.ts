@@ -12,15 +12,9 @@ export const appStarted = createAction('app/appStarted');
 export const addFirstListImagesListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.listImages.matchFulfilled,
-    effect: async (
-      action,
-      { dispatch, unsubscribe, cancelActiveListeners }
-    ) => {
+    effect: async (action, { dispatch, unsubscribe, cancelActiveListeners }) => {
       // Only run this listener on the first listImages request for no-board images
-      if (
-        action.meta.arg.queryCacheKey !==
-        getListImagesUrl({ board_id: 'none', categories: IMAGE_CATEGORIES })
-      ) {
+      if (action.meta.arg.queryCacheKey !== getListImagesUrl({ board_id: 'none', categories: IMAGE_CATEGORIES })) {
         return;
       }
 

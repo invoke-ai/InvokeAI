@@ -1,4 +1,4 @@
-import { IconButton, Tooltip } from '@invoke-ai/ui';
+import { IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCodeBold } from 'react-icons/pi';

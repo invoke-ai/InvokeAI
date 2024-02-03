@@ -1,4 +1,4 @@
-import { Combobox, FormControl, FormLabel, Tooltip } from '@invoke-ai/ui';
+import { Combobox, FormControl, FormLabel, Tooltip } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
@@ -9,16 +9,9 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
 import type { MainModelConfigEntity } from 'services/api/endpoints/models';
-import {
-  getModelId,
-  mainModelsAdapterSelectors,
-  useGetMainModelsQuery,
-} from 'services/api/endpoints/models';
+import { getModelId, mainModelsAdapterSelectors, useGetMainModelsQuery } from 'services/api/endpoints/models';
 
-const selectModel = createMemoizedSelector(
-  selectGenerationSlice,
-  (generation) => generation.model
-);
+const selectModel = createMemoizedSelector(selectGenerationSlice, (generation) => generation.model);
 
 const ParamMainModelSelect = () => {
   const dispatch = useAppDispatch();
@@ -29,27 +22,23 @@ const ParamMainModelSelect = () => {
     if (!data || !model) {
       return;
     }
-    return mainModelsAdapterSelectors.selectById(data, getModelId(model))
-      ?.description;
+    return mainModelsAdapterSelectors.selectById(data, getModelId(model))?.description;
   }, [data, model]);
   const _onChange = useCallback(
     (model: MainModelConfigEntity | null) => {
       if (!model) {
         return;
       }
-      dispatch(
-        modelSelected(pick(model, ['base_model', 'model_name', 'model_type']))
-      );
+      dispatch(modelSelected(pick(model, ['base_model', 'model_name', 'model_type'])));
     },
     [dispatch]
   );
-  const { options, value, onChange, placeholder, noOptionsMessage } =
-    useGroupedModelCombobox({
-      modelEntities: data,
-      onChange: _onChange,
-      selectedModel: model,
-      isLoading,
-    });
+  const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
+    modelEntities: data,
+    onChange: _onChange,
+    selectedModel: model,
+    isLoading,
+  });
 
   return (
     <Tooltip label={tooltipLabel}>

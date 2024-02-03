@@ -1,5 +1,5 @@
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { typedMemo } from 'common/util/typedMemo';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { useCallback, useMemo } from 'react';
@@ -15,15 +15,10 @@ const options: ComboboxOption[] = [
   { value: 'sdxl-refiner', label: MODEL_TYPE_MAP['sdxl-refiner'] },
 ];
 
-const BaseModelSelect = <T extends AnyModelConfig>(
-  props: UseControllerProps<T>
-) => {
+const BaseModelSelect = <T extends AnyModelConfig>(props: UseControllerProps<T>) => {
   const { t } = useTranslation();
   const { field } = useController(props);
-  const value = useMemo(
-    () => options.find((o) => o.value === field.value),
-    [field.value]
-  );
+  const value = useMemo(() => options.find((o) => o.value === field.value), [field.value]);
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       field.onChange(v?.value);

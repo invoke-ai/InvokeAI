@@ -1,12 +1,7 @@
-import type {
-  FieldInputTemplate,
-  FieldOutputTemplate,
-} from 'features/nodes/types/field';
+import type { FieldInputTemplate, FieldOutputTemplate } from 'features/nodes/types/field';
 import { isNil } from 'lodash-es';
 
-export const getSortedFilteredFieldNames = (
-  fields: FieldInputTemplate[] | FieldOutputTemplate[]
-): string[] => {
+export const getSortedFilteredFieldNames = (fields: FieldInputTemplate[] | FieldOutputTemplate[]): string[] => {
   const visibleFields = fields.filter((field) => !field.ui_hidden);
 
   // we want explicitly ordered fields to be before unordered fields; split the list

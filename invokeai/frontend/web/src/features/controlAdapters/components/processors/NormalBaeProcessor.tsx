@@ -1,9 +1,4 @@
-import {
-  CompositeNumberInput,
-  CompositeSlider,
-  FormControl,
-  FormLabel,
-} from '@invoke-ai/ui';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type { RequiredNormalbaeImageProcessorInvocation } from 'features/controlAdapters/store/types';
@@ -12,8 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './common/ProcessorWrapper';
 
-const DEFAULTS = CONTROLNET_PROCESSORS.normalbae_image_processor
-  .default as RequiredNormalbaeImageProcessorInvocation;
+const DEFAULTS = CONTROLNET_PROCESSORS.normalbae_image_processor.default as RequiredNormalbaeImageProcessorInvocation;
 
 type Props = {
   controlNetId: string;

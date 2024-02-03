@@ -2,10 +2,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  useClearInvocationCacheMutation,
-  useGetInvocationCacheStatusQuery,
-} from 'services/api/endpoints/appInfo';
+import { useClearInvocationCacheMutation, useGetInvocationCacheStatusQuery } from 'services/api/endpoints/appInfo';
 
 export const useClearInvocationCache = () => {
   const { t } = useTranslation();
@@ -16,10 +13,7 @@ export const useClearInvocationCache = () => {
     fixedCacheKey: 'clearInvocationCache',
   });
 
-  const isDisabled = useMemo(
-    () => !cacheStatus?.size || !isConnected,
-    [cacheStatus?.size, isConnected]
-  );
+  const isDisabled = useMemo(() => !cacheStatus?.size || !isConnected, [cacheStatus?.size, isConnected]);
 
   const clearInvocationCache = useCallback(async () => {
     if (isDisabled) {

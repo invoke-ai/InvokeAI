@@ -1,14 +1,8 @@
-import type { SystemStyleObject } from '@invoke-ai/ui';
-import {
-  ButtonGroup,
-  Flex,
-  Icon,
-  IconButton,
-  Portal,
-  spinAnimation,
-} from '@invoke-ai/ui';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { ButtonGroup, Flex, Icon, IconButton, Portal, spinAnimation, useDisclosure } from '@invoke-ai/ui-library';
 import CancelCurrentQueueItemIconButton from 'features/queue/components/CancelCurrentQueueItemIconButton';
-import ClearQueueIconButton from 'features/queue/components/ClearQueueIconButton';
+import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQueueConfirmationAlertDialog';
+import { ClearAllQueueIconButton } from 'features/queue/components/ClearQueueIconButton';
 import { QueueButtonTooltip } from 'features/queue/components/QueueButtonTooltip';
 import { useQueueBack } from 'features/queue/hooks/useQueueBack';
 import type { UsePanelReturn } from 'features/ui/hooks/usePanel';
@@ -41,6 +35,8 @@ const FloatingSidePanelButtons = (props: Props) => {
       ),
     [isDisabled, queueStatus?.processor.is_processing]
   );
+
+  const disclosure = useDisclosure();
 
   if (!props.panelApi.isCollapsed) {
     return null;
@@ -78,7 +74,8 @@ const FloatingSidePanelButtons = (props: Props) => {
           />
           <CancelCurrentQueueItemIconButton sx={floatingButtonStyles} />
         </ButtonGroup>
-        <ClearQueueIconButton sx={floatingButtonStyles} />
+        <ClearAllQueueIconButton sx={floatingButtonStyles} onOpen={disclosure.onOpen} />
+        <ClearQueueConfirmationAlertDialog disclosure={disclosure} />
       </Flex>
     </Portal>
   );

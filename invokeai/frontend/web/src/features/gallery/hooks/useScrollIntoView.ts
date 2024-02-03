@@ -16,11 +16,7 @@ import { useEffect, useRef } from 'react';
  * @param selectionCount The number of images selected.
  * @returns
  */
-export const useScrollIntoView = (
-  isSelected: boolean,
-  index: number,
-  areMultiplesSelected: boolean
-) => {
+export const useScrollIntoView = (isSelected: boolean, index: number, areMultiplesSelected: boolean) => {
   const imageContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

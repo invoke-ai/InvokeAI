@@ -1,5 +1,5 @@
-import type { ChakraProps } from '@invoke-ai/ui';
-import { Flex, FormControlGroup } from '@invoke-ai/ui';
+import type { ChakraProps } from '@invoke-ai/ui-library';
+import { Flex, FormControlGroup } from '@invoke-ai/ui-library';
 import { useHasImageOutput } from 'features/nodes/hooks/useHasImageOutput';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';

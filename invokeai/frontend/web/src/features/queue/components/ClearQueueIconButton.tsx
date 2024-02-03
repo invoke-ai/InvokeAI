@@ -1,5 +1,5 @@
-import type { IconButtonProps } from '@invoke-ai/ui';
-import { IconButton, useDisclosure, useShiftModifier } from '@invoke-ai/ui';
+import type { IconButtonProps } from '@invoke-ai/ui-library';
+import { IconButton, useDisclosure, useShiftModifier } from '@invoke-ai/ui-library';
 import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
@@ -12,10 +12,7 @@ type ClearQueueIconButtonProps = ClearQueueButtonProps & {
   onOpen: () => void;
 };
 
-const ClearAllQueueIconButton = ({
-  onOpen,
-  ...props
-}: ClearQueueIconButtonProps) => {
+export const ClearAllQueueIconButton = ({ onOpen, ...props }: ClearQueueIconButtonProps) => {
   const { t } = useTranslation();
   const { isLoading, isDisabled } = useClearQueue();
 
@@ -36,8 +33,7 @@ const ClearAllQueueIconButton = ({
 
 const ClearSingleQueueItemIconButton = (props: ClearQueueButtonProps) => {
   const { t } = useTranslation();
-  const { cancelQueueItem, isLoading, isDisabled } =
-    useCancelCurrentQueueItem();
+  const { cancelQueueItem, isLoading, isDisabled } = useCancelCurrentQueueItem();
 
   return (
     <IconButton

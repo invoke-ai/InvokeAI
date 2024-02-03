@@ -6,16 +6,10 @@ import {
   controlAdapterImageChanged,
   controlAdapterIsEnabledChanged,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
-import type {
-  TypesafeDraggableData,
-  TypesafeDroppableData,
-} from 'features/dnd/types';
+import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
-import {
-  initialImageChanged,
-  selectOptimalDimension,
-} from 'features/parameters/store/generationSlice';
+import { initialImageChanged, selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 
 import { startAppListening } from '../';
@@ -35,15 +29,9 @@ export const addImageDroppedListener = () => {
       if (activeData.payloadType === 'IMAGE_DTO') {
         log.debug({ activeData, overData }, 'Image dropped');
       } else if (activeData.payloadType === 'GALLERY_SELECTION') {
-        log.debug(
-          { activeData, overData },
-          `Images (${getState().gallery.selection.length}) dropped`
-        );
+        log.debug({ activeData, overData }, `Images (${getState().gallery.selection.length}) dropped`);
       } else if (activeData.payloadType === 'NODE_FIELD') {
-        log.debug(
-          { activeData: parseify(activeData), overData: parseify(overData) },
-          'Node field dropped'
-        );
+        log.debug({ activeData: parseify(activeData), overData: parseify(overData) }, 'Node field dropped');
       } else {
         log.debug({ activeData, overData }, `Unknown payload dropped`);
       }
@@ -104,12 +92,7 @@ export const addImageDroppedListener = () => {
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
-        dispatch(
-          setInitialCanvasImage(
-            activeData.payload.imageDTO,
-            selectOptimalDimension(getState())
-          )
-        );
+        dispatch(setInitialCanvasImage(activeData.payload.imageDTO, selectOptimalDimension(getState())));
         return;
       }
 
@@ -191,10 +174,7 @@ export const addImageDroppedListener = () => {
       /**
        * Multiple images dropped on user board
        */
-      if (
-        overData.actionType === 'ADD_TO_BOARD' &&
-        activeData.payloadType === 'GALLERY_SELECTION'
-      ) {
+      if (overData.actionType === 'ADD_TO_BOARD' && activeData.payloadType === 'GALLERY_SELECTION') {
         const imageDTOs = getState().gallery.selection;
         const { boardId } = overData.context;
         dispatch(
@@ -209,10 +189,7 @@ export const addImageDroppedListener = () => {
       /**
        * Multiple images dropped on 'none' board
        */
-      if (
-        overData.actionType === 'REMOVE_FROM_BOARD' &&
-        activeData.payloadType === 'GALLERY_SELECTION'
-      ) {
+      if (overData.actionType === 'REMOVE_FROM_BOARD' && activeData.payloadType === 'GALLERY_SELECTION') {
         const imageDTOs = getState().gallery.selection;
         dispatch(
           imagesApi.endpoints.removeImagesFromBoard.initiate({

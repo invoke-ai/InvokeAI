@@ -1,12 +1,9 @@
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import {
-  selectGenerationSlice,
-  vaeSelected,
-} from 'features/parameters/store/generationSlice';
+import { selectGenerationSlice, vaeSelected } from 'features/parameters/store/generationSlice';
 import { pick } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -37,14 +34,13 @@ const ParamVAEModelSelect = () => {
     },
     [dispatch]
   );
-  const { options, value, onChange, placeholder, noOptionsMessage } =
-    useGroupedModelCombobox({
-      modelEntities: data,
-      onChange: _onChange,
-      selectedModel: vae ? { ...vae, model_type: 'vae' } : null,
-      isLoading,
-      getIsDisabled,
-    });
+  const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
+    modelEntities: data,
+    onChange: _onChange,
+    selectedModel: vae ? { ...vae, model_type: 'vae' } : null,
+    isLoading,
+    getIsDisabled,
+  });
 
   return (
     <FormControl isDisabled={!options.length} isInvalid={!options.length}>

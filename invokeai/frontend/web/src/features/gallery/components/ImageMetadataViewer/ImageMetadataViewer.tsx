@@ -1,12 +1,4 @@
-import {
-  ExternalLink,
-  Flex,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
-} from '@invoke-ai/ui';
+import { ExternalLink, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { memo } from 'react';
@@ -46,14 +38,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
     >
       <ExternalLink href={image.image_url} label={image.image_name} />
 
-      <Tabs
-        variant="line"
-        isLazy={true}
-        display="flex"
-        flexDir="column"
-        w="full"
-        h="full"
-      >
+      <Tabs variant="line" isLazy={true} display="flex" flexDir="column" w="full" h="full">
         <TabList>
           <Tab>{t('metadata.recallParameters')}</Tab>
           <Tab>{t('metadata.metadata')}</Tab>

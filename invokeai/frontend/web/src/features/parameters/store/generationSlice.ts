@@ -18,10 +18,7 @@ import type {
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
-import {
-  getIsSizeOptimal,
-  getOptimalDimension,
-} from 'features/parameters/util/optimalDimension';
+import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
 import type { ImageDTO } from 'services/api/types';
@@ -81,10 +78,7 @@ export const generationSlice = createSlice({
     setCfgScale: (state, action: PayloadAction<ParameterCFGScale>) => {
       state.cfgScale = action.payload;
     },
-    setCfgRescaleMultiplier: (
-      state,
-      action: PayloadAction<ParameterCFGRescaleMultiplier>
-    ) => {
+    setCfgRescaleMultiplier: (state, action: PayloadAction<ParameterCFGRescaleMultiplier>) => {
       state.cfgRescaleMultiplier = action.payload;
     },
     setScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
@@ -124,16 +118,10 @@ export const generationSlice = createSlice({
     setMaskBlur: (state, action: PayloadAction<number>) => {
       state.maskBlur = action.payload;
     },
-    setMaskBlurMethod: (
-      state,
-      action: PayloadAction<ParameterMaskBlurMethod>
-    ) => {
+    setMaskBlurMethod: (state, action: PayloadAction<ParameterMaskBlurMethod>) => {
       state.maskBlurMethod = action.payload;
     },
-    setCanvasCoherenceMode: (
-      state,
-      action: PayloadAction<ParameterCanvasCoherenceMode>
-    ) => {
+    setCanvasCoherenceMode: (state, action: PayloadAction<ParameterCanvasCoherenceMode>) => {
       state.canvasCoherenceMode = action.payload;
     },
     setCanvasCoherenceSteps: (state, action: PayloadAction<number>) => {
@@ -148,10 +136,7 @@ export const generationSlice = createSlice({
     setInfillTileSize: (state, action: PayloadAction<number>) => {
       state.infillTileSize = action.payload;
     },
-    setInfillPatchmatchDownscaleSize: (
-      state,
-      action: PayloadAction<number>
-    ) => {
+    setInfillPatchmatchDownscaleSize: (state, action: PayloadAction<number>) => {
       state.infillPatchmatchDownscaleSize = action.payload;
     },
     initialImageChanged: (state, action: PayloadAction<ImageDTO>) => {
@@ -161,11 +146,7 @@ export const generationSlice = createSlice({
     modelChanged: {
       reducer: (
         state,
-        action: PayloadAction<
-          ParameterModel | null,
-          string,
-          { previousModel?: ParameterModel | null }
-        >
+        action: PayloadAction<ParameterModel | null, string, { previousModel?: ParameterModel | null }>
       ) => {
         const newModel = action.payload;
         state.model = newModel;
@@ -194,17 +175,11 @@ export const generationSlice = createSlice({
         if (getIsSizeOptimal(state.width, state.height, optimalDimension)) {
           return;
         }
-        const { width, height } = calculateNewSize(
-          state.aspectRatio.value,
-          optimalDimension * optimalDimension
-        );
+        const { width, height } = calculateNewSize(state.aspectRatio.value, optimalDimension * optimalDimension);
         state.width = width;
         state.height = height;
       },
-      prepare: (
-        payload: ParameterModel | null,
-        previousModel?: ParameterModel | null
-      ) => ({
+      prepare: (payload: ParameterModel | null, previousModel?: ParameterModel | null) => ({
         payload,
         meta: {
           previousModel,

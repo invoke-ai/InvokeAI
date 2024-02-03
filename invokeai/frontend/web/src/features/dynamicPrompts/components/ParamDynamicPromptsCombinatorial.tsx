@@ -1,4 +1,4 @@
-import { FormControl, FormLabel, Switch } from '@invoke-ai/ui';
+import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { combinatorialToggled } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo, useCallback } from 'react';

@@ -11,21 +11,13 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
-import {
-  $tool,
-  resetToolInteractionState,
-} from 'features/canvas/store/canvasNanostore';
+import { $tool, resetToolInteractionState } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import {
-  addEraseRect,
-  addFillRect,
-  setBrushColor,
-  setBrushSize,
-} from 'features/canvas/store/canvasSlice';
+import { addEraseRect, addFillRect, setBrushColor, setBrushSize } from 'features/canvas/store/canvasSlice';
 import { clamp } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import type { RgbaColor } from 'react-colorful';
@@ -275,11 +267,7 @@ const IAICanvasToolChooserOptions = () => {
                 </FormControl>
               </Flex>
               <Box w="full" pt={2} pb={2}>
-                <IAIColorPicker
-                  color={brushColor}
-                  onChange={handleChangeBrushColor}
-                  withNumberInput
-                />
+                <IAIColorPicker color={brushColor} onChange={handleChangeBrushColor} withNumberInput />
               </Box>
             </Flex>
           </PopoverBody>

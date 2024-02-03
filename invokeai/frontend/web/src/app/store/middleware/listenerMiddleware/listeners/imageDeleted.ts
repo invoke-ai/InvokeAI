@@ -43,31 +43,21 @@ export const addRequestedSingleImageDeletionListener = () => {
       dispatch(isModalOpenChanged(false));
 
       const state = getState();
-      const lastSelectedImage =
-        state.gallery.selection[state.gallery.selection.length - 1]?.image_name;
+      const lastSelectedImage = state.gallery.selection[state.gallery.selection.length - 1]?.image_name;
 
       if (imageDTO && imageDTO?.image_name === lastSelectedImage) {
         const { image_name } = imageDTO;
 
         const baseQueryArgs = selectListImagesQueryArgs(state);
-        const { data } =
-          imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
+        const { data } = imagesApi.endpoints.listImages.select(baseQueryArgs)(state);
 
         const cachedImageDTOs = data ? imagesSelectors.selectAll(data) : [];
 
-        const deletedImageIndex = cachedImageDTOs.findIndex(
-          (i) => i.image_name === image_name
-        );
+        const deletedImageIndex = cachedImageDTOs.findIndex((i) => i.image_name === image_name);
 
-        const filteredImageDTOs = cachedImageDTOs.filter(
-          (i) => i.image_name !== image_name
-        );
+        const filteredImageDTOs = cachedImageDTOs.filter((i) => i.image_name !== image_name);
 
-        const newSelectedImageIndex = clamp(
-          deletedImageIndex,
-          0,
-          filteredImageDTOs.length - 1
-        );
+        const newSelectedImageIndex = clamp(deletedImageIndex, 0, filteredImageDTOs.length - 1);
 
         const newSelectedImageDTO = filteredImageDTOs[newSelectedImageIndex];
 
@@ -85,9 +75,7 @@ export const addRequestedSingleImageDeletionListener = () => {
 
       imageDTOs.forEach((imageDTO) => {
         // reset init image if we deleted it
-        if (
-          getState().generation.initialImage?.imageName === imageDTO.image_name
-        ) {
+        if (getState().generation.initialImage?.imageName === imageDTO.image_name) {
           dispatch(clearInitialImage());
         }
 
@@ -95,8 +83,7 @@ export const addRequestedSingleImageDeletionListener = () => {
         forEach(selectControlAdapterAll(getState().controlAdapters), (ca) => {
           if (
             ca.controlImage === imageDTO.image_name ||
-            (isControlNetOrT2IAdapter(ca) &&
-              ca.processedControlImage === imageDTO.image_name)
+            (isControlNetOrT2IAdapter(ca) && ca.processedControlImage === imageDTO.image_name)
           ) {
             dispatch(
               controlAdapterImageChanged({
@@ -120,10 +107,7 @@ export const addRequestedSingleImageDeletionListener = () => {
           }
 
           forEach(node.data.inputs, (input) => {
-            if (
-              isImageFieldInputInstance(input) &&
-              input.value?.image_name === imageDTO.image_name
-            ) {
+            if (isImageFieldInputInstance(input) && input.value?.image_name === imageDTO.image_name) {
               dispatch(
                 fieldImageValueChanged({
                   nodeId: node.data.id,
@@ -137,24 +121,16 @@ export const addRequestedSingleImageDeletionListener = () => {
       });
 
       // Delete from server
-      const { requestId } = dispatch(
-        imagesApi.endpoints.deleteImage.initiate(imageDTO)
-      );
+      const { requestId } = dispatch(imagesApi.endpoints.deleteImage.initiate(imageDTO));
 
       // Wait for successful deletion, then trigger boards to re-fetch
       const wasImageDeleted = await condition(
-        (action) =>
-          imagesApi.endpoints.deleteImage.matchFulfilled(action) &&
-          action.meta.requestId === requestId,
+        (action) => imagesApi.endpoints.deleteImage.matchFulfilled(action) && action.meta.requestId === requestId,
         30000
       );
 
       if (wasImageDeleted) {
-        dispatch(
-          api.util.invalidateTags([
-            { type: 'Board', id: imageDTO.board_id ?? 'none' },
-          ])
-        );
+        dispatch(api.util.invalidateTags([{ type: 'Board', id: imageDTO.board_id ?? 'none' }]));
       }
     },
   });
@@ -176,17 +152,12 @@ export const addRequestedMultipleImageDeletionListener = () => {
 
       try {
         // Delete from server
-        await dispatch(
-          imagesApi.endpoints.deleteImages.initiate({ imageDTOs })
-        ).unwrap();
+        await dispatch(imagesApi.endpoints.deleteImages.initiate({ imageDTOs })).unwrap();
         const state = getState();
         const queryArgs = selectListImagesQueryArgs(state);
-        const { data } =
-          imagesApi.endpoints.listImages.select(queryArgs)(state);
+        const { data } = imagesApi.endpoints.listImages.select(queryArgs)(state);
 
-        const newSelectedImageDTO = data
-          ? imagesSelectors.selectAll(data)[0]
-          : undefined;
+        const newSelectedImageDTO = data ? imagesSelectors.selectAll(data)[0] : undefined;
 
         if (newSelectedImageDTO) {
           dispatch(imageSelected(newSelectedImageDTO));
@@ -204,10 +175,7 @@ export const addRequestedMultipleImageDeletionListener = () => {
 
         imageDTOs.forEach((imageDTO) => {
           // reset init image if we deleted it
-          if (
-            getState().generation.initialImage?.imageName ===
-            imageDTO.image_name
-          ) {
+          if (getState().generation.initialImage?.imageName === imageDTO.image_name) {
             dispatch(clearInitialImage());
           }
 
@@ -215,8 +183,7 @@ export const addRequestedMultipleImageDeletionListener = () => {
           forEach(selectControlAdapterAll(getState().controlAdapters), (ca) => {
             if (
               ca.controlImage === imageDTO.image_name ||
-              (isControlNetOrT2IAdapter(ca) &&
-                ca.processedControlImage === imageDTO.image_name)
+              (isControlNetOrT2IAdapter(ca) && ca.processedControlImage === imageDTO.image_name)
             ) {
               dispatch(
                 controlAdapterImageChanged({
@@ -240,10 +207,7 @@ export const addRequestedMultipleImageDeletionListener = () => {
             }
 
             forEach(node.data.inputs, (input) => {
-              if (
-                isImageFieldInputInstance(input) &&
-                input.value?.image_name === imageDTO.image_name
-              ) {
+              if (isImageFieldInputInstance(input) && input.value?.image_name === imageDTO.image_name) {
                 dispatch(
                   fieldImageValueChanged({
                     nodeId: node.data.id,
@@ -295,10 +259,7 @@ export const addImageDeletedRejectedListener = () => {
     matcher: imagesApi.endpoints.deleteImage.matchRejected,
     effect: (action) => {
       const log = logger('images');
-      log.debug(
-        { imageDTO: action.meta.arg.originalArgs },
-        'Unable to delete image'
-      );
+      log.debug({ imageDTO: action.meta.arg.originalArgs }, 'Unable to delete image');
     },
   });
 };

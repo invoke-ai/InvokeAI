@@ -32,8 +32,7 @@ export const addGalleryImageClickedListener = () => {
       const { imageDTO, shiftKey, ctrlKey, metaKey } = action.payload;
       const state = getState();
       const queryArgs = selectListImagesQueryArgs(state);
-      const { data: listImagesData } =
-        imagesApi.endpoints.listImages.select(queryArgs)(state);
+      const { data: listImagesData } = imagesApi.endpoints.listImages.select(queryArgs)(state);
 
       if (!listImagesData) {
         // Should never happen if we have clicked a gallery image
@@ -46,12 +45,8 @@ export const addGalleryImageClickedListener = () => {
       if (shiftKey) {
         const rangeEndImageName = imageDTO.image_name;
         const lastSelectedImage = selection[selection.length - 1]?.image_name;
-        const lastClickedIndex = imageDTOs.findIndex(
-          (n) => n.image_name === lastSelectedImage
-        );
-        const currentClickedIndex = imageDTOs.findIndex(
-          (n) => n.image_name === rangeEndImageName
-        );
+        const lastClickedIndex = imageDTOs.findIndex((n) => n.image_name === lastSelectedImage);
+        const currentClickedIndex = imageDTOs.findIndex((n) => n.image_name === rangeEndImageName);
         if (lastClickedIndex > -1 && currentClickedIndex > -1) {
           // We have a valid range!
           const start = Math.min(lastClickedIndex, currentClickedIndex);
@@ -60,15 +55,8 @@ export const addGalleryImageClickedListener = () => {
           dispatch(selectionChanged(selection.concat(imagesToSelect)));
         }
       } else if (ctrlKey || metaKey) {
-        if (
-          selection.some((i) => i.image_name === imageDTO.image_name) &&
-          selection.length > 1
-        ) {
-          dispatch(
-            selectionChanged(
-              selection.filter((n) => n.image_name !== imageDTO.image_name)
-            )
-          );
+        if (selection.some((i) => i.image_name === imageDTO.image_name) && selection.length > 1) {
+          dispatch(selectionChanged(selection.filter((n) => n.image_name !== imageDTO.image_name)));
         } else {
           dispatch(selectionChanged(selection.concat(imageDTO)));
         }

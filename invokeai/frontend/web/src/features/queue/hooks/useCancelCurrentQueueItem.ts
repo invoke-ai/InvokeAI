@@ -3,10 +3,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { isNil } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  useCancelQueueItemMutation,
-  useGetQueueStatusQuery,
-} from 'services/api/endpoints/queue';
+import { useCancelQueueItemMutation, useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
 export const useCancelCurrentQueueItem = () => {
   const isConnected = useAppSelector((s) => s.system.isConnected);
@@ -14,10 +11,7 @@ export const useCancelCurrentQueueItem = () => {
   const [trigger, { isLoading }] = useCancelQueueItemMutation();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const currentQueueItemId = useMemo(
-    () => queueStatus?.queue.item_id,
-    [queueStatus?.queue.item_id]
-  );
+  const currentQueueItemId = useMemo(() => queueStatus?.queue.item_id, [queueStatus?.queue.item_id]);
   const cancelQueueItem = useCallback(async () => {
     if (!currentQueueItemId) {
       return;
@@ -40,10 +34,7 @@ export const useCancelCurrentQueueItem = () => {
     }
   }, [currentQueueItemId, dispatch, t, trigger]);
 
-  const isDisabled = useMemo(
-    () => !isConnected || isNil(currentQueueItemId),
-    [isConnected, currentQueueItemId]
-  );
+  const isDisabled = useMemo(() => !isConnected || isNil(currentQueueItemId), [isConnected, currentQueueItemId]);
 
   return {
     cancelQueueItem,

@@ -7,10 +7,9 @@ export type RequestedBoardImagesDeletionArg = {
   imagesUsage: ImageUsage;
 };
 
-export const requestedBoardImagesDeletion =
-  createAction<RequestedBoardImagesDeletionArg>(
-    'gallery/requestedBoardImagesDeletion'
-  );
+export const requestedBoardImagesDeletion = createAction<RequestedBoardImagesDeletionArg>(
+  'gallery/requestedBoardImagesDeletion'
+);
 
 export const sentImageToCanvas = createAction('gallery/sentImageToCanvas');
 

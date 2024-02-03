@@ -8,7 +8,7 @@ import {
   MenuItem,
   MenuList,
   useDisclosure,
-} from '@invoke-ai/ui';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
@@ -31,13 +31,10 @@ export const QueueActionsMenuButton = memo(() => {
   const isResumeEnabled = useFeatureStatus('resumeQueue').isFeatureEnabled;
   const { queueSize } = useGetQueueStatusQuery(undefined, {
     selectFromResult: (res) => ({
-      queueSize: res.data
-        ? res.data.queue.pending + res.data.queue.in_progress
-        : 0,
+      queueSize: res.data ? res.data.queue.pending + res.data.queue.in_progress : 0,
     }),
   });
-  const { isLoading: isLoadingClearQueue, isDisabled: isDisabledClearQueue } =
-    useClearQueue();
+  const { isLoading: isLoadingClearQueue, isDisabled: isDisabledClearQueue } = useClearQueue();
   const {
     resumeProcessor,
     isLoading: isLoadingResumeProcessor,
@@ -56,17 +53,8 @@ export const QueueActionsMenuButton = memo(() => {
     <Box pos="relative">
       <ClearQueueConfirmationAlertDialog disclosure={clearQueueDisclosure} />
 
-      <Menu
-        isOpen={isOpen}
-        onOpen={onOpen}
-        onClose={onClose}
-        placement="bottom-end"
-      >
-        <MenuButton
-          as={IconButton}
-          aria-label="Queue Actions Menu"
-          icon={<RiListCheck />}
-        />
+      <Menu isOpen={isOpen} onOpen={onOpen} onClose={onClose} placement="bottom-end">
+        <MenuButton as={IconButton} aria-label="Queue Actions Menu" icon={<RiListCheck />} />
         <MenuList>
           <MenuItem
             isDestructive
@@ -104,13 +92,7 @@ export const QueueActionsMenuButton = memo(() => {
         </MenuList>
       </Menu>
       {queueSize > 0 && (
-        <Badge
-          pos="absolute"
-          insetInlineStart={-3}
-          insetBlockStart={-1.5}
-          colorScheme="invokeYellow"
-          zIndex="docked"
-        >
+        <Badge pos="absolute" insetInlineStart={-3} insetBlockStart={-1.5} colorScheme="invokeYellow" zIndex="docked">
           {queueSize}
         </Badge>
       )}

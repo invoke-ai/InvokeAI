@@ -1,14 +1,11 @@
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { typedMemo } from 'common/util/typedMemo';
 import { useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import type {
-  CheckpointModelConfig,
-  DiffusersModelConfig,
-} from 'services/api/types';
+import type { CheckpointModelConfig, DiffusersModelConfig } from 'services/api/types';
 
 const options: ComboboxOption[] = [
   { value: 'normal', label: 'Normal' },
@@ -16,17 +13,10 @@ const options: ComboboxOption[] = [
   { value: 'depth', label: 'Depth' },
 ];
 
-const ModelVariantSelect = <
-  T extends CheckpointModelConfig | DiffusersModelConfig,
->(
-  props: UseControllerProps<T>
-) => {
+const ModelVariantSelect = <T extends CheckpointModelConfig | DiffusersModelConfig>(props: UseControllerProps<T>) => {
   const { t } = useTranslation();
   const { field } = useController(props);
-  const value = useMemo(
-    () => options.find((o) => o.value === field.value),
-    [field.value]
-  );
+  const value = useMemo(() => options.find((o) => o.value === field.value), [field.value]);
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       field.onChange(v?.value);

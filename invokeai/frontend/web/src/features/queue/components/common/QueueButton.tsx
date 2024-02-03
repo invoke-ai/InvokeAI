@@ -1,5 +1,5 @@
-import type { ChakraProps, ThemeTypings } from '@invoke-ai/ui';
-import { Button, IconButton } from '@invoke-ai/ui';
+import type { ChakraProps, ThemeTypings } from '@invoke-ai/ui-library';
+import { Button, IconButton } from '@invoke-ai/ui-library';
 import type { ReactElement, ReactNode } from 'react';
 import { memo } from 'react';
 

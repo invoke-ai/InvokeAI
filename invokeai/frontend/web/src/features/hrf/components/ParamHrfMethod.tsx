@@ -1,5 +1,5 @@
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setHrfMethod } from 'features/hrf/store/hrfSlice';
 import { isParameterHRFMethod } from 'features/parameters/types/parameterSchemas';
@@ -26,10 +26,7 @@ const ParamHrfMethodSelect = () => {
     [dispatch]
   );
 
-  const value = useMemo(
-    () => options.find((o) => o.value === hrfMethod),
-    [hrfMethod]
-  );
+  const value = useMemo(() => options.find((o) => o.value === hrfMethod), [hrfMethod]);
 
   return (
     <FormControl>

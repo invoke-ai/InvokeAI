@@ -13,9 +13,7 @@ export const useControlAdapterProcessorType = (id: string) => {
       createSelector(selectControlAdaptersSlice, (controlAdapters) => {
         const ca = selectControlAdapterById(controlAdapters, id);
 
-        return ca && isControlNetOrT2IAdapter(ca)
-          ? ca.processorType
-          : undefined;
+        return ca && isControlNetOrT2IAdapter(ca) ? ca.processorType : undefined;
       }),
     [id]
   );

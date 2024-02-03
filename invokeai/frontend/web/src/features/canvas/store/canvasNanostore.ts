@@ -16,14 +16,12 @@ export const $isTransformingBoundingBox = atom<boolean>(false);
 export const $isMouseOverBoundingBoxOutline = atom<boolean>(false);
 export const $isModifyingBoundingBox = computed(
   [$isTransformingBoundingBox, $isMovingBoundingBox],
-  (isTransformingBoundingBox, isMovingBoundingBox) =>
-    isTransformingBoundingBox || isMovingBoundingBox
+  (isTransformingBoundingBox, isMovingBoundingBox) => isTransformingBoundingBox || isMovingBoundingBox
 );
 
 export const resetCanvasInteractionState = () => {
   $cursorPosition.set(null);
   $isDrawing.set(false);
-  $isMouseOverBoundingBox.set(false);
   $isMoveBoundingBoxKeyHeld.set(false);
   $isMoveStageKeyHeld.set(false);
   $isMovingBoundingBox.set(false);
@@ -32,7 +30,6 @@ export const resetCanvasInteractionState = () => {
 
 export const resetToolInteractionState = () => {
   $isTransformingBoundingBox.set(false);
-  $isMouseOverBoundingBox.set(false);
   $isMovingBoundingBox.set(false);
   $isMovingStage.set(false);
 };

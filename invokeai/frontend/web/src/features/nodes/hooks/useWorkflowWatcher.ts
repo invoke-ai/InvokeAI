@@ -15,11 +15,11 @@ const debouncedBuildWorkflow = debounce((arg: BuildWorkflowArg) => {
   $builtWorkflow.set(buildWorkflowFast(arg));
 }, 300);
 
-const selectWorkflowSlices = createSelector(
-  selectNodesSlice,
-  selectWorkflowSlice,
-  (nodes, workflow) => ({ nodes: nodes.nodes, edges: nodes.edges, workflow })
-);
+const selectWorkflowSlices = createSelector(selectNodesSlice, selectWorkflowSlice, (nodes, workflow) => ({
+  nodes: nodes.nodes,
+  edges: nodes.edges,
+  workflow,
+}));
 
 export const useWorkflowWatcher = () => {
   const buildWorkflowArg = useAppSelector(selectWorkflowSlices);

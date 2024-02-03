@@ -7,10 +7,12 @@ import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
 export type LoRA = ParameterLoRAModel & {
   id: string;
   weight: number;
+  isEnabled?: boolean;
 };
 
-export const defaultLoRAConfig = {
+export const defaultLoRAConfig: Pick<LoRA, 'weight' | 'isEnabled'> = {
   weight: 0.75,
+  isEnabled: true,
 };
 
 export type LoraState = {
@@ -31,10 +33,7 @@ export const loraSlice = createSlice({
       const { model_name, id, base_model } = action.payload;
       state.loras[id] = { id, model_name, base_model, ...defaultLoRAConfig };
     },
-    loraRecalled: (
-      state,
-      action: PayloadAction<LoRAModelConfigEntity & { weight: number }>
-    ) => {
+    loraRecalled: (state, action: PayloadAction<LoRAModelConfigEntity & { weight: number }>) => {
       const { model_name, id, base_model, weight } = action.payload;
       state.loras[id] = { id, model_name, base_model, weight };
     },
@@ -45,10 +44,7 @@ export const loraSlice = createSlice({
     lorasCleared: (state) => {
       state.loras = {};
     },
-    loraWeightChanged: (
-      state,
-      action: PayloadAction<{ id: string; weight: number }>
-    ) => {
+    loraWeightChanged: (state, action: PayloadAction<{ id: string; weight: number }>) => {
       const { id, weight } = action.payload;
       const lora = state.loras[id];
       if (!lora) {
@@ -64,6 +60,14 @@ export const loraSlice = createSlice({
       }
       lora.weight = defaultLoRAConfig.weight;
     },
+    loraIsEnabledChanged: (state, action: PayloadAction<Pick<LoRA, 'id' | 'isEnabled'>>) => {
+      const { id, isEnabled } = action.payload;
+      const lora = state.loras[id];
+      if (!lora) {
+        return;
+      }
+      lora.isEnabled = isEnabled;
+    },
   },
 });
 
@@ -72,6 +76,7 @@ export const {
   loraRemoved,
   loraWeightChanged,
   loraWeightReset,
+  loraIsEnabledChanged,
   lorasCleared,
   loraRecalled,
 } = loraSlice.actions;

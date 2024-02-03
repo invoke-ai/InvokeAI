@@ -22,13 +22,8 @@ const deleteImageModal = createSlice({
   },
 });
 
-export const {
-  isModalOpenChanged,
-  imagesToDeleteSelected,
-  imageDeletionCanceled,
-} = deleteImageModal.actions;
+export const { isModalOpenChanged, imagesToDeleteSelected, imageDeletionCanceled } = deleteImageModal.actions;
 
 export default deleteImageModal.reducer;
 
-export const selectDeleteImageModalSlice = (state: RootState) =>
-  state.deleteImageModal;
+export const selectDeleteImageModalSlice = (state: RootState) => state.deleteImageModal;

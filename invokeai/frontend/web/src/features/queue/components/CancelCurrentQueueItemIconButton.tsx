@@ -1,5 +1,5 @@
-import type { ChakraProps } from '@invoke-ai/ui';
-import { IconButton } from '@invoke-ai/ui';
+import type { ChakraProps } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,8 +10,7 @@ type Props = {
 
 const CancelCurrentQueueItemIconButton = ({ sx }: Props) => {
   const { t } = useTranslation();
-  const { cancelQueueItem, isLoading, isDisabled } =
-    useCancelCurrentQueueItem();
+  const { cancelQueueItem, isLoading, isDisabled } = useCancelCurrentQueueItem();
 
   return (
     <IconButton

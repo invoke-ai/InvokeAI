@@ -23,6 +23,7 @@ theme:
   icon:
     repo: fontawesome/brands/github
     edit: material/file-document-edit-outline
+  favicon: img/favicon.ico
   palette:
     # - media: '(prefers-color-scheme: light)'
     #   scheme: default
@@ -106,7 +107,6 @@ plugins:
 extra_javascript:
   - https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js
   - javascripts/tablesort.js
-  - https://widget.kapa.ai/kapa-widget.bundle.js
   - javascript/init_kapa_widget.js
 
 extra:

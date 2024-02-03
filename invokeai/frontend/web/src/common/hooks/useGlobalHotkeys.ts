@@ -9,13 +9,8 @@ import { useHotkeys } from 'react-hotkeys-hook';
 
 export const useGlobalHotkeys = () => {
   const dispatch = useAppDispatch();
-  const isModelManagerEnabled =
-    useFeatureStatus('modelManager').isFeatureEnabled;
-  const {
-    queueBack,
-    isDisabled: isDisabledQueueBack,
-    isLoading: isLoadingQueueBack,
-  } = useQueueBack();
+  const isModelManagerEnabled = useFeatureStatus('modelManager').isFeatureEnabled;
+  const { queueBack, isDisabled: isDisabledQueueBack, isLoading: isLoadingQueueBack } = useQueueBack();
 
   useHotkeys(
     ['ctrl+enter', 'meta+enter'],
@@ -28,11 +23,7 @@ export const useGlobalHotkeys = () => {
     [queueBack, isDisabledQueueBack, isLoadingQueueBack]
   );
 
-  const {
-    queueFront,
-    isDisabled: isDisabledQueueFront,
-    isLoading: isLoadingQueueFront,
-  } = useQueueFront();
+  const { queueFront, isDisabled: isDisabledQueueFront, isLoading: isLoadingQueueFront } = useQueueFront();
 
   useHotkeys(
     ['ctrl+shift+enter', 'meta+shift+enter'],
@@ -61,11 +52,7 @@ export const useGlobalHotkeys = () => {
     [cancelQueueItem, isDisabledCancelQueueItem, isLoadingCancelQueueItem]
   );
 
-  const {
-    clearQueue,
-    isDisabled: isDisabledClearQueue,
-    isLoading: isLoadingClearQueue,
-  } = useClearQueue();
+  const { clearQueue, isDisabled: isDisabledClearQueue, isLoading: isLoadingClearQueue } = useClearQueue();
 
   useHotkeys(
     ['ctrl+shift+x', 'meta+shift+x'],

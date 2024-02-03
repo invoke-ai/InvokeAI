@@ -1,12 +1,6 @@
 import { useAppSelector } from 'app/store/storeHooks';
-import {
-  DRAG_HANDLE_CLASSNAME,
-  NODE_WIDTH,
-} from 'features/nodes/types/constants';
-import type {
-  AnyNode,
-  InvocationTemplate,
-} from 'features/nodes/types/invocation';
+import { DRAG_HANDLE_CLASSNAME, NODE_WIDTH } from 'features/nodes/types/constants';
+import type { AnyNode, InvocationTemplate } from 'features/nodes/types/invocation';
 import { buildCurrentImageNode } from 'features/nodes/util/node/buildCurrentImageNode';
 import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
 import { buildNotesNode } from 'features/nodes/util/node/buildNotesNode';
@@ -30,9 +24,7 @@ export const useBuildNode = () => {
       let _y = window.innerHeight / 2;
 
       // attempt to center the node in the middle of the flow
-      const rect = document
-        .querySelector('#workflow-editor')
-        ?.getBoundingClientRect();
+      const rect = document.querySelector('#workflow-editor')?.getBoundingClientRect();
 
       if (rect) {
         _x = rect.width / 2 - NODE_WIDTH / 2 + rect.left;

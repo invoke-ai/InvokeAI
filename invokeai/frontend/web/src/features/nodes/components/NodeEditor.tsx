@@ -1,9 +1,10 @@
 import 'reactflow/dist/style.css';
 
-import { Flex } from '@invoke-ai/ui';
+import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import TopPanel from 'features/nodes/components/flow/panels/TopPanel/TopPanel';
+import { SaveWorkflowAsDialog } from 'features/workflowLibrary/components/SaveWorkflowAsDialog/SaveWorkflowAsDialog';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { CSSProperties } from 'react';
@@ -53,28 +54,19 @@ const NodeEditor = () => {
     >
       <AnimatePresence>
         {isReady && (
-          <motion.div
-            initial={initial}
-            animate={animate}
-            exit={exit}
-            style={isReadyMotionStyles}
-          >
+          <motion.div initial={initial} animate={animate} exit={exit} style={isReadyMotionStyles}>
             <Flow />
             <AddNodePopover />
             <TopPanel />
             <BottomLeftPanel />
             <MinimapPanel />
+            <SaveWorkflowAsDialog />
           </motion.div>
         )}
       </AnimatePresence>
       <AnimatePresence>
         {!isReady && (
-          <motion.div
-            initial={initial}
-            animate={animate}
-            exit={exit}
-            style={notIsReadyMotionStyles}
-          >
+          <motion.div initial={initial} animate={animate} exit={exit} style={notIsReadyMotionStyles}>
             <Flex
               layerStyle="first"
               position="relative"
@@ -85,10 +77,7 @@ const NodeEditor = () => {
               justifyContent="center"
               pointerEvents="none"
             >
-              <IAINoContentFallback
-                label={t('nodes.loadingNodes')}
-                icon={MdDeviceHub}
-              />
+              <IAINoContentFallback label={t('nodes.loadingNodes')} icon={MdDeviceHub} />
             </Flex>
           </motion.div>
         )}

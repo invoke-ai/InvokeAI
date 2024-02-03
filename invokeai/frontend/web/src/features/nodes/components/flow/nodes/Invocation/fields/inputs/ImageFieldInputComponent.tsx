@@ -1,17 +1,11 @@
-import { Flex, Text } from '@invoke-ai/ui';
+import { Flex, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
-import type {
-  TypesafeDraggableData,
-  TypesafeDroppableData,
-} from 'features/dnd/types';
+import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
-import type {
-  ImageFieldInputInstance,
-  ImageFieldInputTemplate,
-} from 'features/nodes/types/field';
+import type { ImageFieldInputInstance, ImageFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
@@ -20,15 +14,11 @@ import type { PostUploadAction } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
-const ImageFieldInputComponent = (
-  props: FieldComponentProps<ImageFieldInputInstance, ImageFieldInputTemplate>
-) => {
+const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInstance, ImageFieldInputTemplate>) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
   const isConnected = useAppSelector((s) => s.system.isConnected);
-  const { currentData: imageDTO, isError } = useGetImageDTOQuery(
-    field.value?.image_name ?? skipToken
-  );
+  const { currentData: imageDTO, isError } = useGetImageDTOQuery(field.value?.image_name ?? skipToken);
 
   const handleReset = useCallback(() => {
     dispatch(
@@ -75,13 +65,7 @@ const ImageFieldInputComponent = (
   }, [handleReset, isConnected, isError]);
 
   return (
-    <Flex
-      className="nodrag"
-      w="full"
-      h="full"
-      alignItems="center"
-      justifyContent="center"
-    >
+    <Flex className="nodrag" w="full" h="full" alignItems="center" justifyContent="center">
       <IAIDndImage
         imageDTO={imageDTO}
         droppableData={droppableData}

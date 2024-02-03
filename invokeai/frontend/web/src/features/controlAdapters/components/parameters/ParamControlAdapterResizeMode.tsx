@@ -1,5 +1,5 @@
-import type { ComboboxOnChange } from '@invoke-ai/ui';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui';
+import type { ComboboxOnChange } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
@@ -45,10 +45,7 @@ const ParamControlAdapterResizeMode = ({ id }: Props) => {
     [id, dispatch]
   );
 
-  const value = useMemo(
-    () => options.find((o) => o.value === resizeMode),
-    [options, resizeMode]
-  );
+  const value = useMemo(() => options.find((o) => o.value === resizeMode), [options, resizeMode]);
 
   if (!resizeMode) {
     return null;
@@ -59,12 +56,7 @@ const ParamControlAdapterResizeMode = ({ id }: Props) => {
       <InformationalPopover feature="controlNetResizeMode">
         <FormLabel>{t('controlnet.resizeMode')}</FormLabel>
       </InformationalPopover>
-      <Combobox
-        value={value}
-        options={options}
-        isDisabled={!isEnabled}
-        onChange={handleResizeModeChange}
-      />
+      <Combobox value={value} options={options} isDisabled={!isEnabled} onChange={handleResizeModeChange} />
     </FormControl>
   );
 };

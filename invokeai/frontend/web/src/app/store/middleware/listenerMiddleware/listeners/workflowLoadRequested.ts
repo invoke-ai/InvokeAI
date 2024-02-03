@@ -1,14 +1,8 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
-import {
-  workflowLoaded,
-  workflowLoadRequested,
-} from 'features/nodes/store/actions';
+import { workflowLoaded, workflowLoadRequested } from 'features/nodes/store/actions';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
-import {
-  WorkflowMigrationError,
-  WorkflowVersionError,
-} from 'features/nodes/types/error';
+import { WorkflowMigrationError, WorkflowVersionError } from 'features/nodes/types/error';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
@@ -28,10 +22,7 @@ export const addWorkflowLoadRequestedListener = () => {
       const nodeTemplates = getState().nodeTemplates.templates;
 
       try {
-        const { workflow: validatedWorkflow, warnings } = validateWorkflow(
-          workflow,
-          nodeTemplates
-        );
+        const { workflow: validatedWorkflow, warnings } = validateWorkflow(workflow, nodeTemplates);
 
         if (asCopy) {
           // If we're loading a copy, we need to remove the ID so that the backend will create a new workflow
@@ -108,10 +99,7 @@ export const addWorkflowLoadRequestedListener = () => {
           );
         } else {
           // Some other error occurred
-          log.error(
-            { error: parseify(e) },
-            t('nodes.unknownErrorValidatingWorkflow')
-          );
+          log.error({ error: parseify(e) }, t('nodes.unknownErrorValidatingWorkflow'));
           dispatch(
             addToast(
               makeToast({

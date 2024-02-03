@@ -17,16 +17,9 @@ export const addReceivedOpenAPISchemaListener = () => {
       log.debug({ schemaJSON }, 'Received OpenAPI schema');
       const { nodesAllowlist, nodesDenylist } = getState().config;
 
-      const nodeTemplates = parseSchema(
-        schemaJSON,
-        nodesAllowlist,
-        nodesDenylist
-      );
+      const nodeTemplates = parseSchema(schemaJSON, nodesAllowlist, nodesDenylist);
 
-      log.debug(
-        { nodeTemplates: parseify(nodeTemplates) },
-        `Built ${size(nodeTemplates)} node templates`
-      );
+      log.debug({ nodeTemplates: parseify(nodeTemplates) }, `Built ${size(nodeTemplates)} node templates`);
 
       dispatch(nodeTemplatesBuilt(nodeTemplates));
     },
@@ -36,10 +29,7 @@ export const addReceivedOpenAPISchemaListener = () => {
     actionCreator: receivedOpenAPISchema.rejected,
     effect: (action) => {
       const log = logger('system');
-      log.error(
-        { error: parseify(action.error) },
-        'Problem retrieving OpenAPI Schema'
-      );
+      log.error({ error: parseify(action.error) }, 'Problem retrieving OpenAPI Schema');
     },
   });
 };

@@ -1,12 +1,4 @@
-import {
-  Box,
-  Flex,
-  FormControl,
-  FormLabel,
-  Icon,
-  IconButton,
-  Switch,
-} from '@invoke-ai/ui';
+import { Box, Flex, FormControl, FormLabel, Icon, IconButton, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
@@ -68,19 +60,10 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
   }
 
   return (
-    <Flex
-      flexDir="column"
-      gap={4}
-      p={4}
-      borderRadius="base"
-      position="relative"
-      bg="base.750"
-    >
+    <Flex flexDir="column" gap={4} p={4} borderRadius="base" position="relative" bg="base.750">
       <Flex gap={2} alignItems="center" justifyContent="space-between">
         <FormControl>
-          <FormLabel flexGrow={1}>
-            {t(`controlnet.${controlAdapterType}`, { number })}
-          </FormLabel>
+          <FormLabel flexGrow={1}>{t(`controlnet.${controlAdapterType}`, { number })}</FormLabel>
           <Switch
             aria-label={t('controlnet.toggleControlNet')}
             isChecked={isEnabled}
@@ -89,17 +72,10 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
         </FormControl>
       </Flex>
       <Flex gap={4} alignItems="center">
-        <Box
-          minW={0}
-          w="full"
-          transitionProperty="common"
-          transitionDuration="0.1s"
-        >
+        <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
           <ParamControlAdapterModel id={id} />
         </Box>
-        {activeTabName === 'unifiedCanvas' && (
-          <ControlNetCanvasImageImports id={id} />
-        )}
+        {activeTabName === 'unifiedCanvas' && <ControlNetCanvasImageImports id={id} />}
         <IconButton
           size="sm"
           tooltip={t('controlnet.duplicate')}
@@ -117,16 +93,8 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
         />
         <IconButton
           size="sm"
-          tooltip={
-            isExpanded
-              ? t('controlnet.hideAdvanced')
-              : t('controlnet.showAdvanced')
-          }
-          aria-label={
-            isExpanded
-              ? t('controlnet.hideAdvanced')
-              : t('controlnet.showAdvanced')
-          }
+          tooltip={isExpanded ? t('controlnet.hideAdvanced') : t('controlnet.showAdvanced')}
+          aria-label={isExpanded ? t('controlnet.hideAdvanced') : t('controlnet.showAdvanced')}
           onClick={toggleIsExpanded}
           variant="ghost"
           icon={
@@ -148,13 +116,7 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
             <ParamControlAdapterBeginEnd id={id} />
           </Flex>
           {!isExpanded && (
-            <Flex
-              alignItems="center"
-              justifyContent="center"
-              h={32}
-              w={32}
-              aspectRatio="1/1"
-            >
+            <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1">
               <ControlAdapterImagePreview id={id} isSmall />
             </Flex>
           )}

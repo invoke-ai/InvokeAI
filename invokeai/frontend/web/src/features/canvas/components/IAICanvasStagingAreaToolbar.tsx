@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, Flex, IconButton } from '@invoke-ai/ui';
+import { Button, ButtonGroup, Flex, IconButton } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -38,8 +38,7 @@ const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
   return {
     currentIndex: selectedImageIndex,
     total: images.length,
-    currentStagingAreaImage:
-      images.length > 0 ? images[selectedImageIndex] : undefined,
+    currentStagingAreaImage: images.length > 0 ? images[selectedImageIndex] : undefined,
     shouldShowStagingImage,
     shouldShowStagingOutline,
   };
@@ -47,12 +46,7 @@ const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
 
 const IAICanvasStagingAreaToolbar = () => {
   const dispatch = useAppDispatch();
-  const {
-    currentStagingAreaImage,
-    shouldShowStagingImage,
-    currentIndex,
-    total,
-  } = useAppSelector(selector);
+  const { currentStagingAreaImage, shouldShowStagingImage, currentIndex, total } = useAppSelector(selector);
 
   const { t } = useTranslation();
 
@@ -64,20 +58,11 @@ const IAICanvasStagingAreaToolbar = () => {
     dispatch(setShouldShowStagingOutline(false));
   }, [dispatch]);
 
-  const handlePrevImage = useCallback(
-    () => dispatch(prevStagingAreaImage()),
-    [dispatch]
-  );
+  const handlePrevImage = useCallback(() => dispatch(prevStagingAreaImage()), [dispatch]);
 
-  const handleNextImage = useCallback(
-    () => dispatch(nextStagingAreaImage()),
-    [dispatch]
-  );
+  const handleNextImage = useCallback(() => dispatch(nextStagingAreaImage()), [dispatch]);
 
-  const handleAccept = useCallback(
-    () => dispatch(commitStagingAreaImage()),
-    [dispatch]
-  );
+  const handleAccept = useCallback(() => dispatch(commitStagingAreaImage()), [dispatch]);
 
   useHotkeys(['left'], handlePrevImage, {
     enabled: () => true,
@@ -89,14 +74,22 @@ const IAICanvasStagingAreaToolbar = () => {
     preventDefault: true,
   });
 
-  useHotkeys(['enter'], () => handleAccept, {
+  useHotkeys(['enter'], handleAccept, {
     enabled: () => true,
     preventDefault: true,
   });
 
-  const { data: imageDTO } = useGetImageDTOQuery(
-    currentStagingAreaImage?.imageName ?? skipToken
+  useHotkeys(
+    ['esc'],
+    () => {
+      handleDiscardStagingArea();
+    },
+    {
+      preventDefault: true,
+    }
   );
+
+  const { data: imageDTO } = useGetImageDTOQuery(currentStagingAreaImage?.imageName ?? skipToken);
 
   const handleToggleShouldShowStagingImage = useCallback(() => {
     dispatch(setShouldShowStagingImage(!shouldShowStagingImage));
@@ -113,6 +106,17 @@ const IAICanvasStagingAreaToolbar = () => {
       })
     );
   }, [dispatch, imageDTO]);
+
+  useHotkeys(
+    ['shift+s'],
+    () => {
+      shouldShowStagingImage && handleSaveToGallery();
+    },
+    {
+      preventDefault: true,
+    },
+    [shouldShowStagingImage, handleSaveToGallery]
+  );
 
   const handleDiscardStagingArea = useCallback(() => {
     dispatch(discardStagedImages());
@@ -166,23 +170,15 @@ const IAICanvasStagingAreaToolbar = () => {
           colorScheme="invokeBlue"
         />
         <IconButton
-          tooltip={
-            shouldShowStagingImage
-              ? t('unifiedCanvas.showResultsOn')
-              : t('unifiedCanvas.showResultsOff')
-          }
-          aria-label={
-            shouldShowStagingImage
-              ? t('unifiedCanvas.showResultsOn')
-              : t('unifiedCanvas.showResultsOff')
-          }
+          tooltip={shouldShowStagingImage ? t('unifiedCanvas.showResultsOn') : t('unifiedCanvas.showResultsOff')}
+          aria-label={shouldShowStagingImage ? t('unifiedCanvas.showResultsOn') : t('unifiedCanvas.showResultsOff')}
           data-alert={!shouldShowStagingImage}
           icon={shouldShowStagingImage ? <PiEyeBold /> : <PiEyeSlashBold />}
           onClick={handleToggleShouldShowStagingImage}
           colorScheme="invokeBlue"
         />
         <IconButton
-          tooltip={t('unifiedCanvas.saveToGallery')}
+          tooltip={`${t('unifiedCanvas.saveToGallery')} (Shift+S)`}
           aria-label={t('unifiedCanvas.saveToGallery')}
           isDisabled={!imageDTO || !imageDTO.is_intermediate}
           icon={<PiFloppyDiskBold />}
@@ -190,7 +186,7 @@ const IAICanvasStagingAreaToolbar = () => {
           colorScheme="invokeBlue"
         />
         <IconButton
-          tooltip={t('unifiedCanvas.discardAll')}
+          tooltip={`${t('unifiedCanvas.discardAll')} (Esc)`}
           aria-label={t('unifiedCanvas.discardAll')}
           icon={<PiXBold />}
           onClick={handleDiscardStagingArea}
