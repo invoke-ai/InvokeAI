@@ -64,7 +64,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
         finally:
             # Record state after the invocation.
             node_stats = NodeExecutionStats(
-                invocation_type=invocation.type,
+                invocation_type=invocation.get_type(),
                 start_time=start_time,
                 end_time=time.time(),
                 start_ram_gb=start_ram / GB,
