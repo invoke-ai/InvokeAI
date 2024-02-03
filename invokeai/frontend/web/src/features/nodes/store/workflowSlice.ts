@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesDeleted } from 'features/nodes/store/nodesSlice';
 import type { WorkflowsState as WorkflowState } from 'features/nodes/store/types';
@@ -129,4 +129,11 @@ export const migrateWorkflowState = (state: any): any => {
     state._version = 1;
   }
   return state;
+};
+
+export const workflowPersistConfig: PersistConfig<WorkflowState> = {
+  name: workflowSlice.name,
+  initialState: initialWorkflowState,
+  migrate: migrateWorkflowState,
+  persistDenylist: [],
 };

@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { nodeTemplatesBuilt } from 'features/nodes/store/nodeTemplatesSlice';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
@@ -862,4 +862,22 @@ export const migrateNodesState = (state: any): any => {
     state._version = 1;
   }
   return state;
+};
+
+export const nodesPersistConfig: PersistConfig<NodesState> = {
+  name: nodesSlice.name,
+  initialState: initialNodesState,
+  migrate: migrateNodesState,
+  persistDenylist: [
+    'connectionStartParams',
+    'connectionStartFieldType',
+    'selectedNodes',
+    'selectedEdges',
+    'isReady',
+    'nodesToCopy',
+    'edgesToCopy',
+    'connectionMade',
+    'modifyingEdge',
+    'addNewNodePosition',
+  ],
 };

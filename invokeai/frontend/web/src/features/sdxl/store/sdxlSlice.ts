@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import type {
   ParameterNegativeStylePromptSDXL,
   ParameterPositiveStylePromptSDXL,
@@ -96,4 +96,11 @@ export const migrateSDXLState = (state: any): any => {
     state._version = 1;
   }
   return state;
+};
+
+export const sdxlPersistConfig: PersistConfig<SDXLState> = {
+  name: sdxlSlice.name,
+  initialState: initialSDXLState,
+  migrate: migrateSDXLState,
+  persistDenylist: [],
 };

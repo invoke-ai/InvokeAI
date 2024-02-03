@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import calculateCoordinates from 'features/canvas/util/calculateCoordinates';
 import calculateScale from 'features/canvas/util/calculateScale';
@@ -730,4 +730,11 @@ export const migrateCanvasState = (state: any): any => {
     state.aspectRatio = initialAspectRatioState;
   }
   return state;
+};
+
+export const canvasPersistConfig: PersistConfig<CanvasState> = {
+  name: canvasSlice.name,
+  initialState: initialCanvasState,
+  migrate: migrateCanvasState,
+  persistDenylist: [],
 };

@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import { z } from 'zod';
 
 export const zSeedBehaviour = z.enum(['PER_ITERATION', 'PER_PROMPT']);
@@ -84,4 +84,11 @@ export const migrateDynamicPromptsState = (state: any): any => {
     state._version = 1;
   }
   return state;
+};
+
+export const dynamicPromptsPersistConfig: PersistConfig<DynamicPromptsState> = {
+  name: dynamicPromptsSlice.name,
+  initialState: initialDynamicPromptsState,
+  migrate: migrateDynamicPromptsState,
+  persistDenylist: ['prompts'],
 };
