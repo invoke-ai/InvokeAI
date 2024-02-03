@@ -27,13 +27,13 @@ class Installer:
     Deploys an InvokeAI installation into a given path
     """
 
+    reqs: list[str] = INSTALLER_REQS
+
     def __init__(self) -> None:
-        self.reqs = INSTALLER_REQS
         if os.getenv("VIRTUAL_ENV") is not None:
             print("A virtual environment is already activated. Please 'deactivate' before installation.")
             sys.exit(-1)
         self.bootstrap()
-
 
     def mktemp_venv(self) -> TemporaryDirectory:
         """
@@ -86,19 +86,12 @@ class Installer:
         except subprocess.CalledProcessError as e:
             print(e)
 
-    def app_venv(self, path: Optional[str] = None) -> Path:
+    def app_venv(self, venv_parent) -> Path:
         """
         Create a virtualenv for the InvokeAI installation
         """
 
-        # explicit venv location
-        # currently unused in normal operation
-        # useful for testing or special cases
-        if path is not None:
-            venv_dir = Path(path)
-
-        else:
-            venv_dir = self.dest / ".venv"
+        venv_dir = venv_parent / ".venv"
 
         # Prefer to copy python executables
         # so that updates to system python don't break InvokeAI
@@ -131,16 +124,16 @@ class Installer:
 
         messages.welcome()
 
-        default_path = Path(os.environ.get("INVOKEAI_ROOT") or Path(root).expanduser().resolve())
-        self.dest = default_path if yes_to_all else messages.dest_path(root)
-        if self.dest is None:
+        auto_dest = Path(os.environ.get("INVOKEAI_ROOT", root)).expanduser().resolve()
+        destination = auto_dest if yes_to_all else messages.dest_path(root)
+        if destination is None:
             print("Could not find or create the destination directory. Installation cancelled.")
             sys.exit(0)
 
         # create the venv for the app
-        self.venv = self.app_venv()
+        self.venv = self.app_venv(venv_parent=destination)
 
-        self.instance = InvokeAiInstance(runtime=self.dest, venv=self.venv, version=version)
+        self.instance = InvokeAiInstance(runtime=destination, venv=self.venv, version=version)
 
         # install dependencies and the InvokeAI application
         (extra_index_url, optional_modules) = get_torch_source() if not yes_to_all else (None, None)
