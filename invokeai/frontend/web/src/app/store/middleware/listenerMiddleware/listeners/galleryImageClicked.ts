@@ -1,6 +1,6 @@
 import { createAction } from '@reduxjs/toolkit';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { selectionChanged } from 'features/gallery/store/gallerySlice';
+import { imageSelectionChanged } from 'features/gallery/store/gallerySlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { imagesSelectors } from 'services/api/util';
@@ -52,16 +52,16 @@ export const addGalleryImageClickedListener = () => {
           const start = Math.min(lastClickedIndex, currentClickedIndex);
           const end = Math.max(lastClickedIndex, currentClickedIndex);
           const imagesToSelect = imageDTOs.slice(start, end + 1);
-          dispatch(selectionChanged(selection.concat(imagesToSelect)));
+          dispatch(imageSelectionChanged(selection.concat(imagesToSelect)));
         }
       } else if (ctrlKey || metaKey) {
         if (selection.some((i) => i.image_name === imageDTO.image_name) && selection.length > 1) {
-          dispatch(selectionChanged(selection.filter((n) => n.image_name !== imageDTO.image_name)));
+          dispatch(imageSelectionChanged(selection.filter((n) => n.image_name !== imageDTO.image_name)));
         } else {
-          dispatch(selectionChanged(selection.concat(imageDTO)));
+          dispatch(imageSelectionChanged(selection.concat(imageDTO)));
         }
       } else {
-        dispatch(selectionChanged([imageDTO]));
+        dispatch(imageSelectionChanged(imageDTO));
       }
     },
   });

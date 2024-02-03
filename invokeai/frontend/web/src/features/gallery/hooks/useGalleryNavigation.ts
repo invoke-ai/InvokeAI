@@ -5,7 +5,7 @@ import { imageListContainerTestId } from 'features/gallery/components/ImageGrid/
 import { virtuosoGridRefs } from 'features/gallery/components/ImageGrid/types';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
-import { imageSelected } from 'features/gallery/store/gallerySlice';
+import { imageSelectionChanged } from 'features/gallery/store/gallerySlice';
 import { getIsVisible } from 'features/gallery/util/getIsVisible';
 import { getScrollToIndexAlign } from 'features/gallery/util/getScrollToIndexAlign';
 import { clamp } from 'lodash-es';
@@ -144,7 +144,7 @@ export const useGalleryNavigation = (): UseGalleryNavigationReturn => {
       if (!image || index === lastSelectedImageIndex) {
         return;
       }
-      dispatch(imageSelected(image));
+      dispatch(imageSelectionChanged(image));
       scrollToImage(image.image_name, index);
     },
     [dispatch, lastSelectedImageIndex, data]

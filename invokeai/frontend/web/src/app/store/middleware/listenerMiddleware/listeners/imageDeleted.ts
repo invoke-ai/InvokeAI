@@ -9,7 +9,7 @@ import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { isModalOpenChanged } from 'features/deleteImageModal/store/slice';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { imageSelected } from 'features/gallery/store/gallerySlice';
+import { imageSelectionChanged } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { isImageFieldInputInstance } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
@@ -62,9 +62,9 @@ export const addRequestedSingleImageDeletionListener = () => {
         const newSelectedImageDTO = filteredImageDTOs[newSelectedImageIndex];
 
         if (newSelectedImageDTO) {
-          dispatch(imageSelected(newSelectedImageDTO));
+          dispatch(imageSelectionChanged(newSelectedImageDTO));
         } else {
-          dispatch(imageSelected(null));
+          dispatch(imageSelectionChanged(null));
         }
       }
 
@@ -160,9 +160,9 @@ export const addRequestedMultipleImageDeletionListener = () => {
         const newSelectedImageDTO = data ? imagesSelectors.selectAll(data)[0] : undefined;
 
         if (newSelectedImageDTO) {
-          dispatch(imageSelected(newSelectedImageDTO));
+          dispatch(imageSelectionChanged(newSelectedImageDTO));
         } else {
-          dispatch(imageSelected(null));
+          dispatch(imageSelectionChanged(null));
         }
 
         dispatch(isModalOpenChanged(false));

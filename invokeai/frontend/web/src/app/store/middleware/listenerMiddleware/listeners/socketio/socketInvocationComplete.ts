@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
-import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
+import { boardIdSelected, galleryViewChanged, imageSelectionChanged } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { isImageOutput } from 'features/nodes/types/common';
 import { LINEAR_UI_OUTPUT, nodeIDDenyList } from 'features/nodes/util/graph/constants';
@@ -105,7 +105,7 @@ export const addInvocationCompleteEventListener = () => {
               );
             }
 
-            dispatch(imageSelected(imageDTO));
+            dispatch(imageSelectionChanged(imageDTO));
           }
         }
       }

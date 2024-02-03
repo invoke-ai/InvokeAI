@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { galleryImageClicked } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
+import { imageSelectionChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import type { MouseEvent } from 'react';
 import { useCallback, useMemo } from 'react';
@@ -26,7 +26,7 @@ export const useMultiselect = (imageDTO?: ImageDTO) => {
         return;
       }
       if (!isMultiSelectEnabled) {
-        dispatch(selectionChanged([imageDTO]));
+        dispatch(imageSelectionChanged(imageDTO));
         return;
       }
 

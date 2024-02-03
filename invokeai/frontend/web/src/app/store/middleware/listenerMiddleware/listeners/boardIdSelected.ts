@@ -1,5 +1,5 @@
 import { isAnyOf } from '@reduxjs/toolkit';
-import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
+import { boardIdSelected, galleryViewChanged, imageSelectionChanged } from 'features/gallery/store/gallerySlice';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { imagesApi } from 'services/api/endpoints/images';
 import { imagesSelectors } from 'services/api/util';
@@ -37,17 +37,17 @@ export const addBoardIdSelectedListener = () => {
 
         if (boardImagesData && boardIdSelected.match(action) && action.payload.selectedImageName) {
           const selectedImage = imagesSelectors.selectById(boardImagesData, action.payload.selectedImageName);
-          dispatch(imageSelected(selectedImage || null));
+          dispatch(imageSelectionChanged(selectedImage ?? null));
         } else if (boardImagesData) {
           const firstImage = imagesSelectors.selectAll(boardImagesData)[0];
-          dispatch(imageSelected(firstImage || null));
+          dispatch(imageSelectionChanged(firstImage ?? null));
         } else {
           // board has no images - deselect
-          dispatch(imageSelected(null));
+          dispatch(imageSelectionChanged(null));
         }
       } else {
         // fallback - deselect
-        dispatch(imageSelected(null));
+        dispatch(imageSelectionChanged(null));
       }
     },
   });

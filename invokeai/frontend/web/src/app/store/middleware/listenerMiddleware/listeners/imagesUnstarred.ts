@@ -1,4 +1,4 @@
-import { selectionChanged } from 'features/gallery/store/gallerySlice';
+import { imageSelectionChanged } from 'features/gallery/store/gallerySlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
@@ -25,7 +25,7 @@ export const addImagesUnstarredListener = () => {
           updatedSelection.push(selectedImageDTO);
         }
       });
-      dispatch(selectionChanged(updatedSelection));
+      dispatch(imageSelectionChanged(updatedSelection));
     },
   });
 };

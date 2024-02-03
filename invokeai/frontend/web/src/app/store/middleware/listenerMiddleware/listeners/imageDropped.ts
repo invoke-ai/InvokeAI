@@ -7,7 +7,7 @@ import {
   controlAdapterIsEnabledChanged,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
-import { imageSelected } from 'features/gallery/store/gallerySlice';
+import { imageSelectionChanged } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { initialImageChanged, selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -44,7 +44,7 @@ export const addImageDroppedListener = () => {
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
-        dispatch(imageSelected(activeData.payload.imageDTO));
+        dispatch(imageSelectionChanged(activeData.payload.imageDTO));
         return;
       }
 

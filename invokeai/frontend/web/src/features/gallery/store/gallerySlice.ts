@@ -26,11 +26,16 @@ export const gallerySlice = createSlice({
   name: 'gallery',
   initialState: initialGalleryState,
   reducers: {
-    imageSelected: (state, action: PayloadAction<ImageDTO | null>) => {
-      state.selection = action.payload ? [action.payload] : [];
-    },
-    selectionChanged: (state, action: PayloadAction<ImageDTO[]>) => {
-      state.selection = uniqBy(action.payload, (i) => i.image_name);
+    imageSelectionChanged: (state, action: PayloadAction<ImageDTO[] | ImageDTO | null>) => {
+      if (!action.payload) {
+        state.selection = [];
+        return;
+      }
+      if (Array.isArray(action.payload)) {
+        state.selection = uniqBy(action.payload, (i) => i.image_name);
+        return;
+      }
+      state.selection = [action.payload];
     },
     shouldAutoSwitchChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoSwitch = action.payload;
@@ -97,14 +102,13 @@ export const gallerySlice = createSlice({
 });
 
 export const {
-  imageSelected,
   shouldAutoSwitchChanged,
   autoAssignBoardOnClickChanged,
   setGalleryImageMinimumWidth,
   boardIdSelected,
   autoAddBoardIdChanged,
   galleryViewChanged,
-  selectionChanged,
+  imageSelectionChanged,
   boardSearchTextChanged,
   moreImagesLoaded,
 } = gallerySlice.actions;
