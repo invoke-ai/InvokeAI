@@ -1,5 +1,13 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { ButtonGroup, Flex, IconButton, Menu, MenuButton, MenuList, spinAnimation } from '@invoke-ai/ui-library';
+import {
+  ButtonGroup,
+  Flex,
+  IconButton,
+  Menu,
+  MenuButton,
+  MenuList,
+  spinWithPauseAnimation,
+} from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppToaster } from 'app/components/Toaster';
@@ -24,7 +32,6 @@ import { useTranslation } from 'react-i18next';
 import {
   PiArrowsCounterClockwiseBold,
   PiAsteriskBold,
-  PiCircleNotchBold,
   PiDotsThreeOutlineFill,
   PiEyeBold,
   PiFlowArrowBold,
@@ -47,7 +54,7 @@ const selectShouldDisableToolbarButtons = createSelector(
 );
 
 const loadingStyles: SystemStyleObject = {
-  svg: { animation: spinAnimation },
+  svg: { animation: spinWithPauseAnimation },
 };
 
 export const ViewerToolbar = memo(() => {
@@ -295,7 +302,7 @@ export const ViewerToolbar = memo(() => {
           <IconButton
             aria-label={`${t('viewer.viewerModeProgress')}`}
             tooltip={`${t('viewer.viewerModeProgress')}`}
-            icon={hasProgress ? <PiCircleNotchBold /> : <PiHourglassMediumFill />}
+            icon={<PiHourglassMediumFill />}
             isChecked={viewerMode === 'progress'}
             onClick={handleSelectViewerProgress}
             sx={hasProgress ? loadingStyles : undefined}
