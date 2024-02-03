@@ -10,7 +10,7 @@ from invokeai.app.services.item_storage.item_storage_common import ItemNotFoundE
 T = TypeVar("T", bound=BaseModel)
 
 
-class ItemStorageMemory(ItemStorageABC, Generic[T]):
+class ItemStorageMemory(ItemStorageABC[T], Generic[T]):
     """
     Provides a simple in-memory storage for items, with a maximum number of items to store.
     The storage uses the LRU strategy to evict items from storage when the max has been reached.
