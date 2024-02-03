@@ -57,8 +57,6 @@ export const {
   expanderStateChanged,
 } = uiSlice.actions;
 
-export default uiSlice.reducer;
-
 export const selectUiSlice = (state: RootState) => state.ui;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */

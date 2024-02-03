@@ -37,8 +37,6 @@ export const hrfSlice = createSlice({
 
 export const { setHrfEnabled, setHrfStrength, setHrfMethod } = hrfSlice.actions;
 
-export default hrfSlice.reducer;
-
 export const selectHrfSlice = (state: RootState) => state.hrf;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */

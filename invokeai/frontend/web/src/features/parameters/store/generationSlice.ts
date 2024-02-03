@@ -299,8 +299,6 @@ export const {
 
 export const { selectOptimalDimension } = generationSlice.selectors;
 
-export default generationSlice.reducer;
-
 export const selectGenerationSlice = (state: RootState) => state.generation;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */

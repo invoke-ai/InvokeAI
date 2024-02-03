@@ -719,8 +719,6 @@ export const {
   scaledBoundingBoxDimensionsReset,
 } = canvasSlice.actions;
 
-export default canvasSlice.reducer;
-
 export const selectCanvasSlice = (state: RootState) => state.canvas;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */

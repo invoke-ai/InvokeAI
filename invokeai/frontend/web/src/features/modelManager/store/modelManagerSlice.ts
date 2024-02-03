@@ -29,8 +29,6 @@ export const modelManagerSlice = createSlice({
 
 export const { setSearchFolder, setAdvancedAddScanModel } = modelManagerSlice.actions;
 
-export default modelManagerSlice.reducer;
-
 export const selectModelManagerSlice = (state: RootState) => state.modelmanager;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */

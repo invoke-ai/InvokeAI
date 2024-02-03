@@ -194,8 +194,6 @@ export const {
   setShouldEnableInformationalPopovers,
 } = systemSlice.actions;
 
-export default systemSlice.reducer;
-
 const isAnyServerError = isAnyOf(socketInvocationError, socketSessionRetrievalError, socketInvocationRetrievalError);
 
 export const selectSystemSlice = (state: RootState) => state.system;
