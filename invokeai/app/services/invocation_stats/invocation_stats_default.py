@@ -9,6 +9,7 @@ import torch
 import invokeai.backend.util.logging as logger
 from invokeai.app.invocations.baseinvocation import BaseInvocation
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.item_storage.item_storage_common import ItemNotFoundError
 from invokeai.backend.model_management.model_cache import CacheStats
 
 from .invocation_stats_base import InvocationStatsServiceBase
@@ -82,7 +83,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
         for graph_execution_state_id in self._stats:
             try:
                 graph_execution_state = self._invoker.services.graph_execution_manager.get(graph_execution_state_id)
-            except Exception:
+            except ItemNotFoundError:
                 # TODO(ryand): What would cause this? Should this exception just be allowed to propagate?
                 logger.warning(f"Failed to get graph state for {graph_execution_state_id}.")
                 continue
