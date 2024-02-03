@@ -3,6 +3,7 @@ import re
 import pytest
 from pydantic import BaseModel
 
+from invokeai.app.services.item_storage.item_storage_common import ItemNotFoundError
 from invokeai.app.services.item_storage.item_storage_memory import ItemStorageMemory
 
 
@@ -58,8 +59,8 @@ def test_item_storage_memory_gets(item_storage_memory: ItemStorageMemory[MockIte
     item = item_storage_memory.get("2")
     assert item == item_2
 
-    item = item_storage_memory.get("3")
-    assert item is None
+    with pytest.raises(ItemNotFoundError, match=re.escape("Item with id 3 not found")):
+        item_storage_memory.get("3")
 
 
 def test_item_storage_memory_deletes(item_storage_memory: ItemStorageMemory[MockItemModel]):
