@@ -27,7 +27,7 @@ export const initialWorkflowState: WorkflowState = {
   ...blankWorkflow,
 };
 
-const workflowSlice = createSlice({
+export const workflowSlice = createSlice({
   name: 'workflow',
   initialState: initialWorkflowState,
   reducers: {
@@ -118,8 +118,6 @@ export const {
   workflowReset,
   workflowSaved,
 } = workflowSlice.actions;
-
-export default workflowSlice.reducer;
 
 export const selectWorkflowSlice = (state: RootState) => state.workflow;
 

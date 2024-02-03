@@ -36,7 +36,7 @@ export const initialSDXLState: SDXLState = {
   refinerStart: 0.8,
 };
 
-const sdxlSlice = createSlice({
+export const sdxlSlice = createSlice({
   name: 'sdxl',
   initialState: initialSDXLState,
   reducers: {
@@ -85,8 +85,6 @@ export const {
   setRefinerNegativeAestheticScore,
   setRefinerStart,
 } = sdxlSlice.actions;
-
-export default sdxlSlice.reducer;
 
 export const selectSdxlSlice = (state: RootState) => state.sdxl;
 

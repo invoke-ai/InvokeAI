@@ -35,8 +35,6 @@ export const postprocessingSlice = createSlice({
 
 export const { esrganModelNameChanged } = postprocessingSlice.actions;
 
-export default postprocessingSlice.reducer;
-
 export const selectPostprocessingSlice = (state: RootState) => state.postprocessing;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */

@@ -109,8 +109,6 @@ export const {
   moreImagesLoaded,
 } = gallerySlice.actions;
 
-export default gallerySlice.reducer;
-
 const isAnyBoardDeleted = isAnyOf(
   imagesApi.endpoints.deleteBoard.matchFulfilled,
   imagesApi.endpoints.deleteBoardAndImages.matchFulfilled

@@ -424,8 +424,6 @@ export const {
   controlAdapterModelCleared,
 } = controlAdaptersSlice.actions;
 
-export default controlAdaptersSlice.reducer;
-
 export const isAnyControlAdapterAdded = isAnyOf(
   controlAdapterAdded,
   controlAdapterAddedFromImage,

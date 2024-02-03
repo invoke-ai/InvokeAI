@@ -139,7 +139,7 @@ const fieldValueReducer = <T extends FieldValue>(
   input.value = result.data;
 };
 
-const nodesSlice = createSlice({
+export const nodesSlice = createSlice({
   name: 'nodes',
   initialState: initialNodesState,
   reducers: {
@@ -851,8 +851,6 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   selectionPasted,
   edgeAdded
 );
-
-export default nodesSlice.reducer;
 
 export const selectNodesSlice = (state: RootState) => state.nodes;
 

@@ -74,8 +74,6 @@ export const {
   seedBehaviourChanged,
 } = dynamicPromptsSlice.actions;
 
-export default dynamicPromptsSlice.reducer;
-
 export const selectDynamicPromptsSlice = (state: RootState) => state.dynamicPrompts;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */

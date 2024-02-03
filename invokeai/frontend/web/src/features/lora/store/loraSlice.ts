@@ -81,8 +81,6 @@ export const {
   loraRecalled,
 } = loraSlice.actions;
 
-export default loraSlice.reducer;
-
 export const selectLoraSlice = (state: RootState) => state.lora;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
