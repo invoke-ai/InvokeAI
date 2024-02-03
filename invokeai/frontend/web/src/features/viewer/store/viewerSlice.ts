@@ -1,7 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { imageSelectionChanged } from 'features/gallery/store/gallerySlice';
+import { galleryImageClicked } from 'features/gallery/store/gallerySlice';
 
 export type ViewerMode = 'image' | 'info' | 'progress';
 
@@ -27,10 +27,11 @@ export const viewerSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addCase(imageSelectionChanged, (state) => {
-      // When a gallery image is selected and we are in progress mode, switch to image mode
+    builder.addCase(galleryImageClicked, (state) => {
+      // When a gallery image is clicked and we are in progress mode, switch to image mode.
+      // This is not the same as the gallery _selection_ being changed.
       if (state.viewerMode === 'progress') {
-        // state.viewerMode = 'image';
+        state.viewerMode = 'image';
       }
     });
   },
