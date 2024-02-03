@@ -79,7 +79,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
         This shouldn't be necessary, but we don't have totally robust upstream handling of graph completions/errors, so
         for now we call this function periodically to prevent them from accumulating.
         """
-        to_prune = []
+        to_prune: list[str] = []
         for graph_execution_state_id in self._stats:
             try:
                 graph_execution_state = self._invoker.services.graph_execution_manager.get(graph_execution_state_id)
