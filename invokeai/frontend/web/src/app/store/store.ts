@@ -109,12 +109,12 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
 
 const unserialize: UnserializeFunction = (data, key) => {
   const log = logger('system');
-  const config = persistConfigs[key as keyof typeof persistConfigs];
-  if (!config) {
-    throw new Error(`No unserialize config for slice "${key}"`);
+  const persistConfig = persistConfigs[key as keyof typeof persistConfigs];
+  if (!persistConfig) {
+    throw new Error(`No persist config for slice "${key}"`);
   }
   try {
-    const { initialState, migrate } = config;
+    const { initialState, migrate } = persistConfig;
     const parsed = JSON.parse(data);
     // strip out old keys
     const stripped = pick(parsed, keys(initialState));
@@ -134,12 +134,16 @@ const unserialize: UnserializeFunction = (data, key) => {
     return transformed;
   } catch (err) {
     log.warn({ error: serializeError(err) }, `Error rehydrating slice "${key}", falling back to default initial state`);
-    return config.initialState;
+    return persistConfig.initialState;
   }
 };
 
 export const serialize: SerializeFunction = (data, key) => {
-  const result = omit(data, persistConfigs[key as keyof typeof persistConfigs]?.persistDenylist ?? []);
+  const persistConfig = persistConfigs[key as keyof typeof persistConfigs];
+  if (!persistConfig) {
+    throw new Error(`No persist config for slice "${key}"`);
+  }
+  const result = omit(data, persistConfig.persistDenylist);
   return JSON.stringify(result);
 };
 
