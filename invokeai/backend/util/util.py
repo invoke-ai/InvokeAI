@@ -24,6 +24,20 @@ import invokeai.backend.util.logging as logger
 
 from .devices import torch_dtype
 
+# actual size of a gig
+GIG = 1073741824
+
+def directory_size(directory: Path) -> int:
+    """
+    Return the aggregate size of all files in a directory (bytes).
+    """
+    sum = 0
+    for root, dirs, files in os.walk(directory):
+        for f in files:
+            sum += Path(root, f).stat().st_size
+        for d in dirs:
+            sum += Path(root, d).stat().st_size
+    return sum
 
 def log_txt_as_img(wh, xc, size=10):
     # wh a tuple of (width, height)

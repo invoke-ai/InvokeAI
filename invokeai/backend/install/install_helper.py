@@ -98,11 +98,13 @@ class TqdmEventService(EventServiceBase):
         super().__init__()
         self._bars: Dict[str, tqdm] = {}
         self._last: Dict[str, int] = {}
+        self._logger = InvokeAILogger.get_logger(__name__)
 
     def dispatch(self, event_name: str, payload: Any) -> None:
         """Dispatch an event by appending it to self.events."""
+        data = payload["data"]
+        source = data["source"]
         if payload["event"] == "model_install_downloading":
-            data = payload["data"]
             dest = data["local_path"]
             total_bytes = data["total_bytes"]
             bytes = data["bytes"]
@@ -111,7 +113,12 @@ class TqdmEventService(EventServiceBase):
                 self._last[dest] = 0
             self._bars[dest].update(bytes - self._last[dest])
             self._last[dest] = bytes
-
+        elif payload["event"] == "model_install_completed":
+            self._logger.info(f"{source}: installed successfully.")
+        elif payload["event"] == "model_install_error":
+            self._logger.warning(f"{source}: installation failed with error {data['error']}")
+        elif payload["event"] == "model_install_cancelled":
+            self._logger.warning(f"{source}: installation cancelled")
 
 class InstallHelper(object):
     """Capture information stored jointly in INITIAL_MODELS.yaml and the installed models db."""

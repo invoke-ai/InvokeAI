@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from pydantic import BaseModel, Field
 
 from invokeai.app.services.shared.pagination import PaginatedResults
-from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelFormat, ModelType
+from invokeai.backend.model_manager import LoadedModel, AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore
 
 
@@ -99,6 +99,19 @@ class ModelRecordServiceBase(ABC):
         :param key: Key of model config to be fetched.
 
         Exceptions: UnknownModelException
+        """
+        pass
+
+    @abstractmethod
+    def load_model(self, key: str, submodel_type: Optional[SubModelType]) -> LoadedModel:
+        """
+        Load the indicated model into memory and return a LoadedModel object.
+
+        :param key: Key of model config to be fetched.
+        :param submodel_type: For main (pipeline models), the submodel to fetch 
+
+        Exceptions: UnknownModelException -- model with this key not known
+                    NotImplementedException -- a model loader was not provided at initialization time
         """
         pass
 

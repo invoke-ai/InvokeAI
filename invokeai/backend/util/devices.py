@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import nullcontext
-from typing import Union
+from typing import Union, Optional
 
 import torch
 from torch import autocast
@@ -43,7 +43,8 @@ def choose_precision(device: torch.device) -> str:
     return "float32"
 
 
-def torch_dtype(device: torch.device) -> torch.dtype:
+def torch_dtype(device: Optional[torch.device] = None) -> torch.dtype:
+    device = device or choose_torch_device()
     precision = choose_precision(device)
     if precision == "float16":
         return torch.float16

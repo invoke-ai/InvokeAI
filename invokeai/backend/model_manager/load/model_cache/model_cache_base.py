@@ -10,34 +10,41 @@ model will be cleared and (re)loaded from disk when next needed.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from logging import Logger
-from typing import Dict, Optional
+from typing import Dict, Optional, TypeVar, Generic
 
 import torch
 
-from invokeai.backend.model_manager import SubModelType
-from invokeai.backend.model_manager.load.load_base import AnyModel, ModelLockerBase
+from invokeai.backend.model_manager import AnyModel, SubModelType
 
+class ModelLockerBase(ABC):
+    """Base class for the model locker used by the loader."""
+
+    @abstractmethod
+    def lock(self) -> AnyModel:
+        """Lock the contained model and move it into VRAM."""
+        pass
+
+    @abstractmethod
+    def unlock(self) -> None:
+        """Unlock the contained model, and remove it from VRAM."""
+        pass
+
+    @property
+    @abstractmethod
+    def model(self) -> AnyModel:
+        """Return the model."""
+        pass
+
+T = TypeVar("T")
 
 @dataclass
-class CacheStats(object):
-    """Data object to record statistics on cache hits/misses."""
-
-    hits: int = 0  # cache hits
-    misses: int = 0  # cache misses
-    high_watermark: int = 0  # amount of cache used
-    in_cache: int = 0  # number of models in cache
-    cleared: int = 0  # number of models cleared to make space
-    cache_size: int = 0  # total size of cache
-    loaded_model_sizes: Dict[str, int] = field(default_factory=dict)
-
-
-@dataclass
-class CacheRecord:
+class CacheRecord(Generic[T]):
     """Elements of the cache."""
 
     key: str
-    model: AnyModel
+    model: T
     size: int
+    loaded: bool = False
     _locks: int = 0
 
     def lock(self) -> None:
@@ -55,7 +62,7 @@ class CacheRecord:
         return self._locks > 0
 
 
-class ModelCacheBase(ABC):
+class ModelCacheBase(ABC, Generic[T]):
     """Virtual base class for RAM model cache."""
 
     @property
@@ -76,8 +83,14 @@ class ModelCacheBase(ABC):
         """Return true if the cache is configured to lazily offload models in VRAM."""
         pass
 
+    @property
     @abstractmethod
-    def offload_unlocked_models(self) -> None:
+    def max_cache_size(self) -> float:
+        """Return true if the cache is configured to lazily offload models in VRAM."""
+        pass
+
+    @abstractmethod
+    def offload_unlocked_models(self, size_required: int) -> None:
         """Offload from VRAM any models not actively in use."""
         pass
 
@@ -101,7 +114,7 @@ class ModelCacheBase(ABC):
     def put(
         self,
         key: str,
-        model: AnyModel,
+        model: T,
         submodel_type: Optional[SubModelType] = None,
     ) -> None:
         """Store model under key and optional submodel_type."""
@@ -132,11 +145,6 @@ class ModelCacheBase(ABC):
     @abstractmethod
     def cache_size(self) -> int:
         """Get the total size of the models currently cached."""
-        pass
-
-    @abstractmethod
-    def get_stats(self) -> CacheStats:
-        """Return cache hit/miss/size statistics."""
         pass
 
     @abstractmethod
