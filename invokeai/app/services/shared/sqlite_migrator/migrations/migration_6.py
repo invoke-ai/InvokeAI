@@ -1,11 +1,9 @@
 import sqlite3
-from logging import Logger
 
-from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
 
-class Migration6Callback:
 
+class Migration6Callback:
     def __call__(self, cursor: sqlite3.Cursor) -> None:
         self._recreate_model_triggers(cursor)
 
@@ -27,6 +25,7 @@ class Migration6Callback:
             END;
             """
         )
+
 
 def build_migration_6() -> Migration:
     """

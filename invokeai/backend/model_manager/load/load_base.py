@@ -10,17 +10,19 @@ Use like this:
        # do something with loaded_model
 """
 
+import hashlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Type, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Type
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager import AnyModel, AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
-from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
-from invokeai.backend.model_manager.load.model_cache.model_locker import ModelLockerBase
+from invokeai.backend.model_manager.config import VaeCheckpointConfig, VaeDiffusersConfig
 from invokeai.backend.model_manager.load.convert_cache.convert_cache_base import ModelConvertCacheBase
+from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase, ModelLockerBase
+
 
 @dataclass
 class LoadedModel:
@@ -52,7 +54,7 @@ class ModelLoaderBase(ABC):
         self,
         app_config: InvokeAIAppConfig,
         logger: Logger,
-        ram_cache: ModelCacheBase,
+        ram_cache: ModelCacheBase[AnyModel],
         convert_cache: ModelConvertCacheBase,
     ):
         """Initialize the loader."""
@@ -91,7 +93,7 @@ class AnyModelLoader:
         self,
         app_config: InvokeAIAppConfig,
         logger: Logger,
-        ram_cache: ModelCacheBase,
+        ram_cache: ModelCacheBase[AnyModel],
         convert_cache: ModelConvertCacheBase,
     ):
         """Initialize AnyModelLoader with its dependencies."""
@@ -101,11 +103,11 @@ class AnyModelLoader:
         self._convert_cache = convert_cache
 
     @property
-    def ram_cache(self) -> ModelCacheBase:
+    def ram_cache(self) -> ModelCacheBase[AnyModel]:
         """Return the RAM cache associated used by the loaders."""
         return self._ram_cache
 
-    def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType]=None) -> LoadedModel:
+    def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
         """
         Return a model given its configuration.
 
@@ -113,9 +115,7 @@ class AnyModelLoader:
         :param submodel_type: an ModelType enum indicating the portion of
                the model to retrieve (e.g. ModelType.Vae)
         """
-        implementation = self.__class__.get_implementation(
-            base=model_config.base, type=model_config.type, format=model_config.format
-        )
+        implementation, model_config, submodel_type = self.__class__.get_implementation(model_config, submodel_type)
         return implementation(
             app_config=self._app_config,
             logger=self._logger,
@@ -128,16 +128,37 @@ class AnyModelLoader:
         return "-".join([base.value, type.value, format.value])
 
     @classmethod
-    def get_implementation(cls, base: BaseModelType, type: ModelType, format: ModelFormat) -> Type[ModelLoaderBase]:
+    def get_implementation(
+        cls, config: AnyModelConfig, submodel_type: Optional[SubModelType]
+    ) -> Tuple[Type[ModelLoaderBase], AnyModelConfig, Optional[SubModelType]]:
         """Get subclass of ModelLoaderBase registered to handle base and type."""
-        key1 = cls._to_registry_key(base, type, format)  # for a specific base type
-        key2 = cls._to_registry_key(BaseModelType.Any, type, format)  # with wildcard Any
+        # We have to handle VAE overrides here because this will change the model type and the corresponding implementation returned
+        conf2, submodel_type = cls._handle_subtype_overrides(config, submodel_type)
+
+        key1 = cls._to_registry_key(conf2.base, conf2.type, conf2.format)  # for a specific base type
+        key2 = cls._to_registry_key(BaseModelType.Any, conf2.type, conf2.format)  # with wildcard Any
         implementation = cls._registry.get(key1) or cls._registry.get(key2)
         if not implementation:
             raise NotImplementedError(
-                f"No subclass of LoadedModel is registered for base={base}, type={type}, format={format}"
+                f"No subclass of LoadedModel is registered for base={config.base}, type={config.type}, format={config.format}"
             )
-        return implementation
+        return implementation, conf2, submodel_type
+
+    @classmethod
+    def _handle_subtype_overrides(
+        cls, config: AnyModelConfig, submodel_type: Optional[SubModelType]
+    ) -> Tuple[AnyModelConfig, Optional[SubModelType]]:
+        if submodel_type == SubModelType.Vae and hasattr(config, "vae") and config.vae is not None:
+            model_path = Path(config.vae)
+            config_class = (
+                VaeCheckpointConfig if model_path.suffix in [".pt", ".safetensors", ".ckpt"] else VaeDiffusersConfig
+            )
+            hash = hashlib.md5(model_path.as_posix().encode("utf-8")).hexdigest()
+            new_conf = config_class(path=model_path.as_posix(), name=model_path.stem, base=config.base, key=hash)
+            submodel_type = None
+        else:
+            new_conf = config
+        return new_conf, submodel_type
 
     @classmethod
     def register(
@@ -152,4 +173,3 @@ class AnyModelLoader:
             return subclass
 
         return decorator
-
