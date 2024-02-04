@@ -8,6 +8,8 @@ from invokeai.app.services.item_storage.item_storage_memory import ItemStorageMe
 from invokeai.app.services.object_serializer.object_serializer_disk import ObjectSerializerDisk
 from invokeai.app.services.object_serializer.object_serializer_forward_cache import ObjectSerializerForwardCache
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
+from invokeai.backend.model_manager.load import AnyModelLoader, ModelConvertCache
+from invokeai.backend.model_manager.load.model_cache import ModelCache
 from invokeai.backend.model_manager.metadata import ModelMetadataStore
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
 from invokeai.backend.util.logging import InvokeAILogger
@@ -98,15 +100,26 @@ class ApiDependencies:
         )
         model_manager = ModelManagerService(config, logger)
         model_record_service = ModelRecordServiceSQL(db=db)
+        model_loader = AnyModelLoader(
+            app_config=config,
+            logger=logger,
+            ram_cache=ModelCache(
+                max_cache_size=config.ram_cache_size, max_vram_cache_size=config.vram_cache_size, logger=logger
+            ),
+            convert_cache=ModelConvertCache(
+                cache_path=config.models_convert_cache_path, max_size=config.convert_cache_size
+            ),
+        )
+        model_record_service = ModelRecordServiceSQL(db=db, loader=model_loader)
         download_queue_service = DownloadQueueService(event_bus=events)
-        metadata_store = ModelMetadataStore(db=db)
         model_install_service = ModelInstallService(
             app_config=config,
             record_store=model_record_service,
             download_queue=download_queue_service,
-            metadata_store=metadata_store,
+            metadata_store=ModelMetadataStore(db=db),
             event_bus=events,
         )
+        model_manager = ModelManagerService(config, logger)  # TO DO: legacy model manager v1. Remove
         names = SimpleNameService()
         performance_statistics = InvocationStatsService()
         processor = DefaultInvocationProcessor()

@@ -42,6 +42,7 @@ Typical usage:
 
 import json
 import sqlite3
+import time
 from math import ceil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
@@ -53,8 +54,10 @@ from invokeai.backend.model_manager.config import (
     ModelConfigFactory,
     ModelFormat,
     ModelType,
+    SubModelType,
 )
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore, UnknownMetadataException
+from invokeai.backend.model_manager.load import AnyModelLoader, LoadedModel
 
 from ..shared.sqlite.sqlite_database import SqliteDatabase
 from .model_records_base import (
@@ -69,16 +72,17 @@ from .model_records_base import (
 class ModelRecordServiceSQL(ModelRecordServiceBase):
     """Implementation of the ModelConfigStore ABC using a SQL database."""
 
-    def __init__(self, db: SqliteDatabase):
+    def __init__(self, db: SqliteDatabase, loader: Optional[AnyModelLoader]=None):
         """
         Initialize a new object from preexisting sqlite3 connection and threading lock objects.
 
-        :param conn: sqlite3 connection object
-        :param lock: threading Lock object
+        :param db: Sqlite connection object
+        :param loader: Initialized model loader object (optional)
         """
         super().__init__()
         self._db = db
-        self._cursor = self._db.conn.cursor()
+        self._cursor = db.conn.cursor()
+        self._loader = loader
 
     @property
     def db(self) -> SqliteDatabase:
@@ -199,7 +203,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.lock:
             self._cursor.execute(
                 """--sql
-                SELECT config FROM model_config
+                SELECT config, strftime('%s',updated_at) FROM model_config
                 WHERE id=?;
                 """,
                 (key,),
@@ -207,8 +211,23 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             rows = self._cursor.fetchone()
             if not rows:
                 raise UnknownModelException("model not found")
-            model = ModelConfigFactory.make_config(json.loads(rows[0]))
+            model = ModelConfigFactory.make_config(json.loads(rows[0]), timestamp=rows[1])
         return model
+
+    def load_model(self, key: str, submodel_type: Optional[SubModelType]) -> LoadedModel:
+        """
+        Load the indicated model into memory and return a LoadedModel object.
+
+        :param key: Key of model config to be fetched.
+        :param submodel_type: For main (pipeline models), the submodel to fetch.
+
+        Exceptions: UnknownModelException -- model with this key not known
+                    NotImplementedException -- a model loader was not provided at initialization time
+        """
+        if not self._loader:
+            raise NotImplementedError(f"Class {self.__class__} was not initialized with a model loader")
+        model_config = self.get_model(key)
+        return self._loader.load_model(model_config, submodel_type)
 
     def exists(self, key: str) -> bool:
         """
@@ -265,12 +284,12 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.lock:
             self._cursor.execute(
                 f"""--sql
-                select config FROM model_config
+                select config, strftime('%s',updated_at) FROM model_config
                 {where};
                 """,
                 tuple(bindings),
             )
-            results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
+            results = [ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in self._cursor.fetchall()]
         return results
 
     def search_by_path(self, path: Union[str, Path]) -> List[AnyModelConfig]:
@@ -279,12 +298,12 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.lock:
             self._cursor.execute(
                 """--sql
-                SELECT config FROM model_config
+                SELECT config, strftime('%s',updated_at) FROM model_config
                 WHERE path=?;
                 """,
                 (str(path),),
             )
-            results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
+            results = [ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in self._cursor.fetchall()]
         return results
 
     def search_by_hash(self, hash: str) -> List[AnyModelConfig]:
@@ -293,12 +312,12 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.lock:
             self._cursor.execute(
                 """--sql
-                SELECT config FROM model_config
+                SELECT config, strftime('%s',updated_at) FROM model_config
                 WHERE original_hash=?;
                 """,
                 (hash,),
             )
-            results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
+            results = [ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in self._cursor.fetchall()]
         return results
 
     @property
