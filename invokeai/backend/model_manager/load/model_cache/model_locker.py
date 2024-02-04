@@ -2,9 +2,10 @@
 Base class and implementation of a class that moves models in and out of VRAM.
 """
 
-from abc import ABC, abstractmethod
 from invokeai.backend.model_manager import AnyModel
-from .model_cache_base import ModelLockerBase, ModelCacheBase, CacheRecord
+
+from .model_cache_base import CacheRecord, ModelCacheBase, ModelLockerBase
+
 
 class ModelLocker(ModelLockerBase):
     """Internal class that mediates movement in and out of GPU."""
@@ -56,4 +57,3 @@ class ModelLocker(ModelLockerBase):
         if not self._cache.lazy_offloading:
             self._cache.offload_unlocked_models(self._cache_entry.size)
             self._cache.print_cuda_stats()
-
