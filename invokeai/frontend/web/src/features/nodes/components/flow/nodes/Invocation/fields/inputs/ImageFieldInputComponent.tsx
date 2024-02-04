@@ -71,7 +71,7 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
         droppableData={droppableData}
         draggableData={draggableData}
         postUploadAction={postUploadAction}
-        useThumbailFallback
+        fallbackSrc={imageDTO?.thumbnail_url}
         uploadElement={<UploadElement />}
         dropLabel={<DropLabel />}
         minSize={8}

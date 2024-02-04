@@ -38,7 +38,7 @@ const CurrentImageNode = (props: NodeProps) => {
   if (imageDTO) {
     return (
       <Wrapper nodeProps={props}>
-        <IAIDndImage imageDTO={imageDTO} isDragDisabled useThumbailFallback />
+        <IAIDndImage imageDTO={imageDTO} isDragDisabled fallbackSrc={imageDTO?.thumbnail_url} />
       </Wrapper>
     );
   }

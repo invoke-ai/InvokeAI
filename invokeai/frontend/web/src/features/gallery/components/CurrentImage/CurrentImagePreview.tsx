@@ -76,7 +76,7 @@ const CurrentImagePreview = () => {
           draggableData={draggableData}
           isUploadDisabled={true}
           fitContainer
-          useThumbailFallback
+          fallbackSrc={imageDTO?.thumbnail_url}
           dropLabel={t('gallery.setCurrentImage')}
           noContentFallback={<IAINoContentFallback icon={PiImageBold} label={t('gallery.noImageSelected')} />}
           dataTestId="image-preview"

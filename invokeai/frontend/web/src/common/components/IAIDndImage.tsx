@@ -37,11 +37,11 @@ type IAIDndImageProps = FlexProps & {
   isSelected?: boolean;
   thumbnail?: boolean;
   noContentFallback?: ReactElement;
-  useThumbailFallback?: boolean;
   withHoverOverlay?: boolean;
   children?: JSX.Element;
   uploadElement?: ReactNode;
   dataTestId?: string;
+  fallbackSrc?: string;
 };
 
 const IAIDndImage = (props: IAIDndImageProps) => {
@@ -64,7 +64,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     thumbnail = false,
     noContentFallback = defaultNoContentFallback,
     uploadElement = defaultUploadElement,
-    useThumbailFallback,
+    fallbackSrc,
     withHoverOverlay = false,
     children,
     onMouseOver,
@@ -150,8 +150,8 @@ const IAIDndImage = (props: IAIDndImageProps) => {
               <Image
                 src={thumbnail ? imageDTO.thumbnail_url : imageDTO.image_url}
                 fallbackStrategy="beforeLoadOrError"
-                fallbackSrc={useThumbailFallback ? imageDTO.thumbnail_url : undefined}
-                fallback={useThumbailFallback ? undefined : <IAILoadingImageFallback image={imageDTO} />}
+                fallbackSrc={fallbackSrc}
+                fallback={fallbackSrc ? undefined : <IAILoadingImageFallback image={imageDTO} />}
                 onError={onError}
                 draggable={false}
                 w={imageDTO.width}
