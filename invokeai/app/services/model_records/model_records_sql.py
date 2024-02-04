@@ -42,7 +42,6 @@ Typical usage:
 
 import json
 import sqlite3
-import time
 from math import ceil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
@@ -56,8 +55,8 @@ from invokeai.backend.model_manager.config import (
     ModelType,
     SubModelType,
 )
-from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore, UnknownMetadataException
 from invokeai.backend.model_manager.load import AnyModelLoader, LoadedModel
+from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore, UnknownMetadataException
 
 from ..shared.sqlite.sqlite_database import SqliteDatabase
 from .model_records_base import (
@@ -72,7 +71,7 @@ from .model_records_base import (
 class ModelRecordServiceSQL(ModelRecordServiceBase):
     """Implementation of the ModelConfigStore ABC using a SQL database."""
 
-    def __init__(self, db: SqliteDatabase, loader: Optional[AnyModelLoader]=None):
+    def __init__(self, db: SqliteDatabase, loader: Optional[AnyModelLoader] = None):
         """
         Initialize a new object from preexisting sqlite3 connection and threading lock objects.
 
@@ -289,7 +288,9 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 """,
                 tuple(bindings),
             )
-            results = [ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in self._cursor.fetchall()]
+            results = [
+                ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in self._cursor.fetchall()
+            ]
         return results
 
     def search_by_path(self, path: Union[str, Path]) -> List[AnyModelConfig]:
@@ -303,7 +304,9 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 """,
                 (str(path),),
             )
-            results = [ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in self._cursor.fetchall()]
+            results = [
+                ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in self._cursor.fetchall()
+            ]
         return results
 
     def search_by_hash(self, hash: str) -> List[AnyModelConfig]:
@@ -317,7 +320,9 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 """,
                 (hash,),
             )
-            results = [ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in self._cursor.fetchall()]
+            results = [
+                ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in self._cursor.fetchall()
+            ]
         return results
 
     @property

@@ -8,13 +8,14 @@ model will be cleared and (re)loaded from disk when next needed.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from logging import Logger
-from typing import Dict, Optional, TypeVar, Generic
+from typing import Generic, Optional, TypeVar
 
 import torch
 
 from invokeai.backend.model_manager import AnyModel, SubModelType
+
 
 class ModelLockerBase(ABC):
     """Base class for the model locker used by the loader."""
@@ -35,7 +36,9 @@ class ModelLockerBase(ABC):
         """Return the model."""
         pass
 
+
 T = TypeVar("T")
+
 
 @dataclass
 class CacheRecord(Generic[T]):
@@ -115,6 +118,7 @@ class ModelCacheBase(ABC, Generic[T]):
         self,
         key: str,
         model: T,
+        size: int,
         submodel_type: Optional[SubModelType] = None,
     ) -> None:
         """Store model under key and optional submodel_type."""
