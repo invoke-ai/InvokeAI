@@ -535,19 +535,19 @@ class ModelInstallService(ModelInstallServiceBase):
     def _import_from_url(self, source: URLModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
         # URLs from Civitai or HuggingFace will be handled specially
         url_patterns = {
-            r"https?://civitai.com/": CivitaiMetadataFetch,
-            r"https?://huggingface.co/": HuggingFaceMetadataFetch,
+            r"^https?://civitai.com/": CivitaiMetadataFetch,
+            r"^https?://huggingface.co/[^/]+/[^/]+$": HuggingFaceMetadataFetch,
         }
         metadata = None
         for pattern, fetcher in url_patterns.items():
             if re.match(pattern, str(source.url), re.IGNORECASE):
                 metadata = fetcher(self._session).from_url(source.url)
                 break
+        self._logger.debug(f"metadata={metadata}")
         if metadata and isinstance(metadata, ModelMetadataWithFiles):
             remote_files = metadata.download_urls(session=self._session)
         else:
             remote_files = [RemoteModelFile(url=source.url, path=Path("."), size=0)]
-
         return self._import_remote_model(
             source=source,
             config=config,
@@ -586,6 +586,7 @@ class ModelInstallService(ModelInstallServiceBase):
         assert install_job.total_bytes is not None  # to avoid type checking complaints in the loop below
 
         self._logger.info(f"Queuing {source} for downloading")
+        self._logger.debug(f"remote_files={remote_files}")
         for model_file in remote_files:
             url = model_file.url
             path = model_file.path

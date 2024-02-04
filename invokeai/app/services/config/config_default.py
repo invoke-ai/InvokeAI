@@ -173,10 +173,10 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Literal, Optional, Union, get_type_hints
+from typing import Any, ClassVar, Dict, List, Literal, Optional, Union
 
 from omegaconf import DictConfig, OmegaConf
-from pydantic import Field, TypeAdapter
+from pydantic import Field
 from pydantic.config import JsonDict
 from pydantic_settings import SettingsConfigDict
 
@@ -336,13 +336,9 @@ class InvokeAIAppConfig(InvokeAISettings):
         super().parse_args(argv)
 
         if self.singleton_init and not clobber:
-            hints = get_type_hints(self.__class__)
-            for k in self.singleton_init:
-                setattr(
-                    self,
-                    k,
-                    TypeAdapter(hints[k]).validate_python(self.singleton_init[k]),
-                )
+            # When setting values in this way, set validate_assignment to true if you want to validate the value.
+            for k, v in self.singleton_init.items():
+                setattr(self, k, v)
 
     @classmethod
     def get_config(cls, **kwargs: Any) -> InvokeAIAppConfig:

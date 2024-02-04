@@ -12,13 +12,14 @@ export type UseClearIntermediatesReturn = {
   clearIntermediates: () => void;
   isLoading: boolean;
   hasPendingItems: boolean;
+  refetchIntermediatesCount: () => void;
 };
 
 export const useClearIntermediates = (shouldShowClearIntermediates: boolean): UseClearIntermediatesReturn => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
-  const { data: intermediatesCount } = useGetIntermediatesCountQuery(undefined, {
+  const { data: intermediatesCount, refetch: refetchIntermediatesCount } = useGetIntermediatesCountQuery(undefined, {
     refetchOnMountOrArgChange: true,
     skip: !shouldShowClearIntermediates,
   });
@@ -58,5 +59,5 @@ export const useClearIntermediates = (shouldShowClearIntermediates: boolean): Us
       });
   }, [t, _clearIntermediates, dispatch, hasPendingItems]);
 
-  return { intermediatesCount, clearIntermediates, isLoading, hasPendingItems };
+  return { intermediatesCount, clearIntermediates, isLoading, hasPendingItems, refetchIntermediatesCount };
 };
