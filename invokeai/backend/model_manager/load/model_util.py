@@ -48,6 +48,9 @@ def _calc_onnx_model_by_data(model: IAIOnnxRuntimeModel) -> int:
 
 def calc_model_size_by_fs(model_path: Path, subfolder: Optional[str] = None, variant: Optional[str] = None) -> int:
     """Estimate the size of a model on disk in bytes."""
+    if model_path.is_file():
+        return model_path.stat().st_size
+        
     if subfolder is not None:
         model_path = model_path / subfolder
 

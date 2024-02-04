@@ -237,6 +237,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     autoimport_dir      : Path = Field(default=Path('autoimport'), description='Path to a directory of models files to be imported on startup.', json_schema_extra=Categories.Paths)
     conf_path           : Path = Field(default=Path('configs/models.yaml'), description='Path to models definition file', json_schema_extra=Categories.Paths)
     models_dir          : Path = Field(default=Path('models'), description='Path to the models directory', json_schema_extra=Categories.Paths)
+    convert_cache_dir   : Path = Field(default=Path('models/.cache'), description='Path to the converted models cache directory', json_schema_extra=Categories.Paths)
     legacy_conf_dir     : Path = Field(default=Path('configs/stable-diffusion'), description='Path to directory of legacy checkpoint config files', json_schema_extra=Categories.Paths)
     db_dir              : Path = Field(default=Path('databases'), description='Path to InvokeAI databases directory', json_schema_extra=Categories.Paths)
     outdir              : Path = Field(default=Path('outputs'), description='Default folder for output images', json_schema_extra=Categories.Paths)
@@ -262,6 +263,8 @@ class InvokeAIAppConfig(InvokeAISettings):
     # CACHE
     ram                 : float = Field(default=7.5, gt=0, description="Maximum memory amount used by model cache for rapid switching (floating point number, GB)", json_schema_extra=Categories.ModelCache, )
     vram                : float = Field(default=0.25, ge=0, description="Amount of VRAM reserved for model storage (floating point number, GB)", json_schema_extra=Categories.ModelCache, )
+    convert_cache       : float = Field(default=10.0, ge=0, description="Maximum size of on-disk converted models cache (GB)", json_schema_extra=Categories.ModelCache)
+
     lazy_offload        : bool = Field(default=True, description="Keep models in VRAM until their space is needed", json_schema_extra=Categories.ModelCache, )
     log_memory_usage    : bool = Field(default=False, description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.", json_schema_extra=Categories.ModelCache)
 
@@ -405,6 +408,11 @@ class InvokeAIAppConfig(InvokeAISettings):
         return self._resolve(self.models_dir)
 
     @property
+    def models_convert_cache_path(self) -> Path:
+        """Path to the converted cache models directory."""
+        return self._resolve(self.convert_cache_dir)
+
+    @property
     def custom_nodes_path(self) -> Path:
         """Path to the custom nodes directory."""
         custom_nodes_path = self._resolve(self.custom_nodes_dir)
@@ -433,14 +441,19 @@ class InvokeAIAppConfig(InvokeAISettings):
         return True
 
     @property
-    def ram_cache_size(self) -> Union[Literal["auto"], float]:
-        """Return the ram cache size using the legacy or modern setting."""
+    def ram_cache_size(self) -> float:
+        """Return the ram cache size using the legacy or modern setting (GB)."""
         return self.max_cache_size or self.ram
 
     @property
-    def vram_cache_size(self) -> Union[Literal["auto"], float]:
-        """Return the vram cache size using the legacy or modern setting."""
+    def vram_cache_size(self) -> float:
+        """Return the vram cache size using the legacy or modern setting (GB)."""
         return self.max_vram_cache_size or self.vram
+
+    @property
+    def convert_cache_size(self) -> float:
+        """Return the convert cache size on disk (GB)."""
+        return self.convert_cache
 
     @property
     def use_cpu(self) -> bool:

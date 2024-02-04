@@ -16,39 +16,11 @@ from logging import Logger
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Type, Union
 
-import torch
-from diffusers import DiffusionPipeline
-from injector import inject
-
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.model_records import ModelRecordServiceBase
-from invokeai.backend.model_manager import AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
-from invokeai.backend.model_manager.convert_cache import ModelConvertCacheBase
-from invokeai.backend.model_manager.onnx_runtime import IAIOnnxRuntimeModel
-from invokeai.backend.model_manager.ram_cache import ModelCacheBase
-
-AnyModel = Union[DiffusionPipeline, torch.nn.Module, IAIOnnxRuntimeModel]
-
-
-class ModelLockerBase(ABC):
-    """Base class for the model locker used by the loader."""
-
-    @abstractmethod
-    def lock(self) -> None:
-        """Lock the contained model and move it into VRAM."""
-        pass
-
-    @abstractmethod
-    def unlock(self) -> None:
-        """Unlock the contained model, and remove it from VRAM."""
-        pass
-
-    @property
-    @abstractmethod
-    def model(self) -> AnyModel:
-        """Return the model."""
-        pass
-
+from invokeai.backend.model_manager import AnyModel, AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
+from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
+from invokeai.backend.model_manager.load.model_cache.model_locker import ModelLockerBase
+from invokeai.backend.model_manager.load.convert_cache.convert_cache_base import ModelConvertCacheBase
 
 @dataclass
 class LoadedModel:
@@ -69,7 +41,7 @@ class LoadedModel:
     @property
     def model(self) -> AnyModel:
         """Return the model without locking it."""
-        return self.locker.model()
+        return self.locker.model
 
 
 class ModelLoaderBase(ABC):
@@ -89,9 +61,9 @@ class ModelLoaderBase(ABC):
     @abstractmethod
     def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
         """
-        Return a model given its key.
+        Return a model given its confguration.
 
-        Given a model key identified in the model configuration backend,
+        Given a model identified in the model configuration backend,
         return a ModelInfo object that can be used to retrieve the model.
 
         :param model_config: Model configuration, as returned by ModelConfigRecordStore
@@ -115,34 +87,32 @@ class AnyModelLoader:
     # this tracks the loader subclasses
     _registry: Dict[str, Type[ModelLoaderBase]] = {}
 
-    @inject
     def __init__(
         self,
-        store: ModelRecordServiceBase,
         app_config: InvokeAIAppConfig,
         logger: Logger,
         ram_cache: ModelCacheBase,
         convert_cache: ModelConvertCacheBase,
     ):
-        """Store the provided ModelRecordServiceBase and empty the registry."""
-        self._store = store
+        """Initialize AnyModelLoader with its dependencies."""
         self._app_config = app_config
         self._logger = logger
         self._ram_cache = ram_cache
         self._convert_cache = convert_cache
 
-    def get_model(self, key: str, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
-        """
-        Return a model given its key.
+    @property
+    def ram_cache(self) -> ModelCacheBase:
+        """Return the RAM cache associated used by the loaders."""
+        return self._ram_cache
 
-        Given a model key identified in the model configuration backend,
-        return a ModelInfo object that can be used to retrieve the model.
+    def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType]=None) -> LoadedModel:
+        """
+        Return a model given its configuration.
 
         :param key: model key, as known to the config backend
         :param submodel_type: an ModelType enum indicating the portion of
                the model to retrieve (e.g. ModelType.Vae)
         """
-        model_config = self._store.get_model(key)
         implementation = self.__class__.get_implementation(
             base=model_config.base, type=model_config.type, format=model_config.format
         )
@@ -165,7 +135,7 @@ class AnyModelLoader:
         implementation = cls._registry.get(key1) or cls._registry.get(key2)
         if not implementation:
             raise NotImplementedError(
-                "No subclass of LoadedModel is registered for base={base}, type={type}, format={format}"
+                f"No subclass of LoadedModel is registered for base={base}, type={type}, format={format}"
             )
         return implementation
 
@@ -176,18 +146,10 @@ class AnyModelLoader:
         """Define a decorator which registers the subclass of loader."""
 
         def decorator(subclass: Type[ModelLoaderBase]) -> Type[ModelLoaderBase]:
-            print("Registering class", subclass.__name__)
+            print("DEBUG: Registering class", subclass.__name__)
             key = cls._to_registry_key(base, type, format)
             cls._registry[key] = subclass
             return subclass
 
         return decorator
 
-
-# in _init__.py will call something like
-# def configure_loader_dependencies(binder):
-#     binder.bind(ModelRecordServiceBase, ApiDependencies.invoker.services.model_records, scope=singleton)
-#     binder.bind(InvokeAIAppConfig, ApiDependencies.invoker.services.configuration, scope=singleton)
-# etc
-# injector = Injector(configure_loader_dependencies)
-# loader = injector.get(ModelFactory)
