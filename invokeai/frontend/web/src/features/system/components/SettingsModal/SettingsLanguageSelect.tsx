@@ -3,44 +3,46 @@ import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { languageChanged } from 'features/system/store/systemSlice';
+import type { Language } from 'features/system/store/types';
 import { isLanguage } from 'features/system/store/types';
+import { map } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const optionsObject: Record<Language, string> = {
+  ar: 'العربية',
+  az: 'Azərbaycan dili',
+  de: 'Deutsch',
+  en: 'English',
+  es: 'Español',
+  fi: 'Suomi',
+  fr: 'Français',
+  he: 'עִבְֿרִית',
+  hu: 'Magyar Nyelv',
+  it: 'Italiano',
+  ja: '日本語',
+  ko: '한국어',
+  nl: 'Nederlands',
+  pl: 'Polski',
+  pt: 'Português',
+  pt_BR: 'Português do Brasil',
+  ru: 'Русский',
+  sv: 'Svenska',
+  tr: 'Türkçe',
+  ua: 'Украї́нська',
+  zh_CN: '简体中文',
+  zh_Hant: '漢語',
+};
+
+const options = map(optionsObject, (label, value) => ({ label, value }));
 
 export const SettingsLanguageSelect = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const language = useAppSelector((s) => s.system.language);
-  const options = useMemo(
-    () => [
-      { label: 'العربية', value: 'ar' },
-      { label: 'Azərbaycan dili', value: 'az' },
-      { label: 'Deutsch', value: 'de' },
-      { label: 'English', value: 'en' },
-      { label: 'Español', value: 'es' },
-      { label: 'Suomi', value: 'fi' },
-      { label: 'Français', value: 'fr' },
-      { label: 'עִבְֿרִית', value: 'he' },
-      { label: 'Magyar Nyelv', value: 'hu' },
-      { label: 'Italiano', value: 'it' },
-      { label: '日本語', value: 'ja' },
-      { label: '한국어', value: 'ko' },
-      { label: 'Nederlands', value: 'nl' },
-      { label: 'Polski', value: 'pl' },
-      { label: 'Português', value: 'pt' },
-      { label: 'Português do Brasil', value: 'pt_BR' },
-      { label: 'Русский', value: 'ru' },
-      { label: 'Svenska', value: 'sv' },
-      { label: 'Türkçe', value: 'tr' },
-      { label: 'Украї́нська', value: 'ua' },
-      { label: '简体中文', value: 'zh_CN' },
-      { label: '漢語', value: 'zh_Hant' },
-    ],
-    []
-  );
   const isLocalizationEnabled = useFeatureStatus('localization').isFeatureEnabled;
 
-  const value = useMemo(() => options.find((o) => o.value === language), [language, options]);
+  const value = useMemo(() => options.find((o) => o.value === language), [language]);
 
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {
