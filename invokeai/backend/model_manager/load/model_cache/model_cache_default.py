@@ -19,22 +19,24 @@ context. Use like this:
 """
 
 import gc
+import logging
 import math
+import sys
 import time
 from contextlib import suppress
 from logging import Logger
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import torch
 
 from invokeai.backend.model_manager import SubModelType
 from invokeai.backend.model_manager.load.load_base import AnyModel
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
-from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
 from invokeai.backend.util.devices import choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger
+
 from .model_cache_base import CacheRecord, ModelCacheBase
-from .model_locker import ModelLockerBase, ModelLocker
+from .model_locker import ModelLocker, ModelLockerBase
 
 if choose_torch_device() == torch.device("mps"):
     from torch import mps
@@ -91,7 +93,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         self._execution_device: torch.device = execution_device
         self._storage_device: torch.device = storage_device
         self._logger = logger or InvokeAILogger.get_logger(self.__class__.__name__)
-        self._log_memory_usage = log_memory_usage
+        self._log_memory_usage = log_memory_usage or self._logger.level == logging.DEBUG
 
         self._cached_models: Dict[str, CacheRecord[AnyModel]] = {}
         self._cache_stack: List[str] = []
@@ -141,14 +143,14 @@ class ModelCache(ModelCacheBase[AnyModel]):
         self,
         key: str,
         model: AnyModel,
+        size: int,
         submodel_type: Optional[SubModelType] = None,
     ) -> None:
         """Store model under key and optional submodel_type."""
         key = self._make_cache_key(key, submodel_type)
         assert key not in self._cached_models
 
-        loaded_model_size = calc_model_size_by_data(model)
-        cache_record = CacheRecord(key, model, loaded_model_size)
+        cache_record = CacheRecord(key, model, size)
         self._cached_models[key] = cache_record
         self._cache_stack.append(key)
 
@@ -195,28 +197,32 @@ class ModelCache(ModelCacheBase[AnyModel]):
         for _, cache_entry in sorted(self._cached_models.items(), key=lambda x: x[1].size):
             if vram_in_use <= reserved:
                 break
+            if not cache_entry.loaded:
+                continue
             if not cache_entry.locked:
                 self.move_model_to_device(cache_entry, self.storage_device)
                 cache_entry.loaded = False
                 vram_in_use = torch.cuda.memory_allocated() + size_required
-                self.logger.debug(f"{(vram_in_use/GIG):.2f}GB VRAM now available for models; max allowed={(reserved/GIG):.2f}GB")
+                self.logger.debug(
+                    f"Removing {cache_entry.key} from VRAM to free {(cache_entry.size/GIG):.2f}GB; vram free = {(torch.cuda.memory_allocated()/GIG):.2f}GB"
+                )
 
         torch.cuda.empty_cache()
         if choose_torch_device() == torch.device("mps"):
             mps.empty_cache()
 
-    # TO DO: Only reason to pass the CacheRecord rather than the model is to get the key and size
-    # for printing debugging messages. Revisit whether this is necessary
-    def move_model_to_device(self, cache_entry: CacheRecord, target_device: torch.device) -> None:
+    def move_model_to_device(self, cache_entry: CacheRecord[AnyModel], target_device: torch.device) -> None:
         """Move model into the indicated device."""
-        # These attributes are not in the base class but in derived classes
-        assert hasattr(cache_entry.model, "device")
-        assert hasattr(cache_entry.model, "to")
+        # These attributes are not in the base ModelMixin class but in derived classes.
+        # Some models don't have these attributes, in which case they run in RAM/CPU.
+        self.logger.debug(f"Called to move {cache_entry.key} to {target_device}")
+        if not (hasattr(cache_entry.model, "device") and hasattr(cache_entry.model, "to")):
+            return
 
         source_device = cache_entry.model.device
 
-        # Note: We compare device types only so that 'cuda' == 'cuda:0'. This would need to be revised to support
-        # multi-GPU.
+        # Note: We compare device types only so that 'cuda' == 'cuda:0'.
+        # This would need to be revised to support multi-GPU.
         if torch.device(source_device).type == torch.device(target_device).type:
             return
 
@@ -227,8 +233,8 @@ class ModelCache(ModelCacheBase[AnyModel]):
         end_model_to_time = time.time()
         self.logger.debug(
             f"Moved model '{cache_entry.key}' from {source_device} to"
-            f" {target_device} in {(end_model_to_time-start_model_to_time):.2f}s.\n"
-            f"Estimated model size: {(cache_entry.size/GIG):.3f} GB.\n"
+            f" {target_device} in {(end_model_to_time-start_model_to_time):.2f}s."
+            f"Estimated model size: {(cache_entry.size/GIG):.3f} GB."
             f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
         )
 
@@ -291,7 +297,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
                 f" {(bytes_needed/GIG):.2f} GB"
             )
 
-        self.logger.debug(f"Before unloading: cached_models={len(self._cached_models)}")
+        self.logger.debug(f"Before making_room: cached_models={len(self._cached_models)}")
 
         pos = 0
         models_cleared = 0
@@ -336,7 +342,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
             # 1 from onnx runtime object
             if not cache_entry.locked and refs <= (3 if "onnx" in model_key else 2):
                 self.logger.debug(
-                    f"Unloading model {model_key} to free {(model_size/GIG):.2f} GB (-{(cache_entry.size/GIG):.2f} GB)"
+                    f"Removing {model_key} from RAM cache to free at least {(model_size/GIG):.2f} GB (-{(cache_entry.size/GIG):.2f} GB)"
                 )
                 current_size -= cache_entry.size
                 models_cleared += 1
@@ -365,4 +371,4 @@ class ModelCache(ModelCacheBase[AnyModel]):
         if choose_torch_device() == torch.device("mps"):
             mps.empty_cache()
 
-        self.logger.debug(f"After unloading: cached_models={len(self._cached_models)}")
+        self.logger.debug(f"After making room: cached_models={len(self._cached_models)}")
