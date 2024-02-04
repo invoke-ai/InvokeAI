@@ -987,6 +987,9 @@
         "generation": "Oluşturma"
     },
     "sdxl": {
-        "cfgScale": "CFG Ölçeği"
+        "cfgScale": "CFG Ölçeği",
+        "loading": "Yükleniyor...",
+        "denoisingStrength": "Arındırma Ölçüsü",
+        "concatPromptStyle": "İstem ve Stili Bitiştir"
     }
 }
