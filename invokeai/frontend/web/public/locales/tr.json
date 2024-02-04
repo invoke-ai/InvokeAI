@@ -821,9 +821,6 @@
         "useSeed": "Tohumu Kullan",
         "vSymmetryStep": "Dikey Bakışım Adımı",
         "compositingSettingsHeader": "Birleştirme Seçenekleri",
-        "cancel": {
-            "cancel": ""
-        },
         "infillScalingHeader": "Doldurma ve Ölçek",
         "scheduler": "Planlayıcı",
         "coherenceMode": "Kip",
@@ -963,7 +960,6 @@
         "vaeLocationValidationMsg": "VAE dosyası konumu."
     },
     "dynamicPrompts": {
-        "loading": "",
         "combinatorial": "Birleşimsel Oluşturma",
         "promptsWithCount_one": "{{count}} İstem",
         "promptsWithCount_other": "{{count}} İstem"
@@ -992,8 +988,5 @@
     },
     "sdxl": {
         "cfgScale": "CFG Ölçeği"
-    },
-    "metadata": {
-        "cfgScale": ""
     }
 }
