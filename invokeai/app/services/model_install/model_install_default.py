@@ -145,7 +145,7 @@ class ModelInstallService(ModelInstallServiceBase):
     ) -> str:  # noqa D102
         model_path = Path(model_path)
         config = config or {}
-        if config.get("source") is None:
+        if not config.get("source"):
             config["source"] = model_path.resolve().as_posix()
         return self._register(model_path, config)
 
@@ -156,7 +156,7 @@ class ModelInstallService(ModelInstallServiceBase):
     ) -> str:  # noqa D102
         model_path = Path(model_path)
         config = config or {}
-        if config.get("source") is None:
+        if not config.get("source"):
             config["source"] = model_path.resolve().as_posix()
 
         info: AnyModelConfig = self._probe_model(Path(model_path), config)
@@ -300,6 +300,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     job.total_bytes = self._stat_size(job.local_path)
                     job.bytes = job.total_bytes
                     self._signal_job_running(job)
+                    job.config_in["source"] = str(job.source)
                     if job.inplace:
                         key = self.register_path(job.local_path, job.config_in)
                     else:
