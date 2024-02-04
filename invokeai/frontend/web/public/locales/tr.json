@@ -2,7 +2,7 @@
     "accessibility": {
         "invokeProgressBar": "Invoke durum çubuğu",
         "nextImage": "Sonraki Görsel",
-        "useThisParameter": "Bu ayarları kullan",
+        "useThisParameter": "Bu seçenekleri kullan",
         "copyMetadataJson": "Üstveriyi kopyala (JSON)",
         "exitViewer": "Görüntüleyiciden Çık",
         "zoomIn": "Yakınlaştır",
@@ -11,7 +11,7 @@
         "rotateClockwise": "Saat yönüne döndür",
         "flipHorizontally": "Yatay Çevir",
         "flipVertically": "Dikey Çevir",
-        "modifyConfig": "Ayarları Değiştir",
+        "modifyConfig": "Yapılandırmayı Değiştir",
         "toggleAutoscroll": "Otomatik kaydırmayı Aç-Kapat",
         "toggleLogViewer": "Günlüğü Aç-Kapat",
         "showOptionsPanel": "Yan Paneli Göster",
@@ -33,7 +33,7 @@
         "reportBugLabel": "Sorun Bildir",
         "githubLabel": "Github",
         "discordLabel": "Discord",
-        "settingsLabel": "Ayarlar",
+        "settingsLabel": "Seçenekler",
         "langArabic": "Arapça",
         "langEnglish": "İngilizce",
         "langDutch": "Hollandaca",
@@ -59,7 +59,7 @@
         "langKorean": "Korece",
         "unifiedCanvas": "Tuval",
         "nodesDesc": "Görsel oluşturmaya yardımcı çizge tabanlı sistem şimdilik geliştirme aşamasındadır. Bu süper özellik hakkındaki gelişmeler için kulağınız bizde olsun.",
-        "postProcessDesc1": "Invoke AI birçok rötuş (post-process) aracı sağlar. Görsel büyütme ve yüz iyileştirme WebUI üzerinden kullanıma uygun durumdadır. Bunlara Yazıdan Görsel ve Görselden Görsel sekmelerindeki Gelişmiş Ayarlar menüsünden ulaşabilirsiniz. Ayrıca var olan görseli üzerindeki düğmeler yardımıyla düzenleyebilirsiniz.",
+        "postProcessDesc1": "Invoke AI birçok rötuş (post-process) aracı sağlar. Görsel büyütme ve yüz iyileştirme WebUI üzerinden kullanıma uygun durumdadır. Bunlara Yazıdan Görsel ve Görselden Görsel sekmelerindeki Gelişmiş Seçenekler menüsünden ulaşabilirsiniz. Ayrıca var olan görseli üzerindeki düğmeler yardımıyla düzenleyebilirsiniz.",
         "batch": "Toplu İş Yöneticisi",
         "accept": "Onayla",
         "cancel": "Vazgeç",
@@ -68,7 +68,7 @@
         "on": "Açık",
         "or": "ya da",
         "aboutDesc": "Invoke'u iş için mi kullanıyorsunuz? Şuna bir göz atın:",
-        "advancedOptions": "Gelişmiş Ayarlar",
+        "advancedOptions": "Gelişmiş Seçenekler",
         "ai": "yapay zeka",
         "close": "Kapat",
         "auto": "Otomatik",
@@ -153,7 +153,11 @@
         "input": "Giriş",
         "copy": "Kopyala",
         "created": "Yaratma",
-        "updated": "Güncelleme"
+        "updated": "Güncelleme",
+        "ipAdapter": "IP Aracı",
+        "t2iAdapter": "T2I Aracı",
+        "controlAdapter": "Yönetim Aracı",
+        "controlNet": "ControlNet"
     },
     "accordions": {
         "generation": {
@@ -173,7 +177,9 @@
             "infillTab": "Doldurma"
         },
         "control": {
-            "ipTab": "Görsel İstemleri"
+            "ipTab": "Görsel İstemleri",
+            "title": "Yönetim",
+            "controlAdaptersTab": "Yönetim Araçları"
         }
     },
     "boards": {
@@ -221,7 +227,7 @@
         "none": "Hiçbiri",
         "noneDescription": "Hiçbir işlem uygulanmamış",
         "selectModel": "Model seçin",
-        "showAdvanced": "Gelişmiş Ayarları Göster",
+        "showAdvanced": "Gelişmiş Seçenekleri Göster",
         "controlNetT2IMutexDesc": "$t(common.controlNet) ve $t(common.t2iAdapter)'nün birlikte kullanımı şimdilik desteklenmiyor.",
         "canny": "Canny",
         "colorMapDescription": "Görselden renk haritası oluşturur",
@@ -245,7 +251,49 @@
         "importMaskFromCanvas": "Tuvalden Maskeyi İçe Aktar",
         "lowThreshold": "Alt Eşik",
         "base": "Taban",
-        "depthAnythingDescription": "Depth Anything yöntemi ile derinlik haritası oluşturma"
+        "depthAnythingDescription": "Depth Anything yöntemi ile derinlik haritası oluşturma",
+        "controlAdapter_one": "Yönetim Aracı",
+        "controlAdapter_other": "Yönetim Aracı",
+        "beginEndStepPercent": "Başlangıç / Bitiş Yüzdesi",
+        "control": "Yönetim",
+        "controlnet": "{{number}}. $t(controlnet.controlAdapter_one) ($t(common.controlNet))",
+        "amult": "a_mult",
+        "hideAdvanced": "Gelişmiş Seçenekleri Gizle",
+        "enableControlnet": "ControlNet'i Etkinleştir",
+        "hed": "HED",
+        "ip_adapter": "{{number}}. $t(controlnet.controlAdapter_one) ($t(common.ipAdapter))",
+        "t2i_adapter": "{{number}}. $t(controlnet.controlAdapter_one) ($t(common.t2iAdapter))",
+        "autoConfigure": "Aracı otomatik yapılandır",
+        "bgth": "bg_th",
+        "coarse": "İri",
+        "controlMode": "Yönetim Kipi",
+        "depthAnything": "Depth Anything",
+        "hedDescription": "Holistically-Nested Edge Detection (Bütünsel Yuvalanmış Kenar Tespiti)",
+        "lineartAnime": "Çizim (Anime)",
+        "lineartAnimeDescription": "Anime stili çizim işleme",
+        "minConfidence": "Özgüven Alt Limiti",
+        "pidiDescription": "PIDI görsel işleme",
+        "mediapipeFace": "Mediapipe Yüz",
+        "megaControl": "Aşırı Yönetim",
+        "mlsd": "M-LSD",
+        "openPoseDescription": "Openpose kullanarak poz belirleme",
+        "setControlImageDimensions": "Yönetim Görseli Boyutlarını En/Boydan Al",
+        "pidi": "PIDI",
+        "scribble": "çiziktirme",
+        "ipAdapterModel": "Araç Modeli",
+        "resetIPAdapterImage": "IP Aracı Görselini Kaldır",
+        "mediapipeFaceDescription": "Mediapipe kullanarak yüz algılama",
+        "saveControlImage": "Yönetim Görselini Kaydet",
+        "w": "En",
+        "lineartDescription": "Görseli çizime çevirir",
+        "maxFaces": "Yüz Üst Limiti",
+        "mlsdDescription": "Minimalist Line Segment Detector (Kolay Çizgi Parçası Algılama)",
+        "normalBae": "Normal BAE",
+        "normalBaeDescription": "Normal BAE işleme",
+        "openPose": "Openpose",
+        "resetControlImage": "Yönetim Görselini Kaldır",
+        "enableIPAdapter": "IP Aracını Etkinleştir",
+        "lineart": "Çizim"
     },
     "queue": {
         "queuedCount": "{{pending}} Sırada",
@@ -331,7 +379,7 @@
         "unstarImage": "Yıldızı Kaldır",
         "uploads": "Yüklemeler",
         "problemDeletingImagesDesc": "Bir ya da daha çok görsel silinemedi",
-        "gallerySettings": "Galeri Ayarları",
+        "gallerySettings": "Galeri Düzeni",
         "image": "görsel",
         "galleryImageSize": "Görsel Boyutu",
         "allImagesLoaded": "Tüm Görseller Yüklendi",
@@ -394,8 +442,8 @@
             "title": "Çalışma Alanını Genişlet"
         },
         "pinOptions": {
-            "desc": "Ayar panelini iğnele",
-            "title": "Ayarları İğnele"
+            "desc": "Seçenekler panelini iğnele",
+            "title": "Seçenekleri İğnele"
         },
         "nodesHotkeys": "Çizgeler",
         "quickToggleMove": {
@@ -500,8 +548,8 @@
             "title": "Silgiyi Kullan"
         },
         "toggleOptions": {
-            "desc": "Ayarlar panelini aç-kapat",
-            "title": "Ayarları Aç-Kapat"
+            "desc": "Seçenekler panelini aç-kapat",
+            "title": "Seçenekleri Aç-Kapat"
         },
         "copyToClipboard": {
             "desc": "Tuval içeriğini kopyala",
@@ -534,8 +582,8 @@
             "title": "Önceki Görsel"
         },
         "toggleOptionsAndGallery": {
-            "title": "Ayarları ve Galeriyi Aç-Kapat",
-            "desc": "Ayarlar ve galeri panellerini aç-kapat"
+            "title": "Seçenekleri ve Galeriyi Aç-Kapat",
+            "desc": "Seçenekler ve galeri panellerini aç-kapat"
         },
         "toggleSnap": {
             "desc": "Kılavuza Uydur",
@@ -554,8 +602,8 @@
             "desc": "Tuval fırçasının/silgisinin boyutunu düşürür"
         },
         "resetOptionsAndGallery": {
-            "desc": "Ayarlar ve galeri panellerini resetler",
-            "title": "Ayarları ve Galeriyi Resetle"
+            "desc": "Seçenekler ve galeri panellerini resetler",
+            "title": "Seçenekleri ve Galeriyi Resetle"
         },
         "remixImage": {
             "desc": "Seçili görselin tohumu hariç tüm değişkenlerini kullan",
@@ -606,7 +654,7 @@
         "currentImageDescription": "İşlemdeki görseli Çizge Düzenleyicide gösterir",
         "workflowAuthor": "Yaratıcı",
         "workflowName": "Ad",
-        "workflowSettings": "İş Akışı Düzenleyici Ayarları",
+        "workflowSettings": "İş Akışı Düzenleyici Seçenekleri",
         "currentImage": "İşlemdeki Görsel",
         "noWorkflow": "İş Akışı Yok",
         "newWorkflowDesc": "Yeni iş akışı?",
@@ -663,7 +711,26 @@
         }
     },
     "modelManager": {
-        "baseModel": "Ana Model"
+        "baseModel": "Ana Model",
+        "addManually": "Kendin Ekle",
+        "addNew": "Yeni Ekle",
+        "active": "etkin",
+        "addSelected": "Seçilenleri Ekle",
+        "addNewModel": "Yeni Model Ekle",
+        "configFile": "Yapılandırma Dosyası",
+        "deleteConfig": "Yapılandırmayı Sil",
+        "availableModels": "Kullanılabilir Modeller",
+        "customConfigFileLocation": "Özel Yapılandırma Dosyası Yeri",
+        "advanced": "Gelişmiş",
+        "allModels": "Tüm Modeller",
+        "alpha": "Alfa",
+        "configValidationMsg": "Modelin yapılandırma dosyasının yeri.",
+        "cannotUseSpaces": "Boşluk Kullanılamaz",
+        "config": "Yapılandırma",
+        "pathToCustomConfig": "Özel Yapılandırma Yeri",
+        "customConfig": "Özel Yapılandırma",
+        "addModel": "Model Ekle",
+        "useCustomConfig": "Özel Yapılandırma Kullan"
     },
     "dynamicPrompts": {
         "loading": "Devimsel İstemler Oluşturuluyor...",
@@ -674,5 +741,8 @@
     },
     "settings": {
         "generation": "Oluşturma"
+    },
+    "metadata": {
+        "cfgScale": ""
     }
 }
