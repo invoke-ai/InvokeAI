@@ -13,27 +13,30 @@ export const SettingsLanguageSelect = memo(() => {
   const language = useAppSelector((s) => s.system.language);
   const options = useMemo(
     () => [
-      { label: t('common.langArabic', { lng: 'ar' }), value: 'ar' },
-      { label: t('common.langDutch', { lng: 'nl' }), value: 'nl' },
-      { label: t('common.langEnglish', { lng: 'en' }), value: 'en' },
-      { label: t('common.langFrench', { lng: 'fr' }), value: 'fr' },
-      { label: t('common.langGerman', { lng: 'de' }), value: 'de' },
-      { label: t('common.langHebrew', { lng: 'he' }), value: 'he' },
-      { label: t('common.langItalian', { lng: 'it' }), value: 'it' },
-      { label: t('common.langJapanese', { lng: 'ja' }), value: 'ja' },
-      { label: t('common.langKorean', { lng: 'ko' }), value: 'ko' },
-      { label: t('common.langPolish', { lng: 'pl' }), value: 'pl' },
-      { label: t('common.langBrPortuguese', { lng: 'pt_BR' }), value: 'pt_BR' },
-      { label: t('common.langPortuguese', { lng: 'pt' }), value: 'pt' },
-      { label: t('common.langRussian', { lng: 'ru' }), value: 'ru' },
-      {
-        label: t('common.langSimplifiedChinese', { lng: 'zh_CN' }),
-        value: 'zh_CN',
-      },
-      { label: t('common.langSpanish', { lng: 'es' }), value: 'es' },
-      { label: t('common.langUkranian', { lng: 'ua' }), value: 'ua' },
+      { label: 'العربية', value: 'ar' },
+      { label: 'Azərbaycan dili', value: 'az' },
+      { label: 'Deutsch', value: 'de' },
+      { label: 'English', value: 'en' },
+      { label: 'Español', value: 'es' },
+      { label: 'Suomi', value: 'fi' },
+      { label: 'Français', value: 'fr' },
+      { label: 'עִבְֿרִית', value: 'he' },
+      { label: 'Magyar Nyelv', value: 'hu' },
+      { label: 'Italiano', value: 'it' },
+      { label: '日本語', value: 'ja' },
+      { label: '한국어', value: 'ko' },
+      { label: 'Nederlands', value: 'nl' },
+      { label: 'Polski', value: 'pl' },
+      { label: 'Português', value: 'pt' },
+      { label: 'Português do Brasil', value: 'pt_BR' },
+      { label: 'Русский', value: 'ru' },
+      { label: 'Svenska', value: 'sv' },
+      { label: 'Türkçe', value: 'tr' },
+      { label: 'Украї́нська', value: 'ua' },
+      { label: '简体中文', value: 'zh_CN' },
+      { label: '漢語', value: 'zh_Hant' },
     ],
-    [t]
+    []
   );
   const isLocalizationEnabled = useFeatureStatus('localization').isFeatureEnabled;
 
