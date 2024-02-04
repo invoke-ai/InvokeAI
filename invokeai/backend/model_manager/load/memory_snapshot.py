@@ -97,4 +97,4 @@ def get_pretty_snapshot_diff(snapshot_1: Optional[MemorySnapshot], snapshot_2: O
     if snapshot_1.vram is not None and snapshot_2.vram is not None:
         msg += get_msg_line("VRAM", snapshot_1.vram, snapshot_2.vram)
 
-    return msg
+    return "\n"+msg if len(msg)>0 else msg
