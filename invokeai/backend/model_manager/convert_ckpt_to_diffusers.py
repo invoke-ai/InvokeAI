@@ -43,7 +43,6 @@ from diffusers.schedulers import (
     UnCLIPScheduler,
 )
 from diffusers.utils import is_accelerate_available
-from diffusers.utils.import_utils import BACKENDS_MAPPING
 from picklescan.scanner import scan_file_path
 from transformers import (
     AutoFeatureExtractor,
@@ -58,8 +57,8 @@ from transformers import (
 )
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.model_manager import BaseModelType, ModelVariantType
+from invokeai.backend.util.logging import InvokeAILogger
 
 try:
     from omegaconf import OmegaConf
@@ -1643,7 +1642,6 @@ def download_controlnet_from_original_ckpt(
     cross_attention_dim: Optional[bool] = None,
     scan_needed: bool = False,
 ) -> DiffusionPipeline:
-
     from omegaconf import OmegaConf
 
     if from_safetensors:

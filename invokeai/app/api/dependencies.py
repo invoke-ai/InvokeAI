@@ -4,10 +4,10 @@ from logging import Logger
 
 from invokeai.app.services.item_storage.item_storage_memory import ItemStorageMemory
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
-from invokeai.backend.model_manager.metadata import ModelMetadataStore
-from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.model_manager.load import AnyModelLoader, ModelConvertCache
 from invokeai.backend.model_manager.load.model_cache import ModelCache
+from invokeai.backend.model_manager.metadata import ModelMetadataStore
+from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
 
 from ..services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
@@ -90,15 +90,14 @@ class ApiDependencies:
         model_loader = AnyModelLoader(
             app_config=config,
             logger=logger,
-            ram_cache=ModelCache(max_cache_size=config.ram_cache_size,
-                                 max_vram_cache_size=config.vram_cache_size,
-                                 logger=logger),
+            ram_cache=ModelCache(
+                max_cache_size=config.ram_cache_size, max_vram_cache_size=config.vram_cache_size, logger=logger
+            ),
             convert_cache=ModelConvertCache(
-                cache_path = config.models_convert_cache_path,
-                max_size = config.convert_cache_size
-            )
+                cache_path=config.models_convert_cache_path, max_size=config.convert_cache_size
+            ),
         )
-        model_record_service = ModelRecordServiceSQL(db=db,loader=model_loader)
+        model_record_service = ModelRecordServiceSQL(db=db, loader=model_loader)
         download_queue_service = DownloadQueueService(event_bus=events)
         model_install_service = ModelInstallService(
             app_config=config,

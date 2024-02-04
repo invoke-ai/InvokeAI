@@ -4,8 +4,8 @@ Disk-based converted model cache.
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-class ModelConvertCacheBase(ABC):
 
+class ModelConvertCacheBase(ABC):
     @property
     @abstractmethod
     def max_size(self) -> float:
@@ -25,4 +25,3 @@ class ModelConvertCacheBase(ABC):
     def cache_path(self, key: str) -> Path:
         """Return the path for a model with the indicated key."""
         pass
-

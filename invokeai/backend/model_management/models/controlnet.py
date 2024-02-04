@@ -139,7 +139,6 @@ def _convert_controlnet_ckpt_and_cache(
     cache it to disk, and return Path to converted
     file. If already on disk then just returns Path.
     """
-    print(f"DEBUG: controlnet config = {model_config}")
     app_config = InvokeAIAppConfig.get_config()
     weights = app_config.root_path / model_path
     output_path = Path(output_path)

@@ -173,7 +173,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Literal, Optional, Union, get_type_hints
+from typing import Any, ClassVar, Dict, List, Literal, Optional, get_type_hints
 
 from omegaconf import DictConfig, OmegaConf
 from pydantic import Field, TypeAdapter

@@ -8,10 +8,11 @@ from typing import Optional, Union
 import torch
 from diffusers import DiffusionPipeline
 
+from invokeai.backend.model_manager.config import AnyModel
 from invokeai.backend.model_manager.onnx_runtime import IAIOnnxRuntimeModel
 
 
-def calc_model_size_by_data(model: Union[DiffusionPipeline, torch.nn.Module, IAIOnnxRuntimeModel]) -> int:
+def calc_model_size_by_data(model: AnyModel) -> int:
     """Get size of a model in memory in bytes."""
     if isinstance(model, DiffusionPipeline):
         return _calc_pipeline_by_data(model)
@@ -50,7 +51,7 @@ def calc_model_size_by_fs(model_path: Path, subfolder: Optional[str] = None, var
     """Estimate the size of a model on disk in bytes."""
     if model_path.is_file():
         return model_path.stat().st_size
-        
+
     if subfolder is not None:
         model_path = model_path / subfolder
 

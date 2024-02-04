@@ -120,6 +120,7 @@ class TqdmEventService(EventServiceBase):
         elif payload["event"] == "model_install_cancelled":
             self._logger.warning(f"{source}: installation cancelled")
 
+
 class InstallHelper(object):
     """Capture information stored jointly in INITIAL_MODELS.yaml and the installed models db."""
 

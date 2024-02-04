@@ -2,15 +2,17 @@
 Placeholder for convert cache implementation.
 """
 
-from pathlib import Path
 import shutil
-from invokeai.backend.util.logging import InvokeAILogger
+from pathlib import Path
+
 from invokeai.backend.util import GIG, directory_size
+from invokeai.backend.util.logging import InvokeAILogger
+
 from .convert_cache_base import ModelConvertCacheBase
 
-class ModelConvertCache(ModelConvertCacheBase):
 
-    def __init__(self, cache_path: Path, max_size: float=10.0):
+class ModelConvertCache(ModelConvertCacheBase):
+    def __init__(self, cache_path: Path, max_size: float = 10.0):
         """Initialize the convert cache with the base directory and a limit on its maximum size (in GBs)."""
         if not cache_path.exists():
             cache_path.mkdir(parents=True)

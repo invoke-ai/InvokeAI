@@ -29,8 +29,12 @@ CkptType = Dict[str, Any]
 
 LEGACY_CONFIGS: Dict[BaseModelType, Dict[ModelVariantType, Union[str, Dict[SchedulerPredictionType, str]]]] = {
     BaseModelType.StableDiffusion1: {
-        ModelVariantType.Normal: "v1-inference.yaml",
+        ModelVariantType.Normal: {
+            SchedulerPredictionType.Epsilon: "v1-inference.yaml",
+            SchedulerPredictionType.VPrediction: "v1-inference-v.yaml",
+        },
         ModelVariantType.Inpaint: "v1-inpainting-inference.yaml",
+        ModelVariantType.Depth: "v2-midas-inference.yaml",
     },
     BaseModelType.StableDiffusion2: {
         ModelVariantType.Normal: {

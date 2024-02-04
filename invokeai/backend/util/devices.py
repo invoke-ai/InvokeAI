@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import nullcontext
-from typing import Union, Optional
+from typing import Optional, Union
 
 import torch
 from torch import autocast

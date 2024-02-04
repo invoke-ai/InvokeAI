@@ -13,9 +13,9 @@ from .config import (
     SchedulerPredictionType,
     SubModelType,
 )
+from .load import LoadedModel
 from .probe import ModelProbe
 from .search import ModelSearch
-from .load import LoadedModel
 
 __all__ = [
     "AnyModel",

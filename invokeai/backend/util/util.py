@@ -27,6 +27,7 @@ from .devices import torch_dtype
 # actual size of a gig
 GIG = 1073741824
 
+
 def directory_size(directory: Path) -> int:
     """
     Return the aggregate size of all files in a directory (bytes).
@@ -38,6 +39,7 @@ def directory_size(directory: Path) -> int:
         for d in dirs:
             sum += Path(root, d).stat().st_size
     return sum
+
 
 def log_txt_as_img(wh, xc, size=10):
     # wh a tuple of (width, height)
