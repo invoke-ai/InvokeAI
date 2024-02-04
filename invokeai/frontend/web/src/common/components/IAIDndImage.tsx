@@ -175,7 +175,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
             </>
           )}
           {!imageDTO && isUploadDisabled && noContentFallback}
-          {imageDTO && !isDragDisabled && (
+          {imageDTO && !isDragDisabled && draggableData && (
             <IAIDraggable data={draggableData} disabled={isDragDisabled || !imageDTO} onClick={onClick} />
           )}
           {children}
