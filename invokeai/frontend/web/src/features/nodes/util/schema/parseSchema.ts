@@ -124,6 +124,20 @@ export const parseSchema = (
                 message: e.message,
               })
             );
+          } else {
+            logger('nodes').warn(
+              {
+                node: type,
+                field: propertyName,
+                schema: parseify(property),
+                error: serializeError(e),
+              },
+              t('nodes.inputFieldTypeParseError', {
+                node: type,
+                field: propertyName,
+                message: 'unknown error',
+              })
+            );
           }
         }
 
@@ -201,6 +215,20 @@ export const parseSchema = (
                 node: type,
                 field: propertyName,
                 message: e.message,
+              })
+            );
+          } else {
+            logger('nodes').warn(
+              {
+                node: type,
+                field: propertyName,
+                schema: parseify(property),
+                error: serializeError(e),
+              },
+              t('nodes.outputFieldTypeParseError', {
+                node: type,
+                field: propertyName,
+                message: 'unknown error',
               })
             );
           }
