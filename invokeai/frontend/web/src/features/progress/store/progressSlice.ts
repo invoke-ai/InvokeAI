@@ -90,15 +90,6 @@ export const initialProgressState: ProgressState = {
   latestDenoiseProgress: null,
 };
 
-export const progressPersistDenylist: (keyof ProgressState)[] = [
-  'canvasDenoiseProgress',
-  'canvasLatestImageData',
-  'linearDenoiseProgress',
-  'linearLatestImageData',
-  'workflowDenoiseProgress',
-  'workflowLatestImageData',
-];
-
 export const progressSlice = createSlice({
   name: 'progress',
   initialState: initialProgressState,
@@ -277,5 +268,14 @@ export const progressPersistConfig: PersistConfig<ProgressState> = {
   name: progressSlice.name,
   initialState: initialProgressState,
   migrate: migrateProgressState,
-  persistDenylist: progressPersistDenylist,
+  persistDenylist: [
+    'latestDenoiseProgress',
+    'canvasDenoiseProgress',
+    'canvasLatestImageData',
+    'linearDenoiseProgress',
+    'linearLatestImageData',
+    'workflowDenoiseProgress',
+    'workflowLatestImageData',
+  ],
 };
+
