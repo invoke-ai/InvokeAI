@@ -137,6 +137,9 @@ export const progressSlice = createSlice({
     });
 
     builder.addCase(socketGeneratorProgress, (state, action) => {
+      if (!isTrackedBatchId(state, action.payload.data.queue_batch_id)) {
+        return;
+      }
       const denoiseProgress = buildDenoiseProgress(action.payload.data);
       state.latestDenoiseProgress = denoiseProgress;
       if (state.linearBatchIds.includes(action.payload.data.queue_batch_id)) {
@@ -151,17 +154,17 @@ export const progressSlice = createSlice({
     });
 
     builder.addCase(socketQueueItemStatusChanged, (state, action) => {
-      // This logic only applies to the linear and workflow views. Canvas progress images are linked to the staging area
-      // and handled separately.
+      if (!isTrackedBatchId(state, action.payload.data.queue_item.batch_id)) {
+        return;
+      }
 
       // When the queue is empty, clear progress and batch ids.
       if (!action.payload.data.queue_status.in_progress && !action.payload.data.queue_status.pending) {
-        // state.linearBatchIds = [];
         state.workflowBatchIds = [];
         // state.canvasDenoiseProgress = null;
         // state.linearDenoiseProgress = null;
         state.workflowDenoiseProgress = null;
-        return;
+        state.latestDenoiseProgress = null;
       }
 
       // // If the current queue item / session has just finished *and* we are storing its progress, clear the progress.
@@ -209,6 +212,7 @@ export const progressSlice = createSlice({
       state.canvasDenoiseProgress = null;
       state.linearDenoiseProgress = null;
       state.workflowDenoiseProgress = null;
+      state.latestDenoiseProgress = null;
     });
 
     builder.addMatcher(queueApi.endpoints.cancelByBatchIds.matchFulfilled, (state, action) => {
@@ -279,3 +283,10 @@ export const progressPersistConfig: PersistConfig<ProgressState> = {
   ],
 };
 
+const isTrackedBatchId = (state: ProgressState, batchId: string): boolean => {
+  return (
+    state.canvasBatchIds.includes(batchId) ||
+    state.linearBatchIds.includes(batchId) ||
+    state.workflowBatchIds.includes(batchId)
+  );
+};
