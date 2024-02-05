@@ -13,6 +13,7 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
+from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_management.models.base import BaseModelType, ModelType
 from invokeai.backend.model_management.models.ip_adapter import get_ip_adapter_image_encoder_model_id
 
@@ -92,7 +93,7 @@ class IPAdapterInvocation(BaseInvocation):
         validate_begin_end_step(self.begin_step_percent, self.end_step_percent)
         return self
 
-    def invoke(self, context) -> IPAdapterOutput:
+    def invoke(self, context: InvocationContext) -> IPAdapterOutput:
         # Lookup the CLIP Vision encoder that is intended to be used with the IP-Adapter model.
         ip_adapter_info = context.models.get_info(
             self.ip_adapter_model.model_name, self.ip_adapter_model.base_model, ModelType.IPAdapter

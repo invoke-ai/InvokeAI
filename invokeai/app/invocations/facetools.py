@@ -1,7 +1,7 @@
 import math
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, TypedDict
+from typing import Optional, TypedDict
 
 import cv2
 import numpy as np
@@ -19,9 +19,7 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.invocations.fields import ImageField, InputField, OutputField, WithMetadata
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory
-
-if TYPE_CHECKING:
-    from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.services.shared.invocation_context import InvocationContext
 
 
 @invocation_output("face_mask_output")
@@ -176,7 +174,7 @@ def prepare_faces_list(
 
 
 def generate_face_box_mask(
-    context: "InvocationContext",
+    context: InvocationContext,
     minimum_confidence: float,
     x_offset: float,
     y_offset: float,
@@ -275,7 +273,7 @@ def generate_face_box_mask(
 
 
 def extract_face(
-    context: "InvocationContext",
+    context: InvocationContext,
     image: ImageType,
     face: FaceResultData,
     padding: int,
@@ -356,7 +354,7 @@ def extract_face(
 
 
 def get_faces_list(
-    context: "InvocationContext",
+    context: InvocationContext,
     image: ImageType,
     should_chunk: bool,
     minimum_confidence: float,
@@ -458,7 +456,7 @@ class FaceOffInvocation(BaseInvocation, WithMetadata):
         description="Whether to bypass full image face detection and default to image chunking. Chunking will occur if no faces are found in the full image.",
     )
 
-    def faceoff(self, context: "InvocationContext", image: ImageType) -> Optional[ExtractFaceData]:
+    def faceoff(self, context: InvocationContext, image: ImageType) -> Optional[ExtractFaceData]:
         all_faces = get_faces_list(
             context=context,
             image=image,
@@ -485,7 +483,7 @@ class FaceOffInvocation(BaseInvocation, WithMetadata):
 
         return face_data
 
-    def invoke(self, context) -> FaceOffOutput:
+    def invoke(self, context: InvocationContext) -> FaceOffOutput:
         image = context.images.get_pil(self.image.image_name)
         result = self.faceoff(context=context, image=image)
 
@@ -543,7 +541,7 @@ class FaceMaskInvocation(BaseInvocation, WithMetadata):
             raise ValueError('Face IDs must be a comma-separated list of integers (e.g. "1,2,3")')
         return v
 
-    def facemask(self, context: "InvocationContext", image: ImageType) -> FaceMaskResult:
+    def facemask(self, context: InvocationContext, image: ImageType) -> FaceMaskResult:
         all_faces = get_faces_list(
             context=context,
             image=image,
@@ -600,7 +598,7 @@ class FaceMaskInvocation(BaseInvocation, WithMetadata):
             mask=mask_pil,
         )
 
-    def invoke(self, context) -> FaceMaskOutput:
+    def invoke(self, context: InvocationContext) -> FaceMaskOutput:
         image = context.images.get_pil(self.image.image_name)
         result = self.facemask(context=context, image=image)
 
@@ -633,7 +631,7 @@ class FaceIdentifierInvocation(BaseInvocation, WithMetadata):
         description="Whether to bypass full image face detection and default to image chunking. Chunking will occur if no faces are found in the full image.",
     )
 
-    def faceidentifier(self, context: "InvocationContext", image: ImageType) -> ImageType:
+    def faceidentifier(self, context: InvocationContext, image: ImageType) -> ImageType:
         image = image.copy()
 
         all_faces = get_faces_list(
@@ -674,7 +672,7 @@ class FaceIdentifierInvocation(BaseInvocation, WithMetadata):
 
         return image
 
-    def invoke(self, context) -> ImageOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
         result_image = self.faceidentifier(context=context, image=image)
 

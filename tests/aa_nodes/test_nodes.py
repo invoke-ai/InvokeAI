@@ -8,6 +8,7 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.fields import InputField, OutputField
 from invokeai.app.invocations.image import ImageField
+from invokeai.app.services.shared.invocation_context import InvocationContext
 
 
 # Define test invocations before importing anything that uses invocations
@@ -20,7 +21,7 @@ class ListPassThroughInvocationOutput(BaseInvocationOutput):
 class ListPassThroughInvocation(BaseInvocation):
     collection: list[ImageField] = InputField(default=[])
 
-    def invoke(self, context) -> ListPassThroughInvocationOutput:
+    def invoke(self, context: InvocationContext) -> ListPassThroughInvocationOutput:
         return ListPassThroughInvocationOutput(collection=self.collection)
 
 
@@ -33,13 +34,13 @@ class PromptTestInvocationOutput(BaseInvocationOutput):
 class PromptTestInvocation(BaseInvocation):
     prompt: str = InputField(default="")
 
-    def invoke(self, context) -> PromptTestInvocationOutput:
+    def invoke(self, context: InvocationContext) -> PromptTestInvocationOutput:
         return PromptTestInvocationOutput(prompt=self.prompt)
 
 
 @invocation("test_error", version="1.0.0")
 class ErrorInvocation(BaseInvocation):
-    def invoke(self, context) -> PromptTestInvocationOutput:
+    def invoke(self, context: InvocationContext) -> PromptTestInvocationOutput:
         raise Exception("This invocation is supposed to fail")
 
 
@@ -53,7 +54,7 @@ class TextToImageTestInvocation(BaseInvocation):
     prompt: str = InputField(default="")
     prompt2: str = InputField(default="")
 
-    def invoke(self, context) -> ImageTestInvocationOutput:
+    def invoke(self, context: InvocationContext) -> ImageTestInvocationOutput:
         return ImageTestInvocationOutput(image=ImageField(image_name=self.id))
 
 
@@ -62,7 +63,7 @@ class ImageToImageTestInvocation(BaseInvocation):
     prompt: str = InputField(default="")
     image: Union[ImageField, None] = InputField(default=None)
 
-    def invoke(self, context) -> ImageTestInvocationOutput:
+    def invoke(self, context: InvocationContext) -> ImageTestInvocationOutput:
         return ImageTestInvocationOutput(image=ImageField(image_name=self.id))
 
 
@@ -75,7 +76,7 @@ class PromptCollectionTestInvocationOutput(BaseInvocationOutput):
 class PromptCollectionTestInvocation(BaseInvocation):
     collection: list[str] = InputField()
 
-    def invoke(self, context) -> PromptCollectionTestInvocationOutput:
+    def invoke(self, context: InvocationContext) -> PromptCollectionTestInvocationOutput:
         return PromptCollectionTestInvocationOutput(collection=self.collection.copy())
 
 
@@ -88,7 +89,7 @@ class AnyTypeTestInvocationOutput(BaseInvocationOutput):
 class AnyTypeTestInvocation(BaseInvocation):
     value: Any = InputField(default=None)
 
-    def invoke(self, context) -> AnyTypeTestInvocationOutput:
+    def invoke(self, context: InvocationContext) -> AnyTypeTestInvocationOutput:
         return AnyTypeTestInvocationOutput(value=self.value)
 
 
@@ -96,7 +97,7 @@ class AnyTypeTestInvocation(BaseInvocation):
 class PolymorphicStringTestInvocation(BaseInvocation):
     value: Union[str, list[str]] = InputField(default="")
 
-    def invoke(self, context) -> PromptCollectionTestInvocationOutput:
+    def invoke(self, context: InvocationContext) -> PromptCollectionTestInvocationOutput:
         if isinstance(self.value, str):
             return PromptCollectionTestInvocationOutput(collection=[self.value])
         return PromptCollectionTestInvocationOutput(collection=self.value)

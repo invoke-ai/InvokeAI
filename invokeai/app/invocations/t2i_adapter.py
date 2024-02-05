@@ -11,6 +11,7 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.invocations.controlnet_image_processors import CONTROLNET_RESIZE_VALUES
 from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, OutputField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
+from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_management.models.base import BaseModelType
 
 
@@ -89,7 +90,7 @@ class T2IAdapterInvocation(BaseInvocation):
         validate_begin_end_step(self.begin_step_percent, self.end_step_percent)
         return self
 
-    def invoke(self, context) -> T2IAdapterOutput:
+    def invoke(self, context: InvocationContext) -> T2IAdapterOutput:
         return T2IAdapterOutput(
             t2i_adapter=T2IAdapterField(
                 image=self.image,
