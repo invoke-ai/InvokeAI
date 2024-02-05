@@ -39,7 +39,7 @@ else:
 def welcome():
     @group()
     def text():
-        if (platform_specific := _platform_specific_help()) != "":
+        if (platform_specific := _platform_specific_help()) is not None:
             yield platform_specific
             yield ""
         yield Text.from_markup(
@@ -345,7 +345,7 @@ def introduction() -> None:
     console.line(2)
 
 
-def _platform_specific_help() -> Text:
+def _platform_specific_help() -> Text | None:
     if OS == "Darwin":
         text = Text.from_markup(
             """[b wheat1]macOS Users![/]\n\nPlease be sure you have the [b wheat1]Xcode command-line tools[/] installed before continuing.\nIf not, cancel with [i]Control-C[/] and follow the Xcode install instructions at [deep_sky_blue1]https://www.freecodecamp.org/news/install-xcode-command-line-tools/[/]."""
@@ -359,5 +359,5 @@ def _platform_specific_help() -> Text:
      [deep_sky_blue1]https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170[/]"""
         )
     else:
-        text = Text()
+        return
     return text
