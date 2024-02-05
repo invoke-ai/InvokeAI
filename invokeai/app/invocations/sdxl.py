@@ -1,4 +1,5 @@
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
+from invokeai.app.services.shared.invocation_context import InvocationContext
 
 from ...backend.model_management import ModelType, SubModelType
 from .baseinvocation import (
@@ -38,7 +39,7 @@ class SDXLModelLoaderInvocation(BaseInvocation):
     )
     # TODO: precision?
 
-    def invoke(self, context) -> SDXLModelLoaderOutput:
+    def invoke(self, context: InvocationContext) -> SDXLModelLoaderOutput:
         base_model = self.model.base_model
         model_name = self.model.model_name
         model_type = ModelType.Main
@@ -127,7 +128,7 @@ class SDXLRefinerModelLoaderInvocation(BaseInvocation):
     )
     # TODO: precision?
 
-    def invoke(self, context) -> SDXLRefinerModelLoaderOutput:
+    def invoke(self, context: InvocationContext) -> SDXLRefinerModelLoaderOutput:
         base_model = self.model.base_model
         model_name = self.model.model_name
         model_type = ModelType.Main

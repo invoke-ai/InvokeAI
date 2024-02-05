@@ -8,6 +8,7 @@ from PIL import Image, ImageOps
 
 from invokeai.app.invocations.fields import ColorField, ImageField
 from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
 from invokeai.backend.image_util.cv2_inpaint import cv2_inpaint
 from invokeai.backend.image_util.lama import LaMA
@@ -129,7 +130,7 @@ class InfillColorInvocation(BaseInvocation, WithMetadata):
         description="The color to use to infill",
     )
 
-    def invoke(self, context) -> ImageOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
 
         solid_bg = Image.new("RGBA", image.size, self.color.tuple())
@@ -155,7 +156,7 @@ class InfillTileInvocation(BaseInvocation, WithMetadata):
         description="The seed to use for tile generation (omit for random)",
     )
 
-    def invoke(self, context) -> ImageOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
 
         infilled = tile_fill_missing(image.copy(), seed=self.seed, tile_size=self.tile_size)
@@ -176,7 +177,7 @@ class InfillPatchMatchInvocation(BaseInvocation, WithMetadata):
     downscale: float = InputField(default=2.0, gt=0, description="Run patchmatch on downscaled image to speedup infill")
     resample_mode: PIL_RESAMPLING_MODES = InputField(default="bicubic", description="The resampling mode")
 
-    def invoke(self, context) -> ImageOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name).convert("RGBA")
 
         resample_mode = PIL_RESAMPLING_MAP[self.resample_mode]
@@ -213,7 +214,7 @@ class LaMaInfillInvocation(BaseInvocation, WithMetadata):
 
     image: ImageField = InputField(description="The image to infill")
 
-    def invoke(self, context) -> ImageOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
 
         infilled = infill_lama(image.copy())
@@ -229,7 +230,7 @@ class CV2InfillInvocation(BaseInvocation, WithMetadata):
 
     image: ImageField = InputField(description="The image to infill")
 
-    def invoke(self, context) -> ImageOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
 
         infilled = infill_cv2(image.copy())

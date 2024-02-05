@@ -40,6 +40,7 @@ from easing_functions import (
 from matplotlib.ticker import MaxNLocator
 
 from invokeai.app.invocations.primitives import FloatCollectionOutput
+from invokeai.app.services.shared.invocation_context import InvocationContext
 
 from .baseinvocation import BaseInvocation, invocation
 from .fields import InputField
@@ -62,7 +63,7 @@ class FloatLinearRangeInvocation(BaseInvocation):
         description="number of values to interpolate over (including start and stop)",
     )
 
-    def invoke(self, context) -> FloatCollectionOutput:
+    def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
         param_list = list(np.linspace(self.start, self.stop, self.steps))
         return FloatCollectionOutput(collection=param_list)
 
@@ -130,7 +131,7 @@ class StepParamEasingInvocation(BaseInvocation):
     # alt_mirror: bool = InputField(default=False, description="alternative mirroring by dual easing")
     show_easing_plot: bool = InputField(default=False, description="show easing plot")
 
-    def invoke(self, context) -> FloatCollectionOutput:
+    def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
         log_diagnostics = False
         # convert from start_step_percent to nearest step <= (steps * start_step_percent)
         # start_step = int(np.floor(self.num_steps * self.start_step_percent))

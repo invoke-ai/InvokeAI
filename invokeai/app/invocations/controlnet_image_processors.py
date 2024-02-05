@@ -28,6 +28,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, OutputField, WithMetadata
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
+from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.depth_anything import DepthAnythingDetector
 from invokeai.backend.image_util.dw_openpose import DWOpenposeDetector
 from invokeai.backend.model_management.models.base import BaseModelType
@@ -119,7 +120,7 @@ class ControlNetInvocation(BaseInvocation):
         validate_begin_end_step(self.begin_step_percent, self.end_step_percent)
         return self
 
-    def invoke(self, context) -> ControlOutput:
+    def invoke(self, context: InvocationContext) -> ControlOutput:
         return ControlOutput(
             control=ControlField(
                 image=self.image,
@@ -143,7 +144,7 @@ class ImageProcessorInvocation(BaseInvocation, WithMetadata):
         # superclass just passes through image without processing
         return image
 
-    def invoke(self, context) -> ImageOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         raw_image = context.images.get_pil(self.image.image_name)
         # image type should be PIL.PngImagePlugin.PngImageFile ?
         processed_image = self.run_processor(raw_image)

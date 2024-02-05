@@ -174,7 +174,7 @@ class ResizeInvocation(BaseInvocation):
     width: int = InputField(default=512, ge=64, le=2048, description="Width of the new image")
     height: int = InputField(default=512, ge=64, le=2048, description="Height of the new image")
 
-    def invoke(self, context):
+    def invoke(self, context: InvocationContext):
         pass
 ```
 
@@ -203,7 +203,7 @@ class ResizeInvocation(BaseInvocation):
     width: int = InputField(default=512, ge=64, le=2048, description="Width of the new image")
     height: int = InputField(default=512, ge=64, le=2048, description="Height of the new image")
 
-    def invoke(self, context) -> ImageOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         pass
 ```
 
@@ -229,7 +229,7 @@ class ResizeInvocation(BaseInvocation):
     width: int = InputField(default=512, ge=64, le=2048, description="Width of the new image")
     height: int = InputField(default=512, ge=64, le=2048, description="Height of the new image")
 
-    def invoke(self, context) -> ImageOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         # Load the input image as a PIL image
         image = context.images.get_pil(self.image.image_name)
 
