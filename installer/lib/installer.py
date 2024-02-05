@@ -34,6 +34,7 @@ class Installer:
             print("A virtual environment is already activated. Please 'deactivate' before installation.")
             sys.exit(-1)
         self.bootstrap()
+        self.available_releases = get_github_releases()
 
     def mktemp_venv(self) -> TemporaryDirectory:
         """
@@ -105,7 +106,7 @@ class Installer:
         return venv_dir
 
     def install(
-        self, root: str = "~/invokeai", version: str = "latest", yes_to_all=False, find_links: Optional[Path] = None
+        self, version=None, root: str = "~/invokeai", yes_to_all=False, find_links: Optional[Path] = None
     ) -> None:
         """
         Install the InvokeAI application into the given runtime path
@@ -122,7 +123,9 @@ class Installer:
 
         import messages
 
-        messages.welcome()
+        messages.welcome(self.available_releases)
+
+        version = messages.choose_version(self.available_releases)
 
         auto_dest = Path(os.environ.get("INVOKEAI_ROOT", root)).expanduser().resolve()
         destination = auto_dest if yes_to_all else messages.dest_path(root)
@@ -157,7 +160,7 @@ class InvokeAiInstance:
     A single runtime directory *may* be shared by multiple virtual environments, though this isn't currently tested or supported.
     """
 
-    def __init__(self, runtime: Path, venv: Path, version: str) -> None:
+    def __init__(self, runtime: Path, venv: Path, version: str = "stable") -> None:
         self.runtime = runtime
         self.venv = venv
         self.pip = get_pip_from_venv(venv)
@@ -179,21 +182,7 @@ class InvokeAiInstance:
 
     def install(self, extra_index_url=None, optional_modules=None, find_links=None):
         """
-        Install this instance, including dependencies and the app itself
-
-        :param extra_index_url: the "--extra-index-url ..." line for pip to look in extra indexes.
-        :type extra_index_url: str
-        """
-
-        import messages
-
-        messages.simple_banner("Installing the InvokeAI Application :art:")
-        self.install_app(extra_index_url, optional_modules, find_links)
-
-    def install_app(self, extra_index_url=None, optional_modules=None, find_links=None):
-        """
-        Install the application with pip.
-        Supports installation from PyPi or from a local source directory.
+        Install the package from PyPi.
 
         :param extra_index_url: the "--extra-index-url ..." line for pip to look in extra indexes.
         :type extra_index_url: str
@@ -205,15 +194,26 @@ class InvokeAiInstance:
         :type find_links: Path
         """
 
-        ## this only applies to pypi installs; TODO actually use this
-        if self.version == "pre":
+        import messages
+
+        # not currently used, but may be useful for "install most recent version" option
+        if self.version == "prerelease":
             version = None
-            pre = "--pre"
+            pre_flag = "--pre"
+        elif self.version == "stable":
+            version = None
+            pre_flag = None
         else:
             version = self.version
-            pre = None
+            pre_flag = None
 
-        src = f"invokeai=={version}" if version is not None else "invokeai"
+        src = "invokeai"
+        if optional_modules:
+            src += optional_modules
+        if version:
+            src += f"=={version}"
+
+        messages.simple_banner("Installing the InvokeAI Application :art:")
 
         from plumbum import FG, ProcessExecutionError, local  # type: ignore
 
@@ -225,12 +225,12 @@ class InvokeAiInstance:
             "--require-virtualenv",
             "--force-reinstall",
             "--use-pep517",
-            str(src) + (optional_modules if optional_modules else ""),
+            str(src),
             "--find-links" if find_links is not None else None,
             find_links,
             "--extra-index-url" if extra_index_url is not None else None,
             extra_index_url,
-            pre,
+            pre_flag,
         ]
 
         try:
