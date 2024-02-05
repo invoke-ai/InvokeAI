@@ -20,6 +20,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.ip_adapter import IPAdapterModelField
 from invokeai.app.invocations.model import LoRAModelField, MainModelField, VAEModelField
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
+from invokeai.app.services.shared.invocation_context import InvocationContext
 
 from ...version import __version__
 
@@ -64,7 +65,7 @@ class MetadataItemInvocation(BaseInvocation):
     label: str = InputField(description=FieldDescriptions.metadata_item_label)
     value: Any = InputField(description=FieldDescriptions.metadata_item_value, ui_type=UIType.Any)
 
-    def invoke(self, context) -> MetadataItemOutput:
+    def invoke(self, context: InvocationContext) -> MetadataItemOutput:
         return MetadataItemOutput(item=MetadataItemField(label=self.label, value=self.value))
 
 
@@ -81,7 +82,7 @@ class MetadataInvocation(BaseInvocation):
         description=FieldDescriptions.metadata_item_polymorphic
     )
 
-    def invoke(self, context) -> MetadataOutput:
+    def invoke(self, context: InvocationContext) -> MetadataOutput:
         if isinstance(self.items, MetadataItemField):
             # single metadata item
             data = {self.items.label: self.items.value}
@@ -100,7 +101,7 @@ class MergeMetadataInvocation(BaseInvocation):
 
     collection: list[MetadataField] = InputField(description=FieldDescriptions.metadata_collection)
 
-    def invoke(self, context) -> MetadataOutput:
+    def invoke(self, context: InvocationContext) -> MetadataOutput:
         data = {}
         for item in self.collection:
             data.update(item.model_dump())
@@ -218,7 +219,7 @@ class CoreMetadataInvocation(BaseInvocation):
         description="The start value used for refiner denoising",
     )
 
-    def invoke(self, context) -> MetadataOutput:
+    def invoke(self, context: InvocationContext) -> MetadataOutput:
         """Collects and outputs a CoreMetadata object"""
 
         return MetadataOutput(

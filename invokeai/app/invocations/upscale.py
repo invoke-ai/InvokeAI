@@ -10,6 +10,7 @@ from pydantic import ConfigDict
 
 from invokeai.app.invocations.fields import ImageField
 from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.basicsr.rrdbnet_arch import RRDBNet
 from invokeai.backend.image_util.realesrgan.realesrgan import RealESRGAN
 from invokeai.backend.util.devices import choose_torch_device
@@ -42,7 +43,7 @@ class ESRGANInvocation(BaseInvocation, WithMetadata):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    def invoke(self, context) -> ImageOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
         models_path = context.config.get().models_path
 
