@@ -368,25 +368,26 @@ def get_torch_source() -> Tuple[str | None, str | None]:
     :rtype: list
     """
 
-    from messages import graphical_accelerator
+    from messages import select_gpu
 
-    # device can be one of: "cuda", "rocm", "cpu", "idk"
-    device = graphical_accelerator()
+    # device can be one of: "cuda", "rocm", "cpu", "cuda_and_dml, autodetect"
+    device = select_gpu()
 
     url = None
     optional_modules = "[onnx]"
     if OS == "Linux":
-        if device == "rocm":
+        if device.value == "rocm":
             url = "https://download.pytorch.org/whl/rocm5.6"
-        elif device == "cpu":
+        elif device.value == "cpu":
             url = "https://download.pytorch.org/whl/cpu"
 
-    if device == "cuda":
-        url = "https://download.pytorch.org/whl/cu121"
-        optional_modules = "[xformers,onnx-cuda]"
-    if device == "cuda_and_dml":
-        url = "https://download.pytorch.org/whl/cu121"
-        optional_modules = "[xformers,onnx-directml]"
+    elif OS == "Windows":
+        if device.value == "cuda":
+            url = "https://download.pytorch.org/whl/cu121"
+            optional_modules = "[xformers,onnx-cuda]"
+        if device.value == "cuda_and_dml":
+            url = "https://download.pytorch.org/whl/cu121"
+            optional_modules = "[xformers,onnx-directml]"
 
     # in all other cases, Torch wheels should be coming from PyPi as of Torch 1.13
 
