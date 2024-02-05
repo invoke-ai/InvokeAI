@@ -28,8 +28,10 @@ from diffusers import ModelMixin
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from typing_extensions import Annotated, Any, Dict
 
-from .onnx_runtime import IAIOnnxRuntimeModel
+from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
+
 from ..ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
+
 
 class InvalidModelConfigException(Exception):
     """Exception for when config parser doesn't recognized this combination of model type and format."""

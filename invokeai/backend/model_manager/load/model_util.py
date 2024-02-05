@@ -3,13 +3,13 @@
 
 import json
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 import torch
 from diffusers import DiffusionPipeline
 
 from invokeai.backend.model_manager.config import AnyModel
-from invokeai.backend.model_manager.onnx_runtime import IAIOnnxRuntimeModel
+from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
 
 
 def calc_model_size_by_data(model: AnyModel) -> int:
