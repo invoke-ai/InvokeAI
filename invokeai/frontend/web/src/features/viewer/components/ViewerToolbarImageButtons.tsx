@@ -1,17 +1,15 @@
 import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
-import { skipToken } from '@reduxjs/toolkit/query';
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { sentImageToImg2Img } from 'features/gallery/store/actions';
-import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import ParamUpscalePopover from 'features/parameters/components/Upscale/ParamUpscaleSettings';
 import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { selectIsDisabledToolbarImageButtons } from 'features/viewer/store/viewerSelectors';
+import { useCurrentImageDTO } from 'features/viewer/hooks/useCurrentImageDTO';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -24,34 +22,30 @@ import {
   PiQuotesBold,
   PiRulerBold,
 } from 'react-icons/pi';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 
 export const ViewerToolbarImageButtons = memo(() => {
   const dispatch = useAppDispatch();
   const isConnected = useAppSelector((s) => s.system.isConnected);
-  const lastSelectedImage = useAppSelector(selectLastSelectedImage);
-  const isDisabled = useAppSelector(selectIsDisabledToolbarImageButtons);
   const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
   const isQueueMutationInProgress = useIsQueueMutationInProgress();
   const { t } = useTranslation();
+  const imageDTO = useCurrentImageDTO();
 
   const { recallBothPrompts, recallSeed, recallWidthAndHeight, recallAllParameters } = useRecallParameters();
 
-  const { currentData: imageDTO } = useGetImageDTOQuery(lastSelectedImage?.image_name ?? skipToken);
-
-  const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(lastSelectedImage?.image_name);
+  const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(imageDTO?.image_name);
 
   const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } = useGetAndLoadEmbeddedWorkflow({});
 
   const handleLoadWorkflow = useCallback(() => {
-    if (!lastSelectedImage || !lastSelectedImage.has_workflow) {
+    if (!imageDTO || !imageDTO.has_workflow) {
       return;
     }
-    getAndLoadEmbeddedWorkflow(lastSelectedImage.image_name);
-  }, [getAndLoadEmbeddedWorkflow, lastSelectedImage]);
+    getAndLoadEmbeddedWorkflow(imageDTO.image_name);
+  }, [getAndLoadEmbeddedWorkflow, imageDTO]);
 
-  useHotkeys('w', handleLoadWorkflow, [lastSelectedImage]);
+  useHotkeys('w', handleLoadWorkflow, [imageDTO]);
 
   const handleClickUseAllParameters = useCallback(() => {
     recallAllParameters(metadata);
@@ -125,9 +119,9 @@ export const ViewerToolbarImageButtons = memo(() => {
       handleClickUpscale();
     },
     {
-      enabled: () => Boolean(isUpscalingEnabled && !isDisabled && isConnected),
+      enabled: () => Boolean(isUpscalingEnabled && imageDTO && isConnected),
     },
-    [isUpscalingEnabled, imageDTO, isDisabled, isConnected]
+    [isUpscalingEnabled, imageDTO, imageDTO, isConnected]
   );
 
   useHotkeys(
@@ -145,7 +139,7 @@ export const ViewerToolbarImageButtons = memo(() => {
           icon={<PiFlowArrowBold />}
           tooltip={`${t('nodes.loadWorkflow')} (W)`}
           aria-label={`${t('nodes.loadWorkflow')} (W)`}
-          isDisabled={isDisabled || !imageDTO?.has_workflow}
+          isDisabled={!imageDTO || !imageDTO?.has_workflow}
           onClick={handleLoadWorkflow}
           isLoading={getAndLoadEmbeddedWorkflowResult.isLoading}
         />
@@ -154,7 +148,7 @@ export const ViewerToolbarImageButtons = memo(() => {
           icon={<PiArrowsCounterClockwiseBold />}
           tooltip={`${t('parameters.remixImage')} (R)`}
           aria-label={`${t('parameters.remixImage')} (R)`}
-          isDisabled={isDisabled || !metadata?.positive_prompt}
+          isDisabled={!imageDTO || !metadata?.positive_prompt}
           onClick={handleRemixImage}
         />
         <IconButton
@@ -162,7 +156,7 @@ export const ViewerToolbarImageButtons = memo(() => {
           icon={<PiQuotesBold />}
           tooltip={`${t('parameters.usePrompt')} (P)`}
           aria-label={`${t('parameters.usePrompt')} (P)`}
-          isDisabled={isDisabled || !metadata?.positive_prompt}
+          isDisabled={!imageDTO || !metadata?.positive_prompt}
           onClick={handleUsePrompt}
         />
         <IconButton
@@ -170,7 +164,7 @@ export const ViewerToolbarImageButtons = memo(() => {
           icon={<PiPlantBold />}
           tooltip={`${t('parameters.useSeed')} (S)`}
           aria-label={`${t('parameters.useSeed')} (S)`}
-          isDisabled={isDisabled || metadata?.seed === null || metadata?.seed === undefined}
+          isDisabled={!imageDTO || metadata?.seed === null || metadata?.seed === undefined}
           onClick={handleUseSeed}
         />
         <IconButton
@@ -179,7 +173,7 @@ export const ViewerToolbarImageButtons = memo(() => {
           tooltip={`${t('parameters.useSize')} (D)`}
           aria-label={`${t('parameters.useSize')} (D)`}
           isDisabled={
-            isDisabled ||
+            !imageDTO ||
             metadata?.height === null ||
             metadata?.height === undefined ||
             metadata?.width === null ||
@@ -192,17 +186,17 @@ export const ViewerToolbarImageButtons = memo(() => {
           icon={<PiAsteriskBold />}
           tooltip={`${t('parameters.useAll')} (A)`}
           aria-label={`${t('parameters.useAll')} (A)`}
-          isDisabled={isDisabled || !metadata}
+          isDisabled={!imageDTO || !metadata}
           onClick={handleClickUseAllParameters}
         />
       </ButtonGroup>
 
       {isUpscalingEnabled && (
-        <ButtonGroup isDisabled={isQueueMutationInProgress || isDisabled}>
+        <ButtonGroup isDisabled={isQueueMutationInProgress || !imageDTO}>
           {isUpscalingEnabled && <ParamUpscalePopover imageDTO={imageDTO} />}
         </ButtonGroup>
       )}
-      <DeleteImageButton onClick={handleDelete} isDisabled={isDisabled} />
+      <DeleteImageButton onClick={handleDelete} isDisabled={!imageDTO} />
     </>
   );
 });
