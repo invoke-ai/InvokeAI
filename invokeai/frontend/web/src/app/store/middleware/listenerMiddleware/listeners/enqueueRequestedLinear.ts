@@ -4,7 +4,6 @@ import { buildLinearImageToImageGraph } from 'features/nodes/util/graph/buildLin
 import { buildLinearSDXLImageToImageGraph } from 'features/nodes/util/graph/buildLinearSDXLImageToImageGraph';
 import { buildLinearSDXLTextToImageGraph } from 'features/nodes/util/graph/buildLinearSDXLTextToImageGraph';
 import { buildLinearTextToImageGraph } from 'features/nodes/util/graph/buildLinearTextToImageGraph';
-import { linearBatchEnqueued } from 'features/progress/store/progressSlice';
 import { queueApi } from 'services/api/endpoints/queue';
 
 import { startAppListening } from '..';
@@ -36,20 +35,12 @@ export const addEnqueueRequestedLinear = () => {
 
       const batchConfig = prepareLinearUIBatch(state, graph, prepend);
 
-      try {
-        const req = dispatch(
-          queueApi.endpoints.enqueueBatch.initiate(batchConfig, {
-            fixedCacheKey: 'enqueueBatch',
-          })
-        );
-        const enqueueResult = await req.unwrap();
-        req.reset();
-        if (enqueueResult.batch.batch_id) {
-          dispatch(linearBatchEnqueued(enqueueResult.batch.batch_id));
-        }
-      } catch {
-        // no-op
-      }
+      const req = dispatch(
+        queueApi.endpoints.enqueueBatch.initiate(batchConfig, {
+          fixedCacheKey: 'enqueueBatch',
+        })
+      );
+      req.reset();
     },
   });
 };

@@ -2,12 +2,12 @@ import { useMemo } from 'react';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
 export const useIsProcessing = () => {
-  const { data } = useGetQueueStatusQuery();
+  const { currentData } = useGetQueueStatusQuery();
   const isProcessing = useMemo(() => {
-    if ((data?.processor.is_processing && data?.queue.pending) || data?.queue.in_progress) {
+    if ((currentData?.processor.is_processing && currentData?.queue.pending) || currentData?.queue.in_progress) {
       return true;
     }
     return false;
-  }, [data?.processor.is_processing, data?.queue.in_progress, data?.queue.pending]);
+  }, [currentData?.processor.is_processing, currentData?.queue.in_progress, currentData?.queue.pending]);
   return isProcessing;
 };

@@ -1,7 +1,8 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import type { TypesafeDraggableData } from 'features/dnd/types';
-import { latestLinearImageLoaded } from 'features/progress/store/progressSlice';
+import { latestImageLoaded } from 'features/progress/store/progressSlice';
+import { useProgressImageRenderingStyles } from 'features/viewer/hooks/useProgressImageRenderingStyles';
 import { memo, useCallback, useMemo } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
@@ -11,7 +12,8 @@ type Props = {
 
 export const ViewerProgressLatestImage = memo(({ imageDTO }: Props) => {
   const dispatch = useAppDispatch();
-  const progressImageDataURL = useAppSelector((s) => s.progress.linearDenoiseProgress?.progress_image?.dataURL);
+  const progressImageDataURL = useAppSelector((s) => s.progress.latestDenoiseProgress?.progress_image?.dataURL);
+  const sx = useProgressImageRenderingStyles();
   const draggableData = useMemo<TypesafeDraggableData | undefined>(
     () => ({
       id: 'current-image',
@@ -22,7 +24,7 @@ export const ViewerProgressLatestImage = memo(({ imageDTO }: Props) => {
   );
 
   const onLoad = useCallback(() => {
-    dispatch(latestLinearImageLoaded());
+    dispatch(latestImageLoaded());
   }, [dispatch]);
 
   return (
@@ -34,6 +36,7 @@ export const ViewerProgressLatestImage = memo(({ imageDTO }: Props) => {
       fallbackSrc={progressImageDataURL}
       dataTestId="progress-latest-image"
       onLoad={onLoad}
+      sx={sx}
     />
   );
 });

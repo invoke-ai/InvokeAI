@@ -48,6 +48,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
   const {
     imageDTO,
     onError,
+    onLoad,
     onClick,
     withMetadataOverlay = false,
     isDropDisabled = false,
@@ -150,7 +151,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
               <Image
                 src={thumbnail ? imageDTO.thumbnail_url : imageDTO.image_url}
                 fallbackStrategy="beforeLoadOrError"
-                fallbackSrc={fallbackSrc}
+                fallbackSrc={fallbackSrc ?? imageDTO.thumbnail_url}
                 fallback={fallbackSrc ? undefined : <IAILoadingImageFallback image={imageDTO} />}
                 onError={onError}
                 draggable={false}
@@ -161,6 +162,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                 borderRadius="base"
                 sx={imageSx}
                 data-testid={dataTestId}
+                onLoad={onLoad}
               />
               {withMetadataOverlay && <ImageMetadataOverlay imageDTO={imageDTO} />}
               <SelectionOverlay isSelected={isSelected} isHovered={withHoverOverlay ? isHovered : false} />

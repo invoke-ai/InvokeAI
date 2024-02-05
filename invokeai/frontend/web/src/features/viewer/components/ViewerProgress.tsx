@@ -9,15 +9,15 @@ import { PiHourglassBold } from 'react-icons/pi';
 
 export const ViewerProgress = memo(() => {
   const { t } = useTranslation();
-  const linearDenoiseProgress = useAppSelector((s) => s.progress.linearDenoiseProgress);
+  const latestDenoiseProgress = useAppSelector((s) => s.progress.latestDenoiseProgress);
   const latestImageDTO = useLatestImageDTO();
 
   if (latestImageDTO) {
     return <ViewerProgressLatestImage imageDTO={latestImageDTO} />;
   }
 
-  if (linearDenoiseProgress?.progress_image) {
-    return <ViewerProgressLinearDenoiseProgress progressImage={linearDenoiseProgress.progress_image} />;
+  if (latestDenoiseProgress?.progress_image) {
+    return <ViewerProgressLinearDenoiseProgress progressImage={latestDenoiseProgress.progress_image} />;
   }
 
   return <IAINoContentFallback icon={PiHourglassBold} label={t('viewer.noProgress')} />;

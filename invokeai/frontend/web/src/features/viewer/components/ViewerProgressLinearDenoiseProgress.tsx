@@ -1,7 +1,6 @@
-import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Image } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
-import { memo, useMemo } from 'react';
+import { useProgressImageRenderingStyles } from 'features/viewer/hooks/useProgressImageRenderingStyles';
+import { memo } from 'react';
 import type { ProgressImage } from 'services/events/types';
 
 type Props = {
@@ -9,14 +8,7 @@ type Props = {
 };
 
 export const ViewerProgressLinearDenoiseProgress = memo(({ progressImage }: Props) => {
-  const shouldAntialiasProgressImage = useAppSelector((s) => s.system.shouldAntialiasProgressImage);
-
-  const sx = useMemo<SystemStyleObject>(
-    () => ({
-      imageRendering: shouldAntialiasProgressImage ? 'auto' : 'pixelated',
-    }),
-    [shouldAntialiasProgressImage]
-  );
+  const sx = useProgressImageRenderingStyles();
 
   return (
     <Image

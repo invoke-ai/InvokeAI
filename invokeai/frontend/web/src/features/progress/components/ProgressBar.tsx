@@ -8,8 +8,8 @@ const ProgressBar = () => {
   const { t } = useTranslation();
   const isConnected = useAppSelector((s) => s.system.isConnected);
   const isProcessing = useIsProcessing();
-  const hasSteps = useAppSelector((s) => isProcessing && Boolean(s.progress.latestDenoiseProgress));
-  const value = useAppSelector((s) => (isProcessing ? (s.progress.latestDenoiseProgress?.percentage ?? 0) * 100 : 0));
+  const hasSteps = useAppSelector((s) => isProcessing && Boolean(s.progress.currentDenoiseProgress));
+  const value = useAppSelector((s) => (isProcessing ? (s.progress.currentDenoiseProgress?.percentage ?? 0) * 100 : 0));
   const isIndeterminate = useMemo(() => {
     return isConnected && isProcessing && !hasSteps;
   }, [hasSteps, isConnected, isProcessing]);

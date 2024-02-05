@@ -28,7 +28,6 @@ import { Layer, Stage } from 'react-konva';
 
 import IAICanvasBoundingBoxOverlay from './IAICanvasBoundingBoxOverlay';
 import IAICanvasGrid from './IAICanvasGrid';
-import IAICanvasIntermediateImage from './IAICanvasIntermediateImage';
 import IAICanvasMaskCompositer from './IAICanvasMaskCompositer';
 import IAICanvasMaskLines from './IAICanvasMaskLines';
 import IAICanvasObjectRenderer from './IAICanvasObjectRenderer';
@@ -55,7 +54,7 @@ const IAICanvas = () => {
   const shouldShowBoundingBox = useAppSelector((s) => s.canvas.shouldShowBoundingBox);
   const shouldShowGrid = useAppSelector((s) => s.canvas.shouldShowGrid);
   const stageScale = useAppSelector((s) => s.canvas.stageScale);
-  const shouldShowIntermediates = useAppSelector((s) => s.canvas.shouldShowIntermediates);
+  // const shouldShowIntermediates = useAppSelector((s) => s.canvas.shouldShowIntermediates);
   const shouldAntialias = useAppSelector((s) => s.canvas.shouldAntialias);
   const shouldRestrictStrokesToBox = useAppSelector((s) => s.canvas.shouldRestrictStrokesToBox);
   const { stageCoordinates, stageDimensions } = useAppSelector(selector);
@@ -184,7 +183,7 @@ const IAICanvas = () => {
           <Layer id="preview" imageSmoothingEnabled={shouldAntialias}>
             {!isStaging && <IAICanvasToolPreview visible={tool !== 'move'} listening={false} />}
             <IAICanvasStagingArea listening={false} visible={isStaging} />
-            {shouldShowIntermediates && <IAICanvasIntermediateImage />}
+            {/* {shouldShowIntermediates && <IAICanvasIntermediateImage />} */}
             <IAICanvasBoundingBox visible={shouldShowBoundingBox && !isStaging} />
           </Layer>
         </ChakraStage>

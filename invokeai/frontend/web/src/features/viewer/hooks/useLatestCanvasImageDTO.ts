@@ -1,13 +1,17 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import { selectProgressSlice } from 'features/progress/store/progressSlice';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
-export const selectLatestImageName = createSelector(selectProgressSlice, (progress) => {
+const selectLatestCanvasImageName = createSelector(selectProgressSlice, selectCanvasSlice, (progress, _canvas) => {
   const { latestDenoiseProgress, latestImageOutputEvent } = progress;
 
   if (!latestImageOutputEvent) {
+    return null;
+  }
+  if (!progress.canvasBatchIds.includes(latestImageOutputEvent.queue_batch_id)) {
     return null;
   }
 
@@ -28,8 +32,8 @@ export const selectLatestImageName = createSelector(selectProgressSlice, (progre
 /**
  * Returns the latest image's DTO. This is not the currently selected image, just the last image received.
  */
-export const useLatestImageDTO = () => {
-  const latestImageName = useAppSelector(selectLatestImageName);
+export const useLatestCanvasImageDTO = () => {
+  const latestImageName = useAppSelector(selectLatestCanvasImageName);
   const { currentData: imageDTO } = useGetImageDTOQuery(latestImageName ?? skipToken);
   return imageDTO;
 };

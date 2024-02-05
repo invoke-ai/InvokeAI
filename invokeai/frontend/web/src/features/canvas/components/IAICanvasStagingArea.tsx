@@ -5,7 +5,7 @@ import type { GroupConfig } from 'konva/lib/Group';
 import { memo } from 'react';
 import { Group, Rect } from 'react-konva';
 
-import IAICanvasImage from './IAICanvasImage';
+import { IAICanvasStagingAreaImage } from './IAICanvasStagingAreaImage';
 
 const dash = [4, 4];
 
@@ -37,12 +37,11 @@ const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
 type Props = GroupConfig;
 
 const IAICanvasStagingArea = (props: Props) => {
-  const { currentStagingAreaImage, shouldShowStagingImage, shouldShowStagingOutline, x, y, width, height } =
-    useAppSelector(selector);
+  const { shouldShowStagingOutline, x, y, width, height } = useAppSelector(selector);
 
   return (
     <Group {...props}>
-      {shouldShowStagingImage && currentStagingAreaImage && <IAICanvasImage canvasImage={currentStagingAreaImage} />}
+      <IAICanvasStagingAreaImage />
       {shouldShowStagingOutline && (
         <Group listening={false}>
           <Rect
