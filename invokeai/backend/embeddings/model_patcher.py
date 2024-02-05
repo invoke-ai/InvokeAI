@@ -1,21 +1,25 @@
+# Copyright (c) 2024 Ryan Dick, Lincoln D. Stein, and the InvokeAI Development Team
+"""These classes implement model patching with LoRAs and Textual Inversions."""
 from __future__ import annotations
 
 import pickle
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
 from compel.embeddings_provider import BaseTextualInversionManager
-from diffusers.models import UNet2DConditionModel
+from diffusers import ModelMixin, OnnxRuntimeModel, UNet2DConditionModel
 from safetensors.torch import load_file
 from transformers import CLIPTextModel, CLIPTokenizer
+from typing_extensions import Self
 
 from invokeai.app.shared.models import FreeUConfig
-from invokeai.backend.model_management.model_load_optimizations import skip_torch_weight_init
+from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
+from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
 
-from .models.lora import LoRAModel
+from .lora import LoRAModelRaw
 
 """
 loras = [
@@ -62,8 +66,8 @@ class ModelPatcher:
     def apply_lora_unet(
         cls,
         unet: UNet2DConditionModel,
-        loras: List[Tuple[LoRAModel, float]],
-    ):
+        loras: List[Tuple[LoRAModelRaw, float]],
+    ) -> Generator[None, None, None]:
         with cls.apply_lora(unet, loras, "lora_unet_"):
             yield
 
@@ -72,7 +76,7 @@ class ModelPatcher:
     def apply_lora_text_encoder(
         cls,
         text_encoder: CLIPTextModel,
-        loras: List[Tuple[LoRAModel, float]],
+        loras: List[Tuple[LoRAModelRaw, float]],
     ):
         with cls.apply_lora(text_encoder, loras, "lora_te_"):
             yield
@@ -82,7 +86,7 @@ class ModelPatcher:
     def apply_sdxl_lora_text_encoder(
         cls,
         text_encoder: CLIPTextModel,
-        loras: List[Tuple[LoRAModel, float]],
+        loras: List[Tuple[LoRAModelRaw, float]],
     ):
         with cls.apply_lora(text_encoder, loras, "lora_te1_"):
             yield
@@ -92,7 +96,7 @@ class ModelPatcher:
     def apply_sdxl_lora_text_encoder2(
         cls,
         text_encoder: CLIPTextModel,
-        loras: List[Tuple[LoRAModel, float]],
+        loras: List[Tuple[LoRAModelRaw, float]],
     ):
         with cls.apply_lora(text_encoder, loras, "lora_te2_"):
             yield
@@ -101,10 +105,10 @@ class ModelPatcher:
     @contextmanager
     def apply_lora(
         cls,
-        model: torch.nn.Module,
-        loras: List[Tuple[LoRAModel, float]],  # THIS IS INCORRECT. IT IS ACTUALLY A LoRAModelRaw
+        model: Union[torch.nn.Module, ModelMixin, UNet2DConditionModel],
+        loras: List[Tuple[LoRAModelRaw, float]],
         prefix: str,
-    ):
+    ) -> Generator[None, None, None]:
         original_weights = {}
         try:
             with torch.no_grad():
@@ -141,17 +145,21 @@ class ModelPatcher:
                         # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
                         # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
                         layer_weight = layer.get_weight(module.weight) * (lora_weight * layer_scale)
-                        layer.to(device="cpu")
+                        layer.to(device=torch.device("cpu"))
 
+                        assert isinstance(layer_weight, torch.Tensor)  # mypy thinks layer_weight is a float|Any ??!
                         if module.weight.shape != layer_weight.shape:
                             # TODO: debug on lycoris
+                            assert hasattr(layer_weight, "reshape")
                             layer_weight = layer_weight.reshape(module.weight.shape)
 
+                        assert isinstance(layer_weight, torch.Tensor)  # mypy thinks layer_weight is a float|Any ??!
                         module.weight += layer_weight.to(dtype=dtype)
 
             yield  # wait for context manager exit
 
         finally:
+            assert hasattr(model, "get_submodule")  # mypy not picking up fact that torch.nn.Module has get_submodule()
             with torch.no_grad():
                 for module_key, weight in original_weights.items():
                     model.get_submodule(module_key).weight.copy_(weight)
@@ -162,8 +170,8 @@ class ModelPatcher:
         cls,
         tokenizer: CLIPTokenizer,
         text_encoder: CLIPTextModel,
-        ti_list: List[Tuple[str, Any]],
-    ) -> Tuple[CLIPTokenizer, TextualInversionManager]:
+        ti_list: List[Tuple[str, TextualInversionModel]],
+    ) -> Generator[Tuple[CLIPTokenizer, TextualInversionManager], None, None]:
         init_tokens_count = None
         new_tokens_added = None
 
@@ -187,15 +195,13 @@ class ModelPatcher:
             ti_manager = TextualInversionManager(ti_tokenizer)
             init_tokens_count = text_encoder.resize_token_embeddings(None, pad_to_multiple_of).num_embeddings
 
-            def _get_trigger(ti_name, index):
+            def _get_trigger(ti_name: str, index: int) -> str:
                 trigger = ti_name
                 if index > 0:
                     trigger += f"-!pad-{i}"
                 return f"<{trigger}>"
 
-            def _get_ti_embedding(model_embeddings, ti):
-                print(f"DEBUG: model_embeddings={type(model_embeddings)}, ti={type(ti)}")
-                print(f"DEBUG: is it an nn.Module? {isinstance(model_embeddings, torch.nn.Module)}")
+            def _get_ti_embedding(model_embeddings: torch.nn.Module, ti: TextualInversionModel) -> torch.Tensor:
                 # for SDXL models, select the embedding that matches the text encoder's dimensions
                 if ti.embedding_2 is not None:
                     return (
@@ -204,7 +210,6 @@ class ModelPatcher:
                         else ti.embedding
                     )
                 else:
-                    print(f"DEBUG: ti.embedding={type(ti.embedding)}")
                     return ti.embedding
 
             # modify tokenizer
@@ -262,7 +267,7 @@ class ModelPatcher:
         cls,
         text_encoder: CLIPTextModel,
         clip_skip: int,
-    ):
+    ) -> Generator[None, None, None]:
         skipped_layers = []
         try:
             for _i in range(clip_skip):
@@ -280,9 +285,10 @@ class ModelPatcher:
         cls,
         unet: UNet2DConditionModel,
         freeu_config: Optional[FreeUConfig] = None,
-    ):
+    ) -> Generator[None, None, None]:
         did_apply_freeu = False
         try:
+            assert hasattr(unet, "enable_freeu")  # mypy doesn't pick up this attribute?
             if freeu_config is not None:
                 unet.enable_freeu(b1=freeu_config.b1, b2=freeu_config.b2, s1=freeu_config.s1, s2=freeu_config.s2)
                 did_apply_freeu = True
@@ -290,6 +296,7 @@ class ModelPatcher:
             yield
 
         finally:
+            assert hasattr(unet, "disable_freeu")  # mypy doesn't pick up this attribute?
             if did_apply_freeu:
                 unet.disable_freeu()
 
@@ -304,7 +311,7 @@ class TextualInversionModel:
         file_path: Union[str, Path],
         device: Optional[torch.device] = None,
         dtype: Optional[torch.dtype] = None,
-    ):
+    ) -> Self:
         if not isinstance(file_path, Path):
             file_path = Path(file_path)
 
@@ -348,7 +355,8 @@ class TextualInversionModel:
         return result
 
 
-class TextualInversionManager(BaseTextualInversionManager):
+# no type hints for BaseTextualInversionManager?
+class TextualInversionManager(BaseTextualInversionManager):  # type: ignore
     pad_tokens: Dict[int, List[int]]
     tokenizer: CLIPTokenizer
 
@@ -382,17 +390,13 @@ class TextualInversionManager(BaseTextualInversionManager):
 
 
 class ONNXModelPatcher:
-    from diffusers import OnnxRuntimeModel
-
-    from .models.base import IAIOnnxRuntimeModel
-
     @classmethod
     @contextmanager
     def apply_lora_unet(
         cls,
         unet: OnnxRuntimeModel,
-        loras: List[Tuple[LoRAModel, float]],
-    ):
+        loras: List[Tuple[LoRAModelRaw, float]],
+    ) -> Generator[None, None, None]:
         with cls.apply_lora(unet, loras, "lora_unet_"):
             yield
 
@@ -401,8 +405,8 @@ class ONNXModelPatcher:
     def apply_lora_text_encoder(
         cls,
         text_encoder: OnnxRuntimeModel,
-        loras: List[Tuple[LoRAModel, float]],
-    ):
+        loras: List[Tuple[LoRAModelRaw, float]],
+    ) -> Generator[None, None, None]:
         with cls.apply_lora(text_encoder, loras, "lora_te_"):
             yield
 
@@ -413,9 +417,9 @@ class ONNXModelPatcher:
     def apply_lora(
         cls,
         model: IAIOnnxRuntimeModel,
-        loras: List[Tuple[LoRAModel, float]],
+        loras: List[Tuple[LoRAModelRaw, float]],
         prefix: str,
-    ):
+    ) -> Generator[None, None, None]:
         from .models.base import IAIOnnxRuntimeModel
 
         if not isinstance(model, IAIOnnxRuntimeModel):
@@ -424,7 +428,7 @@ class ONNXModelPatcher:
         orig_weights = {}
 
         try:
-            blended_loras = {}
+            blended_loras: Dict[str, torch.Tensor] = {}
 
             for lora, lora_weight in loras:
                 for layer_key, layer in lora.layers.items():
@@ -435,7 +439,7 @@ class ONNXModelPatcher:
                     layer_key = layer_key.replace(prefix, "")
                     # TODO: rewrite to pass original tensor weight(required by ia3)
                     layer_weight = layer.get_weight(None).detach().cpu().numpy() * lora_weight
-                    if layer_key is blended_loras:
+                    if layer_key in blended_loras:
                         blended_loras[layer_key] += layer_weight
                     else:
                         blended_loras[layer_key] = layer_weight
@@ -502,7 +506,7 @@ class ONNXModelPatcher:
         tokenizer: CLIPTokenizer,
         text_encoder: IAIOnnxRuntimeModel,
         ti_list: List[Tuple[str, Any]],
-    ) -> Tuple[CLIPTokenizer, TextualInversionManager]:
+    ) -> Generator[Tuple[CLIPTokenizer, TextualInversionManager], None, None]:
         from .models.base import IAIOnnxRuntimeModel
 
         if not isinstance(text_encoder, IAIOnnxRuntimeModel):
@@ -520,7 +524,7 @@ class ONNXModelPatcher:
             ti_tokenizer = pickle.loads(pickle.dumps(tokenizer))
             ti_manager = TextualInversionManager(ti_tokenizer)
 
-            def _get_trigger(ti_name, index):
+            def _get_trigger(ti_name: str, index: int) -> str:
                 trigger = ti_name
                 if index > 0:
                     trigger += f"-!pad-{i}"
