@@ -47,8 +47,14 @@ from invokeai.app.invocations.primitives import (
     StringCollectionOutput,
     StringOutput,
 )
+from invokeai.app.services.boards.boards_common import BoardDTO
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
+from invokeai.backend.model_management.model_manager import ModelInfo
+from invokeai.backend.model_management.models.base import BaseModelType, ModelType, SubModelType
+from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     ConditioningFieldData,
@@ -101,9 +107,23 @@ __all__ = [
     "StringOutput",
     # invokeai.app.services.image_records.image_records_common
     "ImageCategory",
+    # invokeai.app.services.boards.boards_common
+    "BoardDTO",
     # invokeai.backend.stable_diffusion.diffusion.conditioning_data
     "BasicConditioningInfo",
     "ConditioningFieldData",
     "ExtraConditioningInfo",
     "SDXLConditioningInfo",
+    # invokeai.backend.stable_diffusion.diffusers_pipeline
+    "PipelineIntermediateState",
+    # invokeai.app.services.workflow_records.workflow_records_common
+    "WorkflowWithoutID",
+    # invokeai.app.services.config.config_default
+    "InvokeAIAppConfig",
+    # invokeai.backend.model_management.model_manager
+    "ModelInfo",
+    # invokeai.backend.model_management.models.base
+    "BaseModelType",
+    "ModelType",
+    "SubModelType",
 ]
