@@ -106,7 +106,7 @@ class SchedulerInvocation(BaseInvocation):
         ui_type=UIType.Scheduler,
     )
 
-    def invoke(self, context) -> SchedulerOutput:
+    def invoke(self, context: InvocationContext) -> SchedulerOutput:
         return SchedulerOutput(scheduler=self.scheduler)
 
 
@@ -141,7 +141,7 @@ class CreateDenoiseMaskInvocation(BaseInvocation):
         return mask_tensor
 
     @torch.no_grad()
-    def invoke(self, context) -> DenoiseMaskOutput:
+    def invoke(self, context: InvocationContext) -> DenoiseMaskOutput:
         if self.image is not None:
             image = context.images.get_pil(self.image.image_name)
             image = image_resized_to_grid_as_tensor(image.convert("RGB"))
@@ -630,7 +630,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         return 1 - mask, masked_latents
 
     @torch.no_grad()
-    def invoke(self, context) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
         with SilenceWarnings():  # this quenches NSFW nag from diffusers
             seed = None
             noise = None
@@ -777,7 +777,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata):
     fp32: bool = InputField(default=DEFAULT_PRECISION == "float32", description=FieldDescriptions.fp32)
 
     @torch.no_grad()
-    def invoke(self, context) -> ImageOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.latents.get(self.latents.latents_name)
 
         vae_info = context.models.load(**self.vae.vae.model_dump())
@@ -868,7 +868,7 @@ class ResizeLatentsInvocation(BaseInvocation):
     mode: LATENTS_INTERPOLATION_MODE = InputField(default="bilinear", description=FieldDescriptions.interp_mode)
     antialias: bool = InputField(default=False, description=FieldDescriptions.torch_antialias)
 
-    def invoke(self, context) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
         latents = context.latents.get(self.latents.latents_name)
 
         # TODO:
@@ -909,7 +909,7 @@ class ScaleLatentsInvocation(BaseInvocation):
     mode: LATENTS_INTERPOLATION_MODE = InputField(default="bilinear", description=FieldDescriptions.interp_mode)
     antialias: bool = InputField(default=False, description=FieldDescriptions.torch_antialias)
 
-    def invoke(self, context) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
         latents = context.latents.get(self.latents.latents_name)
 
         # TODO:
@@ -998,7 +998,7 @@ class ImageToLatentsInvocation(BaseInvocation):
         return latents
 
     @torch.no_grad()
-    def invoke(self, context) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
         image = context.images.get_pil(self.image.image_name)
 
         vae_info = context.models.load(**self.vae.vae.model_dump())
@@ -1046,7 +1046,7 @@ class BlendLatentsInvocation(BaseInvocation):
     )
     alpha: float = InputField(default=0.5, description=FieldDescriptions.blend_alpha)
 
-    def invoke(self, context) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
         latents_a = context.latents.get(self.latents_a.latents_name)
         latents_b = context.latents.get(self.latents_b.latents_name)
 
@@ -1147,7 +1147,7 @@ class CropLatentsCoreInvocation(BaseInvocation):
         description="The height (in px) of the crop rectangle in image space. This value will be converted to a dimension in latent space.",
     )
 
-    def invoke(self, context) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
         latents = context.latents.get(self.latents.latents_name)
 
         x1 = self.x // LATENT_SCALE_FACTOR
