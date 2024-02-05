@@ -5,9 +5,13 @@ import { selectProgressSlice } from 'features/progress/store/progressSlice';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 export const selectLatestImageName = createSelector(selectProgressSlice, (progress) => {
-  const { latestDenoiseProgress, latestImageOutputEvent } = progress;
+  const { latestDenoiseProgress, latestImageOutputEvent, canvasBatchIds } = progress;
 
   if (!latestImageOutputEvent) {
+    return null;
+  }
+
+  if (canvasBatchIds.includes(latestImageOutputEvent.queue_batch_id)) {
     return null;
   }
 

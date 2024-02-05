@@ -9,7 +9,17 @@ import { PiHourglassBold } from 'react-icons/pi';
 
 export const ViewerProgress = memo(() => {
   const { t } = useTranslation();
-  const latestDenoiseProgress = useAppSelector((s) => s.progress.latestDenoiseProgress);
+  const latestDenoiseProgress = useAppSelector((s) => {
+    if (!s.progress.latestDenoiseProgress) {
+      return null;
+    }
+
+    if (s.progress.canvasBatchIds.includes(s.progress.latestDenoiseProgress.queue_batch_id)) {
+      return null;
+    }
+
+    return s.progress.latestDenoiseProgress;
+  });
   const latestImageDTO = useLatestImageDTO();
 
   if (latestImageDTO) {

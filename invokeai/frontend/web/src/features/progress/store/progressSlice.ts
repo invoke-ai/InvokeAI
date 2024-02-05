@@ -90,8 +90,12 @@ export const progressSlice = createSlice({
       state.currentDenoiseProgress = null;
     });
 
-    builder.addCase(socketQueueItemStatusChanged, (state) => {
+    builder.addCase(socketQueueItemStatusChanged, (state, action) => {
       state.currentDenoiseProgress = null;
+      const { status } = action.payload.data.queue_item;
+      if (status === 'canceled' || status === 'failed') {
+        state.latestDenoiseProgress = null;
+      }
     });
 
     builder.addMatcher(
