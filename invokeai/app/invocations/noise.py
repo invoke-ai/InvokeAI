@@ -5,6 +5,7 @@ import torch
 from pydantic import field_validator
 
 from invokeai.app.invocations.fields import FieldDescriptions, InputField, LatentsField, OutputField
+from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
 
 from ...backend.util.devices import choose_torch_device, torch_dtype
@@ -112,7 +113,7 @@ class NoiseInvocation(BaseInvocation):
         """Returns the seed modulo (SEED_MAX + 1) to ensure it is within the valid range."""
         return v % (SEED_MAX + 1)
 
-    def invoke(self, context) -> NoiseOutput:
+    def invoke(self, context: InvocationContext) -> NoiseOutput:
         noise = get_noise(
             width=self.width,
             height=self.height,

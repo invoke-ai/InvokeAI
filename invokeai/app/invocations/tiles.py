@@ -13,6 +13,7 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.fields import ImageField, Input, InputField, OutputField, WithMetadata
 from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.tiles.tiles import (
     calc_tiles_even_split,
     calc_tiles_min_overlap,
@@ -56,7 +57,7 @@ class CalculateImageTilesInvocation(BaseInvocation):
         description="The target overlap, in pixels, between adjacent tiles. Adjacent tiles will overlap by at least this amount",
     )
 
-    def invoke(self, context) -> CalculateImageTilesOutput:
+    def invoke(self, context: InvocationContext) -> CalculateImageTilesOutput:
         tiles = calc_tiles_with_overlap(
             image_height=self.image_height,
             image_width=self.image_width,
@@ -99,7 +100,7 @@ class CalculateImageTilesEvenSplitInvocation(BaseInvocation):
         description="The overlap, in pixels, between adjacent tiles.",
     )
 
-    def invoke(self, context) -> CalculateImageTilesOutput:
+    def invoke(self, context: InvocationContext) -> CalculateImageTilesOutput:
         tiles = calc_tiles_even_split(
             image_height=self.image_height,
             image_width=self.image_width,
@@ -129,7 +130,7 @@ class CalculateImageTilesMinimumOverlapInvocation(BaseInvocation):
     tile_height: int = InputField(ge=1, default=576, description="The tile height, in pixels.")
     min_overlap: int = InputField(default=128, ge=0, description="Minimum overlap between adjacent tiles, in pixels.")
 
-    def invoke(self, context) -> CalculateImageTilesOutput:
+    def invoke(self, context: InvocationContext) -> CalculateImageTilesOutput:
         tiles = calc_tiles_min_overlap(
             image_height=self.image_height,
             image_width=self.image_width,
@@ -174,7 +175,7 @@ class TileToPropertiesInvocation(BaseInvocation):
 
     tile: Tile = InputField(description="The tile to split into properties.")
 
-    def invoke(self, context) -> TileToPropertiesOutput:
+    def invoke(self, context: InvocationContext) -> TileToPropertiesOutput:
         return TileToPropertiesOutput(
             coords_left=self.tile.coords.left,
             coords_right=self.tile.coords.right,
@@ -211,7 +212,7 @@ class PairTileImageInvocation(BaseInvocation):
     image: ImageField = InputField(description="The tile image.")
     tile: Tile = InputField(description="The tile properties.")
 
-    def invoke(self, context) -> PairTileImageOutput:
+    def invoke(self, context: InvocationContext) -> PairTileImageOutput:
         return PairTileImageOutput(
             tile_with_image=TileWithImage(
                 tile=self.tile,
@@ -247,7 +248,7 @@ class MergeTilesToImageInvocation(BaseInvocation, WithMetadata):
         description="The amount to blend adjacent tiles in pixels. Must be <= the amount of overlap between adjacent tiles.",
     )
 
-    def invoke(self, context) -> ImageOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         images = [twi.image for twi in self.tiles_with_images]
         tiles = [twi.tile for twi in self.tiles_with_images]
 

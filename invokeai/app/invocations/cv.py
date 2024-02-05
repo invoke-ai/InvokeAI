@@ -7,6 +7,7 @@ from PIL import Image, ImageOps
 
 from invokeai.app.invocations.fields import ImageField
 from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.services.shared.invocation_context import InvocationContext
 
 from .baseinvocation import BaseInvocation, invocation
 from .fields import InputField, WithMetadata
@@ -19,7 +20,7 @@ class CvInpaintInvocation(BaseInvocation, WithMetadata):
     image: ImageField = InputField(description="The image to inpaint")
     mask: ImageField = InputField(description="The mask to use when inpainting")
 
-    def invoke(self, context) -> ImageOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
         mask = context.images.get_pil(self.mask.image_name)
 
