@@ -392,7 +392,7 @@ class ConfigInterface:
     def __init__(self, services: InvocationServices) -> None:
         def get() -> InvokeAIAppConfig:
             """
-            Gets the app's config.
+            Gets the app's config. The config is read-only; attempts to mutate it will raise an error.
             """
 
             # The config can be changed at runtime.
@@ -400,6 +400,7 @@ class ConfigInterface:
             # We don't want nodes doing this, so we make a frozen copy.
 
             config = services.configuration.get_config()
+            # TODO(psyche): If config cannot be changed at runtime, should we cache this?
             frozen_config = config.model_copy(update={"model_config": ConfigDict(frozen=True)})
             return frozen_config
 
