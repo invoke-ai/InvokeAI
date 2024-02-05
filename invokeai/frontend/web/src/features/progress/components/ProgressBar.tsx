@@ -1,18 +1,18 @@
 import { Progress } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { useIsProcessing } from 'features/queue/hooks/useIsProcessing';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
 const ProgressBar = () => {
   const { t } = useTranslation();
-  const { data: queueStatus } = useGetQueueStatusQuery();
   const isConnected = useAppSelector((s) => s.system.isConnected);
-  const hasSteps = useAppSelector((s) => Boolean(s.progress.latestDenoiseProgress));
-  const value = useAppSelector((s) => (s.progress.latestDenoiseProgress?.percentage ?? 0) * 100);
+  const isProcessing = useIsProcessing();
+  const hasSteps = useAppSelector((s) => isProcessing && Boolean(s.progress.latestDenoiseProgress));
+  const value = useAppSelector((s) => (isProcessing ? (s.progress.latestDenoiseProgress?.percentage ?? 0) * 100 : 0));
   const isIndeterminate = useMemo(() => {
-    return isConnected && Boolean(queueStatus?.queue.in_progress) && !hasSteps;
-  }, [hasSteps, isConnected, queueStatus?.queue.in_progress]);
+    return isConnected && isProcessing && !hasSteps;
+  }, [hasSteps, isConnected, isProcessing]);
 
   return (
     <Progress
