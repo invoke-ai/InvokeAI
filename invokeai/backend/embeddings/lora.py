@@ -1,12 +1,16 @@
 # Copyright (c) 2024 The InvokeAI Development team
 """LoRA model support."""
 
+import bisect
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
+
 import torch
 from safetensors.torch import load_file
-from pathlib import Path
-from typing import Dict, Optional, Union, List, Tuple
 from typing_extensions import Self
+
 from invokeai.backend.model_manager import BaseModelType
+
 
 class LoRALayerBase:
     # rank: Optional[int]
@@ -41,7 +45,7 @@ class LoRALayerBase:
         self.rank = None  # set in layer implementation
         self.layer_key = layer_key
 
-    def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
+    def get_weight(self, orig_weight: Optional[torch.Tensor]) -> torch.Tensor:
         raise NotImplementedError()
 
     def calc_size(self) -> int:
@@ -82,7 +86,7 @@ class LoRALayer(LoRALayerBase):
 
         self.rank = self.down.shape[0]
 
-    def get_weight(self, orig_weight: torch.Tensor):
+    def get_weight(self, orig_weight: Optional[torch.Tensor]) -> torch.Tensor:
         if self.mid is not None:
             up = self.up.reshape(self.up.shape[0], self.up.shape[1])
             down = self.down.reshape(self.down.shape[0], self.down.shape[1])
@@ -121,11 +125,7 @@ class LoHALayer(LoRALayerBase):
     # t1: Optional[torch.Tensor] = None
     # t2: Optional[torch.Tensor] = None
 
-    def __init__(
-        self,
-        layer_key: str,
-        values: Dict[str, torch.Tensor]
-    ):
+    def __init__(self, layer_key: str, values: Dict[str, torch.Tensor]):
         super().__init__(layer_key, values)
 
         self.w1_a = values["hada_w1_a"]
@@ -145,7 +145,7 @@ class LoHALayer(LoRALayerBase):
 
         self.rank = self.w1_b.shape[0]
 
-    def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
+    def get_weight(self, orig_weight: Optional[torch.Tensor]) -> torch.Tensor:
         if self.t1 is None:
             weight: torch.Tensor = (self.w1_a @ self.w1_b) * (self.w2_a @ self.w2_b)
 
@@ -227,7 +227,7 @@ class LoKRLayer(LoRALayerBase):
         else:
             self.rank = None  # unscaled
 
-    def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
+    def get_weight(self, orig_weight: Optional[torch.Tensor]) -> torch.Tensor:
         w1: Optional[torch.Tensor] = self.w1
         if w1 is None:
             assert self.w1_a is not None
@@ -305,7 +305,7 @@ class FullLayer(LoRALayerBase):
 
         self.rank = None  # unscaled
 
-    def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
+    def get_weight(self, orig_weight: Optional[torch.Tensor]) -> torch.Tensor:
         return self.weight
 
     def calc_size(self) -> int:
@@ -330,7 +330,7 @@ class IA3Layer(LoRALayerBase):
     def __init__(
         self,
         layer_key: str,
-            values: Dict[str, torch.Tensor],
+        values: Dict[str, torch.Tensor],
     ):
         super().__init__(layer_key, values)
 
@@ -339,10 +339,11 @@ class IA3Layer(LoRALayerBase):
 
         self.rank = None  # unscaled
 
-    def get_weight(self, orig_weight: torch.Tensor):
+    def get_weight(self, orig_weight: Optional[torch.Tensor]) -> torch.Tensor:
         weight = self.weight
         if not self.on_input:
             weight = weight.reshape(-1, 1)
+        assert orig_weight is not None
         return orig_weight * weight
 
     def calc_size(self) -> int:
@@ -361,8 +362,10 @@ class IA3Layer(LoRALayerBase):
         self.weight = self.weight.to(device=device, dtype=dtype)
         self.on_input = self.on_input.to(device=device, dtype=dtype)
 
+
 AnyLoRALayer = Union[LoRALayer, LoHALayer, LoKRLayer, FullLayer, IA3Layer]
-        
+
+
 # TODO: rename all methods used in model logic with Info postfix and remove here Raw postfix
 class LoRAModelRaw:  # (torch.nn.Module):
     _name: str
@@ -530,7 +533,7 @@ class LoRAModelRaw:  # (torch.nn.Module):
 
 # code from
 # https://github.com/bmaltais/kohya_ss/blob/2accb1305979ba62f5077a23aabac23b4c37e935/networks/lora_diffusers.py#L15C1-L97C32
-def make_sdxl_unet_conversion_map() -> List[Tuple[str,str]]:
+def make_sdxl_unet_conversion_map() -> List[Tuple[str, str]]:
     """Create a dict mapping state_dict keys from Stability AI SDXL format to diffusers SDXL format."""
     unet_conversion_map_layer = []
 

@@ -15,6 +15,7 @@ from invokeai.backend.model_manager import (
 )
 from invokeai.backend.model_manager.convert_ckpt_to_diffusers import convert_ldm_vae_to_diffusers
 from invokeai.backend.model_manager.load.load_base import AnyModelLoader
+
 from .generic_diffusers import GenericDiffusersLoader
 
 
