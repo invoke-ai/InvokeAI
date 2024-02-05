@@ -353,6 +353,42 @@ def set_sys_path(venv_path: Path) -> None:
     sys.path.append(str(Path(venv_path, lib, "site-packages").expanduser().resolve()))
 
 
+def get_github_releases() -> tuple[list, list] | None:
+    """
+    Query Github for published (pre-)release versions.
+    Return a tuple where the first element is a list of stable releases and the second element is a list of pre-releases.
+    Return None if the query fails for any reason.
+    """
+
+    import requests
+
+    ## get latest releases using github api
+    url = "https://api.github.com/repos/invoke-ai/InvokeAI/releases"
+    releases, pre_releases = [], []
+    try:
+        res = requests.get(url)
+        res.raise_for_status()
+        tag_info = res.json()
+        for tag in tag_info:
+            if not tag["prerelease"]:
+                releases.append(tag["tag_name"].lstrip("v"))
+            else:
+                pre_releases.append(tag["tag_name"].lstrip("v"))
+    except requests.HTTPError as e:
+        print(f"Error: {e}")
+        print("Could not fetch version information from GitHub. Please check your network connection and try again.")
+        return
+    except Exception as e:
+        print(f"Error: {e}")
+        print("An unexpected error occurred while trying to fetch version information from GitHub. Please try again.")
+        return
+
+    releases.sort(reverse=True)
+    pre_releases.sort(reverse=True)
+
+    return releases, pre_releases
+
+
 def get_torch_source() -> Tuple[str | None, str | None]:
     """
     Determine the extra index URL for pip to use for torch installation.
