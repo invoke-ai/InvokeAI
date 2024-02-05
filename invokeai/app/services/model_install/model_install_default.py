@@ -178,6 +178,11 @@ class ModelInstallService(ModelInstallServiceBase):
         )
 
     def import_model(self, source: ModelSource, config: Optional[Dict[str, Any]] = None) -> ModelInstallJob:  # noqa D102
+        similar_jobs = [x for x in self.list_jobs() if x.source == source and not x.in_terminal_state]
+        if similar_jobs:
+            self._logger.warning(f"There is already an active install job for {source}. Not enqueuing.")
+            return similar_jobs[0]
+
         if isinstance(source, LocalModelSource):
             install_job = self._import_local_model(source, config)
             self._install_queue.put(install_job)  # synchronously install

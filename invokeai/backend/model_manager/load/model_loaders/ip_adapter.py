@@ -1,10 +1,10 @@
 # Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Class for IP Adapter model loading in InvokeAI."""
 
-import torch
-
 from pathlib import Path
 from typing import Optional
+
+import torch
 
 from invokeai.backend.ip_adapter.ip_adapter import build_ip_adapter
 from invokeai.backend.model_manager import (
@@ -17,6 +17,7 @@ from invokeai.backend.model_manager import (
 )
 from invokeai.backend.model_manager.load.load_base import AnyModelLoader
 from invokeai.backend.model_manager.load.load_default import ModelLoader
+
 
 @AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.IPAdapter, format=ModelFormat.InvokeAI)
 class IPAdapterInvokeAILoader(ModelLoader):
@@ -36,4 +37,3 @@ class IPAdapterInvokeAILoader(ModelLoader):
             dtype=self._torch_dtype,
         )
         return model
-

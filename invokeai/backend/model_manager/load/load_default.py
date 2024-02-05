@@ -10,11 +10,17 @@ from diffusers import ModelMixin
 from diffusers.configuration_utils import ConfigMixin
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_manager import AnyModel, AnyModelConfig, InvalidModelConfigException, ModelRepoVariant, SubModelType
+from invokeai.backend.model_manager import (
+    AnyModel,
+    AnyModelConfig,
+    InvalidModelConfigException,
+    ModelRepoVariant,
+    SubModelType,
+)
 from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
 from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase, ModelLockerBase
-from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs, calc_model_size_by_data
+from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data, calc_model_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.util.devices import choose_torch_device, torch_dtype
 
@@ -160,4 +166,3 @@ class ModelLoader(ModelLoaderBase):
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
         raise NotImplementedError
-

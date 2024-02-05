@@ -15,6 +15,7 @@ from invokeai.backend.model_manager import (
 from invokeai.backend.model_manager.load.load_base import AnyModelLoader
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 
+
 @AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.CLIPVision, format=ModelFormat.Diffusers)
 @AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.T2IAdapter, format=ModelFormat.Diffusers)
 class GenericDiffusersLoader(ModelLoader):
