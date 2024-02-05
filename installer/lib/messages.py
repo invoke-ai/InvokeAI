@@ -9,7 +9,7 @@ from enum import Enum
 from pathlib import Path
 
 from prompt_toolkit import HTML, prompt
-from prompt_toolkit.completion import PathCompleter
+from prompt_toolkit.completion import FuzzyWordCompleter, PathCompleter
 from prompt_toolkit.validation import Validator
 from rich import box, print
 from rich.console import Console, Group, group
@@ -61,6 +61,33 @@ def welcome():
     )
     console.line()
 
+
+def choose_version(available_releases: tuple | None = None) -> str:
+    """
+    Prompt the user to choose an Invoke version to install
+    """
+
+    # short circuit if we couldn't get a version list
+    # still try to install the latest stable version
+    if available_releases is None:
+        return "stable"
+
+    console.print(":grey_question: [orange3]Please choose an Invoke version to install.")
+
+    choices = available_releases[0] + available_releases[1]
+
+    response = prompt(
+        message=f"   <Enter> to install the recommended release ({choices[0]}). <Tab> or type to pick a version: ",
+        complete_while_typing=True,
+        completer=FuzzyWordCompleter(choices),
+    )
+
+    console.print(f"   Version {choices[0]} will be installed.")
+    console.line()
+
+    return "stable" if response == "" else response
+
+    return response
 
 def confirm_install(dest: Path) -> bool:
     if dest.exists():
