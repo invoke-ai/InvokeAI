@@ -14,7 +14,9 @@ from invokeai.backend.model_manager import (
 )
 from invokeai.backend.model_manager.convert_ckpt_to_diffusers import convert_controlnet_to_diffusers
 from invokeai.backend.model_manager.load.load_base import AnyModelLoader
+
 from .generic_diffusers import GenericDiffusersLoader
+
 
 @AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.ControlNet, format=ModelFormat.Diffusers)
 @AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)
@@ -37,7 +39,7 @@ class ControlnetLoader(GenericDiffusersLoader):
         if config.base not in {BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2}:
             raise Exception(f"Vae conversion not supported for model type: {config.base}")
         else:
-            assert hasattr(config, 'config')
+            assert hasattr(config, "config")
             config_file = config.config
 
         if weights_path.suffix == ".safetensors":
