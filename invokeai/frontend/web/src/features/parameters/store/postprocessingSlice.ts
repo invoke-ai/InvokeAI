@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import { z } from 'zod';
 
 export const zParamESRGANModelName = z.enum([
@@ -35,8 +35,6 @@ export const postprocessingSlice = createSlice({
 
 export const { esrganModelNameChanged } = postprocessingSlice.actions;
 
-export default postprocessingSlice.reducer;
-
 export const selectPostprocessingSlice = (state: RootState) => state.postprocessing;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -45,4 +43,11 @@ export const migratePostprocessingState = (state: any): any => {
     state._version = 1;
   }
   return state;
+};
+
+export const postprocessingPersistConfig: PersistConfig<PostprocessingState> = {
+  name: postprocessingSlice.name,
+  initialState: initialPostprocessingState,
+  migrate: migratePostprocessingState,
+  persistDenylist: [],
 };

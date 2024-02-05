@@ -53,6 +53,4 @@ export const {
   resumeProcessorOnEnqueueChanged,
 } = queueSlice.actions;
 
-export default queueSlice.reducer;
-
 export const selectQueueSlice = (state: RootState) => state.queue;

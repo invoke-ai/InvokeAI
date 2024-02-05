@@ -424,6 +424,7 @@ class ONNXModelPatcher:
             blended_loras = {}
 
             for lora, lora_weight in loras:
+                print(f'DEBUG: lora type = {type(lora)}')
                 for layer_key, layer in lora.layers.items():
                     if not layer_key.startswith(prefix):
                         continue

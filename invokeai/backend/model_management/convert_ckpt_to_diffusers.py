@@ -42,8 +42,7 @@ from diffusers.schedulers import (
     PNDMScheduler,
     UnCLIPScheduler,
 )
-from diffusers.utils import is_accelerate_available, is_omegaconf_available
-from diffusers.utils.import_utils import BACKENDS_MAPPING
+from diffusers.utils import is_accelerate_available
 from picklescan.scanner import scan_file_path
 from transformers import (
     AutoFeatureExtractor,
@@ -1211,9 +1210,6 @@ def download_from_original_stable_diffusion_ckpt(
     if prediction_type == "v-prediction":
         prediction_type = "v_prediction"
 
-    if not is_omegaconf_available():
-        raise ValueError(BACKENDS_MAPPING["omegaconf"][1])
-
     if from_safetensors:
         from safetensors.torch import load_file as safe_load
 
@@ -1647,11 +1643,6 @@ def download_controlnet_from_original_ckpt(
     cross_attention_dim: Optional[bool] = None,
     scan_needed: bool = False,
 ) -> DiffusionPipeline:
-    if not is_omegaconf_available():
-        raise ValueError(BACKENDS_MAPPING["omegaconf"][1])
-
-    from omegaconf import OmegaConf
-
     if from_safetensors:
         from safetensors import safe_open
 

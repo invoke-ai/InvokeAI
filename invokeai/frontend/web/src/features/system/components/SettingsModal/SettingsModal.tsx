@@ -81,9 +81,10 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
     hasPendingItems,
     intermediatesCount,
     isLoading: isLoadingClearIntermediates,
+    refetchIntermediatesCount,
   } = useClearIntermediates(shouldShowClearIntermediates);
 
-  const { isOpen: isSettingsModalOpen, onOpen: onSettingsModalOpen, onClose: onSettingsModalClose } = useDisclosure();
+  const { isOpen: isSettingsModalOpen, onOpen: _onSettingsModalOpen, onClose: onSettingsModalClose } = useDisclosure();
 
   const { isOpen: isRefreshModalOpen, onOpen: onRefreshModalOpen, onClose: onRefreshModalClose } = useDisclosure();
 
@@ -98,6 +99,11 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const shouldEnableInformationalPopovers = useAppSelector((s) => s.system.shouldEnableInformationalPopovers);
 
   const clearStorage = useClearStorage();
+
+  const handleOpenSettingsModel = useCallback(() => {
+    refetchIntermediatesCount();
+    _onSettingsModalOpen();
+  }, [_onSettingsModalOpen, refetchIntermediatesCount]);
 
   const handleClickResetWebUI = useCallback(() => {
     clearStorage();
@@ -171,7 +177,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   return (
     <>
       {cloneElement(children, {
-        onClick: onSettingsModalOpen,
+        onClick: handleOpenSettingsModel,
       })}
 
       <Modal isOpen={isSettingsModalOpen} onClose={onSettingsModalClose} size="2xl" isCentered>

@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { isAnyControlAdapterAdded } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
@@ -299,8 +299,6 @@ export const {
 
 export const { selectOptimalDimension } = generationSlice.selectors;
 
-export default generationSlice.reducer;
-
 export const selectGenerationSlice = (state: RootState) => state.generation;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -310,4 +308,11 @@ export const migrateGenerationState = (state: any): GenerationState => {
     state.aspectRatio = initialAspectRatioState;
   }
   return state;
+};
+
+export const generationPersistConfig: PersistConfig<GenerationState> = {
+  name: generationSlice.name,
+  initialState: initialGenerationState,
+  migrate: migrateGenerationState,
+  persistDenylist: [],
 };

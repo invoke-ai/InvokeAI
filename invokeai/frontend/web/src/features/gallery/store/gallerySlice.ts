@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import { uniqBy } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -109,8 +109,6 @@ export const {
   moreImagesLoaded,
 } = gallerySlice.actions;
 
-export default gallerySlice.reducer;
-
 const isAnyBoardDeleted = isAnyOf(
   imagesApi.endpoints.deleteBoard.matchFulfilled,
   imagesApi.endpoints.deleteBoardAndImages.matchFulfilled
@@ -124,4 +122,11 @@ export const migrateGalleryState = (state: any): any => {
     state._version = 1;
   }
   return state;
+};
+
+export const galleryPersistConfig: PersistConfig<GalleryState> = {
+  name: gallerySlice.name,
+  initialState: initialGalleryState,
+  migrate: migrateGalleryState,
+  persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'offset', 'limit'],
 };
