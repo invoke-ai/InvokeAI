@@ -23,7 +23,7 @@ import torch
 from npyscreen import widget
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.model_install import ModelInstallService
+from invokeai.app.services.model_install import ModelInstallServiceBase
 from invokeai.backend.install.install_helper import InstallHelper, InstallSelections, UnifiedModelInfo
 from invokeai.backend.model_manager import ModelType
 from invokeai.backend.util import choose_precision, choose_torch_device
@@ -499,7 +499,7 @@ class AddModelApplication(npyscreen.NPSAppManaged):  # type: ignore
         )
 
 
-def list_models(installer: ModelInstallService, model_type: ModelType):
+def list_models(installer: ModelInstallServiceBase, model_type: ModelType):
     """Print out all models of type model_type."""
     models = installer.record_store.search_by_attr(model_type=model_type)
     print(f"Installed models of type `{model_type}`:")
@@ -527,7 +527,9 @@ def select_and_download_models(opt: Namespace) -> None:
         install_helper.add_or_delete(selections)
 
     elif opt.default_only:
-        selections = InstallSelections(install_models=[install_helper.default_model()])
+        default_model = install_helper.default_model()
+        assert default_model is not None
+        selections = InstallSelections(install_models=[default_model])
         install_helper.add_or_delete(selections)
 
     elif opt.yes_to_all:

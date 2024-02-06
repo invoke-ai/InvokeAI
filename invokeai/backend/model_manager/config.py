@@ -30,7 +30,10 @@ from typing_extensions import Annotated, Any, Dict
 
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
 
+from ..embeddings.embedding_base import EmbeddingModelRaw
 from ..ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
+
+AnyModel = Union[ModelMixin, torch.nn.Module, IAIOnnxRuntimeModel, IPAdapter, IPAdapterPlus, EmbeddingModelRaw]
 
 
 class InvalidModelConfigException(Exception):
@@ -299,7 +302,7 @@ AnyModelConfig = Union[
 ]
 
 AnyModelConfigValidator = TypeAdapter(AnyModelConfig)
-AnyModel = Union[ModelMixin, torch.nn.Module, IAIOnnxRuntimeModel, IPAdapter, IPAdapterPlus]
+
 
 # IMPLEMENTATION NOTE:
 # The preferred alternative to the above is a discriminated Union as shown
