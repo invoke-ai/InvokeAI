@@ -182,8 +182,6 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         error_type=e.__class__.__name__,
                         error=error,
                     )
-                    with suppress(GESStatsNotFoundError):
-                        self.__invoker.services.performance_statistics.reset_stats(graph_execution_state.id)
                     pass
 
                 # Check queue to see if this is canceled, and skip if so
