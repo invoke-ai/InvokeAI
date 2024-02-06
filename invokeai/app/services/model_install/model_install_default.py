@@ -495,10 +495,10 @@ class ModelInstallService(ModelInstallServiceBase):
         return id
 
     @staticmethod
-    def _guess_variant() -> ModelRepoVariant:
+    def _guess_variant() -> Optional[ModelRepoVariant]:
         """Guess the best HuggingFace variant type to download."""
         precision = choose_precision(choose_torch_device())
-        return ModelRepoVariant.FP16 if precision == "float16" else ModelRepoVariant.DEFAULT
+        return ModelRepoVariant.FP16 if precision == "float16" else None
 
     def _import_local_model(self, source: LocalModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
         return ModelInstallJob(
@@ -523,7 +523,7 @@ class ModelInstallService(ModelInstallServiceBase):
         if not source.access_token:
             self._logger.info("No HuggingFace access token present; some models may not be downloadable.")
 
-        metadata = HuggingFaceMetadataFetch(self._session).from_id(source.repo_id)
+        metadata = HuggingFaceMetadataFetch(self._session).from_id(source.repo_id, source.variant)
         assert isinstance(metadata, ModelMetadataWithFiles)
         remote_files = metadata.download_urls(
             variant=source.variant or self._guess_variant(),

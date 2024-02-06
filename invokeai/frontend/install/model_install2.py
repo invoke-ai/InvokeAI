@@ -505,7 +505,7 @@ def list_models(installer: ModelInstallService, model_type: ModelType):
     print(f"Installed models of type `{model_type}`:")
     for model in models:
         path = (config.models_path / model.path).resolve()
-        print(f"{model.name:40}{model.base.value:14}{path}")
+        print(f"{model.name:40}{model.base.value:5}{model.type.value:8}{model.format.value:12}{path}")
 
 
 # --------------------------------------------------------

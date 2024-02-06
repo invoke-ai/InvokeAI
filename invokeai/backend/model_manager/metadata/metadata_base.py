@@ -184,7 +184,6 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
             [x.path for x in self.files], variant, subfolder
         )  #  all files in the model
         prefix = f"{subfolder}/" if subfolder else ""
-
         # the next step reads model_index.json to determine which subdirectories belong
         # to the model
         if Path(f"{prefix}model_index.json") in paths:

@@ -109,7 +109,7 @@ class SchedulerPredictionType(str, Enum):
 class ModelRepoVariant(str, Enum):
     """Various hugging face variants on the diffusers format."""
 
-    DEFAULT = "default"  # model files without "fp16" or other qualifier
+    DEFAULT = ""  # model files without "fp16" or other qualifier - empty str
     FP16 = "fp16"
     FP32 = "fp32"
     ONNX = "onnx"
@@ -246,6 +246,16 @@ class ONNXSD2Config(_MainConfig):
     upcast_attention: bool = True
 
 
+class ONNXSDXLConfig(_MainConfig):
+    """Model config for ONNX format models based on sdxl."""
+
+    type: Literal[ModelType.ONNX] = ModelType.ONNX
+    format: Literal[ModelFormat.Onnx, ModelFormat.Olive]
+    # No yaml config file for ONNX, so these are part of config
+    base: Literal[BaseModelType.StableDiffusionXL] = BaseModelType.StableDiffusionXL
+    prediction_type: SchedulerPredictionType = SchedulerPredictionType.VPrediction
+
+
 class IPAdapterConfig(ModelConfigBase):
     """Model config for IP Adaptor format models."""
 
@@ -267,7 +277,7 @@ class T2IConfig(ModelConfigBase):
     format: Literal[ModelFormat.Diffusers]
 
 
-_ONNXConfig = Annotated[Union[ONNXSD1Config, ONNXSD2Config], Field(discriminator="base")]
+_ONNXConfig = Annotated[Union[ONNXSD1Config, ONNXSD2Config, ONNXSDXLConfig], Field(discriminator="base")]
 _ControlNetConfig = Annotated[
     Union[ControlNetDiffusersConfig, ControlNetCheckpointConfig],
     Field(discriminator="format"),

@@ -7,6 +7,7 @@ import safetensors.torch
 import torch
 from picklescan.scanner import scan_file_path
 
+import invokeai.backend.util.logging as logger
 from invokeai.backend.model_management.models.base import read_checkpoint_meta
 from invokeai.backend.model_management.models.ip_adapter import IPAdapterModelFormat
 from invokeai.backend.model_management.util import lora_token_vector_length
@@ -590,12 +591,19 @@ class TextualInversionFolderProbe(FolderProbeBase):
         return TextualInversionCheckpointProbe(path).get_base_type()
 
 
-class ONNXFolderProbe(FolderProbeBase):
+class ONNXFolderProbe(PipelineFolderProbe):
+    def get_base_type(self) -> BaseModelType:
+        # Due to the way the installer is set up, the configuration file for safetensors
+        # will come along for the ride if both the onnx and safetensors forms
+        # share the same directory. We take advantage of this here.
+        if (self.model_path / "unet" / "config.json").exists():
+            return super().get_base_type()
+        else:
+            logger.warning('Base type probing is not implemented for ONNX models. Assuming "sd-1"')
+            return BaseModelType.StableDiffusion1
+
     def get_format(self) -> ModelFormat:
         return ModelFormat("onnx")
-
-    def get_base_type(self) -> BaseModelType:
-        return BaseModelType.StableDiffusion1
 
     def get_variant_type(self) -> ModelVariantType:
         return ModelVariantType.Normal

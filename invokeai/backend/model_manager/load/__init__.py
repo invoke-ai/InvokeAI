@@ -16,7 +16,6 @@ from .model_cache.model_cache_default import ModelCache
 # This registers the subclasses that implement loaders of specific model types
 loaders = [x.stem for x in Path(Path(__file__).parent, "model_loaders").glob("*.py") if x.stem != "__init__"]
 for module in loaders:
-    print(f"module={module}")
     import_module(f"{__package__}.model_loaders.{module}")
 
 __all__ = ["AnyModelLoader", "LoadedModel"]
