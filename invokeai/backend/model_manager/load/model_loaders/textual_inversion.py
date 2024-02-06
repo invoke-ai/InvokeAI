@@ -5,7 +5,7 @@
 from pathlib import Path
 from typing import Optional, Tuple
 
-from invokeai.backend.embeddings.model_patcher import TextualInversionModel as TextualInversionModelRaw
+from invokeai.backend.embeddings.textual_inversion import TextualInversionModelRaw
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,
