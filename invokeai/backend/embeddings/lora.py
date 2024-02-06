@@ -11,6 +11,8 @@ from typing_extensions import Self
 
 from invokeai.backend.model_manager import BaseModelType
 
+from .embedding_base import EmbeddingModelRaw
+
 
 class LoRALayerBase:
     # rank: Optional[int]
@@ -317,7 +319,7 @@ class FullLayer(LoRALayerBase):
         self,
         device: Optional[torch.device] = None,
         dtype: Optional[torch.dtype] = None,
-    ):
+    ) -> None:
         super().to(device=device, dtype=dtype)
 
         self.weight = self.weight.to(device=device, dtype=dtype)
@@ -367,7 +369,7 @@ AnyLoRALayer = Union[LoRALayer, LoHALayer, LoKRLayer, FullLayer, IA3Layer]
 
 
 # TODO: rename all methods used in model logic with Info postfix and remove here Raw postfix
-class LoRAModelRaw:  # (torch.nn.Module):
+class LoRAModelRaw(EmbeddingModelRaw):  # (torch.nn.Module):
     _name: str
     layers: Dict[str, AnyLoRALayer]
 
@@ -471,16 +473,16 @@ class LoRAModelRaw:  # (torch.nn.Module):
             file_path = Path(file_path)
 
         model = cls(
-            name=file_path.stem,  # TODO:
+            name=file_path.stem,
             layers={},
         )
 
         if file_path.suffix == ".safetensors":
-            state_dict = load_file(file_path.absolute().as_posix(), device="cpu")
+            sd = load_file(file_path.absolute().as_posix(), device="cpu")
         else:
-            state_dict = torch.load(file_path, map_location="cpu")
+            sd = torch.load(file_path, map_location="cpu")
 
-        state_dict = cls._group_state(state_dict)
+        state_dict = cls._group_state(sd)
 
         if base_model == BaseModelType.StableDiffusionXL:
             state_dict = cls._convert_sdxl_keys_to_diffusers_format(state_dict)

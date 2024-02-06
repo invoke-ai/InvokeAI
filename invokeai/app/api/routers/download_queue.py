@@ -55,7 +55,7 @@ async def download(
 ) -> DownloadJob:
     """Download the source URL to the file or directory indicted in dest."""
     queue = ApiDependencies.invoker.services.download_queue
-    return queue.download(source, dest, priority, access_token)
+    return queue.download(source, Path(dest), priority, access_token)
 
 
 @download_queue_router.get(

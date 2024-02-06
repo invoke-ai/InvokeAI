@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from invokeai.backend import BaseModelType
+from invokeai.backend.model_manager import BaseModelType, ModelRepoVariant
 from invokeai.backend.model_manager.probe import VaeFolderProbe
 
 
@@ -21,10 +21,10 @@ def test_get_base_type(vae_path: str, expected_type: BaseModelType, datadir: Pat
     base_type = probe.get_base_type()
     assert base_type == expected_type
     repo_variant = probe.get_repo_variant()
-    assert repo_variant == "default"
+    assert repo_variant == ModelRepoVariant.DEFAULT
 
 
 def test_repo_variant(datadir: Path):
     probe = VaeFolderProbe(datadir / "vae" / "taesdxl-fp16")
     repo_variant = probe.get_repo_variant()
-    assert repo_variant == "fp16"
+    assert repo_variant == ModelRepoVariant.FP16

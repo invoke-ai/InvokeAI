@@ -241,10 +241,11 @@ class InstallHelper(object):
         if match := re.match(f"^([^/]+/[^/]+?)(?::({variants}))?$", model_path_id_or_url):
             repo_id = match.group(1)
             repo_variant = ModelRepoVariant(match.group(2)) if match.group(2) else None
+            subfolder = Path(model_info.subfolder) if model_info.subfolder else None
             return HFModelSource(
                 repo_id=repo_id,
                 access_token=HfFolder.get_token(),
-                subfolder=model_info.subfolder,
+                subfolder=subfolder,
                 variant=repo_variant,
             )
         if re.match(r"^(http|https):", model_path_id_or_url):
