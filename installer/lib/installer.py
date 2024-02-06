@@ -73,7 +73,7 @@ class Installer:
 
         try:
             # upgrade pip to the latest version to avoid a confusing message
-            res = subprocess.check_output([pip, "install", "--upgrade", "pip"]).decode()
+            res = upgrade_pip(Path(venv_dir.name))
             if verbose:
                 print(res)
 
@@ -169,6 +169,7 @@ class InvokeAiInstance:
         set_sys_path(venv)
         os.environ["INVOKEAI_ROOT"] = str(self.runtime.expanduser().resolve())
         os.environ["VIRTUAL_ENV"] = str(self.venv.expanduser().resolve())
+        upgrade_pip(venv)
 
     def get(self) -> tuple[Path, Path]:
         """
@@ -218,7 +219,6 @@ class InvokeAiInstance:
         from plumbum import FG, ProcessExecutionError, local  # type: ignore
 
         pip = local[self.pip]
-        _ = pip["install", "--upgrade", "pip"] & FG
 
         pipeline = pip[
             "install",
@@ -328,6 +328,23 @@ def get_pip_from_venv(venv_path: Path) -> str:
 
     pip = "Scripts\\pip.exe" if OS == "Windows" else "bin/pip"
     return str(venv_path.expanduser().resolve() / pip)
+
+
+def upgrade_pip(venv_path: Path) -> str | None:
+    """
+    Upgrade the pip executable in the given virtual environment
+    """
+
+    python = "Scripts\\python.exe" if OS == "Windows" else "bin/python"
+    python = str(venv_path.expanduser().resolve() / python)
+
+    try:
+        result = subprocess.check_output([python, "-m", "pip", "install", "--upgrade", "pip"]).decode()
+    except subprocess.CalledProcessError as e:
+        print(e)
+        result = None
+
+    return result
 
 
 def set_sys_path(venv_path: Path) -> None:
