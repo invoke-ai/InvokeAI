@@ -1,3 +1,4 @@
-"""Init file for RamCache."""
+"""Init file for ModelCache."""
+
 
 _all__ = ["ModelCacheBase", "ModelCache"]
