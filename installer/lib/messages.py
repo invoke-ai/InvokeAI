@@ -36,7 +36,7 @@ else:
     console = Console(style=Style(color="grey74", bgcolor="grey19"))
 
 
-def welcome():
+def welcome(available_releases: tuple | None = None) -> None:
     @group()
     def text():
         if (platform_specific := _platform_specific_help()) is not None:
@@ -46,6 +46,16 @@ def welcome():
             "Some of the installation steps take a long time to run. Please be patient. If the script appears to hang for more than 10 minutes, please interrupt with [i]Control-C[/] and retry.",
             justify="center",
         )
+        if available_releases is not None:
+            latest_stable = available_releases[0][0]
+            last_pre = available_releases[1][0]
+            yield ""
+            yield Text.from_markup(
+                f"[red3]🠶[/] Latest stable release (recommended): [b bright_white]{latest_stable}", justify="center"
+            )
+            yield Text.from_markup(
+                f"[red3]🠶[/] Last published pre-release version: [b bright_white]{last_pre}", justify="center"
+            )
 
     console.rule()
     print(
