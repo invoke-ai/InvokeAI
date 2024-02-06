@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { galleryImageClicked } from 'features/gallery/store/gallerySlice';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 
 import type { InvokeTabName } from './tabMap';
@@ -48,6 +49,14 @@ export const uiSlice = createSlice({
   extraReducers(builder) {
     builder.addCase(initialImageChanged, (state) => {
       state.activeTab = 'img2img';
+    });
+
+    builder.addCase(galleryImageClicked, (state) => {
+      // When a gallery image is clicked and we are in progress mode, switch to image mode.
+      // This is not the same as the gallery _selection_ being changed.
+      if (state.viewerMode === 'progress') {
+        state.viewerMode = 'image';
+      }
     });
   },
 });
