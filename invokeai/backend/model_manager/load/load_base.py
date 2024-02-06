@@ -18,8 +18,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple, Type
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_manager import AnyModel, AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
-from invokeai.backend.model_manager.config import VaeCheckpointConfig, VaeDiffusersConfig
+from invokeai.backend.model_manager import AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
+from invokeai.backend.model_manager.config import AnyModel, VaeCheckpointConfig, VaeDiffusersConfig
 from invokeai.backend.model_manager.load.convert_cache.convert_cache_base import ModelConvertCacheBase
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase, ModelLockerBase
 from invokeai.backend.util.logging import InvokeAILogger

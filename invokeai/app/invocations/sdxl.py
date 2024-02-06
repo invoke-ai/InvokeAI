@@ -1,6 +1,6 @@
 from invokeai.app.shared.fields import FieldDescriptions
+from invokeai.backend.model_manager import SubModelType
 
-from ...backend.model_management import ModelType, SubModelType
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -44,45 +44,31 @@ class SDXLModelLoaderInvocation(BaseInvocation):
     # TODO: precision?
 
     def invoke(self, context: InvocationContext) -> SDXLModelLoaderOutput:
-        base_model = self.model.base_model
-        model_name = self.model.model_name
-        model_type = ModelType.Main
+        model_key = self.model.key
 
         # TODO: not found exceptions
-        if not context.services.model_manager.model_exists(
-            model_name=model_name,
-            base_model=base_model,
-            model_type=model_type,
-        ):
-            raise Exception(f"Unknown {base_model} {model_type} model: {model_name}")
+        if not context.services.model_records.exists(model_key):
+            raise Exception(f"Unknown model: {model_key}")
 
         return SDXLModelLoaderOutput(
             unet=UNetField(
                 unet=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=model_key,
                     submodel=SubModelType.UNet,
                 ),
                 scheduler=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=model_key,
                     submodel=SubModelType.Scheduler,
                 ),
                 loras=[],
             ),
             clip=ClipField(
                 tokenizer=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=model_key,
                     submodel=SubModelType.Tokenizer,
                 ),
                 text_encoder=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=model_key,
                     submodel=SubModelType.TextEncoder,
                 ),
                 loras=[],
@@ -90,15 +76,11 @@ class SDXLModelLoaderInvocation(BaseInvocation):
             ),
             clip2=ClipField(
                 tokenizer=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=model_key,
                     submodel=SubModelType.Tokenizer2,
                 ),
                 text_encoder=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=model_key,
                     submodel=SubModelType.TextEncoder2,
                 ),
                 loras=[],
@@ -106,9 +88,7 @@ class SDXLModelLoaderInvocation(BaseInvocation):
             ),
             vae=VaeField(
                 vae=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=model_key,
                     submodel=SubModelType.Vae,
                 ),
             ),
@@ -133,45 +113,31 @@ class SDXLRefinerModelLoaderInvocation(BaseInvocation):
     # TODO: precision?
 
     def invoke(self, context: InvocationContext) -> SDXLRefinerModelLoaderOutput:
-        base_model = self.model.base_model
-        model_name = self.model.model_name
-        model_type = ModelType.Main
+        model_key = self.model.key
 
         # TODO: not found exceptions
-        if not context.services.model_manager.model_exists(
-            model_name=model_name,
-            base_model=base_model,
-            model_type=model_type,
-        ):
-            raise Exception(f"Unknown {base_model} {model_type} model: {model_name}")
+        if not context.services.model_records.exists(model_key):
+            raise Exception(f"Unknown model: {model_key}")
 
         return SDXLRefinerModelLoaderOutput(
             unet=UNetField(
                 unet=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=model_key,
                     submodel=SubModelType.UNet,
                 ),
                 scheduler=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=model_key,
                     submodel=SubModelType.Scheduler,
                 ),
                 loras=[],
             ),
             clip2=ClipField(
                 tokenizer=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=model_key,
                     submodel=SubModelType.Tokenizer2,
                 ),
                 text_encoder=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=model_key,
                     submodel=SubModelType.TextEncoder2,
                 ),
                 loras=[],
@@ -179,9 +145,7 @@ class SDXLRefinerModelLoaderInvocation(BaseInvocation):
             ),
             vae=VaeField(
                 vae=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=model_key,
                     submodel=SubModelType.Vae,
                 ),
             ),

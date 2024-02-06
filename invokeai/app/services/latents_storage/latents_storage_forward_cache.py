@@ -1,12 +1,13 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
 from queue import Queue
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 import torch
 
 from invokeai.app.services.invoker import Invoker
 
+from ..compel import ConditioningFieldData
 from .latents_storage_base import LatentsStorageBase
 
 
@@ -46,7 +47,9 @@ class ForwardCacheLatentsStorage(LatentsStorageBase):
         self.__set_cache(name, latent)
         return latent
 
-    def save(self, name: str, data: torch.Tensor) -> None:
+    # TODO: (LS) ConditioningFieldData added as Union because of type-checking errors
+    # in compel.py. Unclear whether this is a long-standing bug, but seems to run.
+    def save(self, name: str, data: Union[torch.Tensor, ConditioningFieldData]) -> None:
         self.__underlying_storage.save(name, data)
         self.__set_cache(name, data)
         self._on_changed(data)

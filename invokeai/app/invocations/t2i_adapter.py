@@ -1,6 +1,6 @@
 from typing import Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -16,14 +16,10 @@ from invokeai.app.invocations.controlnet_image_processors import CONTROLNET_RESI
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.shared.fields import FieldDescriptions
-from invokeai.backend.model_management.models.base import BaseModelType
 
 
 class T2IAdapterModelField(BaseModel):
-    model_name: str = Field(description="Name of the T2I-Adapter model")
-    base_model: BaseModelType = Field(description="Base model")
-
-    model_config = ConfigDict(protected_namespaces=())
+    key: str = Field(description="Model record key for the T2I-Adapter model")
 
 
 class T2IAdapterField(BaseModel):

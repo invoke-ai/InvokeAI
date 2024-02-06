@@ -1,9 +1,11 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
 from abc import ABC, abstractmethod
-from typing import Callable
+from typing import Callable, Union
 
 import torch
+
+from ..compel import ConditioningFieldData
 
 
 class LatentsStorageBase(ABC):
@@ -20,8 +22,10 @@ class LatentsStorageBase(ABC):
     def get(self, name: str) -> torch.Tensor:
         pass
 
+    # (LS) Added a Union with ConditioningFieldData to fix type mismatch errors in compel.py
+    # Not 100% sure this isn't an existing bug.
     @abstractmethod
-    def save(self, name: str, data: torch.Tensor) -> None:
+    def save(self, name: str, data: Union[torch.Tensor, ConditioningFieldData]) -> None:
         pass
 
     @abstractmethod

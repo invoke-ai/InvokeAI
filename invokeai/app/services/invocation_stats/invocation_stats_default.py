@@ -2,6 +2,7 @@ import json
 import time
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 import psutil
 import torch
@@ -10,7 +11,7 @@ import invokeai.backend.util.logging as logger
 from invokeai.app.invocations.baseinvocation import BaseInvocation
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.item_storage.item_storage_common import ItemNotFoundError
-from invokeai.backend.model_management.model_cache import CacheStats
+from invokeai.backend.model_manager.load.model_cache import CacheStats
 
 from .invocation_stats_base import InvocationStatsServiceBase
 from .invocation_stats_common import (
@@ -41,7 +42,10 @@ class InvocationStatsService(InvocationStatsServiceBase):
         self._invoker = invoker
 
     @contextmanager
-    def collect_stats(self, invocation: BaseInvocation, graph_execution_state_id: str):
+    def collect_stats(self, invocation: BaseInvocation, graph_execution_state_id: str) -> Iterator[None]:
+        services = self._invoker.services
+        if services.model_records is None or services.model_records.loader is None:
+            yield None
         if not self._stats.get(graph_execution_state_id):
             # First time we're seeing this graph_execution_state_id.
             self._stats[graph_execution_state_id] = GraphExecutionStats()
@@ -55,8 +59,10 @@ class InvocationStatsService(InvocationStatsServiceBase):
         start_ram = psutil.Process().memory_info().rss
         if torch.cuda.is_available():
             torch.cuda.reset_peak_memory_stats()
-        if self._invoker.services.model_manager:
-            self._invoker.services.model_manager.collect_cache_stats(self._cache_stats[graph_execution_state_id])
+
+        # TO DO [LS]: clean up loader service - shouldn't be an attribute of model records
+        assert services.model_records.loader is not None
+        services.model_records.loader.ram_cache.stats = self._cache_stats[graph_execution_state_id]
 
         try:
             # Let the invocation run.
@@ -73,7 +79,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
             )
             self._stats[graph_execution_state_id].add_node_execution_stats(node_stats)
 
-    def _prune_stale_stats(self):
+    def _prune_stale_stats(self) -> None:
         """Check all graphs being tracked and prune any that have completed/errored.
 
         This shouldn't be necessary, but we don't have totally robust upstream handling of graph completions/errors, so

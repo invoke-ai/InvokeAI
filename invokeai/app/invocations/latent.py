@@ -3,13 +3,13 @@
 import math
 from contextlib import ExitStack
 from functools import singledispatchmethod
-from typing import List, Literal, Optional, Union
+from typing import Iterator, List, Literal, Optional, Tuple, Union
 
 import einops
 import numpy as np
 import torch
 import torchvision.transforms as T
-from diffusers import AutoencoderKL, AutoencoderTiny
+from diffusers import AutoencoderKL, AutoencoderTiny, UNet2DConditionModel
 from diffusers.image_processor import VaeImageProcessor
 from diffusers.models.adapter import T2IAdapter
 from diffusers.models.attention_processor import (
@@ -38,14 +38,13 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
+from invokeai.backend.embeddings.model_patcher import ModelPatcher
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
-from invokeai.backend.model_management.models import ModelType, SilenceWarnings
+from invokeai.backend.model_manager import AnyModel, BaseModelType
+from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData, IPAdapterConditioningInfo
+from invokeai.backend.util.silence_warnings import SilenceWarnings
 
-from ...backend.model_management.lora import ModelPatcher
-from ...backend.model_management.models import BaseModelType
-from ...backend.model_management.seamless import set_seamless
-from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.stable_diffusion.diffusers_pipeline import (
     ControlNetData,
     IPAdapterData,
@@ -77,7 +76,7 @@ if choose_torch_device() == torch.device("mps"):
 
 DEFAULT_PRECISION = choose_precision(choose_torch_device())
 
-SAMPLER_NAME_VALUES = Literal[tuple(SCHEDULER_MAP.keys())]
+SAMPLER_NAME_VALUES = Literal[tuple(SCHEDULER_MAP.keys())]  # FIXME: "Invalid type alias"
 
 # HACK: Many nodes are currently hard-coded to use a fixed latent scale factor of 8. This is fragile, and will need to
 # be addressed if future models use a different latent scale factor. Also, note that there may be places where the scale
@@ -156,7 +155,7 @@ class CreateDenoiseMaskInvocation(BaseInvocation):
         )
 
         if image is not None:
-            vae_info = context.services.model_manager.get_model(
+            vae_info = context.services.model_records.load_model(
                 **self.vae.vae.model_dump(),
                 context=context,
             )
@@ -189,7 +188,7 @@ def get_scheduler(
     seed: int,
 ) -> Scheduler:
     scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP["ddim"])
-    orig_scheduler_info = context.services.model_manager.get_model(
+    orig_scheduler_info = context.services.model_records.load_model(
         **scheduler_info.model_dump(),
         context=context,
     )
@@ -422,10 +421,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
         controlnet_data = []
         for control_info in control_list:
             control_model = exit_stack.enter_context(
-                context.services.model_manager.get_model(
-                    model_name=control_info.control_model.model_name,
-                    model_type=ModelType.ControlNet,
-                    base_model=control_info.control_model.base_model,
+                context.services.model_records.load_model(
+                    key=control_info.control_model.key,
                     context=context,
                 )
             )
@@ -490,18 +487,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
         conditioning_data.ip_adapter_conditioning = []
         for single_ip_adapter in ip_adapter:
             ip_adapter_model: Union[IPAdapter, IPAdapterPlus] = exit_stack.enter_context(
-                context.services.model_manager.get_model(
-                    model_name=single_ip_adapter.ip_adapter_model.model_name,
-                    model_type=ModelType.IPAdapter,
-                    base_model=single_ip_adapter.ip_adapter_model.base_model,
+                context.services.model_records.load_model(
+                    key=single_ip_adapter.ip_adapter_model.key,
                     context=context,
                 )
             )
 
-            image_encoder_model_info = context.services.model_manager.get_model(
-                model_name=single_ip_adapter.image_encoder_model.model_name,
-                model_type=ModelType.CLIPVision,
-                base_model=single_ip_adapter.image_encoder_model.base_model,
+            image_encoder_model_info = context.services.model_records.load_model(
+                key=single_ip_adapter.image_encoder_model.key,
                 context=context,
             )
 
@@ -554,10 +547,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         t2i_adapter_data = []
         for t2i_adapter_field in t2i_adapter:
-            t2i_adapter_model_info = context.services.model_manager.get_model(
-                model_name=t2i_adapter_field.t2i_adapter_model.model_name,
-                model_type=ModelType.T2IAdapter,
-                base_model=t2i_adapter_field.t2i_adapter_model.base_model,
+            t2i_adapter_model_info = context.services.model_records.load_model(
+                key=t2i_adapter_field.t2i_adapter_model.key,
                 context=context,
             )
             image = context.services.images.get_pil_image(t2i_adapter_field.image.image_name)
@@ -593,7 +584,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     do_classifier_free_guidance=False,
                     width=t2i_input_width,
                     height=t2i_input_height,
-                    num_channels=t2i_adapter_model.config.in_channels,
+                    num_channels=t2i_adapter_model.config["in_channels"],  # mypy treats this as a FrozenDict
                     device=t2i_adapter_model.device,
                     dtype=t2i_adapter_model.dtype,
                     resize_mode=t2i_adapter_field.resize_mode,
@@ -703,28 +694,30 @@ class DenoiseLatentsInvocation(BaseInvocation):
             def step_callback(state: PipelineIntermediateState):
                 self.dispatch_progress(context, source_node_id, state, self.unet.unet.base_model)
 
-            def _lora_loader():
+            def _lora_loader() -> Iterator[Tuple[AnyModel, float]]:
                 for lora in self.unet.loras:
-                    lora_info = context.services.model_manager.get_model(
+                    lora_info = context.services.model_records.load_model(
                         **lora.model_dump(exclude={"weight"}),
                         context=context,
                     )
-                    yield (lora_info.context.model, lora.weight)
+                    yield (lora_info.model, lora.weight)
                     del lora_info
                 return
 
-            unet_info = context.services.model_manager.get_model(
+            unet_info = context.services.model_records.load_model(
                 **self.unet.unet.model_dump(),
                 context=context,
             )
+            assert isinstance(unet_info.model, UNet2DConditionModel)
             with (
                 ExitStack() as exit_stack,
-                ModelPatcher.apply_freeu(unet_info.context.model, self.unet.freeu_config),
-                set_seamless(unet_info.context.model, self.unet.seamless_axes),
+                ModelPatcher.apply_freeu(unet_info.model, self.unet.freeu_config),
+                set_seamless(unet_info.model, self.unet.seamless_axes),  # FIXME
                 unet_info as unet,
                 # Apply the LoRA after unet has been moved to its target device for faster patching.
                 ModelPatcher.apply_lora_unet(unet, _lora_loader()),
             ):
+                assert isinstance(unet, torch.Tensor)
                 latents = latents.to(device=unet.device, dtype=unet.dtype)
                 if noise is not None:
                     noise = noise.to(device=unet.device, dtype=unet.dtype)
@@ -822,12 +815,13 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.services.latents.get(self.latents.latents_name)
 
-        vae_info = context.services.model_manager.get_model(
+        vae_info = context.services.model_records.load_model(
             **self.vae.vae.model_dump(),
             context=context,
         )
 
-        with set_seamless(vae_info.context.model, self.vae.seamless_axes), vae_info as vae:
+        with set_seamless(vae_info.model, self.vae.seamless_axes), vae_info as vae:
+            assert isinstance(vae, torch.Tensor)
             latents = latents.to(vae.device)
             if self.fp32:
                 vae.to(dtype=torch.float32)
@@ -1063,7 +1057,7 @@ class ImageToLatentsInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
-        vae_info = context.services.model_manager.get_model(
+        vae_info = context.services.model_records.load_model(
             **self.vae.vae.model_dump(),
             context=context,
         )

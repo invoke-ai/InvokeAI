@@ -8,16 +8,16 @@ from typing import List, Literal, Union
 import numpy as np
 import torch
 from diffusers.image_processor import VaeImageProcessor
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 from tqdm import tqdm
 
 from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput, ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
-from invokeai.backend import BaseModelType, ModelType, SubModelType
+from invokeai.backend import ModelType, SubModelType
+from invokeai.backend.embeddings.model_patcher import ONNXModelPatcher
 
-from ...backend.model_management import ONNXModelPatcher
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.util import choose_torch_device
 from ..util.ti_utils import extract_ti_triggers_from_prompt
@@ -62,16 +62,16 @@ class ONNXPromptInvocation(BaseInvocation):
     clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
 
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        tokenizer_info = context.services.model_manager.get_model(
+        tokenizer_info = context.services.model_records.load_model(
             **self.clip.tokenizer.model_dump(),
         )
-        text_encoder_info = context.services.model_manager.get_model(
+        text_encoder_info = context.services.model_records.load_model(
             **self.clip.text_encoder.model_dump(),
         )
         with tokenizer_info as orig_tokenizer, text_encoder_info as text_encoder:  # , ExitStack() as stack:
             loras = [
                 (
-                    context.services.model_manager.get_model(**lora.model_dump(exclude={"weight"})).context.model,
+                    context.services.model_records.load_model(**lora.model_dump(exclude={"weight"})).model,
                     lora.weight,
                 )
                 for lora in self.clip.loras
@@ -84,11 +84,11 @@ class ONNXPromptInvocation(BaseInvocation):
                     ti_list.append(
                         (
                             name,
-                            context.services.model_manager.get_model(
+                            context.services.model_records.load_model_by_attr(
                                 model_name=name,
-                                base_model=self.clip.text_encoder.base_model,
+                                base_model=text_encoder_info.config.base,
                                 model_type=ModelType.TextualInversion,
-                            ).context.model,
+                            ).model,
                         )
                     )
                 except Exception:
@@ -257,13 +257,13 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
                 eta=0.0,
             )
 
-        unet_info = context.services.model_manager.get_model(**self.unet.unet.model_dump())
+        unet_info = context.services.model_records.load_model(**self.unet.unet.model_dump())
 
         with unet_info as unet:  # , ExitStack() as stack:
             # loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.unet.loras]
             loras = [
                 (
-                    context.services.model_manager.get_model(**lora.model_dump(exclude={"weight"})).context.model,
+                    context.services.model_records.load_model(**lora.model_dump(exclude={"weight"})).model,
                     lora.weight,
                 )
                 for lora in self.unet.loras
@@ -344,9 +344,9 @@ class ONNXLatentsToImageInvocation(BaseInvocation, WithMetadata):
         latents = context.services.latents.get(self.latents.latents_name)
 
         if self.vae.vae.submodel != SubModelType.VaeDecoder:
-            raise Exception(f"Expected vae_decoder, found: {self.vae.vae.model_type}")
+            raise Exception(f"Expected vae_decoder, found: {self.vae.vae.submodel}")
 
-        vae_info = context.services.model_manager.get_model(
+        vae_info = context.services.model_records.load_model(
             **self.vae.vae.model_dump(),
         )
 
@@ -400,11 +400,7 @@ class ONNXModelLoaderOutput(BaseInvocationOutput):
 class OnnxModelField(BaseModel):
     """Onnx model field"""
 
-    model_name: str = Field(description="Name of the model")
-    base_model: BaseModelType = Field(description="Base model")
-    model_type: ModelType = Field(description="Model Type")
-
-    model_config = ConfigDict(protected_namespaces=())
+    key: str = Field(description="Model ID")
 
 
 @invocation("onnx_model_loader", title="ONNX Main Model", tags=["onnx", "model"], category="model", version="1.0.0")
@@ -416,74 +412,31 @@ class OnnxModelLoaderInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> ONNXModelLoaderOutput:
-        base_model = self.model.base_model
-        model_name = self.model.model_name
-        model_type = ModelType.ONNX
+        model_key = self.model.key
 
         # TODO: not found exceptions
-        if not context.services.model_manager.model_exists(
-            model_name=model_name,
-            base_model=base_model,
-            model_type=model_type,
-        ):
-            raise Exception(f"Unknown {base_model} {model_type} model: {model_name}")
-
-        """
-        if not context.services.model_manager.model_exists(
-            model_name=self.model_name,
-            model_type=SDModelType.Diffusers,
-            submodel=SDModelType.Tokenizer,
-        ):
-            raise Exception(
-                f"Failed to find tokenizer submodel in {self.model_name}! Check if model corrupted"
-            )
-
-        if not context.services.model_manager.model_exists(
-            model_name=self.model_name,
-            model_type=SDModelType.Diffusers,
-            submodel=SDModelType.TextEncoder,
-        ):
-            raise Exception(
-                f"Failed to find text_encoder submodel in {self.model_name}! Check if model corrupted"
-            )
-
-        if not context.services.model_manager.model_exists(
-            model_name=self.model_name,
-            model_type=SDModelType.Diffusers,
-            submodel=SDModelType.UNet,
-        ):
-            raise Exception(
-                f"Failed to find unet submodel from {self.model_name}! Check if model corrupted"
-            )
-        """
+        if not context.services.model_records.exists(model_key):
+            raise Exception(f"Unknown model: {model_key}")
 
         return ONNXModelLoaderOutput(
             unet=UNetField(
                 unet=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=model_key,
                     submodel=SubModelType.UNet,
                 ),
                 scheduler=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=model_key,
                     submodel=SubModelType.Scheduler,
                 ),
                 loras=[],
             ),
             clip=ClipField(
                 tokenizer=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=model_key,
                     submodel=SubModelType.Tokenizer,
                 ),
                 text_encoder=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=model_key,
                     submodel=SubModelType.TextEncoder,
                 ),
                 loras=[],
@@ -491,17 +444,13 @@ class OnnxModelLoaderInvocation(BaseInvocation):
             ),
             vae_decoder=VaeField(
                 vae=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=model_key,
                     submodel=SubModelType.VaeDecoder,
                 ),
             ),
             vae_encoder=VaeField(
                 vae=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+                    key=model_key,
                     submodel=SubModelType.VaeEncoder,
                 ),
             ),

@@ -24,19 +24,17 @@ import math
 import sys
 import time
 from contextlib import suppress
-from dataclasses import dataclass, field
 from logging import Logger
 from typing import Dict, List, Optional
 
 import torch
 
-from invokeai.backend.model_manager import SubModelType
-from invokeai.backend.model_manager.load.load_base import AnyModel
+from invokeai.backend.model_manager import AnyModel, SubModelType
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
 from invokeai.backend.util.devices import choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger
 
-from .model_cache_base import CacheRecord, ModelCacheBase
+from .model_cache_base import CacheRecord, CacheStats, ModelCacheBase
 from .model_locker import ModelLocker, ModelLockerBase
 
 if choose_torch_device() == torch.device("mps"):
@@ -54,20 +52,6 @@ GIG = 1073741824
 
 # Size of a MB in bytes.
 MB = 2**20
-
-
-@dataclass
-class CacheStats(object):
-    """Collect statistics on cache performance."""
-
-    hits: int = 0  # cache hits
-    misses: int = 0  # cache misses
-    high_watermark: int = 0  # amount of cache used
-    in_cache: int = 0  # number of models in cache
-    cleared: int = 0  # number of models cleared to make space
-    cache_size: int = 0  # total size of cache
-    # {submodel_key => size}
-    loaded_model_sizes: Dict[str, int] = field(default_factory=dict)
 
 
 class ModelCache(ModelCacheBase[AnyModel]):
@@ -110,7 +94,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         self._logger = logger or InvokeAILogger.get_logger(self.__class__.__name__)
         self._log_memory_usage = log_memory_usage or self._logger.level == logging.DEBUG
         # used for stats collection
-        self.stats = CacheStats()
+        self._stats: Optional[CacheStats] = None
 
         self._cached_models: Dict[str, CacheRecord[AnyModel]] = {}
         self._cache_stack: List[str] = []
@@ -139,6 +123,16 @@ class ModelCache(ModelCacheBase[AnyModel]):
     def max_cache_size(self) -> float:
         """Return the cap on cache size."""
         return self._max_cache_size
+
+    @property
+    def stats(self) -> Optional[CacheStats]:
+        """Return collected CacheStats object."""
+        return self._stats
+
+    @stats.setter
+    def stats(self, stats: CacheStats) -> None:
+        """Set the CacheStats object for collectin cache statistics."""
+        self._stats = stats
 
     def cache_size(self) -> int:
         """Get the total size of the models currently cached."""
@@ -189,21 +183,24 @@ class ModelCache(ModelCacheBase[AnyModel]):
         """
         key = self._make_cache_key(key, submodel_type)
         if key in self._cached_models:
-            self.stats.hits += 1
+            if self.stats:
+                self.stats.hits += 1
         else:
-            self.stats.misses += 1
+            if self.stats:
+                self.stats.misses += 1
             raise IndexError(f"The model with key {key} is not in the cache.")
 
         cache_entry = self._cached_models[key]
 
         # more stats
-        stats_name = stats_name or key
-        self.stats.cache_size = int(self._max_cache_size * GIG)
-        self.stats.high_watermark = max(self.stats.high_watermark, self.cache_size())
-        self.stats.in_cache = len(self._cached_models)
-        self.stats.loaded_model_sizes[stats_name] = max(
-            self.stats.loaded_model_sizes.get(stats_name, 0), cache_entry.size
-        )
+        if self.stats:
+            stats_name = stats_name or key
+            self.stats.cache_size = int(self._max_cache_size * GIG)
+            self.stats.high_watermark = max(self.stats.high_watermark, self.cache_size())
+            self.stats.in_cache = len(self._cached_models)
+            self.stats.loaded_model_sizes[stats_name] = max(
+                self.stats.loaded_model_sizes.get(stats_name, 0), cache_entry.size
+            )
 
         # this moves the entry to the top (right end) of the stack
         with suppress(Exception):

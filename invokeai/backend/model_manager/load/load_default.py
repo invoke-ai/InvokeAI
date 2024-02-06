@@ -19,7 +19,7 @@ from invokeai.backend.model_manager import (
 )
 from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
 from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase
-from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase, ModelLockerBase
+from invokeai.backend.model_manager.load.model_cache.model_cache_base import CacheStats, ModelCacheBase, ModelLockerBase
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data, calc_model_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.util.devices import choose_torch_device, torch_dtype
@@ -71,7 +71,7 @@ class ModelLoader(ModelLoaderBase):
         model_path, model_config, submodel_type = self._get_model_path(model_config, submodel_type)
 
         if not model_path.exists():
-            raise InvalidModelConfigException(f"Files for model 'model_config.name' not found at {model_path}")
+            raise InvalidModelConfigException(f"Files for model '{model_config.name}' not found at {model_path}")
 
         model_path = self._convert_if_needed(model_config, model_path, submodel_type)
         locker = self._load_if_needed(model_config, model_path, submodel_type)

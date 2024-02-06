@@ -24,7 +24,7 @@ from controlnet_aux import (
 )
 from controlnet_aux.util import HWC3, ade_palette
 from PIL import Image
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
@@ -32,7 +32,6 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.backend.image_util.depth_anything import DepthAnythingDetector
 
-from ...backend.model_management import BaseModelType
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -57,10 +56,7 @@ CONTROLNET_RESIZE_VALUES = Literal[
 class ControlNetModelField(BaseModel):
     """ControlNet model field"""
 
-    model_name: str = Field(description="Name of the ControlNet model")
-    base_model: BaseModelType = Field(description="Base model")
-
-    model_config = ConfigDict(protected_namespaces=())
+    key: str = Field(description="Model config record key for the ControlNet model")
 
 
 class ControlField(BaseModel):

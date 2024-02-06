@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from pydantic import BaseModel, Field
 
+from invokeai.app.invocations.baseinvocation import InvocationContext
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.backend.model_manager import (
     AnyModelConfig,
@@ -19,6 +20,7 @@ from invokeai.backend.model_manager import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.model_manager.load import AnyModelLoader
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore
 
 
@@ -110,12 +112,45 @@ class ModelRecordServiceBase(ABC):
         pass
 
     @abstractmethod
-    def load_model(self, key: str, submodel_type: Optional[SubModelType]) -> LoadedModel:
+    def load_model(
+        self,
+        key: str,
+        submodel: Optional[SubModelType] = None,
+        context: Optional[InvocationContext] = None,
+    ) -> LoadedModel:
         """
         Load the indicated model into memory and return a LoadedModel object.
 
         :param key: Key of model config to be fetched.
-        :param submodel_type: For main (pipeline models), the submodel to fetch
+        :param submodel: For main (pipeline models), the submodel to fetch
+        :param context: Invocation context, used for event issuing.
+
+        Exceptions: UnknownModelException -- model with this key not known
+                    NotImplementedException -- a model loader was not provided at initialization time
+        """
+        pass
+
+    @abstractmethod
+    def load_model_by_attr(
+        self,
+        model_name: str,
+        base_model: BaseModelType,
+        model_type: ModelType,
+        submodel: Optional[SubModelType] = None,
+        context: Optional[InvocationContext] = None,
+    ) -> LoadedModel:
+        """
+        Load the indicated model into memory and return a LoadedModel object.
+
+        This is provided for API compatability with the get_model() method
+        in the original model manager. However, note that LoadedModel is
+        not the same as the original ModelInfo that ws returned.
+
+        :param model_name: Key of model config to be fetched.
+        :param base_model: Base model
+        :param model_type: Type of the model
+        :param submodel: For main (pipeline models), the submodel to fetch
+        :param context: The invocation context.
 
         Exceptions: UnknownModelException -- model with this key not known
                     NotImplementedException -- a model loader was not provided at initialization time
@@ -166,7 +201,7 @@ class ModelRecordServiceBase(ABC):
     @abstractmethod
     def exists(self, key: str) -> bool:
         """
-        Return True if a model with the indicated key exists in the databse.
+        Return True if a model with the indicated key exists in the database.
 
         :param key: Unique key for the model to be deleted
         """
@@ -207,6 +242,12 @@ class ModelRecordServiceBase(ABC):
         If none of the optional filters are passed, will return all
         models in the database.
         """
+        pass
+
+    @property
+    @abstractmethod
+    def loader(self) -> Optional[AnyModelLoader]:
+        """Return the model loader used by this instance."""
         pass
 
     def all_models(self) -> List[AnyModelConfig]:

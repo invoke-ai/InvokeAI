@@ -7,6 +7,7 @@ import torch
 
 from invokeai.app.services.invoker import Invoker
 
+from ..compel import ConditioningFieldData
 from .latents_storage_base import LatentsStorageBase
 
 
@@ -27,7 +28,7 @@ class DiskLatentsStorage(LatentsStorageBase):
         latent_path = self.get_path(name)
         return torch.load(latent_path)
 
-    def save(self, name: str, data: torch.Tensor) -> None:
+    def save(self, name: str, data: Union[torch.Tensor, ConditioningFieldData]) -> None:
         self.__output_folder.mkdir(parents=True, exist_ok=True)
         latent_path = self.get_path(name)
         torch.save(data, latent_path)
