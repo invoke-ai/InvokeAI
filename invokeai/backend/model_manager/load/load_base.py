@@ -22,6 +22,7 @@ from invokeai.backend.model_manager import AnyModel, AnyModelConfig, BaseModelTy
 from invokeai.backend.model_manager.config import VaeCheckpointConfig, VaeDiffusersConfig
 from invokeai.backend.model_manager.load.convert_cache.convert_cache_base import ModelConvertCacheBase
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase, ModelLockerBase
+from invokeai.backend.util.logging import InvokeAILogger
 
 
 @dataclass
@@ -88,6 +89,7 @@ class AnyModelLoader:
 
     # this tracks the loader subclasses
     _registry: Dict[str, Type[ModelLoaderBase]] = {}
+    _logger: Logger = InvokeAILogger.get_logger()
 
     def __init__(
         self,
@@ -167,7 +169,7 @@ class AnyModelLoader:
         """Define a decorator which registers the subclass of loader."""
 
         def decorator(subclass: Type[ModelLoaderBase]) -> Type[ModelLoaderBase]:
-            print("DEBUG: Registering class", subclass.__name__)
+            cls._logger.debug(f"Registering class {subclass.__name__} to load models of type {base}/{type}/{format}")
             key = cls._to_registry_key(base, type, format)
             cls._registry[key] = subclass
             return subclass
