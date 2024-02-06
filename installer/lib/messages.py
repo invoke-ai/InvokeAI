@@ -97,22 +97,6 @@ def choose_version(available_releases: tuple | None = None) -> str:
 
     return "stable" if response == "" else response
 
-    return response
-
-def confirm_install(dest: Path) -> bool:
-    if dest.exists():
-        print(f":exclamation: Directory {dest} already exists :exclamation:")
-        dest_confirmed = Confirm.ask(
-            ":stop_sign: (re)install in this location?",
-            default=False,
-        )
-    else:
-        print(f"InvokeAI will be installed in {dest}")
-        dest_confirmed = Confirm.ask("Use this location?", default=True)
-    console.line()
-
-    return dest_confirmed
-
 
 def user_wants_auto_configuration() -> bool:
     """Prompt the user to choose between manual and auto configuration."""
@@ -147,6 +131,22 @@ def user_wants_auto_configuration() -> bool:
     return choice.lower().startswith("a")
 
 
+def confirm_install(dest: Path) -> bool:
+    if dest.exists():
+        print(f":stop_sign: Directory {dest} already exists!")
+        print("   Is this location correct?")
+        default = False
+    else:
+        print(f":file_folder: InvokeAI will be installed in {dest}")
+        default = True
+
+    dest_confirmed = Confirm.ask("   Please confirm:", default=default)
+
+    console.line()
+
+    return dest_confirmed
+
+
 def dest_path(dest=None) -> Path | None:
     """
     Prompt the user for the destination path and create the path
@@ -162,15 +162,10 @@ def dest_path(dest=None) -> Path | None:
     else:
         dest = Path.cwd().expanduser().resolve()
     prev_dest = init_path = dest
-
-    dest_confirmed = confirm_install(dest)
+    dest_confirmed = False
 
     while not dest_confirmed:
-        # if the given destination already exists, the starting point for browsing is its parent directory.
-        # the user may have made a typo, or otherwise wants to place the root dir next to an existing one.
-        # if the destination dir does NOT exist, then the user must have changed their mind about the selection.
-        # since we can't read their mind, start browsing at Path.cwd().
-        browse_start = (prev_dest.parent if prev_dest.exists() else Path.cwd()).expanduser().resolve()
+        browse_start = (dest or Path.cwd()).expanduser().resolve()
 
         path_completer = PathCompleter(
             only_directories=True,
@@ -180,7 +175,8 @@ def dest_path(dest=None) -> Path | None:
         )
 
         console.line()
-        console.print(f"[orange3]Please select the destination directory for the installation:[/] \\[{browse_start}]: ")
+
+        console.print(f":grey_question: [orange3]Please select the install destination:[/] \\[{browse_start}]: ")
         selected = prompt(
             ">>> ",
             complete_in_thread=True,
@@ -193,6 +189,7 @@ def dest_path(dest=None) -> Path | None:
         )
         prev_dest = dest
         dest = Path(selected)
+
         console.line()
 
         dest_confirmed = confirm_install(dest.expanduser().resolve())
