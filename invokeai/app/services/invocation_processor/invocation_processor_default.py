@@ -54,6 +54,17 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                 else None
             )
 
+            def stats_cleanup(graph_execution_state_id: str) -> None:
+                if profiler:
+                    profile_path = profiler.stop()
+                    stats_path = profile_path.with_suffix(".json")
+                    self.__invoker.services.performance_statistics.dump_stats(
+                        graph_execution_state_id=graph_execution_state_id, output_path=stats_path
+                    )
+                with suppress(GESStatsNotFoundError):
+                    self.__invoker.services.performance_statistics.log_stats(graph_execution_state_id)
+                    self.__invoker.services.performance_statistics.reset_stats(graph_execution_state_id)
+
             while not stop_event.is_set():
                 try:
                     queue_item = self.__invoker.services.queue.get()
@@ -156,15 +167,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                     pass
 
                 except CanceledException:
-                    with suppress(GESStatsNotFoundError):
-                        if profiler:
-                            profile_path = profiler.stop()
-                            stats_path = profile_path.with_suffix(".json")
-                            self.__invoker.services.performance_statistics.dump_stats(
-                                graph_execution_state_id=graph_execution_state.id, output_path=stats_path
-                            )
-                        self.__invoker.services.performance_statistics.log_stats(graph_execution_state.id)
-                        self.__invoker.services.performance_statistics.reset_stats(graph_execution_state.id)
+                    stats_cleanup(graph_execution_state.id)
                     pass
 
                 except Exception as e:
@@ -226,15 +229,7 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
                         queue_id=queue_item.session_queue_id,
                         graph_execution_state_id=graph_execution_state.id,
                     )
-                    if profiler:
-                        profile_path = profiler.stop()
-                        stats_path = profile_path.with_suffix(".json")
-                        self.__invoker.services.performance_statistics.dump_stats(
-                            graph_execution_state_id=graph_execution_state.id, output_path=stats_path
-                        )
-                    with suppress(GESStatsNotFoundError):
-                        self.__invoker.services.performance_statistics.log_stats(graph_execution_state.id)
-                        self.__invoker.services.performance_statistics.reset_stats(graph_execution_state.id)
+                    stats_cleanup(graph_execution_state.id)
 
         except KeyboardInterrupt:
             pass  # Log something? KeyboardInterrupt is probably not going to be seen by the processor
