@@ -8,13 +8,13 @@ model will be cleared and (re)loaded from disk when next needed.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from logging import Logger
-from typing import Generic, Optional, TypeVar
+from typing import Dict, Generic, Optional, TypeVar
 
 import torch
 
-from invokeai.backend.model_manager import AnyModel, SubModelType
+from invokeai.backend.model_manager.config import AnyModel, SubModelType
 
 
 class ModelLockerBase(ABC):
@@ -65,6 +65,19 @@ class CacheRecord(Generic[T]):
         return self._locks > 0
 
 
+@dataclass
+class CacheStats(object):
+    """Collect statistics on cache performance."""
+
+    hits: int = 0  # cache hits
+    misses: int = 0  # cache misses
+    high_watermark: int = 0  # amount of cache used
+    in_cache: int = 0  # number of models in cache
+    cleared: int = 0  # number of models cleared to make space
+    cache_size: int = 0  # total size of cache
+    loaded_model_sizes: Dict[str, int] = field(default_factory=dict)
+
+
 class ModelCacheBase(ABC, Generic[T]):
     """Virtual base class for RAM model cache."""
 
@@ -98,8 +111,20 @@ class ModelCacheBase(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    def move_model_to_device(self, cache_entry: CacheRecord, device: torch.device) -> None:
+    def move_model_to_device(self, cache_entry: CacheRecord[AnyModel], device: torch.device) -> None:
         """Move model into the indicated device."""
+        pass
+
+    @property
+    @abstractmethod
+    def stats(self) -> CacheStats:
+        """Return collected CacheStats object."""
+        pass
+
+    @stats.setter
+    @abstractmethod
+    def stats(self, stats: CacheStats) -> None:
+        """Set the CacheStats object for collectin cache statistics."""
         pass
 
     @property

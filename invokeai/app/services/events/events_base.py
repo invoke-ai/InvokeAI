@@ -11,8 +11,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueStatus,
 )
 from invokeai.app.util.misc import get_timestamp
-from invokeai.backend.model_management.model_manager import LoadedModelInfo
-from invokeai.backend.model_management.models.base import BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager import AnyModelConfig
 
 
 class EventServiceBase:
@@ -171,10 +170,7 @@ class EventServiceBase:
         queue_item_id: int,
         queue_batch_id: str,
         graph_execution_state_id: str,
-        model_name: str,
-        base_model: BaseModelType,
-        model_type: ModelType,
-        submodel: SubModelType,
+        model_config: AnyModelConfig,
     ) -> None:
         """Emitted when a model is requested"""
         self.__emit_queue_event(
@@ -184,10 +180,7 @@ class EventServiceBase:
                 "queue_item_id": queue_item_id,
                 "queue_batch_id": queue_batch_id,
                 "graph_execution_state_id": graph_execution_state_id,
-                "model_name": model_name,
-                "base_model": base_model,
-                "model_type": model_type,
-                "submodel": submodel,
+                "model_config": model_config.model_dump(),
             },
         )
 
@@ -197,11 +190,7 @@ class EventServiceBase:
         queue_item_id: int,
         queue_batch_id: str,
         graph_execution_state_id: str,
-        model_name: str,
-        base_model: BaseModelType,
-        model_type: ModelType,
-        submodel: SubModelType,
-        loaded_model_info: LoadedModelInfo,
+        model_config: AnyModelConfig,
     ) -> None:
         """Emitted when a model is correctly loaded (returns model info)"""
         self.__emit_queue_event(
@@ -211,13 +200,7 @@ class EventServiceBase:
                 "queue_item_id": queue_item_id,
                 "queue_batch_id": queue_batch_id,
                 "graph_execution_state_id": graph_execution_state_id,
-                "model_name": model_name,
-                "base_model": base_model,
-                "model_type": model_type,
-                "submodel": submodel,
-                "hash": loaded_model_info.hash,
-                "location": str(loaded_model_info.location),
-                "precision": str(loaded_model_info.precision),
+                "model_config": model_config.model_dump(),
             },
         )
 
