@@ -30,6 +30,7 @@ from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.backend.model_manager import (
     BaseModelType,
     InvalidModelConfigException,
+    ModelRepoVariant,
     ModelType,
 )
 from invokeai.backend.model_manager.metadata import UnknownMetadataException
@@ -233,11 +234,18 @@ class InstallHelper(object):
 
         if model_path.exists():  # local file on disk
             return LocalModelSource(path=model_path.absolute(), inplace=True)
-        if re.match(r"^[^/]+/[^/]+$", model_path_id_or_url):  # hugging face repo_id
+
+        # parsing huggingface repo ids
+        # we're going to do a little trick that allows for extended repo_ids of form "foo/bar:fp16"
+        variants = "|".join([x.lower() for x in ModelRepoVariant.__members__])
+        if match := re.match(f"^([^/]+/[^/]+?)(?::({variants}))?$", model_path_id_or_url):
+            repo_id = match.group(1)
+            repo_variant = ModelRepoVariant(match.group(2)) if match.group(2) else None
             return HFModelSource(
-                repo_id=model_path_id_or_url,
+                repo_id=repo_id,
                 access_token=HfFolder.get_token(),
                 subfolder=model_info.subfolder,
+                variant=repo_variant,
             )
         if re.match(r"^(http|https):", model_path_id_or_url):
             return URLModelSource(url=AnyHttpUrl(model_path_id_or_url))
@@ -278,9 +286,11 @@ class InstallHelper(object):
                 model_name=model_name,
             )
             if len(matches) > 1:
-                print(f"{model} is ambiguous. Please use model_type:model_name (e.g. main:my_model) to disambiguate.")
+                print(
+                    f"{model_to_remove} is ambiguous. Please use model_base/model_type/model_name (e.g. sd-1/main/my_model) to disambiguate."
+                )
             elif not matches:
-                print(f"{model}: unknown model")
+                print(f"{model_to_remove}: unknown model")
             else:
                 for m in matches:
                     print(f"Deleting {m.type}:{m.name}")
