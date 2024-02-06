@@ -129,11 +129,17 @@ class ModelCacheBase(ABC, Generic[T]):
         self,
         key: str,
         submodel_type: Optional[SubModelType] = None,
+        stats_name: Optional[str] = None,
     ) -> ModelLockerBase:
         """
-        Retrieve model locker object using key and optional submodel_type.
+        Retrieve model using key and optional submodel_type.
 
-        This may return an UnknownModelException if the model is not in the cache.
+        :param key: Opaque model key
+        :param submodel_type: Type of the submodel to fetch
+        :param stats_name: A human-readable id for the model for the purposes of
+        stats reporting.
+
+        This may raise an IndexError if the model is not in the cache.
         """
         pass
 

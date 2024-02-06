@@ -19,9 +19,11 @@ from typing import Optional
 
 import requests
 from huggingface_hub import HfApi, configure_http_backend, hf_hub_url
-from huggingface_hub.utils._errors import RepositoryNotFoundError
+from huggingface_hub.utils._errors import RepositoryNotFoundError, RevisionNotFoundError
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
+
+from invokeai.backend.model_manager import ModelRepoVariant
 
 from ..metadata_base import (
     AnyModelRepoMetadata,
@@ -53,12 +55,22 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
         metadata = HuggingFaceMetadata.model_validate_json(json)
         return metadata
 
-    def from_id(self, id: str) -> AnyModelRepoMetadata:
+    def from_id(self, id: str, variant: Optional[ModelRepoVariant] = None) -> AnyModelRepoMetadata:
         """Return a HuggingFaceMetadata object given the model's repo_id."""
-        try:
-            model_info = HfApi().model_info(repo_id=id, files_metadata=True)
-        except RepositoryNotFoundError as excp:
-            raise UnknownMetadataException(f"'{id}' not found. See trace for details.") from excp
+        # Little loop which tries fetching a revision corresponding to the selected variant.
+        # If not available, then set variant to None and get the default.
+        # If this too fails, raise exception.
+        model_info = None
+        while not model_info:
+            try:
+                model_info = HfApi().model_info(repo_id=id, files_metadata=True, revision=variant)
+            except RepositoryNotFoundError as excp:
+                raise UnknownMetadataException(f"'{id}' not found. See trace for details.") from excp
+            except RevisionNotFoundError:
+                if variant is None:
+                    raise
+                else:
+                    variant = None
 
         _, name = id.split("/")
         return HuggingFaceMetadata(
@@ -70,7 +82,7 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
             tags=model_info.tags,
             files=[
                 RemoteModelFile(
-                    url=hf_hub_url(id, x.rfilename),
+                    url=hf_hub_url(id, x.rfilename, revision=variant),
                     path=Path(name, x.rfilename),
                     size=x.size,
                     sha256=x.lfs.get("sha256") if x.lfs else None,

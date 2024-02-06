@@ -32,6 +32,8 @@ import requests
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
 
+from invokeai.backend.model_manager import ModelRepoVariant
+
 from ..metadata_base import (
     AnyModelRepoMetadata,
     CivitaiMetadata,
@@ -82,9 +84,12 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
             return self.from_civitai_versionid(int(version_id))
         raise UnknownMetadataException("The url '{url}' does not match any known Civitai URL patterns")
 
-    def from_id(self, id: str) -> AnyModelRepoMetadata:
+    def from_id(self, id: str, variant: Optional[ModelRepoVariant] = None) -> AnyModelRepoMetadata:
         """
         Given a Civitai model version ID, return a ModelRepoMetadata object.
+
+        :param id: An ID.
+        :param variant: A model variant from the ModelRepoVariant enum (currently ignored)
 
         May raise an `UnknownMetadataException`.
         """
