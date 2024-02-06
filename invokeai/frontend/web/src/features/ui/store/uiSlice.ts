@@ -4,7 +4,7 @@ import type { PersistConfig, RootState } from 'app/store/store';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 
 import type { InvokeTabName } from './tabMap';
-import type { UIState } from './uiTypes';
+import type { UIState, ViewerMode } from './uiTypes';
 
 export const initialUIState: UIState = {
   _version: 1,
@@ -14,6 +14,7 @@ export const initialUIState: UIState = {
   panels: {},
   accordions: {},
   expanders: {},
+  viewerMode: 'image',
 };
 
 export const uiSlice = createSlice({
@@ -40,6 +41,9 @@ export const uiSlice = createSlice({
       const { id, isOpen } = action.payload;
       state.expanders[id] = isOpen;
     },
+    viewerModeChanged: (state, action: PayloadAction<ViewerMode>) => {
+      state.viewerMode = action.payload;
+    },
   },
   extraReducers(builder) {
     builder.addCase(initialImageChanged, (state) => {
@@ -55,6 +59,7 @@ export const {
   panelsChanged,
   accordionStateChanged,
   expanderStateChanged,
+  viewerModeChanged,
 } = uiSlice.actions;
 
 export const selectUiSlice = (state: RootState) => state.ui;

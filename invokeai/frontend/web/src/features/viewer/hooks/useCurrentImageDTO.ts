@@ -10,7 +10,7 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 export const useCurrentImageDTO = () => {
   const latestImageName = useAppSelector(selectLatestImageName);
   const lastSelectedImage = useAppSelector(selectLastSelectedImage);
-  const viewerMode = useAppSelector((s) => s.viewer.viewerMode);
+  const viewerMode = useAppSelector((s) => s.ui.viewerMode);
   const { currentData: imageDTO } = useGetImageDTOQuery(
     (viewerMode === 'progress' ? latestImageName : lastSelectedImage?.image_name) ?? skipToken
   );

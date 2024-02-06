@@ -29,4 +29,10 @@ export interface UIState {
    * The state of expanders. The key is the id of the expander, and the value is a boolean representing the open state.
    */
   expanders: Record<string, boolean>;
+  /**
+   * The currently-selected viewer mode.
+   */
+  viewerMode: ViewerMode;
 }
+
+export type ViewerMode = 'image' | 'info' | 'progress';

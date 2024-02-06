@@ -8,7 +8,7 @@ import { ViewerToolbar } from 'features/viewer/components/ViewerToolbar';
 import { memo } from 'react';
 
 export const Viewer = memo(() => {
-  const viewerMode = useAppSelector((s) => s.viewer.viewerMode);
+  const viewerMode = useAppSelector((s) => s.ui.viewerMode);
 
   return (
     <Flex position="relative" flexDirection="column" height="full" width="full" gap={4}>

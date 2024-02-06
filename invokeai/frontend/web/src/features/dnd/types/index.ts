@@ -12,7 +12,7 @@ import type {
 } from '@dnd-kit/core';
 import type { BoardId } from 'features/gallery/store/types';
 import type { FieldInputInstance, FieldInputTemplate } from 'features/nodes/types/field';
-import type { ViewerMode } from 'features/viewer/store/viewerSlice';
+import type { ViewerMode } from 'features/ui/store/uiTypes';
 import type { ImageDTO } from 'services/api/types';
 
 type BaseDropData = {

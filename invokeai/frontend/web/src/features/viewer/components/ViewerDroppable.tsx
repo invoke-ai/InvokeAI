@@ -14,7 +14,7 @@ const selectLastSelectedImageName = createSelector(
 export const ViewerDroppable = memo(() => {
   const { t } = useTranslation();
   const currentImageName = useAppSelector(selectLastSelectedImageName);
-  const viewerMode = useAppSelector((s) => s.viewer.viewerMode);
+  const viewerMode = useAppSelector((s) => s.ui.viewerMode);
   const viewerDropData = useMemo<ViewerImageDropData>(
     () => ({
       id: 'viewer-image',

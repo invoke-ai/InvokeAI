@@ -2,7 +2,7 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { ButtonGroup, IconButton, spinAnimation } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useIsProcessing } from 'features/queue/hooks/useIsProcessing';
-import { viewerModeChanged } from 'features/viewer/store/viewerSlice';
+import { viewerModeChanged } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +15,7 @@ const loadingStyles: SystemStyleObject = {
 export const ViewerToolbarModeButtons = memo(() => {
   const dispatch = useAppDispatch();
   const isProcessing = useIsProcessing();
-  const viewerMode = useAppSelector((s) => s.viewer.viewerMode);
+  const viewerMode = useAppSelector((s) => s.ui.viewerMode);
   const { t } = useTranslation();
 
   const handleSelectViewerImage = useCallback(() => {
