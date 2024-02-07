@@ -223,8 +223,8 @@ class TensorsInterface(InvocationContextInterface):
         :param tensor: The tensor to save.
         """
 
-        tensor_id = self._services.tensors.save(obj=tensor)
-        return tensor_id
+        name = self._services.tensors.save(obj=tensor)
+        return name
 
     def load(self, name: str) -> Tensor:
         """
@@ -243,8 +243,8 @@ class ConditioningInterface(InvocationContextInterface):
         :param conditioning_context_data: The conditioning data to save.
         """
 
-        conditioning_id = self._services.conditioning.save(obj=conditioning_data)
-        return conditioning_id
+        name = self._services.conditioning.save(obj=conditioning_data)
+        return name
 
     def load(self, name: str) -> ConditioningFieldData:
         """
