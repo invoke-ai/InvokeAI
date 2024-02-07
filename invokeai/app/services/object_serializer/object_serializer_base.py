@@ -8,7 +8,6 @@ class ObjectSerializerBase(ABC, Generic[T]):
     """Saves and loads arbitrary python objects."""
 
     def __init__(self) -> None:
-        self._on_saved_callbacks: list[Callable[[str, T], None]] = []
         self._on_deleted_callbacks: list[Callable[[str], None]] = []
 
     @abstractmethod
@@ -36,17 +35,9 @@ class ObjectSerializerBase(ABC, Generic[T]):
         """
         pass
 
-    def on_saved(self, on_saved: Callable[[str, T], None]) -> None:
-        """Register a callback for when an object is saved"""
-        self._on_saved_callbacks.append(on_saved)
-
     def on_deleted(self, on_deleted: Callable[[str], None]) -> None:
         """Register a callback for when an object is deleted"""
         self._on_deleted_callbacks.append(on_deleted)
-
-    def _on_saved(self, name: str, obj: T) -> None:
-        for callback in self._on_saved_callbacks:
-            callback(name, obj)
 
     def _on_deleted(self, name: str) -> None:
         for callback in self._on_deleted_callbacks:
