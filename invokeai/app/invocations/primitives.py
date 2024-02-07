@@ -16,6 +16,7 @@ from invokeai.app.invocations.fields import (
     OutputField,
     UIComponent,
 )
+from invokeai.app.invocations.latent import LATENT_SCALE_FACTOR
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.shared.invocation_context import InvocationContext
 
@@ -321,8 +322,8 @@ class LatentsOutput(BaseInvocationOutput):
     def build(cls, latents_name: str, latents: torch.Tensor, seed: Optional[int] = None) -> "LatentsOutput":
         return cls(
             latents=LatentsField(latents_name=latents_name, seed=seed),
-            width=latents.size()[3] * 8,
-            height=latents.size()[2] * 8,
+            width=latents.size()[3] * LATENT_SCALE_FACTOR,
+            height=latents.size()[2] * LATENT_SCALE_FACTOR,
         )
 
 
