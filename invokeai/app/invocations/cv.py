@@ -10,11 +10,11 @@ from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 
 from .baseinvocation import BaseInvocation, invocation
-from .fields import InputField, WithMetadata
+from .fields import InputField, WithBoard, WithMetadata
 
 
 @invocation("cv_inpaint", title="OpenCV Inpaint", tags=["opencv", "inpaint"], category="inpaint", version="1.2.1")
-class CvInpaintInvocation(BaseInvocation, WithMetadata):
+class CvInpaintInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Simple inpaint using opencv."""
 
     image: ImageField = InputField(description="The image to inpaint")

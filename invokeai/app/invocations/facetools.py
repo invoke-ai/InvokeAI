@@ -16,7 +16,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import ImageField, InputField, OutputField, WithMetadata
+from invokeai.app.invocations.fields import ImageField, InputField, OutputField, WithBoard, WithMetadata
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -619,7 +619,7 @@ class FaceMaskInvocation(BaseInvocation, WithMetadata):
 @invocation(
     "face_identifier", title="FaceIdentifier", tags=["image", "face", "identifier"], category="image", version="1.2.1"
 )
-class FaceIdentifierInvocation(BaseInvocation, WithMetadata):
+class FaceIdentifierInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Outputs an image with detected face IDs printed on each face. For use with other FaceTools."""
 
     image: ImageField = InputField(description="Image to face detect")

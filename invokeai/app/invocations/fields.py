@@ -280,6 +280,22 @@ class WithWorkflow:
         super().__init_subclass__()
 
 
+class WithBoard(BaseModel):
+    """
+    Inherit from this class if your node needs a board input field.
+    """
+
+    board: Optional["BoardField"] = Field(
+        default=None,
+        description=FieldDescriptions.board,
+        json_schema_extra=InputFieldJSONSchemaExtra(
+            field_kind=FieldKind.Internal,
+            input=Input.Direct,
+            orig_required=False,
+        ).model_dump(exclude_none=True),
+    )
+
+
 class OutputFieldJSONSchemaExtra(BaseModel):
     """
     Extra attributes to be added to input fields and their OpenAPI schema. Used by the workflow editor

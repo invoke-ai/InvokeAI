@@ -33,6 +33,7 @@ from invokeai.app.invocations.fields import (
     LatentsField,
     OutputField,
     UIType,
+    WithBoard,
     WithMetadata,
 )
 from invokeai.app.invocations.ip_adapter import IPAdapterField
@@ -762,7 +763,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     category="latents",
     version="1.2.1",
 )
-class LatentsToImageInvocation(BaseInvocation, WithMetadata):
+class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generates an image from latents."""
 
     latents: LatentsField = InputField(
