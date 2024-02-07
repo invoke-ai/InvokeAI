@@ -25,17 +25,17 @@ class PickleStorageTorch(PickleStorageBase[T]):
         self._delete_all_items()
 
     def get(self, name: str) -> T:
-        latent_path = self._get_path(name)
-        return torch.load(latent_path)
+        file_path = self._get_path(name)
+        return torch.load(file_path)
 
     def save(self, name: str, data: T) -> None:
         self._output_folder.mkdir(parents=True, exist_ok=True)
-        latent_path = self._get_path(name)
-        torch.save(data, latent_path)
+        file_path = self._get_path(name)
+        torch.save(data, file_path)
 
     def delete(self, name: str) -> None:
-        latent_path = self._get_path(name)
-        latent_path.unlink()
+        file_path = self._get_path(name)
+        file_path.unlink()
 
     def _get_path(self, name: str) -> Path:
         return self._output_folder / name
