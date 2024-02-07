@@ -17,10 +17,12 @@ import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import type { InvokeTabName } from 'features/ui/store/tabMap';
 import { activeTabIndexSelector, activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { setActiveTab } from 'features/ui/store/uiSlice';
+import WorkflowPanel from 'features/workflow/WorkflowPanel';
 import type { CSSProperties, MouseEvent, ReactElement, ReactNode } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
+import { MdOutlineDynamicForm } from 'react-icons/md';
 import { PiFlowArrowBold } from 'react-icons/pi';
 import { RiBox2Line, RiBrushLine, RiImage2Line, RiInputMethodLine, RiPlayList2Fill } from 'react-icons/ri';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
@@ -34,12 +36,14 @@ import QueueTab from './tabs/QueueTab';
 import ResizeHandle from './tabs/ResizeHandle';
 import TextToImageTab from './tabs/TextToImageTab';
 import UnifiedCanvasTab from './tabs/UnifiedCanvasTab';
+import WorkflowTab from './tabs/WorkflowTab';
 
 export interface InvokeTabInfo {
   id: InvokeTabName;
   translationKey: string;
   icon: ReactElement;
   content: ReactNode;
+  optionsPanel?: ReactNode;
 }
 
 const tabs: InvokeTabInfo[] = [
@@ -48,24 +52,35 @@ const tabs: InvokeTabInfo[] = [
     translationKey: 'common.txt2img',
     icon: <RiInputMethodLine />,
     content: <TextToImageTab />,
+    optionsPanel: <ParametersPanel />,
   },
   {
     id: 'img2img',
     translationKey: 'common.img2img',
     icon: <RiImage2Line />,
     content: <ImageTab />,
+    optionsPanel: <ParametersPanel />,
   },
   {
     id: 'unifiedCanvas',
     translationKey: 'common.unifiedCanvas',
     icon: <RiBrushLine />,
     content: <UnifiedCanvasTab />,
+    optionsPanel: <ParametersPanel />,
+  },
+  {
+    id: 'workflow',
+    translationKey: 'common.workflow',
+    icon: <MdOutlineDynamicForm />,
+    content: <WorkflowTab />,
+    optionsPanel: <WorkflowPanel />,
   },
   {
     id: 'nodes',
     translationKey: 'common.nodes',
     icon: <PiFlowArrowBold />,
     content: <NodesTab />,
+    optionsPanel: <NodeEditorPanelGroup />,
   },
   {
     id: 'modelManager',
@@ -86,7 +101,6 @@ const enabledTabsSelector = createMemoizedSelector(selectConfigSlice, (config) =
 );
 
 export const NO_GALLERY_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
-export const NO_OPTIONS_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
 const panelStyles: CSSProperties = { height: '100%', width: '100%' };
 const GALLERY_MIN_SIZE_PX = 310;
 const GALLERY_MIN_SIZE_PCT = 20;
@@ -108,7 +122,6 @@ const InvokeTabs = () => {
       e.target.blur();
     }
   }, []);
-  const shouldShowOptionsPanel = useMemo(() => !NO_OPTIONS_PANEL_TABS.includes(activeTabName), [activeTabName]);
   const shouldShowGalleryPanel = useMemo(() => !NO_GALLERY_PANEL_TABS.includes(activeTabName), [activeTabName]);
 
   const tabs = useMemo(
@@ -131,6 +144,10 @@ const InvokeTabs = () => {
       )),
     [enabledTabs, t, handleClickTab, activeTabName]
   );
+
+  const activeTabData = useMemo(() => {
+    return enabledTabs.find((tab) => tab.id === activeTabName);
+  }, [enabledTabs, activeTabName]);
 
   const tabPanels = useMemo(
     () => enabledTabs.map((tab) => <TabPanel key={tab.id}>{tab.content}</TabPanel>),
@@ -237,7 +254,7 @@ const InvokeTabs = () => {
         style={panelStyles}
         storage={panelStorage}
       >
-        {shouldShowOptionsPanel && (
+        {!!activeTabData?.optionsPanel && (
           <>
             <Panel
               id="options-panel"
@@ -249,7 +266,7 @@ const InvokeTabs = () => {
               onExpand={optionsPanel.onExpand}
               collapsible
             >
-              {activeTabName === 'nodes' ? <NodeEditorPanelGroup /> : <ParametersPanel />}
+              {activeTabData?.optionsPanel}
             </Panel>
             <ResizeHandle
               id="options-main-handle"
@@ -285,7 +302,7 @@ const InvokeTabs = () => {
           </>
         )}
       </PanelGroup>
-      {shouldShowOptionsPanel && <FloatingParametersPanelButtons panelApi={optionsPanel} />}
+      {!!activeTabData?.optionsPanel && <FloatingParametersPanelButtons panelApi={optionsPanel} />}
       {shouldShowGalleryPanel && <FloatingGalleryButton panelApi={galleryPanel} />}
     </Tabs>
   );
