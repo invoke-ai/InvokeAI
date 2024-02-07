@@ -63,7 +63,6 @@ def mock_services() -> InvocationServices:
         image_records=None,  # type: ignore
         images=None,  # type: ignore
         invocation_cache=MemoryInvocationCache(max_cache_size=0),
-        latents=None,  # type: ignore
         logger=logging,  # type: ignore
         model_manager=None,  # type: ignore
         model_records=None,  # type: ignore
@@ -77,6 +76,8 @@ def mock_services() -> InvocationServices:
         session_queue=None,  # type: ignore
         urls=None,  # type: ignore
         workflow_records=None,  # type: ignore
+        tensors=None,
+        conditioning=None,
     )
 
 
