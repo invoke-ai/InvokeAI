@@ -36,33 +36,6 @@ if TYPE_CHECKING:
 class InvocationServices:
     """Services that can be used by invocations"""
 
-    # TODO: Just forward-declared everything due to circular dependencies. Fix structure.
-    board_images: "BoardImagesServiceABC"
-    board_image_record_storage: "BoardImageRecordStorageBase"
-    boards: "BoardServiceABC"
-    board_records: "BoardRecordStorageBase"
-    configuration: "InvokeAIAppConfig"
-    events: "EventServiceBase"
-    graph_execution_manager: "ItemStorageABC[GraphExecutionState]"
-    images: "ImageServiceABC"
-    image_records: "ImageRecordStorageBase"
-    image_files: "ImageFileStorageBase"
-    latents: "LatentsStorageBase"
-    logger: "Logger"
-    model_manager: "ModelManagerServiceBase"
-    model_records: "ModelRecordServiceBase"
-    download_queue: "DownloadQueueServiceBase"
-    model_install: "ModelInstallServiceBase"
-    processor: "InvocationProcessorABC"
-    performance_statistics: "InvocationStatsServiceBase"
-    queue: "InvocationQueueABC"
-    session_queue: "SessionQueueBase"
-    session_processor: "SessionProcessorBase"
-    invocation_cache: "InvocationCacheBase"
-    names: "NameServiceBase"
-    urls: "UrlServiceBase"
-    workflow_records: "WorkflowRecordsStorageBase"
-
     def __init__(
         self,
         board_images: "BoardImagesServiceABC",
