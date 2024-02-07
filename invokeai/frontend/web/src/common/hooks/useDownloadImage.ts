@@ -1,4 +1,6 @@
 import { useAppToaster } from 'app/components/Toaster';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { imageDownloaded } from 'features/gallery/store/actions';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -8,6 +10,7 @@ export const useDownloadImage = () => {
   const toaster = useAppToaster();
   const { t } = useTranslation();
   const imageUrlToBlob = useImageUrlToBlob();
+  const dispatch = useAppDispatch();
 
   const downloadImage = useCallback(
     async (image_url: string, image_name: string) => {
@@ -26,6 +29,7 @@ export const useDownloadImage = () => {
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
+        dispatch(imageDownloaded());
       } catch (err) {
         toaster({
           title: t('toast.problemDownloadingImage'),
@@ -36,7 +40,7 @@ export const useDownloadImage = () => {
         });
       }
     },
-    [t, toaster, imageUrlToBlob]
+    [t, toaster, imageUrlToBlob, dispatch]
   );
 
   return { downloadImage };
