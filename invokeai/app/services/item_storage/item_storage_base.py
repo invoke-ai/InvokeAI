@@ -1,9 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Generic, TypeVar
 
-from pydantic import BaseModel
-
-T = TypeVar("T", bound=BaseModel)
+T = TypeVar("T")
 
 
 class ItemStorageABC(ABC, Generic[T]):
