@@ -442,7 +442,7 @@ class InvocationContext:
         config: ConfigInterface,
         util: UtilInterface,
         boards: BoardsInterface,
-        data: InvocationContextData,
+        context_data: InvocationContextData,
         services: InvocationServices,
     ) -> None:
         self.images = images
@@ -461,8 +461,8 @@ class InvocationContext:
         """Provides utility methods."""
         self.boards = boards
         """Provides methods to interact with boards."""
-        self.data = data
-        """Provides data about the current queue item and invocation."""
+        self._data = context_data
+        """Provides data about the current queue item and invocation. This is an internal API and may change without warning."""
         self._services = services
         """Provides access to the full application services. This is an internal API and may change without warning."""
 
@@ -481,77 +481,77 @@ class InvocationContext:
     @property
     @deprecated(
         version=deprecation_version,
-        reason=get_deprecation_reason("`context.graph_execution_state_api`", "`context.data.session_id`"),
+        reason=get_deprecation_reason("`context.graph_execution_state_id", "`context._data.session_id`"),
     )
     def graph_execution_state_id(self) -> str:
         """
         **DEPRECATED as of v3.7.0**
 
-        `context.graph_execution_state_api` will be removed in v3.8.0. Use `context.data.session_id` instead. See PLACEHOLDER_URL for details.
+        `context.graph_execution_state_api` will be removed in v3.8.0. Use `context._data.session_id` instead. See PLACEHOLDER_URL for details.
 
         The ID of the session (aka graph execution state).
         """
-        return self.data.session_id
+        return self._data.session_id
 
     @property
     @deprecated(
         version=deprecation_version,
-        reason=get_deprecation_reason("`context.queue_id`", "`context.data.queue_id`"),
+        reason=get_deprecation_reason("`context.queue_id`", "`context._data.queue_id`"),
     )
     def queue_id(self) -> str:
         """
         **DEPRECATED as of v3.7.0**
 
-        `context.queue_id` will be removed in v3.8.0. Use `context.data.queue_id` instead. See PLACEHOLDER_URL for details.
+        `context.queue_id` will be removed in v3.8.0. Use `context._data.queue_id` instead. See PLACEHOLDER_URL for details.
 
         The ID of the queue.
         """
-        return self.data.queue_id
+        return self._data.queue_id
 
     @property
     @deprecated(
         version=deprecation_version,
-        reason=get_deprecation_reason("`context.queue_item_id`", "`context.data.queue_item_id`"),
+        reason=get_deprecation_reason("`context.queue_item_id`", "`context._data.queue_item_id`"),
     )
     def queue_item_id(self) -> int:
         """
         **DEPRECATED as of v3.7.0**
 
-        `context.queue_item_id` will be removed in v3.8.0. Use `context.data.queue_item_id` instead. See PLACEHOLDER_URL for details.
+        `context.queue_item_id` will be removed in v3.8.0. Use `context._data.queue_item_id` instead. See PLACEHOLDER_URL for details.
 
         The ID of the queue item.
         """
-        return self.data.queue_item_id
+        return self._data.queue_item_id
 
     @property
     @deprecated(
         version=deprecation_version,
-        reason=get_deprecation_reason("`context.queue_batch_id`", "`context.data.batch_id`"),
+        reason=get_deprecation_reason("`context.queue_batch_id`", "`context._data.batch_id`"),
     )
     def queue_batch_id(self) -> str:
         """
         **DEPRECATED as of v3.7.0**
 
-        `context.queue_batch_id` will be removed in v3.8.0. Use `context.data.batch_id` instead. See PLACEHOLDER_URL for details.
+        `context.queue_batch_id` will be removed in v3.8.0. Use `context._data.batch_id` instead. See PLACEHOLDER_URL for details.
 
         The ID of the batch.
         """
-        return self.data.batch_id
+        return self._data.batch_id
 
     @property
     @deprecated(
         version=deprecation_version,
-        reason=get_deprecation_reason("`context.workflow`", "`context.data.workflow`"),
+        reason=get_deprecation_reason("`context.workflow`", "`context._data.workflow`"),
     )
     def workflow(self) -> Optional[WorkflowWithoutID]:
         """
         **DEPRECATED as of v3.7.0**
 
-        `context.workflow` will be removed in v3.8.0. Use `context.data.workflow` instead. See PLACEHOLDER_URL for details.
+        `context.workflow` will be removed in v3.8.0. Use `context._data.workflow` instead. See PLACEHOLDER_URL for details.
 
         The workflow associated with this queue item, if any.
         """
-        return self.data.workflow
+        return self._data.workflow
 
 
 def build_invocation_context(
@@ -580,7 +580,7 @@ def build_invocation_context(
         config=config,
         latents=latents,
         models=models,
-        data=context_data,
+        context_data=context_data,
         util=util,
         conditioning=conditioning,
         services=services,
