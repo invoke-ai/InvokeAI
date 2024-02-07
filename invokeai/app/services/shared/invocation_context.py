@@ -357,19 +357,24 @@ class ModelsInterface(InvocationContextInterface):
 
 
 class ConfigInterface(InvocationContextInterface):
+    def __init__(self, services: InvocationServices, context_data: InvocationContextData) -> None:
+        super().__init__(services, context_data)
+        # Config cache, only populated at runtime if requested
+        self._frozen_config: Optional[InvokeAIAppConfig] = None
+
     def get(self) -> InvokeAIAppConfig:
         """
         Gets the app's config. The config is read-only; attempts to mutate it will raise an error.
         """
 
-        # The config can be changed at runtime.
-        #
-        # We don't want nodes doing this, so we make a frozen copy.
+        if self._frozen_config is None:
+            # The config is a live pydantic model and can be changed at runtime.
+            # We don't want nodes doing this, so we make a frozen copy.
+            self._frozen_config = self._services.configuration.get_config().model_copy(
+                update={"model_config": ConfigDict(frozen=True)}
+            )
 
-        config = self._services.configuration.get_config()
-        # TODO(psyche): If config cannot be changed at runtime, should we cache this?
-        frozen_config = config.model_copy(update={"model_config": ConfigDict(frozen=True)})
-        return frozen_config
+        return self._frozen_config
 
 
 class UtilInterface(InvocationContextInterface):
