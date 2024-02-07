@@ -37,7 +37,8 @@ class MemoryInvocationCache(InvocationCacheBase):
         if self._max_cache_size == 0:
             return
         self._invoker.services.images.on_deleted(self._delete_by_match)
-        self._invoker.services.latents.on_deleted(self._delete_by_match)
+        self._invoker.services.tensors.on_deleted(self._delete_by_match)
+        self._invoker.services.conditioning.on_deleted(self._delete_by_match)
 
     def get(self, key: Union[int, str]) -> Optional[BaseInvocationOutput]:
         with self._lock:

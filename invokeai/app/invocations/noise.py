@@ -121,5 +121,5 @@ class NoiseInvocation(BaseInvocation):
             seed=self.seed,
             use_cpu=self.use_cpu,
         )
-        name = context.latents.save(tensor=noise)
+        name = context.tensors.save(tensor=noise)
         return NoiseOutput.build(latents_name=name, latents=noise, seed=self.seed)
