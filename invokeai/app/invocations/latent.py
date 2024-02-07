@@ -304,11 +304,11 @@ class DenoiseLatentsInvocation(BaseInvocation):
         unet,
         seed,
     ) -> ConditioningData:
-        positive_cond_data = context.conditioning.get(self.positive_conditioning.conditioning_name)
+        positive_cond_data = context.conditioning.load(self.positive_conditioning.conditioning_name)
         c = positive_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
         extra_conditioning_info = c.extra_conditioning
 
-        negative_cond_data = context.conditioning.get(self.negative_conditioning.conditioning_name)
+        negative_cond_data = context.conditioning.load(self.negative_conditioning.conditioning_name)
         uc = negative_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
 
         conditioning_data = ConditioningData(
@@ -621,10 +621,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
         if self.denoise_mask is None:
             return None, None
 
-        mask = context.tensors.get(self.denoise_mask.mask_name)
+        mask = context.tensors.load(self.denoise_mask.mask_name)
         mask = tv_resize(mask, latents.shape[-2:], T.InterpolationMode.BILINEAR, antialias=False)
         if self.denoise_mask.masked_latents_name is not None:
-            masked_latents = context.tensors.get(self.denoise_mask.masked_latents_name)
+            masked_latents = context.tensors.load(self.denoise_mask.masked_latents_name)
         else:
             masked_latents = None
 
@@ -636,11 +636,11 @@ class DenoiseLatentsInvocation(BaseInvocation):
             seed = None
             noise = None
             if self.noise is not None:
-                noise = context.tensors.get(self.noise.latents_name)
+                noise = context.tensors.load(self.noise.latents_name)
                 seed = self.noise.seed
 
             if self.latents is not None:
-                latents = context.tensors.get(self.latents.latents_name)
+                latents = context.tensors.load(self.latents.latents_name)
                 if seed is None:
                     seed = self.latents.seed
 
@@ -779,7 +779,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        latents = context.tensors.get(self.latents.latents_name)
+        latents = context.tensors.load(self.latents.latents_name)
 
         vae_info = context.models.load(**self.vae.vae.model_dump())
 
@@ -870,7 +870,7 @@ class ResizeLatentsInvocation(BaseInvocation):
     antialias: bool = InputField(default=False, description=FieldDescriptions.torch_antialias)
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        latents = context.tensors.get(self.latents.latents_name)
+        latents = context.tensors.load(self.latents.latents_name)
 
         # TODO:
         device = choose_torch_device()
@@ -911,7 +911,7 @@ class ScaleLatentsInvocation(BaseInvocation):
     antialias: bool = InputField(default=False, description=FieldDescriptions.torch_antialias)
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        latents = context.tensors.get(self.latents.latents_name)
+        latents = context.tensors.load(self.latents.latents_name)
 
         # TODO:
         device = choose_torch_device()
@@ -1048,8 +1048,8 @@ class BlendLatentsInvocation(BaseInvocation):
     alpha: float = InputField(default=0.5, description=FieldDescriptions.blend_alpha)
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        latents_a = context.tensors.get(self.latents_a.latents_name)
-        latents_b = context.tensors.get(self.latents_b.latents_name)
+        latents_a = context.tensors.load(self.latents_a.latents_name)
+        latents_b = context.tensors.load(self.latents_b.latents_name)
 
         if latents_a.shape != latents_b.shape:
             raise Exception("Latents to blend must be the same size.")
@@ -1149,7 +1149,7 @@ class CropLatentsCoreInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        latents = context.tensors.get(self.latents.latents_name)
+        latents = context.tensors.load(self.latents.latents_name)
 
         x1 = self.x // LATENT_SCALE_FACTOR
         y1 = self.y // LATENT_SCALE_FACTOR
