@@ -463,7 +463,8 @@ class InvocationContext:
         """Provides methods to interact with boards."""
         self.data = data
         """Provides data about the current queue item and invocation."""
-        self.__services = services
+        self._services = services
+        """Provides access to the full application services. This is an internal API and may change without warning."""
 
     @property
     @deprecated(version=deprecation_version, reason=get_deprecation_reason("`context.services`"))
@@ -475,7 +476,7 @@ class InvocationContext:
 
         The invocation services.
         """
-        return self.__services
+        return self._services
 
     @property
     @deprecated(
