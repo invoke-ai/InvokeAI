@@ -11,7 +11,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import ImageField, Input, InputField, OutputField, WithMetadata
+from invokeai.app.invocations.fields import ImageField, Input, InputField, OutputField, WithBoard, WithMetadata
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.tiles.tiles import (
@@ -232,7 +232,7 @@ BLEND_MODES = Literal["Linear", "Seam"]
     version="1.1.0",
     classification=Classification.Beta,
 )
-class MergeTilesToImageInvocation(BaseInvocation, WithMetadata):
+class MergeTilesToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Merge multiple tile images into a single image."""
 
     # Inputs

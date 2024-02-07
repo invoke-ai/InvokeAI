@@ -15,7 +15,7 @@ from invokeai.backend.image_util.lama import LaMA
 from invokeai.backend.image_util.patchmatch import PatchMatch
 
 from .baseinvocation import BaseInvocation, invocation
-from .fields import InputField, WithMetadata
+from .fields import InputField, WithBoard, WithMetadata
 from .image import PIL_RESAMPLING_MAP, PIL_RESAMPLING_MODES
 
 
@@ -121,7 +121,7 @@ def tile_fill_missing(im: Image.Image, tile_size: int = 16, seed: Optional[int] 
 
 
 @invocation("infill_rgba", title="Solid Color Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.1")
-class InfillColorInvocation(BaseInvocation, WithMetadata):
+class InfillColorInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Infills transparent areas of an image with a solid color"""
 
     image: ImageField = InputField(description="The image to infill")
@@ -144,7 +144,7 @@ class InfillColorInvocation(BaseInvocation, WithMetadata):
 
 
 @invocation("infill_tile", title="Tile Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.2")
-class InfillTileInvocation(BaseInvocation, WithMetadata):
+class InfillTileInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Infills transparent areas of an image with tiles of the image"""
 
     image: ImageField = InputField(description="The image to infill")
@@ -170,7 +170,7 @@ class InfillTileInvocation(BaseInvocation, WithMetadata):
 @invocation(
     "infill_patchmatch", title="PatchMatch Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.1"
 )
-class InfillPatchMatchInvocation(BaseInvocation, WithMetadata):
+class InfillPatchMatchInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Infills transparent areas of an image using the PatchMatch algorithm"""
 
     image: ImageField = InputField(description="The image to infill")
@@ -209,7 +209,7 @@ class InfillPatchMatchInvocation(BaseInvocation, WithMetadata):
 
 
 @invocation("infill_lama", title="LaMa Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.1")
-class LaMaInfillInvocation(BaseInvocation, WithMetadata):
+class LaMaInfillInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Infills transparent areas of an image using the LaMa model"""
 
     image: ImageField = InputField(description="The image to infill")
@@ -225,7 +225,7 @@ class LaMaInfillInvocation(BaseInvocation, WithMetadata):
 
 
 @invocation("infill_cv2", title="CV2 Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.1")
-class CV2InfillInvocation(BaseInvocation, WithMetadata):
+class CV2InfillInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Infills transparent areas of an image using OpenCV Inpainting"""
 
     image: ImageField = InputField(description="The image to infill")

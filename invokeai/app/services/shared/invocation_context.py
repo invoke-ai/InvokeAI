@@ -5,10 +5,10 @@ from deprecated import deprecated
 from PIL.Image import Image
 from torch import Tensor
 
-from invokeai.app.invocations.fields import MetadataField, WithMetadata
+from invokeai.app.invocations.fields import MetadataField, WithBoard, WithMetadata
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordChanges, ResourceOrigin
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
@@ -158,7 +158,9 @@ class ImagesInterface(InvocationContextInterface):
         If the current queue item has a workflow or metadata, it is automatically saved with the image.
 
         :param image: The image to save, as a PIL image.
-        :param board_id: The board ID to add the image to, if it should be added.
+        :param board_id: The board ID to add the image to, if it should be added. It the invocation \
+            inherits from `WithBoard`, that board will be used automatically. **Use this only if \
+            you want to override or provide a board manually!**
         :param image_category: The category of the image. Only the GENERAL category is added \
             to the gallery.
         :param metadata: The metadata to save with the image, if it should have any. If the \
@@ -173,11 +175,15 @@ class ImagesInterface(InvocationContextInterface):
             else metadata
         )
 
+        # If the invocation inherits WithBoard, use that. Else, use the board_id passed in.
+        board_ = self._context_data.invocation.board if isinstance(self._context_data.invocation, WithBoard) else None
+        board_id_ = board_.board_id if board_ is not None else board_id
+
         return self._services.images.create(
             image=image,
             is_intermediate=self._context_data.invocation.is_intermediate,
             image_category=image_category,
-            board_id=board_id,
+            board_id=board_id_,
             metadata=metadata_,
             image_origin=ResourceOrigin.INTERNAL,
             workflow=self._context_data.workflow,
@@ -207,32 +213,6 @@ class ImagesInterface(InvocationContextInterface):
 
         :param image_name: The name of the image to get.
         """
-        return self._services.images.get_dto(image_name)
-
-    def update(
-        self,
-        image_name: str,
-        board_id: Optional[str] = None,
-        is_intermediate: Optional[bool] = False,
-    ) -> ImageDTO:
-        """
-        Updates an image, returning its updated DTO.
-
-        It is not suggested to update images saved by earlier nodes, as this can cause confusion for users.
-
-        If you use this method, you *must* return the image as an :class:`ImageOutput` for the gallery to
-        get the updated image.
-
-        :param image_name: The name of the image to update.
-        :param board_id: The board ID to add the image to, if it should be added.
-        :param is_intermediate: Whether the image is an intermediate. Intermediate images aren't added to the gallery.
-        """
-        if is_intermediate is not None:
-            self._services.images.update(image_name, ImageRecordChanges(is_intermediate=is_intermediate))
-        if board_id is None:
-            self._services.board_images.remove_image_from_board(image_name)
-        else:
-            self._services.board_images.add_image_to_board(image_name, board_id)
         return self._services.images.get_dto(image_name)
 
 
