@@ -132,7 +132,6 @@ export type DivideInvocation = s['DivideInvocation'];
 export type ImageNSFWBlurInvocation = s['ImageNSFWBlurInvocation'];
 export type ImageWatermarkInvocation = s['ImageWatermarkInvocation'];
 export type SeamlessModeInvocation = s['SeamlessModeInvocation'];
-export type LinearUIOutputInvocation = s['LinearUIOutputInvocation'];
 export type MetadataInvocation = s['MetadataInvocation'];
 export type CoreMetadataInvocation = s['CoreMetadataInvocation'];
 export type MetadataItemInvocation = s['MetadataItemInvocation'];

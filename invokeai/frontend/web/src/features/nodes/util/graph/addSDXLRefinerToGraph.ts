@@ -24,7 +24,7 @@ import {
   SDXL_REFINER_POSITIVE_CONDITIONING,
   SDXL_REFINER_SEAMLESS,
 } from './constants';
-import { getSDXLStylePrompts } from './getSDXLStylePrompt';
+import { getSDXLStylePrompts } from './graphBuilderUtils';
 import { upsertMetadata } from './metadata';
 
 export const addSDXLRefinerToGraph = (

@@ -4,7 +4,7 @@ import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { isImageOutput } from 'features/nodes/types/common';
-import { LINEAR_UI_OUTPUT, nodeIDDenyList } from 'features/nodes/util/graph/constants';
+import { CANVAS_OUTPUT } from 'features/nodes/util/graph/constants';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import { imagesAdapter } from 'services/api/util';
@@ -24,10 +24,9 @@ export const addInvocationCompleteEventListener = () => {
       const { data } = action.payload;
       log.debug({ data: parseify(data) }, `Invocation complete (${action.payload.data.node.type})`);
 
-      const { result, node, queue_batch_id, source_node_id } = data;
-
+      const { result, node, queue_batch_id } = data;
       // This complete event has an associated image output
-      if (isImageOutput(result) && !nodeTypeDenylist.includes(node.type) && !nodeIDDenyList.includes(source_node_id)) {
+      if (isImageOutput(result) && !nodeTypeDenylist.includes(node.type)) {
         const { image_name } = result.image;
         const { canvas, gallery } = getState();
 
@@ -42,7 +41,7 @@ export const addInvocationCompleteEventListener = () => {
         imageDTORequest.unsubscribe();
 
         // Add canvas images to the staging area
-        if (canvas.batchIds.includes(queue_batch_id) && [LINEAR_UI_OUTPUT].includes(data.source_node_id)) {
+        if (canvas.batchIds.includes(queue_batch_id) && data.source_node_id === CANVAS_OUTPUT) {
           dispatch(addImageToStagingArea(imageDTO));
         }
 

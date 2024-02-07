@@ -39,16 +39,12 @@ export const addUpscaleRequestedListener = () => {
         return;
       }
 
-      const { esrganModelName } = state.postprocessing;
-      const { autoAddBoardId } = state.gallery;
-
       const enqueueBatchArg: BatchConfig = {
         prepend: true,
         batch: {
           graph: buildAdHocUpscaleGraph({
             image_name,
-            esrganModelName,
-            autoAddBoardId,
+            state,
           }),
           runs: 1,
         },
