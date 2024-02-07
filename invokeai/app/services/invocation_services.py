@@ -29,7 +29,6 @@ if TYPE_CHECKING:
     from .model_manager.model_manager_base import ModelManagerServiceBase
     from .model_records import ModelRecordServiceBase
     from .names.names_base import NameServiceBase
-    from .pickle_storage.pickle_storage_base import PickleStorageBase
     from .session_processor.session_processor_base import SessionProcessorBase
     from .session_queue.session_queue_base import SessionQueueBase
     from .shared.graph import GraphExecutionState
@@ -66,8 +65,8 @@ class InvocationServices:
         names: "NameServiceBase",
         urls: "UrlServiceBase",
         workflow_records: "WorkflowRecordsStorageBase",
-        tensors: "PickleStorageBase[torch.Tensor]",
-        conditioning: "PickleStorageBase[ConditioningFieldData]",
+        tensors: "ItemStorageABC[torch.Tensor]",
+        conditioning: "ItemStorageABC[ConditioningFieldData]",
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
