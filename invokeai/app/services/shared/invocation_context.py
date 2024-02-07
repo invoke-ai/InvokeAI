@@ -279,15 +279,8 @@ class ModelsInterface(InvocationContextInterface):
         :param submodel: The submodel of the model to get.
         """
 
-        # During this call, the model manager emits events with model loading status. The model
-        # manager itself has access to the events services, but does not have access to the
-        # required metadata for the events.
-        #
-        # For example, it needs access to the node's ID so that the events can be associated
-        # with the execution of a specific node.
-        #
-        # While this is available within the node, it's tedious to need to pass it in on every
-        # call. We can avoid that by wrapping the method here.
+        # The model manager emits events as it loads the model. It needs the context data to build
+        # the event payloads.
 
         return self._services.model_manager.get_model(
             model_name, base_model, model_type, submodel, context_data=self._context_data
