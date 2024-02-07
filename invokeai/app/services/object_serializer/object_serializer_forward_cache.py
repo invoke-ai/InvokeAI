@@ -1,10 +1,12 @@
 from queue import Queue
-from typing import Optional, TypeVar
+from typing import TYPE_CHECKING, Optional, TypeVar
 
-from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.object_serializer.object_serializer_base import ObjectSerializerBase
 
 T = TypeVar("T")
+
+if TYPE_CHECKING:
+    from invokeai.app.services.invoker import Invoker
 
 
 class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
@@ -17,13 +19,13 @@ class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
         self._cache_ids = Queue[str]()
         self._max_cache_size = max_cache_size
 
-    def start(self, invoker: Invoker) -> None:
+    def start(self, invoker: "Invoker") -> None:
         self._invoker = invoker
         start_op = getattr(self._underlying_storage, "start", None)
         if callable(start_op):
             start_op(invoker)
 
-    def stop(self, invoker: Invoker) -> None:
+    def stop(self, invoker: "Invoker") -> None:
         self._invoker = invoker
         stop_op = getattr(self._underlying_storage, "stop", None)
         if callable(stop_op):

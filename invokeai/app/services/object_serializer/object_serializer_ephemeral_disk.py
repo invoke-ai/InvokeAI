@@ -1,14 +1,17 @@
 import typing
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, TypeVar
+from typing import TYPE_CHECKING, Optional, TypeVar
 
 import torch
 
-from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.object_serializer.object_serializer_base import ObjectSerializerBase
 from invokeai.app.services.object_serializer.object_serializer_common import ObjectNotFoundError
 from invokeai.app.util.misc import uuid_string
+
+if TYPE_CHECKING:
+    from invokeai.app.services.invoker import Invoker
+
 
 T = TypeVar("T")
 
@@ -31,7 +34,7 @@ class ObjectSerializerEphemeralDisk(ObjectSerializerBase[T]):
         self._output_dir.mkdir(parents=True, exist_ok=True)
         self.__obj_class_name: Optional[str] = None
 
-    def start(self, invoker: Invoker) -> None:
+    def start(self, invoker: "Invoker") -> None:
         self._invoker = invoker
         delete_all_result = self._delete_all()
         if delete_all_result.deleted_count > 0:
