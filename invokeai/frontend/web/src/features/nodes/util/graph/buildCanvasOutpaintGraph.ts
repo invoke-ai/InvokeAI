@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
+import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
 import type {
   ImageDTO,
   ImageToLatentsInvocation,
@@ -11,7 +12,6 @@ import type {
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
-import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
@@ -200,7 +200,8 @@ export const buildCanvasOutpaintGraph = (
       [CANVAS_OUTPUT]: {
         type: 'color_correct',
         id: CANVAS_OUTPUT,
-        is_intermediate,
+        is_intermediate: getIsIntermediate(state),
+        board: getBoardField(state),
         use_cache: false,
       },
     },
@@ -768,8 +769,6 @@ export const buildCanvasOutpaintGraph = (
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
-
-  addLinearUIOutputNode(state, graph);
 
   return graph;
 };

@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
+import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import type {
   DenoiseLatentsInvocation,
@@ -322,7 +323,8 @@ export const addHrfToGraph = (state: RootState, graph: NonNullableGraph): void =
     type: 'l2i',
     id: LATENTS_TO_IMAGE_HRF_HR,
     fp32: originalLatentsToImageNode?.fp32,
-    is_intermediate: true,
+    is_intermediate: getIsIntermediate(state),
+    board: getBoardField(state),
   };
   graph.edges.push(
     {

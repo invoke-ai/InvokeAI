@@ -9,7 +9,6 @@ export const LATENTS_TO_IMAGE_HRF_LR = 'latents_to_image_hrf_lr';
 export const IMAGE_TO_LATENTS_HRF = 'image_to_latents_hrf';
 export const RESIZE_HRF = 'resize_hrf';
 export const ESRGAN_HRF = 'esrgan_hrf';
-export const LINEAR_UI_OUTPUT = 'linear_ui_output';
 export const NSFW_CHECKER = 'nsfw_checker';
 export const WATERMARKER = 'invisible_watermark';
 export const NOISE = 'noise';
