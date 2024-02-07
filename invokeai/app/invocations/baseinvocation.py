@@ -17,11 +17,8 @@ from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
 from invokeai.app.invocations.fields import (
-    FieldDescriptions,
     FieldKind,
     Input,
-    InputFieldJSONSchemaExtra,
-    MetadataField,
 )
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -306,9 +303,7 @@ RESERVED_NODE_ATTRIBUTE_FIELD_NAMES = {
     "workflow",
 }
 
-RESERVED_INPUT_FIELD_NAMES = {
-    "metadata",
-}
+RESERVED_INPUT_FIELD_NAMES = {"metadata", "board"}
 
 RESERVED_OUTPUT_FIELD_NAMES = {"type"}
 
@@ -518,29 +513,3 @@ def invocation_output(
         return cls
 
     return wrapper
-
-
-class WithMetadata(BaseModel):
-    """
-    Inherit from this class if your node needs a metadata input field.
-    """
-
-    metadata: Optional[MetadataField] = Field(
-        default=None,
-        description=FieldDescriptions.metadata,
-        json_schema_extra=InputFieldJSONSchemaExtra(
-            field_kind=FieldKind.Internal,
-            input=Input.Connection,
-            orig_required=False,
-        ).model_dump(exclude_none=True),
-    )
-
-
-class WithWorkflow:
-    workflow = None
-
-    def __init_subclass__(cls) -> None:
-        logger.warn(
-            f"{cls.__module__.split('.')[0]}.{cls.__name__}: WithWorkflow is deprecated. Use `context.workflow` to access the workflow."
-        )
-        super().__init_subclass__()
