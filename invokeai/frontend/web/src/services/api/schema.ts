@@ -968,6 +968,8 @@ export type components = {
      * @description Creates a blank image and forwards it to the pipeline
      */
     BlankImageInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -1860,6 +1862,8 @@ export type components = {
      * @description Infills transparent areas of an image using OpenCV Inpainting
      */
     CV2InfillInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -2095,6 +2099,8 @@ export type components = {
      * @description Canny edge detection for ControlNet
      */
     CannyImageProcessorInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -2482,6 +2488,8 @@ export type components = {
      * using a mask to only color-correct certain regions of the target image.
      */
     ColorCorrectInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -2590,6 +2598,8 @@ export type components = {
      * @description Generates a color map from the provided image
      */
     ColorMapImageProcessorInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -2797,6 +2807,8 @@ export type components = {
      * @description Applies content shuffle processing to image
      */
     ContentShuffleImageProcessorInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -3442,6 +3454,8 @@ export type components = {
      * @description Simple inpaint using opencv.
      */
     CvInpaintInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -3677,6 +3691,8 @@ export type components = {
      * @description Generates a depth map based on the Depth Anything algorithm
      */
     DepthAnythingImageProcessorInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -3910,6 +3926,8 @@ export type components = {
      * @description Upscales an image using RealESRGAN.
      */
     ESRGANInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -4041,6 +4059,8 @@ export type components = {
      * @description Outputs an image with detected face IDs printed on each face. For use with other FaceTools.
      */
     FaceIdentifierInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -4873,6 +4893,8 @@ export type components = {
      * @description Applies HED edge detection to image
      */
     HedImageProcessorInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -5324,6 +5346,8 @@ export type components = {
      * @description Blurs an image
      */
     ImageBlurInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -5382,6 +5406,8 @@ export type components = {
      * @description Gets a channel from an image.
      */
     ImageChannelInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -5422,6 +5448,8 @@ export type components = {
      * @description Scale a specific color channel of an image.
      */
     ImageChannelMultiplyInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -5473,6 +5501,8 @@ export type components = {
      * @description Add or subtract a value from a specific color channel of an image.
      */
     ImageChannelOffsetInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -5640,6 +5670,8 @@ export type components = {
      * @description Converts an image to a different mode.
      */
     ImageConvertInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -5680,6 +5712,8 @@ export type components = {
      * @description Crops an image to a specified box. The box can be outside of the image.
      */
     ImageCropInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -5949,6 +5983,8 @@ export type components = {
      * @description Adjusts the Hue of an image.
      */
     ImageHueAdjustmentInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -5988,6 +6024,8 @@ export type components = {
      * @description Inverse linear interpolation of all pixels of an image
      */
     ImageInverseLerpInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -6064,6 +6102,8 @@ export type components = {
      * @description Linear interpolation of all pixels of an image
      */
     ImageLerpInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -6109,6 +6149,8 @@ export type components = {
      * @description Multiplies two images together using `PIL.ImageChops.multiply()`.
      */
     ImageMultiplyInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -6144,6 +6186,8 @@ export type components = {
      * @description Add blur to NSFW-flagged images
      */
     ImageNSFWBlurInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -6252,6 +6296,8 @@ export type components = {
      * @description Pastes an image into another image.
      */
     ImagePasteInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -6337,6 +6383,8 @@ export type components = {
      * @description Resizes an image to specific dimensions
      */
     ImageResizeInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -6446,6 +6494,8 @@ export type components = {
      * @description Scales an image by a factor
      */
     ImageScaleInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -6621,6 +6671,8 @@ export type components = {
      * @description Add an invisible watermark to an image
      */
     ImageWatermarkInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -6676,6 +6728,8 @@ export type components = {
      * @description Infills transparent areas of an image with a solid color
      */
     InfillColorInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -6719,6 +6773,8 @@ export type components = {
      * @description Infills transparent areas of an image using the PatchMatch algorithm
      */
     InfillPatchMatchInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -6765,6 +6821,8 @@ export type components = {
      * @description Infills transparent areas of an image with tiles of the image
      */
     InfillTileInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -7065,6 +7123,8 @@ export type components = {
      * @description Infills transparent areas of an image using the LaMa model
      */
     LaMaInfillInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -7092,96 +7152,6 @@ export type components = {
        * @constant
        */
       type: "infill_lama";
-    };
-    /**
-     * Latent Consistency MonoNode
-     * @description Wrapper node around diffusers LatentConsistencyTxt2ImgPipeline
-     */
-    LatentConsistencyInvocation: {
-      /**
-       * Id
-       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
-       */
-      id: string;
-      /**
-       * Is Intermediate
-       * @description Whether or not this is an intermediate invocation.
-       * @default false
-       */
-      is_intermediate?: boolean;
-      /**
-       * Use Cache
-       * @description Whether or not to use the cache
-       * @default true
-       */
-      use_cache?: boolean;
-      /**
-       * Prompt
-       * @description The prompt to use
-       */
-      prompt?: string;
-      /**
-       * Num Inference Steps
-       * @description The number of inference steps to use, 4-8 recommended
-       * @default 8
-       */
-      num_inference_steps?: number;
-      /**
-       * Guidance Scale
-       * @description The guidance scale to use
-       * @default 8
-       */
-      guidance_scale?: number;
-      /**
-       * Batches
-       * @description The number of batches to use
-       * @default 1
-       */
-      batches?: number;
-      /**
-       * Images Per Batch
-       * @description The number of images per batch to use
-       * @default 1
-       */
-      images_per_batch?: number;
-      /**
-       * Seeds
-       * @description List of noise seeds to use
-       */
-      seeds?: number[];
-      /**
-       * Lcm Origin Steps
-       * @description The lcm origin steps to use
-       * @default 50
-       */
-      lcm_origin_steps?: number;
-      /**
-       * Width
-       * @description The width to use
-       * @default 512
-       */
-      width?: number;
-      /**
-       * Height
-       * @description The height to use
-       * @default 512
-       */
-      height?: number;
-      /**
-       * Precision
-       * @description floating point precision
-       * @default fp16
-       * @enum {string}
-       */
-      precision?: "fp16" | "fp32";
-      /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"];
-      /**
-       * type
-       * @default latent_consistency_mononode
-       * @constant
-       */
-      type: "latent_consistency_mononode";
     };
     /**
      * Latents Collection Primitive
@@ -7310,6 +7280,8 @@ export type components = {
      * @description Generates an image from latents.
      */
     LatentsToImageInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -7357,6 +7329,8 @@ export type components = {
      * @description Applies leres processing to image
      */
     LeresImageProcessorInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -7442,45 +7416,12 @@ export type components = {
       AllowCommercialUse?: components["schemas"]["CommercialUsage"];
     };
     /**
-     * Linear UI Image Output
-     * @description Handles Linear UI Image Outputting tasks.
-     */
-    LinearUIOutputInvocation: {
-      /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
-      /**
-       * Id
-       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
-       */
-      id: string;
-      /**
-       * Is Intermediate
-       * @description Whether or not this is an intermediate invocation.
-       * @default false
-       */
-      is_intermediate?: boolean;
-      /**
-       * Use Cache
-       * @description Whether or not to use the cache
-       * @default false
-       */
-      use_cache?: boolean;
-      /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
-      /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
-      /**
-       * type
-       * @default linear_ui_output
-       * @constant
-       */
-      type: "linear_ui_output";
-    };
-    /**
      * Lineart Anime Processor
      * @description Applies line art anime processing to image
      */
     LineartAnimeImageProcessorInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -7526,6 +7467,8 @@ export type components = {
      * @description Applies line art processing to image
      */
     LineartImageProcessorInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -7954,6 +7897,8 @@ export type components = {
      * @description Combine two masks together by multiplying them using `PIL.ImageChops.multiply()`.
      */
     MaskCombineInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -7989,6 +7934,8 @@ export type components = {
      * @description Applies an edge mask to an image
      */
     MaskEdgeInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -8042,6 +7989,8 @@ export type components = {
      * @description Extracts the alpha channel of an image as a mask.
      */
     MaskFromAlphaInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -8122,6 +8071,8 @@ export type components = {
      * @description Applies mediapipe face processing to image
      */
     MediapipeFaceProcessorInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -8238,6 +8189,8 @@ export type components = {
      * @description Merge multiple tile images into a single image.
      */
     MergeTilesToImageInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -8404,6 +8357,8 @@ export type components = {
      * @description Applies Midas depth processing to image
      */
     MidasDepthImageProcessorInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -8449,6 +8404,8 @@ export type components = {
      * @description Applies MLSD processing to image
      */
     MlsdImageProcessorInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -8961,6 +8918,8 @@ export type components = {
      * @description Applies NormalBae processing to image
      */
     NormalbaeImageProcessorInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -9591,6 +9550,8 @@ export type components = {
      * @description Applies PIDI processing to image
      */
     PidiImageProcessorInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -10443,6 +10404,8 @@ export type components = {
      * @description Saves an image. Unlike an image primitive, this invocation stores a copy of the image.
      */
     SaveImageInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -10464,8 +10427,6 @@ export type components = {
       use_cache?: boolean;
       /** @description The image to process */
       image?: components["schemas"]["ImageField"];
-      /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"];
       /**
        * type
        * @default save_image
@@ -10651,6 +10612,8 @@ export type components = {
      * @description Applies segment anything processing to image
      */
     SegmentAnythingProcessorInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -12189,6 +12152,8 @@ export type components = {
      * @description Tile resampler processor
      */
     TileResamplerProcessorInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -12378,6 +12343,8 @@ export type components = {
      * @description Applies an unsharp mask filter to an image
      */
     UnsharpMaskInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
@@ -12846,6 +12813,8 @@ export type components = {
      * @description Applies Zoe depth processing to image
      */
     ZoeDepthImageProcessorInvocation: {
+      /** @description The board to save the image to */
+      board?: components["schemas"]["BoardField"] | null;
       /** @description Optional metadata to be saved with the image */
       metadata?: components["schemas"]["MetadataField"] | null;
       /**
