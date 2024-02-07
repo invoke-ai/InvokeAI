@@ -313,9 +313,7 @@ class DenoiseMaskOutput(BaseInvocationOutput):
 class LatentsOutput(BaseInvocationOutput):
     """Base class for nodes that output a single latents tensor"""
 
-    latents: LatentsField = OutputField(
-        description=FieldDescriptions.latents,
-    )
+    latents: LatentsField = OutputField(description=FieldDescriptions.latents)
     width: int = OutputField(description=FieldDescriptions.width)
     height: int = OutputField(description=FieldDescriptions.height)
 
@@ -346,7 +344,7 @@ class LatentsInvocation(BaseInvocation):
     latents: LatentsField = InputField(description="The latents tensor", input=Input.Connection)
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        latents = context.latents.get(self.latents.latents_name)
+        latents = context.tensors.get(self.latents.latents_name)
 
         return LatentsOutput.build(self.latents.latents_name, latents)
 
