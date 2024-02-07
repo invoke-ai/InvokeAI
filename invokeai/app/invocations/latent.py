@@ -860,9 +860,9 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata):
                 vae.disable_tiling()
 
             # clear memory as vae decode can request a lot
-            # torch.cuda.empty_cache()
-            # if choose_torch_device() == torch.device("mps"):
-            #     mps.empty_cache()
+            torch.cuda.empty_cache()
+            if choose_torch_device() == torch.device("mps"):
+                mps.empty_cache()
 
             with torch.inference_mode():
                 # copied from diffusers pipeline
@@ -874,9 +874,9 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata):
 
                 image = VaeImageProcessor.numpy_to_pil(np_image)[0]
 
-        # torch.cuda.empty_cache()
-        # if choose_torch_device() == torch.device("mps"):
-        #     mps.empty_cache()
+        torch.cuda.empty_cache()
+        if choose_torch_device() == torch.device("mps"):
+            mps.empty_cache()
 
         image_dto = context.services.images.create(
             image=image,
