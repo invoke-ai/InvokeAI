@@ -41,7 +41,6 @@ class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
     def save(self, obj: T) -> str:
         name = self._underlying_storage.save(obj)
         self._set_cache(name, obj)
-        self._on_saved(name, obj)
         return name
 
     def delete(self, name: str) -> None:
