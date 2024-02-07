@@ -344,7 +344,7 @@ class LatentsInvocation(BaseInvocation):
     latents: LatentsField = InputField(description="The latents tensor", input=Input.Connection)
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        latents = context.tensors.get(self.latents.latents_name)
+        latents = context.tensors.load(self.latents.latents_name)
 
         return LatentsOutput.build(self.latents.latents_name, latents)
 

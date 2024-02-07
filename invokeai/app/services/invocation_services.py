@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from invokeai.app.services.object_serializer.object_serializer_base import ObjectSerializerBase
+
 if TYPE_CHECKING:
     from logging import Logger
 
@@ -65,8 +67,8 @@ class InvocationServices:
         names: "NameServiceBase",
         urls: "UrlServiceBase",
         workflow_records: "WorkflowRecordsStorageBase",
-        tensors: "ItemStorageABC[torch.Tensor]",
-        conditioning: "ItemStorageABC[ConditioningFieldData]",
+        tensors: "ObjectSerializerBase[torch.Tensor]",
+        conditioning: "ObjectSerializerBase[ConditioningFieldData]",
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
