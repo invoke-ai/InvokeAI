@@ -223,16 +223,16 @@ class TensorsInterface(InvocationContextInterface):
         :param tensor: The tensor to save.
         """
 
-        name = self._services.tensors.set(item=tensor)
-        return name
+        tensor_id = self._services.tensors.save(obj=tensor)
+        return tensor_id
 
-    def get(self, tensor_name: str) -> Tensor:
+    def load(self, name: str) -> Tensor:
         """
-        Gets a tensor by name.
+        Loads a tensor by name.
 
-        :param tensor_name: The name of the tensor to get.
+        :param name: The name of the tensor to load.
         """
-        return self._services.tensors.get(tensor_name)
+        return self._services.tensors.load(name)
 
 
 class ConditioningInterface(InvocationContextInterface):
@@ -243,17 +243,17 @@ class ConditioningInterface(InvocationContextInterface):
         :param conditioning_context_data: The conditioning data to save.
         """
 
-        name = self._services.conditioning.set(item=conditioning_data)
-        return name
+        conditioning_id = self._services.conditioning.save(obj=conditioning_data)
+        return conditioning_id
 
-    def get(self, conditioning_name: str) -> ConditioningFieldData:
+    def load(self, name: str) -> ConditioningFieldData:
         """
-        Gets conditioning data by name.
+        Loads conditioning data by name.
 
-        :param conditioning_name: The name of the conditioning data to get.
+        :param name: The name of the conditioning data to load.
         """
 
-        return self._services.conditioning.get(conditioning_name)
+        return self._services.conditioning.load(name)
 
 
 class ModelsInterface(InvocationContextInterface):

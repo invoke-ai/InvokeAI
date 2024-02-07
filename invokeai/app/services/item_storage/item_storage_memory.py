@@ -34,7 +34,7 @@ class ItemStorageMemory(ItemStorageABC[T], Generic[T]):
         self._items[item_id] = item
         return item
 
-    def set(self, item: T) -> str:
+    def set(self, item: T) -> None:
         item_id = getattr(item, self._id_field)
         if item_id in self._items:
             # If item already exists, remove it and add it to the end
@@ -44,7 +44,6 @@ class ItemStorageMemory(ItemStorageABC[T], Generic[T]):
             self._items.popitem(last=False)
         self._items[item_id] = item
         self._on_changed(item)
-        return item_id
 
     def delete(self, item_id: str) -> None:
         # This is a no-op if the item doesn't exist.
