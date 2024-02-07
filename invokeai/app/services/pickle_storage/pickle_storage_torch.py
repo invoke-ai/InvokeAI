@@ -48,15 +48,15 @@ class PickleStorageTorch(PickleStorageBase[T]):
         if not self._invoker:
             raise ValueError("Invoker is not set. Must call `start()` first.")
 
-        deleted_latents_count = 0
+        deleted_count = 0
         freed_space = 0
-        for latents_file in Path(self._output_folder).glob("*"):
-            if latents_file.is_file():
-                freed_space += latents_file.stat().st_size
-                deleted_latents_count += 1
-                latents_file.unlink()
-        if deleted_latents_count > 0:
+        for file in Path(self._output_folder).glob("*"):
+            if file.is_file():
+                freed_space += file.stat().st_size
+                deleted_count += 1
+                file.unlink()
+        if deleted_count > 0:
             freed_space_in_mb = round(freed_space / 1024 / 1024, 2)
             self._invoker.services.logger.info(
-                f"Deleted {deleted_latents_count} {self._item_type_name} files (freed {freed_space_in_mb}MB)"
+                f"Deleted {deleted_count} {self._item_type_name} files (freed {freed_space_in_mb}MB)"
             )
