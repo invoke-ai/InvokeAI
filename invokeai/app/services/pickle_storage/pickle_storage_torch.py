@@ -15,6 +15,7 @@ class PickleStorageTorch(PickleStorageBase[T]):
     """Responsible for storing and retrieving non-serializable data using `torch.save` and `torch.load`."""
 
     def __init__(self, output_folder: Path, item_type_name: "str"):
+        super().__init__()
         self._output_folder = output_folder
         self._output_folder.mkdir(parents=True, exist_ok=True)
         self._item_type_name = item_type_name
