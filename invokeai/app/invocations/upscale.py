@@ -16,7 +16,7 @@ from invokeai.backend.image_util.realesrgan.realesrgan import RealESRGAN
 from invokeai.backend.util.devices import choose_torch_device
 
 from .baseinvocation import BaseInvocation, invocation
-from .fields import InputField, WithMetadata
+from .fields import InputField, WithBoard, WithMetadata
 
 # TODO: Populate this from disk?
 # TODO: Use model manager to load?
@@ -32,7 +32,7 @@ if choose_torch_device() == torch.device("mps"):
 
 
 @invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="esrgan", version="1.3.1")
-class ESRGANInvocation(BaseInvocation, WithMetadata):
+class ESRGANInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Upscales an image using RealESRGAN."""
 
     image: ImageField = InputField(description="The input image")

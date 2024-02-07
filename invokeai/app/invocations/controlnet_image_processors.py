@@ -25,7 +25,15 @@ from controlnet_aux.util import HWC3, ade_palette
 from PIL import Image
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, OutputField, WithMetadata
+from invokeai.app.invocations.fields import (
+    FieldDescriptions,
+    ImageField,
+    Input,
+    InputField,
+    OutputField,
+    WithBoard,
+    WithMetadata,
+)
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -135,7 +143,7 @@ class ControlNetInvocation(BaseInvocation):
 
 
 # This invocation exists for other invocations to subclass it - do not register with @invocation!
-class ImageProcessorInvocation(BaseInvocation, WithMetadata):
+class ImageProcessorInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Base class for invocations that preprocess images for ControlNet"""
 
     image: ImageField = InputField(description="The image to process")
