@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Generic, TypeVar
 
-T = TypeVar("T")
+from pydantic import BaseModel
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class ItemStorageABC(ABC, Generic[T]):
@@ -26,9 +28,9 @@ class ItemStorageABC(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    def set(self, item: T) -> str:
+    def set(self, item: T) -> None:
         """
-        Sets the item. The id will be extracted based on id_field.
+        Sets the item.
         :param item: the item to set
         """
         pass
