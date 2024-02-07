@@ -314,6 +314,10 @@ export const addHrfToGraph = (state: RootState, graph: NonNullableGraph): void =
   );
   copyConnectionsToDenoiseLatentsHrf(graph);
 
+  // The original l2i node is unnecessary now, remove it
+  graph.edges = graph.edges.filter((edge) => edge.destination.node_id !== LATENTS_TO_IMAGE);
+  delete graph.nodes[LATENTS_TO_IMAGE];
+
   graph.nodes[LATENTS_TO_IMAGE_HRF_HR] = {
     type: 'l2i',
     id: LATENTS_TO_IMAGE_HRF_HR,
