@@ -4,9 +4,9 @@ from logging import Logger
 
 import torch
 
+from invokeai.app.services.item_storage.item_storage_ephemeral_disk import ItemStorageEphemeralDisk
+from invokeai.app.services.item_storage.item_storage_forward_cache import ItemStorageForwardCache
 from invokeai.app.services.item_storage.item_storage_memory import ItemStorageMemory
-from invokeai.app.services.pickle_storage.pickle_storage_forward_cache import PickleStorageForwardCache
-from invokeai.app.services.pickle_storage.pickle_storage_torch import PickleStorageTorch
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.backend.model_manager.metadata import ModelMetadataStore
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
@@ -90,9 +90,9 @@ class ApiDependencies:
         image_records = SqliteImageRecordStorage(db=db)
         images = ImageService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
-        tensors = PickleStorageForwardCache(PickleStorageTorch[torch.Tensor](output_folder / "tensors", "tensor"))
-        conditioning = PickleStorageForwardCache(
-            PickleStorageTorch[ConditioningFieldData](output_folder / "conditioning", "conditioning")
+        tensors = ItemStorageForwardCache(ItemStorageEphemeralDisk[torch.Tensor](output_folder / "tensors"))
+        conditioning = ItemStorageForwardCache(
+            ItemStorageEphemeralDisk[ConditioningFieldData](output_folder / "conditioning")
         )
         model_manager = ModelManagerService(config, logger)
         model_record_service = ModelRecordServiceSQL(db=db)
