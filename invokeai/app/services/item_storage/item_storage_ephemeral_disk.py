@@ -37,7 +37,7 @@ class ItemStorageEphemeralDisk(ItemStorageABC[T]):
 
     def set(self, item: T) -> str:
         self._output_folder.mkdir(parents=True, exist_ok=True)
-        item_id = f"{self._item_class_name}_{uuid_string()}"
+        item_id = self._new_item_id()
         file_path = self._get_path(item_id)
         torch.save(item, file_path)  # pyright: ignore [reportUnknownMemberType]
         return item_id
@@ -48,6 +48,9 @@ class ItemStorageEphemeralDisk(ItemStorageABC[T]):
 
     def _get_path(self, item_id: str) -> Path:
         return self._output_folder / item_id
+
+    def _new_item_id(self) -> str:
+        return f"{self._item_class_name}_{uuid_string()}"
 
     def _delete_all_items(self) -> None:
         """
