@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Optional
 
 from deprecated import deprecated
 from PIL.Image import Image
-from pydantic import ConfigDict
 from torch import Tensor
 
 from invokeai.app.invocations.fields import MetadataField, WithMetadata
