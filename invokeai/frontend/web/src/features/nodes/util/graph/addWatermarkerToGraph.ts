@@ -1,5 +1,4 @@
 import type { RootState } from 'app/store/store';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import type {
   ImageNSFWBlurInvocation,
   ImageWatermarkInvocation,
@@ -8,16 +7,13 @@ import type {
 } from 'services/api/types';
 
 import { LATENTS_TO_IMAGE, NSFW_CHECKER, WATERMARKER } from './constants';
+import { getBoardField, getIsIntermediate } from './graphBuilderUtils';
 
 export const addWatermarkerToGraph = (
   state: RootState,
   graph: NonNullableGraph,
   nodeIdToAddTo = LATENTS_TO_IMAGE
 ): void => {
-  const activeTabName = activeTabNameSelector(state);
-
-  const is_intermediate = activeTabName === 'unifiedCanvas' ? !state.canvas.shouldAutoSave : false;
-
   const nodeToAddTo = graph.nodes[nodeIdToAddTo] as LatentsToImageInvocation | undefined;
 
   const nsfwCheckerNode = graph.nodes[NSFW_CHECKER] as ImageNSFWBlurInvocation | undefined;
@@ -30,7 +26,8 @@ export const addWatermarkerToGraph = (
   const watermarkerNode: ImageWatermarkInvocation = {
     id: WATERMARKER,
     type: 'img_watermark',
-    is_intermediate,
+    is_intermediate: getIsIntermediate(state),
+    board: getBoardField(state),
   };
 
   graph.nodes[WATERMARKER] = watermarkerNode;
