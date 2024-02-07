@@ -4,7 +4,6 @@ import type { NonNullableGraph } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
-import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
@@ -24,7 +23,7 @@ import {
   SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from './constants';
-import { getSDXLStylePrompts } from './getSDXLStylePrompt';
+import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from './graphBuilderUtils';
 import { addCoreMetadataNode } from './metadata';
 
 /**
@@ -222,7 +221,8 @@ export const buildCanvasSDXLTextToImageGraph = (state: RootState): NonNullableGr
     graph.nodes[CANVAS_OUTPUT] = {
       id: CANVAS_OUTPUT,
       type: 'img_resize',
-      is_intermediate,
+      is_intermediate: getIsIntermediate(state),
+      board: getBoardField(state),
       width: width,
       height: height,
       use_cache: false,
@@ -254,7 +254,8 @@ export const buildCanvasSDXLTextToImageGraph = (state: RootState): NonNullableGr
     graph.nodes[CANVAS_OUTPUT] = {
       type: 'l2i',
       id: CANVAS_OUTPUT,
-      is_intermediate,
+      is_intermediate: getIsIntermediate(state),
+      board: getBoardField(state),
       fp32,
       use_cache: false,
     };
@@ -329,8 +330,6 @@ export const buildCanvasSDXLTextToImageGraph = (state: RootState): NonNullableGr
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
-
-  addLinearUIOutputNode(state, graph);
 
   return graph;
 };

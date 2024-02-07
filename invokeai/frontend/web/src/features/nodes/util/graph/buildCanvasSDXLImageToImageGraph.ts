@@ -4,7 +4,6 @@ import type { ImageDTO, ImageToLatentsInvocation, NonNullableGraph } from 'servi
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
-import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
@@ -26,7 +25,7 @@ import {
   SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from './constants';
-import { getSDXLStylePrompts } from './getSDXLStylePrompt';
+import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from './graphBuilderUtils';
 import { addCoreMetadataNode } from './metadata';
 
 /**
@@ -246,7 +245,8 @@ export const buildCanvasSDXLImageToImageGraph = (state: RootState, initialImage:
     graph.nodes[CANVAS_OUTPUT] = {
       id: CANVAS_OUTPUT,
       type: 'img_resize',
-      is_intermediate,
+      is_intermediate: getIsIntermediate(state),
+      board: getBoardField(state),
       width: width,
       height: height,
       use_cache: false,
@@ -367,8 +367,6 @@ export const buildCanvasSDXLImageToImageGraph = (state: RootState, initialImage:
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
-
-  addLinearUIOutputNode(state, graph);
 
   return graph;
 };

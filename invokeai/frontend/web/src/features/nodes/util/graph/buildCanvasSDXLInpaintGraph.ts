@@ -12,7 +12,6 @@ import type {
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
-import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
@@ -44,7 +43,7 @@ import {
   SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from './constants';
-import { getSDXLStylePrompts } from './getSDXLStylePrompt';
+import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from './graphBuilderUtils';
 
 /**
  * Builds the Canvas tab's Inpaint graph.
@@ -190,7 +189,8 @@ export const buildCanvasSDXLInpaintGraph = (
       [CANVAS_OUTPUT]: {
         type: 'color_correct',
         id: CANVAS_OUTPUT,
-        is_intermediate,
+        is_intermediate: getIsIntermediate(state),
+        board: getBoardField(state),
         reference: canvasInitImage,
         use_cache: false,
       },
@@ -686,8 +686,6 @@ export const buildCanvasSDXLInpaintGraph = (
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
-
-  addLinearUIOutputNode(state, graph);
 
   return graph;
 };
