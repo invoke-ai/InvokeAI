@@ -6,6 +6,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from logging import Logger
 
+    import torch
+
+    from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
+
     from .board_image_records.board_image_records_base import BoardImageRecordStorageBase
     from .board_images.board_images_base import BoardImagesServiceABC
     from .board_records.board_records_base import BoardRecordStorageBase
@@ -21,11 +25,11 @@ if TYPE_CHECKING:
     from .invocation_queue.invocation_queue_base import InvocationQueueABC
     from .invocation_stats.invocation_stats_base import InvocationStatsServiceBase
     from .item_storage.item_storage_base import ItemStorageABC
-    from .latents_storage.latents_storage_base import LatentsStorageBase
     from .model_install import ModelInstallServiceBase
     from .model_manager.model_manager_base import ModelManagerServiceBase
     from .model_records import ModelRecordServiceBase
     from .names.names_base import NameServiceBase
+    from .pickle_storage.pickle_storage_base import PickleStorageBase
     from .session_processor.session_processor_base import SessionProcessorBase
     from .session_queue.session_queue_base import SessionQueueBase
     from .shared.graph import GraphExecutionState
@@ -48,7 +52,6 @@ class InvocationServices:
         images: "ImageServiceABC",
         image_files: "ImageFileStorageBase",
         image_records: "ImageRecordStorageBase",
-        latents: "LatentsStorageBase",
         logger: "Logger",
         model_manager: "ModelManagerServiceBase",
         model_records: "ModelRecordServiceBase",
@@ -63,6 +66,8 @@ class InvocationServices:
         names: "NameServiceBase",
         urls: "UrlServiceBase",
         workflow_records: "WorkflowRecordsStorageBase",
+        tensors: "PickleStorageBase[torch.Tensor]",
+        conditioning: "PickleStorageBase[ConditioningFieldData]",
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
@@ -74,7 +79,6 @@ class InvocationServices:
         self.images = images
         self.image_files = image_files
         self.image_records = image_records
-        self.latents = latents
         self.logger = logger
         self.model_manager = model_manager
         self.model_records = model_records
@@ -89,3 +93,5 @@ class InvocationServices:
         self.names = names
         self.urls = urls
         self.workflow_records = workflow_records
+        self.tensors = tensors
+        self.conditioning = conditioning
