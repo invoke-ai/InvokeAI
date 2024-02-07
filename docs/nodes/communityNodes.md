@@ -42,6 +42,7 @@ To use a community workflow, download the the `.json` node graph file and load i
     + [Oobabooga](#oobabooga)
     + [Prompt Tools](#prompt-tools)
     + [Remote Image](#remote-image)
+    + [BriaAI Background Remove](#briaai-remove-background)
     + [Remove Background](#remove-background)    
     + [Retroize](#retroize)
     + [Size Stepper Nodes](#size-stepper-nodes)
@@ -433,6 +434,17 @@ See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/mai
 - *Post Image to Remote Server* - Lets you upload an image to a remote server using an HTTP POST request, eg for storage, display or further processing.
 
 **Node Link:** https://github.com/fieldOfView/InvokeAI-remote_image
+
+--------------------------------
+
+### BriaAI Remove Background
+
+**Description**: Implements one click background removal with BriaAI's new version 1.4 model which seems to be be producing better results than any other previous background removal tool.
+
+**Node Link:** https://github.com/blessedcoolant/invoke_bria_rmbg
+
+**View**
+<img src="https://raw.githubusercontent.com/blessedcoolant/invoke_bria_rmbg/main/assets/preview.jpg" />
 
 --------------------------------
 ### Remove Background
