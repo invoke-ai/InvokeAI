@@ -1,4 +1,5 @@
 import typing
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, TypeVar
 
@@ -10,6 +11,12 @@ from invokeai.app.services.object_serializer.object_serializer_common import Obj
 from invokeai.app.util.misc import uuid_string
 
 T = TypeVar("T")
+
+
+@dataclass
+class DeleteAllResult:
+    deleted_count: int
+    freed_space_bytes: float
 
 
 class ObjectSerializerEphemeralDisk(ObjectSerializerBase[T]):
@@ -26,7 +33,12 @@ class ObjectSerializerEphemeralDisk(ObjectSerializerBase[T]):
 
     def start(self, invoker: Invoker) -> None:
         self._invoker = invoker
-        self._delete_all()
+        delete_all_result = self._delete_all()
+        if delete_all_result.deleted_count > 0:
+            freed_space_in_mb = round(delete_all_result.freed_space_bytes / 1024 / 1024, 2)
+            self._invoker.services.logger.info(
+                f"Deleted {delete_all_result.deleted_count} {self._obj_class_name} files (freed {freed_space_in_mb}MB)"
+            )
 
     def load(self, name: str) -> T:
         file_path = self._get_path(name)
@@ -58,17 +70,13 @@ class ObjectSerializerEphemeralDisk(ObjectSerializerBase[T]):
     def _new_name(self) -> str:
         return f"{self._obj_class_name}_{uuid_string()}"
 
-    def _delete_all(self) -> None:
+    def _delete_all(self) -> DeleteAllResult:
         """
         Deletes all objects from disk.
-        Must be called after we have access to `self._invoker` (e.g. in `start()`).
         """
 
         # We could try using a temporary directory here, but they aren't cleared in the event of a crash, so we'd have
         # to manually clear them on startup anyways. This is a bit simpler and more reliable.
-
-        if not self._invoker:
-            raise ValueError("Invoker is not set. Must call `start()` first.")
 
         deleted_count = 0
         freed_space = 0
@@ -77,8 +85,4 @@ class ObjectSerializerEphemeralDisk(ObjectSerializerBase[T]):
                 freed_space += file.stat().st_size
                 deleted_count += 1
                 file.unlink()
-        if deleted_count > 0:
-            freed_space_in_mb = round(freed_space / 1024 / 1024, 2)
-            self._invoker.services.logger.info(
-                f"Deleted {deleted_count} {self._obj_class_name} files (freed {freed_space_in_mb}MB)"
-            )
+        return DeleteAllResult(deleted_count, freed_space)
