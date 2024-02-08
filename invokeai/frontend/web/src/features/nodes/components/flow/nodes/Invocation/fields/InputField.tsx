@@ -8,7 +8,6 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import EditableFieldTitle from './EditableFieldTitle';
-import FieldContextMenu from './FieldContextMenu';
 import FieldHandle from './FieldHandle';
 import FieldLinearViewToggle from './FieldLinearViewToggle';
 import InputFieldRenderer from './InputFieldRenderer';
@@ -48,11 +47,11 @@ const InputField = ({ nodeId, fieldName }: Props) => {
     return false;
   }, [fieldTemplate, isConnected, doesFieldHaveValue]);
 
-  const handleMouseOver = useCallback(() => {
+  const onMouseEnter = useCallback(() => {
     setIsHovered(true);
   }, []);
 
-  const handleMouseOut = useCallback(() => {
+  const onMouseLeave = useCallback(() => {
     setIsHovered(false);
   }, []);
 
@@ -97,22 +96,17 @@ const InputField = ({ nodeId, fieldName }: Props) => {
   return (
     <InputFieldWrapper shouldDim={shouldDim}>
       <FormControl isInvalid={isMissingInput} isDisabled={isConnected} orientation="vertical" px={2}>
-        <Flex flexDir="column" w="full" gap={1} onMouseEnter={handleMouseOver} onMouseLeave={handleMouseOut}>
-          <FieldContextMenu nodeId={nodeId} fieldName={fieldName} kind="input">
-            {(ref) => (
-              <Flex>
-                <EditableFieldTitle
-                  ref={ref}
-                  nodeId={nodeId}
-                  fieldName={fieldName}
-                  kind="input"
-                  isMissingInput={isMissingInput}
-                  withTooltip
-                />
-                <FieldLinearViewToggle nodeId={nodeId} fieldName={fieldName} isHovered={isHovered} />
-              </Flex>
-            )}
-          </FieldContextMenu>
+        <Flex flexDir="column" w="full" gap={1} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
+          <Flex>
+            <EditableFieldTitle
+              nodeId={nodeId}
+              fieldName={fieldName}
+              kind="input"
+              isMissingInput={isMissingInput}
+              withTooltip
+            />
+            {isHovered && <FieldLinearViewToggle nodeId={nodeId} fieldName={fieldName} />}
+          </Flex>
           <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
         </Flex>
       </FormControl>

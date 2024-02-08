@@ -13,10 +13,9 @@ import { PiMinusBold, PiPlusBold } from 'react-icons/pi';
 type Props = {
   nodeId: string;
   fieldName: string;
-  isHovered: boolean;
 };
 
-const FieldLinearViewToggle = ({ nodeId, fieldName, isHovered }: Props) => {
+const FieldLinearViewToggle = ({ nodeId, fieldName }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -38,37 +37,31 @@ const FieldLinearViewToggle = ({ nodeId, fieldName, isHovered }: Props) => {
     dispatch(workflowExposedFieldRemoved({ nodeId, fieldName }));
   }, [dispatch, fieldName, nodeId]);
 
-  const ToggleButton = useMemo(() => {
-    if (!isHovered) {
-      return null;
-    } else if (!isExposed) {
-      return (
-        <IconButton
-          mx="2"
-          tooltip={t('nodes.addLinearView')}
-          aria-label={t('nodes.addLinearView')}
-          icon={<PiPlusBold />}
-          onClick={handleExposeField}
-          pointerEvents="auto"
-          size="xs"
-        />
-      );
-    } else if (isExposed) {
-      return (
-        <IconButton
-          mx="2"
-          tooltip={t('nodes.removeLinearView')}
-          aria-label={t('nodes.removeLinearView')}
-          icon={<PiMinusBold />}
-          onClick={handleUnexposeField}
-          pointerEvents="auto"
-          size="xs"
-        />
-      );
-    }
-  }, [isHovered, handleExposeField, handleUnexposeField, isExposed, t]);
-
-  return ToggleButton;
+  if (!isExposed) {
+    return (
+      <IconButton
+        variant="ghost"
+        tooltip={t('nodes.addLinearView')}
+        aria-label={t('nodes.addLinearView')}
+        icon={<PiPlusBold />}
+        onClick={handleExposeField}
+        pointerEvents="auto"
+        size="xs"
+      />
+    );
+  } else {
+    return (
+      <IconButton
+        variant="ghost"
+        tooltip={t('nodes.removeLinearView')}
+        aria-label={t('nodes.removeLinearView')}
+        icon={<PiMinusBold />}
+        onClick={handleUnexposeField}
+        pointerEvents="auto"
+        size="xs"
+      />
+    );
+  }
 };
 
 export default memo(FieldLinearViewToggle);
