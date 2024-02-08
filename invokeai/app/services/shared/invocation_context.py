@@ -167,16 +167,19 @@ class ImagesInterface(InvocationContextInterface):
             **Use this only if you want to override or provide metadata manually!**
         """
 
-        # If the invocation inherits metadata, use that. Else, use the metadata passed in.
-        metadata_ = (
-            self._context_data.invocation.metadata
-            if isinstance(self._context_data.invocation, WithMetadata)
-            else metadata
-        )
+        # If `metadata` is provided directly, use that. Else, use the metadata provided by `WithMetadata`, falling back to None.
+        metadata_ = None
+        if metadata:
+            metadata_ = metadata
+        elif isinstance(self._context_data.invocation, WithMetadata):
+            metadata_ = self._context_data.invocation.metadata
 
-        # If the invocation inherits WithBoard, use that. Else, use the board_id passed in.
-        board_ = self._context_data.invocation.board if isinstance(self._context_data.invocation, WithBoard) else None
-        board_id_ = board_.board_id if board_ is not None else board_id
+        # If `board_id` is provided directly, use that. Else, use the board provided by `WithBoard`, falling back to None.
+        board_id_ = None
+        if board_id:
+            board_id_ = board_id
+        elif isinstance(self._context_data.invocation, WithBoard) and self._context_data.invocation.board:
+            board_id_ = self._context_data.invocation.board.board_id
 
         return self._services.images.create(
             image=image,
