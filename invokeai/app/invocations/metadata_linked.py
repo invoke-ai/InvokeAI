@@ -15,7 +15,8 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.latent import SAMPLER_NAME_VALUES, SchedulerOutput
 from invokeai.app.invocations.metadata import MetadataOutput
-from invokeai.app.invocations.primitives import FloatOutput, ImageField, IntegerOutput, StringOutput
+from invokeai.app.invocations.model import VaeField
+from invokeai.app.invocations.primitives import BooleanOutput, FloatOutput, ImageField, IntegerOutput, StringOutput
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.version import __version__
 
@@ -35,6 +36,10 @@ CORE_LABELS = Literal[
     "steps",
     "scheduler",
     "clip_skip",
+    "model",
+    "vae",
+    "seamless_x",
+    "seamless_y",
 ]
 
 CORE_LABELS_STRING = Literal[
@@ -60,9 +65,20 @@ CORE_LABELS_FLOAT = Literal[
     "cfg_rescale_multiplier",
 ]
 
+CORE_LABELS_BOOL = Literal[
+    f"{CUSTOM_LABEL}",
+    "seamless_x",
+    "seamless_y",
+]
+
 CORE_LABELS_SCHEDULER = Literal[
     f"{CUSTOM_LABEL}",
     "scheduler",
+]
+
+CORE_LABELS_MODEL = Literal[
+    f"{CUSTOM_LABEL}",
+    "model",
 ]
 
 
@@ -72,6 +88,7 @@ def validate_custom_label(
         "MetadataToStringInvocation",
         "MetadataToIntegerInvocation",
         "MetadataToFloatInvocation",
+        "MetadataToBoolInvocation",
         "MetadataToSchedulerInvocation",
     ],
 ):
@@ -107,8 +124,11 @@ class MetadataItemLinkedInvocation(BaseInvocation, WithMetadata):
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
     def invoke(self, context: InvocationContext) -> MetadataOutput:
+        k = self.custom_label if self.label == CUSTOM_LABEL else self.label
+        v = self.value.vae if isinstance(self.value, VaeField) else self.value
+
         data = {} if self.metadata is None else self.metadata.model_dump()
-        data.update({self.custom_label if self.label == CUSTOM_LABEL else self.label: self.value})
+        data.update({k: v})
         data.update({"app_version": __version__})
 
         return MetadataOutput(metadata=MetadataField.model_validate(data))
@@ -230,6 +250,38 @@ class MetadataToFloatInvocation(BaseInvocation, WithMetadata):
         output = data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
 
         return FloatOutput(value=float(output))
+
+
+@invocation(
+    "metadata_to_bool",
+    title="Metadata To Bool",
+    tags=["metadata"],
+    category="metadata",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
+class MetadataToBoolInvocation(BaseInvocation, WithMetadata):
+    """Extracts a Boolean value of a label from metadata"""
+
+    label: CORE_LABELS_BOOL = InputField(
+        default=CUSTOM_LABEL,
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+    custom_label: Optional[str] = InputField(
+        default=None,
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+    default_value: bool = InputField(description="The default bool to use if not found in the metadata")
+
+    _validate_custom_label = model_validator(mode="after")(validate_custom_label)
+
+    def invoke(self, context: InvocationContext) -> BooleanOutput:
+        data = {} if self.metadata is None else self.metadata.model_dump()
+        output = data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
+
+        return BooleanOutput(value=bool(output))
 
 
 @invocation(
