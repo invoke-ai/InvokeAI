@@ -22,26 +22,30 @@ class DeleteAllResult:
     freed_space_bytes: float
 
 
-class ObjectSerializerEphemeralDisk(ObjectSerializerBase[T]):
-    """Provides a disk-backed ephemeral storage for arbitrary python objects. The storage is cleared at startup.
+class ObjectSerializerDisk(ObjectSerializerBase[T]):
+    """Provides a disk-backed storage for arbitrary python objects.
 
     :param output_folder: The folder where the objects will be stored
+    :param delete_on_startup: If True, all objects in the output folder will be deleted on startup
     """
 
-    def __init__(self, output_dir: Path):
+    def __init__(self, output_dir: Path, delete_on_startup: bool = False):
         super().__init__()
         self._output_dir = output_dir
         self._output_dir.mkdir(parents=True, exist_ok=True)
+        self._delete_on_startup = delete_on_startup
         self.__obj_class_name: Optional[str] = None
 
     def start(self, invoker: "Invoker") -> None:
         self._invoker = invoker
-        delete_all_result = self._delete_all()
-        if delete_all_result.deleted_count > 0:
-            freed_space_in_mb = round(delete_all_result.freed_space_bytes / 1024 / 1024, 2)
-            self._invoker.services.logger.info(
-                f"Deleted {delete_all_result.deleted_count} {self._obj_class_name} files (freed {freed_space_in_mb}MB)"
-            )
+
+        if self._delete_on_startup:
+            delete_all_result = self._delete_all()
+            if delete_all_result.deleted_count > 0:
+                freed_space_in_mb = round(delete_all_result.freed_space_bytes / 1024 / 1024, 2)
+                self._invoker.services.logger.info(
+                    f"Deleted {delete_all_result.deleted_count} {self._obj_class_name} files (freed {freed_space_in_mb}MB)"
+                )
 
     def load(self, name: str) -> T:
         file_path = self._get_path(name)
