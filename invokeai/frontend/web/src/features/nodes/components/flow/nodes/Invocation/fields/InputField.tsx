@@ -4,12 +4,13 @@ import { useDoesInputHaveValue } from 'features/nodes/hooks/useDoesInputHaveValu
 import { useFieldInputInstance } from 'features/nodes/hooks/useFieldInputInstance';
 import { useFieldInputTemplate } from 'features/nodes/hooks/useFieldInputTemplate';
 import type { PropsWithChildren } from 'react';
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import EditableFieldTitle from './EditableFieldTitle';
 import FieldContextMenu from './FieldContextMenu';
 import FieldHandle from './FieldHandle';
+import FieldLinearViewToggle from './FieldLinearViewToggle';
 import InputFieldRenderer from './InputFieldRenderer';
 
 interface Props {
@@ -22,6 +23,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
   const fieldTemplate = useFieldInputTemplate(nodeId, fieldName);
   const fieldInstance = useFieldInputInstance(nodeId, fieldName);
   const doesFieldHaveValue = useDoesInputHaveValue(nodeId, fieldName);
+  const [isHovered, setIsHovered] = useState(false);
 
   const { isConnected, isConnectionInProgress, isConnectionStartField, connectionError, shouldDim } =
     useConnectionState({ nodeId, fieldName, kind: 'input' });
@@ -45,6 +47,14 @@ const InputField = ({ nodeId, fieldName }: Props) => {
 
     return false;
   }, [fieldTemplate, isConnected, doesFieldHaveValue]);
+
+  const handleMouseOver = useCallback(() => {
+    setIsHovered(true);
+  }, []);
+
+  const handleMouseOut = useCallback(() => {
+    setIsHovered(false);
+  }, []);
 
   if (!fieldTemplate || !fieldInstance) {
     return (
@@ -87,17 +97,20 @@ const InputField = ({ nodeId, fieldName }: Props) => {
   return (
     <InputFieldWrapper shouldDim={shouldDim}>
       <FormControl isInvalid={isMissingInput} isDisabled={isConnected} orientation="vertical" px={2}>
-        <Flex flexDir="column" w="full" gap={1}>
+        <Flex flexDir="column" w="full" gap={1} onMouseEnter={handleMouseOver} onMouseLeave={handleMouseOut}>
           <FieldContextMenu nodeId={nodeId} fieldName={fieldName} kind="input">
             {(ref) => (
-              <EditableFieldTitle
-                ref={ref}
-                nodeId={nodeId}
-                fieldName={fieldName}
-                kind="input"
-                isMissingInput={isMissingInput}
-                withTooltip
-              />
+              <Flex>
+                <EditableFieldTitle
+                  ref={ref}
+                  nodeId={nodeId}
+                  fieldName={fieldName}
+                  kind="input"
+                  isMissingInput={isMissingInput}
+                  withTooltip
+                />
+                <FieldLinearViewToggle nodeId={nodeId} fieldName={fieldName} isHovered={isHovered} />
+              </Flex>
             )}
           </FieldContextMenu>
           <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
