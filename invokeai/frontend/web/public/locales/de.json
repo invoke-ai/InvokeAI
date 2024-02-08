@@ -603,7 +603,8 @@
         "resetWebUIDesc2": "Wenn die Bilder nicht in der Galerie angezeigt werden oder etwas anderes nicht funktioniert, versuchen Sie bitte, die Einstellungen zurückzusetzen, bevor Sie einen Fehler auf GitHub melden.",
         "resetComplete": "Die Web-Oberfläche wurde zurückgesetzt.",
         "models": "Modelle",
-        "useSlidersForAll": "Schieberegler für alle Optionen verwenden"
+        "useSlidersForAll": "Schieberegler für alle Optionen verwenden",
+        "showAdvancedOptions": "Erweiterte Optionen anzeigen"
     },
     "toast": {
         "tempFoldersEmptied": "Temp-Ordner geleert",
@@ -714,7 +715,7 @@
         "showResultsOff": "Zeige Ergebnisse (Aus)"
     },
     "accessibility": {
-        "modelSelect": "Model Auswahl",
+        "modelSelect": "Modell-Auswahl",
         "uploadImage": "Bild hochladen",
         "previousImage": "Voriges Bild",
         "useThisParameter": "Benutze diesen Parameter",
@@ -752,7 +753,7 @@
         "selectBoard": "Ordner aussuchen",
         "cancel": "Abbrechen",
         "addBoard": "Ordner hinzufügen",
-        "uncategorized": "Nicht kategorisiert",
+        "uncategorized": "Ohne Kategorie",
         "downloadBoard": "Ordner runterladen",
         "changeBoard": "Ordner wechseln",
         "loading": "Laden...",
@@ -948,19 +949,39 @@
     },
     "popovers": {
         "noiseUseCPU": {
-            "heading": "Nutze Prozessor rauschen"
+            "heading": "Nutze Prozessor rauschen",
+            "paragraphs": [
+                null,
+                null,
+                "CPU-Rauschen einzuschalten beeinflusst nicht die Systemleistung."
+            ]
         },
         "paramModel": {
-            "heading": "Modell"
+            "heading": "Modell",
+            "paragraphs": [
+                "Modell für die Entrauschungsschritte.",
+                "Verschiedene Modelle werden in der Regel so trainiert, dass sie sich auf die Erzeugung bestimmter Ästhetik und/oder Inhalte spezialisiert."
+            ]
         },
         "paramIterations": {
-            "heading": "Iterationen"
+            "heading": "Iterationen",
+            "paragraphs": [
+                "Die Anzahl der Bilder, die erzeugt werden sollen.",
+                "Wenn \"Dynamische Prompts\" aktiviert ist, wird jeder einzelne Prompt so oft generiert."
+            ]
         },
         "paramCFGScale": {
-            "heading": "CFG-Skala"
+            "heading": "CFG-Skala",
+            "paragraphs": [
+                "Bestimmt, wie viel Ihr Prompt den Erzeugungsprozess beeinflusst."
+            ]
         },
         "paramSteps": {
-            "heading": "Schritte"
+            "heading": "Schritte",
+            "paragraphs": [
+                "Anzahl der Schritte, die bei jeder Generierung durchgeführt werden.",
+                "Höhere Schrittzahlen werden in der Regel bessere Bilder ergeben, aber mehr Zeit benötigen."
+            ]
         },
         "lora": {
             "heading": "LoRA Gewichte"
@@ -969,13 +990,56 @@
             "heading": "Füllmethode"
         },
         "paramVAE": {
-            "heading": "VAE"
+            "heading": "VAE",
+            "paragraphs": [
+                "Verwendetes Modell, um den KI-Ausgang in das endgültige Bild zu übersetzen."
+            ]
+        },
+        "paramRatio": {
+            "heading": "Seitenverhältnis",
+            "paragraphs": [
+                "Das Seitenverhältnis des erzeugten Bildes.",
+                "Für SD1.5-Modelle wird eine Bildgröße von 512x512 Pixel empfohlen, für SDXL-Modelle sind es 1024x1024 Pixel."
+            ]
+        },
+        "paramDenoisingStrength": {
+            "paragraphs": [
+                "Wie viel Rauschen dem Eingabebild hinzugefügt wird.",
+                "0 wird zu einem identischen Bild führen, während 1 zu einem völlig neuen Bild führt."
+            ],
+            "heading": "Stärke der Entrauschung"
+        },
+        "paramVAEPrecision": {
+            "heading": "VAE-Präzision",
+            "paragraphs": [
+                "Die bei der VAE-Kodierung und Dekodierung verwendete Präzision. FP16/Halbpräzision ist effizienter, aber auf Kosten kleiner Bildvariationen."
+            ]
+        },
+        "paramCFGRescaleMultiplier": {
+            "heading": "CFG Rescale Multiplikator",
+            "paragraphs": [
+                "Rescale-Multiplikator für die CFG-Lenkung, der für Modelle verwendet wird, die mit dem zero-terminal SNR (ztsnr) trainiert wurden. Empfohlener Wert: 0,7."
+            ]
+        },
+        "scaleBeforeProcessing": {
+            "paragraphs": [
+                "Skaliert den ausgewählten Bereich auf die Größe, die für das Modell am besten geeignet ist."
+            ],
+            "heading": "Skalieren vor der Verarbeitung"
+        },
+        "paramSeed": {
+            "paragraphs": [
+                "Kontrolliert das für die Erzeugung verwendete Startrauschen.",
+                "Deaktivieren Sie “Random Seed”, um identische Ergebnisse mit den gleichen Generierungseinstellungen zu erzeugen."
+            ],
+            "heading": "Seed"
         }
     },
     "ui": {
         "lockRatio": "Verhältnis sperren",
         "hideProgressImages": "Verstecke Prozess Bild",
-        "showProgressImages": "Zeige Prozess Bild"
+        "showProgressImages": "Zeige Prozess Bild",
+        "swapSizes": "Tausche Größen"
     },
     "invocationCache": {
         "disable": "Deaktivieren",
@@ -1065,10 +1129,103 @@
         "imageCollection": "Bildersammlung",
         "imageCollectionDescription": "Eine Sammlung von Bildern.",
         "denoiseMaskField": "Entrauschen-Maske",
-        "ipAdapterCollection": "IP-Adapter Sammlung"
+        "ipAdapterCollection": "IP-Adapter Sammlung",
+        "newWorkflowDesc2": "Ihr aktueller Arbeitsablauf hat ungespeicherte Änderungen.",
+        "problemSettingTitle": "Problem beim Einstellen des Titels",
+        "noConnectionData": "Keine Verbindungsdaten",
+        "outputField": "Ausgabefeld",
+        "outputFieldInInput": "Ausgabefeld im Eingang",
+        "problemReadingWorkflow": "Problem beim Lesen des Arbeitsablaufs vom Bild",
+        "reloadNodeTemplates": "Knoten-Vorlagen neu laden",
+        "newWorkflow": "Neuer Arbeitsablauf",
+        "newWorkflowDesc": "Einen neuen Arbeitsablauf erstellen?",
+        "noFieldsLinearview": "Keine Felder zur linearen Ansicht hinzugefügt",
+        "clearWorkflow": "Arbeitsablauf löschen",
+        "clearWorkflowDesc": "Diesen Arbeitsablauf löschen und neu starten?",
+        "noConnectionInProgress": "Es besteht keine Verbindung",
+        "notes": "Anmerkungen",
+        "nodeVersion": "Knoten Version",
+        "noOutputSchemaName": "Kein Name des Ausgabeschemas im ref-Objekt gefunden",
+        "node": "Knoten",
+        "nodeSearch": "Knoten suchen",
+        "removeLinearView": "Entfernen aus Linear View",
+        "nodeOutputs": "Knoten-Ausgänge",
+        "nodeTemplate": "Knoten-Vorlage",
+        "nodeType": "Knotentyp",
+        "noFieldType": "Kein Feldtyp",
+        "oNNXModelField": "ONNX-Modell",
+        "noMatchingNodes": "Keine passenden Knoten",
+        "noNodeSelected": "Kein Knoten gewählt",
+        "noImageFoundState": "Kein Anfangsbild im Status gefunden",
+        "nodeOpacity": "Knoten-Deckkraft",
+        "noOutputRecorded": "Keine Ausgänge aufgezeichnet",
+        "outputSchemaNotFound": "Ausgabeschema nicht gefunden",
+        "oNNXModelFieldDescription": "ONNX-Modellfeld.",
+        "outputNode": "Ausgabeknoten",
+        "pickOne": "Eins auswählen",
+        "problemReadingMetadata": "Problem beim Lesen von Metadaten aus dem Bild",
+        "notesDescription": "Anmerkungen zum Arbeitsablauf hinzufügen",
+        "outputFields": "Ausgabefelder",
+        "sDXLRefinerModelField": "Refiner-Modell",
+        "sDXLMainModelFieldDescription": "SDXL Modellfeld.",
+        "clearWorkflowDesc2": "Ihr aktueller Arbeitsablauf hat ungespeicherte Änderungen.",
+        "skipped": "Übersprungen",
+        "schedulerDescription": "Zu erledigen",
+        "scheduler": "Planer",
+        "showGraphNodes": "Graph Overlay anzeigen",
+        "showMinimapnodes": "MiniMap anzeigen",
+        "sDXLMainModelField": "SDXL Modell",
+        "skippedReservedInput": "Reserviertes Eingabefeld übersprungen",
+        "sDXLRefinerModelFieldDescription": "Zu erledigen",
+        "showLegendNodes": "Feldtyp-Legende anzeigen",
+        "skippedReservedOutput": "Reserviertes Ausgangsfeld übersprungen",
+        "skippingInputNoTemplate": "Überspringe Eingabefeld ohne Vorlage",
+        "executionStateCompleted": "Erledigt",
+        "denoiseMaskFieldDescription": "Denoise Maske kann zwischen Knoten weitergegeben werden",
+        "downloadWorkflow": "Workflow JSON herunterladen",
+        "executionStateInProgress": "In Bearbeitung",
+        "snapToGridHelp": "Knoten am Gitternetz einrasten bei Bewegung",
+        "controlCollection": "Control-Sammlung",
+        "controlFieldDescription": "Control-Informationen zwischen Knotenpunkten weitergegeben.",
+        "latentsField": "Latents",
+        "mainModelFieldDescription": "Zu erledigen",
+        "missingTemplate": "Ungültiger Knoten: Knoten {{node}} vom Typ {{type}} fehlt Vorlage (nicht installiert?)",
+        "skippingUnknownInputType": "Überspringe unbekannten Eingabe-Feldtyp",
+        "stringCollectionDescription": "Eine Sammlung von Zeichenfolgen.",
+        "string": "Zeichenfolge",
+        "stringCollection": "Sammlung von Zeichenfolgen",
+        "stringDescription": "Zeichenfolgen (Strings) sind Text.",
+        "fieldTypesMustMatch": "Feldtypen müssen übereinstimmen",
+        "fitViewportNodes": "An Ansichtsgröße anpassen",
+        "missingCanvaInitMaskImages": "Fehlende Startbilder und Masken auf der Arbeitsfläche",
+        "missingCanvaInitImage": "Fehlendes Startbild auf der Arbeitsfläche",
+        "ipAdapterModelDescription": "IP-Adapter-Modellfeld",
+        "latentsPolymorphicDescription": "Zwischen Nodes können Latents weitergegeben werden.",
+        "loadingNodes": "Lade Nodes...",
+        "latentsCollectionDescription": "Zwischen Knoten können Latents weitergegeben werden.",
+        "mismatchedVersion": "Ungültiger Knoten: Knoten {{node}} vom Typ {{type}} hat keine passende Version (Update versuchen?)",
+        "colorCollectionDescription": "Zu erledigen",
+        "ipAdapterPolymorphicDescription": "Eine Sammlung von IP-Adaptern.",
+        "fullyContainNodesHelp": "Nodes müssen vollständig innerhalb der Auswahlbox sein, um ausgewählt werden zu können",
+        "latentsFieldDescription": "Zwischen Nodes können Latents weitergegeben werden.",
+        "noWorkflow": "Kein Workflow",
+        "hideGraphNodes": "Graph Overlay verbergen",
+        "sourceNode": "Quellknoten",
+        "executionStateError": "Fehler",
+        "latentsCollection": "Latents Sammlung",
+        "maybeIncompatible": "Möglicherweise inkompatibel mit installierten",
+        "nodePack": "Knoten-Pack",
+        "skippingUnknownOutputType": "Überspringe unbekannten Ausgabe-Feldtyp",
+        "loadWorkflow": "Lade Workflow",
+        "snapToGrid": "Am Gitternetz einrasten",
+        "skippingReservedFieldType": "Überspringe reservierten Feldtyp",
+        "loRAModelField": "LoRA",
+        "loRAModelFieldDescription": "Zu erledigen",
+        "mainModelField": "Modell",
+        "doesNotExist": "existiert nicht"
     },
     "hrf": {
-        "enableHrf": "Aktivieren Sie die Korrektur für hohe Auflösungen",
+        "enableHrf": "Korrektur für hohe Auflösungen",
         "upscaleMethod": "Vergrößerungsmethoden",
         "enableHrfTooltip": "Generieren Sie mit einer niedrigeren Anfangsauflösung, skalieren Sie auf die Basisauflösung hoch und führen Sie dann Image-to-Image aus.",
         "metadata": {
