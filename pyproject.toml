@@ -55,12 +55,12 @@ dependencies = [
   "transformers==4.37.2",
 
   # Core application dependencies, pinned for reproducible builds.
-  "fastapi-events==0.10.0",
-  "fastapi==0.108.0",
+  "fastapi-events==0.10.1",
+  "fastapi==0.109.2",
   "huggingface-hub==0.20.3",
   "pydantic-settings==2.1.0",
   "pydantic==2.5.3",
-  "python-socketio==5.11.0",
+  "python-socketio==5.11.1",
   "uvicorn[standard]==0.25.0",
 
   # Auxiliary dependencies, pinned only if necessary.
