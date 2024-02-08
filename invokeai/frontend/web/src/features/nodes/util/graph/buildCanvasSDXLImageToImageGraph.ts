@@ -124,6 +124,7 @@ export const buildCanvasSDXLImageToImageGraph = (state: RootState, initialImage:
         id: SDXL_DENOISE_LATENTS,
         is_intermediate,
         cfg_scale,
+        cfg_rescale_multiplier,
         scheduler,
         steps,
         denoising_start: refinerModel ? Math.min(refinerStart, 1 - strength) : 1 - strength,

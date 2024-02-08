@@ -126,6 +126,7 @@ export const buildLinearSDXLImageToImageGraph = (state: RootState): NonNullableG
         type: 'denoise_latents',
         id: SDXL_DENOISE_LATENTS,
         cfg_scale,
+        cfg_rescale_multiplier,
         scheduler,
         steps,
         denoising_start: refinerModel ? Math.min(refinerStart, 1 - strength) : 1 - strength,
