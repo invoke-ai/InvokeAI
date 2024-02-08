@@ -5,7 +5,7 @@ from logging import Logger
 import torch
 
 from invokeai.app.services.item_storage.item_storage_memory import ItemStorageMemory
-from invokeai.app.services.object_serializer.object_serializer_ephemeral_disk import ObjectSerializerEphemeralDisk
+from invokeai.app.services.object_serializer.object_serializer_disk import ObjectSerializerDisk
 from invokeai.app.services.object_serializer.object_serializer_forward_cache import ObjectSerializerForwardCache
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.backend.model_manager.metadata import ModelMetadataStore
@@ -90,9 +90,11 @@ class ApiDependencies:
         image_records = SqliteImageRecordStorage(db=db)
         images = ImageService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
-        tensors = ObjectSerializerForwardCache(ObjectSerializerEphemeralDisk[torch.Tensor](output_folder / "tensors"))
+        tensors = ObjectSerializerForwardCache(
+            ObjectSerializerDisk[torch.Tensor](output_folder / "tensors", delete_on_startup=True)
+        )
         conditioning = ObjectSerializerForwardCache(
-            ObjectSerializerEphemeralDisk[ConditioningFieldData](output_folder / "conditioning")
+            ObjectSerializerDisk[ConditioningFieldData](output_folder / "conditioning", delete_on_startup=True)
         )
         model_manager = ModelManagerService(config, logger)
         model_record_service = ModelRecordServiceSQL(db=db)
