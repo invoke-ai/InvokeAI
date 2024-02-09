@@ -5,6 +5,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
+import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import { useControlAdapterControlImage } from 'features/controlAdapters/hooks/useControlAdapterControlImage';
 import { useControlAdapterProcessedControlImage } from 'features/controlAdapters/hooks/useControlAdapterProcessedControlImage';
@@ -91,19 +92,14 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
       return;
     }
 
+    const width = roundToMultiple(controlImage.width, 8);
+    const height = roundToMultiple(controlImage.height, 8);
+
     if (activeTabName === 'unifiedCanvas') {
-      dispatch(
-        setBoundingBoxDimensions(
-          {
-            width: controlImage.width,
-            height: controlImage.height,
-          },
-          optimalDimension
-        )
-      );
+      dispatch(setBoundingBoxDimensions({ width, height }, optimalDimension));
     } else {
-      dispatch(widthChanged(controlImage.width));
-      dispatch(heightChanged(controlImage.height));
+      dispatch(widthChanged(width));
+      dispatch(heightChanged(height));
     }
   }, [controlImage, activeTabName, dispatch, optimalDimension]);
 
