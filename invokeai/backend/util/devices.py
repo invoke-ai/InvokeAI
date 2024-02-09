@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import nullcontext
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 import torch
 from torch import autocast
@@ -31,7 +31,9 @@ def choose_torch_device() -> torch.device:
 
 # We are in transition here from using a single global AppConfig to allowing multiple
 # configurations. It is strongly recommended to pass the app_config to this function.
-def choose_precision(device: torch.device, app_config: Optional[InvokeAIAppConfig] = None) -> str:
+def choose_precision(
+    device: torch.device, app_config: Optional[InvokeAIAppConfig] = None
+) -> Literal["float32", "float16", "bfloat16"]:
     """Return an appropriate precision for the given torch device."""
     app_config = app_config or config
     if device.type == "cuda":
