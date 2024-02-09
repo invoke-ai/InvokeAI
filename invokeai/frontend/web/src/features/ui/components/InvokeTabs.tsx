@@ -40,7 +40,6 @@ export interface InvokeTabInfo {
   translationKey: string;
   icon: ReactElement;
   content: ReactNode;
-  optionsPanel?: ReactNode;
 }
 
 const tabs: InvokeTabInfo[] = [
@@ -49,28 +48,24 @@ const tabs: InvokeTabInfo[] = [
     translationKey: 'common.txt2img',
     icon: <RiInputMethodLine />,
     content: <TextToImageTab />,
-    optionsPanel: <ParametersPanel />,
   },
   {
     id: 'img2img',
     translationKey: 'common.img2img',
     icon: <RiImage2Line />,
     content: <ImageTab />,
-    optionsPanel: <ParametersPanel />,
   },
   {
     id: 'unifiedCanvas',
     translationKey: 'common.unifiedCanvas',
     icon: <RiBrushLine />,
     content: <UnifiedCanvasTab />,
-    optionsPanel: <ParametersPanel />,
   },
   {
     id: 'nodes',
     translationKey: 'common.nodes',
     icon: <PiFlowArrowBold />,
     content: <NodesTab />,
-    optionsPanel: <NodeEditorPanelGroup />,
   },
   {
     id: 'modelManager',
@@ -91,6 +86,7 @@ const enabledTabsSelector = createMemoizedSelector(selectConfigSlice, (config) =
 );
 
 export const NO_GALLERY_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
+export const NO_OPTIONS_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
 const panelStyles: CSSProperties = { height: '100%', width: '100%' };
 const GALLERY_MIN_SIZE_PX = 310;
 const GALLERY_MIN_SIZE_PCT = 20;
@@ -112,6 +108,7 @@ const InvokeTabs = () => {
       e.target.blur();
     }
   }, []);
+  const shouldShowOptionsPanel = useMemo(() => !NO_OPTIONS_PANEL_TABS.includes(activeTabName), [activeTabName]);
   const shouldShowGalleryPanel = useMemo(() => !NO_GALLERY_PANEL_TABS.includes(activeTabName), [activeTabName]);
 
   const tabs = useMemo(
@@ -134,10 +131,6 @@ const InvokeTabs = () => {
       )),
     [enabledTabs, t, handleClickTab, activeTabName]
   );
-
-  const activeTabData = useMemo(() => {
-    return enabledTabs.find((tab) => tab.id === activeTabName);
-  }, [enabledTabs, activeTabName]);
 
   const tabPanels = useMemo(
     () => enabledTabs.map((tab) => <TabPanel key={tab.id}>{tab.content}</TabPanel>),
@@ -244,7 +237,7 @@ const InvokeTabs = () => {
         style={panelStyles}
         storage={panelStorage}
       >
-        {!!activeTabData?.optionsPanel && (
+        {shouldShowOptionsPanel && (
           <>
             <Panel
               id="options-panel"
@@ -256,7 +249,7 @@ const InvokeTabs = () => {
               onExpand={optionsPanel.onExpand}
               collapsible
             >
-              {activeTabData?.optionsPanel}
+              {activeTabName === 'nodes' ? <NodeEditorPanelGroup /> : <ParametersPanel />}
             </Panel>
             <ResizeHandle
               id="options-main-handle"
@@ -292,7 +285,7 @@ const InvokeTabs = () => {
           </>
         )}
       </PanelGroup>
-      {!!activeTabData?.optionsPanel && <FloatingParametersPanelButtons panelApi={optionsPanel} />}
+      {shouldShowOptionsPanel && <FloatingParametersPanelButtons panelApi={optionsPanel} />}
       {shouldShowGalleryPanel && <FloatingGalleryButton panelApi={galleryPanel} />}
     </Tabs>
   );

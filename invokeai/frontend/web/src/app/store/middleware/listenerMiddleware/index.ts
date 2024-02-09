@@ -23,7 +23,6 @@ import { addControlNetImageProcessedListener } from './listeners/controlNetImage
 import { addEnqueueRequestedCanvasListener } from './listeners/enqueueRequestedCanvas';
 import { addEnqueueRequestedLinear } from './listeners/enqueueRequestedLinear';
 import { addEnqueueRequestedNodes } from './listeners/enqueueRequestedNodes';
-import { addEnqueueRequestedWorkflow } from './listeners/enqueueRequestedWorkflow';
 import { addGetOpenAPISchemaListener } from './listeners/getOpenAPISchema';
 import {
   addImageAddedToBoardFulfilledListener,
@@ -109,7 +108,6 @@ addGalleryImageClickedListener();
 // User Invoked
 addEnqueueRequestedCanvasListener();
 addEnqueueRequestedNodes();
-addEnqueueRequestedWorkflow();
 addEnqueueRequestedLinear();
 addAnyEnqueuedListener();
 addBatchEnqueuedListener();

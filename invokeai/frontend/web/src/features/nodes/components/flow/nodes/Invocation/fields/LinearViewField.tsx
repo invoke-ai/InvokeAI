@@ -9,17 +9,15 @@ import { useTranslation } from 'react-i18next';
 import { PiInfoBold, PiTrashSimpleBold } from 'react-icons/pi';
 
 import EditableFieldTitle from './EditableFieldTitle';
-import FieldTitle from './FieldTitle';
 import FieldTooltipContent from './FieldTooltipContent';
 import InputFieldRenderer from './InputFieldRenderer';
 
 type Props = {
   nodeId: string;
   fieldName: string;
-  editable?: boolean;
 };
 
-const LinearViewField = ({ nodeId, fieldName, editable = true }: Props) => {
+const LinearViewField = ({ nodeId, fieldName }: Props) => {
   const dispatch = useAppDispatch();
   const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
   const { t } = useTranslation();
@@ -39,11 +37,7 @@ const LinearViewField = ({ nodeId, fieldName, editable = true }: Props) => {
       flexDir="column"
     >
       <Flex>
-        {editable ? (
-          <EditableFieldTitle nodeId={nodeId} fieldName={fieldName} kind="input" />
-        ) : (
-          <FieldTitle nodeId={nodeId} fieldName={fieldName} kind="input" />
-        )}
+        <EditableFieldTitle nodeId={nodeId} fieldName={fieldName} kind="input" />
         <Spacer />
         <Tooltip
           label={<FieldTooltipContent nodeId={nodeId} fieldName={fieldName} kind="input" />}
@@ -54,16 +48,14 @@ const LinearViewField = ({ nodeId, fieldName, editable = true }: Props) => {
             <Icon fontSize="sm" color="base.300" as={PiInfoBold} />
           </Flex>
         </Tooltip>
-        {editable && (
-          <IconButton
-            aria-label={t('nodes.removeLinearView')}
-            tooltip={t('nodes.removeLinearView')}
-            variant="ghost"
-            size="sm"
-            onClick={handleRemoveField}
-            icon={<PiTrashSimpleBold />}
-          />
-        )}
+        <IconButton
+          aria-label={t('nodes.removeLinearView')}
+          tooltip={t('nodes.removeLinearView')}
+          variant="ghost"
+          size="sm"
+          onClick={handleRemoveField}
+          icon={<PiTrashSimpleBold />}
+        />
       </Flex>
       <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
       <NodeSelectionOverlay isSelected={false} isHovered={isMouseOverNode} />
