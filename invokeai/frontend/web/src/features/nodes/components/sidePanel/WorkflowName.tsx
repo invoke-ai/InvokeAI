@@ -1,5 +1,6 @@
-import { Flex, Icon, Spacer, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { useTranslation } from 'react-i18next';
 import { PiInfoBold } from 'react-icons/pi';
 
 import WorkflowInfoTooltipContent from './viewMode/WorkflowInfoTooltipContent';
@@ -7,6 +8,7 @@ import { WorkflowWarning } from './viewMode/WorkflowWarning';
 
 export const WorkflowName = () => {
   const name = useAppSelector((s) => s.workflow.name);
+  const { t } = useTranslation();
 
   return (
     <>
@@ -26,7 +28,9 @@ export const WorkflowName = () => {
           <WorkflowWarning />
         </Flex>
       ) : (
-        <Spacer />
+        <Text fontSize="lg" fontStyle="italic" fontWeight="semibold">
+          {t('workflows.unnamedWorkflow')}
+        </Text>
       )}
     </>
   );

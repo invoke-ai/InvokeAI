@@ -13,7 +13,6 @@ import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
 import InspectorPanel from './inspector/InspectorPanel';
-import { ModeToggle } from './ModeToggle';
 import { WorkflowViewMode } from './viewMode/WorkflowViewMode';
 import WorkflowPanel from './workflow/WorkflowPanel';
 import { WorkflowMenu } from './WorkflowMenu';
@@ -46,7 +45,6 @@ const NodeEditorPanelGroup = () => {
         <WorkflowName />
         <WorkflowMenu />
       </Flex>
-      <ModeToggle />
 
       {mode === 'view' && <WorkflowViewMode />}
       {mode === 'edit' && (

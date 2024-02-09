@@ -11,6 +11,8 @@ import { isWorkflowWithID, useSaveLibraryWorkflow } from 'features/workflowLibra
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ModeToggle } from './ModeToggle';
+
 const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
   return {
     mode: workflow.mode,
@@ -47,6 +49,7 @@ export const WorkflowMenu = () => {
       <WorkflowLibraryButton />
       <UploadWorkflowButton />
       <NewWorkflowButton />
+      <ModeToggle />
     </Flex>
   );
 };
