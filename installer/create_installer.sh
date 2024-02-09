@@ -111,6 +111,10 @@ FILENAME=InvokeAI-installer-$VERSION.zip
 # Zip everything up
 zip -r ${FILENAME} InvokeAI-Installer
 
+echo
+echo -e "${BGREEN}Built installer: ./${FILENAME}${RESET}"
+echo -e "${BGREEN}Built PyPi distribution: ./dist${RESET}"
+
 # clean up, but only if we are not in a github action
 if [[ -z ${CI} ]]; then
     echo
