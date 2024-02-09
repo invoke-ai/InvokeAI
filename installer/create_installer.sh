@@ -118,8 +118,8 @@ echo -e "${BGREEN}Built PyPi distribution: ./dist${RESET}"
 # clean up, but only if we are not in a github action
 if [[ -z ${CI} ]]; then
     echo
-    echo "Cleaning up frontend files..."
-    rm -rf InvokeAI-Installer tmp dist ../invokeai/frontend/web/dist/
+    echo "Cleaning up intermediate build files..."
+    rm -rf InvokeAI-Installer tmp ../invokeai/frontend/web/dist/
 fi
 
 if [[ ! -z ${CI} ]]; then
