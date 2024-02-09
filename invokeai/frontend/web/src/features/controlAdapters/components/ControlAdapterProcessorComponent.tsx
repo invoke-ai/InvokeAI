@@ -6,6 +6,7 @@ import CannyProcessor from './processors/CannyProcessor';
 import ColorMapProcessor from './processors/ColorMapProcessor';
 import ContentShuffleProcessor from './processors/ContentShuffleProcessor';
 import DepthAnyThingProcessor from './processors/DepthAnyThingProcessor';
+import DWPoseProcessor from './processors/DWPoseProcessor';
 import HedProcessor from './processors/HedProcessor';
 import LineartAnimeProcessor from './processors/LineartAnimeProcessor';
 import LineartProcessor from './processors/LineartProcessor';
@@ -75,6 +76,10 @@ const ControlAdapterProcessorComponent = ({ id }: Props) => {
 
   if (processorNode.type === 'openpose_image_processor') {
     return <OpenposeProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
+  }
+
+  if (processorNode.type === 'dwpose_image_processor') {
+    return <DWPoseProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
   }
 
   if (processorNode.type === 'pidi_image_processor') {
