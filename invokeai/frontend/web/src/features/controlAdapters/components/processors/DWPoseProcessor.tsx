@@ -1,4 +1,4 @@
-import { Flex, FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
+import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type { RequiredDWPoseImageProcessorInvocation } from 'features/controlAdapters/store/types';
@@ -18,7 +18,7 @@ type Props = {
 
 const DWPoseProcessor = (props: Props) => {
   const { controlNetId, processorNode, isEnabled } = props;
-  const { draw_body, draw_face, draw_hands } = processorNode;
+  const { image_resolution, draw_body, draw_face, draw_hands } = processorNode;
   const processorChanged = useProcessorNodeChanged();
   const { t } = useTranslation();
 
@@ -43,6 +43,13 @@ const DWPoseProcessor = (props: Props) => {
     [controlNetId, processorChanged]
   );
 
+  const handleImageResolutionChanged = useCallback(
+    (v: number) => {
+      processorChanged(controlNetId, { image_resolution: v });
+    },
+    [controlNetId, processorChanged]
+  );
+
   return (
     <ProcessorWrapper>
       <Flex sx={{ flexDir: 'row', gap: 6 }}>
@@ -59,6 +66,24 @@ const DWPoseProcessor = (props: Props) => {
           <Switch defaultChecked={DEFAULTS.draw_hands} isChecked={draw_hands} onChange={handleDrawHandsChanged} />
         </FormControl>
       </Flex>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.imageResolution')}</FormLabel>
+        <CompositeSlider
+          value={image_resolution}
+          onChange={handleImageResolutionChanged}
+          defaultValue={DEFAULTS.image_resolution}
+          min={0}
+          max={4096}
+          marks
+        />
+        <CompositeNumberInput
+          value={image_resolution}
+          onChange={handleImageResolutionChanged}
+          defaultValue={DEFAULTS.image_resolution}
+          min={0}
+          max={4096}
+        />
+      </FormControl>
     </ProcessorWrapper>
   );
 };
