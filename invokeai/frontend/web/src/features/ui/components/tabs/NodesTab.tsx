@@ -1,9 +1,9 @@
+import { Box, Flex } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
+import CurrentImageDisplay from 'features/gallery/components/CurrentImage/CurrentImageDisplay';
 import NodeEditor from 'features/nodes/components/NodeEditor';
 import { memo } from 'react';
 import { ReactFlowProvider } from 'reactflow';
-import { useAppSelector } from '../../../../app/store/storeHooks';
-import { Box, Flex } from '@invoke-ai/ui-library';
-import CurrentImageDisplay from '../../../gallery/components/CurrentImage/CurrentImageDisplay';
 
 const NodesTab = () => {
   const mode = useAppSelector((s) => s.workflow.mode);

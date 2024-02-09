@@ -1,11 +1,12 @@
-import { t } from 'i18next';
-import { createMemoizedSelector } from '../../../../../app/store/createMemoizedSelector';
-import { useAppSelector } from '../../../../../app/store/storeHooks';
-import { IAINoContentFallback } from '../../../../../common/components/IAIImageFallback';
-import ScrollableContent from '../../../../../common/components/OverlayScrollbars/ScrollableContent';
-import { selectWorkflowSlice } from '../../../store/workflowSlice';
-import WorkflowField from './WorkflowField';
 import { Box, Flex } from '@invoke-ai/ui-library';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { useAppSelector } from 'app/store/storeHooks';
+import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
+import { t } from 'i18next';
+
+import WorkflowField from './WorkflowField';
 
 const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
   return {

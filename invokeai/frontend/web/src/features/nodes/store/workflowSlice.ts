@@ -24,7 +24,7 @@ export const blankWorkflow: Omit<WorkflowV2, 'nodes' | 'edges'> = {
 export const initialWorkflowState: WorkflowState = {
   _version: 1,
   isTouched: true,
-  mode: "view",
+  mode: 'view',
   ...blankWorkflow,
 };
 

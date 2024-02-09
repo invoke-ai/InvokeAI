@@ -1,26 +1,34 @@
+import type { ComboboxOnChange } from '@invoke-ai/ui-library';
+import { Combobox } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import type { WorkflowMode } from 'features/nodes/store/types';
+import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import { useCallback, useMemo } from 'react';
-import { useAppDispatch, useAppSelector } from '../../../../app/store/storeHooks';
-import { workflowModeChanged } from '../../store/workflowSlice';
-import { Combobox, ComboboxOnChange } from '@invoke-ai/ui-library';
-import { WorkflowMode } from '../../store/types';
-
-const MODE_OPTIONS = [
-  { value: 'view', label: 'View' },
-  { value: 'edit', label: 'Edit' },
-];
+import { useTranslation } from 'react-i18next';
 
 export const ModeToggle = () => {
   const dispatch = useAppDispatch();
   const mode = useAppSelector((s) => s.workflow.mode);
+  const { t } = useTranslation();
 
-  const onChange = useCallback<ComboboxOnChange>((v) => {
-    if (!v) {
-      return;
-    }
-    dispatch(workflowModeChanged(v.value as WorkflowMode));
-  }, []);
+  const modeOptions = useMemo(() => {
+    return [
+      { value: 'view', label: t('nodes.viewMode') },
+      { value: 'edit', label: t('nodes.editMode') },
+    ];
+  }, [t]);
 
-  const value = useMemo(() => MODE_OPTIONS.find((o) => o.value === mode), [mode]);
+  const onChange = useCallback<ComboboxOnChange>(
+    (v) => {
+      if (!v) {
+        return;
+      }
+      dispatch(workflowModeChanged(v.value as WorkflowMode));
+    },
+    [dispatch]
+  );
 
-  return <Combobox value={value} onChange={onChange} options={MODE_OPTIONS} colorScheme="invokeBlue.300" />;
+  const value = useMemo(() => modeOptions.find((o) => o.value === mode), [mode, modeOptions]);
+
+  return <Combobox value={value} onChange={onChange} options={modeOptions} colorScheme="invokeBlue.300" />;
 };
