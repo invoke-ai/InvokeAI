@@ -8,13 +8,13 @@ import { WorkflowWarningTooltip } from './WorkflowWarningTooltip';
 
 export const WorkflowWarning = () => {
   const nodesNeedUpdate = useGetNodesNeedUpdate();
-  const isTouched = useAppSelector((s) => s.workflow.isTouched);
+  const { isTouched, mode } = useAppSelector((s) => s.workflow);
 
   const showWarning = useMemo(() => {
     return nodesNeedUpdate || isTouched;
   }, [nodesNeedUpdate, isTouched]);
 
-  if (!showWarning) {
+  if (!showWarning || mode === 'edit') {
     return <></>;
   }
 

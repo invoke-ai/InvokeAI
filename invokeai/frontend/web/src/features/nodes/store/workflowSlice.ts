@@ -23,7 +23,7 @@ export const blankWorkflow: Omit<WorkflowV2, 'nodes' | 'edges'> = {
 
 export const initialWorkflowState: WorkflowState = {
   _version: 1,
-  isTouched: true,
+  isTouched: false,
   mode: 'view',
   ...blankWorkflow,
 };
@@ -82,7 +82,6 @@ export const workflowSlice = createSlice({
     workflowIDChanged: (state, action: PayloadAction<string>) => {
       state.id = action.payload;
     },
-    workflowReset: () => cloneDeep(initialWorkflowState),
     workflowSaved: (state) => {
       state.isTouched = false;
     },
@@ -120,7 +119,6 @@ export const {
   workflowVersionChanged,
   workflowContactChanged,
   workflowIDChanged,
-  workflowReset,
   workflowSaved,
 } = workflowSlice.actions;
 
