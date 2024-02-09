@@ -292,7 +292,7 @@ class OpenposeImageProcessorInvocation(ImageProcessorInvocation):
     image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
 
     def run_processor(self, image):
-        openpose_processor = OpenposeDetector.from_pretrained("lllyasviel/Annotators")
+        openpose_processor = OpenposeDetector.from_pretrained(pretrained_model_or_path="lllyasviel/Annotators")
         processed_image = openpose_processor(
             image,
             detect_resolution=self.detect_resolution,
@@ -649,8 +649,15 @@ class DWPoseImageProcessorInvocation(ImageProcessorInvocation):
     draw_body: bool = InputField(default=True)
     draw_face: bool = InputField(default=False)
     draw_hands: bool = InputField(default=False)
+    image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
 
     def run_processor(self, image):
         dwpose = DWPoseDetector()
-        processed_image = dwpose(image, draw_face=self.draw_face, draw_hands=self.draw_hands, draw_body=self.draw_body)
+        processed_image = dwpose(
+            image,
+            draw_face=self.draw_face,
+            draw_hands=self.draw_hands,
+            draw_body=self.draw_body,
+            resolution=self.image_resolution,
+        )
         return processed_image

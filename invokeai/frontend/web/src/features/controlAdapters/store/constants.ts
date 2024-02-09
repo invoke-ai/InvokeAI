@@ -232,6 +232,7 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
     default: {
       id: 'dwpose_image_processor',
       type: 'dwpose_image_processor',
+      image_resolution: 512,
       draw_body: true,
       draw_face: false,
       draw_hands: false,

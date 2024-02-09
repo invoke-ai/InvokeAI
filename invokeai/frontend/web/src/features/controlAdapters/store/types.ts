@@ -157,7 +157,7 @@ export type RequiredOpenposeImageProcessorInvocation = O.Required<
  */
 export type RequiredDWPoseImageProcessorInvocation = O.Required<
   DWPoseImageProcessorInvocation,
-  'type' | 'draw_body' | 'draw_face' | 'draw_hands'
+  'type' | 'image_resolution' | 'draw_body' | 'draw_face' | 'draw_hands'
 >;
 
 /**

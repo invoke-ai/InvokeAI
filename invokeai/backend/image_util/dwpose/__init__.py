@@ -1,12 +1,13 @@
 import numpy as np
 import torch
+from controlnet_aux.util import resize_image
 from PIL import Image
 
 from invokeai.backend.image_util.dwpose.utils import draw_bodypose, draw_facepose, draw_handpose
 from invokeai.backend.image_util.dwpose.wholebody import Wholebody
 
 
-def draw_pose(pose, H, W, draw_face=True, draw_body=True, draw_hands=True):
+def draw_pose(pose, H, W, draw_face=True, draw_body=True, draw_hands=True, resolution=512):
     bodies = pose["bodies"]
     faces = pose["faces"]
     hands = pose["hands"]
@@ -23,7 +24,11 @@ def draw_pose(pose, H, W, draw_face=True, draw_body=True, draw_hands=True):
     if draw_face:
         canvas = draw_facepose(canvas, faces)
 
-    dwpose_image = Image.fromarray(canvas)
+    dwpose_image = resize_image(
+        canvas,
+        resolution,
+    )
+    dwpose_image = Image.fromarray(dwpose_image)
 
     return dwpose_image
 
@@ -32,7 +37,9 @@ class DWPoseDetector:
     def __init__(self) -> None:
         self.pose_estimation = Wholebody()
 
-    def __call__(self, image: Image.Image, draw_face=False, draw_body=True, draw_hands=False) -> Image.Image:
+    def __call__(
+        self, image: Image.Image, draw_face=False, draw_body=True, draw_hands=False, resolution=512
+    ) -> Image.Image:
         np_image = np.array(image)
         H, W, C = np_image.shape
 
@@ -64,4 +71,6 @@ class DWPoseDetector:
             bodies = {"candidate": body, "subset": score}
             pose = {"bodies": bodies, "hands": hands, "faces": faces}
 
-            return draw_pose(pose, H, W, draw_face=draw_face, draw_hands=draw_hands, draw_body=draw_body)
+            return draw_pose(
+                pose, H, W, draw_face=draw_face, draw_hands=draw_hands, draw_body=draw_body, resolution=resolution
+            )
