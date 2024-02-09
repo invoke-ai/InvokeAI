@@ -1,14 +1,12 @@
 import { Flex, Icon, Spacer, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useGetNodesNeedUpdate } from 'features/nodes/hooks/useGetNodesNeedUpdate';
-import { PiInfoBold, PiWarningBold } from 'react-icons/pi';
+import { PiInfoBold } from 'react-icons/pi';
 
 import WorkflowInfoTooltipContent from './viewMode/WorkflowInfoTooltipContent';
-import { WorkflowWarningTooltip } from './workflow/WorkflowWarningTooltip';
+import { WorkflowWarning } from './viewMode/WorkflowWarning';
 
 export const WorkflowName = () => {
   const name = useAppSelector((s) => s.workflow.name);
-  const nodesNeedUpdate = useGetNodesNeedUpdate();
 
   return (
     <>
@@ -25,13 +23,7 @@ export const WorkflowName = () => {
               </Flex>
             </Flex>
           </Tooltip>
-          {nodesNeedUpdate && (
-            <Tooltip label={<WorkflowWarningTooltip />}>
-              <Flex h="full" alignItems="center" gap="2">
-                <Icon color="warning.400" as={PiWarningBold} />
-              </Flex>
-            </Tooltip>
-          )}
+          <WorkflowWarning />
         </Flex>
       ) : (
         <Spacer />

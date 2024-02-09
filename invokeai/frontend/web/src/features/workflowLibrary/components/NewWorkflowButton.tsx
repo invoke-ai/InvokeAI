@@ -28,8 +28,8 @@ const UploadWorkflowMenuItem = () => {
 
   return (
     <IconButton
-      aria-label={t('workflows.newWorkflow')}
-      tooltip={t('workflows.newWorkflow')}
+      aria-label={t('nodes.newWorkflow')}
+      tooltip={t('nodes.newWorkflow')}
       icon={<PiFlowArrowBold />}
       onClick={handleNewWorkflow}
       pointerEvents="auto"

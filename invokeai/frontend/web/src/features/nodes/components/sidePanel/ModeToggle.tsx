@@ -5,6 +5,7 @@ import type { WorkflowMode } from 'features/nodes/store/types';
 import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Select as ChakraReactSelect } from 'chakra-react-select';
 
 export const ModeToggle = () => {
   const dispatch = useAppDispatch();
