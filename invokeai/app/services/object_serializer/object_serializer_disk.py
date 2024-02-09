@@ -37,13 +37,11 @@ class ObjectSerializerDisk(ObjectSerializerBase[T]):
         self.__obj_class_name: Optional[str] = None
 
     def start(self, invoker: "Invoker") -> None:
-        self._invoker = invoker
-
         if self._delete_on_startup:
             delete_all_result = self._delete_all()
             if delete_all_result.deleted_count > 0:
                 freed_space_in_mb = round(delete_all_result.freed_space_bytes / 1024 / 1024, 2)
-                self._invoker.services.logger.info(
+                invoker.services.logger.info(
                     f"Deleted {delete_all_result.deleted_count} {self._obj_class_name} files (freed {freed_space_in_mb}MB)"
                 )
 
