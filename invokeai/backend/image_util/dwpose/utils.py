@@ -1,3 +1,5 @@
+# Code from the original DWPose Implementation: https://github.com/IDEA-Research/DWPose
+
 import math
 
 import cv2

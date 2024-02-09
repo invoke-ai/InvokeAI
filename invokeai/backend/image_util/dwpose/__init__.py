@@ -34,6 +34,11 @@ def draw_pose(pose, H, W, draw_face=True, draw_body=True, draw_hands=True, resol
 
 
 class DWPoseDetector:
+    """
+    Code from the original implementation of the DWPose Detector.
+    Credits: https://github.com/IDEA-Research/DWPose
+    """
+
     def __init__(self) -> None:
         self.pose_estimation = Wholebody()
 
