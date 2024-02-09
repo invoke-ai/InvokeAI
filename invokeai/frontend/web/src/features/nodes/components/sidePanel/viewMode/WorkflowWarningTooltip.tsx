@@ -1,7 +1,7 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
+import { useGetNodesNeedUpdate } from 'features/nodes/hooks/useGetNodesNeedUpdate';
 import { useTranslation } from 'react-i18next';
-import { useGetNodesNeedUpdate } from '../../../hooks/useGetNodesNeedUpdate';
-import { useAppSelector } from '../../../../../app/store/storeHooks';
 
 export const WorkflowWarningTooltip = () => {
   const { t } = useTranslation();

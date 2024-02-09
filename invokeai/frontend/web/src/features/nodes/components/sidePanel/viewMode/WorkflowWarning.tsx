@@ -1,9 +1,10 @@
 import { Flex, Icon, Tooltip } from '@invoke-ai/ui-library';
-import { PiWarningBold } from 'react-icons/pi';
-import { WorkflowWarningTooltip } from './WorkflowWarningTooltip';
-import { useGetNodesNeedUpdate } from '../../../hooks/useGetNodesNeedUpdate';
-import { useAppSelector } from '../../../../../app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
+import { useGetNodesNeedUpdate } from 'features/nodes/hooks/useGetNodesNeedUpdate';
 import { useMemo } from 'react';
+import { PiWarningBold } from 'react-icons/pi';
+
+import { WorkflowWarningTooltip } from './WorkflowWarningTooltip';
 
 export const WorkflowWarning = () => {
   const nodesNeedUpdate = useGetNodesNeedUpdate();
