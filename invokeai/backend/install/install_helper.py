@@ -37,7 +37,7 @@ from invokeai.backend.model_manager.metadata import UnknownMetadataException
 from invokeai.backend.util.logging import InvokeAILogger
 
 # name of the starter models file
-INITIAL_MODELS = "INITIAL_MODELS2.yaml"
+INITIAL_MODELS = "INITIAL_MODELS.yaml"
 
 
 def initialize_record_store(app_config: InvokeAIAppConfig) -> ModelRecordServiceBase:
