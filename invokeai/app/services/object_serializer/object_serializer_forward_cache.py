@@ -36,9 +36,9 @@ class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
         if cache_item is not None:
             return cache_item
 
-        latent = self._underlying_storage.load(name)
-        self._set_cache(name, latent)
-        return latent
+        obj = self._underlying_storage.load(name)
+        self._set_cache(name, obj)
+        return obj
 
     def save(self, obj: T) -> str:
         name = self._underlying_storage.save(obj)
