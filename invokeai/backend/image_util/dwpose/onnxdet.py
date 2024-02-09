@@ -62,7 +62,7 @@ def demo_postprocess(outputs, img_size, p6=False):
     hsizes = [img_size[0] // stride for stride in strides]
     wsizes = [img_size[1] // stride for stride in strides]
 
-    for hsize, wsize, stride in zip(hsizes, wsizes, strides):
+    for hsize, wsize, stride in zip(hsizes, wsizes, strides, strict=False):
         xv, yv = np.meshgrid(np.arange(wsize), np.arange(hsize))
         grid = np.stack((xv, yv), 2).reshape(1, -1, 2)
         grids.append(grid)
@@ -118,7 +118,7 @@ def inference_detector(session, oriImg):
         final_boxes, final_scores, final_cls_inds = dets[:, :4], dets[:, 4], dets[:, 5]
         isscore = final_scores > 0.3
         iscat = final_cls_inds == 0
-        isbbox = [i and j for (i, j) in zip(isscore, iscat)]
+        isbbox = [i and j for (i, j) in zip(isscore, iscat, strict=False)]
         final_boxes = final_boxes[isbbox]
     else:
         final_boxes = np.array([])
