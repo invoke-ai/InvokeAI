@@ -66,7 +66,7 @@ class ObjectSerializerDisk(ObjectSerializerBase[T]):
     def _obj_class_name(self) -> str:
         if not self.__obj_class_name:
             # `__orig_class__` is not available in the constructor for some technical, undoubtedly very pythonic reason
-            self.__obj_class_name = typing.get_args(self.__orig_class__)[0].__name__  # pyright: ignore [reportUnknownMemberType, reportGeneralTypeIssues]
+            self.__obj_class_name = typing.get_args(self.__orig_class__)[0].__name__  # pyright: ignore [reportUnknownMemberType, reportAttributeAccessIssue]
         return self.__obj_class_name
 
     def _get_path(self, name: str) -> Path:
