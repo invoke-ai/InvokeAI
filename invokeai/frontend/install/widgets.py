@@ -267,6 +267,17 @@ class SingleSelectWithChanged(npyscreen.SelectOne):
             self.on_changed(self.value)
 
 
+class CheckboxWithChanged(npyscreen.Checkbox):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.on_changed = None
+
+    def whenToggled(self):
+        super().whenToggled()
+        if self.on_changed:
+            self.on_changed(self.value)
+
+
 class SingleSelectColumnsSimple(SelectColumnBase, SingleSelectWithChanged):
     """Row of radio buttons. Spacebar to select."""
 
