@@ -136,8 +136,7 @@ dependencies = [
 
 # full commands
 "invokeai-configure" = "invokeai.frontend.install.invokeai_configure:invokeai_configure"
-"invokeai-merge" = "invokeai.frontend.merge:invokeai_merge_diffusers"
-"invokeai-merge2" = "invokeai.frontend.merge.merge_diffusers2:main"
+"invokeai-merge" = "invokeai.frontend.merge.merge_diffusers:main"
 "invokeai-ti" = "invokeai.frontend.training:invokeai_textual_inversion"
 "invokeai-model-install" = "invokeai.frontend.install.model_install:main"
 "invokeai-model-install2" = "invokeai.frontend.install.model_install2:main"              # will eventually be renamed to invokeai-model-install
