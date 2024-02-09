@@ -23,7 +23,7 @@ import ParamMainModelSelect from 'features/parameters/components/MainModel/Param
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import { filter, size } from 'lodash-es';
+import { filter } from 'lodash-es';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -33,7 +33,7 @@ const formLabelProps: FormLabelProps = {
 
 const badgesSelector = createMemoizedSelector(selectLoraSlice, selectGenerationSlice, (lora, generation) => {
   const enabledLoRAsCount = filter(lora.loras, (l) => !!l.isEnabled).length;
-  const loraTabBadges = size(lora.loras) ? [enabledLoRAsCount] : [];
+  const loraTabBadges = enabledLoRAsCount ? [enabledLoRAsCount] : [];
   const accordionBadges: (string | number)[] = [];
   if (generation.model) {
     accordionBadges.push(generation.model.model_name);
