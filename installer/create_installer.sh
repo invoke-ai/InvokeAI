@@ -28,6 +28,18 @@ VERSION=$(
 )
 VERSION="v${VERSION}"
 
+if [[ ! -z ${CI} ]]; then
+    echo
+    echo -e "${BCYAN}CI environment detected${RESET}"
+    echo
+else
+    echo
+    echo -e "${BYELLOW}This script must be run from the installer directory!${RESET}"
+    echo "The current working directory is $(pwd)"
+    read -p "If that looks right, press any key to proceed, or CTRL-C to exit..."
+    echo
+fi
+
 echo -e "${BGREEN}HEAD${RESET}:"
 git_show HEAD
 echo
@@ -35,7 +47,6 @@ echo
 # ---------------------- FRONTEND ----------------------
 
 pushd ../invokeai/frontend/web >/dev/null
-echo
 echo "Installing frontend dependencies..."
 echo
 pnpm i --frozen-lockfile
