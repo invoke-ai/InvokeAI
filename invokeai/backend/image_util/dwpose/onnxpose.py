@@ -1,3 +1,5 @@
+# Code from the original DWPose Implementation: https://github.com/IDEA-Research/DWPose
+
 from typing import List, Tuple
 
 import cv2

@@ -1,3 +1,6 @@
+# Code from the original DWPose Implementation: https://github.com/IDEA-Research/DWPose
+# Modified pathing to suit Invoke
+
 import pathlib
 
 import numpy as np
