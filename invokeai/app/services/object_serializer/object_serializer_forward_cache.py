@@ -10,7 +10,10 @@ if TYPE_CHECKING:
 
 
 class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
-    """Provides a simple forward cache for an underlying storage. The cache is LRU and has a maximum size."""
+    """
+    Provides a LRU cache for an instance of `ObjectSerializerBase`.
+    Saving an object to the cache always writes through to the underlying storage.
+    """
 
     def __init__(self, underlying_storage: ObjectSerializerBase[T], max_cache_size: int = 20):
         super().__init__()
