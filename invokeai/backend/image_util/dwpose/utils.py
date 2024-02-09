@@ -189,7 +189,7 @@ def draw_handpose(canvas, all_hand_peaks):
                     thickness=2,
                 )
 
-        for i, keyponit in enumerate(peaks):
+        for _, keyponit in enumerate(peaks):
             x, y = keyponit
             x = int(x * W)
             y = int(y * H)
