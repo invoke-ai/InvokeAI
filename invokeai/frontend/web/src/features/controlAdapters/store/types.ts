@@ -11,6 +11,7 @@ import type {
   ColorMapImageProcessorInvocation,
   ContentShuffleImageProcessorInvocation,
   DepthAnythingImageProcessorInvocation,
+  DWPoseImageProcessorInvocation,
   HedImageProcessorInvocation,
   LineartAnimeImageProcessorInvocation,
   LineartImageProcessorInvocation,
@@ -41,6 +42,7 @@ export type ControlAdapterProcessorNode =
   | MlsdImageProcessorInvocation
   | NormalbaeImageProcessorInvocation
   | OpenposeImageProcessorInvocation
+  | DWPoseImageProcessorInvocation
   | PidiImageProcessorInvocation
   | ZoeDepthImageProcessorInvocation;
 
@@ -151,6 +153,14 @@ export type RequiredOpenposeImageProcessorInvocation = O.Required<
 >;
 
 /**
+ * The DWPose processor node, with parameters flagged as required
+ */
+export type RequiredDWPoseImageProcessorInvocation = O.Required<
+  DWPoseImageProcessorInvocation,
+  'type' | 'draw_body' | 'draw_face' | 'draw_hands'
+>;
+
+/**
  * The Pidi processor node, with parameters flagged as required
  */
 export type RequiredPidiImageProcessorInvocation = O.Required<
@@ -180,6 +190,7 @@ export type RequiredControlAdapterProcessorNode =
       | RequiredMlsdImageProcessorInvocation
       | RequiredNormalbaeImageProcessorInvocation
       | RequiredOpenposeImageProcessorInvocation
+      | RequiredDWPoseImageProcessorInvocation
       | RequiredPidiImageProcessorInvocation
       | RequiredZoeDepthImageProcessorInvocation,
       'id'
@@ -303,6 +314,16 @@ export const isNormalbaeImageProcessorInvocation = (obj: unknown): obj is Normal
  */
 export const isOpenposeImageProcessorInvocation = (obj: unknown): obj is OpenposeImageProcessorInvocation => {
   if (isObject(obj) && 'type' in obj && obj.type === 'openpose_image_processor') {
+    return true;
+  }
+  return false;
+};
+
+/**
+ * Type guard for DWPoseImageProcessorInvocation
+ */
+export const isDWPoseImageProcessorInvocation = (obj: unknown): obj is DWPoseImageProcessorInvocation => {
+  if (isObject(obj) && 'type' in obj && obj.type === 'dwpose_image_processor') {
     return true;
   }
   return false;
