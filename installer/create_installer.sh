@@ -13,7 +13,7 @@ function git_show {
     git show -s --format=oneline --abbrev-commit "$1" | cat
 }
 
-if [[ -v "VIRTUAL_ENV" ]]; then
+if [[ ! -z "${VIRTUAL_ENV}" ]]; then
     # we can't just call 'deactivate' because this function is not exported
     # to the environment of this script from the bash process that runs the script
     echo -e "${BRED}A virtual environment is activated. Please deactivate it before proceeding.${RESET}"
