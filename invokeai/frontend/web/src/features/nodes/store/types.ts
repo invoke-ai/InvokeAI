@@ -33,9 +33,12 @@ export type NodesState = {
   selectionMode: SelectionMode;
 };
 
+export type WorkflowMode = "edit" | "view";
+
 export type WorkflowsState = Omit<WorkflowV2, 'nodes' | 'edges'> & {
   _version: 1;
   isTouched: boolean;
+  mode: WorkflowMode;
 };
 
 export type NodeTemplatesState = {

@@ -3,7 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesDeleted } from 'features/nodes/store/nodesSlice';
-import type { WorkflowsState as WorkflowState } from 'features/nodes/store/types';
+import type { WorkflowMode, WorkflowsState as WorkflowState } from 'features/nodes/store/types';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import type { WorkflowCategory, WorkflowV2 } from 'features/nodes/types/workflow';
 import { cloneDeep, isEqual, uniqBy } from 'lodash-es';
@@ -24,6 +24,7 @@ export const blankWorkflow: Omit<WorkflowV2, 'nodes' | 'edges'> = {
 export const initialWorkflowState: WorkflowState = {
   _version: 1,
   isTouched: true,
+  mode: "view",
   ...blankWorkflow,
 };
 
@@ -31,6 +32,9 @@ export const workflowSlice = createSlice({
   name: 'workflow',
   initialState: initialWorkflowState,
   reducers: {
+    workflowModeChanged: (state, action: PayloadAction<WorkflowMode>) => {
+      state.mode = action.payload;
+    },
     workflowExposedFieldAdded: (state, action: PayloadAction<FieldIdentifier>) => {
       state.exposedFields = uniqBy(
         state.exposedFields.concat(action.payload),
@@ -104,6 +108,7 @@ export const workflowSlice = createSlice({
 });
 
 export const {
+  workflowModeChanged,
   workflowExposedFieldAdded,
   workflowExposedFieldRemoved,
   workflowNameChanged,
