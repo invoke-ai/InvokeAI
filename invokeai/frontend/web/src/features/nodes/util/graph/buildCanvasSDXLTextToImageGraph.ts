@@ -117,7 +117,6 @@ export const buildCanvasSDXLTextToImageGraph = (state: RootState): NonNullableGr
         id: SDXL_DENOISE_LATENTS,
         is_intermediate,
         cfg_scale,
-        cfg_rescale_multiplier,
         scheduler,
         steps,
         denoising_start: 0,

@@ -115,7 +115,6 @@ export const buildCanvasTextToImageGraph = (state: RootState): NonNullableGraph 
         id: DENOISE_LATENTS,
         is_intermediate,
         cfg_scale,
-        cfg_rescale_multiplier,
         scheduler,
         steps,
         denoising_start: 0,
