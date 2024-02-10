@@ -263,6 +263,7 @@ class IPAdapterConfig(ModelConfigBase):
     """Model config for IP Adaptor format models."""
 
     type: Literal[ModelType.IPAdapter] = ModelType.IPAdapter
+    image_encoder_model_id: str
     format: Literal[ModelFormat.InvokeAI]
 
 
