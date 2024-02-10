@@ -21,7 +21,7 @@ Validation errors will raise an InvalidModelConfigException error.
 """
 import time
 from enum import Enum
-from typing import Literal, Optional, Type, Union
+from typing import Literal, Optional, Type, Union, Class
 
 import torch
 from diffusers import ModelMixin
@@ -333,9 +333,9 @@ class ModelConfigFactory(object):
     @classmethod
     def make_config(
         cls,
-        model_data: Union[dict, AnyModelConfig],
+        model_data: Union[Dict[str, Any], AnyModelConfig],
         key: Optional[str] = None,
-        dest_class: Optional[Type] = None,
+        dest_class: Optional[Type[Class]] = None,
         timestamp: Optional[float] = None,
     ) -> AnyModelConfig:
         """
