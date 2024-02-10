@@ -7,9 +7,11 @@ TODO(psyche): Do we want to dogfood this?
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
+    Classification,
     invocation,
     invocation_output,
 )
+from invokeai.app.invocations.constants import SCHEDULER_NAME_VALUES
 from invokeai.app.invocations.fields import (
     BoardField,
     ColorField,
@@ -28,6 +30,8 @@ from invokeai.app.invocations.fields import (
     WithMetadata,
     WithWorkflow,
 )
+from invokeai.app.invocations.latent import SchedulerOutput
+from invokeai.app.invocations.metadata import MetadataItemField, MetadataItemOutput, MetadataOutput
 from invokeai.app.invocations.model import (
     ClipField,
     CLIPOutput,
@@ -68,6 +72,7 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
+from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.model_management.model_manager import LoadedModelInfo
 from invokeai.backend.model_management.models.base import BaseModelType, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
@@ -77,11 +82,14 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ExtraConditioningInfo,
     SDXLConditioningInfo,
 )
+from invokeai.backend.util.devices import CPU_DEVICE, CUDA_DEVICE, MPS_DEVICE, choose_precision, choose_torch_device
+from invokeai.version import __version__
 
 __all__ = [
     # invokeai.app.invocations.baseinvocation
     "BaseInvocation",
     "BaseInvocationOutput",
+    "Classification",
     "invocation",
     "invocation_output",
     # invokeai.app.services.shared.invocation_context
@@ -103,6 +111,12 @@ __all__ = [
     "UIType",
     "WithMetadata",
     "WithWorkflow",
+    # invokeai.app.invocations.latent
+    "SchedulerOutput",
+    # invokeai.app.invocations.metadata
+    "MetadataItemField",
+    "MetadataItemOutput",
+    "MetadataOutput",
     # invokeai.app.invocations.model
     "ModelInfo",
     "LoraInfo",
@@ -157,4 +171,17 @@ __all__ = [
     "BaseModelType",
     "ModelType",
     "SubModelType",
+    # invokeai.app.invocations.constants
+    "SCHEDULER_NAME_VALUES",
+    # invokeai.version
+    "__version__",
+    # invokeai.backend.util.devices
+    "choose_precision",
+    "choose_torch_device",
+    "CPU_DEVICE",
+    "CUDA_DEVICE",
+    "MPS_DEVICE",
+    # invokeai.app.util.misc
+    "SEED_MAX",
+    "get_random_seed",
 ]
