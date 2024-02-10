@@ -21,7 +21,7 @@ Validation errors will raise an InvalidModelConfigException error.
 """
 import time
 from enum import Enum
-from typing import Literal, Optional, Type, Union, Class
+from typing import Literal, Optional, Type, Union
 
 import torch
 from diffusers import ModelMixin
@@ -335,7 +335,7 @@ class ModelConfigFactory(object):
         cls,
         model_data: Union[Dict[str, Any], AnyModelConfig],
         key: Optional[str] = None,
-        dest_class: Optional[Type[Class]] = None,
+        dest_class: Optional[Type[ModelConfigBase]] = None,
         timestamp: Optional[float] = None,
     ) -> AnyModelConfig:
         """
@@ -347,14 +347,17 @@ class ModelConfigFactory(object):
         :param dest_class: The config class to be returned. If not provided, will
         be selected automatically.
         """
+        model: Optional[ModelConfigBase] = None
         if isinstance(model_data, ModelConfigBase):
             model = model_data
         elif dest_class:
-            model = dest_class.validate_python(model_data)
+            model = dest_class.model_validate(model_data)
         else:
-            model = AnyModelConfigValidator.validate_python(model_data)
+            # mypy doesn't typecheck TypeAdapters well?
+            model = AnyModelConfigValidator.validate_python(model_data)  # type: ignore
+        assert model is not None
         if key:
             model.key = key
         if timestamp:
             model.last_modified = timestamp
-        return model
+        return model  # type: ignore
