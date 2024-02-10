@@ -23,6 +23,7 @@ from diffusers.schedulers import SchedulerMixin as Scheduler
 from pydantic import field_validator
 from torchvision.transforms.functional import resize as tv_resize
 
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
     ConditioningField,
     DenoiseMaskField,
@@ -78,12 +79,6 @@ if choose_torch_device() == torch.device("mps"):
 DEFAULT_PRECISION = choose_precision(choose_torch_device())
 
 SAMPLER_NAME_VALUES = Literal[tuple(SCHEDULER_MAP.keys())]
-
-# HACK: Many nodes are currently hard-coded to use a fixed latent scale factor of 8. This is fragile, and will need to
-# be addressed if future models use a different latent scale factor. Also, note that there may be places where the scale
-# factor is hard-coded to a literal '8' rather than using this constant.
-# The ratio of image:latent dimensions is LATENT_SCALE_FACTOR:1, or 8:1.
-LATENT_SCALE_FACTOR = 8
 
 
 @invocation_output("scheduler_output")
