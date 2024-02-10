@@ -34,7 +34,6 @@ classifiers = [
 dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
   "accelerate==0.26.1",
-  "basicsr==1.4.2",
   "clip_anytorch==2.5.2",       # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel==2.0.2",
   "controlnet-aux==0.0.7",

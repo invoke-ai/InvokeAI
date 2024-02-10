@@ -5,12 +5,12 @@ from typing import Literal
 import cv2
 import numpy as np
 import torch
-from basicsr.archs.rrdbnet_arch import RRDBNet
 from PIL import Image
 from pydantic import ConfigDict
 
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.backend.image_util.basicsr.rrdbnet_arch import RRDBNet
 from invokeai.backend.image_util.realesrgan.realesrgan import RealESRGAN
 from invokeai.backend.util.devices import choose_torch_device
 
