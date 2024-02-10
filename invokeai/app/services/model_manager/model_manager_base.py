@@ -14,8 +14,8 @@ from invokeai.app.services.shared.invocation_context import InvocationContextDat
 from invokeai.backend.model_management import (
     AddModelResult,
     BaseModelType,
+    LoadedModelInfo,
     MergeInterpolationMethod,
-    ModelInfo,
     ModelType,
     SchedulerPredictionType,
     SubModelType,
@@ -48,7 +48,7 @@ class ModelManagerServiceBase(ABC):
         model_type: ModelType,
         submodel: Optional[SubModelType] = None,
         context_data: Optional[InvocationContextData] = None,
-    ) -> ModelInfo:
+    ) -> LoadedModelInfo:
         """Retrieve the indicated model with name and type.
         submodel can be used to get a part (such as the vae)
         of a diffusers pipeline."""

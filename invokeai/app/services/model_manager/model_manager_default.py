@@ -16,8 +16,8 @@ from invokeai.app.services.shared.invocation_context import InvocationContextDat
 from invokeai.backend.model_management import (
     AddModelResult,
     BaseModelType,
+    LoadedModelInfo,
     MergeInterpolationMethod,
-    ModelInfo,
     ModelManager,
     ModelMerger,
     ModelNotFoundException,
@@ -98,7 +98,7 @@ class ModelManagerService(ModelManagerServiceBase):
         model_type: ModelType,
         submodel: Optional[SubModelType] = None,
         context_data: Optional[InvocationContextData] = None,
-    ) -> ModelInfo:
+    ) -> LoadedModelInfo:
         """
         Retrieve the indicated model. submodel can be used to get a
         part (such as the vae) of a diffusers mode.
@@ -114,7 +114,7 @@ class ModelManagerService(ModelManagerServiceBase):
                 submodel=submodel,
             )
 
-        model_info = self.mgr.get_model(
+        loaded_model_info = self.mgr.get_model(
             model_name,
             base_model,
             model_type,
@@ -128,10 +128,10 @@ class ModelManagerService(ModelManagerServiceBase):
                 base_model=base_model,
                 model_type=model_type,
                 submodel=submodel,
-                model_info=model_info,
+                loaded_model_info=loaded_model_info,
             )
 
-        return model_info
+        return loaded_model_info
 
     def model_exists(
         self,
@@ -273,7 +273,7 @@ class ModelManagerService(ModelManagerServiceBase):
         base_model: BaseModelType,
         model_type: ModelType,
         submodel: Optional[SubModelType] = None,
-        model_info: Optional[ModelInfo] = None,
+        loaded_model_info: Optional[LoadedModelInfo] = None,
     ):
         if self._invoker is None:
             return
@@ -281,7 +281,7 @@ class ModelManagerService(ModelManagerServiceBase):
         if self._invoker.services.queue.is_canceled(context_data.session_id):
             raise CanceledException()
 
-        if model_info:
+        if loaded_model_info:
             self._invoker.services.events.emit_model_load_completed(
                 queue_id=context_data.queue_id,
                 queue_item_id=context_data.queue_item_id,
@@ -291,7 +291,7 @@ class ModelManagerService(ModelManagerServiceBase):
                 base_model=base_model,
                 model_type=model_type,
                 submodel=submodel,
-                model_info=model_info,
+                loaded_model_info=loaded_model_info,
             )
         else:
             self._invoker.services.events.emit_model_load_started(
