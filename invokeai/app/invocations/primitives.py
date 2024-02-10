@@ -4,6 +4,7 @@ from typing import Optional
 
 import torch
 
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
     ColorField,
     ConditioningField,
@@ -321,8 +322,8 @@ class LatentsOutput(BaseInvocationOutput):
     def build(cls, latents_name: str, latents: torch.Tensor, seed: Optional[int] = None) -> "LatentsOutput":
         return cls(
             latents=LatentsField(latents_name=latents_name, seed=seed),
-            width=latents.size()[3] * 8,
-            height=latents.size()[2] * 8,
+            width=latents.size()[3] * LATENT_SCALE_FACTOR,
+            height=latents.size()[2] * LATENT_SCALE_FACTOR,
         )
 
 
