@@ -7,7 +7,7 @@ import torch
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.backend.install.model_install_backend import ModelInstall
-from invokeai.backend.model_management.model_manager import ModelInfo
+from invokeai.backend.model_management.model_manager import LoadedModelInfo
 from invokeai.backend.model_management.models.base import BaseModelType, ModelNotFoundException, ModelType, SubModelType
 
 
@@ -34,8 +34,8 @@ def install_and_load_model(
     base_model: BaseModelType,
     model_type: ModelType,
     submodel_type: Optional[SubModelType] = None,
-) -> ModelInfo:
-    """Install a model if it is not already installed, then get the ModelInfo for that model.
+) -> LoadedModelInfo:
+    """Install a model if it is not already installed, then get the LoadedModelInfo for that model.
 
     This is intended as a utility function for tests.
 
@@ -49,9 +49,9 @@ def install_and_load_model(
         submodel_type (Optional[SubModelType]): The submodel type, forwarded to ModelManager.get_model(...).
 
     Returns:
-        ModelInfo
+        LoadedModelInfo
     """
-    # If the requested model is already installed, return its ModelInfo.
+    # If the requested model is already installed, return its LoadedModelInfo.
     with contextlib.suppress(ModelNotFoundException):
         return model_installer.mgr.get_model(model_name, base_model, model_type, submodel_type)
 

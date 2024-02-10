@@ -13,7 +13,7 @@ from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
-from invokeai.backend.model_management.model_manager import ModelInfo
+from invokeai.backend.model_management.model_manager import LoadedModelInfo
 from invokeai.backend.model_management.models.base import BaseModelType, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
@@ -272,14 +272,15 @@ class ModelsInterface(InvocationContextInterface):
 
     def load(
         self, model_name: str, base_model: BaseModelType, model_type: ModelType, submodel: Optional[SubModelType] = None
-    ) -> ModelInfo:
+    ) -> LoadedModelInfo:
         """
-        Loads a model, returning its `ModelInfo` object.
+        Loads a model.
 
         :param model_name: The name of the model to get.
         :param base_model: The base model of the model to get.
         :param model_type: The type of the model to get.
         :param submodel: The submodel of the model to get.
+        :returns: An object representing the loaded model.
         """
 
         # The model manager emits events as it loads the model. It needs the context data to build

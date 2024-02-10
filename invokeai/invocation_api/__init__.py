@@ -52,7 +52,7 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
-from invokeai.backend.model_management.model_manager import ModelInfo
+from invokeai.backend.model_management.model_manager import LoadedModelInfo
 from invokeai.backend.model_management.models.base import BaseModelType, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
@@ -121,7 +121,7 @@ __all__ = [
     # invokeai.app.services.config.config_default
     "InvokeAIAppConfig",
     # invokeai.backend.model_management.model_manager
-    "ModelInfo",
+    "LoadedModelInfo",
     # invokeai.backend.model_management.models.base
     "BaseModelType",
     "ModelType",
