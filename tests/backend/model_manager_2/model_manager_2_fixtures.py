@@ -20,6 +20,7 @@ from invokeai.backend.model_manager.config import (
     ModelFormat,
     ModelType,
 )
+from invokeai.backend.model_manager.load import AnyModelLoader, ModelCache, ModelConvertCache
 from invokeai.backend.model_manager.metadata import ModelMetadataStore
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager_2.model_metadata.metadata_examples import (
@@ -87,6 +88,16 @@ def mm2_app_config(mm2_root_dir: Path) -> InvokeAIAppConfig:
         models_dir=mm2_root_dir / "models",
     )
     return app_config
+
+
+@pytest.fixture
+def mm2_loader(mm2_app_config: InvokeAIAppConfig, mm2_record_store: ModelRecordServiceSQL) -> AnyModelLoader:
+    logger = InvokeAILogger.get_logger(config=mm2_app_config)
+    ram_cache = ModelCache(
+        logger=logger, max_cache_size=mm2_app_config.ram_cache_size, max_vram_cache_size=mm2_app_config.vram_cache_size
+    )
+    convert_cache = ModelConvertCache(mm2_app_config.models_convert_cache_path)
+    return AnyModelLoader(app_config=mm2_app_config, logger=logger, ram_cache=ram_cache, convert_cache=convert_cache)
 
 
 @pytest.fixture

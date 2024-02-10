@@ -6,6 +6,7 @@ from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import 
 class Migration6Callback:
     def __call__(self, cursor: sqlite3.Cursor) -> None:
         self._recreate_model_triggers(cursor)
+        self._delete_ip_adapters(cursor)
 
     def _recreate_model_triggers(self, cursor: sqlite3.Cursor) -> None:
         """
@@ -26,6 +27,22 @@ class Migration6Callback:
             """
         )
 
+    def _delete_ip_adapters(self, cursor: sqlite3.Cursor) -> None:
+        """
+        Delete all the IP adapters.
+
+        The model manager will automatically find and re-add them after the migration
+        is done. This allows the manager to add the correct image encoder to their
+        configuration records.
+        """
+
+        cursor.execute(
+            """--sql
+            DELETE FROM model_config
+              WHERE type='ip_adapter';
+            """
+        )
+
 
 def build_migration_6() -> Migration:
     """
@@ -33,6 +50,8 @@ def build_migration_6() -> Migration:
 
     This migration does the following:
     - Adds the model_config_updated_at trigger if it does not exist
+    - Delete all ip_adapter models so that the model prober can find and
+      update with the correct image processor model.
     """
     migration_6 = Migration(
         from_version=5,
