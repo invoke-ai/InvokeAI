@@ -4,9 +4,6 @@ from logging import Logger
 
 from invokeai.app.services.item_storage.item_storage_memory import ItemStorageMemory
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
-from invokeai.backend.model_manager.load import AnyModelLoader, ModelConvertCache
-from invokeai.backend.model_manager.load.model_cache import ModelCache
-from invokeai.backend.model_manager.metadata import ModelMetadataStore
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
 
@@ -27,9 +24,7 @@ from ..services.invocation_stats.invocation_stats_default import InvocationStats
 from ..services.invoker import Invoker
 from ..services.latents_storage.latents_storage_disk import DiskLatentsStorage
 from ..services.latents_storage.latents_storage_forward_cache import ForwardCacheLatentsStorage
-from ..services.model_install import ModelInstallService
 from ..services.model_manager.model_manager_default import ModelManagerService
-from ..services.model_records import ModelRecordServiceSQL
 from ..services.names.names_default import SimpleNameService
 from ..services.session_processor.session_processor_default import DefaultSessionProcessor
 from ..services.session_queue.session_queue_sqlite import SqliteSessionQueue
@@ -87,26 +82,10 @@ class ApiDependencies:
         images = ImageService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         latents = ForwardCacheLatentsStorage(DiskLatentsStorage(f"{output_folder}/latents"))
-        model_loader = AnyModelLoader(
-            app_config=config,
-            logger=logger,
-            ram_cache=ModelCache(
-                max_cache_size=config.ram_cache_size, max_vram_cache_size=config.vram_cache_size, logger=logger
-            ),
-            convert_cache=ModelConvertCache(
-                cache_path=config.models_convert_cache_path, max_size=config.convert_cache_size
-            ),
-        )
-        model_record_service = ModelRecordServiceSQL(db=db, loader=model_loader)
         download_queue_service = DownloadQueueService(event_bus=events)
-        model_install_service = ModelInstallService(
-            app_config=config,
-            record_store=model_record_service,
-            download_queue=download_queue_service,
-            metadata_store=ModelMetadataStore(db=db),
-            event_bus=events,
+        model_manager = ModelManagerService.build_model_manager(
+            app_config=configuration, db=db, download_queue=download_queue_service, events=events
         )
-        model_manager = ModelManagerService(config, logger)  # TO DO: legacy model manager v1. Remove
         names = SimpleNameService()
         performance_statistics = InvocationStatsService()
         processor = DefaultInvocationProcessor()
@@ -131,9 +110,7 @@ class ApiDependencies:
             latents=latents,
             logger=logger,
             model_manager=model_manager,
-            model_records=model_record_service,
             download_queue=download_queue_service,
-            model_install=model_install_service,
             names=names,
             performance_statistics=performance_statistics,
             processor=processor,

@@ -20,7 +20,7 @@ from .baseinvocation import (
 
 
 class ModelInfo(BaseModel):
-    key: str = Field(description="Info to load submodel")
+    key: str = Field(description="Key of model as returned by ModelRecordServiceBase.get_model()")
     submodel: Optional[SubModelType] = Field(default=None, description="Info to load submodel")
 
 

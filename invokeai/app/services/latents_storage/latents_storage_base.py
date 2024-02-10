@@ -5,7 +5,7 @@ from typing import Callable, Union
 
 import torch
 
-from ..compel import ConditioningFieldData
+from invokeai.app.invocations.compel import ConditioningFieldData
 
 
 class LatentsStorageBase(ABC):

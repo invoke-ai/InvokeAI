@@ -5,9 +5,9 @@ from typing import Union
 
 import torch
 
+from invokeai.app.invocations.compel import ConditioningFieldData
 from invokeai.app.services.invoker import Invoker
 
-from ..compel import ConditioningFieldData
 from .latents_storage_base import LatentsStorageBase
 
 

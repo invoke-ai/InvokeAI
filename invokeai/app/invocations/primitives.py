@@ -368,7 +368,7 @@ class LatentsCollectionInvocation(BaseInvocation):
         return LatentsCollectionOutput(collection=self.collection)
 
 
-def build_latents_output(latents_name: str, latents: torch.Tensor, seed: Optional[int] = None):
+def build_latents_output(latents_name: str, latents: torch.Tensor, seed: Optional[int] = None) -> LatentsOutput:
     return LatentsOutput(
         latents=LatentsField(latents_name=latents_name, seed=seed),
         width=latents.size()[3] * 8,

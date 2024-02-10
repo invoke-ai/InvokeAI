@@ -15,8 +15,8 @@ from invokeai.app.invocations.primitives import ConditioningField, ConditioningO
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
-from invokeai.backend import ModelType, SubModelType
 from invokeai.backend.embeddings.model_patcher import ONNXModelPatcher
+from invokeai.backend.model_manager import ModelType, SubModelType
 
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.util import choose_torch_device
@@ -62,16 +62,16 @@ class ONNXPromptInvocation(BaseInvocation):
     clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
 
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        tokenizer_info = context.services.model_records.load_model(
+        tokenizer_info = context.services.model_manager.load.load_model_by_key(
             **self.clip.tokenizer.model_dump(),
         )
-        text_encoder_info = context.services.model_records.load_model(
+        text_encoder_info = context.services.model_manager.load.load_model_by_key(
             **self.clip.text_encoder.model_dump(),
         )
         with tokenizer_info as orig_tokenizer, text_encoder_info as text_encoder:  # , ExitStack() as stack:
             loras = [
                 (
-                    context.services.model_records.load_model(**lora.model_dump(exclude={"weight"})).model,
+                    context.services.model_manager.load.load_model_by_key(**lora.model_dump(exclude={"weight"})).model,
                     lora.weight,
                 )
                 for lora in self.clip.loras
@@ -84,7 +84,7 @@ class ONNXPromptInvocation(BaseInvocation):
                     ti_list.append(
                         (
                             name,
-                            context.services.model_records.load_model_by_attr(
+                            context.services.model_manager.load.load_model_by_attr(
                                 model_name=name,
                                 base_model=text_encoder_info.config.base,
                                 model_type=ModelType.TextualInversion,
@@ -257,13 +257,13 @@ class ONNXTextToLatentsInvocation(BaseInvocation):
                 eta=0.0,
             )
 
-        unet_info = context.services.model_records.load_model(**self.unet.unet.model_dump())
+        unet_info = context.services.model_manager.load.load_model_by_key(**self.unet.unet.model_dump())
 
         with unet_info as unet:  # , ExitStack() as stack:
             # loras = [(stack.enter_context(context.services.model_manager.get_model(**lora.dict(exclude={"weight"}))), lora.weight) for lora in self.unet.loras]
             loras = [
                 (
-                    context.services.model_records.load_model(**lora.model_dump(exclude={"weight"})).model,
+                    context.services.model_manager.load.load_model_by_key(**lora.model_dump(exclude={"weight"})).model,
                     lora.weight,
                 )
                 for lora in self.unet.loras
@@ -346,7 +346,7 @@ class ONNXLatentsToImageInvocation(BaseInvocation, WithMetadata):
         if self.vae.vae.submodel != SubModelType.VaeDecoder:
             raise Exception(f"Expected vae_decoder, found: {self.vae.vae.submodel}")
 
-        vae_info = context.services.model_records.load_model(
+        vae_info = context.services.model_manager.load.load_model_by_key(
             **self.vae.vae.model_dump(),
         )
 

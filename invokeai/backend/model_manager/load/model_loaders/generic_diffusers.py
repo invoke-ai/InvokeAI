@@ -12,8 +12,9 @@ from invokeai.backend.model_manager import (
     ModelType,
     SubModelType,
 )
-from invokeai.backend.model_manager.load.load_base import AnyModelLoader
-from invokeai.backend.model_manager.load.load_default import ModelLoader
+
+from ..load_base import AnyModelLoader
+from ..load_default import ModelLoader
 
 
 @AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.CLIPVision, format=ModelFormat.Diffusers)

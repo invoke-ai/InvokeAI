@@ -8,8 +8,7 @@ from fastapi.routing import APIRouter
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from starlette.exceptions import HTTPException
 
-from invokeai.backend import BaseModelType, ModelType
-from invokeai.backend.model_management import MergeInterpolationMethod
+from invokeai.backend.model_management import BaseModelType, MergeInterpolationMethod, ModelType
 from invokeai.backend.model_management.models import (
     OPENAPI_MODEL_CONFIGS,
     InvalidModelException,
