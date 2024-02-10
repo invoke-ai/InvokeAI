@@ -271,7 +271,7 @@ CONFIG_FILE_VERSION = "3.0.0"
 
 
 @dataclass
-class ModelInfo:
+class LoadedModelInfo:
     context: ModelLocker
     name: str
     base_model: BaseModelType
@@ -450,7 +450,7 @@ class ModelManager(object):
         base_model: BaseModelType,
         model_type: ModelType,
         submodel_type: Optional[SubModelType] = None,
-    ) -> ModelInfo:
+    ) -> LoadedModelInfo:
         """Given a model named identified in models.yaml, return
         an ModelInfo object describing it.
         :param model_name: symbolic name of the model in models.yaml
@@ -508,7 +508,7 @@ class ModelManager(object):
 
         model_hash = "<NO_HASH>"  # TODO:
 
-        return ModelInfo(
+        return LoadedModelInfo(
             context=model_context,
             name=model_name,
             base_model=base_model,
