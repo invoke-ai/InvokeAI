@@ -4,6 +4,7 @@
 import torch
 from pydantic import field_validator
 
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import FieldDescriptions, InputField, LatentsField, OutputField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
@@ -70,8 +71,8 @@ class NoiseOutput(BaseInvocationOutput):
     def build(cls, latents_name: str, latents: torch.Tensor, seed: int) -> "NoiseOutput":
         return cls(
             noise=LatentsField(latents_name=latents_name, seed=seed),
-            width=latents.size()[3] * 8,
-            height=latents.size()[2] * 8,
+            width=latents.size()[3] * LATENT_SCALE_FACTOR,
+            height=latents.size()[2] * LATENT_SCALE_FACTOR,
         )
 
 
@@ -93,13 +94,13 @@ class NoiseInvocation(BaseInvocation):
     )
     width: int = InputField(
         default=512,
-        multiple_of=8,
+        multiple_of=LATENT_SCALE_FACTOR,
         gt=0,
         description=FieldDescriptions.width,
     )
     height: int = InputField(
         default=512,
-        multiple_of=8,
+        multiple_of=LATENT_SCALE_FACTOR,
         gt=0,
         description=FieldDescriptions.height,
     )
