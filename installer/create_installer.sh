@@ -14,11 +14,19 @@ function is_bin_in_path {
 }
 
 function git_show {
-    git show -s --format='%h %s' $1
+    git show -s --format=oneline --abbrev-commit "$1" | cat
 }
+
+if [[ -v "VIRTUAL_ENV" ]]; then
+    # we can't just call 'deactivate' because this function is not exported
+    # to the environment of this script from the bash process that runs the script
+    echo -e "${BRED}A virtual environment is activated. Please deactivate it before proceeding.${RESET}"
+    exit -1
+fi
 
 cd "$(dirname "$0")"
 
+echo
 echo -e "${BYELLOW}This script must be run from the installer directory!${RESET}"
 echo "The current working directory is $(pwd)"
 read -p "If that looks right, press any key to proceed, or CTRL-C to exit..."
@@ -32,13 +40,6 @@ if ! is_bin_in_path python && is_bin_in_path python3; then
     }
 fi
 
-if [[ -v "VIRTUAL_ENV" ]]; then
-    # we can't just call 'deactivate' because this function is not exported
-    # to the environment of this script from the bash process that runs the script
-    echo -e "${BRED}A virtual environment is activated. Please deactivate it before proceeding.${RESET}"
-    exit -1
-fi
-
 VERSION=$(
     cd ..
     python -c "from invokeai.version import __version__ as version; print(version)"
@@ -47,37 +48,8 @@ PATCH=""
 VERSION="v${VERSION}${PATCH}"
 
 echo -e "${BGREEN}HEAD${RESET}:"
-git_show
+git_show HEAD
 echo
-
-# ---------------------- FRONTEND ----------------------
-
-pushd ../invokeai/frontend/web >/dev/null
-echo
-echo "Installing frontend dependencies..."
-echo
-pnpm i --frozen-lockfile
-echo
-echo "Building frontend..."
-echo
-pnpm build
-popd
-
-# ---------------------- BACKEND ----------------------
-
-echo
-echo "Building wheel..."
-echo
-
-# install the 'build' package in the user site packages, if needed
-# could be improved by using a temporary venv, but it's tiny and harmless
-if [[ $(python -c 'from importlib.util import find_spec; print(find_spec("build") is None)') == "True" ]]; then
-    pip install --user build
-fi
-
-rm -rf ../build
-
-python -m build --wheel --outdir dist/ ../.
 
 # ----------------------
 
@@ -97,16 +69,13 @@ done
 mkdir InvokeAI-Installer/lib
 cp lib/*.py InvokeAI-Installer/lib
 
-# Move the wheel
-mv dist/*.whl InvokeAI-Installer/lib/
-
 # Install scripts
 # Mac/Linux
 cp install.sh.in InvokeAI-Installer/install.sh
 chmod a+x InvokeAI-Installer/install.sh
 
 # Windows
-perl -p -e "s/^set INVOKEAI_VERSION=.*/set INVOKEAI_VERSION=$VERSION/" install.bat.in >InvokeAI-Installer/install.bat
+cp install.bat.in InvokeAI-Installer/install.bat
 cp WinLongPathsEnabled.reg InvokeAI-Installer/
 
 # Zip everything up

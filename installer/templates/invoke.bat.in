@@ -15,7 +15,7 @@ echo 4. Download and install models
 echo 5. Change InvokeAI startup options
 echo 6. Re-run the configure script to fix a broken install or to complete a major upgrade
 echo 7. Open the developer console
-echo 8. Update InvokeAI
+echo 8. Update InvokeAI (DEPRECATED - please use the installer)
 echo 9. Run the InvokeAI image database maintenance script
 echo 10. Command-line help
 echo Q - Quit
@@ -52,8 +52,10 @@ IF /I "%choice%" == "1" (
     echo *** Type `exit` to quit this shell and deactivate the Python virtual environment ***
     call cmd /k
 ) ELSE IF /I "%choice%" == "8" (
-   echo Running invokeai-update...
-   python -m invokeai.frontend.install.invokeai_update
+    echo UPDATING FROM WITHIN THE APP IS BEING DEPRECATED.
+    echo Please download the installer from https://github.com/invoke-ai/InvokeAI/releases/latest and run it to update your installation.
+    timeout 4
+    python -m invokeai.frontend.install.invokeai_update
 ) ELSE IF /I "%choice%" == "9" (
    echo Running the db maintenance script...
    python .venv\Scripts\invokeai-db-maintenance.exe
@@ -77,4 +79,3 @@ pause
 
 :ending
 exit /b
-

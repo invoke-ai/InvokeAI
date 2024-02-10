@@ -3,6 +3,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
+import { workflowLoadedFromFile } from 'features/workflowLibrary/store/actions';
 import type { RefObject } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +30,7 @@ export const useLoadWorkflowFromFile: UseLoadWorkflowFromFile = ({ resetRef }) =
         try {
           const parsedJSON = JSON.parse(String(rawJSON));
           dispatch(workflowLoadRequested({ workflow: parsedJSON, asCopy: true }));
+          dispatch(workflowLoadedFromFile());
         } catch (e) {
           // There was a problem reading the file
           logger.error(t('nodes.unableToLoadWorkflow'));

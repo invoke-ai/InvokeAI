@@ -7,10 +7,10 @@ import cv2
 import numpy as np
 import numpy.typing as npt
 import torch
-from basicsr.archs.rrdbnet_arch import RRDBNet
 from cv2.typing import MatLike
 from tqdm import tqdm
 
+from invokeai.backend.image_util.basicsr.rrdbnet_arch import RRDBNet
 from invokeai.backend.util.devices import choose_torch_device
 
 """
