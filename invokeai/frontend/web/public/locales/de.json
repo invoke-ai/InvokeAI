@@ -56,7 +56,7 @@
         "nodeEditor": "Knoten Editor",
         "statusMergingModels": "Modelle zusammenführen",
         "ipAdapter": "IP Adapter",
-        "controlAdapter": "Control Adapter",
+        "controlAdapter": "Control-Adapter",
         "auto": "Automatisch",
         "controlNet": "ControlNet",
         "imageFailedToLoad": "Kann Bild nicht laden",
@@ -75,12 +75,12 @@
         "linear": "Linear",
         "imagePrompt": "Bild Prompt",
         "checkpoint": "Checkpoint",
-        "inpaint": "inpaint",
+        "inpaint": "Inpaint",
         "simple": "Einfach",
         "template": "Vorlage",
         "outputs": "Ausgabe",
         "data": "Daten",
-        "safetensors": "Safetensors",
+        "safetensors": "Safe-Tensors",
         "outpaint": "Ausmalen",
         "details": "Details",
         "format": "Format",
@@ -161,16 +161,16 @@
     "hotkeys": {
         "keyboardShortcuts": "Tastenkürzel",
         "appHotkeys": "App-Tastenkombinationen",
-        "generalHotkeys": "Allgemeine Tastenkürzel",
-        "galleryHotkeys": "Galerie Tastenkürzel",
-        "unifiedCanvasHotkeys": "Unified Canvas Tastenkürzel",
+        "generalHotkeys": "Allgemein",
+        "galleryHotkeys": "Galerie",
+        "unifiedCanvasHotkeys": "Leinwand",
         "invoke": {
             "desc": "Ein Bild erzeugen",
             "title": "Invoke"
         },
         "cancel": {
             "title": "Abbrechen",
-            "desc": "Bilderzeugung abbrechen"
+            "desc": "Aktuelle Bilderzeugung abbrechen"
         },
         "focusPrompt": {
             "title": "Fokussiere Prompt",
@@ -356,7 +356,7 @@
             "title": "Staging-Bild akzeptieren",
             "desc": "Akzeptieren Sie das aktuelle Bild des Staging-Bereichs"
         },
-        "nodesHotkeys": "Knoten Tastenkürzel",
+        "nodesHotkeys": "Knoten",
         "addNodes": {
             "title": "Knotenpunkt hinzufügen",
             "desc": "Öffnet das Menü zum Hinzufügen von Knoten"
@@ -399,7 +399,7 @@
         "vaeLocation": "VAE Ort",
         "vaeLocationValidationMsg": "Pfad zum Speicherort Ihres VAE.",
         "width": "Breite",
-        "widthValidationMsg": "Standardbreite Ihres Models.",
+        "widthValidationMsg": "Standardbreite Ihres Modells.",
         "height": "Höhe",
         "heightValidationMsg": "Standardbhöhe Ihres Models.",
         "addModel": "Modell hinzufügen",
@@ -501,7 +501,7 @@
         "quickAdd": "Schnell hinzufügen",
         "simpleModelDesc": "Geben Sie einen Pfad zu einem lokalen Diffusers-Modell, einem lokalen Checkpoint-/Safetensors-Modell, einer HuggingFace-Repo-ID oder einer Checkpoint-/Diffusers-Modell-URL an.",
         "modelDeleted": "Modell gelöscht",
-        "inpainting": "v1 Inpainting",
+        "inpainting": "V1-Inpainting",
         "modelUpdateFailed": "Modellaktualisierung fehlgeschlagen",
         "useCustomConfig": "Benutzerdefinierte Konfiguration verwenden",
         "settings": "Einstellungen",
@@ -518,7 +518,7 @@
         "interpolationType": "Interpolationstyp",
         "oliveModels": "Olives",
         "variant": "Variante",
-        "loraModels": "LoRAs",
+        "loraModels": "\"LoRAs\"",
         "modelDeleteFailed": "Modell konnte nicht gelöscht werden",
         "mergedModelName": "Zusammengeführter Modellname",
         "checkpointOrSafetensors": "$t(common.checkpoint) / $t(common.safetensors)",
@@ -647,7 +647,7 @@
             "upscale": "Verwenden Sie ESRGAN, um das Bild unmittelbar nach der Erzeugung zu vergrößern.",
             "faceCorrection": "Gesichtskorrektur mit GFPGAN oder Codeformer: Der Algorithmus erkennt Gesichter im Bild und korrigiert alle Fehler. Ein hoher Wert verändert das Bild stärker, was zu attraktiveren Gesichtern führt. Codeformer mit einer höheren Genauigkeit bewahrt das Originalbild auf Kosten einer stärkeren Gesichtskorrektur.",
             "imageToImage": "Bild zu Bild lädt ein beliebiges Bild als Ausgangsbild, aus dem dann zusammen mit dem Prompt ein neues Bild erzeugt wird. Je höher der Wert ist, desto stärker wird das Ergebnisbild verändert. Werte von 0,0 bis 1,0 sind möglich, der empfohlene Bereich ist .25-.75",
-            "boundingBox": "Der Begrenzungsrahmen ist derselbe wie die Einstellungen für Breite und Höhe bei Text zu Bild oder Bild zu Bild. Es wird nur der Bereich innerhalb des Rahmens verarbeitet.",
+            "boundingBox": "Der Begrenzungsrahmen ist derselbe wie die Einstellungen für Breite und Höhe bei Text-zu-Bild oder Bild-zu-Bild. Es wird nur der Bereich innerhalb des Rahmens verarbeitet.",
             "seamCorrection": "Steuert die Behandlung von sichtbaren Übergängen, die zwischen den erzeugten Bildern auf der Leinwand auftreten.",
             "infillAndScaling": "Verwalten Sie Infill-Methoden (für maskierte oder gelöschte Bereiche der Leinwand) und Skalierung (nützlich für kleine Begrenzungsrahmengrößen)."
         }
@@ -727,11 +727,11 @@
         "modifyConfig": "Optionen einstellen",
         "toggleAutoscroll": "Auroscroll ein/ausschalten",
         "toggleLogViewer": "Log Betrachter ein/ausschalten",
-        "showOptionsPanel": "Zeige Optionen",
+        "showOptionsPanel": "Seitenpanel anzeigen",
         "reset": "Zurücksetzten",
         "nextImage": "Nächstes Bild",
         "zoomOut": "Verkleinern",
-        "rotateCounterClockwise": "Gegen den Uhrzeigersinn verdrehen",
+        "rotateCounterClockwise": "Gegen den Uhrzeigersinn drehen",
         "showGalleryPanel": "Galeriefenster anzeigen",
         "exitViewer": "Betrachten beenden",
         "menu": "Menü",
@@ -785,7 +785,7 @@
         "depthMidasDescription": "Tiefenmap erstellen mit Midas",
         "controlnet": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.controlNet))",
         "t2iEnabledControlNetDisabled": "$t(common.t2iAdapter) ist aktiv, $t(common.controlNet) ist deaktiviert",
-        "weight": "Breite",
+        "weight": "Einfluss",
         "selectModel": "Wähle ein Modell",
         "depthMidas": "Tiefe (Midas)",
         "w": "W",
@@ -810,14 +810,14 @@
         "controlAdapter_other": "Control Adapter",
         "colorMapTileSize": "Kachelgröße",
         "depthZoeDescription": "Tiefenmap erstellen mit Zoe",
-        "setControlImageDimensions": "Setze Control Bild Auflösung auf Breite/Höhe",
+        "setControlImageDimensions": "Setze Control-Bild Auflösung auf Breite/Höhe",
         "handAndFace": "Hand und Gesicht",
         "enableIPAdapter": "Aktiviere IP Adapter",
         "resize": "Größe ändern",
         "resetControlImage": "Zurücksetzen vom Referenz Bild",
         "balanced": "Ausgewogen",
         "prompt": "Prompt",
-        "resizeMode": "Größenänderungsmodus",
+        "resizeMode": "Größe",
         "processor": "Prozessor",
         "saveControlImage": "Speichere Referenz Bild",
         "safe": "Speichern",
@@ -842,10 +842,10 @@
         "autoConfigure": "Prozessor automatisch konfigurieren",
         "normalBaeDescription": "Normale BAE-Verarbeitung",
         "noneDescription": "Es wurde keine Verarbeitung angewendet",
-        "openPose": "Openpose",
-        "lineartAnime": "Lineart Anime",
+        "openPose": "Openpose / \"Pose nutzen\"",
+        "lineartAnime": "Lineart Anime / \"Strichzeichnung Anime\"",
         "mediapipeFaceDescription": "Gesichtserkennung mit Mediapipe",
-        "canny": "Canny",
+        "canny": "\"Canny\"",
         "hedDescription": "Ganzheitlich verschachtelte Kantenerkennung",
         "scribble": "Scribble",
         "maxFaces": "Maximale Anzahl Gesichter",
@@ -854,7 +854,7 @@
         "modelSize": "Modell Größe",
         "small": "Klein",
         "base": "Basis",
-        "depthAnything": "Depth Anything",
+        "depthAnything": "Depth Anything / \"Tiefe irgendwas\"",
         "depthAnythingDescription": "Erstellung einer Tiefenkarte mit der Depth Anything-Technik"
     },
     "queue": {
@@ -916,7 +916,9 @@
         "openQueue": "Warteschlange öffnen",
         "batchFailedToQueue": "Fehler beim Einreihen in die Stapelverarbeitung",
         "batchFieldValues": "Stapelverarbeitungswerte",
-        "batchQueued": "Stapelverarbeitung eingereiht"
+        "batchQueued": "Stapelverarbeitung eingereiht",
+        "graphQueued": "Graph eingereiht",
+        "graphFailedToQueue": "Fehler beim Einreihen des Graphen"
     },
     "metadata": {
         "negativePrompt": "Negativ Beschreibung",
@@ -937,22 +939,22 @@
         "generationMode": "Generierungsmodus",
         "Threshold": "Rauschen-Schwelle",
         "seed": "Seed",
-        "perlin": "Perlin Noise",
+        "perlin": "Perlin-Rauschen",
         "hiresFix": "Optimierung für hohe Auflösungen",
         "initImage": "Erstes Bild",
-        "variations": "Samengewichtspaare",
+        "variations": "Seed-Gewichtungs-Paare",
         "vae": "VAE",
         "workflow": "Arbeitsablauf",
         "scheduler": "Planer",
         "noRecallParameters": "Es wurden keine Parameter zum Abrufen gefunden",
-        "recallParameters": "Recall Parameters"
+        "recallParameters": "Parameter wiederherstellen"
     },
     "popovers": {
         "noiseUseCPU": {
             "heading": "Nutze Prozessor rauschen",
             "paragraphs": [
-                null,
-                null,
+                "Entscheidet, ob auf der CPU oder GPU Rauschen erzeugt wird.",
+                "Mit aktiviertem CPU-Rauschen wird ein bestimmter Seedwert das gleiche Bild auf jeder Maschine erzeugen.",
                 "CPU-Rauschen einzuschalten beeinflusst nicht die Systemleistung."
             ]
         },
@@ -984,10 +986,16 @@
             ]
         },
         "lora": {
-            "heading": "LoRA Gewichte"
+            "heading": "LoRA Gewichte",
+            "paragraphs": [
+                "Höhere LoRA-Wichtungen führen zu größeren Auswirkungen auf das endgültige Bild."
+            ]
         },
         "infillMethod": {
-            "heading": "Füllmethode"
+            "heading": "Füllmethode",
+            "paragraphs": [
+                "Infill-Methode für den ausgewählten Bereich."
+            ]
         },
         "paramVAE": {
             "heading": "VAE",
@@ -1033,6 +1041,21 @@
                 "Deaktivieren Sie “Random Seed”, um identische Ergebnisse mit den gleichen Generierungseinstellungen zu erzeugen."
             ],
             "heading": "Seed"
+        },
+        "dynamicPromptsMaxPrompts": {
+            "paragraphs": [
+                "Beschränkt die Anzahl der Prompts, die von \"Dynamic Prompts\" generiert werden können."
+            ],
+            "heading": "Maximale Prompts"
+        },
+        "dynamicPromptsSeedBehaviour": {
+            "paragraphs": [
+                "Bestimmt, wie der Seed-Wert beim Erzeugen von Prompts verwendet wird.",
+                "Verwenden Sie dies, um schnelle Variationen eines einzigen Seeds zu erkunden.",
+                "Wenn Sie z. B. 5 Prompts haben, wird jedes Bild den selben Seed-Wert verwenden.",
+                "\"Per Bild\" wird einen einzigartigen Seed-Wert für jedes Bild verwenden. Dies bietet mehr Variationen."
+            ],
+            "heading": "Seed-Verhalten"
         }
     },
     "ui": {
@@ -1053,7 +1076,7 @@
         "enableFailed": "Problem beim Aktivieren des Zwischenspeichers",
         "disableFailed": "Problem bei Deaktivierung des Cache",
         "enableSucceeded": "Zwischenspeicher aktiviert",
-        "disableSucceeded": "Aufrufcache deaktiviert",
+        "disableSucceeded": "Invocation-Cache deaktiviert",
         "clearSucceeded": "Zwischenspeicher gelöscht",
         "invocationCache": "Zwischenspeicher",
         "clearFailed": "Problem beim Löschen des Zwischenspeichers"
@@ -1099,15 +1122,15 @@
         "collectionFieldType": "{{name}} Sammlung",
         "controlCollectionDescription": "Kontrollinformationen zwischen Knotenpunkten weitergegeben.",
         "connectionWouldCreateCycle": "Verbindung würde einen Kreislauf/cycle schaffen",
-        "ipAdapterDescription": "Ein Adapter für die Bildabfrage (IP-Adapter) / Bilderprompt-Adapter.",
+        "ipAdapterDescription": "Ein Adapter für die Bildabfrage (IP-Adapter) / Bildprompt-Adapter.",
         "controlField": "Kontrolle",
         "inputFields": "Eingabefelder",
         "imageField": "Bild",
         "inputMayOnlyHaveOneConnection": "Eingang darf nur eine Verbindung haben",
         "integerCollectionDescription": "Eine Sammlung ganzer Zahlen.",
-        "integerDescription": "Das sind ganze Zahlen ohne Dezimalpunkt.",
+        "integerDescription": "\"Integer\" sind ganze Zahlen ohne Dezimalpunkt.",
         "conditioningPolymorphic": "Konditionierung polymorphisch",
-        "conditioningPolymorphicDescription": "Die Konditionierung kann zwischen den Knotenpunkten weitergegeben werden.",
+        "conditioningPolymorphicDescription": "Die Konditionierung kann zwischen den Knoten weitergegeben werden.",
         "invalidOutputSchema": "Ungültiges Ausgabeschema",
         "ipAdapterModel": "IP-Adapter Modell",
         "conditioningFieldDescription": "Die Konditionierung kann zwischen den Knotenpunkten weitergegeben werden.",
@@ -1222,7 +1245,21 @@
         "loRAModelField": "LoRA",
         "loRAModelFieldDescription": "Zu erledigen",
         "mainModelField": "Modell",
-        "doesNotExist": "existiert nicht"
+        "doesNotExist": "existiert nicht",
+        "vaeField": "VAE",
+        "unknownOutput": "Unbekannte Ausgabe: {{name}}",
+        "updateNode": "Knoten updaten",
+        "edge": "Rand / Kante",
+        "sourceNodeDoesNotExist": "Ungültiger Rand: Quell- / Ausgabe-Knoten {{node}} existiert nicht",
+        "updateAllNodes": "Update Knoten",
+        "allNodesUpdated": "Alle Knoten aktualisiert",
+        "unknownTemplate": "Unbekannte Vorlage",
+        "floatDescription": "Floats sind Zahlen mit einem Dezimalpunkt.",
+        "updateApp": "Update App",
+        "vaeFieldDescription": "VAE Submodell.",
+        "unknownInput": "Unbekannte Eingabe: {{name}}",
+        "unknownNodeType": "Unbekannter Knotentyp",
+        "float": "Kommazahlen"
     },
     "hrf": {
         "enableHrf": "Korrektur für hohe Auflösungen",
