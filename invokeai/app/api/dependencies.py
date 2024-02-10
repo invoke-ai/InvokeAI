@@ -91,10 +91,10 @@ class ApiDependencies:
         images = ImageService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         tensors = ObjectSerializerForwardCache(
-            ObjectSerializerDisk[torch.Tensor](output_folder / "tensors", delete_on_startup=True)
+            ObjectSerializerDisk[torch.Tensor](output_folder / "tensors", ephemeral=True)
         )
         conditioning = ObjectSerializerForwardCache(
-            ObjectSerializerDisk[ConditioningFieldData](output_folder / "conditioning", delete_on_startup=True)
+            ObjectSerializerDisk[ConditioningFieldData](output_folder / "conditioning", ephemeral=True)
         )
         model_manager = ModelManagerService(config, logger)
         model_record_service = ModelRecordServiceSQL(db=db)
