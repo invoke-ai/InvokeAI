@@ -8,8 +8,8 @@ from PIL import Image
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend import SilenceWarnings
 from invokeai.backend.util.devices import choose_torch_device
+from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 config = InvokeAIAppConfig.get_config()
 

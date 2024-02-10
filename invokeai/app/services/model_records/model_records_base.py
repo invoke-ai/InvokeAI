@@ -10,15 +10,12 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from pydantic import BaseModel, Field
 
-from invokeai.app.invocations.baseinvocation import InvocationContext
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.backend.model_manager import (
     AnyModelConfig,
     BaseModelType,
-    LoadedModel,
     ModelFormat,
     ModelType,
-    SubModelType,
 )
 from invokeai.backend.model_manager.load import AnyModelLoader
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore
@@ -108,52 +105,6 @@ class ModelRecordServiceBase(ABC):
         :param key: Key of model config to be fetched.
 
         Exceptions: UnknownModelException
-        """
-        pass
-
-    @abstractmethod
-    def load_model(
-        self,
-        key: str,
-        submodel: Optional[SubModelType] = None,
-        context: Optional[InvocationContext] = None,
-    ) -> LoadedModel:
-        """
-        Load the indicated model into memory and return a LoadedModel object.
-
-        :param key: Key of model config to be fetched.
-        :param submodel: For main (pipeline models), the submodel to fetch
-        :param context: Invocation context, used for event issuing.
-
-        Exceptions: UnknownModelException -- model with this key not known
-                    NotImplementedException -- a model loader was not provided at initialization time
-        """
-        pass
-
-    @abstractmethod
-    def load_model_by_attr(
-        self,
-        model_name: str,
-        base_model: BaseModelType,
-        model_type: ModelType,
-        submodel: Optional[SubModelType] = None,
-        context: Optional[InvocationContext] = None,
-    ) -> LoadedModel:
-        """
-        Load the indicated model into memory and return a LoadedModel object.
-
-        This is provided for API compatability with the get_model() method
-        in the original model manager. However, note that LoadedModel is
-        not the same as the original ModelInfo that ws returned.
-
-        :param model_name: Key of model config to be fetched.
-        :param base_model: Base model
-        :param model_type: Type of the model
-        :param submodel: For main (pipeline models), the submodel to fetch
-        :param context: The invocation context.
-
-        Exceptions: UnknownModelException -- model with this key not known
-                    NotImplementedException -- a model loader was not provided at initialization time
         """
         pass
 

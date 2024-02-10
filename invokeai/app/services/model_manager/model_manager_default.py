@@ -3,6 +3,7 @@
 
 from typing_extensions import Self
 
+from invokeai.app.services.invoker import Invoker
 from invokeai.backend.model_manager.load import ModelCache, ModelConvertCache
 from invokeai.backend.model_manager.metadata import ModelMetadataStore
 from invokeai.backend.util.logging import InvokeAILogger
@@ -10,9 +11,9 @@ from invokeai.backend.util.logging import InvokeAILogger
 from ..config import InvokeAIAppConfig
 from ..download import DownloadQueueServiceBase
 from ..events.events_base import EventServiceBase
-from ..model_install import ModelInstallService
-from ..model_load import ModelLoadService
-from ..model_records import ModelRecordServiceSQL
+from ..model_install import ModelInstallService, ModelInstallServiceBase
+from ..model_load import ModelLoadService, ModelLoadServiceBase
+from ..model_records import ModelRecordServiceBase, ModelRecordServiceSQL
 from ..shared.sqlite.sqlite_database import SqliteDatabase
 from .model_manager_base import ModelManagerServiceBase
 
@@ -26,6 +27,38 @@ class ModelManagerService(ModelManagerServiceBase):
     model_manager.install -- Routines to install, move and delete models.
     model_manager.load    -- Routines to load models into memory.
     """
+
+    def __init__(
+        self,
+        store: ModelRecordServiceBase,
+        install: ModelInstallServiceBase,
+        load: ModelLoadServiceBase,
+    ):
+        self._store = store
+        self._install = install
+        self._load = load
+
+    @property
+    def store(self) -> ModelRecordServiceBase:
+        return self._store
+
+    @property
+    def install(self) -> ModelInstallServiceBase:
+        return self._install
+
+    @property
+    def load(self) -> ModelLoadServiceBase:
+        return self._load
+
+    def start(self, invoker: Invoker) -> None:
+        for service in [self._store, self._install, self._load]:
+            if hasattr(service, "start"):
+                service.start(invoker)
+
+    def stop(self, invoker: Invoker) -> None:
+        for service in [self._store, self._install, self._load]:
+            if hasattr(service, "stop"):
+                service.stop(invoker)
 
     @classmethod
     def build_model_manager(

@@ -65,7 +65,7 @@ def calc_model_size_by_fs(model_path: Path, subfolder: Optional[str] = None, var
     bit8_files = {f for f in all_files if ".8bit." in f.name or ".8bit-" in f.name}
     other_files = set(all_files) - fp16_files - bit8_files
 
-    if variant is None:
+    if not variant:  # ModelRepoVariant.DEFAULT evaluates to empty string for compatability with HF
         files = other_files
     elif variant == "fp16":
         files = fp16_files

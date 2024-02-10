@@ -64,7 +64,7 @@ class ModelPatcher:
     def apply_lora_unet(
         cls,
         unet: UNet2DConditionModel,
-        loras: List[Tuple[LoRAModelRaw, float]],
+        loras: Iterator[Tuple[LoRAModelRaw, float]],
     ) -> None:
         with cls.apply_lora(unet, loras, "lora_unet_"):
             yield
@@ -307,7 +307,7 @@ class ONNXModelPatcher:
     def apply_lora_unet(
         cls,
         unet: OnnxRuntimeModel,
-        loras: List[Tuple[LoRAModelRaw, float]],
+        loras: Iterator[Tuple[LoRAModelRaw, float]],
     ) -> None:
         with cls.apply_lora(unet, loras, "lora_unet_"):
             yield

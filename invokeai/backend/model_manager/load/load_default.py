@@ -169,7 +169,7 @@ class ModelLoader(ModelLoaderBase):
                 raise InvalidModelConfigException("An expected config.json file is missing from this model.") from e
 
     # This needs to be implemented in subclasses that handle checkpoints
-    def _convert_model(self, config: AnyModelConfig, weights_path: Path, output_path: Path) -> Path:
+    def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Path) -> Path:
         raise NotImplementedError
 
     # This needs to be implemented in the subclass
