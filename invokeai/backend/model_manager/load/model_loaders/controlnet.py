@@ -35,28 +35,28 @@ class ControlnetLoader(GenericDiffusersLoader):
         else:
             return True
 
-    def _convert_model(self, config: AnyModelConfig, weights_path: Path, output_path: Path) -> Path:
+    def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Path) -> Path:
         if config.base not in {BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2}:
             raise Exception(f"Vae conversion not supported for model type: {config.base}")
         else:
             assert hasattr(config, "config")
             config_file = config.config
 
-        if weights_path.suffix == ".safetensors":
-            checkpoint = safetensors.torch.load_file(weights_path, device="cpu")
+        if model_path.suffix == ".safetensors":
+            checkpoint = safetensors.torch.load_file(model_path, device="cpu")
         else:
-            checkpoint = torch.load(weights_path, map_location="cpu")
+            checkpoint = torch.load(model_path, map_location="cpu")
 
         # sometimes weights are hidden under "state_dict", and sometimes not
         if "state_dict" in checkpoint:
             checkpoint = checkpoint["state_dict"]
 
         convert_controlnet_to_diffusers(
-            weights_path,
+            model_path,
             output_path,
             original_config_file=self._app_config.root_path / config_file,
             image_size=512,
             scan_needed=True,
-            from_safetensors=weights_path.suffix == ".safetensors",
+            from_safetensors=model_path.suffix == ".safetensors",
         )
         return output_path

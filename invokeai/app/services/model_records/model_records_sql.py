@@ -46,8 +46,6 @@ from math import ceil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
-from invokeai.app.invocations.baseinvocation import InvocationContext
-from invokeai.app.services.invocation_processor.invocation_processor_common import CanceledException
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
@@ -55,9 +53,8 @@ from invokeai.backend.model_manager.config import (
     ModelConfigFactory,
     ModelFormat,
     ModelType,
-    SubModelType,
 )
-from invokeai.backend.model_manager.load import AnyModelLoader, LoadedModel
+from invokeai.backend.model_manager.load import AnyModelLoader
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore, UnknownMetadataException
 
 from ..shared.sqlite.sqlite_database import SqliteDatabase
@@ -219,74 +216,6 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 raise UnknownModelException("model not found")
             model = ModelConfigFactory.make_config(json.loads(rows[0]), timestamp=rows[1])
         return model
-
-    def load_model(
-        self,
-        key: str,
-        submodel: Optional[SubModelType],
-        context: Optional[InvocationContext] = None,
-    ) -> LoadedModel:
-        """
-        Load the indicated model into memory and return a LoadedModel object.
-
-        :param key: Key of model config to be fetched.
-        :param submodel: For main (pipeline models), the submodel to fetch.
-        :param context: Invocation context used for event reporting
-
-        Exceptions: UnknownModelException -- model with this key not known
-                    NotImplementedException -- a model loader was not provided at initialization time
-        """
-        if not self._loader:
-            raise NotImplementedError(f"Class {self.__class__} was not initialized with a model loader")
-        # we can emit model loading events if we are executing with access to the invocation context
-
-        model_config = self.get_model(key)
-        if context:
-            self._emit_load_event(
-                context=context,
-                model_config=model_config,
-            )
-        loaded_model = self._loader.load_model(model_config, submodel)
-        if context:
-            self._emit_load_event(
-                context=context,
-                model_config=model_config,
-                loaded=True,
-            )
-        return loaded_model
-
-    def load_model_by_attr(
-        self,
-        model_name: str,
-        base_model: BaseModelType,
-        model_type: ModelType,
-        submodel: Optional[SubModelType] = None,
-        context: Optional[InvocationContext] = None,
-    ) -> LoadedModel:
-        """
-        Load the indicated model into memory and return a LoadedModel object.
-
-        This is provided for API compatability with the get_model() method
-        in the original model manager. However, note that LoadedModel is
-        not the same as the original ModelInfo that ws returned.
-
-        :param model_name: Key of model config to be fetched.
-        :param base_model: Base model
-        :param model_type: Type of the model
-        :param submodel: For main (pipeline models), the submodel to fetch
-        :param context: The invocation context.
-
-        Exceptions: UnknownModelException -- model with this key not known
-                    NotImplementedException -- a model loader was not provided at initialization time
-                    ValueError -- more than one model matches this combination
-        """
-        configs = self.search_by_attr(model_name, base_model, model_type)
-        if len(configs) == 0:
-            raise UnknownModelException(f"{base_model}/{model_type}/{model_name}: Unknown model")
-        elif len(configs) > 1:
-            raise ValueError(f"{base_model}/{model_type}/{model_name}: More than one model matches.")
-        else:
-            return self.load_model(configs[0].key, submodel)
 
     def exists(self, key: str) -> bool:
         """
@@ -475,30 +404,4 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             items = [ModelSummary.model_validate(_fixup(dict(x))) for x in rows]
             return PaginatedResults(
                 page=page, pages=ceil(total / per_page), per_page=per_page, total=total, items=items
-            )
-
-    def _emit_load_event(
-        self,
-        context: InvocationContext,
-        model_config: AnyModelConfig,
-        loaded: Optional[bool] = False,
-    ) -> None:
-        if context.services.queue.is_canceled(context.graph_execution_state_id):
-            raise CanceledException()
-
-        if not loaded:
-            context.services.events.emit_model_load_started(
-                queue_id=context.queue_id,
-                queue_item_id=context.queue_item_id,
-                queue_batch_id=context.queue_batch_id,
-                graph_execution_state_id=context.graph_execution_state_id,
-                model_config=model_config,
-            )
-        else:
-            context.services.events.emit_model_load_completed(
-                queue_id=context.queue_id,
-                queue_item_id=context.queue_item_id,
-                queue_batch_id=context.queue_batch_id,
-                graph_execution_state_id=context.graph_execution_state_id,
-                model_config=model_config,
             )
