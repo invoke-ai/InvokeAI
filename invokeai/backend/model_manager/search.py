@@ -26,10 +26,10 @@ from pathlib import Path
 from typing import Callable, Optional, Set, Union
 
 from pydantic import BaseModel, Field
-
+from logging import Logger
 from invokeai.backend.util.logging import InvokeAILogger
 
-default_logger = InvokeAILogger.get_logger()
+default_logger: Logger = InvokeAILogger.get_logger()
 
 
 class SearchStats(BaseModel):
@@ -56,7 +56,7 @@ class ModelSearchBase(ABC, BaseModel):
     on_model_found      : Optional[Callable[[Path], bool]]      = Field(default=None, description="Called when a model is found.")          # noqa E221
     on_search_completed : Optional[Callable[[Set[Path]], None]] = Field(default=None, description="Called when search is complete.")        # noqa E221
     stats               : SearchStats                           = Field(default_factory=SearchStats, description="Summary statistics after search")  # noqa E221
-    logger              : InvokeAILogger                        = Field(default=default_logger, description="Logger instance.")     # noqa E221
+    logger              : Logger                                = Field(default=default_logger, description="Logger instance.")     # noqa E221
     # fmt: on
 
     class Config:
@@ -128,13 +128,13 @@ class ModelSearch(ModelSearchBase):
 
     def model_found(self, model: Path) -> None:
         self.stats.models_found += 1
-        if not self.on_model_found or self.on_model_found(model):
+        if self.on_model_found is None or self.on_model_found(model):
             self.stats.models_filtered += 1
             self.models_found.add(model)
 
     def search_completed(self) -> None:
-        if self.on_search_completed:
-            self.on_search_completed(self._models_found)
+        if self.on_search_completed is not None:
+            self.on_search_completed(self.models_found)
 
     def search(self, directory: Union[Path, str]) -> Set[Path]:
         self._directory = Path(directory)

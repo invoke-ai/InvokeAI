@@ -18,7 +18,7 @@ loaders = [x.stem for x in Path(Path(__file__).parent, "model_loaders").glob("*.
 for module in loaders:
     import_module(f"{__package__}.model_loaders.{module}")
 
-__all__ = ["AnyModelLoader", "LoadedModel"]
+__all__ = ["AnyModelLoader", "LoadedModel", "ModelCache", "ModelConvertCache"]
 
 
 def get_standalone_loader(app_config: Optional[InvokeAIAppConfig]) -> AnyModelLoader:
