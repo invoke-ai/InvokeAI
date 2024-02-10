@@ -1,3 +1,4 @@
+import tempfile
 import typing
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,27 +24,23 @@ class DeleteAllResult:
 
 
 class ObjectSerializerDisk(ObjectSerializerBase[T]):
-    """Provides a disk-backed storage for arbitrary python objects.
+    """Disk-backed storage for arbitrary python objects. Serialization is handled by `torch.save` and `torch.load`.
 
-    :param output_folder: The folder where the objects will be stored
-    :param delete_on_startup: If True, all objects in the output folder will be deleted on startup
+    :param output_dir: The folder where the serialized objects will be stored
+    :param ephemeral: If True, objects will be stored in a temporary directory inside the given output_dir and cleaned up on exit
     """
 
-    def __init__(self, output_dir: Path, delete_on_startup: bool = False):
+    def __init__(self, output_dir: Path, ephemeral: bool = False):
         super().__init__()
-        self._output_dir = output_dir
-        self._output_dir.mkdir(parents=True, exist_ok=True)
-        self._delete_on_startup = delete_on_startup
+        self._ephemeral = ephemeral
+        self._base_output_dir = output_dir
+        self._base_output_dir.mkdir(parents=True, exist_ok=True)
+        # Must specify `ignore_cleanup_errors` to avoid fatal errors during cleanup on Windows
+        self._tempdir = (
+            tempfile.TemporaryDirectory(dir=self._base_output_dir, ignore_cleanup_errors=True) if ephemeral else None
+        )
+        self._output_dir = Path(self._tempdir.name) if self._tempdir else self._base_output_dir
         self.__obj_class_name: Optional[str] = None
-
-    def start(self, invoker: "Invoker") -> None:
-        if self._delete_on_startup:
-            delete_all_result = self._delete_all()
-            if delete_all_result.deleted_count > 0:
-                freed_space_in_mb = round(delete_all_result.freed_space_bytes / 1024 / 1024, 2)
-                invoker.services.logger.info(
-                    f"Deleted {delete_all_result.deleted_count} {self._obj_class_name} files (freed {freed_space_in_mb}MB)"
-                )
 
     def load(self, name: str) -> T:
         file_path = self._get_path(name)
@@ -75,19 +72,14 @@ class ObjectSerializerDisk(ObjectSerializerBase[T]):
     def _new_name(self) -> str:
         return f"{self._obj_class_name}_{uuid_string()}"
 
-    def _delete_all(self) -> DeleteAllResult:
-        """
-        Deletes all objects from disk.
-        """
+    def _tempdir_cleanup(self) -> None:
+        """Calls `cleanup` on the temporary directory, if it exists."""
+        if self._tempdir:
+            self._tempdir.cleanup()
 
-        # We could try using a temporary directory here, but they aren't cleared in the event of a crash, so we'd have
-        # to manually clear them on startup anyways. This is a bit simpler and more reliable.
+    def __del__(self) -> None:
+        # In case the service is not properly stopped, clean up the temporary directory when the class instance is GC'd.
+        self._tempdir_cleanup()
 
-        deleted_count = 0
-        freed_space = 0
-        for file in Path(self._output_dir).glob("*"):
-            if file.is_file():
-                freed_space += file.stat().st_size
-                deleted_count += 1
-                file.unlink()
-        return DeleteAllResult(deleted_count, freed_space)
+    def stop(self, invoker: "Invoker") -> None:
+        self._tempdir_cleanup()
