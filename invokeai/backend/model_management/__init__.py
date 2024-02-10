@@ -3,7 +3,7 @@
 Initialization file for invokeai.backend.model_management
 """
 # This import must be first
-from .model_manager import AddModelResult, ModelInfo, ModelManager, SchedulerPredictionType
+from .model_manager import AddModelResult, LoadedModelInfo, ModelManager, SchedulerPredictionType
 from .lora import ModelPatcher, ONNXModelPatcher
 from .model_cache import ModelCache
 
