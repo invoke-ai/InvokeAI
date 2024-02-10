@@ -62,9 +62,7 @@ def mock_services() -> InvocationServices:
         invocation_cache=MemoryInvocationCache(max_cache_size=0),
         logger=logging,  # type: ignore
         model_manager=None,  # type: ignore
-        model_records=None,  # type: ignore
         download_queue=None,  # type: ignore
-        model_install=None,  # type: ignore
         names=None,  # type: ignore
         performance_statistics=InvocationStatsService(),
         processor=DefaultInvocationProcessor(),

@@ -65,7 +65,7 @@ class StableDiffusionDiffusersModel(ModelLoader):
         else:
             return True
 
-    def _convert_model(self, config: AnyModelConfig, weights_path: Path, output_path: Path) -> Path:
+    def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Path) -> Path:
         assert isinstance(config, MainCheckpointConfig)
         variant = config.variant
         base = config.base
@@ -75,9 +75,9 @@ class StableDiffusionDiffusersModel(ModelLoader):
 
         config_file = config.config
 
-        self._logger.info(f"Converting {weights_path} to diffusers format")
+        self._logger.info(f"Converting {model_path} to diffusers format")
         convert_ckpt_to_diffusers(
-            weights_path,
+            model_path,
             output_path,
             model_type=self.model_base_to_model_type[base],
             model_version=base,
@@ -86,7 +86,7 @@ class StableDiffusionDiffusersModel(ModelLoader):
             extract_ema=True,
             scan_needed=True,
             pipeline_class=pipeline_class,
-            from_safetensors=weights_path.suffix == ".safetensors",
+            from_safetensors=model_path.suffix == ".safetensors",
             precision=self._torch_dtype,
             load_safety_checker=False,
         )

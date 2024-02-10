@@ -28,7 +28,7 @@ model. These are the:
   Hugging Face, as well as discriminating among model versions in
   Civitai, but can be used for arbitrary content.
   
-  * _ModelLoadServiceBase_ (**CURRENTLY UNDER DEVELOPMENT - NOT IMPLEMENTED**)
+  * _ModelLoadServiceBase_
   Responsible for loading a model from disk
   into RAM and VRAM and getting it ready for inference.
 
@@ -41,10 +41,10 @@ The four main services can be found in
 * `invokeai/app/services/model_records/`
 * `invokeai/app/services/model_install/`
 * `invokeai/app/services/downloads/`
-* `invokeai/app/services/model_loader/` (**under development**)
+* `invokeai/app/services/model_load/`
 
 Code related to the FastAPI web API can be found in
-`invokeai/app/api/routers/model_records.py`.
+`invokeai/app/api/routers/model_manager_v2.py`.
 
 ***
 
@@ -84,10 +84,10 @@ diffusers model. When this happens, `original_hash` is unchanged, but
 `ModelType`, `ModelFormat` and `BaseModelType` are string enums that
 are defined in `invokeai.backend.model_manager.config`. They are also
 imported by, and can be reexported from,
-`invokeai.app.services.model_record_service`:
+`invokeai.app.services.model_manager.model_records`:
 
 ```
-from invokeai.app.services.model_record_service import ModelType, ModelFormat, BaseModelType
+from invokeai.app.services.model_records import ModelType, ModelFormat, BaseModelType
 ```
 
 The `path` field can be absolute or relative. If relative, it is taken
@@ -123,7 +123,7 @@ taken to be the `models_dir` directory.
 
 `variant` is an enumerated string class with values `normal`,
 `inpaint` and `depth`. If needed, it can be imported if needed from
-either `invokeai.app.services.model_record_service` or
+either `invokeai.app.services.model_records` or
 `invokeai.backend.model_manager.config`.
 
 ### ONNXSD2Config
@@ -134,7 +134,7 @@ either `invokeai.app.services.model_record_service` or
 | `upcast_attention`  | bool | Model requires its attention module to be upcast |
 
 The `SchedulerPredictionType` enum can be imported from either
-`invokeai.app.services.model_record_service` or
+`invokeai.app.services.model_records` or
 `invokeai.backend.model_manager.config`.
 
 ### Other config classes
@@ -157,15 +157,6 @@ indicates that the model is compatible with any of the base
 models. This works OK for some models, such as the IP Adapter image
 encoders, but is an all-or-nothing proposition.
 
-Another issue is that the config class hierarchy is paralleled to some
-extent by a `ModelBase` class hierarchy defined in
-`invokeai.backend.model_manager.models.base` and its subclasses. These
-are classes representing the models after they are loaded into RAM and
-include runtime information such as load status and bytes used. Some
-of the fields, including `name`, `model_type` and `base_model`, are
-shared between `ModelConfigBase` and `ModelBase`, and this is a
-potential source of confusion.
-
 ## Reading and Writing Model Configuration Records
 
 The `ModelRecordService` provides the ability to retrieve model
@@ -177,11 +168,11 @@ initialization and can be retrieved within an invocation from the
 `InvocationContext` object:
 
 ```
-store = context.services.model_record_store
+store = context.services.model_manager.store
 ```
 
 or from elsewhere in the code by accessing
-`ApiDependencies.invoker.services.model_record_store`.
+`ApiDependencies.invoker.services.model_manager.store`.
 
 ### Creating a `ModelRecordService` 
 
@@ -190,7 +181,7 @@ you can directly create either a `ModelRecordServiceSQL` or a
 `ModelRecordServiceFile` object:
 
 ```
-from invokeai.app.services.model_record_service import ModelRecordServiceSQL, ModelRecordServiceFile
+from invokeai.app.services.model_records import ModelRecordServiceSQL, ModelRecordServiceFile
 
 store = ModelRecordServiceSQL.from_connection(connection, lock)
 store = ModelRecordServiceSQL.from_db_file('/path/to/sqlite_database.db')
@@ -252,26 +243,13 @@ So a typical startup pattern would be:
 ```
 import sqlite3
 from invokeai.app.services.thread import lock
-from invokeai.app.services.model_record_service import ModelRecordServiceBase
+from invokeai.app.services.model_records import ModelRecordServiceBase
 from invokeai.app.services.config import InvokeAIAppConfig
 
 config = InvokeAIAppConfig.get_config()
 db_conn = sqlite3.connect(config.db_path.as_posix(), check_same_thread=False)
 store = ModelRecordServiceBase.open(config, db_conn, lock)
 ```
-
-_A note on simultaneous access to `invokeai.db`_: The current InvokeAI
-service architecture for the image and graph databases is careful to
-use a shared sqlite3 connection and a thread lock to ensure that two
-threads don't attempt to access the database simultaneously. However,
-the default `sqlite3` library used by Python reports using
-**Serialized** mode, which allows multiple threads to access the
-database simultaneously using multiple database connections (see
-https://www.sqlite.org/threadsafe.html and
-https://ricardoanderegg.com/posts/python-sqlite-thread-safety/). Therefore
-it should be safe to allow the record service to open its own SQLite
-database connection. Opening a model record service should then be as
-simple as `ModelRecordServiceBase.open(config)`.
 
 ### Fetching a Model's Configuration from `ModelRecordServiceBase`
 
@@ -1465,7 +1443,7 @@ create alternative instances if you wish.
 ### Creating a ModelLoadService object
 
 The class is defined in
-`invokeai.app.services.model_loader_service`. It is initialized with
+`invokeai.app.services.model_load`. It is initialized with
 an InvokeAIAppConfig object, from which it gets configuration
 information such as the user's desired GPU and precision, and with a
 previously-created `ModelRecordServiceBase` object, from which it
@@ -1475,8 +1453,8 @@ Here is a typical initialization pattern:
 
 ```
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.model_record_service import ModelRecordServiceBase
-from invokeai.app.services.model_loader_service import ModelLoadService
+from invokeai.app.services.model_records import ModelRecordServiceBase
+from invokeai.app.services.model_load import ModelLoadService
 
 config = InvokeAIAppConfig.get_config()
 store = ModelRecordServiceBase.open(config)
@@ -1487,14 +1465,11 @@ Note that we are relying on the contents of the application
 configuration to choose the implementation of
 `ModelRecordServiceBase`.
 
-### get_model(key, [submodel_type], [context]) -> ModelInfo:
+### load_model_by_key(key, [submodel_type], [context]) -> LoadedModel
 
-*** TO DO: change to get_model(key, context=None, **kwargs)
-
-The `get_model()` method, like its similarly-named cousin in
-`ModelRecordService`, receives the unique key that identifies the
-model.  It loads the model into memory, gets the model ready for use,
-and returns a `ModelInfo` object. 
+The `load_model_by_key()` method receives the unique key that
+identifies the model.  It loads the model into memory, gets the model
+ready for use, and returns a `LoadedModel` object.
 
 The optional second argument, `subtype` is a `SubModelType` string
 enum, such as "vae". It is mandatory when used with a main model, and
@@ -1504,46 +1479,64 @@ The optional third argument, `context` can be provided by
 an invocation to trigger model load event reporting. See below for
 details.
 
-The returned `ModelInfo` object shares some fields in common with
-`ModelConfigBase`, but is otherwise a completely different beast:
+The returned `LoadedModel` object contains a copy of the configuration
+record returned by the model record `get_model()` method, as well as
+the in-memory loaded model:
 
-| **Field Name** | **Type**        |  **Description** |
+
+| **Attribute Name** | **Type**        |  **Description** |
 |----------------|-----------------|------------------|
-| `key`          | str                    | The model key derived from the ModelRecordService database |
-| `name`         | str                    | Name of this model |
-| `base_model`   | BaseModelType          | Base model for this model |
-| `type`         | ModelType or SubModelType   | Either the model type (non-main) or the submodel type (main models)|
-| `location`     | Path or str            | Location of the model on the filesystem |
-| `precision`    | torch.dtype            | The torch.precision to use for inference |
-| `context`      | ModelCache.ModelLocker | A context class used to lock the model in VRAM while in use |
+| `config`       | AnyModelConfig         | A copy of the model's configuration record for retrieving base type, etc. |
+| `model`        | AnyModel               | The instantiated model (details below) |
+| `locker`       | ModelLockerBase        | A context manager that mediates the movement of the model into VRAM |
 
-The types for `ModelInfo` and `SubModelType` can be imported from
-`invokeai.app.services.model_loader_service`.
+Because the loader can return multiple model types, it is typed to
+return `AnyModel`, a Union `ModelMixin`, `torch.nn.Module`,
+`IAIOnnxRuntimeModel`, `IPAdapter`, `IPAdapterPlus`, and
+`EmbeddingModelRaw`. `ModelMixin` is the base class of all diffusers
+models, `EmbeddingModelRaw` is used for LoRA and TextualInversion
+models. The others are obvious.
 
-To use the model, you use the `ModelInfo` as a context manager using
-the following pattern:
+
+`LoadedModel` acts as a context manager. The context loads the model
+into the execution device (e.g. VRAM on CUDA systems), locks the model
+in the execution device for the duration of the context, and returns
+the model. Use it like this:
 
 ```
-model_info = loader.get_model('f13dd932c0c35c22dcb8d6cda4203764', SubModelType('vae'))
+model_info = loader.get_model_by_key('f13dd932c0c35c22dcb8d6cda4203764', SubModelType('vae'))
 with model_info as vae:
 	image = vae.decode(latents)[0]
 ```
 
-The `vae` model will stay locked in the GPU during the period of time
-it is in the context manager's scope.
+`get_model_by_key()` may raise any of the following exceptions:
 
-`get_model()` may raise any of the following exceptions:
-
-- `UnknownModelException`  -- key not in database
-- `ModelNotFoundException` -- key in database but model not found at path
-- `InvalidModelException`  -- the model is guilty of a variety of sins
+- `UnknownModelException`   -- key not in database
+- `ModelNotFoundException`  -- key in database but model not found at path
+- `NotImplementedException` -- the loader doesn't know how to load this type of model
   
-** TO DO: ** Resolve discrepancy between ModelInfo.location and
-ModelConfig.path.
+### load_model_by_attr(model_name, base_model, model_type, [submodel], [context]) -> LoadedModel
+
+This is similar to `load_model_by_key`, but instead it accepts the
+combination of the model's name, type and base, which it passes to the
+model record config store for retrieval. If successful, this method
+returns a `LoadedModel`. It can raise the following exceptions:
+
+```
+UnknownModelException -- model with these attributes not known
+NotImplementedException -- the loader doesn't know how to load this type of model
+ValueError -- more than one model matches this combination of base/type/name
+```
+
+### load_model_by_config(config, [submodel], [context]) -> LoadedModel
+
+This method takes an `AnyModelConfig` returned by
+ModelRecordService.get_model() and returns the corresponding loaded
+model. It may raise a `NotImplementedException`.
 
 ### Emitting model loading events
 
-When the `context` argument is passed to `get_model()`, it will
+When the `context` argument is passed to `load_model_*()`, it will
 retrieve the invocation event bus from the passed `InvocationContext`
 object to emit events on the invocation bus. The two events are
 "model_load_started" and "model_load_completed". Both carry the
@@ -1562,4 +1555,98 @@ payload=dict(
 	precision=str(model_info.precision),
 )
 ```
+
+### Adding Model Loaders
+
+Model loaders are small classes that inherit from the `ModelLoader`
+base class. They typically implement one method `_load_model()` whose
+signature is:
+
+```
+def _load_model(
+    self,
+    model_path: Path,
+    model_variant: Optional[ModelRepoVariant] = None,
+    submodel_type: Optional[SubModelType] = None,
+) -> AnyModel:
+```
+
+`_load_model()` will be passed the path to the model on disk, an
+optional repository variant (used by the diffusers loaders to select,
+e.g.  the `fp16` variant, and an optional submodel_type for main and
+onnx models.
+
+To install a new loader, place it in
+`invokeai/backend/model_manager/load/model_loaders`. Inherit from
+`ModelLoader` and use the `@AnyModelLoader.register()` decorator to
+indicate what type of models the loader can handle.
+
+Here is a complete example from `generic_diffusers.py`, which is able
+to load several different diffusers types:
+
+```
+from pathlib import Path
+from typing import Optional
+
+from invokeai.backend.model_manager import (
+    AnyModel,
+    BaseModelType,
+    ModelFormat,
+    ModelRepoVariant,
+    ModelType,
+    SubModelType,
+)
+from ..load_base import AnyModelLoader
+from ..load_default import ModelLoader
+
+
+@AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.CLIPVision, format=ModelFormat.Diffusers)
+@AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.T2IAdapter, format=ModelFormat.Diffusers)
+class GenericDiffusersLoader(ModelLoader):
+    """Class to load simple diffusers models."""
+
+    def _load_model(
+        self,
+        model_path: Path,
+        model_variant: Optional[ModelRepoVariant] = None,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        model_class = self._get_hf_load_class(model_path)
+        if submodel_type is not None:
+            raise Exception(f"There are no submodels in models of type {model_class}")
+        variant = model_variant.value if model_variant else None
+        result: AnyModel = model_class.from_pretrained(model_path, torch_dtype=self._torch_dtype, variant=variant)  # type: ignore
+        return result
+```
+
+Note that a loader can register itself to handle several different
+model types. An exception will be raised if more than one loader tries
+to register the same model type.
+
+#### Conversion
+
+Some models require conversion to diffusers format before they can be
+loaded. These loaders should override two additional methods:
+
+```
+_needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool
+_convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Path) -> Path:
+```
+
+The first method accepts the model configuration, the path to where
+the unmodified model is currently installed, and a proposed
+destination for the converted model. This method returns True if the
+model needs to be converted. It typically does this by comparing the
+last modification time of the original model file to the modification
+time of the converted model. In some cases you will also want to check
+the modification date of the configuration record, in the event that
+the user has changed something like the scheduler prediction type that
+will require the model to be re-converted. See `controlnet.py` for an
+example of this logic.
+
+The second method accepts the model configuration, the path to the
+original model on disk, and the desired output path for the converted
+model. It does whatever it needs to do to get the model into diffusers
+format, and returns the Path of the resulting model. (The path should
+ordinarily be the same as `output_path`.)
 

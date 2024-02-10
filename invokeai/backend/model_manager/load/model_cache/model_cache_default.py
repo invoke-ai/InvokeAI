@@ -246,7 +246,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
 
     def move_model_to_device(self, cache_entry: CacheRecord[AnyModel], target_device: torch.device) -> None:
         """Move model into the indicated device."""
-        # These attributes are not in the base ModelMixin class but in derived classes.
+        # These attributes are not in the base ModelMixin class but in various derived classes.
         # Some models don't have these attributes, in which case they run in RAM/CPU.
         self.logger.debug(f"Called to move {cache_entry.key} to {target_device}")
         if not (hasattr(cache_entry.model, "device") and hasattr(cache_entry.model, "to")):

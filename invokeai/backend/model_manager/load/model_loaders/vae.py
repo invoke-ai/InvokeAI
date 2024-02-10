@@ -37,7 +37,7 @@ class VaeLoader(GenericDiffusersLoader):
         else:
             return True
 
-    def _convert_model(self, config: AnyModelConfig, weights_path: Path, output_path: Path) -> Path:
+    def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Path) -> Path:
         # TO DO: check whether sdxl VAE models convert.
         if config.base not in {BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2}:
             raise Exception(f"Vae conversion not supported for model type: {config.base}")
@@ -46,10 +46,10 @@ class VaeLoader(GenericDiffusersLoader):
                 "v1-inference.yaml" if config.base == BaseModelType.StableDiffusion1 else "v2-inference-v.yaml"
             )
 
-        if weights_path.suffix == ".safetensors":
-            checkpoint = safetensors.torch.load_file(weights_path, device="cpu")
+        if model_path.suffix == ".safetensors":
+            checkpoint = safetensors.torch.load_file(model_path, device="cpu")
         else:
-            checkpoint = torch.load(weights_path, map_location="cpu")
+            checkpoint = torch.load(model_path, map_location="cpu")
 
         # sometimes weights are hidden under "state_dict", and sometimes not
         if "state_dict" in checkpoint:

@@ -18,8 +18,16 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple, Type
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_manager import AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
-from invokeai.backend.model_manager.config import AnyModel, VaeCheckpointConfig, VaeDiffusersConfig
+from invokeai.backend.model_manager.config import (
+    AnyModel,
+    AnyModelConfig,
+    BaseModelType,
+    ModelFormat,
+    ModelType,
+    SubModelType,
+    VaeCheckpointConfig,
+    VaeDiffusersConfig,
+)
 from invokeai.backend.model_manager.load.convert_cache.convert_cache_base import ModelConvertCacheBase
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase, ModelLockerBase
 from invokeai.backend.util.logging import InvokeAILogger
@@ -32,7 +40,7 @@ class LoadedModel:
     config: AnyModelConfig
     locker: ModelLockerBase
 
-    def __enter__(self) -> AnyModel:  # I think load_file() always returns a dict
+    def __enter__(self) -> AnyModel:
         """Context entry."""
         self.locker.lock()
         return self.model
@@ -171,6 +179,10 @@ class AnyModelLoader:
         def decorator(subclass: Type[ModelLoaderBase]) -> Type[ModelLoaderBase]:
             cls._logger.debug(f"Registering class {subclass.__name__} to load models of type {base}/{type}/{format}")
             key = cls._to_registry_key(base, type, format)
+            if key in cls._registry:
+                raise Exception(
+                    f"{subclass.__name__} is trying to register as a loader for {base}/{type}/{format}, but this type of model has already been registered by {cls._registry[key].__name__}"
+                )
             cls._registry[key] = subclass
             return subclass
 
