@@ -1,4 +1,3 @@
-import os
 from builtins import float
 from typing import List, Union
 
@@ -52,16 +51,6 @@ class IPAdapterField(BaseModel):
         return self
 
 
-def get_ip_adapter_image_encoder_model_id(model_path: str):
-    """Read the ID of the image encoder associated with the IP-Adapter at `model_path`."""
-    image_encoder_config_file = os.path.join(model_path, "image_encoder.txt")
-
-    with open(image_encoder_config_file, "r") as f:
-        image_encoder_model = f.readline().strip()
-
-    return image_encoder_model
-
-
 @invocation_output("ip_adapter_output")
 class IPAdapterOutput(BaseInvocationOutput):
     # Outputs
@@ -102,18 +91,7 @@ class IPAdapterInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> IPAdapterOutput:
         # Lookup the CLIP Vision encoder that is intended to be used with the IP-Adapter model.
         ip_adapter_info = context.services.model_records.get_model(self.ip_adapter_model.key)
-        # HACK(ryand): This is bad for a couple of reasons: 1) we are bypassing the model manager to read the model
-        # directly, and 2) we are reading from disk every time this invocation is called without caching the result.
-        # A better solution would be to store the image encoder model reference in the IP-Adapter model info, but this
-        # is currently messy due to differences between how the model info is generated when installing a model from
-        # disk vs. downloading the model.
-        # TODO (LS): Fix the issue above by:
-        #    1. Change IPAdapterConfig definition to include a field for the repo_id of the image encoder model.
-        #    2. Update probe.py to read `image_encoder.txt` and store it in the config.
-        #    3. Change below to get the image encoder from the configuration record.
-        image_encoder_model_id = get_ip_adapter_image_encoder_model_id(
-            os.path.join(context.services.configuration.get_config().models_path, ip_adapter_info.path)
-        )
+        image_encoder_model_id = ip_adapter_info.image_encoder_model_id
         image_encoder_model_name = image_encoder_model_id.split("/")[-1].strip()
         image_encoder_models = context.services.model_records.search_by_attr(
             model_name=image_encoder_model_name, base_model=BaseModelType.Any, model_type=ModelType.CLIPVision
