@@ -30,7 +30,7 @@ from invokeai.app.invocations.util import validate_begin_end_step, validate_weig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.backend.image_util.depth_anything import DepthAnythingDetector
-from invokeai.backend.image_util.dwpose import DWPoseDetector
+from invokeai.backend.image_util.dw_openpose import DWOpenposeDetector
 
 from ...backend.model_management import BaseModelType
 from .baseinvocation import (
@@ -611,13 +611,13 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
 
 
 @invocation(
-    "dwpose_image_processor",
-    title="DWPose Image Processor",
+    "dw_openpose_image_processor",
+    title="DW Openpose Image Processor",
     tags=["controlnet", "dwpose", "openpose"],
     category="controlnet",
     version="1.0.0",
 )
-class DWPoseImageProcessorInvocation(ImageProcessorInvocation):
+class DWOpenposeImageProcessorInvocation(ImageProcessorInvocation):
     """Generates an openpose pose from an image using DWPose"""
 
     draw_body: bool = InputField(default=True)
@@ -626,8 +626,8 @@ class DWPoseImageProcessorInvocation(ImageProcessorInvocation):
     image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
 
     def run_processor(self, image):
-        dwpose = DWPoseDetector()
-        processed_image = dwpose(
+        dw_openpose = DWOpenposeDetector()
+        processed_image = dw_openpose(
             image,
             draw_face=self.draw_face,
             draw_hands=self.draw_hands,

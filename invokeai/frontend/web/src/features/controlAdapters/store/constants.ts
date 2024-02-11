@@ -205,17 +205,17 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
       image_resolution: 512,
     },
   },
-  dwpose_image_processor: {
-    type: 'dwpose_image_processor',
+  dw_openpose_image_processor: {
+    type: 'dw_openpose_image_processor',
     get label() {
-      return i18n.t('controlnet.dwPose');
+      return i18n.t('controlnet.dwOpenpose');
     },
     get description() {
-      return i18n.t('controlnet.dwPoseDescription');
+      return i18n.t('controlnet.dwOpenposeDescription');
     },
     default: {
-      id: 'dwpose_image_processor',
-      type: 'dwpose_image_processor',
+      id: 'dw_openpose_image_processor',
+      type: 'dw_openpose_image_processor',
       image_resolution: 512,
       draw_body: true,
       draw_face: false,
@@ -267,7 +267,7 @@ export const CONTROLNET_MODEL_DEFAULT_PROCESSORS: {
   lineart_anime: 'lineart_anime_image_processor',
   softedge: 'hed_image_processor',
   shuffle: 'content_shuffle_image_processor',
-  openpose: 'dwpose_image_processor',
+  openpose: 'dw_openpose_image_processor',
   mediapipe: 'mediapipe_face_processor',
   pidi: 'pidi_image_processor',
   zoe: 'zoe_depth_image_processor',

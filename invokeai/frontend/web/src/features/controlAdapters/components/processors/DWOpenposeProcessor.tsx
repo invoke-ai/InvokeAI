@@ -1,22 +1,23 @@
 import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
-import type { RequiredDWPoseImageProcessorInvocation } from 'features/controlAdapters/store/types';
+import type { RequiredDWOpenposeImageProcessorInvocation } from 'features/controlAdapters/store/types';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './common/ProcessorWrapper';
 
-const DEFAULTS = CONTROLNET_PROCESSORS.dwpose_image_processor.default as RequiredDWPoseImageProcessorInvocation;
+const DEFAULTS = CONTROLNET_PROCESSORS.dw_openpose_image_processor
+  .default as RequiredDWOpenposeImageProcessorInvocation;
 
 type Props = {
   controlNetId: string;
-  processorNode: RequiredDWPoseImageProcessorInvocation;
+  processorNode: RequiredDWOpenposeImageProcessorInvocation;
   isEnabled: boolean;
 };
 
-const DWPoseProcessor = (props: Props) => {
+const DWOpenposeProcessor = (props: Props) => {
   const { controlNetId, processorNode, isEnabled } = props;
   const { image_resolution, draw_body, draw_face, draw_hands } = processorNode;
   const processorChanged = useProcessorNodeChanged();
@@ -88,4 +89,4 @@ const DWPoseProcessor = (props: Props) => {
   );
 };
 
-export default memo(DWPoseProcessor);
+export default memo(DWOpenposeProcessor);

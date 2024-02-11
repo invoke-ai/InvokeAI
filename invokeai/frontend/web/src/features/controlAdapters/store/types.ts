@@ -11,7 +11,7 @@ import type {
   ColorMapImageProcessorInvocation,
   ContentShuffleImageProcessorInvocation,
   DepthAnythingImageProcessorInvocation,
-  DWPoseImageProcessorInvocation,
+  DWOpenposeImageProcessorInvocation,
   HedImageProcessorInvocation,
   LineartAnimeImageProcessorInvocation,
   LineartImageProcessorInvocation,
@@ -40,7 +40,7 @@ export type ControlAdapterProcessorNode =
   | MidasDepthImageProcessorInvocation
   | MlsdImageProcessorInvocation
   | NormalbaeImageProcessorInvocation
-  | DWPoseImageProcessorInvocation
+  | DWOpenposeImageProcessorInvocation
   | PidiImageProcessorInvocation
   | ZoeDepthImageProcessorInvocation;
 
@@ -143,10 +143,10 @@ export type RequiredNormalbaeImageProcessorInvocation = O.Required<
 >;
 
 /**
- * The DWPose processor node, with parameters flagged as required
+ * The DW Openpose processor node, with parameters flagged as required
  */
-export type RequiredDWPoseImageProcessorInvocation = O.Required<
-  DWPoseImageProcessorInvocation,
+export type RequiredDWOpenposeImageProcessorInvocation = O.Required<
+  DWOpenposeImageProcessorInvocation,
   'type' | 'image_resolution' | 'draw_body' | 'draw_face' | 'draw_hands'
 >;
 
@@ -179,7 +179,7 @@ export type RequiredControlAdapterProcessorNode =
       | RequiredMidasDepthImageProcessorInvocation
       | RequiredMlsdImageProcessorInvocation
       | RequiredNormalbaeImageProcessorInvocation
-      | RequiredDWPoseImageProcessorInvocation
+      | RequiredDWOpenposeImageProcessorInvocation
       | RequiredPidiImageProcessorInvocation
       | RequiredZoeDepthImageProcessorInvocation,
       'id'
@@ -299,10 +299,10 @@ export const isNormalbaeImageProcessorInvocation = (obj: unknown): obj is Normal
 };
 
 /**
- * Type guard for DWPoseImageProcessorInvocation
+ * Type guard for DWOpenposeImageProcessorInvocation
  */
-export const isDWPoseImageProcessorInvocation = (obj: unknown): obj is DWPoseImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'dwpose_image_processor') {
+export const isDWOpenposeImageProcessorInvocation = (obj: unknown): obj is DWOpenposeImageProcessorInvocation => {
+  if (isObject(obj) && 'type' in obj && obj.type === 'dw_openpose_image_processor') {
     return true;
   }
   return false;
