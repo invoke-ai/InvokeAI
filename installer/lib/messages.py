@@ -82,6 +82,15 @@ def choose_version(available_releases: tuple | None = None) -> str:
     if available_releases is None:
         return "stable"
 
+    console.print(":grey_question: [orange3]Please choose an Invoke version to install.")
+
+    choices = available_releases[0] + available_releases[1]
+
+    response = prompt(
+        message=f"   <Enter> to install the recommended release ({choices[0]}). <Tab> or type to pick a version: ",
+        complete_while_typing=True,
+        completer=FuzzyWordCompleter(choices),
+    )
     console.print(f"   Version {choices[0] if response == '' else response} will be installed.")
 
     console.line()
