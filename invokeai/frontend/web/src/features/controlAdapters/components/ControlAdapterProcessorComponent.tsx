@@ -6,7 +6,7 @@ import CannyProcessor from './processors/CannyProcessor';
 import ColorMapProcessor from './processors/ColorMapProcessor';
 import ContentShuffleProcessor from './processors/ContentShuffleProcessor';
 import DepthAnyThingProcessor from './processors/DepthAnyThingProcessor';
-import DWPoseProcessor from './processors/DWPoseProcessor';
+import DWOpenposeProcessor from './processors/DWOpenposeProcessor';
 import HedProcessor from './processors/HedProcessor';
 import LineartAnimeProcessor from './processors/LineartAnimeProcessor';
 import LineartProcessor from './processors/LineartProcessor';
@@ -73,8 +73,8 @@ const ControlAdapterProcessorComponent = ({ id }: Props) => {
     return <NormalBaeProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
   }
 
-  if (processorNode.type === 'dwpose_image_processor') {
-    return <DWPoseProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
+  if (processorNode.type === 'dw_openpose_image_processor') {
+    return <DWOpenposeProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
   }
 
   if (processorNode.type === 'pidi_image_processor') {
