@@ -17,7 +17,6 @@ from controlnet_aux import (
     MidasDetector,
     MLSDdetector,
     NormalBaeDetector,
-    OpenposeDetector,
     PidiNetDetector,
     SamDetector,
     ZoeDetector,
@@ -273,31 +272,6 @@ class LineartAnimeImageProcessorInvocation(ImageProcessorInvocation):
             image,
             detect_resolution=self.detect_resolution,
             image_resolution=self.image_resolution,
-        )
-        return processed_image
-
-
-@invocation(
-    "openpose_image_processor",
-    title="Openpose Processor",
-    tags=["controlnet", "openpose", "pose"],
-    category="controlnet",
-    version="1.2.0",
-)
-class OpenposeImageProcessorInvocation(ImageProcessorInvocation):
-    """Applies Openpose processing to image"""
-
-    hand_and_face: bool = InputField(default=False, description="Whether to use hands and face mode")
-    detect_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.detect_res)
-    image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
-
-    def run_processor(self, image):
-        openpose_processor = OpenposeDetector.from_pretrained(pretrained_model_or_path="lllyasviel/Annotators")
-        processed_image = openpose_processor(
-            image,
-            detect_resolution=self.detect_resolution,
-            image_resolution=self.image_resolution,
-            hand_and_face=self.hand_and_face,
         )
         return processed_image
 

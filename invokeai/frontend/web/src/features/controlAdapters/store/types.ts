@@ -19,7 +19,6 @@ import type {
   MidasDepthImageProcessorInvocation,
   MlsdImageProcessorInvocation,
   NormalbaeImageProcessorInvocation,
-  OpenposeImageProcessorInvocation,
   PidiImageProcessorInvocation,
   ZoeDepthImageProcessorInvocation,
 } from 'services/api/types';
@@ -41,7 +40,6 @@ export type ControlAdapterProcessorNode =
   | MidasDepthImageProcessorInvocation
   | MlsdImageProcessorInvocation
   | NormalbaeImageProcessorInvocation
-  | OpenposeImageProcessorInvocation
   | DWPoseImageProcessorInvocation
   | PidiImageProcessorInvocation
   | ZoeDepthImageProcessorInvocation;
@@ -145,14 +143,6 @@ export type RequiredNormalbaeImageProcessorInvocation = O.Required<
 >;
 
 /**
- * The Openpose processor node, with parameters flagged as required
- */
-export type RequiredOpenposeImageProcessorInvocation = O.Required<
-  OpenposeImageProcessorInvocation,
-  'type' | 'detect_resolution' | 'image_resolution' | 'hand_and_face'
->;
-
-/**
  * The DWPose processor node, with parameters flagged as required
  */
 export type RequiredDWPoseImageProcessorInvocation = O.Required<
@@ -189,7 +179,6 @@ export type RequiredControlAdapterProcessorNode =
       | RequiredMidasDepthImageProcessorInvocation
       | RequiredMlsdImageProcessorInvocation
       | RequiredNormalbaeImageProcessorInvocation
-      | RequiredOpenposeImageProcessorInvocation
       | RequiredDWPoseImageProcessorInvocation
       | RequiredPidiImageProcessorInvocation
       | RequiredZoeDepthImageProcessorInvocation,
@@ -304,16 +293,6 @@ export const isMlsdImageProcessorInvocation = (obj: unknown): obj is MlsdImagePr
  */
 export const isNormalbaeImageProcessorInvocation = (obj: unknown): obj is NormalbaeImageProcessorInvocation => {
   if (isObject(obj) && 'type' in obj && obj.type === 'normalbae_image_processor') {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for OpenposeImageProcessorInvocation
- */
-export const isOpenposeImageProcessorInvocation = (obj: unknown): obj is OpenposeImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'openpose_image_processor') {
     return true;
   }
   return false;

@@ -14,7 +14,6 @@ import MediapipeFaceProcessor from './processors/MediapipeFaceProcessor';
 import MidasDepthProcessor from './processors/MidasDepthProcessor';
 import MlsdImageProcessor from './processors/MlsdImageProcessor';
 import NormalBaeProcessor from './processors/NormalBaeProcessor';
-import OpenposeProcessor from './processors/OpenposeProcessor';
 import PidiProcessor from './processors/PidiProcessor';
 import ZoeDepthProcessor from './processors/ZoeDepthProcessor';
 
@@ -72,10 +71,6 @@ const ControlAdapterProcessorComponent = ({ id }: Props) => {
 
   if (processorNode.type === 'normalbae_image_processor') {
     return <NormalBaeProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
-  }
-
-  if (processorNode.type === 'openpose_image_processor') {
-    return <OpenposeProcessor controlNetId={id} processorNode={processorNode} isEnabled={isEnabled} />;
   }
 
   if (processorNode.type === 'dwpose_image_processor') {

@@ -264,8 +264,6 @@
         "noneDescription": "No processing applied",
         "normalBae": "Normal BAE",
         "normalBaeDescription": "Normal BAE processing",
-        "openPose": "Openpose",
-        "openPoseDescription": "Human pose estimation using Openpose",
         "dwPose": "DWPose",
         "dwPoseDescription": "Human pose estimation using DWPose",
         "pidi": "PIDI",

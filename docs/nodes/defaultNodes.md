@@ -81,7 +81,7 @@ their descriptions.
 | ONNX Text to Latents                                          | Generates latents from conditionings.                                                                                                                |
 | ONNX Model Loader                                             | Loads a main model, outputting its submodels.                                                                                                        |
 | OpenCV Inpaint                                                | Simple inpaint using opencv.                                                                                                                         |
-| Openpose Processor                                            | Applies Openpose processing to image                                                                                                                 |
+| DWPose Processor                                            | Applies Openpose processing to image                                                                                                                 |
 | PIDI Processor                                                | Applies PIDI processing to image                                                                                                                     |
 | Prompts from File                                             | Loads prompts from a text file                                                                                                                       |
 | Random Integer                                                | Outputs a single random integer.                                                                                                                     |
