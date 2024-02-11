@@ -69,7 +69,7 @@ a token and copy it, since you will need in for the next step.
 
 ### Setup
 
-Set up your environmnent variables. In the `docker` directory, make a copy of `env.sample` and name it `.env`. Make changes as necessary.
+Set up your environmnent variables. In the `docker` directory, make a copy of `.env.sample` and name it `.env`. Make changes as necessary.
 
 Any environment variables supported by InvokeAI can be set here - please see the [CONFIGURATION](../features/CONFIGURATION.md) for further detail.
 

@@ -28,7 +28,7 @@ This is done via Docker Desktop preferences
 
 ### Configure Invoke environment
 
-1. Make a copy of `env.sample` and name it `.env` (`cp env.sample .env` (Mac/Linux) or `copy example.env .env` (Windows)). Make changes as necessary. Set `INVOKEAI_ROOT` to an absolute path to:
+1. Make a copy of `.env.sample` and name it `.env` (`cp .env.sample .env` (Mac/Linux) or `copy example.env .env` (Windows)). Make changes as necessary. Set `INVOKEAI_ROOT` to an absolute path to:
     a. the desired location of the InvokeAI runtime directory, or
     b. an existing, v3.0.0 compatible runtime directory.
 1. Execute `run.sh`
