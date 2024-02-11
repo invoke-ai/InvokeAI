@@ -91,8 +91,7 @@ def choose_version(available_releases: tuple | None = None) -> str:
         complete_while_typing=True,
         completer=FuzzyWordCompleter(choices),
     )
-
-    console.print(f"   Version {choices[0] if response == "" else response} will be installed.")
+    console.print(f"   Version {choices[0] if response == '' else response} will be installed.")
 
     console.line()
 
