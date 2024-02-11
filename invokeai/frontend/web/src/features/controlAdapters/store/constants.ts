@@ -205,22 +205,6 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
       image_resolution: 512,
     },
   },
-  openpose_image_processor: {
-    type: 'openpose_image_processor',
-    get label() {
-      return i18n.t('controlnet.openPose');
-    },
-    get description() {
-      return i18n.t('controlnet.openPoseDescription');
-    },
-    default: {
-      id: 'openpose_image_processor',
-      type: 'openpose_image_processor',
-      detect_resolution: 512,
-      image_resolution: 512,
-      hand_and_face: false,
-    },
-  },
   dwpose_image_processor: {
     type: 'dwpose_image_processor',
     get label() {
