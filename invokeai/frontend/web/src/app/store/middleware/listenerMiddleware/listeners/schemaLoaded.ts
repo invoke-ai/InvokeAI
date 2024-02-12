@@ -13,14 +13,13 @@ export const schemaLoadedListener = () => {
     effect: (action, { dispatch, getState }) => {
       const log = logger('system');
       const schemaJSON = action.payload;
-      console.log({ action });
 
-      log.info({ schemaJSON }, 'Received OpenAPI schema');
+      log.debug({ schemaJSON }, 'Received OpenAPI schema');
       const { nodesAllowlist, nodesDenylist } = getState().config;
 
       const nodeTemplates = parseSchema(schemaJSON, nodesAllowlist, nodesDenylist);
 
-      log.info({ nodeTemplates: parseify(nodeTemplates) }, `Built ${size(nodeTemplates)} node templates`);
+      log.debug({ nodeTemplates: parseify(nodeTemplates) }, `Built ${size(nodeTemplates)} node templates`);
 
       dispatch(nodeTemplatesBuilt(nodeTemplates));
     },

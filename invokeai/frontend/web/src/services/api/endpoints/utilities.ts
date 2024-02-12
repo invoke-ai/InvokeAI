@@ -43,7 +43,6 @@ export const utilitiesApi = api.injectEndpoints({
     }),
     loadSchema: build.query({
       queryFn: async () => {
-        console.log('loading');
         try {
           const openAPISchemaUrl = $openAPISchemaUrl.get();
 
