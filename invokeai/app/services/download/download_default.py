@@ -4,6 +4,7 @@
 import os
 import re
 import threading
+import time
 import traceback
 from pathlib import Path
 from queue import Empty, PriorityQueue
@@ -52,6 +53,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         self._next_job_id = 0
         self._queue = PriorityQueue()
         self._stop_event = threading.Event()
+        self._job_completed_event = threading.Event()
         self._worker_pool = set()
         self._lock = threading.Lock()
         self._logger = InvokeAILogger.get_logger("DownloadQueueService")
@@ -188,6 +190,16 @@ class DownloadQueueService(DownloadQueueServiceBase):
             if not job.in_terminal_state:
                 self.cancel_job(job)
 
+    def wait_for_job(self, job: DownloadJob, timeout: int = 0) -> DownloadJob:
+        """Block until the indicated job has reached terminal state, or when timeout limit reached."""
+        start = time.time()
+        while not job.in_terminal_state:
+            if self._job_completed_event.wait(timeout=5):  # in case we miss an event
+                self._job_completed_event.clear()
+            if timeout > 0 and time.time() - start > timeout:
+                raise TimeoutError("Timeout exceeded")
+        return job
+
     def _start_workers(self, max_workers: int) -> None:
         """Start the requested number of worker threads."""
         self._stop_event.clear()
@@ -223,6 +235,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
             finally:
                 job.job_ended = get_iso_timestamp()
+                self._job_completed_event.set()  # signal a change to terminal state
                 self._queue.task_done()
         self._logger.debug(f"Download queue worker thread {threading.current_thread().name} exiting.")
 
@@ -407,7 +420,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
 # Example on_progress event handler to display a TQDM status bar
 # Activate with:
-#   download_service.download('http://foo.bar/baz', '/tmp', on_progress=TqdmProgress().job_update
+#   download_service.download(DownloadJob('http://foo.bar/baz', '/tmp', on_progress=TqdmProgress().update))
 class TqdmProgress(object):
     """TQDM-based progress bar object to use in on_progress handlers."""
 

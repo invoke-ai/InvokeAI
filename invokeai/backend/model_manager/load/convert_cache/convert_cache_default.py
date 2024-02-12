@@ -53,7 +53,13 @@ class ModelConvertCache(ModelConvertCacheBase):
                 sentinel = path / config
                 if sentinel.exists():
                     return sentinel.stat().st_atime
-            return 0.0
+
+            # no sentinel file found! - pick the most recent file in the directory
+            try:
+                atimes = sorted([x.stat().st_atime for x in path.iterdir() if x.is_file()], reverse=True)
+                return atimes[0]
+            except IndexError:
+                return 0.0
 
         # sort by last access time - least accessed files will be at the end
         lru_models = sorted(self._cache_path.iterdir(), key=by_atime, reverse=True)
