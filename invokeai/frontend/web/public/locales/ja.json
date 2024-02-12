@@ -555,7 +555,6 @@
         "balanced": "バランス",
         "prompt": "プロンプト",
         "depthMidasDescription": "Midasを使用して深度マップを生成",
-        "openPoseDescription": "Openposeを使用してポーズを推定",
         "control": "コントロール",
         "resizeMode": "リサイズモード",
         "weight": "重み",

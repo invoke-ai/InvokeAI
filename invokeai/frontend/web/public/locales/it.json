@@ -1195,7 +1195,6 @@
         "f": "F",
         "h": "A",
         "prompt": "Prompt",
-        "openPoseDescription": "Stima della posa umana utilizzando Openpose",
         "resizeMode": "Ridimensionamento",
         "weight": "Peso",
         "selectModel": "Seleziona un modello",
