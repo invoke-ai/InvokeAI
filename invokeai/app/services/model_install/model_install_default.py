@@ -50,6 +50,7 @@ from .model_install_base import (
     ModelInstallJob,
     ModelInstallServiceBase,
     ModelSource,
+    StringLikeSource,
     URLModelSource,
 )
 
@@ -176,6 +177,34 @@ class ModelInstallService(ModelInstallServiceBase):
             config,
             info,
         )
+
+    def heuristic_import(
+        self,
+        source: str,
+        config: Optional[Dict[str, Any]] = None,
+        access_token: Optional[str] = None,
+    ) -> ModelInstallJob:
+        variants = "|".join(ModelRepoVariant.__members__.values())
+        hf_repoid_re = f"^([^/:]+/[^/:]+)(?::({variants})?(?::/?([^:]+))?)?$"
+        source_obj: Optional[StringLikeSource] = None
+
+        if Path(source).exists():  # A local file or directory
+            source_obj = LocalModelSource(path=Path(source))
+        elif match := re.match(hf_repoid_re, source):
+            source_obj = HFModelSource(
+                repo_id=match.group(1),
+                variant=match.group(2) if match.group(2) else None,  # pass None rather than ''
+                subfolder=Path(match.group(3)) if match.group(3) else None,
+                access_token=access_token,
+            )
+        elif re.match(r"^https?://[^/]+", source):
+            source_obj = URLModelSource(
+                url=AnyHttpUrl(source),
+                access_token=access_token,
+            )
+        else:
+            raise ValueError(f"Unsupported model source: '{source}'")
+        return self.import_model(source_obj, config)
 
     def import_model(self, source: ModelSource, config: Optional[Dict[str, Any]] = None) -> ModelInstallJob:  # noqa D102
         similar_jobs = [x for x in self.list_jobs() if x.source == source and not x.in_terminal_state]
@@ -571,6 +600,8 @@ class ModelInstallService(ModelInstallServiceBase):
         # TODO: Replace with tempfile.tmpdir() when multithreading is cleaned up.
         # Currently the tmpdir isn't automatically removed at exit because it is
         # being held in a daemon thread.
+        if len(remote_files) == 0:
+            raise ValueError(f"{source}: No downloadable files found")
         tmpdir = Path(
             mkdtemp(
                 dir=self._app_config.models_path,
@@ -586,6 +617,16 @@ class ModelInstallService(ModelInstallServiceBase):
             bytes=0,
             total_bytes=0,
         )
+        # In the event that there is a subfolder specified in the source,
+        # we need to remove it from the destination path in order to avoid
+        # creating unwanted subfolders
+        if hasattr(source, "subfolder") and source.subfolder:
+            root = Path(remote_files[0].path.parts[0])
+            subfolder = root / source.subfolder
+        else:
+            root = Path(".")
+            subfolder = Path(".")
+
         # we remember the path up to the top of the tmpdir so that it may be
         # removed safely at the end of the install process.
         install_job._install_tmpdir = tmpdir
@@ -595,7 +636,7 @@ class ModelInstallService(ModelInstallServiceBase):
         self._logger.debug(f"remote_files={remote_files}")
         for model_file in remote_files:
             url = model_file.url
-            path = model_file.path
+            path = root / model_file.path.relative_to(subfolder)
             self._logger.info(f"Downloading {url} => {path}")
             install_job.total_bytes += model_file.size
             assert hasattr(source, "access_token")

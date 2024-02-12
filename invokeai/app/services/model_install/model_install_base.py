@@ -127,8 +127,8 @@ class HFModelSource(StringLikeSource):
     def __str__(self) -> str:
         """Return string version of repoid when string rep needed."""
         base: str = self.repo_id
+        base += f":{self.variant or ''}"
         base += f":{self.subfolder}" if self.subfolder else ""
-        base += f" ({self.variant})" if self.variant else ""
         return base
 
 
@@ -323,6 +323,43 @@ class ModelInstallServiceBase(ABC):
         :param config: Dict of attributes that will override autoassigned values.
         :returns id: The string ID of the registered model.
         """
+
+    @abstractmethod
+    def heuristic_import(
+        self,
+        source: str,
+        config: Optional[Dict[str, Any]] = None,
+        access_token: Optional[str] = None,
+    ) -> ModelInstallJob:
+        r"""Install the indicated model using heuristics to interpret user intentions.
+
+        :param source: String source
+        :param config: Optional dict. Any fields in this dict
+         will override corresponding autoassigned probe fields in the
+         model's config record as described in `import_model()`.
+        :param access_token: Optional access token for remote sources.
+
+        The source can be:
+        1. A local file path in posix() format (`/foo/bar` or `C:\foo\bar`)
+        2. An http or https URL (`https://foo.bar/foo`)
+        3. A HuggingFace repo_id (`foo/bar`, `foo/bar:fp16`, `foo/bar:fp16:vae`)
+
+        We extend the HuggingFace repo_id syntax to include the variant and the
+        subfolder or path. The following are acceptable alternatives:
+            stabilityai/stable-diffusion-v4
+            stabilityai/stable-diffusion-v4:fp16
+            stabilityai/stable-diffusion-v4:fp16:vae
+            stabilityai/stable-diffusion-v4::/checkpoints/sd4.safetensors
+            stabilityai/stable-diffusion-v4:onnx:vae
+
+        Because a local file path can look like a huggingface repo_id, the logic
+        first checks whether the path exists on disk, and if not, it is treated as
+        a parseable huggingface repo.
+
+        The previous support for recursing into a local folder and loading all model-like files
+        has been removed.
+        """
+        pass
 
     @abstractmethod
     def import_model(
