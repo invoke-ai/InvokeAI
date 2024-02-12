@@ -11,29 +11,27 @@ export const WorkflowName = () => {
   const { t } = useTranslation();
 
   return (
-    <>
-      <Flex gap="1" alignItems="center">
-        {name.length ? (
-          <Tooltip label={<WorkflowInfoTooltipContent />} placement="top">
-            <Text fontSize="lg" userSelect="none" noOfLines={1} wordBreak="break-all" fontWeight="semibold">
-              {name}
-            </Text>
-          </Tooltip>
-        ) : (
-          <Text fontSize="lg" fontStyle="italic" fontWeight="semibold">
-            {t('workflows.unnamedWorkflow')}
+    <Flex gap="1" alignItems="center">
+      {name.length ? (
+        <Tooltip label={<WorkflowInfoTooltipContent />} placement="top">
+          <Text fontSize="lg" userSelect="none" noOfLines={1} wordBreak="break-all" fontWeight="semibold">
+            {name}
           </Text>
-        )}
+        </Tooltip>
+      ) : (
+        <Text fontSize="lg" fontStyle="italic" fontWeight="semibold">
+          {t('workflows.unnamedWorkflow')}
+        </Text>
+      )}
 
-        {isTouched && (
-          <Tooltip label="Workflow has unsaved changes">
-            <Flex>
-              <Icon as={PiDotOutlineFill} boxSize="20px" sx={{ color: 'invokeYellow.500' }} />
-            </Flex>
-          </Tooltip>
-        )}
-        <WorkflowWarning />
-      </Flex>
-    </>
+      {isTouched && (
+        <Tooltip label="Workflow has unsaved changes">
+          <Flex>
+            <Icon as={PiDotOutlineFill} boxSize="20px" sx={{ color: 'invokeYellow.500' }} />
+          </Flex>
+        </Tooltip>
+      )}
+      <WorkflowWarning />
+    </Flex>
   );
 };

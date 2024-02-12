@@ -8,7 +8,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFlowArrowBold } from 'react-icons/pi';
 
-const UploadWorkflowMenuItem = () => {
+const NewWorkflowButton = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
@@ -37,4 +37,4 @@ const UploadWorkflowMenuItem = () => {
   );
 };
 
-export default memo(UploadWorkflowMenuItem);
+export default memo(NewWorkflowButton);
