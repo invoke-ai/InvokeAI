@@ -7,6 +7,7 @@ import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
 import QueueControls from 'features/queue/components/QueueControls';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
+import WorkflowLibraryButton from 'features/workflowLibrary/components/WorkflowLibraryButton';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useRef } from 'react';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
@@ -17,7 +18,6 @@ import { WorkflowViewMode } from './viewMode/WorkflowViewMode';
 import WorkflowPanel from './workflow/WorkflowPanel';
 import { WorkflowMenu } from './WorkflowMenu';
 import { WorkflowName } from './WorkflowName';
-import WorkflowLibraryButton from '../../../workflowLibrary/components/WorkflowLibraryButton';
 
 const panelGroupStyles: CSSProperties = { height: '100%', width: '100%' };
 

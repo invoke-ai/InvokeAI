@@ -1,12 +1,12 @@
 import { Flex, Spacer } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
 import AddNodeButton from 'features/nodes/components/flow/panels/TopPanel/AddNodeButton';
 import ClearFlowButton from 'features/nodes/components/flow/panels/TopPanel/ClearFlowButton';
 import SaveWorkflowButton from 'features/nodes/components/flow/panels/TopPanel/SaveWorkflowButton';
 import UpdateNodesButton from 'features/nodes/components/flow/panels/TopPanel/UpdateNodesButton';
+import { WorkflowName } from 'features/nodes/components/sidePanel/WorkflowName';
 import WorkflowLibraryMenu from 'features/workflowLibrary/components/WorkflowLibraryMenu/WorkflowLibraryMenu';
 import { memo } from 'react';
-import { useAppSelector } from '../../../../../../app/store/storeHooks';
-import { WorkflowName } from '../../../sidePanel/WorkflowName';
 
 const TopCenterPanel = () => {
   const name = useAppSelector((s) => s.workflow.name);

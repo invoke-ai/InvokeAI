@@ -1,4 +1,4 @@
-import { Button, Flex, Icon, Menu, MenuButton, MenuItem, MenuList, Text } from '@invoke-ai/ui-library';
+import { Button, Flex, Menu, MenuButton, MenuItem, MenuList, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { WorkflowMode } from 'features/nodes/store/types';
 import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
