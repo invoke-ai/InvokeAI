@@ -1,19 +1,16 @@
-import { Button, IconButton } from '@invoke-ai/ui-library';
+import { Button } from '@invoke-ai/ui-library';
+import { useWorkflowLibraryModalContext } from 'features/workflowLibrary/context/useWorkflowLibraryModalContext';
 import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadWorkflowFromFile';
 import { memo, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { PiUploadSimpleBold } from 'react-icons/pi';
 
-interface Props {
-  full?: boolean;
-  onSuccess?: () => void;
-}
-
-const UploadWorkflowMenuItem = ({ full, onSuccess }: Props) => {
+const UploadWorkflowButton = () => {
   const { t } = useTranslation();
   const resetRef = useRef<() => void>(null);
-  const loadWorkflowFromFile = useLoadWorkflowFromFile({ resetRef, onSuccess });
+  const { onClose } = useWorkflowLibraryModalContext();
+  const loadWorkflowFromFile = useLoadWorkflowFromFile({ resetRef, onSuccess: onClose });
 
   const onDropAccepted = useCallback(
     (files: File[]) => {
@@ -32,28 +29,16 @@ const UploadWorkflowMenuItem = ({ full, onSuccess }: Props) => {
     multiple: false,
   });
   return (
-    <>
-      {full ? (
-        <Button
-          aria-label={t('workflows.uploadWorkflow')}
-          tooltip={t('workflows.uploadWorkflow')}
-          leftIcon={<PiUploadSimpleBold />}
-          {...getRootProps()}
-          pointerEvents="auto"
-        >
-          {t('workflows.uploadWorkflow')}
-        </Button>
-      ) : (
-        <IconButton
-          aria-label={t('workflows.uploadWorkflow')}
-          tooltip={t('workflows.uploadWorkflow')}
-          icon={<PiUploadSimpleBold />}
-          {...getRootProps()}
-          pointerEvents="auto"
-        />
-      )}
-    </>
+    <Button
+      aria-label={t('workflows.uploadWorkflow')}
+      tooltip={t('workflows.uploadWorkflow')}
+      leftIcon={<PiUploadSimpleBold />}
+      {...getRootProps()}
+      pointerEvents="auto"
+    >
+      {t('workflows.uploadWorkflow')}
+    </Button>
   );
 };
 
-export default memo(UploadWorkflowMenuItem);
+export default memo(UploadWorkflowButton);
