@@ -10,7 +10,7 @@ import type { CSSProperties } from 'react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MdDeviceHub } from 'react-icons/md';
-import { useLoadSchemaQuery } from 'services/api/endpoints/utilities';
+import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 
 import AddNodePopover from './flow/AddNodePopover/AddNodePopover';
 import { Flow } from './flow/Flow';
@@ -40,7 +40,7 @@ const exit: AnimationProps['exit'] = {
 };
 
 const NodeEditor = () => {
-  const { data, isLoading } = useLoadSchemaQuery();
+  const { data, isLoading } = useGetOpenAPISchemaQuery();
   const { t } = useTranslation();
   return (
     <Flex

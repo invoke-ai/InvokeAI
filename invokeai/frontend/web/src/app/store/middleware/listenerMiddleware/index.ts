@@ -23,6 +23,7 @@ import { addControlNetImageProcessedListener } from './listeners/controlNetImage
 import { addEnqueueRequestedCanvasListener } from './listeners/enqueueRequestedCanvas';
 import { addEnqueueRequestedLinear } from './listeners/enqueueRequestedLinear';
 import { addEnqueueRequestedNodes } from './listeners/enqueueRequestedNodes';
+import { addGetOpenAPISchemaListener } from './listeners/getOpenAPISchema';
 import {
   addImageAddedToBoardFulfilledListener,
   addImageAddedToBoardRejectedListener,
@@ -47,7 +48,6 @@ import { addInitialImageSelectedListener } from './listeners/initialImageSelecte
 import { addModelSelectedListener } from './listeners/modelSelected';
 import { addModelsLoadedListener } from './listeners/modelsLoaded';
 import { addDynamicPromptsListener } from './listeners/promptChanged';
-import { schemaLoadedListener } from './listeners/schemaLoaded';
 import { addSocketConnectedEventListener as addSocketConnectedListener } from './listeners/socketio/socketConnected';
 import { addSocketDisconnectedEventListener as addSocketDisconnectedListener } from './listeners/socketio/socketDisconnected';
 import { addGeneratorProgressEventListener as addGeneratorProgressListener } from './listeners/socketio/socketGeneratorProgress';
@@ -150,7 +150,7 @@ addImageRemovedFromBoardRejectedListener();
 addBoardIdSelectedListener();
 
 // Node schemas
-schemaLoadedListener();
+addGetOpenAPISchemaListener();
 
 // Workflows
 addWorkflowLoadRequestedListener();

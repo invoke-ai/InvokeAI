@@ -3,13 +3,13 @@ import { parseify } from 'common/util/serialize';
 import { nodeTemplatesBuilt } from 'features/nodes/store/nodeTemplatesSlice';
 import { parseSchema } from 'features/nodes/util/schema/parseSchema';
 import { size } from 'lodash-es';
-import { utilitiesApi } from 'services/api/endpoints/utilities';
+import { appInfoApi } from 'services/api/endpoints/appInfo';
 
 import { startAppListening } from '..';
 
-export const schemaLoadedListener = () => {
+export const addGetOpenAPISchemaListener = () => {
   startAppListening({
-    matcher: utilitiesApi.endpoints.loadSchema.matchFulfilled,
+    matcher: appInfoApi.endpoints.getOpenAPISchema.matchFulfilled,
     effect: (action, { dispatch, getState }) => {
       const log = logger('system');
       const schemaJSON = action.payload;
@@ -26,11 +26,11 @@ export const schemaLoadedListener = () => {
   });
 
   startAppListening({
-    matcher: utilitiesApi.endpoints.loadSchema.matchRejected,
+    matcher: appInfoApi.endpoints.getOpenAPISchema.matchRejected,
     effect: (action) => {
       // If action.meta.condition === true, the request was canceled/skipped because another request was in flight or
       // the value was already in the cache. We don't want to log these errors.
-      if (action.meta.condition) {
+      if (!action.meta.condition) {
         const log = logger('system');
         log.error({ error: parseify(action.error) }, 'Problem retrieving OpenAPI Schema');
       }

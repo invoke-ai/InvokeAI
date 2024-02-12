@@ -1,3 +1,5 @@
+import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
+import type { OpenAPIV3_1 } from 'openapi-types';
 import type { paths } from 'services/api/schema';
 import type { AppConfig, AppDependencyVersions, AppVersion } from 'services/api/types';
 
@@ -57,6 +59,14 @@ export const appInfoApi = api.injectEndpoints({
       }),
       invalidatesTags: ['InvocationCacheStatus'],
     }),
+    getOpenAPISchema: build.query<OpenAPIV3_1.Document, void>({
+      query: () => {
+        const openAPISchemaUrl = $openAPISchemaUrl.get();
+        const url = openAPISchemaUrl ? openAPISchemaUrl : `${window.location.href.replace(/\/$/, '')}/openapi.json`;
+        return url;
+      },
+      providesTags: ['Schema'],
+    }),
   }),
 });
 
@@ -68,4 +78,6 @@ export const {
   useDisableInvocationCacheMutation,
   useEnableInvocationCacheMutation,
   useGetInvocationCacheStatusQuery,
+  useGetOpenAPISchemaQuery,
+  useLazyGetOpenAPISchemaQuery,
 } = appInfoApi;

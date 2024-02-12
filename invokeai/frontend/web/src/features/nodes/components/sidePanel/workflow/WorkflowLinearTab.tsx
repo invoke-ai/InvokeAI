@@ -7,13 +7,13 @@ import LinearViewField from 'features/nodes/components/flow/nodes/Invocation/fie
 import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLoadSchemaQuery } from 'services/api/endpoints/utilities';
+import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 
 const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => workflow.exposedFields);
 
 const WorkflowLinearTab = () => {
   const fields = useAppSelector(selector);
-  const { isLoading } = useLoadSchemaQuery();
+  const { isLoading } = useGetOpenAPISchemaQuery();
   const { t } = useTranslation();
 
   return (
