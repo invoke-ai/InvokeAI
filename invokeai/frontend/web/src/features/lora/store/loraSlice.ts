@@ -35,7 +35,7 @@ export const loraSlice = createSlice({
     },
     loraRecalled: (state, action: PayloadAction<LoRAModelConfigEntity & { weight: number }>) => {
       const { model_name, id, base_model, weight } = action.payload;
-      state.loras[id] = { id, model_name, base_model, weight };
+      state.loras[id] = { id, model_name, base_model, weight, isEnabled: true };
     },
     loraRemoved: (state, action: PayloadAction<string>) => {
       const id = action.payload;
