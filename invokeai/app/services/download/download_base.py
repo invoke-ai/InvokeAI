@@ -260,3 +260,16 @@ class DownloadQueueServiceBase(ABC):
     def join(self) -> None:
         """Wait until all jobs are off the queue."""
         pass
+
+    @abstractmethod
+    def wait_for_job(self, job: DownloadJob, timeout: int = 0) -> DownloadJob:
+        """Wait until the indicated download job has reached a terminal state.
+
+        This will block until the indicated install job has completed,
+        been cancelled, or errored out.
+
+        :param job: The job to wait on.
+        :param timeout: Wait up to indicated number of seconds. Raise a TimeoutError if
+        the job hasn't completed within the indicated time.
+        """
+        pass
