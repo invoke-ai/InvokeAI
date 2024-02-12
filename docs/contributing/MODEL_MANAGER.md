@@ -446,6 +446,44 @@ required parameters:
 
 Once initialized, the installer will provide the following methods:
 
+#### install_job = installer.heuristic_import(source, [config], [access_token])
+
+This is a simplified interface to the installer which takes a source
+string, an optional model configuration dictionary and an optional
+access token.
+
+The `source` is a string that can be any of these forms
+
+1. A path on the local filesystem (`C:\\users\\fred\\model.safetensors`)
+2. A Url pointing to a single downloadable model file (`https://civitai.com/models/58390/detail-tweaker-lora-lora`)
+3. A HuggingFace repo_id with any of the following formats:
+   - `model/name` -- entire model
+   - `model/name:fp32` -- entire model, using the fp32 variant
+   - `model/name:fp16:vae` -- vae submodel, using the fp16 variant
+   - `model/name::vae` -- vae submodel, using default precision
+   - `model/name:fp16:path/to/model.safetensors` -- an individual model file, fp16 variant
+   - `model/name::path/to/model.safetensors` -- an individual model file, default variant
+
+Note that by specifying a relative path to the top of the HuggingFace
+repo, you can download and install arbitrary models files. 
+
+The variant, if not provided, will be automatically filled in with
+`fp32` if the user has requested full precision, and `fp16`
+otherwise. If a variant that does not exist is requested, then the
+method will install whatever HuggingFace returns as its default
+revision.
+
+`config` is an optional dict of values that will override the
+autoprobed values for model type, base, scheduler prediction type, and
+so forth. See [Model configuration and
+probing](#Model-configuration-and-probing) for details.
+
+`access_token` is an optional access token for accessing resources
+that need authentication.
+
+The method will return a `ModelInstallJob`. This object is discussed
+at length in the following section.
+
 #### install_job = installer.import_model()
 
 The `import_model()` method is the core of the installer. The
@@ -464,9 +502,10 @@ source2 = LocalModelSource(path='/opt/models/sushi_diffusers')     # a local dif
 source3 = HFModelSource(repo_id='runwayml/stable-diffusion-v1-5')  # a repo_id
 source4 = HFModelSource(repo_id='runwayml/stable-diffusion-v1-5', subfolder='vae')  # a subfolder within a repo_id
 source5 = HFModelSource(repo_id='runwayml/stable-diffusion-v1-5', variant='fp16')   # a named variant of a HF model
+source6 = HFModelSource(repo_id='runwayml/stable-diffusion-v1-5', subfolder='OrangeMix/OrangeMix1.ckpt')   # path to an individual model file
 
-source6 = URLModelSource(url='https://civitai.com/api/download/models/63006')       # model located at a URL
-source7 = URLModelSource(url='https://civitai.com/api/download/models/63006', access_token='letmein') # with an access token
+source7 = URLModelSource(url='https://civitai.com/api/download/models/63006')       # model located at a URL
+source8 = URLModelSource(url='https://civitai.com/api/download/models/63006', access_token='letmein') # with an access token
 
 for source in [source1, source2, source3, source4, source5, source6, source7]:
    install_job = installer.install_model(source)
@@ -521,7 +560,6 @@ can be passed to `import_model()`.
 `config` can be used to override all or a portion of the configuration
 attributes returned by the model prober. See the section below for
 details.
-
 
 #### LocalModelSource
 
@@ -715,7 +753,7 @@ and `cancelled`, as well as `in_terminal_state`. The last will return
 True if the job is in the complete, errored or cancelled states.
 
 
-#### Model confguration and probing
+#### Model configuration and probing
 
 The install service uses the `invokeai.backend.model_manager.probe`
 module during import to determine the model's type, base type, and
@@ -1106,7 +1144,7 @@ job = queue.create_download_job(
 		 event_handlers=[my_handler1, my_handler2], # if desired
 		 start=True,
 	)
- ```
+```
  
 The `filename` argument forces the downloader to use the specified
 name for the file rather than the name provided by the remote source,
@@ -1427,9 +1465,9 @@ set of keys to the corresponding model config objects.
 Find all model metadata records that have the given author and return
 a set of keys to the corresponding model config objects.
 
-# The remainder of this documentation is provisional, pending implementation of the Load service
+***
 
-## Let's get loaded, the lowdown on ModelLoadService
+## The Lowdown on the ModelLoadService
 
 The `ModelLoadService` is responsible for loading a named model into
 memory so that it can be used for inference. Despite the fact that it

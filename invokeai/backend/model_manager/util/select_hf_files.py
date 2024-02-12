@@ -36,6 +36,11 @@ def filter_files(
     """
     variant = variant or ModelRepoVariant.DEFAULT
     paths: List[Path] = []
+    root = files[0].parts[0]
+
+    # if the subfolder is a single file, then bypass the selection and just return it
+    if subfolder and subfolder.suffix in [".safetensors", ".bin", ".onnx", ".xml", ".pth", ".pt", ".ckpt", ".msgpack"]:
+        return [root / subfolder]
 
     # Start by filtering on model file extensions, discarding images, docs, etc
     for file in files:
@@ -61,6 +66,7 @@ def filter_files(
 
     # limit search to subfolder if requested
     if subfolder:
+        subfolder = root / subfolder
         paths = [x for x in paths if x.parent == Path(subfolder)]
 
     # _filter_by_variant uniquifies the paths and returns a set
