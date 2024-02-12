@@ -17,7 +17,7 @@ from pydantic.networks import AnyHttpUrl
 from requests import Session
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase
+from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase, TqdmProgress
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase, ModelRecordServiceSQL
@@ -87,6 +87,7 @@ class ModelInstallService(ModelInstallServiceBase):
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         self._downloads_changed_event = threading.Event()
+        self._install_completed_event = threading.Event()
         self._download_queue = download_queue
         self._download_cache: Dict[AnyHttpUrl, ModelInstallJob] = {}
         self._running = False
@@ -241,6 +242,17 @@ class ModelInstallService(ModelInstallServiceBase):
         assert isinstance(jobs[0], ModelInstallJob)
         return jobs[0]
 
+    def wait_for_job(self, job: ModelInstallJob, timeout: int = 0) -> ModelInstallJob:
+        """Block until the indicated job has reached terminal state, or when timeout limit reached."""
+        start = time.time()
+        while not job.in_terminal_state:
+            if self._install_completed_event.wait(timeout=5):  # in case we miss an event
+                self._install_completed_event.clear()
+            if timeout > 0 and time.time() - start > timeout:
+                raise TimeoutError("Timeout exceeded")
+        return job
+
+    # TODO: Better name? Maybe wait_for_jobs()? Maybe too easily confused with above
     def wait_for_installs(self, timeout: int = 0) -> List[ModelInstallJob]:  # noqa D102
         """Block until all installation jobs are done."""
         start = time.time()
@@ -248,7 +260,7 @@ class ModelInstallService(ModelInstallServiceBase):
             if self._downloads_changed_event.wait(timeout=5):  # in case we miss an event
                 self._downloads_changed_event.clear()
             if timeout > 0 and time.time() - start > timeout:
-                raise Exception("Timeout exceeded")
+                raise TimeoutError("Timeout exceeded")
         self._install_queue.join()
         return self._install_jobs
 
@@ -301,6 +313,38 @@ class ModelInstallService(ModelInstallServiceBase):
         else:
             path.unlink()
         self.unregister(key)
+
+    def download_and_cache(
+        self,
+        source: Union[str, AnyHttpUrl],
+        access_token: Optional[str] = None,
+        timeout: int = 0,
+    ) -> Path:
+        """Download the model file located at source to the models cache and return its Path."""
+        model_hash = sha256(str(source).encode("utf-8")).hexdigest()[0:32]
+        model_path = self._app_config.models_convert_cache_path / model_hash
+
+        # We expect the cache directory to contain one and only one downloaded file.
+        # We don't know the file's name in advance, as it is set by the download
+        # content-disposition header.
+        if model_path.exists():
+            contents = [x for x in model_path.iterdir() if x.is_file()]
+            if len(contents) > 0:
+                return contents[0]
+
+        model_path.mkdir(parents=True, exist_ok=True)
+        job = self._download_queue.download(
+            source=AnyHttpUrl(str(source)),
+            dest=model_path,
+            access_token=access_token,
+            on_progress=TqdmProgress().update,
+        )
+        self._download_queue.wait_for_job(job, timeout)
+        if job.complete:
+            assert job.download_path is not None
+            return job.download_path
+        else:
+            raise Exception(job.error)
 
     # --------------------------------------------------------------------------------------------
     # Internal functions that manage the installer threads
@@ -365,6 +409,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 # if this is an install of a remote file, then clean up the temporary directory
                 if job._install_tmpdir is not None:
                     rmtree(job._install_tmpdir)
+                self._install_completed_event.set()
                 self._install_queue.task_done()
 
         self._logger.info("Install thread exiting")

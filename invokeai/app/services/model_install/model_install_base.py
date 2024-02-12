@@ -423,6 +423,18 @@ class ModelInstallServiceBase(ABC):
         """Cancel the indicated job."""
 
     @abstractmethod
+    def wait_for_job(self, job: ModelInstallJob, timeout: int = 0) -> ModelInstallJob:
+        """Wait for the indicated job to reach a terminal state.
+
+        This will block until the indicated install job has completed,
+        been cancelled, or errored out.
+
+        :param job: The job to wait on.
+        :param timeout: Wait up to indicated number of seconds. Raise a TimeoutError if
+        the job hasn't completed within the indicated time.
+        """
+
+    @abstractmethod
     def wait_for_installs(self, timeout: int = 0) -> List[ModelInstallJob]:
         """
         Wait for all pending installs to complete.
@@ -431,7 +443,8 @@ class ModelInstallServiceBase(ABC):
         completed, been cancelled, or errored out.
 
         :param timeout: Wait up to indicated number of seconds. Raise an Exception('timeout') if
-        installs do not complete within the indicated time.
+        installs do not complete within the indicated time. A timeout of zero (the default)
+        will block indefinitely until the installs complete.
         """
 
     @abstractmethod
@@ -447,3 +460,22 @@ class ModelInstallServiceBase(ABC):
     @abstractmethod
     def sync_to_config(self) -> None:
         """Synchronize models on disk to those in the model record database."""
+
+    @abstractmethod
+    def download_and_cache(self, source: Union[str, AnyHttpUrl], access_token: Optional[str] = None) -> Path:
+        """
+        Download the model file located at source to the models cache and return its Path.
+
+        :param source: A Url or a string that can be converted into one.
+        :param access_token: Optional access token to access restricted resources.
+
+        The model file will be downloaded into the system-wide model cache
+        (`models/.cache`) if it isn't already there. Note that the model cache
+        is periodically cleared of infrequently-used entries when the model
+        converter runs.
+
+        Note that this doesn't automaticallly install or register the model, but is
+        intended for use by nodes that need access to models that aren't directly
+        supported by InvokeAI. The downloading process takes advantage of the download queue
+        to avoid interrupting other operations.
+        """
