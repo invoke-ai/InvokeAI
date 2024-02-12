@@ -1,5 +1,6 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import {
+  Box,
   Button,
   ButtonGroup,
   Combobox,
@@ -20,6 +21,7 @@ import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableCon
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import WorkflowLibraryListItem from 'features/workflowLibrary/components/WorkflowLibraryListItem';
 import WorkflowLibraryPagination from 'features/workflowLibrary/components/WorkflowLibraryPagination';
+import { useWorkflowLibraryModalContext } from 'features/workflowLibrary/context/useWorkflowLibraryModalContext';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -28,6 +30,8 @@ import { useListWorkflowsQuery } from 'services/api/endpoints/workflows';
 import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
 import { z } from 'zod';
+
+import UploadWorkflowButton from './UploadWorkflowButton';
 
 const PER_PAGE = 10;
 
@@ -55,6 +59,7 @@ const WorkflowLibraryList = () => {
   const [selectedCategory, setSelectedCategory] = useState<WorkflowCategory>('user');
   const [page, setPage] = useState(0);
   const [query, setQuery] = useState('');
+  const { onClose } = useWorkflowLibraryModalContext();
   const projectId = useStore($projectId);
 
   const orderByOptions = useMemo(() => {
@@ -221,11 +226,16 @@ const WorkflowLibraryList = () => {
         <IAINoContentFallback label={t('workflows.noWorkflows')} />
       )}
       <Divider />
-      {data && (
-        <Flex w="full" justifyContent="space-around">
-          <WorkflowLibraryPagination data={data} page={page} setPage={setPage} />
-        </Flex>
-      )}
+
+      <Flex w="full">
+        <Box flex="1">
+          <UploadWorkflowButton full={true} onSuccess={onClose} />
+        </Box>
+        <Box flex="1" textAlign="center">
+          {data && <WorkflowLibraryPagination data={data} page={page} setPage={setPage} />}
+        </Box>
+        <Box flex="1"></Box>
+      </Flex>
     </>
   );
 };
