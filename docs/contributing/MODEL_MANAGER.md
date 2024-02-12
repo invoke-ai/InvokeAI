@@ -792,6 +792,14 @@ returns a list of completed jobs. The optional `timeout` argument will
 return from the call if jobs aren't completed in the specified
 time. An argument of 0 (the default) will block indefinitely.
 
+#### jobs = installer.wait_for_job(job, [timeout])
+
+Like `wait_for_installs()`, but block until a specific job has
+completed or errored, and then return the job.  The optional `timeout`
+argument will return from the call if the job doesn't complete in the
+specified time. An argument of 0 (the default) will block
+indefinitely.
+
 #### jobs = installer.list_jobs()
 
 Return a list of all active and complete `ModelInstallJobs`.
@@ -853,6 +861,31 @@ within the InvokeAI models directory
 This method is similar to `unregister()`, but also unconditionally
 deletes the corresponding model weights file(s), regardless of whether
 they are inside or outside the InvokeAI models hierarchy.
+
+
+#### path = installer.download_and_cache(remote_source, [access_token], [timeout])
+
+This utility routine will download the model file located at source,
+cache it, and return the path to the cached file. It does not attempt
+to determine the model type, probe its configuration values, or
+register it with the models database.
+
+You may provide an access token if the remote source requires
+authorization. The call will block indefinitely until the file is
+completely downloaded, cancelled or raises an error of some sort. If
+you provide a timeout (in seconds), the call will raise a
+`TimeoutError` exception if the download hasn't completed in the
+specified period.
+
+You may use this mechanism to request any type of file, not just a
+model. The file will be stored in a subdirectory of
+`INVOKEAI_ROOT/models/.cache`. If the requested file is found in the
+cache, its path will be returned without redownloading it.
+
+Be aware that the models cache is cleared of infrequently-used files
+and directories at regular intervals when the size of the cache
+exceeds the value specified in Invoke's `convert_cache` configuration
+variable.
 
 #### List[str]=installer.scan_directory(scan_dir: Path, install: bool)
 
@@ -1186,6 +1219,13 @@ queue or was not created by this queue.
 
 This method will block until all the active jobs in the queue have
 reached a terminal state (completed, errored or cancelled).
+
+#### queue.wait_for_job(job, [timeout])
+
+This method will block until the indicated job has reached a terminal
+state (completed, errored or cancelled). If the optional timeout is
+provided, the call will block for at most timeout seconds, and raise a
+TimeoutError otherwise.
 
 #### jobs = queue.list_jobs()
 
