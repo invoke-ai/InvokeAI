@@ -1,29 +1,8 @@
 import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
+import type { OpenAPIV3_1 } from 'openapi-types';
 import type { components } from 'services/api/schema';
 
 import { api } from '..';
-
-function getCircularReplacer() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ancestors: Record<string, any>[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return function (key: string, value: any) {
-    if (typeof value !== 'object' || value === null) {
-      return value;
-    }
-    // `this` is the object that value is contained in, i.e., its direct parent.
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore don't think it's possible to not have TS complain about this...
-    while (ancestors.length > 0 && ancestors.at(-1) !== this) {
-      ancestors.pop();
-    }
-    if (ancestors.includes(value)) {
-      return '[Circular]';
-    }
-    ancestors.push(value);
-    return value;
-  };
-}
 
 export const utilitiesApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -41,29 +20,11 @@ export const utilitiesApi = api.injectEndpoints({
       // disconnected.
       providesTags: ['FetchOnReconnect'],
     }),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    loadSchema: build.query<any, void>({
-      queryFn: async () => {
-        try {
-          const openAPISchemaUrl = $openAPISchemaUrl.get();
-
-          const url = openAPISchemaUrl ? openAPISchemaUrl : `${window.location.href.replace(/\/$/, '')}/openapi.json`;
-          const response = await fetch(url);
-          const openAPISchema = await response.json();
-
-          const schemaJSON = JSON.parse(JSON.stringify(openAPISchema, getCircularReplacer()));
-
-          return { data: schemaJSON };
-        } catch (error) {
-          console.error({ error });
-          return {
-            error: {
-              status: 500,
-              statusText: 'Internal Server Error',
-              data: 'Could not load openAPI schema',
-            },
-          };
-        }
+    loadSchema: build.query<OpenAPIV3_1.Document, void>({
+      query: () => {
+        const openAPISchemaUrl = $openAPISchemaUrl.get();
+        const url = openAPISchemaUrl ? openAPISchemaUrl : `${window.location.href.replace(/\/$/, '')}/openapi.json`;
+        return url;
       },
       providesTags: ['Schema'],
     }),
