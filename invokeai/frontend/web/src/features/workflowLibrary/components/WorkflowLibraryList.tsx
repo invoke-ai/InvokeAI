@@ -21,7 +21,6 @@ import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableCon
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import WorkflowLibraryListItem from 'features/workflowLibrary/components/WorkflowLibraryListItem';
 import WorkflowLibraryPagination from 'features/workflowLibrary/components/WorkflowLibraryPagination';
-import { useWorkflowLibraryModalContext } from 'features/workflowLibrary/context/useWorkflowLibraryModalContext';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -59,7 +58,6 @@ const WorkflowLibraryList = () => {
   const [selectedCategory, setSelectedCategory] = useState<WorkflowCategory>('user');
   const [page, setPage] = useState(0);
   const [query, setQuery] = useState('');
-  const { onClose } = useWorkflowLibraryModalContext();
   const projectId = useStore($projectId);
 
   const orderByOptions = useMemo(() => {
@@ -229,7 +227,7 @@ const WorkflowLibraryList = () => {
 
       <Flex w="full">
         <Box flex="1">
-          <UploadWorkflowButton full={true} onSuccess={onClose} />
+          <UploadWorkflowButton />
         </Box>
         <Box flex="1" textAlign="center">
           {data && <WorkflowLibraryPagination data={data} page={page} setPage={setPage} />}
