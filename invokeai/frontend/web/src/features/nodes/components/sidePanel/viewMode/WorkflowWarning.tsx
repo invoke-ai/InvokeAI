@@ -1,20 +1,13 @@
 import { Flex, Icon, Tooltip } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
 import { useGetNodesNeedUpdate } from 'features/nodes/hooks/useGetNodesNeedUpdate';
-import { useMemo } from 'react';
 import { PiWarningBold } from 'react-icons/pi';
 
 import { WorkflowWarningTooltip } from './WorkflowWarningTooltip';
 
 export const WorkflowWarning = () => {
   const nodesNeedUpdate = useGetNodesNeedUpdate();
-  const { isTouched, mode } = useAppSelector((s) => s.workflow);
 
-  const showWarning = useMemo(() => {
-    return nodesNeedUpdate || isTouched;
-  }, [nodesNeedUpdate, isTouched]);
-
-  if (!showWarning || mode === 'edit') {
+  if (!nodesNeedUpdate) {
     return <></>;
   }
 

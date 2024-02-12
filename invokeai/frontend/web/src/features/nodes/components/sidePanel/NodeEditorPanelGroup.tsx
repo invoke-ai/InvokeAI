@@ -17,6 +17,7 @@ import { WorkflowViewMode } from './viewMode/WorkflowViewMode';
 import WorkflowPanel from './workflow/WorkflowPanel';
 import { WorkflowMenu } from './WorkflowMenu';
 import { WorkflowName } from './WorkflowName';
+import WorkflowLibraryButton from '../../../workflowLibrary/components/WorkflowLibraryButton';
 
 const panelGroupStyles: CSSProperties = { height: '100%', width: '100%' };
 
@@ -42,7 +43,10 @@ const NodeEditorPanelGroup = () => {
     <Flex w="full" h="full" gap={2} flexDir="column">
       <QueueControls />
       <Flex w="full" justifyContent="space-between" alignItems="center" gap="4" padding={1}>
-        <WorkflowName />
+        <Flex justifyContent="space-between" alignItems="center" gap="4">
+          <WorkflowLibraryButton />
+          <WorkflowName />
+        </Flex>
         <WorkflowMenu />
       </Flex>
 

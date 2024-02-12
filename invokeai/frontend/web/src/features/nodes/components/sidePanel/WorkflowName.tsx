@@ -1,37 +1,39 @@
 import { Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useTranslation } from 'react-i18next';
-import { PiInfoBold } from 'react-icons/pi';
+import { PiDotOutlineFill } from 'react-icons/pi';
 
 import WorkflowInfoTooltipContent from './viewMode/WorkflowInfoTooltipContent';
 import { WorkflowWarning } from './viewMode/WorkflowWarning';
 
 export const WorkflowName = () => {
-  const name = useAppSelector((s) => s.workflow.name);
+  const { name, isTouched } = useAppSelector((s) => s.workflow);
   const { t } = useTranslation();
 
   return (
     <>
-      {name.length ? (
-        <Flex gap="2" alignItems="center">
+      <Flex gap="1" alignItems="center">
+        {name.length ? (
           <Tooltip label={<WorkflowInfoTooltipContent />} placement="top">
-            <Flex gap="2" alignItems="center">
-              <Text fontSize="lg" userSelect="none" noOfLines={1} wordBreak="break-all" fontWeight="semibold">
-                {name}
-              </Text>
+            <Text fontSize="lg" userSelect="none" noOfLines={1} wordBreak="break-all" fontWeight="semibold">
+              {name}
+            </Text>
+          </Tooltip>
+        ) : (
+          <Text fontSize="lg" fontStyle="italic" fontWeight="semibold">
+            {t('workflows.unnamedWorkflow')}
+          </Text>
+        )}
 
-              <Flex h="full" alignItems="center" gap="2">
-                <Icon fontSize="lg" color="base.300" as={PiInfoBold} />
-              </Flex>
+        {isTouched && (
+          <Tooltip label="Workflow has unsaved changes">
+            <Flex>
+              <Icon as={PiDotOutlineFill} boxSize="20px" sx={{ color: 'invokeYellow.500' }} />
             </Flex>
           </Tooltip>
-          <WorkflowWarning />
-        </Flex>
-      ) : (
-        <Text fontSize="lg" fontStyle="italic" fontWeight="semibold">
-          {t('workflows.unnamedWorkflow')}
-        </Text>
-      )}
+        )}
+        <WorkflowWarning />
+      </Flex>
     </>
   );
 };

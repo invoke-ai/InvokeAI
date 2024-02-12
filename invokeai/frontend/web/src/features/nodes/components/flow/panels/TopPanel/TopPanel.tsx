@@ -3,11 +3,13 @@ import AddNodeButton from 'features/nodes/components/flow/panels/TopPanel/AddNod
 import ClearFlowButton from 'features/nodes/components/flow/panels/TopPanel/ClearFlowButton';
 import SaveWorkflowButton from 'features/nodes/components/flow/panels/TopPanel/SaveWorkflowButton';
 import UpdateNodesButton from 'features/nodes/components/flow/panels/TopPanel/UpdateNodesButton';
-import WorkflowName from 'features/nodes/components/flow/panels/TopPanel/WorkflowName';
 import WorkflowLibraryMenu from 'features/workflowLibrary/components/WorkflowLibraryMenu/WorkflowLibraryMenu';
 import { memo } from 'react';
+import { useAppSelector } from '../../../../../../app/store/storeHooks';
+import { WorkflowName } from '../../../sidePanel/WorkflowName';
 
 const TopCenterPanel = () => {
+  const name = useAppSelector((s) => s.workflow.name);
   return (
     <Flex gap={2} top={2} left={2} right={2} position="absolute" alignItems="flex-start" pointerEvents="none">
       <Flex gap="2">
@@ -15,7 +17,7 @@ const TopCenterPanel = () => {
         <UpdateNodesButton />
       </Flex>
       <Spacer />
-      <WorkflowName />
+      {!!name.length && <WorkflowName />}
       <Spacer />
       <ClearFlowButton />
       <SaveWorkflowButton />
