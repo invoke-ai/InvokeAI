@@ -3,18 +3,18 @@ import { parseify } from 'common/util/serialize';
 import { nodeTemplatesBuilt } from 'features/nodes/store/nodeTemplatesSlice';
 import { parseSchema } from 'features/nodes/util/schema/parseSchema';
 import { size } from 'lodash-es';
-import { receivedOpenAPISchema } from 'services/api/thunks/schema';
+import { appInfoApi } from 'services/api/endpoints/appInfo';
 
 import { startAppListening } from '..';
 
-export const addReceivedOpenAPISchemaListener = () => {
+export const addGetOpenAPISchemaListener = () => {
   startAppListening({
-    actionCreator: receivedOpenAPISchema.fulfilled,
+    matcher: appInfoApi.endpoints.getOpenAPISchema.matchFulfilled,
     effect: (action, { dispatch, getState }) => {
       const log = logger('system');
       const schemaJSON = action.payload;
 
-      log.debug({ schemaJSON }, 'Received OpenAPI schema');
+      log.debug({ schemaJSON: parseify(schemaJSON) }, 'Received OpenAPI schema');
       const { nodesAllowlist, nodesDenylist } = getState().config;
 
       const nodeTemplates = parseSchema(schemaJSON, nodesAllowlist, nodesDenylist);
@@ -26,10 +26,14 @@ export const addReceivedOpenAPISchemaListener = () => {
   });
 
   startAppListening({
-    actionCreator: receivedOpenAPISchema.rejected,
+    matcher: appInfoApi.endpoints.getOpenAPISchema.matchRejected,
     effect: (action) => {
-      const log = logger('system');
-      log.error({ error: parseify(action.error) }, 'Problem retrieving OpenAPI Schema');
+      // If action.meta.condition === true, the request was canceled/skipped because another request was in flight or
+      // the value was already in the cache. We don't want to log these errors.
+      if (!action.meta.condition) {
+        const log = logger('system');
+        log.error({ error: parseify(action.error) }, 'Problem retrieving OpenAPI Schema');
+      }
     },
   });
 };
