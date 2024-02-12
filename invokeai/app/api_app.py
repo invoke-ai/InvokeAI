@@ -48,7 +48,6 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         download_queue,
         images,
         model_manager_v2,
-        models,
         session_queue,
         sessions,
         utilities,
