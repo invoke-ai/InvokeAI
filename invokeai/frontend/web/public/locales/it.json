@@ -795,7 +795,8 @@
         "workflowDeleted": "Flusso di lavoro eliminato",
         "problemRetrievingWorkflow": "Problema nel recupero del flusso di lavoro",
         "resetInitialImage": "Reimposta l'immagine iniziale",
-        "uploadInitialImage": "Carica l'immagine iniziale"
+        "uploadInitialImage": "Carica l'immagine iniziale",
+        "problemDownloadingImage": "Impossibile scaricare l'immagine"
     },
     "tooltip": {
         "feature": {
@@ -1134,7 +1135,10 @@
         "newWorkflow": "Nuovo flusso di lavoro",
         "newWorkflowDesc": "Creare un nuovo flusso di lavoro?",
         "newWorkflowDesc2": "Il flusso di lavoro attuale presenta modifiche non salvate.",
-        "unsupportedAnyOfLength": "unione di troppi elementi ({{count}})"
+        "unsupportedAnyOfLength": "unione di troppi elementi ({{count}})",
+        "clearWorkflowDesc": "Cancellare questo flusso di lavoro e avviarne uno nuovo?",
+        "clearWorkflow": "Cancella il flusso di lavoro",
+        "clearWorkflowDesc2": "Il tuo flusso di lavoro attuale presenta modifiche non salvate."
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1672,7 +1676,9 @@
         "downloadWorkflow": "Salva su file",
         "uploadWorkflow": "Carica da file",
         "projectWorkflows": "Flussi di lavoro del progetto",
-        "noWorkflows": "Nessun flusso di lavoro"
+        "noWorkflows": "Nessun flusso di lavoro",
+        "workflowCleared": "Flusso di lavoro cancellato",
+        "saveWorkflowToProject": "Salva flusso di lavoro nel progetto"
     },
     "app": {
         "storeNotInitialized": "Il negozio non è inizializzato"
