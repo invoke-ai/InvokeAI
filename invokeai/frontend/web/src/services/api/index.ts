@@ -35,6 +35,7 @@ export const tagTypes = [
   'SDXLRefinerModel',
   'Workflow',
   'WorkflowsRecent',
+  'Schema',
   // This is invalidated on reconnect. It should be used for queries that have changing data,
   // especially related to the queue and generation.
   'FetchOnReconnect',

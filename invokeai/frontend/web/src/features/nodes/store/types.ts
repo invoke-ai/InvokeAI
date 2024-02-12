@@ -26,7 +26,6 @@ export type NodesState = {
   selectedEdges: string[];
   nodeExecutionStates: Record<string, NodeExecutionState>;
   viewport: Viewport;
-  isReady: boolean;
   nodesToCopy: AnyNode[];
   edgesToCopy: InvocationNodeEdge[];
   isAddNodePopoverOpen: boolean;

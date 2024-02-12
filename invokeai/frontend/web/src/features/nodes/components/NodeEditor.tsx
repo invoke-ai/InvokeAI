@@ -1,7 +1,6 @@
 import 'reactflow/dist/style.css';
 
 import { Flex } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import TopPanel from 'features/nodes/components/flow/panels/TopPanel/TopPanel';
 import { SaveWorkflowAsDialog } from 'features/workflowLibrary/components/SaveWorkflowAsDialog/SaveWorkflowAsDialog';
@@ -11,6 +10,7 @@ import type { CSSProperties } from 'react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MdDeviceHub } from 'react-icons/md';
+import { useLoadSchemaQuery } from 'services/api/endpoints/utilities';
 
 import AddNodePopover from './flow/AddNodePopover/AddNodePopover';
 import { Flow } from './flow/Flow';
@@ -40,7 +40,7 @@ const exit: AnimationProps['exit'] = {
 };
 
 const NodeEditor = () => {
-  const isReady = useAppSelector((s) => s.nodes.isReady);
+  const { data, isLoading } = useLoadSchemaQuery();
   const { t } = useTranslation();
   return (
     <Flex
@@ -53,7 +53,7 @@ const NodeEditor = () => {
       justifyContent="center"
     >
       <AnimatePresence>
-        {isReady && (
+        {data && (
           <motion.div initial={initial} animate={animate} exit={exit} style={isReadyMotionStyles}>
             <Flow />
             <AddNodePopover />
@@ -65,7 +65,7 @@ const NodeEditor = () => {
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {!isReady && (
+        {isLoading && (
           <motion.div initial={initial} animate={animate} exit={exit} style={notIsReadyMotionStyles}>
             <Flex
               layerStyle="first"

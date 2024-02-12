@@ -47,7 +47,7 @@ import { addInitialImageSelectedListener } from './listeners/initialImageSelecte
 import { addModelSelectedListener } from './listeners/modelSelected';
 import { addModelsLoadedListener } from './listeners/modelsLoaded';
 import { addDynamicPromptsListener } from './listeners/promptChanged';
-import { addReceivedOpenAPISchemaListener } from './listeners/receivedOpenAPISchema';
+import { schemaLoadedListener } from './listeners/schemaLoaded';
 import { addSocketConnectedEventListener as addSocketConnectedListener } from './listeners/socketio/socketConnected';
 import { addSocketDisconnectedEventListener as addSocketDisconnectedListener } from './listeners/socketio/socketDisconnected';
 import { addGeneratorProgressEventListener as addGeneratorProgressListener } from './listeners/socketio/socketGeneratorProgress';
@@ -150,7 +150,7 @@ addImageRemovedFromBoardRejectedListener();
 addBoardIdSelectedListener();
 
 // Node schemas
-addReceivedOpenAPISchemaListener();
+schemaLoadedListener();
 
 // Workflows
 addWorkflowLoadRequestedListener();

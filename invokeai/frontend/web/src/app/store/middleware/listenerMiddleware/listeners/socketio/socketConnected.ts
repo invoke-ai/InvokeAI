@@ -1,10 +1,9 @@
 import { logger } from 'app/logging/logger';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
-import { isEqual, size } from 'lodash-es';
+import { isEqual } from 'lodash-es';
 import { atom } from 'nanostores';
 import { api } from 'services/api';
 import { queueApi, selectQueueStatus } from 'services/api/endpoints/queue';
-import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import { socketConnected } from 'services/events/actions';
 
 import { startAppListening } from '../..';
@@ -74,19 +73,6 @@ export const addSocketConnectedEventListener = () => {
       } catch {
         // no-op
         log.debug('Unable to get current queue status on reconnect');
-      }
-    },
-  });
-
-  startAppListening({
-    actionCreator: socketConnected,
-    effect: async (action, { dispatch, getState }) => {
-      const { nodeTemplates, config } = getState();
-      // We only want to re-fetch the schema if we don't have any node templates
-      if (!size(nodeTemplates.templates) && !config.disabledTabs.includes('nodes')) {
-        // This request is a createAsyncThunk - resetting API state as in the above listener
-        // will not trigger this request, so we need to manually do it.
-        dispatch(receivedOpenAPISchema());
       }
     },
   });

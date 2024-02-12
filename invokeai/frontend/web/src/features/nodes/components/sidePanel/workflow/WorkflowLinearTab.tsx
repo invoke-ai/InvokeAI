@@ -7,18 +7,22 @@ import LinearViewField from 'features/nodes/components/flow/nodes/Invocation/fie
 import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLoadSchemaQuery } from 'services/api/endpoints/utilities';
 
 const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => workflow.exposedFields);
 
 const WorkflowLinearTab = () => {
   const fields = useAppSelector(selector);
+  const { isLoading } = useLoadSchemaQuery();
   const { t } = useTranslation();
 
   return (
     <Box position="relative" w="full" h="full">
       <ScrollableContent>
         <Flex position="relative" flexDir="column" alignItems="flex-start" p={1} gap={2} h="full" w="full">
-          {fields.length ? (
+          {isLoading ? (
+            <IAINoContentFallback label={t('nodes.loadingNodes')} icon={null} />
+          ) : fields.length ? (
             fields.map(({ nodeId, fieldName }) => (
               <LinearViewField key={`${nodeId}.${fieldName}`} nodeId={nodeId} fieldName={fieldName} />
             ))

@@ -1,17 +1,16 @@
 import { Button } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsClockwiseBold } from 'react-icons/pi';
-import { receivedOpenAPISchema } from 'services/api/thunks/schema';
+import { useLazyLoadSchemaQuery } from 'services/api/endpoints/utilities';
 
 const ReloadNodeTemplatesButton = () => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
+  const [_loadSchema] = useLazyLoadSchemaQuery();
 
   const handleReloadSchema = useCallback(() => {
-    dispatch(receivedOpenAPISchema());
-  }, [dispatch]);
+    _loadSchema();
+  }, [_loadSchema]);
 
   return (
     <Button
