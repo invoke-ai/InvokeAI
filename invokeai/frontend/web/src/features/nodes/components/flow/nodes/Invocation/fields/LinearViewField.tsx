@@ -57,7 +57,7 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
           icon={<PiTrashSimpleBold />}
         />
       </Flex>
-      <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
+      <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} saveToGraph={false} />
       <NodeSelectionOverlay isSelected={false} isHovered={isMouseOverNode} />
     </Flex>
   );

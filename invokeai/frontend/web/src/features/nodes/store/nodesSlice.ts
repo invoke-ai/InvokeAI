@@ -118,6 +118,7 @@ type FieldValueAction<T extends FieldValue> = PayloadAction<{
   nodeId: string;
   fieldName: string;
   value: T;
+  saveToGraph: boolean;
 }>;
 
 const fieldValueReducer = <T extends FieldValue>(
@@ -482,49 +483,51 @@ export const nodesSlice = createSlice({
       state.selectedEdges = action.payload;
     },
     fieldStringValueChanged: (state, action: FieldValueAction<StringFieldValue>) => {
-      fieldValueReducer(state, action, zStringFieldValue);
+      if (action.payload.saveToGraph) {
+        fieldValueReducer(state, action, zStringFieldValue);
+      }
     },
     fieldNumberValueChanged: (state, action: FieldValueAction<IntegerFieldValue | FloatFieldValue>) => {
-      fieldValueReducer(state, action, zIntegerFieldValue.or(zFloatFieldValue));
+      if (action.payload.saveToGraph) { fieldValueReducer(state, action, zIntegerFieldValue.or(zFloatFieldValue)) };
     },
     fieldBooleanValueChanged: (state, action: FieldValueAction<BooleanFieldValue>) => {
-      fieldValueReducer(state, action, zBooleanFieldValue);
+      if (action.payload.saveToGraph) { fieldValueReducer(state, action, zBooleanFieldValue) }
     },
     fieldBoardValueChanged: (state, action: FieldValueAction<BoardFieldValue>) => {
-      fieldValueReducer(state, action, zBoardFieldValue);
+      if (action.payload.saveToGraph) { fieldValueReducer(state, action, zBoardFieldValue) }
     },
     fieldImageValueChanged: (state, action: FieldValueAction<ImageFieldValue>) => {
-      fieldValueReducer(state, action, zImageFieldValue);
+      if (action.payload.saveToGraph) { fieldValueReducer(state, action, zImageFieldValue) }
     },
     fieldColorValueChanged: (state, action: FieldValueAction<ColorFieldValue>) => {
-      fieldValueReducer(state, action, zColorFieldValue);
+      if (action.payload.saveToGraph) { fieldValueReducer(state, action, zColorFieldValue) }
     },
     fieldMainModelValueChanged: (state, action: FieldValueAction<MainModelFieldValue>) => {
-      fieldValueReducer(state, action, zMainModelFieldValue);
+      if (action.payload.saveToGraph) { fieldValueReducer(state, action, zMainModelFieldValue) }
     },
     fieldRefinerModelValueChanged: (state, action: FieldValueAction<SDXLRefinerModelFieldValue>) => {
-      fieldValueReducer(state, action, zSDXLRefinerModelFieldValue);
+      if (action.payload.saveToGraph) { fieldValueReducer(state, action, zSDXLRefinerModelFieldValue) }
     },
     fieldVaeModelValueChanged: (state, action: FieldValueAction<VAEModelFieldValue>) => {
-      fieldValueReducer(state, action, zVAEModelFieldValue);
+      if (action.payload.saveToGraph) { fieldValueReducer(state, action, zVAEModelFieldValue) }
     },
     fieldLoRAModelValueChanged: (state, action: FieldValueAction<LoRAModelFieldValue>) => {
-      fieldValueReducer(state, action, zLoRAModelFieldValue);
+      if (action.payload.saveToGraph) { fieldValueReducer(state, action, zLoRAModelFieldValue) }
     },
     fieldControlNetModelValueChanged: (state, action: FieldValueAction<ControlNetModelFieldValue>) => {
-      fieldValueReducer(state, action, zControlNetModelFieldValue);
+      if (action.payload.saveToGraph) { fieldValueReducer(state, action, zControlNetModelFieldValue) }
     },
     fieldIPAdapterModelValueChanged: (state, action: FieldValueAction<IPAdapterModelFieldValue>) => {
-      fieldValueReducer(state, action, zIPAdapterModelFieldValue);
+      if (action.payload.saveToGraph) { fieldValueReducer(state, action, zIPAdapterModelFieldValue) }
     },
     fieldT2IAdapterModelValueChanged: (state, action: FieldValueAction<T2IAdapterModelFieldValue>) => {
-      fieldValueReducer(state, action, zT2IAdapterModelFieldValue);
+      if (action.payload.saveToGraph) { fieldValueReducer(state, action, zT2IAdapterModelFieldValue) }
     },
     fieldEnumModelValueChanged: (state, action: FieldValueAction<EnumFieldValue>) => {
-      fieldValueReducer(state, action, zEnumFieldValue);
+      if (action.payload.saveToGraph) { fieldValueReducer(state, action, zEnumFieldValue) }
     },
     fieldSchedulerValueChanged: (state, action: FieldValueAction<SchedulerFieldValue>) => {
-      fieldValueReducer(state, action, zSchedulerFieldValue);
+      if (action.payload.saveToGraph) { fieldValueReducer(state, action, zSchedulerFieldValue) }
     },
     notesNodeValueChanged: (state, action: PayloadAction<{ nodeId: string; value: string }>) => {
       const { nodeId, value } = action.payload;

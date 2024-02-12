@@ -4,4 +4,5 @@ export type FieldComponentProps<V extends FieldInputInstance, T extends FieldInp
   nodeId: string;
   field: V;
   fieldTemplate: T;
+  saveToGraph: boolean;
 };

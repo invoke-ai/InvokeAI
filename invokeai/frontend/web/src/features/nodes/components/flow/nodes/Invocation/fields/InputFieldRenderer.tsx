@@ -60,9 +60,10 @@ import VAEModelFieldInputComponent from './inputs/VAEModelFieldInputComponent';
 type InputFieldProps = {
   nodeId: string;
   fieldName: string;
+  saveToGraph?: boolean;
 };
 
-const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
+const InputFieldRenderer = ({ nodeId, fieldName, saveToGraph = true }: InputFieldProps) => {
   const { t } = useTranslation();
   const fieldInstance = useFieldInstance(nodeId, fieldName);
   const fieldTemplate = useFieldTemplate(nodeId, fieldName, 'input');
@@ -76,69 +77,181 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
   }
 
   if (isStringFieldInputInstance(fieldInstance) && isStringFieldInputTemplate(fieldTemplate)) {
-    return <StringFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <StringFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        saveToGraph={saveToGraph}
+      />
+    );
   }
 
   if (isBooleanFieldInputInstance(fieldInstance) && isBooleanFieldInputTemplate(fieldTemplate)) {
-    return <BooleanFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <BooleanFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        saveToGraph={saveToGraph}
+      />
+    );
   }
 
   if (
     (isIntegerFieldInputInstance(fieldInstance) && isIntegerFieldInputTemplate(fieldTemplate)) ||
     (isFloatFieldInputInstance(fieldInstance) && isFloatFieldInputTemplate(fieldTemplate))
   ) {
-    return <NumberFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <NumberFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        saveToGraph={saveToGraph}
+      />
+    );
   }
 
   if (isEnumFieldInputInstance(fieldInstance) && isEnumFieldInputTemplate(fieldTemplate)) {
-    return <EnumFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <EnumFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        saveToGraph={saveToGraph}
+      />
+    );
   }
 
   if (isImageFieldInputInstance(fieldInstance) && isImageFieldInputTemplate(fieldTemplate)) {
-    return <ImageFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <ImageFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        saveToGraph={saveToGraph}
+      />
+    );
   }
 
   if (isBoardFieldInputInstance(fieldInstance) && isBoardFieldInputTemplate(fieldTemplate)) {
-    return <BoardFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <BoardFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        saveToGraph={saveToGraph}
+      />
+    );
   }
 
   if (isMainModelFieldInputInstance(fieldInstance) && isMainModelFieldInputTemplate(fieldTemplate)) {
-    return <MainModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <MainModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        saveToGraph={saveToGraph}
+      />
+    );
   }
 
   if (isSDXLRefinerModelFieldInputInstance(fieldInstance) && isSDXLRefinerModelFieldInputTemplate(fieldTemplate)) {
-    return <RefinerModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <RefinerModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        saveToGraph={saveToGraph}
+      />
+    );
   }
 
   if (isVAEModelFieldInputInstance(fieldInstance) && isVAEModelFieldInputTemplate(fieldTemplate)) {
-    return <VAEModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <VAEModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        saveToGraph={saveToGraph}
+      />
+    );
   }
 
   if (isLoRAModelFieldInputInstance(fieldInstance) && isLoRAModelFieldInputTemplate(fieldTemplate)) {
-    return <LoRAModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <LoRAModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        saveToGraph={saveToGraph}
+      />
+    );
   }
 
   if (isControlNetModelFieldInputInstance(fieldInstance) && isControlNetModelFieldInputTemplate(fieldTemplate)) {
-    return <ControlNetModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <ControlNetModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        saveToGraph={saveToGraph}
+      />
+    );
   }
 
   if (isIPAdapterModelFieldInputInstance(fieldInstance) && isIPAdapterModelFieldInputTemplate(fieldTemplate)) {
-    return <IPAdapterModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <IPAdapterModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        saveToGraph={saveToGraph}
+      />
+    );
   }
 
   if (isT2IAdapterModelFieldInputInstance(fieldInstance) && isT2IAdapterModelFieldInputTemplate(fieldTemplate)) {
-    return <T2IAdapterModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <T2IAdapterModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        saveToGraph={saveToGraph}
+      />
+    );
   }
   if (isColorFieldInputInstance(fieldInstance) && isColorFieldInputTemplate(fieldTemplate)) {
-    return <ColorFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <ColorFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        saveToGraph={saveToGraph}
+      />
+    );
   }
 
   if (isSDXLMainModelFieldInputInstance(fieldInstance) && isSDXLMainModelFieldInputTemplate(fieldTemplate)) {
-    return <SDXLMainModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <SDXLMainModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        saveToGraph={saveToGraph}
+      />
+    );
   }
 
   if (isSchedulerFieldInputInstance(fieldInstance) && isSchedulerFieldInputTemplate(fieldTemplate)) {
-    return <SchedulerFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <SchedulerFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        saveToGraph={saveToGraph}
+      />
+    );
   }
 
   if (fieldInstance && fieldTemplate) {

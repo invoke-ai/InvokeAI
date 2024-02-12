@@ -91,6 +91,7 @@ export const zFieldTypeBase = z.object({
 export const zFieldIdentifier = z.object({
   nodeId: z.string().trim().min(1),
   fieldName: z.string().trim().min(1),
+  value: z.any().optional()
 });
 export type FieldIdentifier = z.infer<typeof zFieldIdentifier>;
 export const isFieldIdentifier = (val: unknown): val is FieldIdentifier => zFieldIdentifier.safeParse(val).success;

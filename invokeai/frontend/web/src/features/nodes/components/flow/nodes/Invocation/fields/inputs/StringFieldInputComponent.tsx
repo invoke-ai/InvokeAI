@@ -8,7 +8,7 @@ import { memo, useCallback } from 'react';
 import type { FieldComponentProps } from './types';
 
 const StringFieldInputComponent = (props: FieldComponentProps<StringFieldInputInstance, StringFieldInputTemplate>) => {
-  const { nodeId, field, fieldTemplate } = props;
+  const { nodeId, field, fieldTemplate, saveToGraph } = props;
   const dispatch = useAppDispatch();
 
   const handleValueChanged = useCallback(
@@ -18,10 +18,11 @@ const StringFieldInputComponent = (props: FieldComponentProps<StringFieldInputIn
           nodeId,
           fieldName: field.name,
           value: e.target.value,
+          saveToGraph,
         })
       );
     },
-    [dispatch, field.name, nodeId]
+    [dispatch, field.name, nodeId, saveToGraph]
   );
 
   if (fieldTemplate.ui_component === 'textarea') {

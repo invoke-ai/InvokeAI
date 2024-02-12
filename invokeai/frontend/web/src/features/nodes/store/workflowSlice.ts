@@ -2,11 +2,12 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { workflowLoaded } from 'features/nodes/store/actions';
-import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesDeleted } from 'features/nodes/store/nodesSlice';
-import type { WorkflowsState as WorkflowState } from 'features/nodes/store/types';
-import type { FieldIdentifier } from 'features/nodes/types/field';
+import { fieldStringValueChanged, isAnyNodeOrEdgeMutation, nodeEditorReset, nodesDeleted } from 'features/nodes/store/nodesSlice';
+import type { NodesState, WorkflowsState as WorkflowState } from 'features/nodes/store/types';
+import { zStringFieldValue, type FieldIdentifier, type FieldValue } from 'features/nodes/types/field';
 import type { WorkflowCategory, WorkflowV2 } from 'features/nodes/types/workflow';
 import { cloneDeep, isEqual, uniqBy } from 'lodash-es';
+import { z } from 'zod';
 
 export const blankWorkflow: Omit<WorkflowV2, 'nodes' | 'edges'> = {
   name: '',
@@ -27,6 +28,29 @@ export const initialWorkflowState: WorkflowState = {
   ...blankWorkflow,
 };
 
+type FieldValueAction<T extends FieldValue> = PayloadAction<{
+  nodeId: string;
+  fieldName: string;
+  value: T;
+  saveToGraph: boolean;
+}>;
+
+const exposedFieldValueReducer = <T extends FieldValue>(
+  state: WorkflowState,
+  action: FieldValueAction<T>,
+  schema: z.ZodTypeAny
+) => {
+  const { nodeId, fieldName, value } = action.payload;
+  const exposedField = state.exposedFields.find(field => field.nodeId === nodeId)
+
+  const result = schema.safeParse(value);
+  if (!result || !exposedField || !result.success) {
+    return;
+  }
+  exposedField.value = schema.safeParse(value);
+
+};
+
 export const workflowSlice = createSlice({
   name: 'workflow',
   initialState: initialWorkflowState,
@@ -42,6 +66,7 @@ export const workflowSlice = createSlice({
       state.exposedFields = state.exposedFields.filter((field) => !isEqual(field, action.payload));
       state.isTouched = true;
     },
+
     workflowNameChanged: (state, action: PayloadAction<string>) => {
       state.name = action.payload;
       state.isTouched = true;
@@ -97,9 +122,17 @@ export const workflowSlice = createSlice({
 
     builder.addCase(nodeEditorReset, () => cloneDeep(initialWorkflowState));
 
+    builder.addCase(fieldStringValueChanged, (state, action) => {
+      if (!action.payload.saveToGraph) {
+        exposedFieldValueReducer(state, action, zStringFieldValue);
+      }
+    })
+
     builder.addMatcher(isAnyNodeOrEdgeMutation, (state) => {
       state.isTouched = true;
     });
+
+
   },
 });
 
