@@ -69,7 +69,7 @@
         "random": "Zufall",
         "batch": "Stapel-Manager",
         "advanced": "Erweitert",
-        "unifiedCanvas": "Einheitliche Leinwand",
+        "unifiedCanvas": "Leinwand",
         "openInNewTab": "In einem neuem Tab öffnen",
         "statusProcessing": "wird bearbeitet",
         "linear": "Linear",
@@ -127,7 +127,7 @@
         "galleryImageResetSize": "Größe zurücksetzen",
         "gallerySettings": "Galerie-Einstellungen",
         "maintainAspectRatio": "Seitenverhältnis beibehalten",
-        "autoSwitchNewImages": "Automatisch zu neuen Bildern wechseln",
+        "autoSwitchNewImages": "Auto-Wechsel zu neuen Bildern",
         "singleColumnLayout": "Einspaltiges Layout",
         "allImagesLoaded": "Alle Bilder geladen",
         "loadMore": "Mehr laden",
@@ -226,7 +226,7 @@
         },
         "sendToImageToImage": {
             "title": "An Bild zu Bild senden",
-            "desc": "Aktuelles Bild an Bild zu Bild senden"
+            "desc": "Aktuelles Bild an Bild-zu-Bild senden"
         },
         "deleteImage": {
             "title": "Bild löschen",
@@ -258,7 +258,7 @@
         },
         "selectEraser": {
             "title": "Radiergummi auswählen",
-            "desc": "Wählt den Radiergummi für die Leinwand aus"
+            "desc": "Wählt den Radiergummi aus"
         },
         "decreaseBrushSize": {
             "title": "Pinselgröße verkleinern",
@@ -330,7 +330,7 @@
         },
         "downloadImage": {
             "title": "Bild herunterladen",
-            "desc": "Aktuelle Leinwand herunterladen"
+            "desc": "Aktuelles Bild herunterladen"
         },
         "undoStroke": {
             "title": "Pinselstrich rückgängig machen",
@@ -564,8 +564,8 @@
         "img2imgStrength": "Bild-zu-Bild-Stärke",
         "toggleLoopback": "Loopback umschalten",
         "sendTo": "Senden an",
-        "sendToImg2Img": "Senden an Bild zu Bild",
-        "sendToUnifiedCanvas": "Senden an Unified Canvas",
+        "sendToImg2Img": "Senden an Bild-zu-Bild",
+        "sendToUnifiedCanvas": "Senden an Leinwand",
         "copyImageToLink": "Bild-Link kopieren",
         "downloadImage": "Bild herunterladen",
         "openInViewer": "Im Viewer öffnen",
@@ -604,7 +604,9 @@
         "resetComplete": "Die Web-Oberfläche wurde zurückgesetzt.",
         "models": "Modelle",
         "useSlidersForAll": "Schieberegler für alle Optionen verwenden",
-        "showAdvancedOptions": "Erweiterte Optionen anzeigen"
+        "showAdvancedOptions": "Erweiterte Optionen anzeigen",
+        "alternateCanvasLayout": "Alternatives Leinwand-Layout",
+        "clearIntermediatesDesc1": "Das Löschen der Zwischenprodukte setzt Leinwand und ControlNet zurück."
     },
     "toast": {
         "tempFoldersEmptied": "Temp-Ordner geleert",
@@ -618,7 +620,7 @@
         "imageSavedToGallery": "Bild in die Galerie gespeichert",
         "canvasMerged": "Leinwand zusammengeführt",
         "sentToImageToImage": "Gesendet an Bild zu Bild",
-        "sentToUnifiedCanvas": "Gesendet an Unified Canvas",
+        "sentToUnifiedCanvas": "Gesendet an Leinwand",
         "parametersSet": "Parameter festlegen",
         "parametersNotSet": "Parameter nicht festgelegt",
         "parametersNotSetDesc": "Keine Metadaten für dieses Bild gefunden.",
@@ -635,7 +637,21 @@
         "metadataLoadFailed": "Metadaten konnten nicht geladen werden",
         "initialImageSet": "Ausgangsbild festgelegt",
         "initialImageNotSet": "Ausgangsbild nicht festgelegt",
-        "initialImageNotSetDesc": "Ausgangsbild konnte nicht geladen werden"
+        "initialImageNotSetDesc": "Ausgangsbild konnte nicht geladen werden",
+        "setCanvasInitialImage": "Ausgangsbild setzen",
+        "problemMergingCanvas": "Problem bei Verschmelzung der Leinwand",
+        "canvasCopiedClipboard": "Leinwand in Zwischenablage kopiert",
+        "canvasSentControlnetAssets": "Leinwand an ControlNet & Sammlung geschickt",
+        "problemDownloadingCanvasDesc": "Kann Basis-Layer nicht exportieren",
+        "canvasDownloaded": "Leinwand heruntergeladen",
+        "problemSavingCanvasDesc": "Kann Basis-Layer nicht exportieren",
+        "canvasSavedGallery": "Leinwand in Galerie gespeichert",
+        "problemMergingCanvasDesc": "Kann Basis-Layer nicht exportieren",
+        "problemSavingCanvas": "Problem beim Speichern der Leinwand",
+        "problemCopyingCanvas": "Problem beim Kopieren der Leinwand",
+        "problemCopyingCanvasDesc": "Kann Basis-Layer nicht exportieren",
+        "problemDownloadingCanvas": "Problem beim Herunterladen der Leinwand",
+        "setAsCanvasInitialImage": "Als Ausgangsbild gesetzt"
     },
     "tooltip": {
         "feature": {
@@ -648,7 +664,7 @@
             "faceCorrection": "Gesichtskorrektur mit GFPGAN oder Codeformer: Der Algorithmus erkennt Gesichter im Bild und korrigiert alle Fehler. Ein hoher Wert verändert das Bild stärker, was zu attraktiveren Gesichtern führt. Codeformer mit einer höheren Genauigkeit bewahrt das Originalbild auf Kosten einer stärkeren Gesichtskorrektur.",
             "imageToImage": "Bild zu Bild lädt ein beliebiges Bild als Ausgangsbild, aus dem dann zusammen mit dem Prompt ein neues Bild erzeugt wird. Je höher der Wert ist, desto stärker wird das Ergebnisbild verändert. Werte von 0,0 bis 1,0 sind möglich, der empfohlene Bereich ist .25-.75",
             "boundingBox": "Der Begrenzungsrahmen ist derselbe wie die Einstellungen für Breite und Höhe bei Text-zu-Bild oder Bild-zu-Bild. Es wird nur der Bereich innerhalb des Rahmens verarbeitet.",
-            "seamCorrection": "Steuert die Behandlung von sichtbaren Übergängen, die zwischen den erzeugten Bildern auf der Leinwand auftreten.",
+            "seamCorrection": "Behandlung von sichtbaren Übergängen, die zwischen den erzeugten Bildern auftreten.",
             "infillAndScaling": "Verwalten Sie Infill-Methoden (für maskierte oder gelöschte Bereiche der Leinwand) und Skalierung (nützlich für kleine Begrenzungsrahmengrößen)."
         }
     },
@@ -659,17 +675,17 @@
         "maskingOptions": "Maskierungsoptionen",
         "enableMask": "Maske aktivieren",
         "preserveMaskedArea": "Maskierten Bereich bewahren",
-        "clearMask": "Maske löschen",
+        "clearMask": "Maske löschen (Shift+C)",
         "brush": "Pinsel",
         "eraser": "Radierer",
         "fillBoundingBox": "Begrenzungsrahmen füllen",
         "eraseBoundingBox": "Begrenzungsrahmen löschen",
-        "colorPicker": "Farbpipette",
+        "colorPicker": "Pipette",
         "brushOptions": "Pinseloptionen",
         "brushSize": "Größe",
         "move": "Bewegen",
         "resetView": "Ansicht zurücksetzen",
-        "mergeVisible": "Sichtbare Zusammenführen",
+        "mergeVisible": "Sichtbare zusammenführen",
         "saveToGallery": "In Galerie speichern",
         "copyToClipboard": "In Zwischenablage kopieren",
         "downloadAsImage": "Als Bild herunterladen",
@@ -683,15 +699,15 @@
         "darkenOutsideSelection": "Außerhalb der Auswahl verdunkeln",
         "autoSaveToGallery": "Automatisch in Galerie speichern",
         "saveBoxRegionOnly": "Nur Auswahlbox speichern",
-        "limitStrokesToBox": "Striche auf Box beschränken",
-        "showCanvasDebugInfo": "Zusätzliche Informationen zur Leinwand anzeigen",
+        "limitStrokesToBox": "Striche auf Auswahl beschränken",
+        "showCanvasDebugInfo": "Zusätzliche Informationen anzeigen",
         "clearCanvasHistory": "Leinwand-Verlauf löschen",
         "clearHistory": "Verlauf löschen",
-        "clearCanvasHistoryMessage": "Wenn Sie den Verlauf der Leinwand löschen, bleibt die aktuelle Leinwand intakt, aber der Verlauf der Rückgängig- und Wiederherstellung wird unwiderruflich gelöscht.",
-        "clearCanvasHistoryConfirm": "Sind Sie sicher, dass Sie den Verlauf der Leinwand löschen möchten?",
+        "clearCanvasHistoryMessage": "Wenn Sie den Verlauf löschen, bleibt die aktuelle Leinwand intakt, aber der Verlauf der Rückgängig- und Wiederherstellung wird unwiderruflich gelöscht.",
+        "clearCanvasHistoryConfirm": "Sind Sie sicher, dass Sie den Verlauf löschen möchten?",
         "emptyTempImageFolder": "Temp-Image Ordner leeren",
         "emptyFolder": "Leerer Ordner",
-        "emptyTempImagesFolderMessage": "Wenn Sie den Ordner für temporäre Bilder leeren, wird auch der Unified Canvas vollständig zurückgesetzt. Dies umfasst den gesamten Verlauf der Rückgängig-/Wiederherstellungsvorgänge, die Bilder im Bereitstellungsbereich und die Leinwand-Basisebene.",
+        "emptyTempImagesFolderMessage": "Wenn Sie den Ordner für temporäre Bilder leeren, wird die Leinwand zurückgesetzt. Dies umfasst den gesamten Verlauf der Rückgängig-/Wiederherstellungsvorgänge, die Bilder im Bereitstellungsbereich und die Leinwand-Basisebene.",
         "emptyTempImagesFolderConfirm": "Sind Sie sicher, dass Sie den temporären Ordner leeren wollen?",
         "activeLayer": "Aktive Ebene",
         "canvasScale": "Leinwand Maßstab",
@@ -708,7 +724,7 @@
         "discardAll": "Alles verwerfen",
         "betaClear": "Löschen",
         "betaDarkenOutside": "Außen abdunkeln",
-        "betaLimitToBox": "Begrenzung auf das Feld",
+        "betaLimitToBox": "Auf Auswahl begrenzen",
         "betaPreserveMasked": "Maskiertes bewahren",
         "antialiasing": "Kantenglättung",
         "showResultsOn": "Zeige Ergebnisse (An)",
@@ -746,7 +762,7 @@
         "autoAddBoard": "Automatisches Hinzufügen zum Ordner",
         "topMessage": "Dieser Ordner enthält Bilder die in den folgenden Funktionen verwendet werden:",
         "move": "Bewegen",
-        "menuItemAutoAdd": "Automatisches Hinzufügen zu diesem Ordner",
+        "menuItemAutoAdd": "Auto-Hinzufügen zu diesem Ordner",
         "myBoard": "Meine Ordner",
         "searchBoard": "Ordner durchsuchen...",
         "noMatching": "Keine passenden Ordner",
@@ -839,7 +855,7 @@
         "lineartAnimeDescription": "Lineart-Verarbeitung im Anime-Stil",
         "minConfidence": "Minimales Vertrauen",
         "megaControl": "Mega-Kontrolle",
-        "autoConfigure": "Prozessor automatisch konfigurieren",
+        "autoConfigure": "Prozessor Auto-konfig",
         "normalBaeDescription": "Normale BAE-Verarbeitung",
         "noneDescription": "Es wurde keine Verarbeitung angewendet",
         "openPose": "Openpose / \"Pose nutzen\"",
@@ -944,7 +960,7 @@
         "initImage": "Erstes Bild",
         "variations": "Seed-Gewichtungs-Paare",
         "vae": "VAE",
-        "workflow": "Arbeitsablauf",
+        "workflow": "Workflow",
         "scheduler": "Planer",
         "noRecallParameters": "Es wurden keine Parameter zum Abrufen gefunden",
         "recallParameters": "Parameter wiederherstellen"
@@ -1056,6 +1072,20 @@
                 "\"Per Bild\" wird einen einzigartigen Seed-Wert für jedes Bild verwenden. Dies bietet mehr Variationen."
             ],
             "heading": "Seed-Verhalten"
+        },
+        "dynamicPrompts": {
+            "paragraphs": [
+                "\"Dynamische Prompts\" übersetzt einen Prompt in mehrere.",
+                "Die Ausgangs-Syntax ist \"ein {roter|grüner|blauer} ball\". Das generiert 3 Prompts: \"ein roter ball\", \"ein grüner ball\" und \"ein blauer ball\".",
+                "Sie können die Syntax so oft verwenden, wie Sie in einem einzigen Prompt möchten, aber stellen Sie sicher, dass die Anzahl der Prompts zur Einstellung von \"Max Prompts\" passt."
+            ],
+            "heading": "Dynamische Prompts"
+        },
+        "controlNetWeight": {
+            "paragraphs": [
+                "Wie stark wird das ControlNet das generierte Bild beeinflussen wird."
+            ],
+            "heading": "Einfluss"
         }
     },
     "ui": {
@@ -1160,10 +1190,10 @@
         "outputFieldInInput": "Ausgabefeld im Eingang",
         "problemReadingWorkflow": "Problem beim Lesen des Arbeitsablaufs vom Bild",
         "reloadNodeTemplates": "Knoten-Vorlagen neu laden",
-        "newWorkflow": "Neuer Arbeitsablauf",
+        "newWorkflow": "Neuer Arbeitsablauf / Workflow",
         "newWorkflowDesc": "Einen neuen Arbeitsablauf erstellen?",
         "noFieldsLinearview": "Keine Felder zur linearen Ansicht hinzugefügt",
-        "clearWorkflow": "Arbeitsablauf löschen",
+        "clearWorkflow": "Workflow löschen",
         "clearWorkflowDesc": "Diesen Arbeitsablauf löschen und neu starten?",
         "noConnectionInProgress": "Es besteht keine Verbindung",
         "notes": "Anmerkungen",
@@ -1220,8 +1250,8 @@
         "stringDescription": "Zeichenfolgen (Strings) sind Text.",
         "fieldTypesMustMatch": "Feldtypen müssen übereinstimmen",
         "fitViewportNodes": "An Ansichtsgröße anpassen",
-        "missingCanvaInitMaskImages": "Fehlende Startbilder und Masken auf der Arbeitsfläche",
-        "missingCanvaInitImage": "Fehlendes Startbild auf der Arbeitsfläche",
+        "missingCanvaInitMaskImages": "Fehlende Startbilder und Masken auf der Leinwand",
+        "missingCanvaInitImage": "Fehlendes Startbild auf der Leinwand",
         "ipAdapterModelDescription": "IP-Adapter-Modellfeld",
         "latentsPolymorphicDescription": "Zwischen Nodes können Latents weitergegeben werden.",
         "loadingNodes": "Lade Nodes...",
@@ -1321,7 +1351,7 @@
         "workflows": "Arbeitsabläufe",
         "noSystemWorkflows": "Keine System-Arbeitsabläufe",
         "workflowName": "Arbeitsablauf-Name",
-        "workflowIsOpen": "Arbeitsablauf ist offen",
+        "workflowIsOpen": "Arbeitsablauf ist geöffnet",
         "saveWorkflowAs": "Arbeitsablauf speichern als",
         "searchWorkflows": "Suche Arbeitsabläufe",
         "newWorkflowCreated": "Neuer Arbeitsablauf erstellt",
