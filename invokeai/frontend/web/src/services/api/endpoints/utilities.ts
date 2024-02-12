@@ -41,7 +41,8 @@ export const utilitiesApi = api.injectEndpoints({
       // disconnected.
       providesTags: ['FetchOnReconnect'],
     }),
-    loadSchema: build.query({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    loadSchema: build.query<any, void>({
       queryFn: async () => {
         try {
           const openAPISchemaUrl = $openAPISchemaUrl.get();
