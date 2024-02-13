@@ -1,3 +1,5 @@
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Flex, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
@@ -25,6 +27,13 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
     dispatch(workflowExposedFieldRemoved({ nodeId, fieldName }));
   }, [dispatch, fieldName, nodeId]);
 
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: nodeId });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
   return (
     <Flex
       onMouseEnter={handleMouseOver}
@@ -35,6 +44,10 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
       w="full"
       p={4}
       flexDir="column"
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
     >
       <Flex>
         <EditableFieldTitle nodeId={nodeId} fieldName={fieldName} kind="input" />

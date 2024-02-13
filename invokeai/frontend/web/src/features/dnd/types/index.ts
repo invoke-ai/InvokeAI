@@ -80,6 +80,14 @@ export type NodeFieldDraggableData = BaseDragData & {
   };
 };
 
+export type LinearViewFieldDraggableData = BaseDragData & {
+  payloadType: 'LINEAR_VIEW_FIELD';
+  payload: {
+    nodeId: string;
+    fieldName: string;
+  };
+};
+
 export type ImageDraggableData = BaseDragData & {
   payloadType: 'IMAGE_DTO';
   payload: { imageDTO: ImageDTO };
@@ -90,7 +98,11 @@ export type GallerySelectionDraggableData = BaseDragData & {
   payload: { boardId: BoardId };
 };
 
-export type TypesafeDraggableData = NodeFieldDraggableData | ImageDraggableData | GallerySelectionDraggableData;
+export type TypesafeDraggableData =
+  | NodeFieldDraggableData
+  | LinearViewFieldDraggableData
+  | ImageDraggableData
+  | GallerySelectionDraggableData;
 
 export interface UseDroppableTypesafeArguments extends Omit<UseDroppableArguments, 'data'> {
   data?: TypesafeDroppableData;

@@ -19,6 +19,7 @@ const AppDndContext = (props: PropsWithChildren) => {
 
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
+      console.log('handling drag start', event.active.data.current);
       log.trace({ dragData: parseify(event.active.data.current) }, 'Drag started');
       const activeData = event.active.data.current;
       if (!activeData) {
@@ -31,6 +32,7 @@ const AppDndContext = (props: PropsWithChildren) => {
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
+      console.log('handling drag end', event.active.data.current);
       log.trace({ dragData: parseify(event.active.data.current) }, 'Drag ended');
       const overData = event.over?.data.current;
       if (!activeDragData || !overData) {
