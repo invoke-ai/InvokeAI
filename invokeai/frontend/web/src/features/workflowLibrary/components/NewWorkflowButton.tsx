@@ -1,5 +1,5 @@
-import { IconButton } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { ConfirmationAlertDialog, Flex, IconButton, Text, useDisclosure } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import { addToast } from 'features/system/store/systemSlice';
@@ -11,6 +11,8 @@ import { PiFlowArrowBold } from 'react-icons/pi';
 const NewWorkflowButton = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const isTouched = useAppSelector((s) => s.workflow.isTouched);
 
   const handleNewWorkflow = useCallback(() => {
     dispatch(nodeEditorReset());
@@ -24,16 +26,39 @@ const NewWorkflowButton = () => {
         })
       )
     );
-  }, [dispatch, t]);
+
+    onClose();
+  }, [dispatch, onClose, t]);
+
+  const onClick = useCallback(() => {
+    if (!isTouched) {
+      handleNewWorkflow();
+      return;
+    }
+    onOpen();
+  }, [handleNewWorkflow, isTouched, onOpen]);
 
   return (
-    <IconButton
-      aria-label={t('nodes.newWorkflow')}
-      tooltip={t('nodes.newWorkflow')}
-      icon={<PiFlowArrowBold />}
-      onClick={handleNewWorkflow}
-      pointerEvents="auto"
-    />
+    <>
+      <IconButton
+        aria-label={t('nodes.newWorkflow')}
+        tooltip={t('nodes.newWorkflow')}
+        icon={<PiFlowArrowBold />}
+        onClick={onClick}
+        pointerEvents="auto"
+      />
+      <ConfirmationAlertDialog
+        isOpen={isOpen}
+        onClose={onClose}
+        title={t('nodes.newWorkflow')}
+        acceptCallback={handleNewWorkflow}
+      >
+        <Flex flexDir="column" gap={2}>
+          <Text>{t('nodes.newWorkflowDesc')}</Text>
+          <Text variant="subtext">{t('nodes.newWorkflowDesc2')}</Text>
+        </Flex>
+      </ConfirmationAlertDialog>
+    </>
   );
 };
 
