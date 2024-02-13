@@ -1,11 +1,10 @@
 // TODO: enable this at some point
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { getIsGraphAcyclic } from 'features/nodes/store/util/getIsGraphAcyclic';
 import { validateSourceAndTargetTypes } from 'features/nodes/store/util/validateSourceAndTargetTypes';
 import type { InvocationNodeData } from 'features/nodes/types/invocation';
 import { useCallback } from 'react';
 import type { Connection, Node } from 'reactflow';
-import { useReactFlow } from 'reactflow';
 
 /**
  * NOTE: The logic here must be duplicated in `invokeai/frontend/web/src/features/nodes/store/util/makeIsConnectionValidSelector.ts`
@@ -13,36 +12,31 @@ import { useReactFlow } from 'reactflow';
  */
 
 export const useIsValidConnection = () => {
-  const flow = useReactFlow();
+  const store = useAppStore();
   const shouldValidateGraph = useAppSelector((s) => s.nodes.shouldValidateGraph);
   const isValidConnection = useCallback(
     ({ source, sourceHandle, target, targetHandle }: Connection): boolean => {
-      const edges = flow.getEdges();
-      const nodes = flow.getNodes();
       // Connection must have valid targets
       if (!(source && sourceHandle && target && targetHandle)) {
         return false;
       }
 
-      // Find the source and target nodes
-      const sourceNode = flow.getNode(source) as Node<InvocationNodeData>;
-      const targetNode = flow.getNode(target) as Node<InvocationNodeData>;
-
-      // Conditional guards against undefined nodes/handles
-      if (!(sourceNode && targetNode && sourceNode.data && targetNode.data)) {
-        return false;
-      }
-
-      const sourceField = sourceNode.data.outputs[sourceHandle];
-      const targetField = targetNode.data.inputs[targetHandle];
-
-      if (!sourceField || !targetField) {
-        // something has gone terribly awry
-        return false;
-      }
-
       if (source === target) {
         // Don't allow nodes to connect to themselves, even if validation is disabled
+        return false;
+      }
+
+      const state = store.getState();
+      const { nodes, edges, templates } = state.nodes;
+
+      // Find the source and target nodes
+      const sourceNode = nodes.find((node) => node.id === source) as Node<InvocationNodeData>;
+      const targetNode = nodes.find((node) => node.id === target) as Node<InvocationNodeData>;
+      const sourceFieldTemplate = templates[sourceNode.data.type]?.outputs[sourceHandle];
+      const targetFieldTemplate = templates[targetNode.data.type]?.inputs[targetHandle];
+
+      // Conditional guards against undefined nodes/handles
+      if (!(sourceFieldTemplate && targetFieldTemplate)) {
         return false;
       }
 
@@ -69,20 +63,20 @@ export const useIsValidConnection = () => {
           return edge.target === target && edge.targetHandle === targetHandle;
         }) &&
         // except CollectionItem inputs can have multiples
-        targetField.type.name !== 'CollectionItemField'
+        targetFieldTemplate.type.name !== 'CollectionItemField'
       ) {
         return false;
       }
 
       // Must use the originalType here if it exists
-      if (!validateSourceAndTargetTypes(sourceField.type, targetField.type)) {
+      if (!validateSourceAndTargetTypes(sourceFieldTemplate.type, targetFieldTemplate.type)) {
         return false;
       }
 
       // Graphs much be acyclic (no loops!)
       return getIsGraphAcyclic(source, target, nodes, edges);
     },
-    [flow, shouldValidateGraph]
+    [shouldValidateGraph, store]
   );
 
   return isValidConnection;

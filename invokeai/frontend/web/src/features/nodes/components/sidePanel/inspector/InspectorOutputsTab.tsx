@@ -5,7 +5,6 @@ import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,12 +13,12 @@ import type { AnyResult } from 'services/events/types';
 
 import ImageOutputPreview from './outputs/ImageOutputPreview';
 
-const selector = createMemoizedSelector(selectNodesSlice, selectNodeTemplatesSlice, (nodes, nodeTemplates) => {
+const selector = createMemoizedSelector(selectNodesSlice, (nodes) => {
   const lastSelectedNodeId = nodes.selectedNodes[nodes.selectedNodes.length - 1];
 
   const lastSelectedNode = nodes.nodes.find((node) => node.id === lastSelectedNodeId);
 
-  const lastSelectedNodeTemplate = lastSelectedNode ? nodeTemplates.templates[lastSelectedNode.data.type] : undefined;
+  const lastSelectedNodeTemplate = lastSelectedNode ? nodes.templates[lastSelectedNode.data.type] : undefined;
 
   const nes = nodes.nodeExecutionStates[lastSelectedNodeId ?? '__UNKNOWN_NODE__'];
 

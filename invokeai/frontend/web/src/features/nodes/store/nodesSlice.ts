@@ -42,7 +42,7 @@ import {
   zT2IAdapterModelFieldValue,
   zVAEModelFieldValue,
 } from 'features/nodes/types/field';
-import type { AnyNode, NodeExecutionState } from 'features/nodes/types/invocation';
+import type { AnyNode, InvocationTemplate, NodeExecutionState } from 'features/nodes/types/invocation';
 import { isInvocationNode, isNotesNode, zNodeStatus } from 'features/nodes/types/invocation';
 import { cloneDeep, forEach } from 'lodash-es';
 import type {
@@ -92,6 +92,7 @@ export const initialNodesState: NodesState = {
   _version: 1,
   nodes: [],
   edges: [],
+  templates: {},
   connectionStartParams: null,
   connectionStartFieldType: null,
   connectionMade: false,
@@ -190,6 +191,7 @@ export const nodesSlice = createSlice({
             node,
             state.nodes,
             state.edges,
+            state.templates,
             nodeId,
             handleId,
             handleType,
@@ -224,12 +226,12 @@ export const nodesSlice = createSlice({
       if (!nodeId || !handleId) {
         return;
       }
-      const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
-      const node = state.nodes?.[nodeIndex];
+      const node = state.nodes.find((n) => n.id === nodeId);
       if (!isInvocationNode(node)) {
         return;
       }
-      const field = handleType === 'source' ? node.data.outputs[handleId] : node.data.inputs[handleId];
+      const template = state.templates[node.data.type];
+      const field = handleType === 'source' ? template?.outputs[handleId] : template?.inputs[handleId];
       state.connectionStartFieldType = field?.type ?? null;
     },
     connectionMade: (state, action: PayloadAction<Connection>) => {
@@ -260,6 +262,7 @@ export const nodesSlice = createSlice({
                 mouseOverNode,
                 state.nodes,
                 state.edges,
+                state.templates,
                 nodeId,
                 handleId,
                 handleType,
@@ -677,6 +680,9 @@ export const nodesSlice = createSlice({
     selectionModeChanged: (state, action: PayloadAction<boolean>) => {
       state.selectionMode = action.payload ? SelectionMode.Full : SelectionMode.Partial;
     },
+    nodeTemplatesBuilt: (state, action: PayloadAction<Record<string, InvocationTemplate>>) => {
+      state.templates = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(workflowLoaded, (state, action) => {
@@ -808,6 +814,7 @@ export const {
   shouldValidateGraphChanged,
   viewportChanged,
   edgeAdded,
+  nodeTemplatesBuilt,
 } = nodesSlice.actions;
 
 // This is used for tracking `state.workflow.isTouched`
