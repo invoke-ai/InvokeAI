@@ -90,10 +90,10 @@ class IPAdapterInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> IPAdapterOutput:
         # Lookup the CLIP Vision encoder that is intended to be used with the IP-Adapter model.
-        ip_adapter_info = context.services.model_records.get_model(self.ip_adapter_model.key)
+        ip_adapter_info = context.services.model_manager.store.get_model(self.ip_adapter_model.key)
         image_encoder_model_id = ip_adapter_info.image_encoder_model_id
         image_encoder_model_name = image_encoder_model_id.split("/")[-1].strip()
-        image_encoder_models = context.services.model_records.search_by_attr(
+        image_encoder_models = context.services.model_manager.store.search_by_attr(
             model_name=image_encoder_model_name, base_model=BaseModelType.Any, model_type=ModelType.CLIPVision
         )
         assert len(image_encoder_models) == 1

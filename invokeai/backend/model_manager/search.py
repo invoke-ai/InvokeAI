@@ -116,9 +116,9 @@ class ModelSearch(ModelSearchBase):
        # returns all models that have 'anime' in the path
     """
 
-    models_found: Set[Path] = Field(default=None)
-    scanned_dirs: Set[Path] = Field(default=None)
-    pruned_paths: Set[Path] = Field(default=None)
+    models_found: Optional[Set[Path]] = Field(default=None)
+    scanned_dirs: Optional[Set[Path]] = Field(default=None)
+    pruned_paths: Optional[Set[Path]] = Field(default=None)
 
     def search_started(self) -> None:
         self.models_found = set()

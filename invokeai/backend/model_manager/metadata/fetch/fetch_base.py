@@ -20,7 +20,7 @@ from requests.sessions import Session
 
 from invokeai.backend.model_manager import ModelRepoVariant
 
-from ..metadata_base import AnyModelRepoMetadata, AnyModelRepoMetadataValidator
+from ..metadata_base import AnyModelRepoMetadata, AnyModelRepoMetadataValidator, BaseMetadata
 
 
 class ModelMetadataFetchBase(ABC):
@@ -62,5 +62,5 @@ class ModelMetadataFetchBase(ABC):
     @classmethod
     def from_json(cls, json: str) -> AnyModelRepoMetadata:
         """Given the JSON representation of the metadata, return the corresponding Pydantic object."""
-        metadata = AnyModelRepoMetadataValidator.validate_json(json)
+        metadata: BaseMetadata = AnyModelRepoMetadataValidator.validate_json(json)  # type: ignore
         return metadata
