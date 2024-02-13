@@ -1,23 +1,20 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { isInvocationNode } from 'features/nodes/types/invocation';
+import { selectFieldInputInstance } from 'features/nodes/store/selectors';
+import type { FieldInputInstance } from 'features/nodes/types/field';
 import { useMemo } from 'react';
 
-export const useFieldInputInstance = (nodeId: string, fieldName: string) => {
+export const useFieldInputInstance = (nodeId: string, fieldName: string): FieldInputInstance | null => {
   const selector = useMemo(
     () =>
       createMemoizedSelector(selectNodesSlice, (nodes) => {
-        const node = nodes.nodes.find((node) => node.id === nodeId);
-        if (!isInvocationNode(node)) {
-          return;
-        }
-        return node.data.inputs[fieldName];
+        return selectFieldInputInstance(nodes, nodeId, fieldName);
       }),
     [fieldName, nodeId]
   );
 
-  const fieldTemplate = useAppSelector(selector);
+  const fieldData = useAppSelector(selector);
 
-  return fieldTemplate;
+  return fieldData;
 };

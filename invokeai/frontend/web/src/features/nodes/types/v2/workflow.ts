@@ -24,12 +24,16 @@ export const zWorkflowInvocationNode = z.object({
   id: z.string().trim().min(1),
   type: z.literal('invocation'),
   data: zInvocationNodeData,
+  width: zDimension,
+  height: zDimension,
   position: zXYPosition,
 });
 export const zWorkflowNotesNode = z.object({
   id: z.string().trim().min(1),
   type: z.literal('notes'),
   data: zNotesNodeData,
+  width: zDimension,
+  height: zDimension,
   position: zXYPosition,
 });
 export const zWorkflowNode = z.union([zWorkflowInvocationNode, zWorkflowNotesNode]);
@@ -64,7 +68,7 @@ export type WorkflowEdge = z.infer<typeof zWorkflowEdge>;
 // #endregion
 
 // #region Workflow
-export const zWorkflowV3 = z.object({
+export const zWorkflowV2 = z.object({
   id: z.string().min(1).optional(),
   name: z.string(),
   author: z.string(),
@@ -78,8 +82,8 @@ export const zWorkflowV3 = z.object({
   exposedFields: z.array(zFieldIdentifier),
   meta: z.object({
     category: zWorkflowCategory.default('user'),
-    version: z.literal('3.0.0'),
+    version: z.literal('2.0.0'),
   }),
 });
-export type WorkflowV3 = z.infer<typeof zWorkflowV3>;
+export type WorkflowV2 = z.infer<typeof zWorkflowV2>;
 // #endregion

@@ -1,5 +1,5 @@
 import { createAction, isAnyOf } from '@reduxjs/toolkit';
-import type { WorkflowV2 } from 'features/nodes/types/workflow';
+import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import type { Graph } from 'services/api/types';
 
 export const textToImageGraphBuilt = createAction<Graph>('nodes/textToImageGraphBuilt');
@@ -21,4 +21,4 @@ export const workflowLoadRequested = createAction<{
 
 export const updateAllNodesRequested = createAction('nodes/updateAllNodesRequested');
 
-export const workflowLoaded = createAction<WorkflowV2>('workflow/workflowLoaded');
+export const workflowLoaded = createAction<WorkflowV3>('workflow/workflowLoaded');

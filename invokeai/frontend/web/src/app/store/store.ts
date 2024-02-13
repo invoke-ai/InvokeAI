@@ -16,7 +16,6 @@ import { hrfPersistConfig, hrfSlice } from 'features/hrf/store/hrfSlice';
 import { loraPersistConfig, loraSlice } from 'features/lora/store/loraSlice';
 import { modelManagerPersistConfig, modelManagerSlice } from 'features/modelManager/store/modelManagerSlice';
 import { nodesPersistConfig, nodesSlice } from 'features/nodes/store/nodesSlice';
-import { nodesTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { workflowPersistConfig, workflowSlice } from 'features/nodes/store/workflowSlice';
 import { generationPersistConfig, generationSlice } from 'features/parameters/store/generationSlice';
 import { postprocessingPersistConfig, postprocessingSlice } from 'features/parameters/store/postprocessingSlice';
@@ -46,7 +45,6 @@ const allReducers = {
   [gallerySlice.name]: gallerySlice.reducer,
   [generationSlice.name]: generationSlice.reducer,
   [nodesSlice.name]: nodesSlice.reducer,
-  [nodesTemplatesSlice.name]: nodesTemplatesSlice.reducer,
   [postprocessingSlice.name]: postprocessingSlice.reducer,
   [systemSlice.name]: systemSlice.reducer,
   [configSlice.name]: configSlice.reducer,

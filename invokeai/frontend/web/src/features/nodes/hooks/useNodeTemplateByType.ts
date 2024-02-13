@@ -1,14 +1,14 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import type { InvocationTemplate } from 'features/nodes/types/invocation';
 import { useMemo } from 'react';
 
-export const useNodeTemplateByType = (type: string) => {
+export const useNodeTemplateByType = (type: string): InvocationTemplate | null => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(selectNodeTemplatesSlice, (nodeTemplates): InvocationTemplate | undefined => {
-        return nodeTemplates.templates[type];
+      createSelector(selectNodesSlice, (nodes) => {
+        return nodes.templates[type] ?? null;
       }),
     [type]
   );

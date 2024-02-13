@@ -15,8 +15,7 @@ export const addUpdateAllNodesRequestedListener = () => {
     actionCreator: updateAllNodesRequested,
     effect: (action, { dispatch, getState }) => {
       const log = logger('nodes');
-      const nodes = getState().nodes.nodes;
-      const templates = getState().nodeTemplates.templates;
+      const { nodes, templates } = getState().nodes;
 
       let unableToUpdateCount = 0;
 

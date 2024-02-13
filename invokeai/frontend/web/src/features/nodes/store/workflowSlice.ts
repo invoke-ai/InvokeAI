@@ -10,10 +10,10 @@ import type {
 } from 'features/nodes/store/types';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import type { WorkflowCategory, WorkflowV2 } from 'features/nodes/types/workflow';
+import type { WorkflowCategory, WorkflowV3 } from 'features/nodes/types/workflow';
 import { cloneDeep, isEqual, omit, uniqBy } from 'lodash-es';
 
-export const blankWorkflow: Omit<WorkflowV2, 'nodes' | 'edges'> = {
+export const blankWorkflow: Omit<WorkflowV3, 'nodes' | 'edges'> = {
   name: '',
   author: '',
   description: '',
@@ -22,7 +22,7 @@ export const blankWorkflow: Omit<WorkflowV2, 'nodes' | 'edges'> = {
   tags: '',
   notes: '',
   exposedFields: [],
-  meta: { version: '2.0.0', category: 'user' },
+  meta: { version: '3.0.0', category: 'user' },
   id: undefined,
 };
 
