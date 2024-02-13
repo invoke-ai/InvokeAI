@@ -2,7 +2,6 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { workflowLoaded } from 'features/nodes/store/actions';
-import { nodeTemplatesBuilt } from 'features/nodes/store/nodeTemplatesSlice';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
   BoardFieldValue,
@@ -65,7 +64,6 @@ import {
   SelectionMode,
   updateEdge,
 } from 'reactflow';
-import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import {
   socketGeneratorProgress,
   socketInvocationComplete,
@@ -92,7 +90,6 @@ export const initialNodesState: NodesState = {
   _version: 1,
   nodes: [],
   edges: [],
-  isReady: false,
   connectionStartParams: null,
   connectionStartFieldType: null,
   connectionMade: false,
@@ -677,10 +674,6 @@ export const nodesSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addCase(receivedOpenAPISchema.pending, (state) => {
-      state.isReady = false;
-    });
-
     builder.addCase(workflowLoaded, (state, action) => {
       const { nodes, edges } = action.payload;
       state.nodes = applyNodeChanges(
@@ -751,9 +744,6 @@ export const nodesSlice = createSlice({
           nes.outputs = [];
         });
       }
-    });
-    builder.addCase(nodeTemplatesBuilt, (state) => {
-      state.isReady = true;
     });
   },
 });
@@ -871,7 +861,6 @@ export const nodesPersistConfig: PersistConfig<NodesState> = {
     'connectionStartFieldType',
     'selectedNodes',
     'selectedEdges',
-    'isReady',
     'nodesToCopy',
     'edgesToCopy',
     'connectionMade',

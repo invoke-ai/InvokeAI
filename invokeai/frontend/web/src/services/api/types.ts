@@ -156,7 +156,7 @@ export type MediapipeFaceProcessorInvocation = s['MediapipeFaceProcessorInvocati
 export type MidasDepthImageProcessorInvocation = s['MidasDepthImageProcessorInvocation'];
 export type MlsdImageProcessorInvocation = s['MlsdImageProcessorInvocation'];
 export type NormalbaeImageProcessorInvocation = s['NormalbaeImageProcessorInvocation'];
-export type OpenposeImageProcessorInvocation = s['OpenposeImageProcessorInvocation'];
+export type DWOpenposeImageProcessorInvocation = s['DWOpenposeImageProcessorInvocation'];
 export type PidiImageProcessorInvocation = s['PidiImageProcessorInvocation'];
 export type ZoeDepthImageProcessorInvocation = s['ZoeDepthImageProcessorInvocation'];
 

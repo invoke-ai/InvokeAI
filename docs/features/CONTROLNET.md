@@ -94,6 +94,8 @@ A model that helps generate creative QR codes that still scan. Can also be used 
 **Openpose**: 
 The OpenPose control model allows for the identification of the general pose of a character by pre-processing an existing image with a clear human structure. With advanced options, Openpose can also detect the face or hands in the image. 
 
+*Note:* The DWPose Processor has replaced the OpenPose processor in Invoke. Workflows and generations that relied on the OpenPose Processor will need to be updated to use the DWPose Processor instead.
+
 **Mediapipe Face**:
 
 The MediaPipe Face identification processor is able to clearly identify facial features in order to capture vivid expressions of human faces.
