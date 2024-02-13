@@ -166,7 +166,7 @@ class ModelProbe(object):
         fields["original_hash"] = fields.get("original_hash") or hash
         fields["current_hash"] = fields.get("current_hash") or hash
 
-        if format_type == ModelFormat.Diffusers:
+        if format_type == ModelFormat.Diffusers and hasattr(probe, "get_repo_variant"):
             fields["repo_variant"] = fields.get("repo_variant") or probe.get_repo_variant()
 
         # additional fields needed for main and controlnet models

@@ -103,7 +103,7 @@ class MainModelLoaderInvocation(BaseInvocation):
         key = self.model.key
 
         # TODO: not found exceptions
-        if not context.services.model_records.exists(key):
+        if not context.services.model_manager.store.exists(key):
             raise Exception(f"Unknown model {key}")
 
         return ModelLoaderOutput(
@@ -172,7 +172,7 @@ class LoraLoaderInvocation(BaseInvocation):
 
         lora_key = self.lora.key
 
-        if not context.services.model_records.exists(lora_key):
+        if not context.services.model_manager.store.exists(lora_key):
             raise Exception(f"Unkown lora: {lora_key}!")
 
         if self.unet is not None and any(lora.key == lora_key for lora in self.unet.loras):
@@ -252,7 +252,7 @@ class SDXLLoraLoaderInvocation(BaseInvocation):
 
         lora_key = self.lora.key
 
-        if not context.services.model_records.exists(lora_key):
+        if not context.services.model_manager.store.exists(lora_key):
             raise Exception(f"Unknown lora: {lora_key}!")
 
         if self.unet is not None and any(lora.key == lora_key for lora in self.unet.loras):
@@ -318,7 +318,7 @@ class VaeLoaderInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> VAEOutput:
         key = self.vae_model.key
 
-        if not context.services.model_records.exists(key):
+        if not context.services.model_manager.store.exists(key):
             raise Exception(f"Unkown vae: {key}!")
 
         return VAEOutput(vae=VaeField(vae=ModelInfo(key=key)))
