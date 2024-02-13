@@ -36,7 +36,7 @@ async def list_downloads() -> List[DownloadJob]:
         400: {"description": "Bad request"},
     },
 )
-async def prune_downloads():
+async def prune_downloads() -> Response:
     """Prune completed and errored jobs."""
     queue = ApiDependencies.invoker.services.download_queue
     queue.prune_jobs()
@@ -87,7 +87,7 @@ async def get_download_job(
 )
 async def cancel_download_job(
     id: int = Path(description="ID of the download job to cancel."),
-):
+) -> Response:
     """Cancel a download job using its ID."""
     try:
         queue = ApiDependencies.invoker.services.download_queue
@@ -105,7 +105,7 @@ async def cancel_download_job(
         204: {"description": "Download jobs have been cancelled"},
     },
 )
-async def cancel_all_download_jobs():
+async def cancel_all_download_jobs() -> Response:
     """Cancel all download jobs."""
     ApiDependencies.invoker.services.download_queue.cancel_all_jobs()
     return Response(status_code=204)
