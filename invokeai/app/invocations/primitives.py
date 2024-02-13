@@ -428,6 +428,11 @@ class ConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
+    mask_name: Optional[str] = Field(
+        default=None,
+        description="The mask associated with this conditioning tensor. Excluded regions should be set to 0, included "
+        "regions should be set to 1.",
+    )
 
 
 @invocation_output("conditioning_output")
