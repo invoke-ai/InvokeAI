@@ -26,16 +26,15 @@ IMAGE_MAX_AGE = 31536000
     "/upload_multiple",
     operation_id="upload_multiple_images",
     responses={
-        201: {"description": "The images were uploaded successfully"},
+        200: {"description": "The images are being prepared for upload"},
         415: {"description": "Images upload failed"},
     },
-    status_code=201,
-    response_model=List[ImageDTO]
-    # response_model=Dict[str, str],
+    status_code=201,  
+    response_model=Dict[str, str],
 )
 async def upload_images(
     files: List[UploadFile],
-    # background_tasks: BackgroundTasks,
+    background_tasks: BackgroundTasks,
     request: Request,
     response: Response,
     image_category: ImageCategory = Query(description="The category of the images"),
@@ -43,16 +42,25 @@ async def upload_images(
     board_id: Optional[str] = Query(default=None, description="The board to add this images to, if any"),
     session_id: Optional[str] = Query(default=None, description="The session ID associated with this upload, if any"),
     crop_visible: Optional[bool] = Query(default=False, description="Whether to crop the images"),
-) -> List[ImageDTO]:
-# ) -> Dict[str, str]:
+) -> Dict[str, str]:
     """Uploads multiple images"""
     upload_data_list = []
-    # frontend emit event for upload started
-    ApiDependencies.invoker.services.events.emit_upload_started("Upload job started processing the image...")
+    # emit event for upload started
+    ApiDependencies.invoker.services.events.emit_upload_images(
+        message=f"Upload job started for {len(files)} images...",
+        status="started",
+        total=len(files),
+        images_uploading=[file.filename for file in files if file.filename is not None],
+    )
 
     # loop to handle multiple files
     for file in files:
         if not file.content_type or not file.content_type.startswith("image"):
+            ApiDependencies.invoker.services.events.emit_upload_images(
+            message="Upload job failed...",
+            status="error",
+            errors=["Not an image"],
+            )
             raise HTTPException(status_code=415, detail="Not an image")
 
         metadata = None
@@ -66,6 +74,11 @@ async def upload_images(
                 pil_image = pil_image.crop(bbox)
         except Exception:
             ApiDependencies.invoker.services.logger.error(traceback.format_exc())
+            ApiDependencies.invoker.services.events.emit_upload_images(
+            message="Upload job failed...",
+            status="error",
+            errors=["Failed to read image"],
+            )
             raise HTTPException(status_code=415, detail="Failed to read image")
 
         # attempt to parse metadata from image
@@ -85,7 +98,7 @@ async def upload_images(
             except ValidationError:
                 ApiDependencies.invoker.services.logger.warn("Failed to parse metadata for uploaded image")
                 pass
-        # constructed an ImageUploadData object for each file
+        # construct an ImageUploadData object for each file
         upload_data = ImageUploadData(
             image=pil_image,
             image_origin=ResourceOrigin.EXTERNAL,
@@ -98,24 +111,11 @@ async def upload_images(
         )
         upload_data_list.append(upload_data)
 
-    try:
-        image_dtos = await ApiDependencies.invoker.services.images.create_multiple(upload_data_list)
-        
-        response.status_code = 201
-        response.headers["Location"] = image_dtos[0].image_url if image_dtos else ""
-        
-        # Return the list of ImageDTOs after processing all files
-        return image_dtos
-    
-    except Exception:
-        ApiDependencies.invoker.services.logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail="Failed to create image")
+    # Schedule image processing as a background task
+    background_tasks.add_task(ApiDependencies.invoker.services.images.create_multiple, upload_data_list)
 
-    # # Schedule image processing as a background task
-    # background_tasks.add_task(ApiDependencies.invoker.services.images.create_multiple, upload_data_list)
-
-    # # Return a response immediately
-    # return {"message": "Images are being processed"}
+    # Return a response immediately
+    return {"message": "Images are being processed"}
 
 
 @images_router.post(
@@ -139,8 +139,7 @@ async def upload_image(
     crop_visible: Optional[bool] = Query(default=False, description="Whether to crop the image"),
 ) -> ImageDTO:
     """Uploads an image"""
-    ApiDependencies.invoker.services.events.emit_upload_started("Upload job started from the WebSockets API")
-    
+
     if not file.content_type or not file.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
 
@@ -160,9 +159,11 @@ async def upload_image(
     # TODO: retain non-invokeai metadata on upload?
     # attempt to parse metadata from image
     metadata_raw = pil_image.info.get("invokeai_metadata", None)
+    print(metadata_raw)
     if metadata_raw:
         try:
             metadata = MetadataFieldValidator.validate_json(metadata_raw)
+            print(metadata)
         except ValidationError:
             ApiDependencies.invoker.services.logger.warn("Failed to parse metadata for uploaded image")
             pass
