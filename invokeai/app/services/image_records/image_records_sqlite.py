@@ -1,7 +1,7 @@
 import sqlite3
 import threading
 from datetime import datetime
-from typing import Optional, Union, cast, List, Tuple
+from typing import Optional, Union, cast
 
 from invokeai.app.invocations.baseinvocation import MetadataField, MetadataFieldValidator
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
@@ -19,8 +19,6 @@ from .image_records_common import (
     ResourceOrigin,
     deserialize_image_record,
 )
-
-from ..images.images_common import ImageDTO, ImageUploadData
 
 
 class SqliteImageRecordStorage(ImageRecordStorageBase):
@@ -317,132 +315,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             raise ImageRecordDeleteException from e
         finally:
             self._lock.release()
-    ############################################################################################################
-    ############################    ERYX CODE   ################################################################
-    ############################################################################################################
-    def save_record_eryx(self, image_dtos: List[ImageUploadData]) -> List[datetime]:
-        try:
-            self._lock.acquire()
-            # Prepare the list of tuples for bulk insert
-            insert_values = [
-                (
-                    image_dto.image_name,
-                    image_dto.image_origin.value,
-                    image_dto.image_category.value,
-                    image_dto.width,
-                    image_dto.height,
-                    image_dto.session_id,
-                    image_dto.metadata.model_dump_json() if hasattr(image_dto, 'metadata') and image_dto.metadata else None,
-                    image_dto.is_intermediate,
-                    False,  # Assuming 'starred' is not part of the DTO
-                    image_dto.workflow is not None
-                )
-                    for image_dto in image_dtos
-            ]
 
-            self._cursor.executemany(
-            """--sql
-            INSERT OR IGNORE INTO images (
-                image_name,
-                image_origin,
-                image_category,
-                width,
-                height,
-                session_id,
-                metadata,
-                is_intermediate,
-                starred,
-                has_workflow
-                )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-            """,
-            insert_values
-        )
-            self._conn.commit()
-
-        # Retrieve the creation timestamps for the inserted records
-            created_at_list = []
-            for image_dto in image_dtos:
-                self._cursor.execute(
-                """--sql
-                SELECT created_at
-                FROM images
-                WHERE image_name = ?;
-                """,
-                (image_dto.image_name,),
-            )
-                created_at = datetime.fromisoformat(self._cursor.fetchone()[0])
-                created_at_list.append(created_at)
-
-            return created_at_list
-        except sqlite3.Error as e:
-            self._conn.rollback()
-            raise ImageRecordSaveException from e
-        finally:
-            self._lock.release()
-
-    # def save_many(self, image_records: List[Tuple]) -> List[datetime]:
-    #     """
-    #     Save multiple image records in a single transaction and return their creation timestamps.
-
-    #     :param image_records: A list of tuples, each containing the fields for one image record.
-    #     :return: A list of datetime objects representing the creation time of each record.
-    #     """
-    #     # save_time_start = time.perf_counter()
-    #     try:
-    #         self._lock.acquire()
-    #         self._cursor.executemany(
-    #             """--sql
-    #             INSERT OR IGNORE INTO images (
-    #                 image_name,
-    #                 image_origin,
-    #                 image_category,
-    #                 width,
-    #                 height,
-    #                 node_id,
-    #                 session_id,
-    #                 metadata,
-    #                 is_intermediate,
-    #                 starred,
-    #                 has_workflow
-    #             )
-    #             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-    #             """,
-    #             image_records
-    #         )
-    #         self._conn.commit()
-
-    #         # Fetch the created_at timestamps for the inserted records
-    #         image_names = [record[0] for record in image_records]
-    #         created_at_list = []
-    #         for name in image_names:
-    #             self._cursor.execute(
-    #                 """--sql
-    #                 SELECT created_at
-    #                 FROM images
-    #                 WHERE image_name = ?;
-    #                 """,
-    #                 (name,)
-    #             )
-    #             created_at = datetime.fromisoformat(self._cursor.fetchone()[0])
-    #             created_at_list.append(created_at)
-
-    #         # save_duration = time.perf_counter() - save_time_start
-    #         # print(f"Total time for images to be inserted into db: {save_duration:.6f} seconds")
-    #         return created_at_list
-
-    #     except sqlite3.Error as e:
-    #         self._conn.rollback()
-    #         raise ImageRecordSaveException from e
-    #     finally:
-    #         self._lock.release()
-    ############################################################################################################
-    ############################################################################################################
-    ############################################################################################################
-            
-    ############################################################################################################
-    ############################    ORIGINAL CODE   ############################################################
-    ############################################################################################################
     def save(
         self,
         image_name: str,
@@ -510,9 +383,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             raise ImageRecordSaveException from e
         finally:
             self._lock.release()
-    ############################################################################################################
-    ############################################################################################################
-    ############################################################################################################
 
     def get_most_recent_image_for_board(self, board_id: str) -> Optional[ImageRecord]:
         try:
