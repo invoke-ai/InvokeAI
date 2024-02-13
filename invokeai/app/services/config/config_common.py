@@ -21,7 +21,7 @@ class PagingArgumentParser(argparse.ArgumentParser):
     It also supports reading defaults from an init file.
     """
 
-    def print_help(self, file=None):
+    def print_help(self, file=None) -> None:
         text = self.format_help()
         pydoc.pager(text)
 

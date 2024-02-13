@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from fastapi import Body, Path, Query, Response
 from fastapi.routing import APIRouter
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
@@ -36,6 +36,35 @@ from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
 from ..dependencies import ApiDependencies
 
 model_manager_v2_router = APIRouter(prefix="/v2/models", tags=["model_manager_v2"])
+
+example_model_output = {
+    "path": "sd-1/main/openjourney",
+    "name": "openjourney",
+    "base": "sd-1",
+    "type": "main",
+    "format": "diffusers",
+    "key": "3a0e45ff858926fd4a63da630688b1e1",
+    "original_hash": "1c12f18fb6e403baef26fb9d720fbd2f",
+    "current_hash": "1c12f18fb6e403baef26fb9d720fbd2f",
+    "description": "sd-1 main model openjourney",
+    "source": "/opt/invokeai/models/sd-1/main/openjourney",
+    "last_modified": 1707794711,
+    "vae": "/opt/invokeai/models/sd-1/vae/vae-ft-mse-840000-ema-pruned_fp16.safetensors",
+    "variant": "normal",
+    "prediction_type": "epsilon",
+    "repo_variant": "fp16",
+}
+
+example_model_input = {
+    "path": "base/type/name",
+    "name": "model_name",
+    "base": "sd-1",
+    "type": "main",
+    "format": "diffusers",
+    "description": "Model description",
+    "vae": None,
+    "variant": "normal",
+}
 
 
 class ModelsList(BaseModel):
@@ -88,7 +117,10 @@ async def list_model_records(
     "/i/{key}",
     operation_id="get_model_record",
     responses={
-        200: {"description": "Success"},
+        200: {
+            "description": "The model configuration was retrieved successfully",
+            "content": {"application/json": {"example": example_model_output}},
+        },
         400: {"description": "Bad request"},
         404: {"description": "The model could not be found"},
     },
@@ -165,18 +197,22 @@ async def search_by_metadata_tags(
     "/i/{key}",
     operation_id="update_model_record",
     responses={
-        200: {"description": "The model was updated successfully"},
+        200: {
+            "description": "The model was updated successfully",
+            "content": {"application/json": {"example": example_model_output}},
+        },
         400: {"description": "Bad request"},
         404: {"description": "The model could not be found"},
         409: {"description": "There is already a model corresponding to the new name"},
     },
     status_code=200,
-    response_model=AnyModelConfig,
 )
 async def update_model_record(
     key: Annotated[str, Path(description="Unique key of model")],
-    info: Annotated[AnyModelConfig, Body(description="Model config", discriminator="type")],
-) -> AnyModelConfig:
+    info: Annotated[
+        AnyModelConfig, Body(description="Model config", discriminator="type", example=example_model_input)
+    ],
+) -> Annotated[AnyModelConfig, Field(example="this is neat")]:
     """Update model contents with a new config. If the model name or base fields are changed, then the model is renamed."""
     logger = ApiDependencies.invoker.services.logger
     record_store = ApiDependencies.invoker.services.model_manager.store
@@ -225,7 +261,10 @@ async def del_model_record(
     "/i/",
     operation_id="add_model_record",
     responses={
-        201: {"description": "The model added successfully"},
+        201: {
+            "description": "The model added successfully",
+            "content": {"application/json": {"example": example_model_output}},
+        },
         409: {"description": "There is already a model corresponding to this path or repo_id"},
         415: {"description": "Unrecognized file/folder format"},
     },
@@ -270,6 +309,7 @@ async def heuristic_import(
     config: Optional[Dict[str, Any]] = Body(
         description="Dict of fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
         default=None,
+        example={"name": "modelT", "description": "antique cars"},
     ),
     access_token: Optional[str] = None,
 ) -> ModelInstallJob:
@@ -497,7 +537,10 @@ async def sync_models_to_config() -> Response:
     "/convert/{key}",
     operation_id="convert_model",
     responses={
-        200: {"description": "Model converted successfully"},
+        200: {
+            "description": "Model converted successfully",
+            "content": {"application/json": {"example": example_model_output}},
+        },
         400: {"description": "Bad request"},
         404: {"description": "Model not found"},
         409: {"description": "There is already a model registered at this location"},
@@ -571,6 +614,15 @@ async def convert_model(
 @model_manager_v2_router.put(
     "/merge",
     operation_id="merge",
+    responses={
+        200: {
+            "description": "Model converted successfully",
+            "content": {"application/json": {"example": example_model_output}},
+        },
+        400: {"description": "Bad request"},
+        404: {"description": "Model not found"},
+        409: {"description": "There is already a model registered at this location"},
+    },
 )
 async def merge(
     keys: List[str] = Body(description="Keys for two to three models to merge", min_length=2, max_length=3),
@@ -596,7 +648,6 @@ async def merge(
         interp: Interpolation method. One of "weighted_sum", "sigmoid", "inv_sigmoid" or "add_difference" [weighted_sum]
         merge_dest_directory: Specify a directory to store the merged model in [models directory]
     """
-    print(f"here i am, keys={keys}")
     logger = ApiDependencies.invoker.services.logger
     try:
         logger.info(f"Merging models: {keys} into {merge_dest_directory or '<MODELS>'}/{merged_model_name}")
