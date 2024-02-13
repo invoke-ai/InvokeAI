@@ -360,7 +360,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
     ) -> ConditioningData:
         positive_cond_data = context.conditioning.load(self.positive_conditioning.conditioning_name)
         c = positive_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
-        extra_conditioning_info = c.extra_conditioning
 
         negative_cond_data = context.conditioning.load(self.negative_conditioning.conditioning_name)
         uc = negative_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
@@ -370,7 +369,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             text_embeddings=c,
             guidance_scale=self.cfg_scale,
             guidance_rescale_multiplier=self.cfg_rescale_multiplier,
-            extra=extra_conditioning_info,
             postprocessing_settings=PostprocessingSettings(
                 threshold=0.0,  # threshold,
                 warmup=0.2,  # warmup,

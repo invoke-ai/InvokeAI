@@ -427,10 +427,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             return latents, attention_map_saver
 
         ip_adapter_unet_patcher = None
-        if conditioning_data.extra is not None and conditioning_data.extra.wants_cross_attention_control:
+        extra_conditioning_info = conditioning_data.text_embeddings.extra_conditioning
+        if extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control:
             attn_ctx = self.invokeai_diffuser.custom_attention_context(
                 self.invokeai_diffuser.model,
-                extra_conditioning_info=conditioning_data.extra,
+                extra_conditioning_info=extra_conditioning_info,
                 step_count=len(self.scheduler.timesteps),
             )
             self.use_ip_adapter = False

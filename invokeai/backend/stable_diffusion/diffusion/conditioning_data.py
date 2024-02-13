@@ -21,11 +21,7 @@ class ExtraConditioningInfo:
 @dataclass
 class BasicConditioningInfo:
     embeds: torch.Tensor
-    # TODO(ryand): Right now we awkwardly copy the extra conditioning info from here up to `ConditioningData`. This
-    # should only be stored in one place.
     extra_conditioning: Optional[ExtraConditioningInfo]
-    # weight: float
-    # mode: ConditioningAlgo
 
     def to(self, device, dtype=None):
         self.embeds = self.embeds.to(device=device, dtype=dtype)
@@ -83,7 +79,6 @@ class ConditioningData:
      ref [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/pdf/2305.08891.pdf)
     """
     guidance_rescale_multiplier: float = 0
-    extra: Optional[ExtraConditioningInfo] = None
     scheduler_args: dict[str, Any] = field(default_factory=dict)
     """
     Additional arguments to pass to invokeai_diffuser.do_latent_postprocessing().
