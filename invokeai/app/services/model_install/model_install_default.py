@@ -162,8 +162,10 @@ class ModelInstallService(ModelInstallServiceBase):
             config["source"] = model_path.resolve().as_posix()
 
         info: AnyModelConfig = self._probe_model(Path(model_path), config)
-        old_hash = info.original_hash
-        dest_path = self.app_config.models_path / info.base.value / info.type.value / model_path.name
+        old_hash = info.current_hash
+        dest_path = (
+            self.app_config.models_path / info.base.value / info.type.value / (config.get("name") or model_path.name)
+        )
         try:
             new_path = self._copy_model(model_path, dest_path)
         except FileExistsError as excp:

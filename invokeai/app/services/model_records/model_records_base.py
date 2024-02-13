@@ -17,7 +17,6 @@ from invokeai.backend.model_manager import (
     ModelFormat,
     ModelType,
 )
-from invokeai.backend.model_manager.load import AnyModelLoader
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore
 
 
@@ -193,12 +192,6 @@ class ModelRecordServiceBase(ABC):
         If none of the optional filters are passed, will return all
         models in the database.
         """
-        pass
-
-    @property
-    @abstractmethod
-    def loader(self) -> Optional[AnyModelLoader]:
-        """Return the model loader used by this instance."""
         pass
 
     def all_models(self) -> List[AnyModelConfig]:

@@ -5,8 +5,10 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from invokeai.app.invocations.baseinvocation import InvocationContext
-from invokeai.backend.model_manager import AnyModelConfig, BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager import AnyModel, AnyModelConfig, BaseModelType, ModelType, SubModelType
 from invokeai.backend.model_manager.load import LoadedModel
+from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
+from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
 
 
 class ModelLoadServiceBase(ABC):
@@ -70,3 +72,13 @@ class ModelLoadServiceBase(ABC):
                     NotImplementedException -- a model loader was not provided at initialization time
                     ValueError -- more than one model matches this combination
         """
+
+    @property
+    @abstractmethod
+    def ram_cache(self) -> ModelCacheBase[AnyModel]:
+        """Return the RAM cache used by this loader."""
+
+    @property
+    @abstractmethod
+    def convert_cache(self) -> ModelConvertCacheBase:
+        """Return the checkpoint convert cache used by this loader."""
