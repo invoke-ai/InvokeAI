@@ -226,7 +226,7 @@ def get_scheduler(
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
 
-    positive_conditioning: ConditioningField = InputField(
+    positive_conditioning: Union[ConditioningField, list[ConditioningField]] = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection, ui_order=0
     )
     negative_conditioning: ConditioningField = InputField(
@@ -332,7 +332,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
     ) -> ConditioningData:
         positive_cond_data = context.services.latents.get(self.positive_conditioning.conditioning_name)
         c = positive_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
-        extra_conditioning_info = c.extra_conditioning
 
         negative_cond_data = context.services.latents.get(self.negative_conditioning.conditioning_name)
         uc = negative_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
@@ -342,7 +341,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             text_embeddings=c,
             guidance_scale=self.cfg_scale,
             guidance_rescale_multiplier=self.cfg_rescale_multiplier,
-            extra=extra_conditioning_info,
             postprocessing_settings=PostprocessingSettings(
                 threshold=0.0,  # threshold,
                 warmup=0.2,  # warmup,
