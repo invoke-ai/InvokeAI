@@ -54,7 +54,6 @@ from invokeai.backend.model_manager.config import (
     ModelFormat,
     ModelType,
 )
-from invokeai.backend.model_manager.load import AnyModelLoader
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore, UnknownMetadataException
 
 from ..shared.sqlite.sqlite_database import SqliteDatabase
@@ -70,27 +69,20 @@ from .model_records_base import (
 class ModelRecordServiceSQL(ModelRecordServiceBase):
     """Implementation of the ModelConfigStore ABC using a SQL database."""
 
-    def __init__(self, db: SqliteDatabase, loader: Optional[AnyModelLoader] = None):
+    def __init__(self, db: SqliteDatabase):
         """
         Initialize a new object from preexisting sqlite3 connection and threading lock objects.
 
         :param db: Sqlite connection object
-        :param loader: Initialized model loader object (optional)
         """
         super().__init__()
         self._db = db
         self._cursor = db.conn.cursor()
-        self._loader = loader
 
     @property
     def db(self) -> SqliteDatabase:
         """Return the underlying database."""
         return self._db
-
-    @property
-    def loader(self) -> Optional[AnyModelLoader]:
-        """Return the model loader used by this instance."""
-        return self._loader
 
     def add_model(self, key: str, config: Union[Dict[str, Any], AnyModelConfig]) -> AnyModelConfig:
         """
