@@ -25,7 +25,7 @@ const UploadProgressToastManager = () => {
           makeToast({
             title: 'Uploading Images',
             description,
-            status: 'info',
+            status: 'success',
             duration: null,
           })
         );
@@ -34,7 +34,7 @@ const UploadProgressToastManager = () => {
         toast.update(uploadProgressToastId, {
           title: 'Uploading Images',
           description,
-          status: 'info',
+          status: 'success',
           duration: null,
         });
       }
