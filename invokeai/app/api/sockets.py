@@ -7,6 +7,8 @@ from socketio import ASGIApp, AsyncServer
 
 from ..services.events.events_base import EventServiceBase
 
+import json # TODO: EryX - Remove this import
+
 
 class SocketIO:
     __sio: AsyncServer
@@ -21,7 +23,7 @@ class SocketIO:
         self.__sio.on("unsubscribe_queue", handler=self._handle_unsub_queue)
         local_handler.register(event_name=EventServiceBase.queue_event, _func=self._handle_queue_event)
         local_handler.register(event_name=EventServiceBase.model_event, _func=self._handle_model_event)
-        local_handler.register(event_name=EventServiceBase.upload_event, _func=self._handle_upload_event) # register the upload event handler
+        local_handler.register(event_name=EventServiceBase.upload_event, _func=self._handle_upload_event)
 
     async def _handle_queue_event(self, event: Event):
         await self.__sio.emit(
@@ -42,4 +44,7 @@ class SocketIO:
         await self.__sio.emit(event=event[1]["event"], data=event[1]["data"])
 
     async def _handle_upload_event(self, event: Event) -> None:
+        print("\n")
+        print(json.dumps(event, indent=4, default=str)) # TODO: EryX - Remove this print
+        print("\n")
         await self.__sio.emit(event=event[1]["event"], data=event[1]["data"])
