@@ -1,4 +1,5 @@
-import type { ToastId, UseToastOptions } from '@chakra-ui/react';
+import type { ToastId } from '@chakra-ui/react';
+import type { UseToastOptions } from '@invoke-ai/ui-library';
 import type { LogLevel } from 'app/logging/logger';
 import type { ProgressImage } from 'services/events/types';
 import { z } from 'zod';
@@ -22,21 +23,27 @@ export type DenoiseProgress = {
 
 export const zLanguage = z.enum([
   'ar',
-  'nl',
-  'en',
-  'fr',
+  'az',
   'de',
+  'en',
+  'es',
+  'fi',
+  'fr',
   'he',
+  'hu',
   'it',
   'ja',
   'ko',
+  'nl',
   'pl',
-  'pt_BR',
   'pt',
+  'pt_BR',
   'ru',
+  'sv',
+  'tr',
+  'ua',
   'zh_CN',
-  'es',
-  'uk',
+  'zh_Hant',
 ]);
 export type Language = z.infer<typeof zLanguage>;
 export const isLanguage = (v: unknown): v is Language =>
