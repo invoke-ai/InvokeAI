@@ -88,9 +88,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 image_path,
                 "PNG",
                 pnginfo=pnginfo,
-                # compress_level from the config service doesnt actually work so needs hardcoding as of 3.6.0
-                compress_level=1,
-                # compress_level=self.__invoker.services.configuration.png_compress_level,
+                compress_level=self.__invoker.services.configuration.png_compress_level,
             )
 
             thumbnail_name = get_thumbnail_name(image_name)
