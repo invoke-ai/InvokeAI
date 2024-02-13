@@ -22,6 +22,7 @@ from invokeai.backend.model_manager.config import (
     AnyModel,
     AnyModelConfig,
     BaseModelType,
+    ModelConfigBase,
     ModelFormat,
     ModelType,
     SubModelType,
@@ -70,7 +71,7 @@ class ModelLoaderBase(ABC):
         pass
 
     @abstractmethod
-    def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
+    def load_model(self, model_config: ModelConfigBase, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
         """
         Return a model given its confguration.
 
@@ -122,7 +123,7 @@ class AnyModelLoader:
         """Return the convert cache associated used by the loaders."""
         return self._convert_cache
 
-    def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
+    def load_model(self, model_config: ModelConfigBase, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
         """
         Return a model given its configuration.
 
@@ -144,8 +145,8 @@ class AnyModelLoader:
 
     @classmethod
     def get_implementation(
-        cls, config: AnyModelConfig, submodel_type: Optional[SubModelType]
-    ) -> Tuple[Type[ModelLoaderBase], AnyModelConfig, Optional[SubModelType]]:
+        cls, config: ModelConfigBase, submodel_type: Optional[SubModelType]
+    ) -> Tuple[Type[ModelLoaderBase], ModelConfigBase, Optional[SubModelType]]:
         """Get subclass of ModelLoaderBase registered to handle base and type."""
         # We have to handle VAE overrides here because this will change the model type and the corresponding implementation returned
         conf2, submodel_type = cls._handle_subtype_overrides(config, submodel_type)
@@ -161,8 +162,8 @@ class AnyModelLoader:
 
     @classmethod
     def _handle_subtype_overrides(
-        cls, config: AnyModelConfig, submodel_type: Optional[SubModelType]
-    ) -> Tuple[AnyModelConfig, Optional[SubModelType]]:
+        cls, config: ModelConfigBase, submodel_type: Optional[SubModelType]
+    ) -> Tuple[ModelConfigBase, Optional[SubModelType]]:
         if submodel_type == SubModelType.Vae and hasattr(config, "vae") and config.vae is not None:
             model_path = Path(config.vae)
             config_class = (

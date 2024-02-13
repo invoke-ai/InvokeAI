@@ -8,12 +8,12 @@ import time
 import traceback
 from pathlib import Path
 from queue import Empty, PriorityQueue
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import requests
 from pydantic.networks import AnyHttpUrl
 from requests import HTTPError
-from tqdm import tqdm
+from tqdm import tqdm, std
 
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.util.misc import get_iso_timestamp
@@ -49,12 +49,12 @@ class DownloadQueueService(DownloadQueueServiceBase):
         :param max_parallel_dl: Number of simultaneous downloads allowed [5].
         :param requests_session: Optional requests.sessions.Session object, for unit tests.
         """
-        self._jobs = {}
+        self._jobs: Dict[int, DownloadJob] = {}
         self._next_job_id = 0
-        self._queue = PriorityQueue()
+        self._queue: PriorityQueue[DownloadJob] = PriorityQueue()
         self._stop_event = threading.Event()
         self._job_completed_event = threading.Event()
-        self._worker_pool = set()
+        self._worker_pool: Set[threading.Thread] = set()
         self._lock = threading.Lock()
         self._logger = InvokeAILogger.get_logger("DownloadQueueService")
         self._event_bus = event_bus
@@ -424,7 +424,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
 class TqdmProgress(object):
     """TQDM-based progress bar object to use in on_progress handlers."""
 
-    _bars: Dict[int, tqdm]  # the tqdm object
+    _bars: Dict[int, tqdm]  # type: ignore
     _last: Dict[int, int]  # last bytes downloaded
 
     def __init__(self) -> None:  # noqa D107

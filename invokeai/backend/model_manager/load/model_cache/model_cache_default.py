@@ -34,8 +34,8 @@ from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, 
 from invokeai.backend.util.devices import choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger
 
-from .model_cache_base import CacheRecord, CacheStats, ModelCacheBase
-from .model_locker import ModelLocker, ModelLockerBase
+from .model_cache_base import CacheRecord, CacheStats, ModelCacheBase, ModelLockerBase
+from .model_locker import ModelLocker
 
 if choose_torch_device() == torch.device("mps"):
     from torch import mps
