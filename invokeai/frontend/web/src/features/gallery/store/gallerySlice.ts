@@ -20,6 +20,7 @@ export const initialGalleryState: GalleryState = {
   boardSearchText: '',
   limit: INITIAL_IMAGE_LIMIT,
   offset: 0,
+  uploadedImages: [],
 };
 
 export const gallerySlice = createSlice({
@@ -74,6 +75,14 @@ export const gallerySlice = createSlice({
         state.limit += IMAGE_LIMIT;
       }
     },
+    addUploadedImages: (state, action: PayloadAction<string[]>) => {
+      // duplicate and add new image names to the uploadedImages array
+      const imagesSet = new Set([...state.uploadedImages, ...action.payload]);
+      state.uploadedImages = Array.from(imagesSet);
+    },
+    resetUploadedImages: (state) => {
+      state.uploadedImages = [];
+    },
   },
   extraReducers: (builder) => {
     builder.addMatcher(isAnyBoardDeleted, (state, action) => {
@@ -113,6 +122,8 @@ export const {
   selectionChanged,
   boardSearchTextChanged,
   moreImagesLoaded,
+  addUploadedImages,
+  resetUploadedImages,
 } = gallerySlice.actions;
 
 export default gallerySlice.reducer;
