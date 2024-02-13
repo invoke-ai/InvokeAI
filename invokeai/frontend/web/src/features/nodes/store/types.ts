@@ -5,13 +5,14 @@ import type {
   InvocationTemplate,
   NodeExecutionState,
 } from 'features/nodes/types/invocation';
-import type { WorkflowV2 } from 'features/nodes/types/workflow';
+import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import type { OnConnectStartParams, SelectionMode, Viewport, XYPosition } from 'reactflow';
 
 export type NodesState = {
   _version: 1;
   nodes: AnyNode[];
   edges: InvocationNodeEdge[];
+  templates: Record<string, InvocationTemplate>;
   connectionStartParams: OnConnectStartParams | null;
   connectionStartFieldType: FieldType | null;
   connectionMade: boolean;
@@ -38,7 +39,7 @@ export type FieldIdentifierWithValue = FieldIdentifier & {
   value: StatefulFieldValue;
 };
 
-export type WorkflowsState = Omit<WorkflowV2, 'nodes' | 'edges'> & {
+export type WorkflowsState = Omit<WorkflowV3, 'nodes' | 'edges'> & {
   _version: 1;
   isTouched: boolean;
   mode: WorkflowMode;

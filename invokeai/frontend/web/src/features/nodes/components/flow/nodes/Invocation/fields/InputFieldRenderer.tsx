@@ -1,6 +1,5 @@
-import { Box, Text } from '@invoke-ai/ui-library';
-import { useFieldInstance } from 'features/nodes/hooks/useFieldData';
-import { useFieldTemplate } from 'features/nodes/hooks/useFieldTemplate';
+import { useFieldInputInstance } from 'features/nodes/hooks/useFieldInputInstance';
+import { useFieldInputTemplate } from 'features/nodes/hooks/useFieldInputTemplate';
 import {
   isBoardFieldInputInstance,
   isBoardFieldInputTemplate,
@@ -38,7 +37,6 @@ import {
   isVAEModelFieldInputTemplate,
 } from 'features/nodes/types/field';
 import { memo } from 'react';
-import { useTranslation } from 'react-i18next';
 
 import BoardFieldInputComponent from './inputs/BoardFieldInputComponent';
 import BooleanFieldInputComponent from './inputs/BooleanFieldInputComponent';
@@ -63,17 +61,8 @@ type InputFieldProps = {
 };
 
 const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
-  const { t } = useTranslation();
-  const fieldInstance = useFieldInstance(nodeId, fieldName);
-  const fieldTemplate = useFieldTemplate(nodeId, fieldName, 'input');
-
-  if (fieldTemplate?.fieldKind === 'output') {
-    return (
-      <Box p={2}>
-        {t('nodes.outputFieldInInput')}: {fieldInstance?.type.name}
-      </Box>
-    );
-  }
+  const fieldInstance = useFieldInputInstance(nodeId, fieldName);
+  const fieldTemplate = useFieldInputTemplate(nodeId, fieldName);
 
   if (isStringFieldInputInstance(fieldInstance) && isStringFieldInputTemplate(fieldTemplate)) {
     return <StringFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
@@ -141,18 +130,10 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
     return <SchedulerFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
-  if (fieldInstance && fieldTemplate) {
+  if (fieldTemplate) {
     // Fallback for when there is no component for the type
     return null;
   }
-
-  return (
-    <Box p={1}>
-      <Text fontSize="sm" fontWeight="semibold" color="error.300">
-        {t('nodes.unknownFieldType', { type: fieldInstance?.type.name })}
-      </Text>
-    </Box>
-  );
 };
 
 export default memo(InputFieldRenderer);

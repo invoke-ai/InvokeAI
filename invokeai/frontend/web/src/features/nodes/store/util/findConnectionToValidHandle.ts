@@ -1,4 +1,6 @@
-import type { FieldInputInstance, FieldOutputInstance, FieldType } from 'features/nodes/types/field';
+import type { FieldInputTemplate, FieldOutputTemplate, FieldType } from 'features/nodes/types/field';
+import type { AnyNode, InvocationNodeEdge, InvocationTemplate } from 'features/nodes/types/invocation';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 import type { Connection, Edge, HandleType, Node } from 'reactflow';
 
 import { getIsGraphAcyclic } from './getIsGraphAcyclic';
@@ -9,7 +11,7 @@ const isValidConnection = (
   handleCurrentType: HandleType,
   handleCurrentFieldType: FieldType,
   node: Node,
-  handle: FieldInputInstance | FieldOutputInstance
+  handle: FieldInputTemplate | FieldOutputTemplate
 ) => {
   let isValidConnection = true;
   if (handleCurrentType === 'source') {
@@ -38,24 +40,31 @@ const isValidConnection = (
 };
 
 export const findConnectionToValidHandle = (
-  node: Node,
-  nodes: Node[],
-  edges: Edge[],
+  node: AnyNode,
+  nodes: AnyNode[],
+  edges: InvocationNodeEdge[],
+  templates: Record<string, InvocationTemplate>,
   handleCurrentNodeId: string,
   handleCurrentName: string,
   handleCurrentType: HandleType,
   handleCurrentFieldType: FieldType
 ): Connection | null => {
-  if (node.id === handleCurrentNodeId) {
+  if (node.id === handleCurrentNodeId || !isInvocationNode(node)) {
     return null;
   }
 
-  const handles = handleCurrentType === 'source' ? node.data.inputs : node.data.outputs;
+  const template = templates[node.data.type];
+
+  if (!template) {
+    return null;
+  }
+
+  const handles = handleCurrentType === 'source' ? template.inputs : template.outputs;
 
   //Prioritize handles whos name matches the node we're coming from
-  if (handles[handleCurrentName]) {
-    const handle = handles[handleCurrentName];
+  const handle = handles[handleCurrentName];
 
+  if (handle) {
     const sourceID = handleCurrentType === 'source' ? handleCurrentNodeId : node.id;
     const targetID = handleCurrentType === 'source' ? node.id : handleCurrentNodeId;
     const sourceHandle = handleCurrentType === 'source' ? handleCurrentName : handle.name;
@@ -77,6 +86,9 @@ export const findConnectionToValidHandle = (
 
   for (const handleName in handles) {
     const handle = handles[handleName];
+    if (!handle) {
+      continue;
+    }
 
     const sourceID = handleCurrentType === 'source' ? handleCurrentNodeId : node.id;
     const targetID = handleCurrentType === 'source' ? node.id : handleCurrentNodeId;

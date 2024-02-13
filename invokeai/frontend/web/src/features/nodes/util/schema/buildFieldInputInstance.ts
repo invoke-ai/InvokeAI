@@ -23,11 +23,8 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
 
 export const buildFieldInputInstance = (id: string, template: FieldInputTemplate): FieldInputInstance => {
   const fieldInstance: FieldInputInstance = {
-    id,
     name: template.name,
-    type: template.type,
     label: '',
-    fieldKind: 'input' as const,
     value: template.default ?? get(FIELD_VALUE_FALLBACK_MAP, template.type.name),
   };
 

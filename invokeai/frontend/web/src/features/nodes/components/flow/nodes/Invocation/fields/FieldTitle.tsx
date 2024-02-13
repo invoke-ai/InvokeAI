@@ -6,7 +6,7 @@ import { memo } from 'react';
 interface Props {
   nodeId: string;
   fieldName: string;
-  kind: 'input' | 'output';
+  kind: 'inputs' | 'outputs';
   isMissingInput?: boolean;
 }
 
