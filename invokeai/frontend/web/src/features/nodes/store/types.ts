@@ -1,4 +1,4 @@
-import type { type FieldType, StatefulFieldValue } from 'features/nodes/types/field';
+import type { FieldType, StatefulFieldValue } from 'features/nodes/types/field';
 import type {
   AnyNode,
   InvocationNodeEdge,

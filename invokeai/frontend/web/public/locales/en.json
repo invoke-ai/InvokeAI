@@ -997,6 +997,7 @@
         "problemReadingMetadata": "Problem reading metadata from image",
         "problemReadingWorkflow": "Problem reading workflow from image",
         "problemSettingTitle": "Problem Setting Title",
+        "resetToDefaultValue": "Reset to default value",
         "reloadNodeTemplates": "Reload Node Templates",
         "removeLinearView": "Remove from Linear View",
         "newWorkflow": "New Workflow",
