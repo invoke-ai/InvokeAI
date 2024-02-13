@@ -2,6 +2,7 @@
 """FastAPI route for model configuration records."""
 
 import pathlib
+import shutil
 from hashlib import sha1
 from random import randbytes
 from typing import Any, Dict, List, Optional, Set
@@ -24,8 +25,10 @@ from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
+    MainCheckpointConfig,
     ModelFormat,
     ModelType,
+    SubModelType,
 )
 from invokeai.backend.model_manager.merge import MergeInterpolationMethod, ModelMerger
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
@@ -318,7 +321,7 @@ async def heuristic_import(
 
 
 @model_manager_v2_router.post(
-    "/import",
+    "/install",
     operation_id="import_model",
     responses={
         201: {"description": "The model imported successfully"},
@@ -488,6 +491,81 @@ async def sync_models_to_config() -> Response:
     """
     ApiDependencies.invoker.services.model_manager.install.sync_to_config()
     return Response(status_code=204)
+
+
+@model_manager_v2_router.put(
+    "/convert/{key}",
+    operation_id="convert_model",
+    responses={
+        200: {"description": "Model converted successfully"},
+        400: {"description": "Bad request"},
+        404: {"description": "Model not found"},
+        409: {"description": "There is already a model registered at this location"},
+    },
+)
+async def convert_model(
+    key: str = Path(description="Unique key of the safetensors main model to convert to diffusers format."),
+) -> AnyModelConfig:
+    """
+    Permanently convert a model into diffusers format, replacing the safetensors version.
+    Note that the key and model hash will change. Use the model configuration record returned
+    by this call to get the new values.
+    """
+    logger = ApiDependencies.invoker.services.logger
+    loader = ApiDependencies.invoker.services.model_manager.load
+    store = ApiDependencies.invoker.services.model_manager.store
+    installer = ApiDependencies.invoker.services.model_manager.install
+
+    try:
+        model_config = store.get_model(key)
+    except UnknownModelException as e:
+        logger.error(str(e))
+        raise HTTPException(status_code=424, detail=str(e))
+
+    if not isinstance(model_config, MainCheckpointConfig):
+        logger.error(f"The model with key {key} is not a main checkpoint model.")
+        raise HTTPException(400, f"The model with key {key} is not a main checkpoint model.")
+
+    # loading the model will convert it into a cached diffusers file
+    loader.load_model_by_config(model_config, submodel_type=SubModelType.Scheduler)
+
+    # Get the path of the converted model from the loader
+    cache_path = loader.convert_cache.cache_path(key)
+    assert cache_path.exists()
+
+    # temporarily rename the original safetensors file so that there is no naming conflict
+    original_name = model_config.name
+    model_config.name = f"{original_name}.DELETE"
+    store.update_model(key, config=model_config)
+
+    # install the diffusers
+    try:
+        new_key = installer.install_path(
+            cache_path,
+            config={
+                "name": original_name,
+                "description": model_config.description,
+                "original_hash": model_config.original_hash,
+                "source": model_config.source,
+            },
+        )
+    except DuplicateModelException as e:
+        logger.error(str(e))
+        raise HTTPException(status_code=409, detail=str(e))
+
+    # get the original metadata
+    if orig_metadata := store.get_metadata(key):
+        store.metadata_store.add_metadata(new_key, orig_metadata)
+
+    # delete the original safetensors file
+    installer.delete(key)
+
+    # delete the cached version
+    shutil.rmtree(cache_path)
+
+    # return the config record for the new diffusers directory
+    new_config: AnyModelConfig = store.get_model(new_key)
+    return new_config
 
 
 @model_manager_v2_router.put(

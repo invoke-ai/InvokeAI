@@ -117,6 +117,11 @@ class AnyModelLoader:
         """Return the RAM cache associated used by the loaders."""
         return self._ram_cache
 
+    @property
+    def convert_cache(self) -> ModelConvertCacheBase:
+        """Return the convert cache associated used by the loaders."""
+        return self._convert_cache
+
     def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
         """
         Return a model given its configuration.
