@@ -109,7 +109,12 @@ export const workflowSlice = createSlice({
         return acc;
       }, []);
 
-      return { ...initialWorkflowState, ...cloneDeep(workflowExtra), originalExposedFieldValues };
+      return {
+        ...initialWorkflowState,
+        ...cloneDeep(workflowExtra),
+        originalExposedFieldValues,
+        mode: state.mode,
+      };
     });
 
     builder.addCase(nodesDeleted, (state, action) => {
