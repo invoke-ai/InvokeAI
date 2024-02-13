@@ -2,7 +2,7 @@
 
 
 from distutils.command import upload
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Literal
 
 from invokeai.app.services.invocation_processor.invocation_processor_common import ProgressImage
 from invokeai.app.services.session_queue.session_queue_common import (
@@ -14,6 +14,8 @@ from invokeai.app.services.session_queue.session_queue_common import (
 from invokeai.app.util.misc import get_timestamp
 from invokeai.backend.model_management.model_manager import ModelInfo
 from invokeai.backend.model_management.models.base import BaseModelType, ModelType, SubModelType
+
+StatusType = Literal['started', 'processing', 'done', 'error']
 
 
 class EventServiceBase:
@@ -502,33 +504,48 @@ class EventServiceBase:
                 "error": error,
             },
         )
-    
-    def emit_upload_started(
+
+    def emit_upload_images(
             self,
-            message: str
+            status: StatusType = 'started',
+            message: Optional[str] = None,
+            progress: Optional[float] = None,
+            processed: Optional[int] = None,
+            total: Optional[int] = None,
+            errors: Optional[List[str]] = None,
+            images_uploading: Optional[List[str]] = None,
+            images_DTOs: Optional[List[dict]] = None
     ) -> None:
         """
-        Emit when a upload job is started.
+        Emit the image upload process to the frontend.
 
-        :param message: A message indacting the upload process of the image started
+        :param status: The status of the queue ('started', 'processing', 'done', 'error').
+        :param message: A message indicating the current state of the upload process.
+        :param progress: The percentage of images out of the total images that were processed.
+        :param processed: The number of images that have been processed so far out of the total images.
+        :param total: The total number of images that are about to be processed.
+        :param errors: A list of error messages encountered during the upload process, if any.
+        :param images_uploading: The list of images currently being uploaded.
+        :param images_DTOs: The list of Image Data Transfer Objects (DTOs) that are done uploading.
         """
-        self.__emit_upload_event(
-            event_name="upload_started",
-            payload={"message": message},
-        )
-    
-    def emit_upload_progress(self, message: str, progress: float, processed: int, total: int) -> None:
-        """
-        Emit when an image was done processing
-
-        :param progress: The precentage of images out of the total images who were processed
-        :param processed: The number of images who have been processed so far out of the total images
-        :param total: The total number of images who are about to be processed
-        """
+        
         payload = {
-            "message": message,
-            "progress": progress,
-            "processed": processed,
-            "total": total
+            "status": status,
+            "message": message
         }
-        self.__emit_upload_event(event_name="upload_progress", payload=payload)
+
+        # Conditionally add fields if they have meaningful values
+        if progress is not None:
+            payload["progress"] = progress
+        if processed is not None:
+            payload["processed"] = processed
+        if total is not None:
+            payload["total"] = total
+        if errors:
+            payload["errors"] = errors
+        if images_uploading:
+            payload["images_uploading"] = images_uploading
+        if images_DTOs:
+            payload["images_DTOs"] = images_DTOs
+
+        self.__emit_upload_event(event_name="upload_images", payload=payload)
