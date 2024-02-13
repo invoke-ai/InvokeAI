@@ -10,7 +10,7 @@ from invokeai.app.services.model_records import ModelRecordServiceBase, UnknownM
 from invokeai.backend.model_manager import AnyModel, AnyModelConfig, BaseModelType, ModelType, SubModelType
 from invokeai.backend.model_manager.load import AnyModelLoader, LoadedModel, ModelCache, ModelConvertCache
 from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
-from invokeai.backend.model_manager.load.model_cache import ModelCacheBase
+from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
 from invokeai.backend.util.logging import InvokeAILogger
 
 from .model_load_base import ModelLoadServiceBase
@@ -45,6 +45,16 @@ class ModelLoadService(ModelLoadServiceBase):
                 max_size=app_config.convert_cache_size,
             ),
         )
+
+    @property
+    def ram_cache(self) -> ModelCacheBase[AnyModel]:
+        """Return the RAM cache used by this loader."""
+        return self._any_loader.ram_cache
+
+    @property
+    def convert_cache(self) -> ModelConvertCacheBase:
+        """Return the checkpoint convert cache used by this loader."""
+        return self._any_loader.convert_cache
 
     def load_model_by_key(
         self,
