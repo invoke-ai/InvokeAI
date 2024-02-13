@@ -208,20 +208,15 @@ export type ClientEmitUnsubscribeQueue = {
   queue_id: string;
 };
 
-/**
- * A `upload_started` socket.io event.
- *
- * @example socket.on(`upload_Started`, (message: UploadStartedEvent) => {toast(message)})
- */
-
-export type UploadStartedEvent = {
-  message: string;
-};
-
-export type UploadProgressEvent = {
-  progress: number;
-  processed: number;
-  total: number;
+export type UploadImagesEvent = {
+  status: 'started' | 'processing' | 'done' | 'error';
+  message?: string;
+  progress?: number;
+  processed?: number;
+  total?: number;
+  errors?: string[];
+  images_uploading?: string[];
+  images_DTOs?: any[];
 };
 
 export type ServerToClientEvents = {
@@ -237,8 +232,7 @@ export type ServerToClientEvents = {
   session_retrieval_error: (payload: SessionRetrievalErrorEvent) => void;
   invocation_retrieval_error: (payload: InvocationRetrievalErrorEvent) => void;
   queue_item_status_changed: (payload: QueueItemStatusChangedEvent) => void;
-  upload_started: (payload: UploadStartedEvent) => void;
-  upload_progress: (payload: UploadProgressEvent) => void;
+  upload_images: (payload: UploadImagesEvent) => void;
 };
 
 export type ClientToServerEvents = {
