@@ -69,8 +69,7 @@ import { addSocketQueueItemStatusChangedEventListener } from './listeners/socket
 import { addSessionRetrievalErrorEventListener } from './listeners/socketio/socketSessionRetrievalError';
 import { addSocketSubscribedEventListener as addSocketSubscribedListener } from './listeners/socketio/socketSubscribed';
 import { addSocketUnsubscribedEventListener as addSocketUnsubscribedListener } from './listeners/socketio/socketUnsubscribed';
-import { addSocketUploadProgressEventListener as addSocketUploadProgressListener } from './listeners/socketio/socketUploadProgress'; // upload progress event
-import { addSocketUploadStartedEventListener as addSocketUploadStartedListener } from './listeners/socketio/socketUploadStarted'; // upload started event
+import { addSocketUploadImagesEventListener as addSocketUploadImagesListener } from './listeners/socketio/socketUploadImages';
 import { addStagingAreaImageSavedListener } from './listeners/stagingAreaImageSaved';
 import { addUpdateAllNodesRequestedListener } from './listeners/updateAllNodesRequested';
 import { addUpscaleRequestedListener } from './listeners/upscaleRequested';
@@ -193,7 +192,4 @@ addUpscaleRequestedListener();
 addDynamicPromptsListener();
 
 // Upload started listener
-addSocketUploadStartedListener();
-
-// Upload progress listener
-addSocketUploadProgressListener();
+addSocketUploadImagesListener();
