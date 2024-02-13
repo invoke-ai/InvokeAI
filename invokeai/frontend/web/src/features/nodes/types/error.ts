@@ -56,3 +56,8 @@ export class FieldParseError extends Error {
     this.name = this.constructor.name;
   }
 }
+
+export class UnableToExtractSchemaNameFromRefError extends FieldParseError {}
+export class UnsupportedArrayItemType extends FieldParseError {}
+export class UnsupportedUnionError extends FieldParseError {}
+export class UnsupportedPrimitiveTypeError extends FieldParseError {}
