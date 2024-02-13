@@ -5,9 +5,9 @@ import { workflowLoaded } from 'features/nodes/store/actions';
 import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesDeleted } from 'features/nodes/store/nodesSlice';
 import type { OriginalFieldValue, WorkflowMode, WorkflowsState as WorkflowState } from 'features/nodes/store/types';
 import type { FieldIdentifier } from 'features/nodes/types/field';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 import type { WorkflowCategory, WorkflowV2 } from 'features/nodes/types/workflow';
 import { cloneDeep, isEqual, uniqBy } from 'lodash-es';
-import { AnyNode, isInvocationNode } from '../types/invocation';
 
 export const blankWorkflow: Omit<WorkflowV2, 'nodes' | 'edges'> = {
   name: '',

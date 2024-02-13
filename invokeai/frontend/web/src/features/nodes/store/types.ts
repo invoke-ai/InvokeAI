@@ -1,4 +1,4 @@
-import { StatefulFieldValue, type FieldType } from 'features/nodes/types/field';
+import type { type FieldType, StatefulFieldValue } from 'features/nodes/types/field';
 import type {
   AnyNode,
   InvocationNodeEdge,
@@ -37,14 +37,14 @@ export type WorkflowMode = 'edit' | 'view';
 export type OriginalFieldValue = {
   fieldName: string;
   nodeId: string;
-  value: StatefulFieldValue
-}
+  value: StatefulFieldValue;
+};
 
 export type WorkflowsState = Omit<WorkflowV2, 'nodes' | 'edges'> & {
   _version: 1;
   isTouched: boolean;
   mode: WorkflowMode;
-  originalExposedFieldValues: OriginalFieldValue[]
+  originalExposedFieldValues: OriginalFieldValue[];
 };
 
 export type NodeTemplatesState = {

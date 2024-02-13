@@ -1,18 +1,18 @@
-import { Flex, Text, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
+import { Flex, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
+import { useFieldInstance } from 'features/nodes/hooks/useFieldData';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
+import { fieldValueReset } from 'features/nodes/store/nodesSlice';
 import { workflowExposedFieldRemoved } from 'features/nodes/store/workflowSlice';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiInfoBold, PiTrashSimpleBold } from 'react-icons/pi';
 
 import EditableFieldTitle from './EditableFieldTitle';
 import FieldTooltipContent from './FieldTooltipContent';
 import InputFieldRenderer from './InputFieldRenderer';
-import { useFieldInstance } from '../../../../../hooks/useFieldData';
-import { fieldValueReset } from '../../../../../store/nodesSlice';
 
 type Props = {
   nodeId: string;

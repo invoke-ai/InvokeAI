@@ -1,15 +1,15 @@
 import { Flex, FormLabel, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import FieldTooltipContent from 'features/nodes/components/flow/nodes/Invocation/fields/FieldTooltipContent';
 import InputFieldRenderer from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldRenderer';
+import { useFieldInstance } from 'features/nodes/hooks/useFieldData';
 import { useFieldLabel } from 'features/nodes/hooks/useFieldLabel';
 import { useFieldTemplateTitle } from 'features/nodes/hooks/useFieldTemplateTitle';
+import { fieldValueReset } from 'features/nodes/store/nodesSlice';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 import { t } from 'i18next';
 import { memo, useCallback, useMemo } from 'react';
 import { PiArrowCounterClockwiseBold, PiInfoBold } from 'react-icons/pi';
-import { useAppDispatch, useAppSelector } from '../../../../../app/store/storeHooks';
-import { useFieldInstance } from '../../../hooks/useFieldData';
-import { fieldValueReset } from '../../../store/nodesSlice';
 
 type Props = {
   nodeId: string;

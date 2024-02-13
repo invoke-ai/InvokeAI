@@ -5,8 +5,9 @@ import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
 import { t } from 'i18next';
+import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
+
 import WorkflowField from './WorkflowField';
-import { useGetOpenAPISchemaQuery } from '../../../../../services/api/endpoints/appInfo';
 
 const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
   return {
