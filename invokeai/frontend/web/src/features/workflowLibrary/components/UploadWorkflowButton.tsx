@@ -22,22 +22,25 @@ const UploadWorkflowButton = () => {
     [loadWorkflowFromFile]
   );
 
-  const { getRootProps } = useDropzone({
+  const { getInputProps, getRootProps } = useDropzone({
     accept: { 'application/json': ['.json'] },
     onDropAccepted,
     noDrag: true,
     multiple: false,
   });
   return (
-    <Button
-      aria-label={t('workflows.uploadWorkflow')}
-      tooltip={t('workflows.uploadWorkflow')}
-      leftIcon={<PiUploadSimpleBold />}
-      {...getRootProps()}
-      pointerEvents="auto"
-    >
-      {t('workflows.uploadWorkflow')}
-    </Button>
+    <>
+      <Button
+        aria-label={t('workflows.uploadWorkflow')}
+        tooltip={t('workflows.uploadWorkflow')}
+        leftIcon={<PiUploadSimpleBold />}
+        {...getRootProps()}
+        pointerEvents="auto"
+      >
+        {t('workflows.uploadWorkflow')}
+      </Button>
+      <input {...getInputProps()} />
+    </>
   );
 };
 
