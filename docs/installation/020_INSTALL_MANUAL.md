@@ -230,13 +230,13 @@ manager, please follow these steps:
         === "local Webserver"
 
             ```bash
-            invokeai --web
+            invokeai-web
             ```
 
         === "Public Webserver"
 
             ```bash
-            invokeai --web --host 0.0.0.0
+            invokeai-web --host 0.0.0.0
             ```
 
         === "CLI"
