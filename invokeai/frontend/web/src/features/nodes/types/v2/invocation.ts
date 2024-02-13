@@ -2,7 +2,7 @@ import type { Edge, Node } from 'reactflow';
 import { z } from 'zod';
 
 import { zClassification, zProgressImage } from './common';
-import { zFieldInputInstance, zFieldInputTemplate, zFieldOutputTemplate } from './field';
+import { zFieldInputInstance, zFieldInputTemplate, zFieldOutputInstance, zFieldOutputTemplate } from './field';
 import { zSemVer } from './semver';
 
 // #region InvocationTemplate
@@ -25,15 +25,16 @@ export type InvocationTemplate = z.infer<typeof zInvocationTemplate>;
 // #region NodeData
 export const zInvocationNodeData = z.object({
   id: z.string().trim().min(1),
-  version: zSemVer,
-  nodePack: z.string().min(1).nullish(),
-  label: z.string(),
-  notes: z.string(),
   type: z.string().trim().min(1),
-  inputs: z.record(zFieldInputInstance),
+  label: z.string(),
   isOpen: z.boolean(),
+  notes: z.string(),
   isIntermediate: z.boolean(),
   useCache: z.boolean(),
+  version: zSemVer,
+  nodePack: z.string().min(1).nullish(),
+  inputs: z.record(zFieldInputInstance),
+  outputs: z.record(zFieldOutputInstance),
 });
 
 export const zNotesNodeData = z.object({
@@ -61,12 +62,11 @@ export type NotesNode = Node<NotesNodeData, 'notes'>;
 export type CurrentImageNode = Node<CurrentImageNodeData, 'current_image'>;
 export type AnyNode = Node<AnyNodeData>;
 
-export const isInvocationNode = (node?: AnyNode | null): node is InvocationNode =>
-  Boolean(node && node.type === 'invocation');
-export const isNotesNode = (node?: AnyNode | null): node is NotesNode => Boolean(node && node.type === 'notes');
-export const isCurrentImageNode = (node?: AnyNode | null): node is CurrentImageNode =>
+export const isInvocationNode = (node?: AnyNode): node is InvocationNode => Boolean(node && node.type === 'invocation');
+export const isNotesNode = (node?: AnyNode): node is NotesNode => Boolean(node && node.type === 'notes');
+export const isCurrentImageNode = (node?: AnyNode): node is CurrentImageNode =>
   Boolean(node && node.type === 'current_image');
-export const isInvocationNodeData = (node?: AnyNodeData | null): node is InvocationNodeData =>
+export const isInvocationNodeData = (node?: AnyNodeData): node is InvocationNodeData =>
   Boolean(node && !['notes', 'current_image'].includes(node.type)); // node.type may be 'notes', 'current_image', or any invocation type
 // #endregion
 

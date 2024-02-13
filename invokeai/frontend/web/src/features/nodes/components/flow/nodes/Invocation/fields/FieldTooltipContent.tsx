@@ -1,5 +1,5 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
-import { useFieldInstance } from 'features/nodes/hooks/useFieldData';
+import { useFieldInputInstance } from 'features/nodes/hooks/useFieldInputInstance';
 import { useFieldTemplate } from 'features/nodes/hooks/useFieldTemplate';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
 import { isFieldInputInstance, isFieldInputTemplate } from 'features/nodes/types/field';
@@ -9,11 +9,11 @@ import { useTranslation } from 'react-i18next';
 interface Props {
   nodeId: string;
   fieldName: string;
-  kind: 'input' | 'output';
+  kind: 'inputs' | 'outputs';
 }
 
 const FieldTooltipContent = ({ nodeId, fieldName, kind }: Props) => {
-  const field = useFieldInstance(nodeId, fieldName);
+  const field = useFieldInputInstance(nodeId, fieldName);
   const fieldTemplate = useFieldTemplate(nodeId, fieldName, kind);
   const isInputTemplate = isFieldInputTemplate(fieldTemplate);
   const fieldTypeName = useFieldTypeName(fieldTemplate?.type);

@@ -1,6 +1,6 @@
 import { parseify } from 'common/util/serialize';
 import type { InvocationTemplate } from 'features/nodes/types/invocation';
-import type { WorkflowV2 } from 'features/nodes/types/workflow';
+import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { isWorkflowInvocationNode } from 'features/nodes/types/workflow';
 import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
 import { t } from 'i18next';
@@ -16,7 +16,7 @@ type WorkflowWarning = {
 };
 
 type ValidateWorkflowResult = {
-  workflow: WorkflowV2;
+  workflow: WorkflowV3;
   warnings: WorkflowWarning[];
 };
 

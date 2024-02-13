@@ -1,6 +1,6 @@
 import type { UnknownAction } from '@reduxjs/toolkit';
 import { isAnyGraphBuilt } from 'features/nodes/store/actions';
-import { nodeTemplatesBuilt } from 'features/nodes/store/nodeTemplatesSlice';
+import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { cloneDeep } from 'lodash-es';
 import { appInfoApi } from 'services/api/endpoints/appInfo';
 import type { Graph } from 'services/api/types';
