@@ -21,7 +21,7 @@ run() {
     printf "%s\n" "$build_args"
   fi
 
-  docker compose build $build_args
+  docker compose build $build_args $service_name
   unset build_args
 
   printf "%s\n" "starting service $service_name"
