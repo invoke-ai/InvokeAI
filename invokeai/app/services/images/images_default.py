@@ -1,15 +1,10 @@
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
-from turtle import color
 from tqdm import tqdm
 
-from typing import Optional, List, Tuple
+from typing import Optional, List
 
-import time
-from datetime import datetime
-
-from PIL import Image
 from PIL.Image import Image as PILImageType
 
 from invokeai.app.invocations.baseinvocation import MetadataField
@@ -35,7 +30,6 @@ from ..image_records.image_records_common import (
 )
 from .images_base import ImageServiceABC
 from .images_common import ImageDTO, image_record_to_dto, ImageUploadData
-
 
 class ImageService(ImageServiceABC):
     __invoker: Invoker
@@ -98,16 +92,29 @@ class ImageService(ImageServiceABC):
         )
     ]
     """
-    # this the images_default create function
-    # TODO: Add additional processing from the process_images method
-    # TODO: Add image record code here for multiple insert as well
-    # TODO: change the return list to image DTOs from None
-    async def create_multiple(self, upload_data_list: List[ImageUploadData]) -> List[ImageDTO]:
-        print("Starting upload process")
+    def create_multiple(self, upload_data_list: List[ImageUploadData]) -> List[ImageDTO]:
+        # Validate image data
+        for image_data in upload_data_list:
+            if image_data.image_origin not in ResourceOrigin:
+                raise InvalidOriginException
+
+            if image_data.image_category not in ImageCategory:
+                raise InvalidImageCategoryException
+
         # Progress bar for processing
         total_images = len(upload_data_list)
         processed_counter = 0  # Local counter
+        errors = []  # Collect errors if any
+        images_DTOs = []  # Collect ImageDTOs for successful uploads
         progress_lock = Lock()
+
+        # Emit the start processing event
+        self.__invoker.services.events.emit_upload_images(
+            status="processing",
+            message=f"Upload job processing {total_images} images...",
+            total=total_images,
+            images_uploading=[data.image_name for data in upload_data_list if data.image_name is not None]
+        )
 
         def process_and_save_image(image_data: ImageUploadData):
             nonlocal processed_counter # refer to the counter in the enclosing scope
@@ -118,9 +125,9 @@ class ImageService(ImageServiceABC):
                 image_data.height = height
                 image_name = self.__invoker.services.names.create_image_name()
                 image_data.image_name = image_name
-                # if image_data.image.size[0] < 5000:  # Example condition: fail if width or height is too large
+                # if image_data.image.size[0] < 5000:  # Fail condition: fail if width or height is too large
                 #     raise Exception("Intentional failure for testing: Image size too large")
-                self.__invoker.services.image_records.save_record_eryx([image_data])
+                self.__invoker.services.image_records.save_many_records([image_data])
 
                 if image_data.board_id is not None:
                     self.__invoker.services.board_image_records.add_image_to_board(board_id=image_data.board_id, image_name=image_data.image_name)
@@ -133,21 +140,18 @@ class ImageService(ImageServiceABC):
                 self._on_changed(image_dto)
 
                 with progress_lock:
-                    processed_counter += 1  # Increment counter
-
-                progress_percentage = (processed_counter / total_images) * 100
-                # Emit progress event
-                self.__invoker.services.events.emit_upload_progress(
-                    message="Image uploaded",
-                    progress=progress_percentage,
-                    processed=processed_counter,
-                    total=total_images
-                )
+                    processed_counter += 1 
 
                 return image_dto
+            except ImageRecordSaveException:
+                self.__invoker.services.logger.error("Failed to save image record")
+                raise
+            except ImageFileSaveException:
+                self.__invoker.services.logger.error("Failed to save image file")
+                raise
             except Exception as e:
                 self.__invoker.services.logger.error(f"Problem processing and saving image: {str(e)}")
-                raise
+                raise e
         
         # Determine the number of available CPU cores
         num_cores = os.cpu_count() or 1
@@ -165,11 +169,67 @@ class ImageService(ImageServiceABC):
                     image_dto = future.result()
                     images_DTOs.append(image_dto)
                     pbar.update(1)  # Update progress bar
+
+                    progress_percentage = (processed_counter / total_images) * 100
+
+                    self.__invoker.services.events.emit_upload_images(
+                        status="processing",
+                        message=f"Processed {processed_counter} out of {total_images} images",
+                        progress=progress_percentage,
+                        processed=processed_counter,
+                        total=total_images,
+                        images_DTOs=[image_dto.model_dump()]
+                    )
                 except Exception as e:
                     self.__invoker.services.logger.error(f"Error in processing image: {str(e)}")
 
         pbar.close()
+        # Emit done event / done with errors event
+        if errors:
+            self.__invoker.services.events.emit_upload_images(
+                status="error",
+                message="Errors encountered during upload",
+                errors=errors
+            )
+        else:
+            self.__invoker.services.events.emit_upload_images(
+                status="done",
+                message="All images uploaded successfully",
+                images_DTOs=[image_dto.model_dump()]
+            )
         return images_DTOs
+    
+    def dispatch_start(self, total_images) -> None:
+        self.__invoker.services.events.emit_upload_images(
+        status="started",
+        message=f"Upload job started for {total_images} images...",
+        total=total_images
+    )
+
+    def dispatch_progress(self, processed_counter, total_images) -> None:
+        progress_percentage = (processed_counter / total_images) * 100
+        self.__invoker.services.events.emit_upload_images(
+            status="processing",
+            message=f"{processed_counter}/{total_images} images uploaded",
+            progress=progress_percentage,
+            processed=processed_counter,
+            total=total_images
+        )
+
+    def dispatch_done(self, message, processed_counter, total_images) -> None:
+        self.__invoker.services.events.emit_upload_images(
+        status="done",
+        message=message,
+        processed=processed_counter,
+        total=total_images
+        )
+
+    def dispatch_error(self, errors) -> None:
+        self.__invoker.services.events.emit_upload_images(
+        status="error",
+        message="Errors encountered during upload",
+        errors=errors
+        )
     
     def create(
         self,
