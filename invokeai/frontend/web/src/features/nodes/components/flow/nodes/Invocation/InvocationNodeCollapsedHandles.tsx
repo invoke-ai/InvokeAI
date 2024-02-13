@@ -1,6 +1,5 @@
 import { useChakraThemeTokens } from 'common/hooks/useChakraThemeTokens';
-import { useNodeData } from 'features/nodes/hooks/useNodeData';
-import { isInvocationNodeData } from 'features/nodes/types/invocation';
+import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
 import { map } from 'lodash-es';
 import type { CSSProperties } from 'react';
 import { memo, useMemo } from 'react';
@@ -13,7 +12,7 @@ interface Props {
 const hiddenHandleStyles: CSSProperties = { visibility: 'hidden' };
 
 const InvocationNodeCollapsedHandles = ({ nodeId }: Props) => {
-  const data = useNodeData(nodeId);
+  const template = useNodeTemplate(nodeId);
   const { base600 } = useChakraThemeTokens();
 
   const dummyHandleStyles: CSSProperties = useMemo(
@@ -37,7 +36,7 @@ const InvocationNodeCollapsedHandles = ({ nodeId }: Props) => {
     [dummyHandleStyles]
   );
 
-  if (!isInvocationNodeData(data)) {
+  if (!template) {
     return null;
   }
 
@@ -45,14 +44,14 @@ const InvocationNodeCollapsedHandles = ({ nodeId }: Props) => {
     <>
       <Handle
         type="target"
-        id={`${data.id}-collapsed-target`}
+        id={`${nodeId}-collapsed-target`}
         isConnectable={false}
         position={Position.Left}
         style={collapsedTargetStyles}
       />
-      {map(data.inputs, (input) => (
+      {map(template.inputs, (input) => (
         <Handle
-          key={`${data.id}-${input.name}-collapsed-input-handle`}
+          key={`${nodeId}-${input.name}-collapsed-input-handle`}
           type="target"
           id={input.name}
           isConnectable={false}
@@ -62,14 +61,14 @@ const InvocationNodeCollapsedHandles = ({ nodeId }: Props) => {
       ))}
       <Handle
         type="source"
-        id={`${data.id}-collapsed-source`}
+        id={`${nodeId}-collapsed-source`}
         isConnectable={false}
         position={Position.Right}
         style={collapsedSourceStyles}
       />
-      {map(data.outputs, (output) => (
+      {map(template.outputs, (output) => (
         <Handle
-          key={`${data.id}-${output.name}-collapsed-output-handle`}
+          key={`${nodeId}-${output.name}-collapsed-output-handle`}
           type="source"
           id={output.name}
           isConnectable={false}

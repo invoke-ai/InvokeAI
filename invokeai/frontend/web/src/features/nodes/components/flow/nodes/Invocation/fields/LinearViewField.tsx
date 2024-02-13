@@ -62,7 +62,7 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
       />
       <Flex flexDir="column" w="full">
         <Flex alignItems="center">
-          <EditableFieldTitle nodeId={nodeId} fieldName={fieldName} kind="input" />
+          <EditableFieldTitle nodeId={nodeId} fieldName={fieldName} kind="inputs" />
           <Spacer />
           {isValueChanged && (
             <IconButton
@@ -75,7 +75,7 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
             />
           )}
           <Tooltip
-            label={<FieldTooltipContent nodeId={nodeId} fieldName={fieldName} kind="input" />}
+            label={<FieldTooltipContent nodeId={nodeId} fieldName={fieldName} kind="inputs" />}
             openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
             placement="top"
           >

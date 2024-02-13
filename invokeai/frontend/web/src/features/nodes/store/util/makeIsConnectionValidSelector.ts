@@ -16,7 +16,7 @@ export const makeConnectionErrorSelector = (
   nodeId: string,
   fieldName: string,
   handleType: HandleType,
-  fieldType?: FieldType
+  fieldType?: FieldType | null
 ) => {
   return createSelector(selectNodesSlice, (nodesSlice) => {
     if (!fieldType) {

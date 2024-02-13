@@ -25,7 +25,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
   const [isHovered, setIsHovered] = useState(false);
 
   const { isConnected, isConnectionInProgress, isConnectionStartField, connectionError, shouldDim } =
-    useConnectionState({ nodeId, fieldName, kind: 'input' });
+    useConnectionState({ nodeId, fieldName, kind: 'inputs' });
 
   const isMissingInput = useMemo(() => {
     if (!fieldTemplate) {
@@ -76,7 +76,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
           <EditableFieldTitle
             nodeId={nodeId}
             fieldName={fieldName}
-            kind="input"
+            kind="inputs"
             isMissingInput={isMissingInput}
             withTooltip
           />
@@ -101,7 +101,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
             <EditableFieldTitle
               nodeId={nodeId}
               fieldName={fieldName}
-              kind="input"
+              kind="inputs"
               isMissingInput={isMissingInput}
               withTooltip
             />

@@ -54,6 +54,5 @@ export const updateNode = (node: InvocationNode, template: InvocationTemplate): 
 
   // Remove any fields that are not in the template
   clone.data.inputs = pick(clone.data.inputs, keys(defaults.data.inputs));
-  clone.data.outputs = pick(clone.data.outputs, keys(defaults.data.outputs));
   return clone;
 };

@@ -22,7 +22,7 @@ import FieldTooltipContent from './FieldTooltipContent';
 interface Props {
   nodeId: string;
   fieldName: string;
-  kind: 'input' | 'output';
+  kind: 'inputs' | 'outputs';
   isMissingInput?: boolean;
   withTooltip?: boolean;
 }
@@ -58,7 +58,7 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
 
   return (
     <Tooltip
-      label={withTooltip ? <FieldTooltipContent nodeId={nodeId} fieldName={fieldName} kind="input" /> : undefined}
+      label={withTooltip ? <FieldTooltipContent nodeId={nodeId} fieldName={fieldName} kind="inputs" /> : undefined}
       openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
     >
       <Editable

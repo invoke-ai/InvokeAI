@@ -6,19 +6,18 @@ import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableCon
 import NotesTextarea from 'features/nodes/components/flow/nodes/Invocation/NotesTextarea';
 import { useNodeNeedsUpdate } from 'features/nodes/hooks/useNodeNeedsUpdate';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import EditableNodeTitle from './details/EditableNodeTitle';
 
-const selector = createMemoizedSelector(selectNodesSlice, selectNodeTemplatesSlice, (nodes, nodeTemplates) => {
+const selector = createMemoizedSelector(selectNodesSlice, (nodes) => {
   const lastSelectedNodeId = nodes.selectedNodes[nodes.selectedNodes.length - 1];
 
   const lastSelectedNode = nodes.nodes.find((node) => node.id === lastSelectedNodeId);
 
-  const lastSelectedNodeTemplate = lastSelectedNode ? nodeTemplates.templates[lastSelectedNode.data.type] : undefined;
+  const lastSelectedNodeTemplate = lastSelectedNode ? nodes.templates[lastSelectedNode.data.type] : undefined;
 
   if (!isInvocationNode(lastSelectedNode) || !lastSelectedNodeTemplate) {
     return;
