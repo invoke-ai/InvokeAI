@@ -99,8 +99,8 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
       <ChangeBoardModal />
       <DynamicPromptsModal />
       <Toaster />
-      <UploadProgressToastManager />{' '}
       {/* "custom" toast for the Upload progress toast */}
+      <UploadProgressToastManager />{' '}
       <PreselectedImage selectedImage={selectedImage} />
     </ErrorBoundary>
   );
