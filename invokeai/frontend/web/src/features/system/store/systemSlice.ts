@@ -1,7 +1,8 @@
-import type { ToastId, UseToastOptions } from '@chakra-ui/react';
+import type { ToastId } from '@chakra-ui/react';
+import type { UseToastOptions } from '@invoke-ai/ui-library';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import { calculateStepPercentage } from 'features/system/util/calculateStepPercentage';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
@@ -224,8 +225,6 @@ export const {
   setUploadProgressToastId,
 } = systemSlice.actions;
 
-export default systemSlice.reducer;
-
 const isAnyServerError = isAnyOf(
   socketInvocationError,
   socketSessionRetrievalError,
@@ -240,4 +239,11 @@ export const migrateSystemState = (state: any): any => {
     state._version = 1;
   }
   return state;
+};
+
+export const systemPersistConfig: PersistConfig<SystemState> = {
+  name: systemSlice.name,
+  initialState: initialSystemState,
+  migrate: migrateSystemState,
+  persistDenylist: ['isConnected', 'denoiseProgress', 'status'],
 };
