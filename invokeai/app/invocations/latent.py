@@ -518,7 +518,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     def get_conditioning_data(
         self,
         context: InvocationContext,
-        unet,
+        unet: UNet2DConditionModel,
         latent_height: int,
         latent_width: int,
     ) -> TextConditioningData:
