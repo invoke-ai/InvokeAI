@@ -1,28 +1,22 @@
-import type { ChakraProps } from '@chakra-ui/react';
+import type { ChakraProps } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
+import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { loraAdded, selectLoraSlice } from 'features/lora/store/loraSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
 
-const selectAddedLoRAs = createMemoizedSelector(
-  selectLoraSlice,
-  (lora) => lora.loras
-);
+const selectAddedLoRAs = createMemoizedSelector(selectLoraSlice, (lora) => lora.loras);
 
 const LoRASelect = () => {
   const dispatch = useAppDispatch();
   const { data, isLoading } = useGetLoRAModelsQuery();
   const { t } = useTranslation();
   const addedLoRAs = useAppSelector(selectAddedLoRAs);
-  const currentBaseModel = useAppSelector(
-    (s) => s.generation.model?.base_model
-  );
+  const currentBaseModel = useAppSelector((s) => s.generation.model?.base_model);
 
   const getIsDisabled = (lora: LoRAModelConfigEntity): boolean => {
     const isCompatible = currentBaseModel === lora.base_model;
@@ -41,7 +35,7 @@ const LoRASelect = () => {
     [dispatch]
   );
 
-  const { options, onChange } = useGroupedModelInvSelect({
+  const { options, onChange } = useGroupedModelCombobox({
     modelEntities: data,
     getIsDisabled,
     onChange: _onChange,
@@ -62,8 +56,9 @@ const LoRASelect = () => {
   const noOptionsMessage = useCallback(() => t('models.noMatchingLoRAs'), [t]);
 
   return (
-    <InvControl label={t('models.lora')} isDisabled={!options.length}>
-      <InvSelect
+    <FormControl isDisabled={!options.length}>
+      <FormLabel>{t('models.lora')} </FormLabel>
+      <Combobox
         placeholder={placeholder}
         value={null}
         options={options}
@@ -72,7 +67,7 @@ const LoRASelect = () => {
         data-testid="add-lora"
         sx={selectStyles}
       />
-    </InvControl>
+    </FormControl>
   );
 };
 

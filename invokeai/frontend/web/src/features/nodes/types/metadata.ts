@@ -28,9 +28,7 @@ export type LoRAMetadataItem = z.infer<typeof zLoRAMetadataItem>;
 export type ControlNetMetadataItem = z.infer<typeof zControlNetMetadataItem>;
 export type IPAdapterMetadataItem = z.infer<typeof zIPAdapterMetadataItem>;
 export type T2IAdapterMetadataItem = z.infer<typeof zT2IAdapterMetadataItem>;
-export type SDXLRefinerModelMetadataItem = z.infer<
-  typeof zSDXLRefinerModelMetadataItem
->;
+export type SDXLRefinerModelMetadataItem = z.infer<typeof zSDXLRefinerModelMetadataItem>;
 export type ModelMetadataItem = z.infer<typeof zModelMetadataItem>;
 export type VAEModelMetadataItem = z.infer<typeof zVAEModelMetadataItem>;
 // #endregion

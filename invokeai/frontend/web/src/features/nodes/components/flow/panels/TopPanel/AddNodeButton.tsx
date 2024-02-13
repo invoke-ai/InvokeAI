@@ -1,5 +1,5 @@
+import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { addNodePopoverOpened } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,7 @@ const AddNodeButton = () => {
   }, [dispatch]);
 
   return (
-    <InvIconButton
+    <IconButton
       tooltip={t('nodes.addNodeToolTip')}
       aria-label={t('nodes.addNode')}
       icon={<PiPlusBold />}

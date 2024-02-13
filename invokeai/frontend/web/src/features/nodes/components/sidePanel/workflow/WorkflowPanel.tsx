@@ -1,11 +1,4 @@
-import {
-  Flex,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
-} from '@chakra-ui/react';
+import { Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -16,15 +9,7 @@ import WorkflowLinearTab from './WorkflowLinearTab';
 const WorkflowPanel = () => {
   const { t } = useTranslation();
   return (
-    <Flex
-      layerStyle="first"
-      flexDir="column"
-      w="full"
-      h="full"
-      borderRadius="base"
-      p={2}
-      gap={2}
-    >
+    <Flex layerStyle="first" flexDir="column" w="full" h="full" borderRadius="base" p={2} gap={2}>
       <Tabs variant="line" display="flex" w="full" h="full" flexDir="column">
         <TabList>
           <Tab>{t('common.linear')}</Tab>

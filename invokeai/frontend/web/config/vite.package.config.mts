@@ -22,12 +22,13 @@ export const packageConfig: UserConfig = {
       fileName: (format) => `invoke-ai-ui.${format}.js`,
     },
     rollupOptions: {
-      external: ['react', 'react-dom', '@emotion/react', '@chakra-ui/react'],
+      external: ['react', 'react-dom', '@emotion/react', '@chakra-ui/react', '@invoke-ai/ui-library'],
       output: {
         globals: {
           react: 'React',
           'react-dom': 'ReactDOM',
           '@emotion/react': 'EmotionReact',
+          '@invoke-ai/ui-library': 'UiLibrary',
         },
       },
     },

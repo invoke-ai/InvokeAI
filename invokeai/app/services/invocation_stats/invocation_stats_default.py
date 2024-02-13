@@ -1,5 +1,7 @@
+import json
 import time
 from contextlib import contextmanager
+from pathlib import Path
 
 import psutil
 import torch
@@ -7,10 +9,19 @@ import torch
 import invokeai.backend.util.logging as logger
 from invokeai.app.invocations.baseinvocation import BaseInvocation
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.item_storage.item_storage_common import ItemNotFoundError
 from invokeai.backend.model_management.model_cache import CacheStats
 
 from .invocation_stats_base import InvocationStatsServiceBase
-from .invocation_stats_common import GraphExecutionStats, NodeExecutionStats
+from .invocation_stats_common import (
+    GESStatsNotFoundError,
+    GraphExecutionStats,
+    GraphExecutionStatsSummary,
+    InvocationStatsSummary,
+    ModelCacheStatsSummary,
+    NodeExecutionStats,
+    NodeExecutionStatsSummary,
+)
 
 # Size of 1GB in bytes.
 GB = 2**30
@@ -53,7 +64,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
         finally:
             # Record state after the invocation.
             node_stats = NodeExecutionStats(
-                invocation_type=invocation.type,
+                invocation_type=invocation.get_type(),
                 start_time=start_time,
                 end_time=time.time(),
                 start_ram_gb=start_ram / GB,
@@ -68,11 +79,11 @@ class InvocationStatsService(InvocationStatsServiceBase):
         This shouldn't be necessary, but we don't have totally robust upstream handling of graph completions/errors, so
         for now we call this function periodically to prevent them from accumulating.
         """
-        to_prune = []
+        to_prune: list[str] = []
         for graph_execution_state_id in self._stats:
             try:
                 graph_execution_state = self._invoker.services.graph_execution_manager.get(graph_execution_state_id)
-            except Exception:
+            except ItemNotFoundError:
                 # TODO(ryand): What would cause this? Should this exception just be allowed to propagate?
                 logger.warning(f"Failed to get graph state for {graph_execution_state_id}.")
                 continue
@@ -95,31 +106,66 @@ class InvocationStatsService(InvocationStatsServiceBase):
             del self._stats[graph_execution_state_id]
             del self._cache_stats[graph_execution_state_id]
         except KeyError as e:
-            logger.warning(f"Attempted to clear statistics for unknown graph {graph_execution_state_id}: {e}.")
+            raise GESStatsNotFoundError(
+                f"Attempted to clear statistics for unknown graph {graph_execution_state_id}: {e}."
+            ) from e
 
-    def log_stats(self, graph_execution_state_id: str):
+    def get_stats(self, graph_execution_state_id: str) -> InvocationStatsSummary:
+        graph_stats_summary = self._get_graph_summary(graph_execution_state_id)
+        node_stats_summaries = self._get_node_summaries(graph_execution_state_id)
+        model_cache_stats_summary = self._get_model_cache_summary(graph_execution_state_id)
+        vram_usage_gb = torch.cuda.memory_allocated() / GB if torch.cuda.is_available() else None
+
+        return InvocationStatsSummary(
+            graph_stats=graph_stats_summary,
+            model_cache_stats=model_cache_stats_summary,
+            node_stats=node_stats_summaries,
+            vram_usage_gb=vram_usage_gb,
+        )
+
+    def log_stats(self, graph_execution_state_id: str) -> None:
+        stats = self.get_stats(graph_execution_state_id)
+        logger.info(str(stats))
+
+    def dump_stats(self, graph_execution_state_id: str, output_path: Path) -> None:
+        stats = self.get_stats(graph_execution_state_id)
+        with open(output_path, "w") as f:
+            f.write(json.dumps(stats.as_dict(), indent=2))
+
+    def _get_model_cache_summary(self, graph_execution_state_id: str) -> ModelCacheStatsSummary:
         try:
-            graph_stats = self._stats[graph_execution_state_id]
             cache_stats = self._cache_stats[graph_execution_state_id]
         except KeyError as e:
-            logger.warning(f"Attempted to log statistics for unknown graph {graph_execution_state_id}: {e}.")
-            return
+            raise GESStatsNotFoundError(
+                f"Attempted to get model cache statistics for unknown graph {graph_execution_state_id}: {e}."
+            ) from e
 
-        log = graph_stats.get_pretty_log(graph_execution_state_id)
+        return ModelCacheStatsSummary(
+            cache_hits=cache_stats.hits,
+            cache_misses=cache_stats.misses,
+            high_water_mark_gb=cache_stats.high_watermark / GB,
+            cache_size_gb=cache_stats.cache_size / GB,
+            total_usage_gb=sum(list(cache_stats.loaded_model_sizes.values())) / GB,
+            models_cached=cache_stats.in_cache,
+            models_cleared=cache_stats.cleared,
+        )
 
-        hwm = cache_stats.high_watermark / GB
-        tot = cache_stats.cache_size / GB
-        loaded = sum(list(cache_stats.loaded_model_sizes.values())) / GB
-        log += f"RAM used to load models: {loaded:4.2f}G\n"
-        if torch.cuda.is_available():
-            log += f"VRAM in use: {(torch.cuda.memory_allocated() / GB):4.3f}G\n"
-        log += "RAM cache statistics:\n"
-        log += f"   Model cache hits: {cache_stats.hits}\n"
-        log += f"   Model cache misses: {cache_stats.misses}\n"
-        log += f"   Models cached: {cache_stats.in_cache}\n"
-        log += f"   Models cleared from cache: {cache_stats.cleared}\n"
-        log += f"   Cache high water mark: {hwm:4.2f}/{tot:4.2f}G\n"
-        logger.info(log)
+    def _get_graph_summary(self, graph_execution_state_id: str) -> GraphExecutionStatsSummary:
+        try:
+            graph_stats = self._stats[graph_execution_state_id]
+        except KeyError as e:
+            raise GESStatsNotFoundError(
+                f"Attempted to get graph statistics for unknown graph {graph_execution_state_id}: {e}."
+            ) from e
 
-        del self._stats[graph_execution_state_id]
-        del self._cache_stats[graph_execution_state_id]
+        return graph_stats.get_graph_stats_summary(graph_execution_state_id)
+
+    def _get_node_summaries(self, graph_execution_state_id: str) -> list[NodeExecutionStatsSummary]:
+        try:
+            graph_stats = self._stats[graph_execution_state_id]
+        except KeyError as e:
+            raise GESStatsNotFoundError(
+                f"Attempted to get node statistics for unknown graph {graph_execution_state_id}: {e}."
+            ) from e
+
+        return graph_stats.get_node_stats_summaries()

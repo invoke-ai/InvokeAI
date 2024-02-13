@@ -1,7 +1,7 @@
+import type { ComboboxOnChange } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type { InvSelectOnChange } from 'common/components/InvSelect/types';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setScheduler } from 'features/parameters/store/generationSlice';
 import { SCHEDULER_OPTIONS } from 'features/parameters/types/constants';
 import { isParameterScheduler } from 'features/parameters/types/parameterSchemas';
@@ -13,7 +13,7 @@ const ParamScheduler = () => {
   const { t } = useTranslation();
   const scheduler = useAppSelector((s) => s.generation.scheduler);
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!isParameterScheduler(v?.value)) {
         return;
@@ -23,19 +23,15 @@ const ParamScheduler = () => {
     [dispatch]
   );
 
-  const value = useMemo(
-    () => SCHEDULER_OPTIONS.find((o) => o.value === scheduler),
-    [scheduler]
-  );
+  const value = useMemo(() => SCHEDULER_OPTIONS.find((o) => o.value === scheduler), [scheduler]);
 
   return (
-    <InvControl label={t('parameters.scheduler')} feature="paramScheduler">
-      <InvSelect
-        value={value}
-        options={SCHEDULER_OPTIONS}
-        onChange={onChange}
-      />
-    </InvControl>
+    <FormControl>
+      <InformationalPopover feature="paramScheduler">
+        <FormLabel>{t('parameters.scheduler')}</FormLabel>
+      </InformationalPopover>
+      <Combobox value={value} options={SCHEDULER_OPTIONS} onChange={onChange} />
+    </FormControl>
   );
 };
 

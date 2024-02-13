@@ -9,10 +9,7 @@ export const addSessionRetrievalErrorEventListener = () => {
   startAppListening({
     actionCreator: socketSessionRetrievalError,
     effect: (action) => {
-      log.error(
-        action.payload,
-        `Session retrieval error (${action.payload.data.graph_execution_state_id})`
-      );
+      log.error(action.payload, `Session retrieval error (${action.payload.data.graph_execution_state_id})`);
     },
   });
 };

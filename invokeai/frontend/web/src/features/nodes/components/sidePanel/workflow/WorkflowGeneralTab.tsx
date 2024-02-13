@@ -1,10 +1,7 @@
-import { Flex } from '@chakra-ui/react';
+import type { FormControlProps } from '@invoke-ai/ui-library';
+import { Flex, FormControl, FormControlGroup, FormLabel, Input, Textarea } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
-import { InvInput } from 'common/components/InvInput/InvInput';
-import { InvTextarea } from 'common/components/InvTextarea/InvTextarea';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import {
   selectWorkflowSlice,
@@ -35,8 +32,7 @@ const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
 });
 
 const WorkflowGeneralTab = () => {
-  const { author, name, description, tags, version, contact, notes } =
-    useAppSelector(selector);
+  const { author, name, description, tags, version, contact, notes } = useAppSelector(selector);
   const dispatch = useAppDispatch();
 
   const handleChangeName = useCallback(
@@ -88,51 +84,47 @@ const WorkflowGeneralTab = () => {
   return (
     <ScrollableContent>
       <Flex flexDir="column" alignItems="flex-start" gap={2} h="full">
-        <InvControlGroup orientation="vertical">
+        <FormControlGroup orientation="vertical" formControlProps={formControlProps}>
           <Flex gap={2} w="full">
-            <InvControl label={t('nodes.workflowName')}>
-              <InvInput value={name} onChange={handleChangeName} />
-            </InvControl>
-            <InvControl label={t('nodes.workflowVersion')}>
-              <InvInput value={version} onChange={handleChangeVersion} />
-            </InvControl>
+            <FormControl>
+              <FormLabel>{t('nodes.workflowName')}</FormLabel>
+              <Input value={name} onChange={handleChangeName} />
+            </FormControl>
+            <FormControl>
+              <FormLabel>{t('nodes.workflowVersion')}</FormLabel>
+              <Input value={version} onChange={handleChangeVersion} />
+            </FormControl>
           </Flex>
           <Flex gap={2} w="full">
-            <InvControl label={t('nodes.workflowAuthor')}>
-              <InvInput value={author} onChange={handleChangeAuthor} />
-            </InvControl>
-            <InvControl label={t('nodes.workflowContact')}>
-              <InvInput value={contact} onChange={handleChangeContact} />
-            </InvControl>
+            <FormControl>
+              <FormLabel>{t('nodes.workflowAuthor')}</FormLabel>
+              <Input value={author} onChange={handleChangeAuthor} />
+            </FormControl>
+            <FormControl>
+              <FormLabel>{t('nodes.workflowContact')}</FormLabel>
+              <Input value={contact} onChange={handleChangeContact} />
+            </FormControl>
           </Flex>
-          <InvControl label={t('nodes.workflowTags')}>
-            <InvInput value={tags} onChange={handleChangeTags} />
-          </InvControl>
-        </InvControlGroup>
-        <InvControl
-          label={t('nodes.workflowDescription')}
-          orientation="vertical"
-        >
-          <InvTextarea
-            onChange={handleChangeDescription}
-            value={description}
-            fontSize="sm"
-            resize="none"
-            rows={3}
-          />
-        </InvControl>
-        <InvControl label={t('nodes.workflowNotes')} orientation="vertical">
-          <InvTextarea
-            onChange={handleChangeNotes}
-            value={notes}
-            fontSize="sm"
-            resize="none"
-            rows={10}
-          />
-        </InvControl>
+          <FormControl>
+            <FormLabel>{t('nodes.workflowTags')}</FormLabel>
+            <Input value={tags} onChange={handleChangeTags} />
+          </FormControl>
+          <FormControl>
+            <FormLabel>{t('nodes.workflowDescription')}</FormLabel>
+            <Textarea onChange={handleChangeDescription} value={description} fontSize="sm" resize="none" rows={3} />
+          </FormControl>
+          <FormControl>
+            <FormLabel>{t('nodes.workflowNotes')}</FormLabel>
+            <Textarea onChange={handleChangeNotes} value={notes} fontSize="sm" resize="none" rows={10} />
+          </FormControl>
+        </FormControlGroup>
       </Flex>
     </ScrollableContent>
   );
 };
 
 export default memo(WorkflowGeneralTab);
+
+const formControlProps: FormControlProps = {
+  flexShrink: 0,
+};

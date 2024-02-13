@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import { uniqBy } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -42,10 +42,7 @@ export const gallerySlice = createSlice({
     autoAssignBoardOnClickChanged: (state, action: PayloadAction<boolean>) => {
       state.autoAssignBoardOnClick = action.payload;
     },
-    boardIdSelected: (
-      state,
-      action: PayloadAction<{ boardId: BoardId; selectedImageName?: string }>
-    ) => {
+    boardIdSelected: (state, action: PayloadAction<{ boardId: BoardId; selectedImageName?: string }>) => {
       state.selectedBoardId = action.payload.boardId;
       state.galleryView = 'images';
       state.offset = 0;
@@ -95,19 +92,16 @@ export const gallerySlice = createSlice({
         state.autoAddBoardId = 'none';
       }
     });
-    builder.addMatcher(
-      boardsApi.endpoints.listAllBoards.matchFulfilled,
-      (state, action) => {
-        const boards = action.payload;
-        if (!state.autoAddBoardId) {
-          return;
-        }
-
-        if (!boards.map((b) => b.board_id).includes(state.autoAddBoardId)) {
-          state.autoAddBoardId = 'none';
-        }
+    builder.addMatcher(boardsApi.endpoints.listAllBoards.matchFulfilled, (state, action) => {
+      const boards = action.payload;
+      if (!state.autoAddBoardId) {
+        return;
       }
-    );
+
+      if (!boards.map((b) => b.board_id).includes(state.autoAddBoardId)) {
+        state.autoAddBoardId = 'none';
+      }
+    });
   },
 });
 
@@ -126,8 +120,6 @@ export const {
   resetUploadedImages,
 } = gallerySlice.actions;
 
-export default gallerySlice.reducer;
-
 const isAnyBoardDeleted = isAnyOf(
   imagesApi.endpoints.deleteBoard.matchFulfilled,
   imagesApi.endpoints.deleteBoardAndImages.matchFulfilled
@@ -141,4 +133,11 @@ export const migrateGalleryState = (state: any): any => {
     state._version = 1;
   }
   return state;
+};
+
+export const galleryPersistConfig: PersistConfig<GalleryState> = {
+  name: gallerySlice.name,
+  initialState: initialGalleryState,
+  migrate: migrateGalleryState,
+  persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'offset', 'limit'],
 };

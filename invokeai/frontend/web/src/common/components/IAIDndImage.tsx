@@ -1,26 +1,11 @@
-import type {
-  ChakraProps,
-  FlexProps,
-  SystemStyleObject,
-} from '@chakra-ui/react';
-import { Flex, Icon, Image } from '@chakra-ui/react';
-import {
-  IAILoadingImageFallback,
-  IAINoContentFallback,
-} from 'common/components/IAIImageFallback';
+import type { ChakraProps, FlexProps, SystemStyleObject } from '@invoke-ai/ui-library';
+import { Flex, Icon, Image } from '@invoke-ai/ui-library';
+import { IAILoadingImageFallback, IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
-import type {
-  TypesafeDraggableData,
-  TypesafeDroppableData,
-} from 'features/dnd/types';
+import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import ImageContextMenu from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
-import type {
-  MouseEvent,
-  ReactElement,
-  ReactNode,
-  SyntheticEvent,
-} from 'react';
+import type { MouseEvent, ReactElement, ReactNode, SyntheticEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { PiImageBold, PiUploadSimpleBold } from 'react-icons/pi';
 import type { ImageDTO, PostUploadAction } from 'services/api/types';
@@ -165,14 +150,8 @@ const IAIDndImage = (props: IAIDndImageProps) => {
               <Image
                 src={thumbnail ? imageDTO.thumbnail_url : imageDTO.image_url}
                 fallbackStrategy="beforeLoadOrError"
-                fallbackSrc={
-                  useThumbailFallback ? imageDTO.thumbnail_url : undefined
-                }
-                fallback={
-                  useThumbailFallback ? undefined : (
-                    <IAILoadingImageFallback image={imageDTO} />
-                  )
-                }
+                fallbackSrc={useThumbailFallback ? imageDTO.thumbnail_url : undefined}
+                fallback={useThumbailFallback ? undefined : <IAILoadingImageFallback image={imageDTO} />}
                 onError={onError}
                 draggable={false}
                 w={imageDTO.width}
@@ -183,13 +162,8 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                 sx={imageSx}
                 data-testid={dataTestId}
               />
-              {withMetadataOverlay && (
-                <ImageMetadataOverlay imageDTO={imageDTO} />
-              )}
-              <SelectionOverlay
-                isSelected={isSelected}
-                isHovered={withHoverOverlay ? isHovered : false}
-              />
+              {withMetadataOverlay && <ImageMetadataOverlay imageDTO={imageDTO} />}
+              <SelectionOverlay isSelected={isSelected} isHovered={withHoverOverlay ? isHovered : false} />
             </Flex>
           )}
           {!imageDTO && !isUploadDisabled && (
@@ -202,20 +176,10 @@ const IAIDndImage = (props: IAIDndImageProps) => {
           )}
           {!imageDTO && isUploadDisabled && noContentFallback}
           {imageDTO && !isDragDisabled && (
-            <IAIDraggable
-              data={draggableData}
-              disabled={isDragDisabled || !imageDTO}
-              onClick={onClick}
-            />
+            <IAIDraggable data={draggableData} disabled={isDragDisabled || !imageDTO} onClick={onClick} />
           )}
           {children}
-          {!isDropDisabled && (
-            <IAIDroppable
-              data={droppableData}
-              disabled={isDropDisabled}
-              dropLabel={dropLabel}
-            />
-          )}
+          {!isDropDisabled && <IAIDroppable data={droppableData} disabled={isDropDisabled} dropLabel={dropLabel} />}
         </Flex>
       )}
     </ImageContextMenu>

@@ -1,4 +1,4 @@
-import { Progress } from '@chakra-ui/react';
+import { Progress } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
@@ -22,9 +22,7 @@ const ProgressBar = () => {
     <Progress
       value={value}
       aria-label={t('accessibility.invokeProgressBar')}
-      isIndeterminate={
-        isConnected && Boolean(queueStatus?.queue.in_progress) && !hasSteps
-      }
+      isIndeterminate={isConnected && Boolean(queueStatus?.queue.in_progress) && !hasSteps}
       h={2}
       w="full"
       colorScheme="invokeBlue"

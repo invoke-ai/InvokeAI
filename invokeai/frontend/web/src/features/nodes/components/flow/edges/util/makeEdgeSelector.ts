@@ -16,18 +16,12 @@ export const makeEdgeSelector = (
     const sourceNode = nodes.nodes.find((node) => node.id === source);
     const targetNode = nodes.nodes.find((node) => node.id === target);
 
-    const isInvocationToInvocationEdge =
-      isInvocationNode(sourceNode) && isInvocationNode(targetNode);
+    const isInvocationToInvocationEdge = isInvocationNode(sourceNode) && isInvocationNode(targetNode);
 
     const isSelected = sourceNode?.selected || targetNode?.selected || selected;
-    const sourceType = isInvocationToInvocationEdge
-      ? sourceNode?.data?.outputs[sourceHandleId || '']?.type
-      : undefined;
+    const sourceType = isInvocationToInvocationEdge ? sourceNode?.data?.outputs[sourceHandleId || '']?.type : undefined;
 
-    const stroke =
-      sourceType && nodes.shouldColorEdges
-        ? getFieldColor(sourceType)
-        : colorTokenToCssVar('base.500');
+    const stroke = sourceType && nodes.shouldColorEdges ? getFieldColor(sourceType) : colorTokenToCssVar('base.500');
 
     return {
       isSelected,

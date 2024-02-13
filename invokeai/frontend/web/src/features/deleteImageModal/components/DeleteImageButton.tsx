@@ -1,11 +1,11 @@
+import type { IconButtonProps } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import type { InvIconButtonProps } from 'common/components/InvIconButton/types';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 
-type DeleteImageButtonProps = Omit<InvIconButtonProps, 'aria-label'> & {
+type DeleteImageButtonProps = Omit<IconButtonProps, 'aria-label'> & {
   onClick: () => void;
 };
 
@@ -15,7 +15,7 @@ export const DeleteImageButton = memo((props: DeleteImageButtonProps) => {
   const isConnected = useAppSelector((s) => s.system.isConnected);
 
   return (
-    <InvIconButton
+    <IconButton
       onClick={onClick}
       icon={<PiTrashSimpleBold />}
       tooltip={`${t('gallery.deleteImage')} (Del)`}

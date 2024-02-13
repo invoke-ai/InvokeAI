@@ -1,7 +1,6 @@
-import type { ChakraProps } from '@chakra-ui/react';
-import { Box, Flex, Heading, Image } from '@chakra-ui/react';
+import type { ChakraProps } from '@invoke-ai/ui-library';
+import { Box, Flex, Heading, Image, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvText } from 'common/components/InvText/wrapper';
 import type { TypesafeDraggableData } from 'features/dnd/types';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -54,7 +53,7 @@ const DragPreview = (props: OverlayDragImageProps) => {
         whiteSpace="nowrap"
         fontSize="sm"
       >
-        <InvText>{field.label || fieldTemplate.title}</InvText>
+        <Text>{field.label || fieldTemplate.title}</Text>
       </Box>
     );
   }
@@ -62,21 +61,8 @@ const DragPreview = (props: OverlayDragImageProps) => {
   if (props.dragData.payloadType === 'IMAGE_DTO') {
     const { thumbnail_url, width, height } = props.dragData.payload.imageDTO;
     return (
-      <Box
-        position="relative"
-        width="full"
-        height="full"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-      >
-        <Image
-          sx={imageStyles}
-          objectFit="contain"
-          src={thumbnail_url}
-          width={width}
-          height={height}
-        />
+      <Box position="relative" width="full" height="full" display="flex" alignItems="center" justifyContent="center">
+        <Image sx={imageStyles} objectFit="contain" src={thumbnail_url} width={width} height={height} />
       </Box>
     );
   }

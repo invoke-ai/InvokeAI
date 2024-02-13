@@ -9,18 +9,14 @@ import { useMemo } from 'react';
 export const useNodeNeedsUpdate = (nodeId: string) => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(
-        selectNodesSlice,
-        selectNodeTemplatesSlice,
-        (nodes, nodeTemplates) => {
-          const node = nodes.nodes.find((node) => node.id === nodeId);
-          const template = nodeTemplates.templates[node?.data.type ?? ''];
-          if (isInvocationNode(node) && template) {
-            return getNeedsUpdate(node, template);
-          }
-          return false;
+      createMemoizedSelector(selectNodesSlice, selectNodeTemplatesSlice, (nodes, nodeTemplates) => {
+        const node = nodes.nodes.find((node) => node.id === nodeId);
+        const template = nodeTemplates.templates[node?.data.type ?? ''];
+        if (isInvocationNode(node) && template) {
+          return getNeedsUpdate(node, template);
         }
-      ),
+        return false;
+      }),
     [nodeId]
   );
 

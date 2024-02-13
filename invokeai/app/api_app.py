@@ -3,6 +3,7 @@
 # values from the command line or config file.
 import sys
 
+from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 from invokeai.version.invokeai_version import __version__
 
 from .services.config import InvokeAIAppConfig
@@ -27,8 +28,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     from fastapi.middleware.gzip import GZipMiddleware
     from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
     from fastapi.openapi.utils import get_openapi
-    from fastapi.responses import FileResponse, HTMLResponse
-    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import HTMLResponse
     from fastapi_events.handlers.local import local_handler
     from fastapi_events.middleware import EventHandlerASGIMiddleware
     from pydantic.json_schema import models_json_schema
@@ -221,19 +221,13 @@ def overridden_redoc() -> HTMLResponse:
 
 web_root_path = Path(list(web_dir.__path__)[0])
 
-# Only serve the UI if we it has a build
-if (web_root_path / "dist").exists():
-    # Cannot add headers to StaticFiles, so we must serve index.html with a custom route
-    # Add cache-control: no-store header to prevent caching of index.html, which leads to broken UIs at release
-    @app.get("/", include_in_schema=False, name="ui_root")
-    def get_index() -> FileResponse:
-        return FileResponse(Path(web_root_path, "dist/index.html"), headers={"Cache-Control": "no-store"})
-
-    # Must mount *after* the other routes else it borks em
-    app.mount("/assets", StaticFiles(directory=Path(web_root_path, "dist/assets/")), name="assets")
-    app.mount("/locales", StaticFiles(directory=Path(web_root_path, "dist/locales/")), name="locales")
-
-app.mount("/static", StaticFiles(directory=Path(web_root_path, "static/")), name="static")  # docs favicon is in here
+try:
+    app.mount("/", NoCacheStaticFiles(directory=Path(web_root_path, "dist"), html=True), name="ui")
+except RuntimeError:
+    logger.warn(f"No UI found at {web_root_path}/dist, skipping UI mount")
+app.mount(
+    "/static", NoCacheStaticFiles(directory=Path(web_root_path, "static/")), name="static"
+)  # docs favicon is in here
 
 
 def invoke_api() -> None:

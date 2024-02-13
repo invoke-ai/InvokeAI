@@ -58,6 +58,7 @@ export const buildCanvasInpaintGraph = (
     negativePrompt,
     model,
     cfgScale: cfg_scale,
+    cfgRescaleMultiplier: cfg_rescale_multiplier,
     scheduler,
     steps,
     img2imgStrength: strength,
@@ -87,9 +88,7 @@ export const buildCanvasInpaintGraph = (
   const is_intermediate = true;
   const fp32 = vaePrecision === 'fp32';
 
-  const isUsingScaledDimensions = ['auto', 'manual'].includes(
-    boundingBoxScaleMethod
-  );
+  const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);
 
   let modelLoaderNodeId = MAIN_MODEL_LOADER;
 
@@ -154,6 +153,7 @@ export const buildCanvasInpaintGraph = (
         is_intermediate,
         steps: steps,
         cfg_scale: cfg_scale,
+        cfg_rescale_multiplier,
         scheduler: scheduler,
         denoising_start: 1 - strength,
         denoising_end: 1,
@@ -177,6 +177,7 @@ export const buildCanvasInpaintGraph = (
         is_intermediate,
         steps: canvasCoherenceSteps,
         cfg_scale: cfg_scale,
+        cfg_rescale_multiplier,
         scheduler: scheduler,
         denoising_start: 1 - canvasCoherenceStrength,
         denoising_end: 1,
@@ -404,10 +405,8 @@ export const buildCanvasInpaintGraph = (
 
     (graph.nodes[NOISE] as NoiseInvocation).width = scaledWidth;
     (graph.nodes[NOISE] as NoiseInvocation).height = scaledHeight;
-    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).width =
-      scaledWidth;
-    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).height =
-      scaledHeight;
+    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).width = scaledWidth;
+    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).height = scaledHeight;
 
     // Connect Nodes
     graph.edges.push(
@@ -553,9 +552,7 @@ export const buildCanvasInpaintGraph = (
       });
     } else {
       graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] = {
-        ...(graph.nodes[
-          CANVAS_COHERENCE_INPAINT_CREATE_MASK
-        ] as CreateDenoiseMaskInvocation),
+        ...(graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] as CreateDenoiseMaskInvocation),
         image: canvasInitImage,
       };
     }
@@ -575,9 +572,7 @@ export const buildCanvasInpaintGraph = (
         });
       } else {
         graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] = {
-          ...(graph.nodes[
-            CANVAS_COHERENCE_INPAINT_CREATE_MASK
-          ] as CreateDenoiseMaskInvocation),
+          ...(graph.nodes[CANVAS_COHERENCE_INPAINT_CREATE_MASK] as CreateDenoiseMaskInvocation),
           mask: canvasMaskImage,
         };
       }

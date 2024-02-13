@@ -1,4 +1,4 @@
-import { Box, Flex, Heading } from '@chakra-ui/react';
+import { Box, Flex, Heading } from '@invoke-ai/ui-library';
 import type { AnimationProps } from 'framer-motion';
 import { motion } from 'framer-motion';
 import { memo } from 'react';
@@ -91,9 +91,7 @@ const ImageUploadOverlay = (props: ImageUploadOverlayProps) => {
           ) : (
             <>
               <Heading size="lg">{t('toast.invalidUpload')}</Heading>
-              <Heading size="md">
-                {t('toast.uploadFailedInvalidUploadDesc')}
-              </Heading>
+              <Heading size="md">{t('toast.uploadFailedInvalidUploadDesc')}</Heading>
             </>
           )}
         </Flex>

@@ -25,9 +25,7 @@ import {
 } from './constants';
 import { addCoreMetadataNode } from './metadata';
 
-export const buildLinearTextToImageGraph = (
-  state: RootState
-): NonNullableGraph => {
+export const buildLinearTextToImageGraph = (state: RootState): NonNullableGraph => {
   const log = logger('nodes');
   const {
     positivePrompt,

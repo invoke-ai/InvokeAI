@@ -90,7 +90,9 @@ do_choice() {
         ;;
     8)
         clear
-        printf "Update InvokeAI\n"
+        printf "UPDATING FROM WITHIN THE APP IS BEING DEPRECATED\n"
+        printf "Please download the installer from https://github.com/invoke-ai/InvokeAI/releases/latest and run it to update your installation.\n"
+        sleep 4
         python -m invokeai.frontend.install.invokeai_update
         ;;
     9)
@@ -122,7 +124,7 @@ do_dialog() {
         5 "Change InvokeAI startup options"
         6 "Re-run the configure script to fix a broken install or to complete a major upgrade"
         7 "Open the developer console"
-        8 "Update InvokeAI"
+        8 "Update InvokeAI (DEPRECATED - please use the installer)"
 	9 "Run the InvokeAI image database maintenance script"
 	10 "Command-line help"
     )

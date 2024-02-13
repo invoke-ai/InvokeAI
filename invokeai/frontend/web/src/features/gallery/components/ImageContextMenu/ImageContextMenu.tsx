@@ -1,7 +1,6 @@
+import type { ContextMenuProps } from '@invoke-ai/ui-library';
+import { ContextMenu, MenuList } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import type { InvContextMenuProps } from 'common/components/InvContextMenu/InvContextMenu';
-import { InvContextMenu } from 'common/components/InvContextMenu/InvContextMenu';
-import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
 import { memo, useCallback } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
@@ -10,7 +9,7 @@ import SingleSelectionMenuItems from './SingleSelectionMenuItems';
 
 type Props = {
   imageDTO: ImageDTO | undefined;
-  children: InvContextMenuProps<HTMLDivElement>['children'];
+  children: ContextMenuProps<HTMLDivElement>['children'];
 };
 
 const ImageContextMenu = ({ imageDTO, children }: Props) => {
@@ -23,22 +22,20 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
 
     if (selectionCount > 1) {
       return (
-        <InvMenuList visibility="visible">
+        <MenuList visibility="visible">
           <MultipleSelectionMenuItems />
-        </InvMenuList>
+        </MenuList>
       );
     }
 
     return (
-      <InvMenuList visibility="visible">
+      <MenuList visibility="visible">
         <SingleSelectionMenuItems imageDTO={imageDTO} />
-      </InvMenuList>
+      </MenuList>
     );
   }, [imageDTO, selectionCount]);
 
-  return (
-    <InvContextMenu renderMenu={renderMenuFunc}>{children}</InvContextMenu>
-  );
+  return <ContextMenu renderMenu={renderMenuFunc}>{children}</ContextMenu>;
 };
 
 export default memo(ImageContextMenu);

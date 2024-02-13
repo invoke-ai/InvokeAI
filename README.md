@@ -169,7 +169,7 @@ the command `npm install -g pnpm` if needed)
     _For Linux with an AMD GPU:_
 
     ```sh
-    pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.4.2
+    pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.6
     ```
 
     _For non-GPU systems:_

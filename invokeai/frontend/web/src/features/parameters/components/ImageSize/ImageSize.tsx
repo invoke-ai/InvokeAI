@@ -1,6 +1,5 @@
-import { Flex } from '@chakra-ui/layout';
-import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
-import type { InvLabelProps } from 'common/components/InvControl/types';
+import type { FormLabelProps } from '@invoke-ai/ui-library';
+import { Flex, FormControlGroup } from '@invoke-ai/ui-library';
 import { AspectRatioPreview } from 'features/parameters/components/ImageSize/AspectRatioPreview';
 import { AspectRatioSelect } from 'features/parameters/components/ImageSize/AspectRatioSelect';
 import type { ImageSizeContextInnerValue } from 'features/parameters/components/ImageSize/ImageSizeContext';
@@ -22,7 +21,7 @@ export const ImageSize = memo((props: ImageSizeProps) => {
     <ImageSizeContext.Provider value={ctx}>
       <Flex gap={4} alignItems="center">
         <Flex gap={4} flexDirection="column" width="full">
-          <InvControlGroup labelProps={labelProps}>
+          <FormControlGroup formLabelProps={formLabelProps}>
             <Flex gap={4}>
               <AspectRatioSelect />
               <SwapDimensionsButton />
@@ -31,7 +30,7 @@ export const ImageSize = memo((props: ImageSizeProps) => {
             </Flex>
             {widthComponent}
             {heightComponent}
-          </InvControlGroup>
+          </FormControlGroup>
         </Flex>
         <Flex w="108px" h="108px" flexShrink={0} flexGrow={0}>
           <AspectRatioPreview />
@@ -43,6 +42,6 @@ export const ImageSize = memo((props: ImageSizeProps) => {
 
 ImageSize.displayName = 'ImageSize';
 
-const labelProps: InvLabelProps = {
+const formLabelProps: FormLabelProps = {
   minW: 14,
 };

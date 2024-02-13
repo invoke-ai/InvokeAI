@@ -1,7 +1,8 @@
+import { useToast } from '@invoke-ai/ui-library';
 import { useAppToaster } from 'app/components/Toaster';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDeleteWorkflowMutation } from 'services/api/endpoints/workflows';
+import { useDeleteWorkflowMutation, workflowsApi } from 'services/api/endpoints/workflows';
 
 type UseDeleteLibraryWorkflowOptions = {
   onSuccess?: () => void;
@@ -13,15 +14,11 @@ type UseDeleteLibraryWorkflowReturn = {
   deleteWorkflowResult: ReturnType<typeof useDeleteWorkflowMutation>[1];
 };
 
-type UseDeleteLibraryWorkflow = (
-  arg: UseDeleteLibraryWorkflowOptions
-) => UseDeleteLibraryWorkflowReturn;
+type UseDeleteLibraryWorkflow = (arg: UseDeleteLibraryWorkflowOptions) => UseDeleteLibraryWorkflowReturn;
 
-export const useDeleteLibraryWorkflow: UseDeleteLibraryWorkflow = ({
-  onSuccess,
-  onError,
-}) => {
+export const useDeleteLibraryWorkflow: UseDeleteLibraryWorkflow = ({ onSuccess, onError }) => {
   const toaster = useAppToaster();
+  const toast = useToast();
   const { t } = useTranslation();
   const [_deleteWorkflow, deleteWorkflowResult] = useDeleteWorkflowMutation();
 
@@ -34,14 +31,16 @@ export const useDeleteLibraryWorkflow: UseDeleteLibraryWorkflow = ({
         });
         onSuccess && onSuccess();
       } catch {
-        toaster({
-          title: t('toast.problemDeletingWorkflow'),
-          status: 'error',
-        });
+        if (!toast.isActive(`auth-error-toast-${workflowsApi.endpoints.deleteWorkflow.name}`)) {
+          toaster({
+            title: t('toast.problemDeletingWorkflow'),
+            status: 'error',
+          });
+        }
         onError && onError();
       }
     },
-    [_deleteWorkflow, toaster, t, onSuccess, onError]
+    [_deleteWorkflow, toaster, t, onSuccess, onError, toast]
   );
 
   return { deleteWorkflow, deleteWorkflowResult };

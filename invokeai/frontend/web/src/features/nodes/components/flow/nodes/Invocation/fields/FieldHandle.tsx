@@ -1,15 +1,9 @@
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { Tooltip } from '@invoke-ai/ui-library';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
-import {
-  HANDLE_TOOLTIP_OPEN_DELAY,
-  MODEL_TYPES,
-} from 'features/nodes/types/constants';
-import type {
-  FieldInputTemplate,
-  FieldOutputTemplate,
-} from 'features/nodes/types/field';
+import { HANDLE_TOOLTIP_OPEN_DELAY, MODEL_TYPES } from 'features/nodes/types/constants';
+import type { FieldInputTemplate, FieldOutputTemplate } from 'features/nodes/types/field';
 import type { CSSProperties } from 'react';
 import { memo, useMemo } from 'react';
 import type { HandleType } from 'reactflow';
@@ -41,13 +35,7 @@ type FieldHandleProps = {
 };
 
 const FieldHandle = (props: FieldHandleProps) => {
-  const {
-    fieldTemplate,
-    handleType,
-    isConnectionInProgress,
-    isConnectionStartField,
-    connectionError,
-  } = props;
+  const { fieldTemplate, handleType, isConnectionInProgress, isConnectionStartField, connectionError } = props;
   const { name } = fieldTemplate;
   const type = fieldTemplate.type;
   const fieldTypeName = useFieldTypeName(type);
@@ -55,10 +43,7 @@ const FieldHandle = (props: FieldHandleProps) => {
     const isModelType = MODEL_TYPES.some((t) => t === type.name);
     const color = getFieldColor(type);
     const s: CSSProperties = {
-      backgroundColor:
-        type.isCollection || type.isCollectionOrScalar
-          ? colorTokenToCssVar('base.900')
-          : color,
+      backgroundColor: type.isCollection || type.isCollectionOrScalar ? colorTokenToCssVar('base.900') : color,
       position: 'absolute',
       width: '1rem',
       height: '1rem',
@@ -90,13 +75,7 @@ const FieldHandle = (props: FieldHandleProps) => {
     }
 
     return s;
-  }, [
-    connectionError,
-    handleType,
-    isConnectionInProgress,
-    isConnectionStartField,
-    type,
-  ]);
+  }, [connectionError, handleType, isConnectionInProgress, isConnectionStartField, type]);
 
   const tooltip = useMemo(() => {
     if (isConnectionInProgress && connectionError) {
@@ -106,7 +85,7 @@ const FieldHandle = (props: FieldHandleProps) => {
   }, [connectionError, fieldTypeName, isConnectionInProgress]);
 
   return (
-    <InvTooltip
+    <Tooltip
       label={tooltip}
       placement={handleType === 'target' ? 'start' : 'end'}
       openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
@@ -117,7 +96,7 @@ const FieldHandle = (props: FieldHandleProps) => {
         position={handleType === 'target' ? Position.Left : Position.Right}
         style={styles}
       />
-    </InvTooltip>
+    </Tooltip>
   );
 };
 

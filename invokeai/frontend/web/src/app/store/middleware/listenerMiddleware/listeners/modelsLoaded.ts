@@ -6,41 +6,24 @@ import {
   selectAllT2IAdapters,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
-import {
-  modelChanged,
-  vaeSelected,
-} from 'features/parameters/store/generationSlice';
-import {
-  zParameterModel,
-  zParameterVAEModel,
-} from 'features/parameters/types/parameterSchemas';
+import { modelChanged, vaeSelected } from 'features/parameters/store/generationSlice';
+import { zParameterModel, zParameterVAEModel } from 'features/parameters/types/parameterSchemas';
 import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
 import { forEach, some } from 'lodash-es';
-import {
-  mainModelsAdapterSelectors,
-  modelsApi,
-  vaeModelsAdapterSelectors,
-} from 'services/api/endpoints/models';
+import { mainModelsAdapterSelectors, modelsApi, vaeModelsAdapterSelectors } from 'services/api/endpoints/models';
 import type { TypeGuardFor } from 'services/api/types';
 
 import { startAppListening } from '..';
 
 export const addModelsLoadedListener = () => {
   startAppListening({
-    predicate: (
-      action
-    ): action is TypeGuardFor<
-      typeof modelsApi.endpoints.getMainModels.matchFulfilled
-    > =>
+    predicate: (action): action is TypeGuardFor<typeof modelsApi.endpoints.getMainModels.matchFulfilled> =>
       modelsApi.endpoints.getMainModels.matchFulfilled(action) &&
       !action.meta.arg.originalArgs.includes('sdxl-refiner'),
     effect: async (action, { getState, dispatch }) => {
       // models loaded, we need to ensure the selected model is available and if not, select the first one
       const log = logger('models');
-      log.info(
-        { models: action.payload.entities },
-        `Main models loaded (${action.payload.ids.length})`
-      );
+      log.info({ models: action.payload.entities }, `Main models loaded (${action.payload.ids.length})`);
 
       const currentModel = getState().generation.model;
       const models = mainModelsAdapterSelectors.selectAll(action.payload);
@@ -67,10 +50,7 @@ export const addModelsLoadedListener = () => {
       const result = zParameterModel.safeParse(models[0]);
 
       if (!result.success) {
-        log.error(
-          { error: result.error.format() },
-          'Failed to parse main model'
-        );
+        log.error({ error: result.error.format() }, 'Failed to parse main model');
         return;
       }
 
@@ -78,20 +58,12 @@ export const addModelsLoadedListener = () => {
     },
   });
   startAppListening({
-    predicate: (
-      action
-    ): action is TypeGuardFor<
-      typeof modelsApi.endpoints.getMainModels.matchFulfilled
-    > =>
-      modelsApi.endpoints.getMainModels.matchFulfilled(action) &&
-      action.meta.arg.originalArgs.includes('sdxl-refiner'),
+    predicate: (action): action is TypeGuardFor<typeof modelsApi.endpoints.getMainModels.matchFulfilled> =>
+      modelsApi.endpoints.getMainModels.matchFulfilled(action) && action.meta.arg.originalArgs.includes('sdxl-refiner'),
     effect: async (action, { getState, dispatch }) => {
       // models loaded, we need to ensure the selected model is available and if not, select the first one
       const log = logger('models');
-      log.info(
-        { models: action.payload.entities },
-        `SDXL Refiner models loaded (${action.payload.ids.length})`
-      );
+      log.info({ models: action.payload.entities }, `SDXL Refiner models loaded (${action.payload.ids.length})`);
 
       const currentModel = getState().sdxl.refinerModel;
       const models = mainModelsAdapterSelectors.selectAll(action.payload);
@@ -122,10 +94,7 @@ export const addModelsLoadedListener = () => {
     effect: async (action, { getState, dispatch }) => {
       // VAEs loaded, need to reset the VAE is it's no longer available
       const log = logger('models');
-      log.info(
-        { models: action.payload.entities },
-        `VAEs loaded (${action.payload.ids.length})`
-      );
+      log.info({ models: action.payload.entities }, `VAEs loaded (${action.payload.ids.length})`);
 
       const currentVae = getState().generation.vae;
 
@@ -136,9 +105,7 @@ export const addModelsLoadedListener = () => {
 
       const isCurrentVAEAvailable = some(
         action.payload.entities,
-        (m) =>
-          m?.model_name === currentVae?.model_name &&
-          m?.base_model === currentVae?.base_model
+        (m) => m?.model_name === currentVae?.model_name && m?.base_model === currentVae?.base_model
       );
 
       if (isCurrentVAEAvailable) {
@@ -156,10 +123,7 @@ export const addModelsLoadedListener = () => {
       const result = zParameterVAEModel.safeParse(firstModel);
 
       if (!result.success) {
-        log.error(
-          { error: result.error.format() },
-          'Failed to parse VAE model'
-        );
+        log.error({ error: result.error.format() }, 'Failed to parse VAE model');
         return;
       }
 
@@ -171,19 +135,14 @@ export const addModelsLoadedListener = () => {
     effect: async (action, { getState, dispatch }) => {
       // LoRA models loaded - need to remove missing LoRAs from state
       const log = logger('models');
-      log.info(
-        { models: action.payload.entities },
-        `LoRAs loaded (${action.payload.ids.length})`
-      );
+      log.info({ models: action.payload.entities }, `LoRAs loaded (${action.payload.ids.length})`);
 
       const loras = getState().lora.loras;
 
       forEach(loras, (lora, id) => {
         const isLoRAAvailable = some(
           action.payload.entities,
-          (m) =>
-            m?.model_name === lora?.model_name &&
-            m?.base_model === lora?.base_model
+          (m) => m?.model_name === lora?.model_name && m?.base_model === lora?.base_model
         );
 
         if (isLoRAAvailable) {
@@ -199,17 +158,12 @@ export const addModelsLoadedListener = () => {
     effect: async (action, { getState, dispatch }) => {
       // ControlNet models loaded - need to remove missing ControlNets from state
       const log = logger('models');
-      log.info(
-        { models: action.payload.entities },
-        `ControlNet models loaded (${action.payload.ids.length})`
-      );
+      log.info({ models: action.payload.entities }, `ControlNet models loaded (${action.payload.ids.length})`);
 
       selectAllControlNets(getState().controlAdapters).forEach((ca) => {
         const isModelAvailable = some(
           action.payload.entities,
-          (m) =>
-            m?.model_name === ca?.model?.model_name &&
-            m?.base_model === ca?.model?.base_model
+          (m) => m?.model_name === ca?.model?.model_name && m?.base_model === ca?.model?.base_model
         );
 
         if (isModelAvailable) {
@@ -225,17 +179,12 @@ export const addModelsLoadedListener = () => {
     effect: async (action, { getState, dispatch }) => {
       // ControlNet models loaded - need to remove missing ControlNets from state
       const log = logger('models');
-      log.info(
-        { models: action.payload.entities },
-        `T2I Adapter models loaded (${action.payload.ids.length})`
-      );
+      log.info({ models: action.payload.entities }, `T2I Adapter models loaded (${action.payload.ids.length})`);
 
       selectAllT2IAdapters(getState().controlAdapters).forEach((ca) => {
         const isModelAvailable = some(
           action.payload.entities,
-          (m) =>
-            m?.model_name === ca?.model?.model_name &&
-            m?.base_model === ca?.model?.base_model
+          (m) => m?.model_name === ca?.model?.model_name && m?.base_model === ca?.model?.base_model
         );
 
         if (isModelAvailable) {
@@ -251,17 +200,12 @@ export const addModelsLoadedListener = () => {
     effect: async (action, { getState, dispatch }) => {
       // ControlNet models loaded - need to remove missing ControlNets from state
       const log = logger('models');
-      log.info(
-        { models: action.payload.entities },
-        `IP Adapter models loaded (${action.payload.ids.length})`
-      );
+      log.info({ models: action.payload.entities }, `IP Adapter models loaded (${action.payload.ids.length})`);
 
       selectAllIPAdapters(getState().controlAdapters).forEach((ca) => {
         const isModelAvailable = some(
           action.payload.entities,
-          (m) =>
-            m?.model_name === ca?.model?.model_name &&
-            m?.base_model === ca?.model?.base_model
+          (m) => m?.model_name === ca?.model?.model_name && m?.base_model === ca?.model?.base_model
         );
 
         if (isModelAvailable) {
@@ -276,10 +220,7 @@ export const addModelsLoadedListener = () => {
     matcher: modelsApi.endpoints.getTextualInversionModels.matchFulfilled,
     effect: async (action) => {
       const log = logger('models');
-      log.info(
-        { models: action.payload.entities },
-        `Embeddings loaded (${action.payload.ids.length})`
-      );
+      log.info({ models: action.payload.entities }, `Embeddings loaded (${action.payload.ids.length})`);
     },
   });
 };

@@ -1,4 +1,4 @@
-import { useToken } from '@chakra-ui/react';
+import { useToken } from '@invoke-ai/ui-library';
 
 export const useChakraThemeTokens = () => {
   const [

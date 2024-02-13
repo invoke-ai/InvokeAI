@@ -1,15 +1,17 @@
-import { useAppDispatch } from 'app/store/storeHooks';
 import {
-  InvCard,
-  InvCardBody,
-  InvCardHeader,
-} from 'common/components/InvCard/wrapper';
-import { InvLabel } from 'common/components/InvControl/InvLabel';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
+  Card,
+  CardBody,
+  CardHeader,
+  CompositeNumberInput,
+  CompositeSlider,
+  Flex,
+  IconButton,
+  Switch,
+  Text,
+} from '@invoke-ai/ui-library';
+import { useAppDispatch } from 'app/store/storeHooks';
 import type { LoRA } from 'features/lora/store/loraSlice';
-import { loraRemoved, loraWeightChanged } from 'features/lora/store/loraSlice';
+import { loraIsEnabledChanged, loraRemoved, loraWeightChanged } from 'features/lora/store/loraSlice';
 import { memo, useCallback } from 'react';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 
@@ -28,26 +30,35 @@ export const LoRACard = memo((props: LoRACardProps) => {
     [dispatch, lora.id]
   );
 
+  const handleSetLoraToggle = useCallback(() => {
+    dispatch(loraIsEnabledChanged({ id: lora.id, isEnabled: !lora.isEnabled }));
+  }, [dispatch, lora.id, lora.isEnabled]);
+
   const handleRemoveLora = useCallback(() => {
     dispatch(loraRemoved(lora.id));
   }, [dispatch, lora.id]);
 
   return (
-    <InvCard variant="lora">
-      <InvCardHeader>
-        <InvLabel noOfLines={1} wordBreak="break-all">
-          {lora.model_name}
-        </InvLabel>
-        <InvIconButton
-          aria-label="Remove LoRA"
-          variant="ghost"
-          size="sm"
-          onClick={handleRemoveLora}
-          icon={<PiTrashSimpleBold />}
-        />
-      </InvCardHeader>
-      <InvCardBody>
-        <InvSlider
+    <Card variant="lora">
+      <CardHeader>
+        <Flex alignItems="center" justifyContent="space-between" width="100%" gap={2}>
+          <Text noOfLines={1} wordBreak="break-all" color={lora.isEnabled ? 'base.200' : 'base.500'}>
+            {lora.model_name}
+          </Text>
+          <Flex alignItems="center" gap={2}>
+            <Switch size="sm" onChange={handleSetLoraToggle} isChecked={lora.isEnabled} />
+            <IconButton
+              aria-label="Remove LoRA"
+              variant="ghost"
+              size="sm"
+              onClick={handleRemoveLora}
+              icon={<PiTrashSimpleBold />}
+            />
+          </Flex>
+        </Flex>
+      </CardHeader>
+      <CardBody>
+        <CompositeSlider
           value={lora.weight}
           onChange={handleChange}
           min={-1}
@@ -55,8 +66,9 @@ export const LoRACard = memo((props: LoRACardProps) => {
           step={0.01}
           marks={marks}
           defaultValue={0.75}
+          isDisabled={!lora.isEnabled}
         />
-        <InvNumberInput
+        <CompositeNumberInput
           value={lora.weight}
           onChange={handleChange}
           min={-5}
@@ -65,9 +77,10 @@ export const LoRACard = memo((props: LoRACardProps) => {
           w={20}
           flexShrink={0}
           defaultValue={0.75}
+          isDisabled={!lora.isEnabled}
         />
-      </InvCardBody>
-    </InvCard>
+      </CardBody>
+    </Card>
   );
 });
 

@@ -2,9 +2,7 @@ import { logger } from 'app/logging/logger';
 import { zParameterControlNetModel } from 'features/parameters/types/parameterSchemas';
 import type { ControlNetModelField } from 'services/api/types';
 
-export const modelIdToControlNetModelParam = (
-  controlNetModelId: string
-): ControlNetModelField | undefined => {
+export const modelIdToControlNetModelParam = (controlNetModelId: string): ControlNetModelField | undefined => {
   const log = logger('models');
   const [base_model, _model_type, model_name] = controlNetModelId.split('/');
 

@@ -1,4 +1,4 @@
-import { Box } from '@chakra-ui/react';
+import { Box } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $cursorPosition } from 'features/canvas/store/canvasNanostore';
 import roundToHundreth from 'features/canvas/util/roundToHundreth';
@@ -14,11 +14,7 @@ const IAICanvasStatusTextCursorPos = () => {
     return `(${roundToHundreth(x)}, ${roundToHundreth(y)})`;
   }, [cursorPosition?.x, cursorPosition?.y]);
 
-  return (
-    <Box>{`${t(
-      'unifiedCanvas.cursorPosition'
-    )}: ${cursorCoordinatesString}`}</Box>
-  );
+  return <Box>{`${t('unifiedCanvas.cursorPosition')}: ${cursorCoordinatesString}`}</Box>;
 };
 
 export default memo(IAICanvasStatusTextCursorPos);

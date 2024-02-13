@@ -1,4 +1,4 @@
-import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
+import { MenuItem } from '@invoke-ai/ui-library';
 import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadWorkflowFromFile';
 import { memo, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
@@ -27,10 +27,10 @@ const UploadWorkflowMenuItem = () => {
     multiple: false,
   });
   return (
-    <InvMenuItem as="button" icon={<PiUploadSimpleBold />} {...getRootProps()}>
+    <MenuItem as="button" icon={<PiUploadSimpleBold />} {...getRootProps()}>
       {t('workflows.uploadWorkflow')}
       <input {...getInputProps()} />
-    </InvMenuItem>
+    </MenuItem>
   );
 };
 

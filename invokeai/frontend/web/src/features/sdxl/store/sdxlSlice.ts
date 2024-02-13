@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import type {
   ParameterNegativeStylePromptSDXL,
   ParameterPositiveStylePromptSDXL,
@@ -36,7 +36,7 @@ export const initialSDXLState: SDXLState = {
   refinerStart: 0.8,
 };
 
-const sdxlSlice = createSlice({
+export const sdxlSlice = createSlice({
   name: 'sdxl',
   initialState: initialSDXLState,
   reducers: {
@@ -49,10 +49,7 @@ const sdxlSlice = createSlice({
     setShouldConcatSDXLStylePrompt: (state, action: PayloadAction<boolean>) => {
       state.shouldConcatSDXLStylePrompt = action.payload;
     },
-    refinerModelChanged: (
-      state,
-      action: PayloadAction<ParameterSDXLRefinerModel | null>
-    ) => {
+    refinerModelChanged: (state, action: PayloadAction<ParameterSDXLRefinerModel | null>) => {
       state.refinerModel = action.payload;
     },
     setRefinerSteps: (state, action: PayloadAction<number>) => {
@@ -64,16 +61,10 @@ const sdxlSlice = createSlice({
     setRefinerScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
       state.refinerScheduler = action.payload;
     },
-    setRefinerPositiveAestheticScore: (
-      state,
-      action: PayloadAction<number>
-    ) => {
+    setRefinerPositiveAestheticScore: (state, action: PayloadAction<number>) => {
       state.refinerPositiveAestheticScore = action.payload;
     },
-    setRefinerNegativeAestheticScore: (
-      state,
-      action: PayloadAction<number>
-    ) => {
+    setRefinerNegativeAestheticScore: (state, action: PayloadAction<number>) => {
       state.refinerNegativeAestheticScore = action.payload;
     },
     setRefinerStart: (state, action: PayloadAction<number>) => {
@@ -95,8 +86,6 @@ export const {
   setRefinerStart,
 } = sdxlSlice.actions;
 
-export default sdxlSlice.reducer;
-
 export const selectSdxlSlice = (state: RootState) => state.sdxl;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -105,4 +94,11 @@ export const migrateSDXLState = (state: any): any => {
     state._version = 1;
   }
   return state;
+};
+
+export const sdxlPersistConfig: PersistConfig<SDXLState> = {
+  name: sdxlSlice.name,
+  initialState: initialSDXLState,
+  migrate: migrateSDXLState,
+  persistDenylist: [],
 };

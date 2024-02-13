@@ -1,5 +1,4 @@
-import { Flex } from '@chakra-ui/react';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
+import { ButtonGroup, Flex } from '@invoke-ai/ui-library';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 
@@ -14,17 +13,17 @@ const QueueTabQueueControls = () => {
   return (
     <Flex layerStyle="first" borderRadius="base" p={2} gap={2}>
       {isPauseEnabled || isResumeEnabled ? (
-        <InvButtonGroup w={28} orientation="vertical" size="sm">
+        <ButtonGroup w={28} orientation="vertical" size="sm">
           {isResumeEnabled ? <ResumeProcessorButton /> : <></>}
           {isPauseEnabled ? <PauseProcessorButton /> : <></>}
-        </InvButtonGroup>
+        </ButtonGroup>
       ) : (
         <></>
       )}
-      <InvButtonGroup w={28} orientation="vertical" size="sm">
+      <ButtonGroup w={28} orientation="vertical" size="sm">
         <PruneQueueButton />
         <ClearQueueButton />
-      </InvButtonGroup>
+      </ButtonGroup>
     </Flex>
   );
 };

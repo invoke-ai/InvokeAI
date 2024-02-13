@@ -1,19 +1,12 @@
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { GroupBase } from 'chakra-react-select';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
-import {
-  esrganModelNameChanged,
-  isParamESRGANModelName,
-} from 'features/parameters/store/postprocessingSlice';
+import { esrganModelNameChanged, isParamESRGANModelName } from 'features/parameters/store/postprocessingSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const options: GroupBase<InvSelectOption>[] = [
+const options: GroupBase<ComboboxOption>[] = [
   {
     label: 'x2 Upscalers',
     options: [
@@ -30,8 +23,7 @@ const options: GroupBase<InvSelectOption>[] = [
       {
         label: 'RealESRGAN x4 Plus',
         value: 'RealESRGAN_x4plus.pth',
-        description:
-          'Best for photos and highly detailed images, medium smoothing',
+        description: 'Best for photos and highly detailed images, medium smoothing',
       },
       {
         label: 'RealESRGAN x4 Plus (anime 6B)',
@@ -50,13 +42,11 @@ const options: GroupBase<InvSelectOption>[] = [
 const ParamESRGANModel = () => {
   const { t } = useTranslation();
 
-  const esrganModelName = useAppSelector(
-    (s) => s.postprocessing.esrganModelName
-  );
+  const esrganModelName = useAppSelector((s) => s.postprocessing.esrganModelName);
 
   const dispatch = useAppDispatch();
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!isParamESRGANModelName(v?.value)) {
         return;
@@ -67,17 +57,15 @@ const ParamESRGANModel = () => {
   );
 
   const value = useMemo(
-    () =>
-      options
-        .flatMap((o) => o.options)
-        .find((m) => m.value === esrganModelName),
+    () => options.flatMap((o) => o.options).find((m) => m.value === esrganModelName),
     [esrganModelName]
   );
 
   return (
-    <InvControl label={t('models.esrganModel')} orientation="vertical">
-      <InvSelect value={value} onChange={onChange} options={options} />
-    </InvControl>
+    <FormControl orientation="vertical">
+      <FormLabel>{t('models.esrganModel')} </FormLabel>
+      <Combobox value={value} onChange={onChange} options={options} />
+    </FormControl>
   );
 };
 

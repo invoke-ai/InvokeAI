@@ -1,4 +1,4 @@
-import { Box, Flex } from '@chakra-ui/react';
+import { Box, Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
@@ -14,73 +14,44 @@ import type { AnyResult } from 'services/events/types';
 
 import ImageOutputPreview from './outputs/ImageOutputPreview';
 
-const selector = createMemoizedSelector(
-  selectNodesSlice,
-  selectNodeTemplatesSlice,
-  (nodes, nodeTemplates) => {
-    const lastSelectedNodeId =
-      nodes.selectedNodes[nodes.selectedNodes.length - 1];
+const selector = createMemoizedSelector(selectNodesSlice, selectNodeTemplatesSlice, (nodes, nodeTemplates) => {
+  const lastSelectedNodeId = nodes.selectedNodes[nodes.selectedNodes.length - 1];
 
-    const lastSelectedNode = nodes.nodes.find(
-      (node) => node.id === lastSelectedNodeId
-    );
+  const lastSelectedNode = nodes.nodes.find((node) => node.id === lastSelectedNodeId);
 
-    const lastSelectedNodeTemplate = lastSelectedNode
-      ? nodeTemplates.templates[lastSelectedNode.data.type]
-      : undefined;
+  const lastSelectedNodeTemplate = lastSelectedNode ? nodeTemplates.templates[lastSelectedNode.data.type] : undefined;
 
-    const nes =
-      nodes.nodeExecutionStates[lastSelectedNodeId ?? '__UNKNOWN_NODE__'];
+  const nes = nodes.nodeExecutionStates[lastSelectedNodeId ?? '__UNKNOWN_NODE__'];
 
-    if (
-      !isInvocationNode(lastSelectedNode) ||
-      !nes ||
-      !lastSelectedNodeTemplate
-    ) {
-      return;
-    }
-
-    return {
-      outputs: nes.outputs,
-      outputType: lastSelectedNodeTemplate.outputType,
-    };
+  if (!isInvocationNode(lastSelectedNode) || !nes || !lastSelectedNodeTemplate) {
+    return;
   }
-);
+
+  return {
+    outputs: nes.outputs,
+    outputType: lastSelectedNodeTemplate.outputType,
+  };
+});
 
 const InspectorOutputsTab = () => {
   const data = useAppSelector(selector);
   const { t } = useTranslation();
 
   if (!data) {
-    return (
-      <IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />
-    );
+    return <IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />;
   }
 
   if (data.outputs.length === 0) {
-    return (
-      <IAINoContentFallback label={t('nodes.noOutputRecorded')} icon={null} />
-    );
+    return <IAINoContentFallback label={t('nodes.noOutputRecorded')} icon={null} />;
   }
 
   return (
     <Box position="relative" w="full" h="full">
       <ScrollableContent>
-        <Flex
-          position="relative"
-          flexDir="column"
-          alignItems="flex-start"
-          p={1}
-          gap={2}
-          h="full"
-          w="full"
-        >
+        <Flex position="relative" flexDir="column" alignItems="flex-start" p={1} gap={2} h="full" w="full">
           {data.outputType === 'image_output' ? (
             data.outputs.map((result, i) => (
-              <ImageOutputPreview
-                key={getKey(result, i)}
-                output={result as ImageOutput}
-              />
+              <ImageOutputPreview key={getKey(result, i)} output={result as ImageOutput} />
             ))
           ) : (
             <DataViewer data={data.outputs} label={t('nodes.nodeOutputs')} />

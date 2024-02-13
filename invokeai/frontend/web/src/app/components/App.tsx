@@ -1,4 +1,4 @@
-import { Box } from '@chakra-ui/react';
+import { Box, useGlobalModifiersInit } from '@invoke-ai/ui-library';
 import { useSocketIO } from 'app/hooks/useSocketIO';
 import { useLogger } from 'app/logging/useLogger';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
@@ -9,7 +9,6 @@ import UploadProgressToastManager from 'common/components/UploadProgressToast';
 import { useClearStorage } from 'common/hooks/useClearStorage';
 import { useFullscreenDropzone } from 'common/hooks/useFullscreenDropzone';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
-import { useGlobalModifiersInit } from 'common/hooks/useGlobalModifiers';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
@@ -47,8 +46,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   useGlobalModifiersInit();
   useGlobalHotkeys();
 
-  const { dropzone, isHandlingUpload, setIsHandlingUpload } =
-    useFullscreenDropzone();
+  const { dropzone, isHandlingUpload, setIsHandlingUpload } = useFullscreenDropzone();
 
   const handleReset = useCallback(() => {
     clearStorage();
@@ -72,10 +70,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   }, [dispatch]);
 
   return (
-    <ErrorBoundary
-      onReset={handleReset}
-      FallbackComponent={AppErrorBoundaryFallback}
-    >
+    <ErrorBoundary onReset={handleReset} FallbackComponent={AppErrorBoundaryFallback}>
       <Box
         id="invoke-app-wrapper"
         w="100vw"
@@ -88,10 +83,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
         <InvokeTabs />
         <AnimatePresence>
           {dropzone.isDragActive && isHandlingUpload && (
-            <ImageUploadOverlay
-              dropzone={dropzone}
-              setIsHandlingUpload={setIsHandlingUpload}
-            />
+            <ImageUploadOverlay dropzone={dropzone} setIsHandlingUpload={setIsHandlingUpload} />
           )}
         </AnimatePresence>
       </Box>

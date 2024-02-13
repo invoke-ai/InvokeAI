@@ -1,6 +1,5 @@
-import type { ChakraProps } from '@chakra-ui/react';
-import { Flex } from '@chakra-ui/react';
-import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
+import type { ChakraProps } from '@invoke-ai/ui-library';
+import { Flex, FormControlGroup } from '@invoke-ai/ui-library';
 import { useHasImageOutput } from 'features/nodes/hooks/useHasImageOutput';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -30,10 +29,10 @@ const InvocationNodeFooter = ({ nodeId }: Props) => {
       h={8}
       justifyContent="space-between"
     >
-      <InvControlGroup controlProps={props} labelProps={props}>
+      <FormControlGroup formControlProps={props} formLabelProps={props}>
         {isCacheEnabled && <UseCacheCheckbox nodeId={nodeId} />}
         {hasImageOutput && <SaveToGalleryCheckbox nodeId={nodeId} />}
-      </InvControlGroup>
+      </FormControlGroup>
     </Flex>
   );
 };

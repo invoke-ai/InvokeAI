@@ -1,17 +1,10 @@
-import { Divider, Flex } from '@chakra-ui/react';
+import { ConfirmationAlertDialog, Divider, Flex, FormControl, FormLabel, Switch, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvConfirmationAlertDialog } from 'common/components/InvConfirmationAlertDialog/InvConfirmationAlertDialog';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSwitch } from 'common/components/InvSwitch/wrapper';
-import { InvText } from 'common/components/InvText/wrapper';
 import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import { selectControlAdaptersSlice } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
-import {
-  getImageUsage,
-  selectImageUsage,
-} from 'features/deleteImageModal/store/selectors';
+import { getImageUsage, selectImageUsage } from 'features/deleteImageModal/store/selectors';
 import {
   imageDeletionCanceled,
   isModalOpenChanged,
@@ -37,14 +30,7 @@ const selectImageUsages = createMemoizedSelector(
     selectControlAdaptersSlice,
     selectImageUsage,
   ],
-  (
-    deleteImageModal,
-    generation,
-    canvas,
-    nodes,
-    controlAdapters,
-    imagesUsage
-  ) => {
+  (deleteImageModal, generation, canvas, nodes, controlAdapters, imagesUsage) => {
     const { imagesToDelete } = deleteImageModal;
 
     const allImageUsage = (imagesToDelete ?? []).map(({ image_name }) =>
@@ -69,19 +55,13 @@ const selectImageUsages = createMemoizedSelector(
 const DeleteImageModal = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const shouldConfirmOnDelete = useAppSelector(
-    (s) => s.system.shouldConfirmOnDelete
-  );
-  const canRestoreDeletedImagesFromBin = useAppSelector(
-    (s) => s.config.canRestoreDeletedImagesFromBin
-  );
+  const shouldConfirmOnDelete = useAppSelector((s) => s.system.shouldConfirmOnDelete);
+  const canRestoreDeletedImagesFromBin = useAppSelector((s) => s.config.canRestoreDeletedImagesFromBin);
   const isModalOpen = useAppSelector((s) => s.deleteImageModal.isModalOpen);
-  const { imagesToDelete, imagesUsage, imageUsageSummary } =
-    useAppSelector(selectImageUsages);
+  const { imagesToDelete, imagesUsage, imageUsageSummary } = useAppSelector(selectImageUsages);
 
   const handleChangeShouldConfirmOnDelete = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) =>
-      dispatch(setShouldConfirmOnDelete(!e.target.checked)),
+    (e: ChangeEvent<HTMLInputElement>) => dispatch(setShouldConfirmOnDelete(!e.target.checked)),
     [dispatch]
   );
 
@@ -95,13 +75,11 @@ const DeleteImageModal = () => {
       return;
     }
     dispatch(imageDeletionCanceled());
-    dispatch(
-      imageDeletionConfirmed({ imageDTOs: imagesToDelete, imagesUsage })
-    );
+    dispatch(imageDeletionConfirmed({ imageDTOs: imagesToDelete, imagesUsage }));
   }, [dispatch, imagesToDelete, imagesUsage]);
 
   return (
-    <InvConfirmationAlertDialog
+    <ConfirmationAlertDialog
       title={t('gallery.deleteImage')}
       isOpen={isModalOpen}
       onClose={handleClose}
@@ -112,20 +90,14 @@ const DeleteImageModal = () => {
       <Flex direction="column" gap={3}>
         <ImageUsageMessage imageUsage={imageUsageSummary} />
         <Divider />
-        <InvText>
-          {canRestoreDeletedImagesFromBin
-            ? t('gallery.deleteImageBin')
-            : t('gallery.deleteImagePermanent')}
-        </InvText>
-        <InvText>{t('common.areYouSure')}</InvText>
-        <InvControl label={t('common.dontAskMeAgain')}>
-          <InvSwitch
-            isChecked={!shouldConfirmOnDelete}
-            onChange={handleChangeShouldConfirmOnDelete}
-          />
-        </InvControl>
+        <Text>{canRestoreDeletedImagesFromBin ? t('gallery.deleteImageBin') : t('gallery.deleteImagePermanent')}</Text>
+        <Text>{t('common.areYouSure')}</Text>
+        <FormControl>
+          <FormLabel>{t('common.dontAskMeAgain')}</FormLabel>
+          <Switch isChecked={!shouldConfirmOnDelete} onChange={handleChangeShouldConfirmOnDelete} />
+        </FormControl>
       </Flex>
-    </InvConfirmationAlertDialog>
+    </ConfirmationAlertDialog>
   );
 };
 

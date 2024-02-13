@@ -1,8 +1,4 @@
-export const calculateStepPercentage = (
-  step: number,
-  total_steps: number,
-  order: number
-) => {
+export const calculateStepPercentage = (step: number, total_steps: number, order: number) => {
   if (total_steps === 0) {
     return 0;
   }

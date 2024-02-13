@@ -1,11 +1,11 @@
 // Grid drawing adapted from https://longviewcoder.com/2021/12/08/konva-a-better-grid/
+import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import type { ReactElement } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { Group, Line as KonvaLine } from 'react-konva';
-import { getArbitraryBaseColor } from 'theme/colors';
 
 const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
   return {
@@ -76,11 +76,11 @@ const IAICanvasGrid = () => {
     };
 
     const // find the x & y size of the grid
-      xSize = gridFullRect.x2 - gridFullRect.x1,
-      ySize = gridFullRect.y2 - gridFullRect.y1,
-      // compute the number of steps required on each axis.
-      xSteps = Math.round(xSize / gridSpacing) + 1,
-      ySteps = Math.round(ySize / gridSpacing) + 1;
+      xSize = gridFullRect.x2 - gridFullRect.x1;
+    const ySize = gridFullRect.y2 - gridFullRect.y1;
+    // compute the number of steps required on each axis.
+    const xSteps = Math.round(xSize / gridSpacing) + 1;
+    const ySteps = Math.round(ySize / gridSpacing) + 1;
 
     const strokeWidth = unscale(1);
 

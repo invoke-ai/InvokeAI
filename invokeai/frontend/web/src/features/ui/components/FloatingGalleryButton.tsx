@@ -1,7 +1,4 @@
-import { Flex } from '@chakra-ui/layout';
-import { Portal } from '@chakra-ui/portal';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { Flex, IconButton, Portal, Tooltip } from '@invoke-ai/ui-library';
 import type { UsePanelReturn } from 'features/ui/hooks/usePanel';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,18 +17,9 @@ const FloatingGalleryButton = (props: Props) => {
 
   return (
     <Portal>
-      <Flex
-        pos="absolute"
-        transform="translate(0, -50%)"
-        minW={8}
-        top="50%"
-        insetInlineEnd="21px"
-      >
-        <InvTooltip
-          label={t('accessibility.showGalleryPanel')}
-          placement="start"
-        >
-          <InvIconButton
+      <Flex pos="absolute" transform="translate(0, -50%)" minW={8} top="50%" insetInlineEnd="21px">
+        <Tooltip label={t('accessibility.showGalleryPanel')} placement="start">
+          <IconButton
             aria-label={t('accessibility.showGalleryPanel')}
             onClick={props.panelApi.expand}
             icon={<PiImagesSquareBold size="20px" />}
@@ -39,7 +27,7 @@ const FloatingGalleryButton = (props: Props) => {
             h={48}
             borderEndRadius={0}
           />
-        </InvTooltip>
+        </Tooltip>
       </Flex>
     </Portal>
   );

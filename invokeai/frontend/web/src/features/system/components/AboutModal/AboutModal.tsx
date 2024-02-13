@@ -1,38 +1,32 @@
-import { ExternalLinkIcon } from '@chakra-ui/icons';
 import {
+  ExternalLink,
   Flex,
   Grid,
   GridItem,
+  Heading,
+  IconButton,
   Image,
-  Link,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
+  Spacer,
+  Text,
+  Tooltip,
   useDisclosure,
-} from '@chakra-ui/react';
-import { InvHeading } from 'common/components/InvHeading/wrapper';
-import {
-  InvModal,
-  InvModalBody,
-  InvModalCloseButton,
-  InvModalContent,
-  InvModalFooter,
-  InvModalHeader,
-  InvModalOverlay,
-} from 'common/components/InvModal/wrapper';
-import { InvText } from 'common/components/InvText/wrapper';
+} from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import {
-  discordLink,
-  githubLink,
-  websiteLink,
-} from 'features/system/store/constants';
+import { discordLink, githubLink, websiteLink } from 'features/system/store/constants';
 import { map } from 'lodash-es';
 import InvokeLogoYellow from 'public/assets/images/invoke-tag-lrg.svg';
 import type { ReactElement } from 'react';
-import { cloneElement, memo } from 'react';
+import { cloneElement, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  useGetAppDepsQuery,
-  useGetAppVersionQuery,
-} from 'services/api/endpoints/appInfo';
+import { PiCopyBold } from 'react-icons/pi';
+import { useGetAppDepsQuery, useGetAppVersionQuery } from 'services/api/endpoints/appInfo';
 
 type AboutModalProps = {
   /* The button to open the Settings Modal */
@@ -42,95 +36,75 @@ type AboutModalProps = {
 const AboutModal = ({ children }: AboutModalProps) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { t } = useTranslation();
-  const { deps } = useGetAppDepsQuery(undefined, {
+  const { depsArray, depsObject } = useGetAppDepsQuery(undefined, {
     selectFromResult: ({ data }) => ({
-      deps: data ? map(data, (version, name) => ({ name, version })) : [],
+      depsObject: data,
+      depsArray: data ? map(data, (version, name) => ({ name, version })) : [],
     }),
   });
   const { data: appVersion } = useGetAppVersionQuery();
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(JSON.stringify(depsObject, null, 2));
+  }, [depsObject]);
 
   return (
     <>
       {cloneElement(children, {
         onClick: onOpen,
       })}
-      <InvModal isOpen={isOpen} onClose={onClose} isCentered size="2xl">
-        <InvModalOverlay />
-        <InvModalContent maxH="80vh" h="33rem">
-          <InvModalHeader>{t('accessibility.about')}</InvModalHeader>
-          <InvModalCloseButton />
-          <InvModalBody display="flex" flexDir="column" gap={4}>
+      <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl">
+        <ModalOverlay />
+        <ModalContent maxH="80vh" h="34rem">
+          <ModalHeader>{t('accessibility.about')}</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody display="flex" flexDir="column" gap={4}>
             <Grid templateColumns="repeat(2, 1fr)" h="full">
-              <GridItem
-                backgroundColor="base.750"
-                borderRadius="base"
-                p="4"
-                h="full"
-              >
+              <GridItem backgroundColor="base.750" borderRadius="base" p="4" h="full">
                 <ScrollableContent>
-                  <InvHeading
-                    position="sticky"
-                    top="0"
-                    backgroundColor="base.750"
-                    size="md"
-                    p="1"
-                  >
-                    {t('common.localSystem')}
-                  </InvHeading>
-                  {deps.map(({ name, version }, i) => (
-                    <Grid
-                      key={i}
-                      py="2"
-                      px="1"
-                      w="full"
-                      templateColumns="repeat(2, 1fr)"
-                    >
-                      <InvText>{name}</InvText>
-                      <InvText>
-                        {version ? version : t('common.notInstalled')}
-                      </InvText>
+                  <Flex position="sticky" top="0" backgroundColor="base.750" p={1} alignItems="center">
+                    <Heading size="md">{t('common.localSystem')}</Heading>
+                    <Spacer />
+                    <Tooltip label={t('common.copy')}>
+                      <IconButton
+                        onClick={handleCopy}
+                        isDisabled={!depsObject}
+                        aria-label={t('common.copy')}
+                        icon={<PiCopyBold />}
+                        variant="ghost"
+                      />
+                    </Tooltip>
+                  </Flex>
+                  {depsArray.map(({ name, version }, i) => (
+                    <Grid key={i} py="2" px="1" w="full" templateColumns="repeat(2, 1fr)">
+                      <Text>{name}</Text>
+                      <Text>{version ? version : t('common.notInstalled')}</Text>
                     </Grid>
                   ))}
                 </ScrollableContent>
               </GridItem>
               <GridItem>
-                <Flex
-                  flexDir="column"
-                  gap={3}
-                  justifyContent="center"
-                  alignItems="center"
-                  h="full"
-                >
+                <Flex flexDir="column" gap={3} justifyContent="center" alignItems="center" h="full">
                   <Image src={InvokeLogoYellow} alt="invoke-logo" w="120px" />
-                  {appVersion && <InvText>{`v${appVersion?.version}`}</InvText>}
+                  {appVersion && <Text>{`v${appVersion?.version}`}</Text>}
                   <Grid templateColumns="repeat(2, 1fr)" gap="3">
                     <GridItem>
-                      <Link fontSize="sm" href={githubLink} isExternal>
-                        {t('common.githubLabel')}
-                        <ExternalLinkIcon mx="2px" />
-                      </Link>
+                      <ExternalLink href={githubLink} label={t('common.githubLabel')} />
                     </GridItem>
                     <GridItem>
-                      <Link fontSize="sm" href={discordLink} isExternal>
-                        {t('common.discordLabel')}
-                        <ExternalLinkIcon mx="2px" />
-                      </Link>
+                      <ExternalLink href={discordLink} label={t('common.discordLabel')} />
                     </GridItem>
                   </Grid>
-                  <InvHeading fontSize="large">
-                    {t('common.aboutHeading')}
-                  </InvHeading>
-                  <InvText fontSize="sm">{t('common.aboutDesc')}</InvText>
-                  <Link isExternal href={websiteLink} fontSize="sm">
-                    {websiteLink} <ExternalLinkIcon mx="2px" />
-                  </Link>
+                  <Heading fontSize="large">{t('common.aboutHeading')}</Heading>
+                  <Text fontSize="sm">{t('common.aboutDesc')}</Text>
+                  <ExternalLink href={websiteLink} label={websiteLink} />
                 </Flex>
               </GridItem>
             </Grid>
-          </InvModalBody>
-          <InvModalFooter />
-        </InvModalContent>
-      </InvModal>
+          </ModalBody>
+          <ModalFooter />
+        </ModalContent>
+      </Modal>
     </>
   );
 };

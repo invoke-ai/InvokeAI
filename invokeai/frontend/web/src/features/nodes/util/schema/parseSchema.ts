@@ -1,10 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { parseify } from 'common/util/serialize';
 import { FieldParseError } from 'features/nodes/types/error';
-import type {
-  FieldInputTemplate,
-  FieldOutputTemplate,
-} from 'features/nodes/types/field';
+import type { FieldInputTemplate, FieldOutputTemplate } from 'features/nodes/types/field';
 import type { InvocationTemplate } from 'features/nodes/types/invocation';
 import type { InvocationSchemaObject } from 'features/nodes/types/openapi';
 import {
@@ -15,6 +12,7 @@ import {
 import { t } from 'i18next';
 import { reduce } from 'lodash-es';
 import type { OpenAPIV3_1 } from 'openapi-types';
+import { serializeError } from 'serialize-error';
 
 import { buildFieldInputTemplate } from './buildFieldInputTemplate';
 import { buildFieldOutputTemplate } from './buildFieldOutputTemplate';
@@ -71,20 +69,10 @@ export const parseSchema = (
   const filteredSchemas = Object.values(openAPI.components?.schemas ?? {})
     .filter(isInvocationSchemaObject)
     .filter(isNotInDenylist)
-    .filter((schema) =>
-      nodesAllowlistExtra
-        ? nodesAllowlistExtra.includes(schema.properties.type.default)
-        : true
-    )
-    .filter((schema) =>
-      nodesDenylistExtra
-        ? !nodesDenylistExtra.includes(schema.properties.type.default)
-        : true
-    );
+    .filter((schema) => (nodesAllowlistExtra ? nodesAllowlistExtra.includes(schema.properties.type.default) : true))
+    .filter((schema) => (nodesDenylistExtra ? !nodesDenylistExtra.includes(schema.properties.type.default) : true));
 
-  const invocations = filteredSchemas.reduce<
-    Record<string, InvocationTemplate>
-  >((invocationsAccumulator, schema) => {
+  const invocations = filteredSchemas.reduce<Record<string, InvocationTemplate>>((invocationsAccumulator, schema) => {
     const type = schema.properties.type.default;
     const title = schema.title.replace('Invocation', '');
     const tags = schema.tags ?? [];
@@ -95,11 +83,7 @@ export const parseSchema = (
 
     const inputs = reduce(
       schema.properties,
-      (
-        inputsAccumulator: Record<string, FieldInputTemplate>,
-        property,
-        propertyName
-      ) => {
+      (inputsAccumulator: Record<string, FieldInputTemplate>, property, propertyName) => {
         if (isReservedInputField(type, propertyName)) {
           logger('nodes').trace(
             { node: type, field: propertyName, schema: parseify(property) },
@@ -120,15 +104,14 @@ export const parseSchema = (
           const fieldType = parseFieldType(property);
 
           if (isReservedFieldType(fieldType.name)) {
-            // Skip processing this reserved field
+            logger('nodes').trace(
+              { node: type, field: propertyName, schema: parseify(property) },
+              'Skipped reserved input field'
+            );
             return inputsAccumulator;
           }
 
-          const fieldInputTemplate = buildFieldInputTemplate(
-            property,
-            propertyName,
-            fieldType
-          );
+          const fieldInputTemplate = buildFieldInputTemplate(property, propertyName, fieldType);
 
           inputsAccumulator[propertyName] = fieldInputTemplate;
         } catch (e) {
@@ -145,6 +128,20 @@ export const parseSchema = (
                 message: e.message,
               })
             );
+          } else {
+            logger('nodes').warn(
+              {
+                node: type,
+                field: propertyName,
+                schema: parseify(property),
+                error: serializeError(e),
+              },
+              t('nodes.inputFieldTypeParseError', {
+                node: type,
+                field: propertyName,
+                message: 'unknown error',
+              })
+            );
           }
         }
 
@@ -156,10 +153,7 @@ export const parseSchema = (
     const outputSchemaName = schema.output.$ref.split('/').pop();
 
     if (!outputSchemaName) {
-      logger('nodes').warn(
-        { outputRefObject: parseify(schema.output) },
-        'No output schema name found in ref object'
-      );
+      logger('nodes').warn({ outputRefObject: parseify(schema.output) }, 'No output schema name found in ref object');
       return invocationsAccumulator;
     }
 
@@ -170,10 +164,7 @@ export const parseSchema = (
     }
 
     if (!isInvocationOutputSchemaObject(outputSchema)) {
-      logger('nodes').error(
-        { outputSchema: parseify(outputSchema) },
-        'Invalid output schema'
-      );
+      logger('nodes').error({ outputSchema: parseify(outputSchema) }, 'Invalid output schema');
       return invocationsAccumulator;
     }
 
@@ -213,11 +204,7 @@ export const parseSchema = (
             return outputsAccumulator;
           }
 
-          const fieldOutputTemplate = buildFieldOutputTemplate(
-            property,
-            propertyName,
-            fieldType
-          );
+          const fieldOutputTemplate = buildFieldOutputTemplate(property, propertyName, fieldType);
 
           outputsAccumulator[propertyName] = fieldOutputTemplate;
         } catch (e) {
@@ -232,6 +219,20 @@ export const parseSchema = (
                 node: type,
                 field: propertyName,
                 message: e.message,
+              })
+            );
+          } else {
+            logger('nodes').warn(
+              {
+                node: type,
+                field: propertyName,
+                schema: parseify(property),
+                error: serializeError(e),
+              },
+              t('nodes.outputFieldTypeParseError', {
+                node: type,
+                field: propertyName,
+                message: 'unknown error',
               })
             );
           }

@@ -1,4 +1,4 @@
-import { Box, chakra, Flex } from '@chakra-ui/react';
+import { Box, chakra, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -19,10 +19,7 @@ import {
   $tool,
 } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import {
-  canvasResized,
-  selectCanvasSlice,
-} from 'features/canvas/store/canvasSlice';
+import { canvasResized, selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
@@ -55,18 +52,12 @@ const ChakraStage = chakra(Stage, {
 const IAICanvas = () => {
   const isStaging = useAppSelector(isStagingSelector);
   const isMaskEnabled = useAppSelector((s) => s.canvas.isMaskEnabled);
-  const shouldShowBoundingBox = useAppSelector(
-    (s) => s.canvas.shouldShowBoundingBox
-  );
+  const shouldShowBoundingBox = useAppSelector((s) => s.canvas.shouldShowBoundingBox);
   const shouldShowGrid = useAppSelector((s) => s.canvas.shouldShowGrid);
   const stageScale = useAppSelector((s) => s.canvas.stageScale);
-  const shouldShowIntermediates = useAppSelector(
-    (s) => s.canvas.shouldShowIntermediates
-  );
+  const shouldShowIntermediates = useAppSelector((s) => s.canvas.shouldShowIntermediates);
   const shouldAntialias = useAppSelector((s) => s.canvas.shouldAntialias);
-  const shouldRestrictStrokesToBox = useAppSelector(
-    (s) => s.canvas.shouldRestrictStrokesToBox
-  );
+  const shouldRestrictStrokesToBox = useAppSelector((s) => s.canvas.shouldRestrictStrokesToBox);
   const { stageCoordinates, stageDimensions } = useAppSelector(selector);
   const dispatch = useAppDispatch();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -95,22 +86,12 @@ const IAICanvas = () => {
       return 'default';
     }
     return 'none';
-  }, [
-    isMouseOverBoundingBox,
-    isMovingStage,
-    isStaging,
-    isTransformingBoundingBox,
-    shouldRestrictStrokesToBox,
-    tool,
-  ]);
+  }, [isMouseOverBoundingBox, isMovingStage, isStaging, isTransformingBoundingBox, shouldRestrictStrokesToBox, tool]);
 
-  const canvasBaseLayerRefCallback = useCallback(
-    (layerElement: Konva.Layer) => {
-      $canvasBaseLayer.set(layerElement);
-      canvasBaseLayerRef.current = layerElement;
-    },
-    []
-  );
+  const canvasBaseLayerRefCallback = useCallback((layerElement: Konva.Layer) => {
+    $canvasBaseLayer.set(layerElement);
+    canvasBaseLayerRef.current = layerElement;
+  }, []);
 
   const lastCursorPositionRef = useRef<Vector2d>({ x: 0, y: 0 });
 
@@ -120,18 +101,10 @@ const IAICanvas = () => {
   const handleWheel = useCanvasWheel(stageRef);
   const handleMouseDown = useCanvasMouseDown(stageRef);
   const handleMouseUp = useCanvasMouseUp(stageRef, didMouseMoveRef);
-  const handleMouseMove = useCanvasMouseMove(
-    stageRef,
-    didMouseMoveRef,
-    lastCursorPositionRef
-  );
-  const { handleDragStart, handleDragMove, handleDragEnd } =
-    useCanvasDragMove();
+  const handleMouseMove = useCanvasMouseMove(stageRef, didMouseMoveRef, lastCursorPositionRef);
+  const { handleDragStart, handleDragMove, handleDragEnd } = useCanvasDragMove();
   const handleMouseOut = useCanvasMouseOut();
-  const handleContextMenu = useCallback(
-    (e: KonvaEventObject<MouseEvent>) => e.evt.preventDefault(),
-    []
-  );
+  const handleContextMenu = useCallback((e: KonvaEventObject<MouseEvent>) => e.evt.preventDefault(), []);
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -169,14 +142,7 @@ const IAICanvas = () => {
   const scale = useMemo(() => ({ x: stageScale, y: stageScale }), [stageScale]);
 
   return (
-    <Flex
-      id="canvas-container"
-      ref={containerRef}
-      position="relative"
-      height="100%"
-      width="100%"
-      borderRadius="base"
-    >
+    <Flex id="canvas-container" ref={containerRef} position="relative" height="100%" width="100%" borderRadius="base">
       <Box position="absolute">
         <ChakraStage
           tabIndex={-1}
@@ -205,19 +171,10 @@ const IAICanvas = () => {
             <IAICanvasGrid />
           </Layer>
 
-          <Layer
-            id="base"
-            ref={canvasBaseLayerRefCallback}
-            listening={false}
-            imageSmoothingEnabled={shouldAntialias}
-          >
+          <Layer id="base" ref={canvasBaseLayerRefCallback} listening={false} imageSmoothingEnabled={shouldAntialias}>
             <IAICanvasObjectRenderer />
           </Layer>
-          <Layer
-            id="mask"
-            visible={isMaskEnabled && !isStaging}
-            listening={false}
-          >
+          <Layer id="mask" visible={isMaskEnabled && !isStaging} listening={false}>
             <IAICanvasMaskLines visible={true} listening={false} />
             <IAICanvasMaskCompositer listening={false} />
           </Layer>
@@ -225,17 +182,10 @@ const IAICanvas = () => {
             <IAICanvasBoundingBoxOverlay />
           </Layer>
           <Layer id="preview" imageSmoothingEnabled={shouldAntialias}>
-            {!isStaging && (
-              <IAICanvasToolPreview
-                visible={tool !== 'move'}
-                listening={false}
-              />
-            )}
+            {!isStaging && <IAICanvasToolPreview visible={tool !== 'move'} listening={false} />}
             <IAICanvasStagingArea listening={false} visible={isStaging} />
             {shouldShowIntermediates && <IAICanvasIntermediateImage />}
-            <IAICanvasBoundingBox
-              visible={shouldShowBoundingBox && !isStaging}
-            />
+            <IAICanvasBoundingBox visible={shouldShowBoundingBox && !isStaging} />
           </Layer>
         </ChakraStage>
       </Box>

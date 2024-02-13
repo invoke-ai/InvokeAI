@@ -1,5 +1,5 @@
-import type { StatGroupProps } from '@chakra-ui/react';
-import { StatGroup } from '@chakra-ui/react';
+import type { StatGroupProps } from '@invoke-ai/ui-library';
+import { StatGroup } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 
 const StatusStatGroup = ({ children, ...rest }: StatGroupProps) => (

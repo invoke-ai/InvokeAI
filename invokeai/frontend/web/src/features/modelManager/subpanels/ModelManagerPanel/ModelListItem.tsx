@@ -1,24 +1,22 @@
-import { Badge, Flex, useDisclosure } from '@chakra-ui/react';
+import {
+  Badge,
+  Button,
+  ConfirmationAlertDialog,
+  Flex,
+  IconButton,
+  Text,
+  Tooltip,
+  useDisclosure,
+} from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvConfirmationAlertDialog } from 'common/components/InvConfirmationAlertDialog/InvConfirmationAlertDialog';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvText } from 'common/components/InvText/wrapper';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
-import type {
-  LoRAModelConfigEntity,
-  MainModelConfigEntity,
-} from 'services/api/endpoints/models';
-import {
-  useDeleteLoRAModelsMutation,
-  useDeleteMainModelsMutation,
-} from 'services/api/endpoints/models';
+import type { LoRAModelConfigEntity, MainModelConfigEntity } from 'services/api/endpoints/models';
+import { useDeleteLoRAModelsMutation, useDeleteMainModelsMutation } from 'services/api/endpoints/models';
 
 type ModelListItemProps = {
   model: MainModelConfigEntity | LoRAModelConfigEntity;
@@ -62,9 +60,7 @@ const ModelListItem = (props: ModelListItemProps) => {
           dispatch(
             addToast(
               makeToast({
-                title: `${t('modelManager.modelDeleteFailed')}: ${
-                  model.model_name
-                }`,
+                title: `${t('modelManager.modelDeleteFailed')}: ${model.model_name}`,
                 status: 'error',
               })
             )
@@ -72,19 +68,12 @@ const ModelListItem = (props: ModelListItemProps) => {
         }
       });
     setSelectedModelId(undefined);
-  }, [
-    deleteMainModel,
-    deleteLoRAModel,
-    model,
-    setSelectedModelId,
-    dispatch,
-    t,
-  ]);
+  }, [deleteMainModel, deleteLoRAModel, model, setSelectedModelId, dispatch, t]);
 
   return (
     <Flex gap={2} alignItems="center" w="full">
       <Flex
-        as={InvButton}
+        as={Button}
         isChecked={isSelected}
         variant={isSelected ? 'solid' : 'ghost'}
         justifyContent="start"
@@ -96,24 +85,20 @@ const ModelListItem = (props: ModelListItemProps) => {
       >
         <Flex gap={4} alignItems="center">
           <Badge minWidth={14} p={0.5} fontSize="sm" variant="solid">
-            {
-              MODEL_TYPE_SHORT_MAP[
-                model.base_model as keyof typeof MODEL_TYPE_SHORT_MAP
-              ]
-            }
+            {MODEL_TYPE_SHORT_MAP[model.base_model as keyof typeof MODEL_TYPE_SHORT_MAP]}
           </Badge>
-          <InvTooltip label={model.description} placement="bottom">
-            <InvText>{model.model_name}</InvText>
-          </InvTooltip>
+          <Tooltip label={model.description} placement="bottom">
+            <Text>{model.model_name}</Text>
+          </Tooltip>
         </Flex>
       </Flex>
-      <InvIconButton
+      <IconButton
         onClick={onOpen}
         icon={<PiTrashSimpleBold />}
         aria-label={t('modelManager.deleteConfig')}
         colorScheme="error"
       />
-      <InvConfirmationAlertDialog
+      <ConfirmationAlertDialog
         isOpen={isOpen}
         onClose={onClose}
         title={t('modelManager.deleteModel')}
@@ -121,10 +106,10 @@ const ModelListItem = (props: ModelListItemProps) => {
         acceptButtonText={t('modelManager.delete')}
       >
         <Flex rowGap={4} flexDirection="column">
-          <InvText fontWeight="bold">{t('modelManager.deleteMsg1')}</InvText>
-          <InvText>{t('modelManager.deleteMsg2')}</InvText>
+          <Text fontWeight="bold">{t('modelManager.deleteMsg1')}</Text>
+          <Text>{t('modelManager.deleteMsg2')}</Text>
         </Flex>
-      </InvConfirmationAlertDialog>
+      </ConfirmationAlertDialog>
     </Flex>
   );
 };

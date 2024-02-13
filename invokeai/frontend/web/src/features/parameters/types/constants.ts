@@ -1,4 +1,4 @@
-import type { InvSelectOption } from 'common/components/InvSelect/types';
+import type { ComboboxOption } from '@invoke-ai/ui-library';
 import type { LoRAModelFormat } from 'services/api/types';
 
 /**
@@ -62,7 +62,7 @@ export const LORA_MODEL_FORMAT_MAP: {
 /**
  * Mapping of schedulers to human readable name
  */
-export const SCHEDULER_OPTIONS: InvSelectOption[] = [
+export const SCHEDULER_OPTIONS: ComboboxOption[] = [
   { value: 'euler', label: 'Euler' },
   { value: 'deis', label: 'DEIS' },
   { value: 'ddim', label: 'DDIM' },

@@ -1,13 +1,10 @@
-import { Box, Flex } from '@chakra-ui/react';
+import { Box, Flex } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import type {
-  TypesafeDraggableData,
-  TypesafeDroppableData,
-} from 'features/dnd/types';
+import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import ProgressImage from 'features/gallery/components/CurrentImage/ProgressImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
@@ -26,16 +23,10 @@ const selectLastSelectedImageName = createSelector(
 );
 
 const CurrentImagePreview = () => {
-  const shouldShowImageDetails = useAppSelector(
-    (s) => s.ui.shouldShowImageDetails
-  );
+  const shouldShowImageDetails = useAppSelector((s) => s.ui.shouldShowImageDetails);
   const imageName = useAppSelector(selectLastSelectedImageName);
-  const hasDenoiseProgress = useAppSelector((s) =>
-    Boolean(s.system.denoiseProgress)
-  );
-  const shouldShowProgressInViewer = useAppSelector(
-    (s) => s.ui.shouldShowProgressInViewer
-  );
+  const hasDenoiseProgress = useAppSelector((s) => Boolean(s.system.denoiseProgress));
+  const shouldShowProgressInViewer = useAppSelector((s) => s.ui.shouldShowProgressInViewer);
 
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
 
@@ -58,8 +49,7 @@ const CurrentImagePreview = () => {
   );
 
   // Show and hide the next/prev buttons on mouse move
-  const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] =
-    useState<boolean>(false);
+  const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
 
   const timeoutId = useRef(0);
 
@@ -97,35 +87,18 @@ const CurrentImagePreview = () => {
           fitContainer
           useThumbailFallback
           dropLabel={t('gallery.setCurrentImage')}
-          noContentFallback={
-            <IAINoContentFallback
-              icon={PiImageBold}
-              label={t('gallery.noImageSelected')}
-            />
-          }
+          noContentFallback={<IAINoContentFallback icon={PiImageBold} label={t('gallery.noImageSelected')} />}
           dataTestId="image-preview"
         />
       )}
       {shouldShowImageDetails && imageDTO && (
-        <Box
-          position="absolute"
-          top="0"
-          width="full"
-          height="full"
-          borderRadius="base"
-        >
+        <Box position="absolute" top="0" width="full" height="full" borderRadius="base">
           <ImageMetadataViewer image={imageDTO} />
         </Box>
       )}
       <AnimatePresence>
         {!shouldShowImageDetails && imageDTO && shouldShowNextPrevButtons && (
-          <motion.div
-            key="nextPrevButtons"
-            initial={initial}
-            animate={animate}
-            exit={exit}
-            style={motionStyles}
-          >
+          <motion.div key="nextPrevButtons" initial={initial} animate={animate} exit={exit} style={motionStyles}>
             <NextPrevImageButtons />
           </motion.div>
         )}

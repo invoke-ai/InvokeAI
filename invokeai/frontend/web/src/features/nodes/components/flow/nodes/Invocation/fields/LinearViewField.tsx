@@ -1,7 +1,5 @@
-import { Flex, Icon, Spacer } from '@chakra-ui/react';
+import { Flex, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { workflowExposedFieldRemoved } from 'features/nodes/store/workflowSlice';
@@ -21,8 +19,7 @@ type Props = {
 
 const LinearViewField = ({ nodeId, fieldName }: Props) => {
   const dispatch = useAppDispatch();
-  const { isMouseOverNode, handleMouseOut, handleMouseOver } =
-    useMouseOverNode(nodeId);
+  const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
   const { t } = useTranslation();
   const handleRemoveField = useCallback(() => {
     dispatch(workflowExposedFieldRemoved({ nodeId, fieldName }));
@@ -40,28 +37,18 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
       flexDir="column"
     >
       <Flex>
-        <EditableFieldTitle
-          nodeId={nodeId}
-          fieldName={fieldName}
-          kind="input"
-        />
+        <EditableFieldTitle nodeId={nodeId} fieldName={fieldName} kind="input" />
         <Spacer />
-        <InvTooltip
-          label={
-            <FieldTooltipContent
-              nodeId={nodeId}
-              fieldName={fieldName}
-              kind="input"
-            />
-          }
+        <Tooltip
+          label={<FieldTooltipContent nodeId={nodeId} fieldName={fieldName} kind="input" />}
           openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
           placement="top"
         >
           <Flex h="full" alignItems="center">
             <Icon fontSize="sm" color="base.300" as={PiInfoBold} />
           </Flex>
-        </InvTooltip>
-        <InvIconButton
+        </Tooltip>
+        <IconButton
           aria-label={t('nodes.removeLinearView')}
           tooltip={t('nodes.removeLinearView')}
           variant="ghost"

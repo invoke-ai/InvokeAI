@@ -2,6 +2,7 @@
 
 from logging import Logger
 
+from invokeai.app.services.item_storage.item_storage_memory import ItemStorageMemory
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.backend.model_manager.metadata import ModelMetadataStore
 from invokeai.backend.util.logging import InvokeAILogger
@@ -22,7 +23,6 @@ from ..services.invocation_queue.invocation_queue_memory import MemoryInvocation
 from ..services.invocation_services import InvocationServices
 from ..services.invocation_stats.invocation_stats_default import InvocationStatsService
 from ..services.invoker import Invoker
-from ..services.item_storage.item_storage_sqlite import SqliteItemStorage
 from ..services.latents_storage.latents_storage_disk import DiskLatentsStorage
 from ..services.latents_storage.latents_storage_forward_cache import ForwardCacheLatentsStorage
 from ..services.model_install import ModelInstallService
@@ -80,7 +80,7 @@ class ApiDependencies:
         board_records = SqliteBoardRecordStorage(db=db)
         boards = BoardService()
         events = FastAPIEventService(event_handler_id)
-        graph_execution_manager = SqliteItemStorage[GraphExecutionState](db=db, table_name="graph_executions")
+        graph_execution_manager = ItemStorageMemory[GraphExecutionState]()
         image_records = SqliteImageRecordStorage(db=db)
         images = ImageService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)

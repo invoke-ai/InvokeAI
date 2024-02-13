@@ -66,10 +66,7 @@ export const systemSlice = createSlice({
     shouldLogToConsoleChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldLogToConsole = action.payload;
     },
-    shouldAntialiasProgressImageChanged: (
-      state,
-      action: PayloadAction<boolean>
-    ) => {
+    shouldAntialiasProgressImageChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldAntialiasProgressImage = action.payload;
     },
     languageChanged: (state, action: PayloadAction<Language>) => {
@@ -81,10 +78,7 @@ export const systemSlice = createSlice({
     shouldUseWatermarkerChanged(state, action: PayloadAction<boolean>) {
       state.shouldUseWatermarker = action.payload;
     },
-    setShouldEnableInformationalPopovers(
-      state,
-      action: PayloadAction<boolean>
-    ) {
+    setShouldEnableInformationalPopovers(state, action: PayloadAction<boolean>) {
       state.shouldEnableInformationalPopovers = action.payload;
     },
     setUploadProgress: (
@@ -182,11 +176,7 @@ export const systemSlice = createSlice({
     });
 
     builder.addCase(socketQueueItemStatusChanged, (state, action) => {
-      if (
-        ['completed', 'canceled', 'failed'].includes(
-          action.payload.data.queue_item.status
-        )
-      ) {
+      if (['completed', 'canceled', 'failed'].includes(action.payload.data.queue_item.status)) {
         state.status = 'CONNECTED';
         state.denoiseProgress = null;
       }
@@ -224,6 +214,7 @@ export const {
   setUploadProgress,
   setUploadProgressToastId,
 } = systemSlice.actions;
+
 
 const isAnyServerError = isAnyOf(
   socketInvocationError,

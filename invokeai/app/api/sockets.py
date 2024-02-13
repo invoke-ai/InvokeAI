@@ -16,7 +16,7 @@ class SocketIO:
 
     def __init__(self, app: FastAPI):
         self.__sio = AsyncServer(async_mode="asgi", cors_allowed_origins="*")
-        self.__app = ASGIApp(socketio_server=self.__sio, socketio_path="socket.io")
+        self.__app = ASGIApp(socketio_server=self.__sio, socketio_path="/ws/socket.io")
         app.mount("/ws", self.__app)
 
         self.__sio.on("subscribe_queue", handler=self._handle_sub_queue)

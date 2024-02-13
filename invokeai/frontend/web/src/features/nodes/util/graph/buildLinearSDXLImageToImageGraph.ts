@@ -1,10 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
-import type {
-  ImageResizeInvocation,
-  ImageToLatentsInvocation,
-  NonNullableGraph,
-} from 'services/api/types';
+import type { ImageResizeInvocation, ImageToLatentsInvocation, NonNullableGraph } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
@@ -35,9 +31,7 @@ import { addCoreMetadataNode } from './metadata';
 /**
  * Builds the Image to Image tab graph.
  */
-export const buildLinearSDXLImageToImageGraph = (
-  state: RootState
-): NonNullableGraph => {
+export const buildLinearSDXLImageToImageGraph = (state: RootState): NonNullableGraph => {
   const log = logger('nodes');
   const {
     positivePrompt,
@@ -89,8 +83,7 @@ export const buildLinearSDXLImageToImageGraph = (
   const use_cpu = shouldUseCpuNoise;
 
   // Construct Style Prompt
-  const { positiveStylePrompt, negativeStylePrompt } =
-    getSDXLStylePrompts(state);
+  const { positiveStylePrompt, negativeStylePrompt } = getSDXLStylePrompts(state);
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
   const graph: NonNullableGraph = {
@@ -133,11 +126,10 @@ export const buildLinearSDXLImageToImageGraph = (
         type: 'denoise_latents',
         id: SDXL_DENOISE_LATENTS,
         cfg_scale,
+        cfg_rescale_multiplier,
         scheduler,
         steps,
-        denoising_start: refinerModel
-          ? Math.min(refinerStart, 1 - strength)
-          : 1 - strength,
+        denoising_start: refinerModel ? Math.min(refinerStart, 1 - strength) : 1 - strength,
         denoising_end: refinerModel ? refinerStart : 1,
         is_intermediate,
       },
@@ -261,10 +253,7 @@ export const buildLinearSDXLImageToImageGraph = (
   };
 
   // handle `fit`
-  if (
-    shouldFitToWidthHeight &&
-    (initialImage.width !== width || initialImage.height !== height)
-  ) {
+  if (shouldFitToWidthHeight && (initialImage.width !== width || initialImage.height !== height)) {
     // The init image needs to be resized to the specified width and height before being passed to `IMAGE_TO_LATENTS`
 
     // Create a resize node, explicitly setting its image

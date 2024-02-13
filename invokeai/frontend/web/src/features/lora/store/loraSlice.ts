@@ -1,16 +1,18 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
 import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
 
 export type LoRA = ParameterLoRAModel & {
   id: string;
   weight: number;
+  isEnabled?: boolean;
 };
 
-export const defaultLoRAConfig = {
+export const defaultLoRAConfig: Pick<LoRA, 'weight' | 'isEnabled'> = {
   weight: 0.75,
+  isEnabled: true,
 };
 
 export type LoraState = {
@@ -31,12 +33,9 @@ export const loraSlice = createSlice({
       const { model_name, id, base_model } = action.payload;
       state.loras[id] = { id, model_name, base_model, ...defaultLoRAConfig };
     },
-    loraRecalled: (
-      state,
-      action: PayloadAction<LoRAModelConfigEntity & { weight: number }>
-    ) => {
+    loraRecalled: (state, action: PayloadAction<LoRAModelConfigEntity & { weight: number }>) => {
       const { model_name, id, base_model, weight } = action.payload;
-      state.loras[id] = { id, model_name, base_model, weight };
+      state.loras[id] = { id, model_name, base_model, weight, isEnabled: true };
     },
     loraRemoved: (state, action: PayloadAction<string>) => {
       const id = action.payload;
@@ -45,10 +44,7 @@ export const loraSlice = createSlice({
     lorasCleared: (state) => {
       state.loras = {};
     },
-    loraWeightChanged: (
-      state,
-      action: PayloadAction<{ id: string; weight: number }>
-    ) => {
+    loraWeightChanged: (state, action: PayloadAction<{ id: string; weight: number }>) => {
       const { id, weight } = action.payload;
       const lora = state.loras[id];
       if (!lora) {
@@ -64,6 +60,14 @@ export const loraSlice = createSlice({
       }
       lora.weight = defaultLoRAConfig.weight;
     },
+    loraIsEnabledChanged: (state, action: PayloadAction<Pick<LoRA, 'id' | 'isEnabled'>>) => {
+      const { id, isEnabled } = action.payload;
+      const lora = state.loras[id];
+      if (!lora) {
+        return;
+      }
+      lora.isEnabled = isEnabled;
+    },
   },
 });
 
@@ -72,11 +76,10 @@ export const {
   loraRemoved,
   loraWeightChanged,
   loraWeightReset,
+  loraIsEnabledChanged,
   lorasCleared,
   loraRecalled,
 } = loraSlice.actions;
-
-export default loraSlice.reducer;
 
 export const selectLoraSlice = (state: RootState) => state.lora;
 
@@ -86,4 +89,11 @@ export const migrateLoRAState = (state: any): any => {
     state._version = 1;
   }
   return state;
+};
+
+export const loraPersistConfig: PersistConfig<LoraState> = {
+  name: loraSlice.name,
+  initialState: initialLoraState,
+  migrate: migrateLoRAState,
+  persistDenylist: [],
 };

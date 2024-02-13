@@ -117,6 +117,11 @@ Mac and Linux machines, and runs on GPU cards with as little as 4 GB of RAM.
 
 ## :octicons-gift-24: InvokeAI Features
 
+### Installation
+  - [Automated Installer](installation/010_INSTALL_AUTOMATED.md)
+  - [Manual Installation](installation/020_INSTALL_MANUAL.md)
+  - [Docker Installation](installation/040_INSTALL_DOCKER.md)
+
 ### The InvokeAI Web Interface
 - [WebUI overview](features/WEB.md)
 - [WebUI hotkey reference guide](features/WEBUIHOTKEYS.md)

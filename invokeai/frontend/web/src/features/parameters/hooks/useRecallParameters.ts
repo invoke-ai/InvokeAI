@@ -2,25 +2,14 @@ import { useAppToaster } from 'app/components/Toaster';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
-import {
-  controlAdapterRecalled,
-  controlAdaptersReset,
-} from 'features/controlAdapters/store/controlAdaptersSlice';
-import type {
-  ControlNetConfig,
-  IPAdapterConfig,
-  T2IAdapterConfig,
-} from 'features/controlAdapters/store/types';
+import { controlAdapterRecalled, controlAdaptersReset } from 'features/controlAdapters/store/controlAdaptersSlice';
+import type { ControlNetConfig, IPAdapterConfig, T2IAdapterConfig } from 'features/controlAdapters/store/types';
 import {
   initialControlNet,
   initialIPAdapter,
   initialT2IAdapter,
 } from 'features/controlAdapters/util/buildControlAdapter';
-import {
-  setHrfEnabled,
-  setHrfMethod,
-  setHrfStrength,
-} from 'features/hrf/store/hrfSlice';
+import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import { loraRecalled, lorasCleared } from 'features/lora/store/loraSlice';
 import type {
   ControlNetMetadataItem,
@@ -29,12 +18,9 @@ import type {
   LoRAMetadataItem,
   T2IAdapterMetadataItem,
 } from 'features/nodes/types/metadata';
+import { initialImageSelected, modelSelected } from 'features/parameters/store/actions';
 import {
-  initialImageSelected,
-  modelSelected,
-} from 'features/parameters/store/actions';
-import {
-  heightChanged,
+  heightRecalled,
   selectGenerationSlice,
   setCfgRescaleMultiplier,
   setCfgScale,
@@ -45,8 +31,9 @@ import {
   setSeed,
   setSteps,
   vaeSelected,
-  widthChanged,
+  widthRecalled,
 } from 'features/parameters/store/generationSlice';
+import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import {
   isParameterCFGRescaleMultiplier,
   isParameterCFGScale,
@@ -99,10 +86,7 @@ import {
 import type { ImageDTO } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 
-const selectModel = createMemoizedSelector(
-  selectGenerationSlice,
-  (generation) => generation.model
-);
+const selectModel = createMemoizedSelector(selectGenerationSlice, (generation) => generation.model);
 
 export const useRecallParameters = () => {
   const dispatch = useAppDispatch();
@@ -158,12 +142,7 @@ export const useRecallParameters = () => {
    * Recall both prompts with toast
    */
   const recallBothPrompts = useCallback(
-    (
-      positivePrompt: unknown,
-      negativePrompt: unknown,
-      positiveStylePrompt: unknown,
-      negativeStylePrompt: unknown
-    ) => {
+    (positivePrompt: unknown, negativePrompt: unknown, positiveStylePrompt: unknown, negativeStylePrompt: unknown) => {
       if (
         isParameterPositivePrompt(positivePrompt) ||
         isParameterNegativePrompt(negativePrompt) ||
@@ -372,7 +351,7 @@ export const useRecallParameters = () => {
         parameterNotSetToast();
         return;
       }
-      dispatch(widthChanged(width));
+      dispatch(widthRecalled(width));
       parameterSetToast();
     },
     [dispatch, parameterSetToast, parameterNotSetToast]
@@ -387,7 +366,7 @@ export const useRecallParameters = () => {
         parameterNotSetToast();
         return;
       }
-      dispatch(heightChanged(height));
+      dispatch(heightRecalled(height));
       parameterSetToast();
     },
     [dispatch, parameterSetToast, parameterNotSetToast]
@@ -406,8 +385,8 @@ export const useRecallParameters = () => {
         allParameterNotSetToast();
         return;
       }
-      dispatch(heightChanged(height));
-      dispatch(widthChanged(width));
+      dispatch(heightRecalled(height));
+      dispatch(widthRecalled(width));
       allParameterSetToast();
     },
     [dispatch, allParameterSetToast, allParameterNotSetToast]
@@ -480,7 +459,7 @@ export const useRecallParameters = () => {
   const { data: loraModels } = useGetLoRAModelsQuery(undefined);
 
   const prepareLoRAMetadataItem = useCallback(
-    (loraMetadataItem: LoRAMetadataItem) => {
+    (loraMetadataItem: LoRAMetadataItem, newModel?: ParameterModel) => {
       if (!isParameterLoRAModel(loraMetadataItem.lora)) {
         return { lora: null, error: 'Invalid LoRA model' };
       }
@@ -488,18 +467,14 @@ export const useRecallParameters = () => {
       const { base_model, model_name } = loraMetadataItem.lora;
 
       const matchingLoRA = loraModels
-        ? loraModelsAdapterSelectors.selectById(
-            loraModels,
-            `${base_model}/lora/${model_name}`
-          )
+        ? loraModelsAdapterSelectors.selectById(loraModels, `${base_model}/lora/${model_name}`)
         : undefined;
 
       if (!matchingLoRA) {
         return { lora: null, error: 'LoRA model is not installed' };
       }
 
-      const isCompatibleBaseModel =
-        matchingLoRA?.base_model === model?.base_model;
+      const isCompatibleBaseModel = matchingLoRA?.base_model === (newModel ?? model)?.base_model;
 
       if (!isCompatibleBaseModel) {
         return {
@@ -510,7 +485,7 @@ export const useRecallParameters = () => {
 
       return { lora: matchingLoRA, error: null };
     },
-    [loraModels, model?.base_model]
+    [loraModels, model]
   );
 
   const recallLoRA = useCallback(
@@ -522,9 +497,7 @@ export const useRecallParameters = () => {
         return;
       }
 
-      dispatch(
-        loraRecalled({ ...result.lora, weight: loraMetadataItem.weight })
-      );
+      dispatch(loraRecalled({ ...result.lora, weight: loraMetadataItem.weight }));
 
       parameterSetToast();
     },
@@ -538,20 +511,13 @@ export const useRecallParameters = () => {
   const { data: controlNetModels } = useGetControlNetModelsQuery(undefined);
 
   const prepareControlNetMetadataItem = useCallback(
-    (controlnetMetadataItem: ControlNetMetadataItem) => {
+    (controlnetMetadataItem: ControlNetMetadataItem, newModel?: ParameterModel) => {
       if (!isParameterControlNetModel(controlnetMetadataItem.control_model)) {
         return { controlnet: null, error: 'Invalid ControlNet model' };
       }
 
-      const {
-        image,
-        control_model,
-        control_weight,
-        begin_step_percent,
-        end_step_percent,
-        control_mode,
-        resize_mode,
-      } = controlnetMetadataItem;
+      const { image, control_model, control_weight, begin_step_percent, end_step_percent, control_mode, resize_mode } =
+        controlnetMetadataItem;
 
       const matchingControlNetModel = controlNetModels
         ? controlNetModelsAdapterSelectors.selectById(
@@ -564,8 +530,7 @@ export const useRecallParameters = () => {
         return { controlnet: null, error: 'ControlNet model is not installed' };
       }
 
-      const isCompatibleBaseModel =
-        matchingControlNetModel?.base_model === model?.base_model;
+      const isCompatibleBaseModel = matchingControlNetModel?.base_model === (newModel ?? model)?.base_model;
 
       if (!isCompatibleBaseModel) {
         return {
@@ -582,10 +547,7 @@ export const useRecallParameters = () => {
         type: 'controlnet',
         isEnabled: true,
         model: matchingControlNetModel,
-        weight:
-          typeof control_weight === 'number'
-            ? control_weight
-            : initialControlNet.weight,
+        weight: typeof control_weight === 'number' ? control_weight : initialControlNet.weight,
         beginStepPct: begin_step_percent || initialControlNet.beginStepPct,
         endStepPct: end_step_percent || initialControlNet.endStepPct,
         controlMode: control_mode || initialControlNet.controlMode,
@@ -600,7 +562,7 @@ export const useRecallParameters = () => {
 
       return { controlnet, error: null };
     },
-    [controlNetModels, model?.base_model]
+    [controlNetModels, model]
   );
 
   const recallControlNet = useCallback(
@@ -616,12 +578,7 @@ export const useRecallParameters = () => {
 
       parameterSetToast();
     },
-    [
-      prepareControlNetMetadataItem,
-      dispatch,
-      parameterSetToast,
-      parameterNotSetToast,
-    ]
+    [prepareControlNetMetadataItem, dispatch, parameterSetToast, parameterNotSetToast]
   );
 
   /**
@@ -631,21 +588,13 @@ export const useRecallParameters = () => {
   const { data: t2iAdapterModels } = useGetT2IAdapterModelsQuery(undefined);
 
   const prepareT2IAdapterMetadataItem = useCallback(
-    (t2iAdapterMetadataItem: T2IAdapterMetadataItem) => {
-      if (
-        !isParameterControlNetModel(t2iAdapterMetadataItem.t2i_adapter_model)
-      ) {
+    (t2iAdapterMetadataItem: T2IAdapterMetadataItem, newModel?: ParameterModel) => {
+      if (!isParameterControlNetModel(t2iAdapterMetadataItem.t2i_adapter_model)) {
         return { controlnet: null, error: 'Invalid ControlNet model' };
       }
 
-      const {
-        image,
-        t2i_adapter_model,
-        weight,
-        begin_step_percent,
-        end_step_percent,
-        resize_mode,
-      } = t2iAdapterMetadataItem;
+      const { image, t2i_adapter_model, weight, begin_step_percent, end_step_percent, resize_mode } =
+        t2iAdapterMetadataItem;
 
       const matchingT2IAdapterModel = t2iAdapterModels
         ? t2iAdapterModelsAdapterSelectors.selectById(
@@ -658,8 +607,7 @@ export const useRecallParameters = () => {
         return { controlnet: null, error: 'ControlNet model is not installed' };
       }
 
-      const isCompatibleBaseModel =
-        matchingT2IAdapterModel?.base_model === model?.base_model;
+      const isCompatibleBaseModel = matchingT2IAdapterModel?.base_model === (newModel ?? model)?.base_model;
 
       if (!isCompatibleBaseModel) {
         return {
@@ -690,7 +638,7 @@ export const useRecallParameters = () => {
 
       return { t2iAdapter, error: null };
     },
-    [model?.base_model, t2iAdapterModels]
+    [model, t2iAdapterModels]
   );
 
   const recallT2IAdapter = useCallback(
@@ -706,12 +654,7 @@ export const useRecallParameters = () => {
 
       parameterSetToast();
     },
-    [
-      prepareT2IAdapterMetadataItem,
-      dispatch,
-      parameterSetToast,
-      parameterNotSetToast,
-    ]
+    [prepareT2IAdapterMetadataItem, dispatch, parameterSetToast, parameterNotSetToast]
   );
 
   /**
@@ -721,18 +664,12 @@ export const useRecallParameters = () => {
   const { data: ipAdapterModels } = useGetIPAdapterModelsQuery(undefined);
 
   const prepareIPAdapterMetadataItem = useCallback(
-    (ipAdapterMetadataItem: IPAdapterMetadataItem) => {
+    (ipAdapterMetadataItem: IPAdapterMetadataItem, newModel?: ParameterModel) => {
       if (!isParameterIPAdapterModel(ipAdapterMetadataItem?.ip_adapter_model)) {
         return { ipAdapter: null, error: 'Invalid IP Adapter model' };
       }
 
-      const {
-        image,
-        ip_adapter_model,
-        weight,
-        begin_step_percent,
-        end_step_percent,
-      } = ipAdapterMetadataItem;
+      const { image, ip_adapter_model, weight, begin_step_percent, end_step_percent } = ipAdapterMetadataItem;
 
       const matchingIPAdapterModel = ipAdapterModels
         ? ipAdapterModelsAdapterSelectors.selectById(
@@ -745,8 +682,7 @@ export const useRecallParameters = () => {
         return { ipAdapter: null, error: 'IP Adapter model is not installed' };
       }
 
-      const isCompatibleBaseModel =
-        matchingIPAdapterModel?.base_model === model?.base_model;
+      const isCompatibleBaseModel = matchingIPAdapterModel?.base_model === (newModel ?? model)?.base_model;
 
       if (!isCompatibleBaseModel) {
         return {
@@ -768,7 +704,7 @@ export const useRecallParameters = () => {
 
       return { ipAdapter, error: null };
     },
-    [ipAdapterModels, model?.base_model]
+    [ipAdapterModels, model]
   );
 
   const recallIPAdapter = useCallback(
@@ -784,12 +720,7 @@ export const useRecallParameters = () => {
 
       parameterSetToast();
     },
-    [
-      prepareIPAdapterMetadataItem,
-      dispatch,
-      parameterSetToast,
-      parameterNotSetToast,
-    ]
+    [prepareIPAdapterMetadataItem, dispatch, parameterSetToast, parameterNotSetToast]
   );
 
   /*
@@ -840,16 +771,19 @@ export const useRecallParameters = () => {
         t2iAdapters,
       } = metadata;
 
+      let newModel: ParameterModel | undefined = undefined;
+
+      if (isParameterModel(model)) {
+        newModel = model;
+        dispatch(modelSelected(model));
+      }
+
       if (isParameterCFGScale(cfg_scale)) {
         dispatch(setCfgScale(cfg_scale));
       }
 
       if (isParameterCFGRescaleMultiplier(cfg_rescale_multiplier)) {
         dispatch(setCfgRescaleMultiplier(cfg_rescale_multiplier));
-      }
-
-      if (isParameterModel(model)) {
-        dispatch(modelSelected(model));
       }
 
       if (isParameterPositivePrompt(positive_prompt)) {
@@ -880,11 +814,11 @@ export const useRecallParameters = () => {
       }
 
       if (isParameterWidth(width)) {
-        dispatch(widthChanged(width));
+        dispatch(widthRecalled(width));
       }
 
       if (isParameterHeight(height)) {
-        dispatch(heightChanged(height));
+        dispatch(heightRecalled(height));
       }
 
       if (isParameterStrength(strength)) {
@@ -927,24 +861,12 @@ export const useRecallParameters = () => {
         dispatch(setRefinerScheduler(refiner_scheduler));
       }
 
-      if (
-        isParameterSDXLRefinerPositiveAestheticScore(
-          refiner_positive_aesthetic_score
-        )
-      ) {
-        dispatch(
-          setRefinerPositiveAestheticScore(refiner_positive_aesthetic_score)
-        );
+      if (isParameterSDXLRefinerPositiveAestheticScore(refiner_positive_aesthetic_score)) {
+        dispatch(setRefinerPositiveAestheticScore(refiner_positive_aesthetic_score));
       }
 
-      if (
-        isParameterSDXLRefinerNegativeAestheticScore(
-          refiner_negative_aesthetic_score
-        )
-      ) {
-        dispatch(
-          setRefinerNegativeAestheticScore(refiner_negative_aesthetic_score)
-        );
+      if (isParameterSDXLRefinerNegativeAestheticScore(refiner_negative_aesthetic_score)) {
+        dispatch(setRefinerNegativeAestheticScore(refiner_negative_aesthetic_score));
       }
 
       if (isParameterSDXLRefinerStart(refiner_start)) {
@@ -953,7 +875,7 @@ export const useRecallParameters = () => {
 
       dispatch(lorasCleared());
       loras?.forEach((lora) => {
-        const result = prepareLoRAMetadataItem(lora);
+        const result = prepareLoRAMetadataItem(lora, newModel);
         if (result.lora) {
           dispatch(loraRecalled({ ...result.lora, weight: lora.weight }));
         }
@@ -961,21 +883,21 @@ export const useRecallParameters = () => {
 
       dispatch(controlAdaptersReset());
       controlnets?.forEach((controlnet) => {
-        const result = prepareControlNetMetadataItem(controlnet);
+        const result = prepareControlNetMetadataItem(controlnet, newModel);
         if (result.controlnet) {
           dispatch(controlAdapterRecalled(result.controlnet));
         }
       });
 
       ipAdapters?.forEach((ipAdapter) => {
-        const result = prepareIPAdapterMetadataItem(ipAdapter);
+        const result = prepareIPAdapterMetadataItem(ipAdapter, newModel);
         if (result.ipAdapter) {
           dispatch(controlAdapterRecalled(result.ipAdapter));
         }
       });
 
       t2iAdapters?.forEach((t2iAdapter) => {
-        const result = prepareT2IAdapterMetadataItem(t2iAdapter);
+        const result = prepareT2IAdapterMetadataItem(t2iAdapter, newModel);
         if (result.t2iAdapter) {
           dispatch(controlAdapterRecalled(result.t2iAdapter));
         }

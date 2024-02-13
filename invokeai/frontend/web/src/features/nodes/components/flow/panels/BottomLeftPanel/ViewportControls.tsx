@@ -1,6 +1,5 @@
+import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import {
   // shouldShowFieldTypeLegendChanged,
   shouldShowMinimapPanelChanged,
@@ -22,9 +21,7 @@ const ViewportControls = () => {
   // const shouldShowFieldTypeLegend = useAppSelector(
   //   (s) => s.nodes.shouldShowFieldTypeLegend
   // );
-  const shouldShowMinimapPanel = useAppSelector(
-    (s) => s.nodes.shouldShowMinimapPanel
-  );
+  const shouldShowMinimapPanel = useAppSelector((s) => s.nodes.shouldShowMinimapPanel);
 
   const handleClickedZoomIn = useCallback(() => {
     zoomIn();
@@ -47,55 +44,47 @@ const ViewportControls = () => {
   }, [shouldShowMinimapPanel, dispatch]);
 
   return (
-    <InvButtonGroup orientation="vertical">
-      <InvIconButton
+    <ButtonGroup orientation="vertical">
+      <IconButton
         tooltip={t('nodes.zoomInNodes')}
         aria-label={t('nodes.zoomInNodes')}
         onClick={handleClickedZoomIn}
         icon={<PiMagnifyingGlassPlusBold />}
       />
-      <InvIconButton
+      <IconButton
         tooltip={t('nodes.zoomOutNodes')}
         aria-label={t('nodes.zoomOutNodes')}
         onClick={handleClickedZoomOut}
         icon={<PiMagnifyingGlassMinusBold />}
       />
-      <InvIconButton
+      <IconButton
         tooltip={t('nodes.fitViewportNodes')}
         aria-label={t('nodes.fitViewportNodes')}
         onClick={handleClickedFitView}
         icon={<PiFrameCornersBold />}
       />
-      {/* <InvTooltip
+      {/* <Tooltip
         label={
           shouldShowFieldTypeLegend
             ? t('nodes.hideLegendNodes')
             : t('nodes.showLegendNodes')
         }
       >
-        <InvIconButton
+        <IconButton
           aria-label="Toggle field type legend"
           isChecked={shouldShowFieldTypeLegend}
           onClick={handleClickedToggleFieldTypeLegend}
           icon={<FaInfo />}
         />
-      </InvTooltip> */}
-      <InvIconButton
-        tooltip={
-          shouldShowMinimapPanel
-            ? t('nodes.hideMinimapnodes')
-            : t('nodes.showMinimapnodes')
-        }
-        aria-label={
-          shouldShowMinimapPanel
-            ? t('nodes.hideMinimapnodes')
-            : t('nodes.showMinimapnodes')
-        }
+      </Tooltip> */}
+      <IconButton
+        tooltip={shouldShowMinimapPanel ? t('nodes.hideMinimapnodes') : t('nodes.showMinimapnodes')}
+        aria-label={shouldShowMinimapPanel ? t('nodes.hideMinimapnodes') : t('nodes.showMinimapnodes')}
         isChecked={shouldShowMinimapPanel}
         onClick={handleClickedToggleMiniMapPanel}
         icon={<PiMapPinBold />}
       />
-    </InvButtonGroup>
+    </ButtonGroup>
   );
 };
 

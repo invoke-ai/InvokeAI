@@ -7,12 +7,9 @@ import { useMemo } from 'react';
 export const useNodeTemplateByType = (type: string) => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(
-        selectNodeTemplatesSlice,
-        (nodeTemplates): InvocationTemplate | undefined => {
-          return nodeTemplates.templates[type];
-        }
-      ),
+      createMemoizedSelector(selectNodeTemplatesSlice, (nodeTemplates): InvocationTemplate | undefined => {
+        return nodeTemplates.templates[type];
+      }),
     [type]
   );
 

@@ -1,21 +1,11 @@
-import { Flex } from '@chakra-ui/react';
+import { Flex, IconButton, Input, Text } from '@invoke-ai/ui-library';
 import { useForm } from '@mantine/form';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvInput } from 'common/components/InvInput/InvInput';
-import { InvText } from 'common/components/InvText/wrapper';
-import {
-  setAdvancedAddScanModel,
-  setSearchFolder,
-} from 'features/modelManager/store/modelManagerSlice';
+import { setAdvancedAddScanModel, setSearchFolder } from 'features/modelManager/store/modelManagerSlice';
 import type { CSSProperties } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  PiArrowsCounterClockwiseBold,
-  PiMagnifyingGlassBold,
-  PiTrashSimpleBold,
-} from 'react-icons/pi';
+import { PiArrowsCounterClockwiseBold, PiMagnifyingGlassBold, PiTrashSimpleBold } from 'react-icons/pi';
 import { useGetModelsInFolderQuery } from 'services/api/endpoints/models';
 
 type SearchFolderForm = {
@@ -55,38 +45,16 @@ function SearchFolderForm() {
   }, [dispatch]);
 
   return (
-    <form
-      onSubmit={searchFolderForm.onSubmit((values) =>
-        searchFolderFormSubmitHandler(values)
-      )}
-      style={formStyles}
-    >
+    <form onSubmit={searchFolderForm.onSubmit((values) => searchFolderFormSubmitHandler(values))} style={formStyles}>
       <Flex w="100%" gap={2} borderRadius={4} alignItems="center">
         <Flex w="100%" alignItems="center" gap={4} minH={12}>
-          <InvText
-            fontSize="sm"
-            fontWeight="semibold"
-            color="base.300"
-            minW="max-content"
-          >
+          <Text fontSize="sm" fontWeight="semibold" color="base.300" minW="max-content">
             {t('common.folder')}
-          </InvText>
+          </Text>
           {!searchFolder ? (
-            <InvInput
-              w="100%"
-              size="md"
-              {...searchFolderForm.getInputProps('folder')}
-            />
+            <Input w="100%" size="md" {...searchFolderForm.getInputProps('folder')} />
           ) : (
-            <Flex
-              w="100%"
-              p={2}
-              px={4}
-              bg="base.700"
-              borderRadius={4}
-              fontSize="sm"
-              fontWeight="bold"
-            >
+            <Flex w="100%" p={2} px={4} bg="base.700" borderRadius={4} fontSize="sm" fontWeight="bold">
               {searchFolder}
             </Flex>
           )}
@@ -94,7 +62,7 @@ function SearchFolderForm() {
 
         <Flex gap={2}>
           {!searchFolder ? (
-            <InvIconButton
+            <IconButton
               aria-label={t('modelManager.findModels')}
               tooltip={t('modelManager.findModels')}
               icon={<PiMagnifyingGlassBold />}
@@ -103,7 +71,7 @@ function SearchFolderForm() {
               type="submit"
             />
           ) : (
-            <InvIconButton
+            <IconButton
               aria-label={t('modelManager.scanAgain')}
               tooltip={t('modelManager.scanAgain')}
               icon={<PiArrowsCounterClockwiseBold />}
@@ -113,7 +81,7 @@ function SearchFolderForm() {
             />
           )}
 
-          <InvIconButton
+          <IconButton
             aria-label={t('modelManager.clearCheckpointFolder')}
             tooltip={t('modelManager.clearCheckpointFolder')}
             icon={<PiTrashSimpleBold />}

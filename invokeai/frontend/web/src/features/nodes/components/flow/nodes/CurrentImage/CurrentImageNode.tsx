@@ -1,9 +1,8 @@
-import { Flex, Image } from '@chakra-ui/react';
+import { Flex, Image, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { InvText } from 'common/components/InvText/wrapper';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
@@ -16,18 +15,14 @@ import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { NodeProps } from 'reactflow';
 
-const selector = createMemoizedSelector(
-  selectSystemSlice,
-  selectGallerySlice,
-  (system, gallery) => {
-    const imageDTO = gallery.selection[gallery.selection.length - 1];
+const selector = createMemoizedSelector(selectSystemSlice, selectGallerySlice, (system, gallery) => {
+  const imageDTO = gallery.selection[gallery.selection.length - 1];
 
-    return {
-      imageDTO,
-      progressImage: system.denoiseProgress?.progress_image,
-    };
-  }
-);
+  return {
+    imageDTO,
+    progressImage: system.denoiseProgress?.progress_image,
+  };
+});
 
 const CurrentImageNode = (props: NodeProps) => {
   const { progressImage, imageDTO } = useAppSelector(selector);
@@ -35,13 +30,7 @@ const CurrentImageNode = (props: NodeProps) => {
   if (progressImage) {
     return (
       <Wrapper nodeProps={props}>
-        <Image
-          src={progressImage.dataURL}
-          w="full"
-          h="full"
-          objectFit="contain"
-          borderRadius="base"
-        />
+        <Image src={progressImage.dataURL} w="full" h="full" objectFit="contain" borderRadius="base" />
       </Wrapper>
     );
   }
@@ -75,11 +64,7 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
   }, []);
   const { t } = useTranslation();
   return (
-    <NodeWrapper
-      nodeId={props.nodeProps.id}
-      selected={props.nodeProps.selected}
-      width={384}
-    >
+    <NodeWrapper nodeId={props.nodeProps.id} selected={props.nodeProps.selected} width={384}>
       <Flex
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -87,33 +72,15 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
         position="relative"
         flexDirection="column"
       >
-        <Flex
-          layerStyle="nodeHeader"
-          borderTopRadius="base"
-          alignItems="center"
-          justifyContent="center"
-          h={8}
-        >
-          <InvText fontSize="sm" fontWeight="semibold" color="base.200">
+        <Flex layerStyle="nodeHeader" borderTopRadius="base" alignItems="center" justifyContent="center" h={8}>
+          <Text fontSize="sm" fontWeight="semibold" color="base.200">
             {t('nodes.currentImage')}
-          </InvText>
+          </Text>
         </Flex>
-        <Flex
-          layerStyle="nodeBody"
-          w="full"
-          h="full"
-          borderBottomRadius="base"
-          p={2}
-        >
+        <Flex layerStyle="nodeBody" w="full" h="full" borderBottomRadius="base" p={2}>
           {props.children}
           {isHovering && (
-            <motion.div
-              key="nextPrevButtons"
-              initial={initial}
-              animate={animate}
-              exit={exit}
-              style={styles}
-            >
+            <motion.div key="nextPrevButtons" initial={initial} animate={animate} exit={exit} style={styles}>
               <NextPrevImageButtons />
             </motion.div>
           )}

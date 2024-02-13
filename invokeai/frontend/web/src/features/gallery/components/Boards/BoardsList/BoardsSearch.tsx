@@ -1,6 +1,5 @@
-import { Input, InputGroup, InputRightElement } from '@chakra-ui/react';
+import { IconButton, Input, InputGroup, InputRightElement } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -51,10 +50,10 @@ const BoardsSearch = () => {
       />
       {boardSearchText && boardSearchText.length && (
         <InputRightElement h="full" pe={2}>
-          <InvIconButton
+          <IconButton
             onClick={clearBoardSearch}
             size="sm"
-            variant="ghost"
+            variant="link"
             aria-label={t('boards.clearSearch')}
             icon={<PiXBold />}
           />

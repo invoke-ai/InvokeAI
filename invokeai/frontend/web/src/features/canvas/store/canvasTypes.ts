@@ -14,9 +14,8 @@ export const LAYER_NAMES = ['base', 'mask'] as const;
 
 export const zBoundingBoxScaleMethod = z.enum(['none', 'auto', 'manual']);
 export type BoundingBoxScaleMethod = z.infer<typeof zBoundingBoxScaleMethod>;
-export const isBoundingBoxScaleMethod = (
-  v: unknown
-): v is BoundingBoxScaleMethod => zBoundingBoxScaleMethod.safeParse(v).success;
+export const isBoundingBoxScaleMethod = (v: unknown): v is BoundingBoxScaleMethod =>
+  zBoundingBoxScaleMethod.safeParse(v).success;
 
 export type CanvasDrawingTool = 'brush' | 'eraser';
 
@@ -75,12 +74,7 @@ export type CanvasEraseRect = {
   height: number;
 };
 
-export type CanvasObject =
-  | CanvasImage
-  | CanvasBaseLine
-  | CanvasMaskLine
-  | CanvasFillRect
-  | CanvasEraseRect;
+export type CanvasObject = CanvasImage | CanvasBaseLine | CanvasMaskLine | CanvasFillRect | CanvasEraseRect;
 
 export type CanvasLayerState = {
   objects: CanvasObject[];
@@ -112,9 +106,7 @@ export const isCanvasFillRect = (obj: CanvasObject): obj is CanvasFillRect =>
 export const isCanvasEraseRect = (obj: CanvasObject): obj is CanvasEraseRect =>
   obj.kind === 'eraseRect' && obj.layer === 'base';
 
-export const isCanvasAnyLine = (
-  obj: CanvasObject
-): obj is CanvasMaskLine | CanvasBaseLine => obj.kind === 'line';
+export const isCanvasAnyLine = (obj: CanvasObject): obj is CanvasMaskLine | CanvasBaseLine => obj.kind === 'line';
 
 export interface CanvasState {
   _version: 1;

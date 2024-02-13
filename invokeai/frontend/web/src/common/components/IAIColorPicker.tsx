@@ -1,15 +1,10 @@
-import type { ChakraProps } from '@chakra-ui/react';
-import { Flex } from '@chakra-ui/react';
+import type { ChakraProps } from '@invoke-ai/ui-library';
+import { CompositeNumberInput, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import type { CSSProperties } from 'react';
 import { memo, useCallback } from 'react';
 import { RgbaColorPicker } from 'react-colorful';
-import type {
-  ColorPickerBaseProps,
-  RgbaColor,
-} from 'react-colorful/dist/types';
-
-import { InvControl } from './InvControl/InvControl';
-import { InvNumberInput } from './InvNumberInput/InvNumberInput';
+import type { ColorPickerBaseProps, RgbaColor } from 'react-colorful/dist/types';
+import { useTranslation } from 'react-i18next';
 
 type IAIColorPickerProps = ColorPickerBaseProps<RgbaColor> & {
   withNumberInput?: boolean;
@@ -35,34 +30,19 @@ const numberInputWidth: ChakraProps['w'] = '4.2rem';
 
 const IAIColorPicker = (props: IAIColorPickerProps) => {
   const { color, onChange, withNumberInput, ...rest } = props;
-  const handleChangeR = useCallback(
-    (r: number) => onChange({ ...color, r }),
-    [color, onChange]
-  );
-  const handleChangeG = useCallback(
-    (g: number) => onChange({ ...color, g }),
-    [color, onChange]
-  );
-  const handleChangeB = useCallback(
-    (b: number) => onChange({ ...color, b }),
-    [color, onChange]
-  );
-  const handleChangeA = useCallback(
-    (a: number) => onChange({ ...color, a }),
-    [color, onChange]
-  );
+  const { t } = useTranslation();
+  const handleChangeR = useCallback((r: number) => onChange({ ...color, r }), [color, onChange]);
+  const handleChangeG = useCallback((g: number) => onChange({ ...color, g }), [color, onChange]);
+  const handleChangeB = useCallback((b: number) => onChange({ ...color, b }), [color, onChange]);
+  const handleChangeA = useCallback((a: number) => onChange({ ...color, a }), [color, onChange]);
   return (
     <Flex sx={sx}>
-      <RgbaColorPicker
-        color={color}
-        onChange={onChange}
-        style={colorPickerStyles}
-        {...rest}
-      />
+      <RgbaColorPicker color={color} onChange={onChange} style={colorPickerStyles} {...rest} />
       {withNumberInput && (
         <Flex>
-          <InvControl label="Red">
-            <InvNumberInput
+          <FormControl>
+            <FormLabel>{t('common.red')}</FormLabel>
+            <CompositeNumberInput
               value={color.r}
               onChange={handleChangeR}
               min={0}
@@ -71,9 +51,10 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
               w={numberInputWidth}
               defaultValue={90}
             />
-          </InvControl>
-          <InvControl label="Green">
-            <InvNumberInput
+          </FormControl>
+          <FormControl>
+            <FormLabel>{t('common.green')}</FormLabel>
+            <CompositeNumberInput
               value={color.g}
               onChange={handleChangeG}
               min={0}
@@ -82,9 +63,10 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
               w={numberInputWidth}
               defaultValue={90}
             />
-          </InvControl>
-          <InvControl label="Blue">
-            <InvNumberInput
+          </FormControl>
+          <FormControl>
+            <FormLabel>{t('common.blue')}</FormLabel>
+            <CompositeNumberInput
               value={color.b}
               onChange={handleChangeB}
               min={0}
@@ -93,9 +75,10 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
               w={numberInputWidth}
               defaultValue={255}
             />
-          </InvControl>
-          <InvControl label="Alpha">
-            <InvNumberInput
+          </FormControl>
+          <FormControl>
+            <FormLabel>{t('common.alpha')}</FormLabel>
+            <CompositeNumberInput
               value={color.a}
               onChange={handleChangeA}
               step={0.1}
@@ -104,7 +87,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
               w={numberInputWidth}
               defaultValue={1}
             />
-          </InvControl>
+          </FormControl>
         </Flex>
       )}
     </Flex>

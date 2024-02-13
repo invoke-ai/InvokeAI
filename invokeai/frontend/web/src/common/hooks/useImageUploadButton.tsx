@@ -28,10 +28,7 @@ type UseImageUploadButtonArgs = {
  * <Button {...getUploadButtonProps()} /> // will open the file dialog on click
  * <input {...getUploadInputProps()} /> // hidden, handles native upload functionality
  */
-export const useImageUploadButton = ({
-  postUploadAction,
-  isDisabled,
-}: UseImageUploadButtonArgs) => {
+export const useImageUploadButton = ({ postUploadAction, isDisabled }: UseImageUploadButtonArgs) => {
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const [uploadImage] = useUploadImageMutation();
   const onDropAccepted = useCallback(

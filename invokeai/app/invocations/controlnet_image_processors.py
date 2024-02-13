@@ -17,7 +17,6 @@ from controlnet_aux import (
     MidasDetector,
     MLSDdetector,
     NormalBaeDetector,
-    OpenposeDetector,
     PidiNetDetector,
     SamDetector,
     ZoeDetector,
@@ -30,6 +29,8 @@ from invokeai.app.invocations.primitives import ImageField, ImageOutput
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.shared.fields import FieldDescriptions
+from invokeai.backend.image_util.depth_anything import DepthAnythingDetector
+from invokeai.backend.image_util.dw_openpose import DWOpenposeDetector
 
 from ...backend.model_management import BaseModelType
 from .baseinvocation import (
@@ -271,31 +272,6 @@ class LineartAnimeImageProcessorInvocation(ImageProcessorInvocation):
             image,
             detect_resolution=self.detect_resolution,
             image_resolution=self.image_resolution,
-        )
-        return processed_image
-
-
-@invocation(
-    "openpose_image_processor",
-    title="Openpose Processor",
-    tags=["controlnet", "openpose", "pose"],
-    category="controlnet",
-    version="1.2.0",
-)
-class OpenposeImageProcessorInvocation(ImageProcessorInvocation):
-    """Applies Openpose processing to image"""
-
-    hand_and_face: bool = InputField(default=False, description="Whether to use hands and face mode")
-    detect_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.detect_res)
-    image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
-
-    def run_processor(self, image):
-        openpose_processor = OpenposeDetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = openpose_processor(
-            image,
-            detect_resolution=self.detect_resolution,
-            image_resolution=self.image_resolution,
-            hand_and_face=self.hand_and_face,
         )
         return processed_image
 
@@ -602,3 +578,60 @@ class ColorMapImageProcessorInvocation(ImageProcessorInvocation):
         color_map = cv2.resize(color_map, (width, height), interpolation=cv2.INTER_NEAREST)
         color_map = Image.fromarray(color_map)
         return color_map
+
+
+DEPTH_ANYTHING_MODEL_SIZES = Literal["large", "base", "small"]
+
+
+@invocation(
+    "depth_anything_image_processor",
+    title="Depth Anything Processor",
+    tags=["controlnet", "depth", "depth anything"],
+    category="controlnet",
+    version="1.0.0",
+)
+class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
+    """Generates a depth map based on the Depth Anything algorithm"""
+
+    model_size: DEPTH_ANYTHING_MODEL_SIZES = InputField(
+        default="small", description="The size of the depth model to use"
+    )
+    resolution: int = InputField(default=512, ge=64, multiple_of=64, description=FieldDescriptions.image_res)
+    offload: bool = InputField(default=False)
+
+    def run_processor(self, image: Image.Image):
+        depth_anything_detector = DepthAnythingDetector()
+        depth_anything_detector.load_model(model_size=self.model_size)
+
+        if image.mode == "RGBA":
+            image = image.convert("RGB")
+
+        processed_image = depth_anything_detector(image=image, resolution=self.resolution, offload=self.offload)
+        return processed_image
+
+
+@invocation(
+    "dw_openpose_image_processor",
+    title="DW Openpose Image Processor",
+    tags=["controlnet", "dwpose", "openpose"],
+    category="controlnet",
+    version="1.0.0",
+)
+class DWOpenposeImageProcessorInvocation(ImageProcessorInvocation):
+    """Generates an openpose pose from an image using DWPose"""
+
+    draw_body: bool = InputField(default=True)
+    draw_face: bool = InputField(default=False)
+    draw_hands: bool = InputField(default=False)
+    image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
+
+    def run_processor(self, image):
+        dw_openpose = DWOpenposeDetector()
+        processed_image = dw_openpose(
+            image,
+            draw_face=self.draw_face,
+            draw_hands=self.draw_hands,
+            draw_body=self.draw_body,
+            resolution=self.image_resolution,
+        )
+        return processed_image

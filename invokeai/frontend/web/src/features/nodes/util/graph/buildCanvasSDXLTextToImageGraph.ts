@@ -30,9 +30,7 @@ import { addCoreMetadataNode } from './metadata';
 /**
  * Builds the Canvas tab's Text to Image graph.
  */
-export const buildCanvasSDXLTextToImageGraph = (
-  state: RootState
-): NonNullableGraph => {
+export const buildCanvasSDXLTextToImageGraph = (state: RootState): NonNullableGraph => {
   const log = logger('nodes');
   const {
     positivePrompt,
@@ -56,9 +54,7 @@ export const buildCanvasSDXLTextToImageGraph = (
 
   const fp32 = vaePrecision === 'fp32';
   const is_intermediate = true;
-  const isUsingScaledDimensions = ['auto', 'manual'].includes(
-    boundingBoxScaleMethod
-  );
+  const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);
 
   const { refinerModel, refinerStart } = state.sdxl;
 
@@ -72,8 +68,7 @@ export const buildCanvasSDXLTextToImageGraph = (
   let modelLoaderNodeId = SDXL_MODEL_LOADER;
 
   // Construct Style Prompt
-  const { positiveStylePrompt, negativeStylePrompt } =
-    getSDXLStylePrompts(state);
+  const { positiveStylePrompt, negativeStylePrompt } = getSDXLStylePrompts(state);
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the
@@ -113,12 +108,8 @@ export const buildCanvasSDXLTextToImageGraph = (
         id: NOISE,
         is_intermediate,
         seed,
-        width: !isUsingScaledDimensions
-          ? width
-          : scaledBoundingBoxDimensions.width,
-        height: !isUsingScaledDimensions
-          ? height
-          : scaledBoundingBoxDimensions.height,
+        width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
+        height: !isUsingScaledDimensions ? height : scaledBoundingBoxDimensions.height,
         use_cpu,
       },
       [SDXL_DENOISE_LATENTS]: {
@@ -126,6 +117,7 @@ export const buildCanvasSDXLTextToImageGraph = (
         id: SDXL_DENOISE_LATENTS,
         is_intermediate,
         cfg_scale,
+        cfg_rescale_multiplier,
         scheduler,
         steps,
         denoising_start: 0,
@@ -285,12 +277,8 @@ export const buildCanvasSDXLTextToImageGraph = (
       generation_mode: 'txt2img',
       cfg_scale,
       cfg_rescale_multiplier,
-      width: !isUsingScaledDimensions
-        ? width
-        : scaledBoundingBoxDimensions.width,
-      height: !isUsingScaledDimensions
-        ? height
-        : scaledBoundingBoxDimensions.height,
+      width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
+      height: !isUsingScaledDimensions ? height : scaledBoundingBoxDimensions.height,
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
       positive_style_prompt: positiveStylePrompt,
@@ -312,12 +300,7 @@ export const buildCanvasSDXLTextToImageGraph = (
 
   // Add Refiner if enabled
   if (refinerModel) {
-    addSDXLRefinerToGraph(
-      state,
-      graph,
-      SDXL_DENOISE_LATENTS,
-      modelLoaderNodeId
-    );
+    addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
     if (seamlessXAxis || seamlessYAxis) {
       modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
     }

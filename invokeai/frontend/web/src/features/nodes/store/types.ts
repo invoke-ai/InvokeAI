@@ -6,12 +6,7 @@ import type {
   NodeExecutionState,
 } from 'features/nodes/types/invocation';
 import type { WorkflowV2 } from 'features/nodes/types/workflow';
-import type {
-  OnConnectStartParams,
-  SelectionMode,
-  Viewport,
-  XYPosition,
-} from 'reactflow';
+import type { OnConnectStartParams, SelectionMode, Viewport, XYPosition } from 'reactflow';
 
 export type NodesState = {
   _version: 1;
@@ -31,7 +26,6 @@ export type NodesState = {
   selectedEdges: string[];
   nodeExecutionStates: Record<string, NodeExecutionState>;
   viewport: Viewport;
-  isReady: boolean;
   nodesToCopy: AnyNode[];
   edgesToCopy: InvocationNodeEdge[];
   isAddNodePopoverOpen: boolean;

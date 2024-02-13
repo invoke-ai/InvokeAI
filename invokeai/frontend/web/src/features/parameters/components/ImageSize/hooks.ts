@@ -12,9 +12,7 @@ type UseAspectRatioPreviewStateArg = {
   height: number;
   containerSize?: Dimensions;
 };
-type UseAspectRatioPreviewState = (
-  arg: UseAspectRatioPreviewStateArg
-) => Dimensions & { shouldShowIcon: boolean };
+type UseAspectRatioPreviewState = (arg: UseAspectRatioPreviewStateArg) => Dimensions & { shouldShowIcon: boolean };
 
 export const useAspectRatioPreviewState: UseAspectRatioPreviewState = ({
   width: _width,
@@ -38,8 +36,7 @@ export const useAspectRatioPreviewState: UseAspectRatioPreviewState = ({
       width = height * aspectRatio;
     }
 
-    const shouldShowIcon =
-      aspectRatio < ICON_HIGH_CUTOFF && aspectRatio > ICON_LOW_CUTOFF;
+    const shouldShowIcon = aspectRatio < ICON_HIGH_CUTOFF && aspectRatio > ICON_LOW_CUTOFF;
 
     return { width, height, shouldShowIcon };
   }, [_height, _width, containerSize]);

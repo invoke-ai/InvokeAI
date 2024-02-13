@@ -11,11 +11,7 @@ export const addInitialImageSelectedListener = () => {
     actionCreator: initialImageSelected,
     effect: (action, { dispatch }) => {
       if (!action.payload) {
-        dispatch(
-          addToast(
-            makeToast({ title: t('toast.imageNotLoadedDesc'), status: 'error' })
-          )
-        );
+        dispatch(addToast(makeToast({ title: t('toast.imageNotLoadedDesc'), status: 'error' })));
         return;
       }
 

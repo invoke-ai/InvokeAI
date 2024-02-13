@@ -51,21 +51,9 @@ export type SchedulerField = z.infer<typeof zSchedulerField>;
 // #endregion
 
 // #region Model-related schemas
-export const zBaseModel = z.enum([
-  'any',
-  'sd-1',
-  'sd-2',
-  'sdxl',
-  'sdxl-refiner',
-]);
-export const zModelType = z.enum([
-  'main',
-  'vae',
-  'lora',
-  'controlnet',
-  'embedding',
-]);
-export const zModelName = z.string().trim().min(1);
+export const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
+export const zModelType = z.enum(['main', 'vae', 'lora', 'controlnet', 'embedding']);
+export const zModelName = z.string().min(3);
 export const zModelIdentifier = z.object({
   model_name: zModelName,
   base_model: zBaseModel,
@@ -154,12 +142,8 @@ export const zControlField = z.object({
   control_weight: z.union([z.number(), z.array(z.number())]).optional(),
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),
-  control_mode: z
-    .enum(['balanced', 'more_prompt', 'more_control', 'unbalanced'])
-    .optional(),
-  resize_mode: z
-    .enum(['just_resize', 'crop_resize', 'fill_resize', 'just_resize_simple'])
-    .optional(),
+  control_mode: z.enum(['balanced', 'more_prompt', 'more_control', 'unbalanced']).optional(),
+  resize_mode: z.enum(['just_resize', 'crop_resize', 'fill_resize', 'just_resize_simple']).optional(),
 });
 export type ControlField = z.infer<typeof zControlField>;
 
@@ -178,9 +162,7 @@ export const zT2IAdapterField = z.object({
   weight: z.union([z.number(), z.array(z.number())]).optional(),
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),
-  resize_mode: z
-    .enum(['just_resize', 'crop_resize', 'fill_resize', 'just_resize_simple'])
-    .optional(),
+  resize_mode: z.enum(['just_resize', 'crop_resize', 'fill_resize', 'just_resize_simple']).optional(),
 });
 export type T2IAdapterField = z.infer<typeof zT2IAdapterField>;
 // #endregion
@@ -202,6 +184,5 @@ export const zImageOutput = z.object({
   type: z.literal('image_output'),
 });
 export type ImageOutput = z.infer<typeof zImageOutput>;
-export const isImageOutput = (output: unknown): output is ImageOutput =>
-  zImageOutput.safeParse(output).success;
+export const isImageOutput = (output: unknown): output is ImageOutput => zImageOutput.safeParse(output).success;
 // #endregion

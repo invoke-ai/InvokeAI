@@ -1,7 +1,7 @@
-import { ChevronUpIcon } from '@chakra-ui/icons';
-import { Button, Flex, Spacer } from '@chakra-ui/react';
+import { Button, Flex, Icon, Spacer } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo, useMemo } from 'react';
+import { PiCaretUpBold } from 'react-icons/pi';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 type Props = {
@@ -36,7 +36,9 @@ const GalleryBoardName = (props: Props) => {
       <Spacer />
       {formattedBoardName}
       <Spacer />
-      <ChevronUpIcon
+      <Icon
+        as={PiCaretUpBold}
+        boxSize={4}
         transform={isOpen ? 'rotate(0deg)' : 'rotate(180deg)'}
         transitionProperty="common"
         transitionDuration="normal"

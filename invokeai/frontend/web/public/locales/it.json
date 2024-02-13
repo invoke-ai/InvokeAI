@@ -7,7 +7,6 @@
         "img2img": "Immagine a Immagine",
         "unifiedCanvas": "Tela unificata",
         "nodes": "Editor del flusso di lavoro",
-        "langItalian": "Italiano",
         "nodesDesc": "Attualmente è in fase di sviluppo un sistema basato su nodi per la generazione di immagini. Resta sintonizzato per gli aggiornamenti su questa fantastica funzionalità.",
         "postProcessing": "Post-elaborazione",
         "postProcessDesc1": "Invoke AI offre un'ampia varietà di funzionalità di post-elaborazione. Ampliamento Immagine e Restaura Volti sono già disponibili nell'interfaccia Web. È possibile accedervi dal menu 'Opzioni avanzate' delle schede 'Testo a Immagine' e 'Immagine a Immagine'. È inoltre possibile elaborare le immagini direttamente, utilizzando i pulsanti di azione dell'immagine sopra la visualizzazione dell'immagine corrente o nel visualizzatore.",
@@ -43,26 +42,11 @@
         "statusModelChanged": "Modello cambiato",
         "githubLabel": "GitHub",
         "discordLabel": "Discord",
-        "langArabic": "Arabo",
-        "langEnglish": "Inglese",
-        "langFrench": "Francese",
-        "langGerman": "Tedesco",
-        "langJapanese": "Giapponese",
-        "langPolish": "Polacco",
-        "langBrPortuguese": "Portoghese Basiliano",
-        "langRussian": "Russo",
-        "langUkranian": "Ucraino",
-        "langSpanish": "Spagnolo",
         "statusMergingModels": "Fusione Modelli",
         "statusMergedModels": "Modelli fusi",
-        "langSimplifiedChinese": "Cinese semplificato",
-        "langDutch": "Olandese",
         "statusModelConverted": "Modello Convertito",
         "statusConvertingModel": "Conversione Modello",
-        "langKorean": "Coreano",
-        "langPortuguese": "Portoghese",
         "loading": "Caricamento in corso",
-        "langHebrew": "Ebraico",
         "loadingInvokeAI": "Caricamento Invoke AI",
         "postprocessing": "Post Elaborazione",
         "txt2img": "Testo a Immagine",
@@ -76,7 +60,6 @@
         "dontAskMeAgain": "Non chiedermelo più",
         "imagePrompt": "Prompt Immagine",
         "darkMode": "Modalità scura",
-        "lightMode": "Modalità chiara",
         "batch": "Gestione Lotto",
         "modelManager": "Gestore modello",
         "communityLabel": "Comunità",
@@ -118,7 +101,15 @@
         "advancedOptions": "Opzioni avanzate",
         "free": "Libero",
         "or": "o",
-        "preferencesLabel": "Preferenze"
+        "preferencesLabel": "Preferenze",
+        "red": "Rosso",
+        "aboutHeading": "Possiedi il tuo potere creativo",
+        "aboutDesc": "Utilizzi Invoke per lavoro? Guarda qui:",
+        "localSystem": "Sistema locale",
+        "green": "Verde",
+        "blue": "Blu",
+        "alpha": "Alfa",
+        "copy": "Copia"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -377,7 +368,11 @@
             "desc": "Apre e chiude le opzioni e i pannelli della galleria",
             "title": "Attiva/disattiva le Opzioni e la Galleria"
         },
-        "clearSearch": "Cancella ricerca"
+        "clearSearch": "Cancella ricerca",
+        "remixImage": {
+            "desc": "Utilizza tutti i parametri tranne il seme dell'immagine corrente",
+            "title": "Remixa l'immagine"
+        }
     },
     "modelManager": {
         "modelManager": "Gestione Modelli",
@@ -521,7 +516,8 @@
         "customConfigFileLocation": "Posizione del file di configurazione personalizzato",
         "vaePrecision": "Precisione VAE",
         "noModelSelected": "Nessun modello selezionato",
-        "conversionNotSupported": "Conversione non supportata"
+        "conversionNotSupported": "Conversione non supportata",
+        "configFile": "File di configurazione"
     },
     "parameters": {
         "images": "Immagini",
@@ -660,7 +656,10 @@
         "lockAspectRatio": "Blocca proporzioni",
         "swapDimensions": "Scambia dimensioni",
         "aspect": "Aspetto",
-        "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (potrebbe essere troppo grande)"
+        "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (potrebbe essere troppo grande)",
+        "boxBlur": "Box",
+        "gaussianBlur": "Gaussian",
+        "remixImage": "Remixa l'immagine"
     },
     "settings": {
         "models": "Modelli",
@@ -794,7 +793,10 @@
         "invalidUpload": "Caricamento non valido",
         "problemDeletingWorkflow": "Problema durante l'eliminazione del flusso di lavoro",
         "workflowDeleted": "Flusso di lavoro eliminato",
-        "problemRetrievingWorkflow": "Problema nel recupero del flusso di lavoro"
+        "problemRetrievingWorkflow": "Problema nel recupero del flusso di lavoro",
+        "resetInitialImage": "Reimposta l'immagine iniziale",
+        "uploadInitialImage": "Carica l'immagine iniziale",
+        "problemDownloadingImage": "Impossibile scaricare l'immagine"
     },
     "tooltip": {
         "feature": {
@@ -899,7 +901,8 @@
         "loadMore": "Carica altro",
         "mode": "Modalità",
         "resetUI": "$t(accessibility.reset) l'Interfaccia Utente",
-        "createIssue": "Segnala un problema"
+        "createIssue": "Segnala un problema",
+        "about": "Informazioni"
     },
     "ui": {
         "hideProgressImages": "Nascondi avanzamento immagini",
@@ -1132,7 +1135,10 @@
         "newWorkflow": "Nuovo flusso di lavoro",
         "newWorkflowDesc": "Creare un nuovo flusso di lavoro?",
         "newWorkflowDesc2": "Il flusso di lavoro attuale presenta modifiche non salvate.",
-        "unsupportedAnyOfLength": "unione di troppi elementi ({{count}})"
+        "unsupportedAnyOfLength": "unione di troppi elementi ({{count}})",
+        "clearWorkflowDesc": "Cancellare questo flusso di lavoro e avviarne uno nuovo?",
+        "clearWorkflow": "Cancella il flusso di lavoro",
+        "clearWorkflowDesc2": "Il tuo flusso di lavoro attuale presenta modifiche non salvate."
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1189,7 +1195,6 @@
         "f": "F",
         "h": "A",
         "prompt": "Prompt",
-        "openPoseDescription": "Stima della posa umana utilizzando Openpose",
         "resizeMode": "Ridimensionamento",
         "weight": "Peso",
         "selectModel": "Seleziona un modello",
@@ -1232,7 +1237,11 @@
         "scribble": "Scarabocchio",
         "amult": "Angolo di illuminazione",
         "coarse": "Approssimativo",
-        "resizeSimple": "Ridimensiona (semplice)"
+        "resizeSimple": "Ridimensiona (semplice)",
+        "large": "Grande",
+        "small": "Piccolo",
+        "depthAnythingDescription": "Generazione di mappe di profondità utilizzando la tecnica Depth Anything",
+        "modelSize": "Dimensioni del modello"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -1664,7 +1673,11 @@
         "userWorkflows": "I miei flussi di lavoro",
         "newWorkflowCreated": "Nuovo flusso di lavoro creato",
         "downloadWorkflow": "Salva su file",
-        "uploadWorkflow": "Carica da file"
+        "uploadWorkflow": "Carica da file",
+        "projectWorkflows": "Flussi di lavoro del progetto",
+        "noWorkflows": "Nessun flusso di lavoro",
+        "workflowCleared": "Flusso di lavoro cancellato",
+        "saveWorkflowToProject": "Salva flusso di lavoro nel progetto"
     },
     "app": {
         "storeNotInitialized": "Il negozio non è inizializzato"

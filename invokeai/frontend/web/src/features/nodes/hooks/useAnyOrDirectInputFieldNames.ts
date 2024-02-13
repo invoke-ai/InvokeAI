@@ -11,27 +11,22 @@ import { useMemo } from 'react';
 export const useAnyOrDirectInputFieldNames = (nodeId: string) => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(
-        selectNodesSlice,
-        selectNodeTemplatesSlice,
-        (nodes, nodeTemplates) => {
-          const node = nodes.nodes.find((node) => node.id === nodeId);
-          if (!isInvocationNode(node)) {
-            return [];
-          }
-          const nodeTemplate = nodeTemplates.templates[node.data.type];
-          if (!nodeTemplate) {
-            return [];
-          }
-          const fields = map(nodeTemplate.inputs).filter(
-            (field) =>
-              (['any', 'direct'].includes(field.input) ||
-                field.type.isCollectionOrScalar) &&
-              keys(TEMPLATE_BUILDER_MAP).includes(field.type.name)
-          );
-          return getSortedFilteredFieldNames(fields);
+      createMemoizedSelector(selectNodesSlice, selectNodeTemplatesSlice, (nodes, nodeTemplates) => {
+        const node = nodes.nodes.find((node) => node.id === nodeId);
+        if (!isInvocationNode(node)) {
+          return [];
         }
-      ),
+        const nodeTemplate = nodeTemplates.templates[node.data.type];
+        if (!nodeTemplate) {
+          return [];
+        }
+        const fields = map(nodeTemplate.inputs).filter(
+          (field) =>
+            (['any', 'direct'].includes(field.input) || field.type.isCollectionOrScalar) &&
+            keys(TEMPLATE_BUILDER_MAP).includes(field.type.name)
+        );
+        return getSortedFilteredFieldNames(fields);
+      }),
     [nodeId]
   );
 

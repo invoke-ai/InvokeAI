@@ -1,6 +1,4 @@
-import { Flex, Icon } from '@chakra-ui/react';
-import { InvText } from 'common/components/InvText/wrapper';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
 import { compare } from 'compare-versions';
 import { useNodeData } from 'features/nodes/hooks/useNodeData';
 import { useNodeNeedsUpdate } from 'features/nodes/hooks/useNodeNeedsUpdate';
@@ -18,19 +16,9 @@ const InvocationNodeInfoIcon = ({ nodeId }: Props) => {
   const needsUpdate = useNodeNeedsUpdate(nodeId);
 
   return (
-    <InvTooltip
-      label={<TooltipContent nodeId={nodeId} />}
-      placement="top"
-      shouldWrapChildren
-    >
-      <Icon
-        as={PiInfoBold}
-        display="block"
-        boxSize={4}
-        w={8}
-        color={needsUpdate ? 'error.400' : 'base.400'}
-      />
-    </InvTooltip>
+    <Tooltip label={<TooltipContent nodeId={nodeId} />} placement="top" shouldWrapChildren>
+      <Icon as={PiInfoBold} display="block" boxSize={4} w={8} color={needsUpdate ? 'error.400' : 'base.400'} />
+    </Tooltip>
   );
 };
 
@@ -64,62 +52,62 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
 
     if (!data.version) {
       return (
-        <InvText as="span" color="error.500">
+        <Text as="span" color="error.500">
           {t('nodes.versionUnknown')}
-        </InvText>
+        </Text>
       );
     }
 
     if (!nodeTemplate.version) {
       return (
-        <InvText as="span" color="error.500">
+        <Text as="span" color="error.500">
           {t('nodes.version')} {data.version} ({t('nodes.unknownTemplate')})
-        </InvText>
+        </Text>
       );
     }
 
     if (compare(data.version, nodeTemplate.version, '<')) {
       return (
-        <InvText as="span" color="error.500">
+        <Text as="span" color="error.500">
           {t('nodes.version')} {data.version} ({t('nodes.updateNode')})
-        </InvText>
+        </Text>
       );
     }
 
     if (compare(data.version, nodeTemplate.version, '>')) {
       return (
-        <InvText as="span" color="error.500">
+        <Text as="span" color="error.500">
           {t('nodes.version')} {data.version} ({t('nodes.updateApp')})
-        </InvText>
+        </Text>
       );
     }
 
     return (
-      <InvText as="span">
+      <Text as="span">
         {t('nodes.version')} {data.version}
-      </InvText>
+      </Text>
     );
   }, [data, nodeTemplate, t]);
 
   if (!isInvocationNodeData(data)) {
-    return <InvText fontWeight="semibold">{t('nodes.unknownNode')}</InvText>;
+    return <Text fontWeight="semibold">{t('nodes.unknownNode')}</Text>;
   }
 
   return (
     <Flex flexDir="column">
-      <InvText as="span" fontWeight="semibold">
+      <Text as="span" fontWeight="semibold">
         {title}
-      </InvText>
+      </Text>
       {nodeTemplate?.nodePack && (
-        <InvText opacity={0.7}>
+        <Text opacity={0.7}>
           {t('nodes.nodePack')}: {nodeTemplate.nodePack}
-        </InvText>
+        </Text>
       )}
-      <InvText opacity={0.7} fontStyle="oblique 5deg">
+      <Text opacity={0.7} fontStyle="oblique 5deg">
         {nodeTemplate?.description}
-      </InvText>
+      </Text>
       {versionComponent}
-      {data?.notes && <InvText>{data.notes}</InvText>}
+      {data?.notes && <Text>{data.notes}</Text>}
     </Flex>
   );
 });

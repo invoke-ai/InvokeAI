@@ -1,4 +1,4 @@
-import { Flex, Image, Spinner } from '@chakra-ui/react';
+import { Flex, Image, Spinner } from '@invoke-ai/ui-library';
 import InvokeLogoWhite from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { memo } from 'react';
 
@@ -6,14 +6,7 @@ import { memo } from 'react';
 
 const Loading = () => {
   return (
-    <Flex
-      position="relative"
-      width="100vw"
-      height="100vh"
-      alignItems="center"
-      justifyContent="center"
-      bg="#151519"
-    >
+    <Flex position="relative" width="100vw" height="100vh" alignItems="center" justifyContent="center" bg="#151519">
       <Image src={InvokeLogoWhite} w="8rem" h="8rem" />
       <Spinner
         label="Loading"

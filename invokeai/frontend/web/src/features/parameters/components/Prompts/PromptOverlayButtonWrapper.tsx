@@ -1,4 +1,4 @@
-import { Flex } from '@chakra-ui/layout';
+import { Flex } from '@invoke-ai/ui-library';
 import { memo, type PropsWithChildren } from 'react';
 
 export const PromptOverlayButtonWrapper = memo((props: PropsWithChildren) => (

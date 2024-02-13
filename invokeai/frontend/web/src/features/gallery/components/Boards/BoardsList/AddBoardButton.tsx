@@ -1,4 +1,4 @@
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { IconButton } from '@invoke-ai/ui-library';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -13,7 +13,7 @@ const AddBoardButton = () => {
   }, [createBoard, DEFAULT_BOARD_NAME]);
 
   return (
-    <InvIconButton
+    <IconButton
       icon={<PiPlusBold />}
       isLoading={isLoading}
       tooltip={t('boards.addBoard')}

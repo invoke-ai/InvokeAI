@@ -1,11 +1,8 @@
 import type { RootState } from 'app/store/store';
 import type { LoRAMetadataItem } from 'features/nodes/types/metadata';
 import { zLoRAMetadataItem } from 'features/nodes/types/metadata';
-import { forEach, size } from 'lodash-es';
-import type {
-  NonNullableGraph,
-  SDXLLoraLoaderInvocation,
-} from 'services/api/types';
+import { filter, size } from 'lodash-es';
+import type { NonNullableGraph, SDXLLoraLoaderInvocation } from 'services/api/types';
 
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
@@ -34,8 +31,8 @@ export const addSDXLLoRAsToGraph = (
    * So we need to inject a LoRA chain into the graph.
    */
 
-  const { loras } = state.lora;
-  const loraCount = size(loras);
+  const enabledLoRAs = filter(state.lora.loras, (l) => l.isEnabled ?? false);
+  const loraCount = size(enabledLoRAs);
 
   if (loraCount === 0) {
     return;
@@ -46,21 +43,15 @@ export const addSDXLLoRAsToGraph = (
   // Handle Seamless Plugs
   const unetLoaderId = modelLoaderNodeId;
   let clipLoaderId = modelLoaderNodeId;
-  if (
-    [SEAMLESS, SDXL_REFINER_INPAINT_CREATE_MASK].includes(modelLoaderNodeId)
-  ) {
+  if ([SEAMLESS, SDXL_REFINER_INPAINT_CREATE_MASK].includes(modelLoaderNodeId)) {
     clipLoaderId = SDXL_MODEL_LOADER;
   }
 
   // Remove modelLoaderNodeId unet/clip/clip2 connections to feed it to LoRAs
   graph.edges = graph.edges.filter(
     (e) =>
-      !(
-        e.source.node_id === unetLoaderId && ['unet'].includes(e.source.field)
-      ) &&
-      !(
-        e.source.node_id === clipLoaderId && ['clip'].includes(e.source.field)
-      ) &&
+      !(e.source.node_id === unetLoaderId && ['unet'].includes(e.source.field)) &&
+      !(e.source.node_id === clipLoaderId && ['clip'].includes(e.source.field)) &&
       !(e.source.node_id === clipLoaderId && ['clip2'].includes(e.source.field))
   );
 
@@ -68,7 +59,7 @@ export const addSDXLLoRAsToGraph = (
   let lastLoraNodeId = '';
   let currentLoraIndex = 0;
 
-  forEach(loras, (lora) => {
+  enabledLoRAs.forEach((lora) => {
     const { model_name, base_model, weight } = lora;
     const currentLoraNodeId = `${LORA_LOADER}_${model_name.replace('.', '_')}`;
 
@@ -171,12 +162,7 @@ export const addSDXLLoRAsToGraph = (
         },
       });
 
-      if (
-        graph.id &&
-        [SDXL_CANVAS_INPAINT_GRAPH, SDXL_CANVAS_OUTPAINT_GRAPH].includes(
-          graph.id
-        )
-      ) {
+      if (graph.id && [SDXL_CANVAS_INPAINT_GRAPH, SDXL_CANVAS_OUTPAINT_GRAPH].includes(graph.id)) {
         graph.edges.push({
           source: {
             node_id: currentLoraNodeId,

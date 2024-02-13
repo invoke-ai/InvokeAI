@@ -16,20 +16,15 @@ export const customPointerWithin: CollisionDetection = (arg) => {
 
   // Get all elements at the pointer coordinates. This excludes elements which are overflowed,
   // so it won't include the droppable elements that are scrolled out of view.
-  const targetElements = document.elementsFromPoint(
-    arg.pointerCoordinates.x,
-    arg.pointerCoordinates.y
-  );
+  const targetElements = document.elementsFromPoint(arg.pointerCoordinates.x, arg.pointerCoordinates.y);
 
-  const filteredDroppableContainers = arg.droppableContainers.filter(
-    (container) => {
-      if (!container.node.current) {
-        return false;
-      }
-      // Only include droppable elements that are in the list of elements at the pointer coordinates.
-      return targetElements.includes(container.node.current);
+  const filteredDroppableContainers = arg.droppableContainers.filter((container) => {
+    if (!container.node.current) {
+      return false;
     }
-  );
+    // Only include droppable elements that are in the list of elements at the pointer coordinates.
+    return targetElements.includes(container.node.current);
+  });
 
   // Run the provided collision detection with the filtered droppable elements.
   return pointerWithin({

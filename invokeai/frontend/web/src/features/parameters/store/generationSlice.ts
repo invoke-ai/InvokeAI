@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { isAnyControlAdapterAdded } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
@@ -18,10 +18,7 @@ import type {
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
-import {
-  getIsSizeOptimal,
-  getOptimalDimension,
-} from 'features/parameters/util/optimalDimension';
+import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
 import type { ImageDTO } from 'services/api/types';
@@ -81,10 +78,7 @@ export const generationSlice = createSlice({
     setCfgScale: (state, action: PayloadAction<ParameterCFGScale>) => {
       state.cfgScale = action.payload;
     },
-    setCfgRescaleMultiplier: (
-      state,
-      action: PayloadAction<ParameterCFGRescaleMultiplier>
-    ) => {
+    setCfgRescaleMultiplier: (state, action: PayloadAction<ParameterCFGRescaleMultiplier>) => {
       state.cfgRescaleMultiplier = action.payload;
     },
     setScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
@@ -124,16 +118,10 @@ export const generationSlice = createSlice({
     setMaskBlur: (state, action: PayloadAction<number>) => {
       state.maskBlur = action.payload;
     },
-    setMaskBlurMethod: (
-      state,
-      action: PayloadAction<ParameterMaskBlurMethod>
-    ) => {
+    setMaskBlurMethod: (state, action: PayloadAction<ParameterMaskBlurMethod>) => {
       state.maskBlurMethod = action.payload;
     },
-    setCanvasCoherenceMode: (
-      state,
-      action: PayloadAction<ParameterCanvasCoherenceMode>
-    ) => {
+    setCanvasCoherenceMode: (state, action: PayloadAction<ParameterCanvasCoherenceMode>) => {
       state.canvasCoherenceMode = action.payload;
     },
     setCanvasCoherenceSteps: (state, action: PayloadAction<number>) => {
@@ -148,10 +136,7 @@ export const generationSlice = createSlice({
     setInfillTileSize: (state, action: PayloadAction<number>) => {
       state.infillTileSize = action.payload;
     },
-    setInfillPatchmatchDownscaleSize: (
-      state,
-      action: PayloadAction<number>
-    ) => {
+    setInfillPatchmatchDownscaleSize: (state, action: PayloadAction<number>) => {
       state.infillPatchmatchDownscaleSize = action.payload;
     },
     initialImageChanged: (state, action: PayloadAction<ImageDTO>) => {
@@ -161,11 +146,7 @@ export const generationSlice = createSlice({
     modelChanged: {
       reducer: (
         state,
-        action: PayloadAction<
-          ParameterModel | null,
-          string,
-          { previousModel?: ParameterModel | null }
-        >
+        action: PayloadAction<ParameterModel | null, string, { previousModel?: ParameterModel | null }>
       ) => {
         const newModel = action.payload;
         state.model = newModel;
@@ -175,8 +156,15 @@ export const generationSlice = createSlice({
         }
 
         // Clamp ClipSkip Based On Selected Model
-        const { maxClip } = CLIP_SKIP_MAP[newModel.base_model];
-        state.clipSkip = clamp(state.clipSkip, 0, maxClip);
+        // TODO(psyche): remove this special handling when https://github.com/invoke-ai/InvokeAI/issues/4583 is resolved
+        // WIP PR here: https://github.com/invoke-ai/InvokeAI/pull/4624
+        if (newModel.base_model === 'sdxl') {
+          // We don't support clip skip for SDXL yet - it's not in the graphs
+          state.clipSkip = 0;
+        } else {
+          const { maxClip } = CLIP_SKIP_MAP[newModel.base_model];
+          state.clipSkip = clamp(state.clipSkip, 0, maxClip);
+        }
 
         if (action.meta.previousModel?.base_model === newModel.base_model) {
           // The base model hasn't changed, we don't need to optimize the size
@@ -187,17 +175,11 @@ export const generationSlice = createSlice({
         if (getIsSizeOptimal(state.width, state.height, optimalDimension)) {
           return;
         }
-        const { width, height } = calculateNewSize(
-          state.aspectRatio.value,
-          optimalDimension * optimalDimension
-        );
+        const { width, height } = calculateNewSize(state.aspectRatio.value, optimalDimension * optimalDimension);
         state.width = width;
         state.height = height;
       },
-      prepare: (
-        payload: ParameterModel | null,
-        previousModel?: ParameterModel | null
-      ) => ({
+      prepare: (payload: ParameterModel | null, previousModel?: ParameterModel | null) => ({
         payload,
         meta: {
           previousModel,
@@ -222,6 +204,18 @@ export const generationSlice = createSlice({
     },
     heightChanged: (state, action: PayloadAction<number>) => {
       state.height = action.payload;
+    },
+    widthRecalled: (state, action: PayloadAction<number>) => {
+      state.width = action.payload;
+      state.aspectRatio.value = action.payload / state.height;
+      state.aspectRatio.id = 'Free';
+      state.aspectRatio.isLocked = false;
+    },
+    heightRecalled: (state, action: PayloadAction<number>) => {
+      state.height = action.payload;
+      state.aspectRatio.value = state.width / action.payload;
+      state.aspectRatio.id = 'Free';
+      state.aspectRatio.isLocked = false;
     },
     aspectRatioChanged: (state, action: PayloadAction<AspectRatioState>) => {
       state.aspectRatio = action.payload;
@@ -299,11 +293,11 @@ export const {
   aspectRatioChanged,
   widthChanged,
   heightChanged,
+  widthRecalled,
+  heightRecalled,
 } = generationSlice.actions;
 
 export const { selectOptimalDimension } = generationSlice.selectors;
-
-export default generationSlice.reducer;
 
 export const selectGenerationSlice = (state: RootState) => state.generation;
 
@@ -314,4 +308,11 @@ export const migrateGenerationState = (state: any): GenerationState => {
     state.aspectRatio = initialAspectRatioState;
   }
   return state;
+};
+
+export const generationPersistConfig: PersistConfig<GenerationState> = {
+  name: generationSlice.name,
+  initialState: initialGenerationState,
+  migrate: migrateGenerationState,
+  persistDenylist: [],
 };

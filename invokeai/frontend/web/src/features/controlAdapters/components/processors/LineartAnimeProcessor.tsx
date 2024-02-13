@@ -1,5 +1,4 @@
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type { RequiredLineartAnimeImageProcessorInvocation } from 'features/controlAdapters/store/types';
@@ -39,34 +38,42 @@ const LineartAnimeProcessor = (props: Props) => {
 
   return (
     <ProcessorWrapper>
-      <InvControl
-        label={t('controlnet.detectResolution')}
-        isDisabled={!isEnabled}
-      >
-        <InvSlider
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.detectResolution')}</FormLabel>
+        <CompositeSlider
           value={detect_resolution}
           defaultValue={DEFAULTS.detect_resolution}
           onChange={handleDetectResolutionChanged}
           min={0}
           max={4096}
-          withNumberInput
           marks
         />
-      </InvControl>
-      <InvControl
-        label={t('controlnet.imageResolution')}
-        isDisabled={!isEnabled}
-      >
-        <InvSlider
+        <CompositeNumberInput
+          value={detect_resolution}
+          defaultValue={DEFAULTS.detect_resolution}
+          onChange={handleDetectResolutionChanged}
+          min={0}
+          max={4096}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.imageResolution')}</FormLabel>
+        <CompositeSlider
           value={image_resolution}
           onChange={handleImageResolutionChanged}
           defaultValue={DEFAULTS.image_resolution}
           min={0}
           max={4096}
-          withNumberInput
           marks
         />
-      </InvControl>
+        <CompositeNumberInput
+          value={image_resolution}
+          onChange={handleImageResolutionChanged}
+          defaultValue={DEFAULTS.image_resolution}
+          min={0}
+          max={4096}
+        />
+      </FormControl>
     </ProcessorWrapper>
   );
 };

@@ -1,10 +1,6 @@
 import type { RootState } from 'app/store/store';
-import { forEach, size } from 'lodash-es';
-import type {
-  CoreMetadataInvocation,
-  LoraLoaderInvocation,
-  NonNullableGraph,
-} from 'services/api/types';
+import { filter, size } from 'lodash-es';
+import type { CoreMetadataInvocation, LoraLoaderInvocation, NonNullableGraph } from 'services/api/types';
 
 import {
   CANVAS_COHERENCE_DENOISE_LATENTS,
@@ -32,8 +28,8 @@ export const addLoRAsToGraph = (
    * So we need to inject a LoRA chain into the graph.
    */
 
-  const { loras } = state.lora;
-  const loraCount = size(loras);
+  const enabledLoRAs = filter(state.lora.loras, (l) => l.isEnabled ?? false);
+  const loraCount = size(enabledLoRAs);
 
   if (loraCount === 0) {
     return;
@@ -41,24 +37,17 @@ export const addLoRAsToGraph = (
 
   // Remove modelLoaderNodeId unet connection to feed it to LoRAs
   graph.edges = graph.edges.filter(
-    (e) =>
-      !(
-        e.source.node_id === modelLoaderNodeId &&
-        ['unet'].includes(e.source.field)
-      )
+    (e) => !(e.source.node_id === modelLoaderNodeId && ['unet'].includes(e.source.field))
   );
   // Remove CLIP_SKIP connections to conditionings to feed it through LoRAs
-  graph.edges = graph.edges.filter(
-    (e) =>
-      !(e.source.node_id === CLIP_SKIP && ['clip'].includes(e.source.field))
-  );
+  graph.edges = graph.edges.filter((e) => !(e.source.node_id === CLIP_SKIP && ['clip'].includes(e.source.field)));
 
   // we need to remember the last lora so we can chain from it
   let lastLoraNodeId = '';
   let currentLoraIndex = 0;
   const loraMetadata: CoreMetadataInvocation['loras'] = [];
 
-  forEach(loras, (lora) => {
+  enabledLoRAs.forEach((lora) => {
     const { model_name, base_model, weight } = lora;
     const currentLoraNodeId = `${LORA_LOADER}_${model_name.replace('.', '_')}`;
 
@@ -137,10 +126,7 @@ export const addLoRAsToGraph = (
         },
       });
 
-      if (
-        graph.id &&
-        [CANVAS_INPAINT_GRAPH, CANVAS_OUTPAINT_GRAPH].includes(graph.id)
-      ) {
+      if (graph.id && [CANVAS_INPAINT_GRAPH, CANVAS_OUTPAINT_GRAPH].includes(graph.id)) {
         graph.edges.push({
           source: {
             node_id: currentLoraNodeId,

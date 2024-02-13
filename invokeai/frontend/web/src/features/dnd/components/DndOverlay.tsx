@@ -17,19 +17,10 @@ const DndOverlay = (props: DndOverlayProps) => {
   const modifiers = useMemo(() => [scaledModifier], [scaledModifier]);
 
   return (
-    <DragOverlay
-      dropAnimation={null}
-      modifiers={modifiers}
-      style={dragOverlayStyles}
-    >
+    <DragOverlay dropAnimation={null} modifiers={modifiers} style={dragOverlayStyles}>
       <AnimatePresence>
         {props.activeDragData && (
-          <motion.div
-            layout
-            key="overlay-drag-image"
-            initial={initial}
-            animate={animate}
-          >
+          <motion.div layout key="overlay-drag-image" initial={initial} animate={animate}>
             <DragPreview dragData={props.activeDragData} />
           </motion.div>
         )}

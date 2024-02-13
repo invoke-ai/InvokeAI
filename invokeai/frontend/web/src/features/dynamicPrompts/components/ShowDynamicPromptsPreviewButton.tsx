@@ -1,12 +1,10 @@
-import type { SystemStyleObject } from '@chakra-ui/styled-system';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { IconButton, spinAnimation, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { useDynamicPromptsModal } from 'features/dynamicPrompts/hooks/useDynamicPromptsModal';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BsBracesAsterisk } from 'react-icons/bs';
-import { spinAnimation } from 'theme/animations';
 
 const loadingStyles: SystemStyleObject = {
   svg: { animation: spinAnimation },
@@ -15,16 +13,12 @@ const loadingStyles: SystemStyleObject = {
 export const ShowDynamicPromptsPreviewButton = memo(() => {
   const { t } = useTranslation();
   const isLoading = useAppSelector((s) => s.dynamicPrompts.isLoading);
+  const isError = useAppSelector((s) => Boolean(s.dynamicPrompts.isError || s.dynamicPrompts.parsingError));
   const { isOpen, onOpen } = useDynamicPromptsModal();
+
   return (
-    <InvTooltip
-      label={
-        isLoading
-          ? t('dynamicPrompts.loading')
-          : t('dynamicPrompts.showDynamicPrompts')
-      }
-    >
-      <InvIconButton
+    <Tooltip label={isLoading ? t('dynamicPrompts.loading') : t('dynamicPrompts.showDynamicPrompts')}>
+      <IconButton
         size="sm"
         variant="promptOverlay"
         isDisabled={isOpen}
@@ -32,8 +26,9 @@ export const ShowDynamicPromptsPreviewButton = memo(() => {
         icon={<BsBracesAsterisk />}
         onClick={onOpen}
         sx={isLoading ? loadingStyles : undefined}
+        colorScheme={isError && !isLoading ? 'error' : 'base'}
       />
-    </InvTooltip>
+    </Tooltip>
   );
 });
 

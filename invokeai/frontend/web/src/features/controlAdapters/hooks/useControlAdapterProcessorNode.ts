@@ -13,9 +13,7 @@ export const useControlAdapterProcessorNode = (id: string) => {
       createMemoizedSelector(selectControlAdaptersSlice, (controlAdapters) => {
         const ca = selectControlAdapterById(controlAdapters, id);
 
-        return ca && isControlNetOrT2IAdapter(ca)
-          ? ca.processorNode
-          : undefined;
+        return ca && isControlNetOrT2IAdapter(ca) ? ca.processorNode : undefined;
       }),
     [id]
   );

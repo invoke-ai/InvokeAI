@@ -4,9 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 export const useCoreParametersCollapseLabel = () => {
   const { t } = useTranslation();
-  const shouldRandomizeSeed = useAppSelector(
-    (s) => s.generation.shouldRandomizeSeed
-  );
+  const shouldRandomizeSeed = useAppSelector((s) => s.generation.shouldRandomizeSeed);
   const iterations = useAppSelector((s) => s.generation.iterations);
 
   const iterationsLabel = useMemo(() => {
@@ -25,10 +23,7 @@ export const useCoreParametersCollapseLabel = () => {
     }
   }, [shouldRandomizeSeed, t]);
 
-  const iterationsAndSeedLabel = useMemo(
-    () => [iterationsLabel, seedLabel].join(', '),
-    [iterationsLabel, seedLabel]
-  );
+  const iterationsAndSeedLabel = useMemo(() => [iterationsLabel, seedLabel].join(', '), [iterationsLabel, seedLabel]);
 
   return { iterationsAndSeedLabel, iterationsLabel, seedLabel };
 };

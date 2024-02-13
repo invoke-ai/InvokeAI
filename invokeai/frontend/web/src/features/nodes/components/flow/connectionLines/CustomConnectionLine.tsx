@@ -9,27 +9,16 @@ import type { ConnectionLineComponentProps } from 'reactflow';
 import { getBezierPath } from 'reactflow';
 
 const selectStroke = createSelector(selectNodesSlice, (nodes) =>
-  nodes.shouldColorEdges
-    ? getFieldColor(nodes.connectionStartFieldType)
-    : colorTokenToCssVar('base.500')
+  nodes.shouldColorEdges ? getFieldColor(nodes.connectionStartFieldType) : colorTokenToCssVar('base.500')
 );
 
 const selectClassName = createSelector(selectNodesSlice, (nodes) =>
-  nodes.shouldAnimateEdges
-    ? 'react-flow__custom_connection-path animated'
-    : 'react-flow__custom_connection-path'
+  nodes.shouldAnimateEdges ? 'react-flow__custom_connection-path animated' : 'react-flow__custom_connection-path'
 );
 
 const pathStyles: CSSProperties = { opacity: 0.8 };
 
-const CustomConnectionLine = ({
-  fromX,
-  fromY,
-  fromPosition,
-  toX,
-  toY,
-  toPosition,
-}: ConnectionLineComponentProps) => {
+const CustomConnectionLine = ({ fromX, fromY, fromPosition, toX, toY, toPosition }: ConnectionLineComponentProps) => {
   const stroke = useAppSelector(selectStroke);
   const className = useAppSelector(selectClassName);
 
@@ -46,14 +35,7 @@ const CustomConnectionLine = ({
 
   return (
     <g>
-      <path
-        fill="none"
-        stroke={stroke}
-        strokeWidth={2}
-        className={className}
-        d={dAttr}
-        style={pathStyles}
-      />
+      <path fill="none" stroke={stroke} strokeWidth={2} className={className} d={dAttr} style={pathStyles} />
     </g>
   );
 };

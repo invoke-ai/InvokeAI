@@ -1,10 +1,6 @@
-import { useDisclosure } from '@chakra-ui/react';
+import { useDisclosure } from '@invoke-ai/ui-library';
 import { isNil } from 'lodash-es';
-import type {
-  ChangeEventHandler,
-  KeyboardEventHandler,
-  RefObject,
-} from 'react';
+import type { ChangeEventHandler, KeyboardEventHandler, RefObject } from 'react';
 import { useCallback } from 'react';
 import { flushSync } from 'react-dom';
 
@@ -14,11 +10,7 @@ export type UseInsertEmbeddingArg = {
   onChange: (v: string) => void;
 };
 
-export const usePrompt = ({
-  prompt,
-  textareaRef,
-  onChange: _onChange,
-}: UseInsertEmbeddingArg) => {
+export const usePrompt = ({ prompt, textareaRef, onChange: _onChange }: UseInsertEmbeddingArg) => {
   const { isOpen, onClose, onOpen } = useDisclosure();
 
   const onChange: ChangeEventHandler<HTMLTextAreaElement> = useCallback(

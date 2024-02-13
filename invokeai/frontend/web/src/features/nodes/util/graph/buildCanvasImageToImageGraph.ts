@@ -1,10 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
-import type {
-  ImageDTO,
-  ImageToLatentsInvocation,
-  NonNullableGraph,
-} from 'services/api/types';
+import type { ImageDTO, ImageToLatentsInvocation, NonNullableGraph } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
@@ -34,10 +30,7 @@ import { addCoreMetadataNode } from './metadata';
 /**
  * Builds the Canvas tab's Image to Image graph.
  */
-export const buildCanvasImageToImageGraph = (
-  state: RootState,
-  initialImage: ImageDTO
-): NonNullableGraph => {
+export const buildCanvasImageToImageGraph = (state: RootState, initialImage: ImageDTO): NonNullableGraph => {
   const log = logger('nodes');
   const {
     positivePrompt,
@@ -63,9 +56,7 @@ export const buildCanvasImageToImageGraph = (
 
   const fp32 = vaePrecision === 'fp32';
   const is_intermediate = true;
-  const isUsingScaledDimensions = ['auto', 'manual'].includes(
-    boundingBoxScaleMethod
-  );
+  const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);
 
   if (!model) {
     log.error('No model found in state');
@@ -119,12 +110,8 @@ export const buildCanvasImageToImageGraph = (
         is_intermediate,
         use_cpu,
         seed,
-        width: !isUsingScaledDimensions
-          ? width
-          : scaledBoundingBoxDimensions.width,
-        height: !isUsingScaledDimensions
-          ? height
-          : scaledBoundingBoxDimensions.height,
+        width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
+        height: !isUsingScaledDimensions ? height : scaledBoundingBoxDimensions.height,
       },
       [IMAGE_TO_LATENTS]: {
         type: 'i2l',
@@ -136,6 +123,7 @@ export const buildCanvasImageToImageGraph = (
         id: DENOISE_LATENTS,
         is_intermediate,
         cfg_scale,
+        cfg_rescale_multiplier,
         scheduler,
         steps,
         denoising_start: 1 - strength,
@@ -301,8 +289,7 @@ export const buildCanvasImageToImageGraph = (
       use_cache: false,
     };
 
-    (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image =
-      initialImage;
+    (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image = initialImage;
 
     graph.edges.push({
       source: {
@@ -322,12 +309,8 @@ export const buildCanvasImageToImageGraph = (
       generation_mode: 'img2img',
       cfg_scale,
       cfg_rescale_multiplier,
-      width: !isUsingScaledDimensions
-        ? width
-        : scaledBoundingBoxDimensions.width,
-      height: !isUsingScaledDimensions
-        ? height
-        : scaledBoundingBoxDimensions.height,
+      width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
+      height: !isUsingScaledDimensions ? height : scaledBoundingBoxDimensions.height,
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
       model,

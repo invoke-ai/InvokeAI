@@ -1,6 +1,5 @@
-import type { ChakraProps, ThemeTypings } from '@chakra-ui/react';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import type { ChakraProps, ThemeTypings } from '@invoke-ai/ui-library';
+import { Button, IconButton } from '@invoke-ai/ui-library';
 import type { ReactElement, ReactNode } from 'react';
 import { memo } from 'react';
 
@@ -31,7 +30,7 @@ const QueueButton = ({
 }: Props) => {
   if (asIconButton) {
     return (
-      <InvIconButton
+      <IconButton
         aria-label={label}
         tooltip={tooltip}
         icon={icon}
@@ -46,7 +45,7 @@ const QueueButton = ({
   }
 
   return (
-    <InvButton
+    <Button
       aria-label={label}
       tooltip={tooltip}
       leftIcon={icon}
@@ -60,7 +59,7 @@ const QueueButton = ({
       data-testid={label}
     >
       {label}
-    </InvButton>
+    </Button>
   );
 };
 

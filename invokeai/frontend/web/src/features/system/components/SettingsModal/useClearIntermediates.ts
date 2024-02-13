@@ -4,10 +4,7 @@ import { controlAdaptersReset } from 'features/controlAdapters/store/controlAdap
 import { addToast } from 'features/system/store/systemSlice';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  useClearIntermediatesMutation,
-  useGetIntermediatesCountQuery,
-} from 'services/api/endpoints/images';
+import { useClearIntermediatesMutation, useGetIntermediatesCountQuery } from 'services/api/endpoints/images';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
 export type UseClearIntermediatesReturn = {
@@ -15,31 +12,23 @@ export type UseClearIntermediatesReturn = {
   clearIntermediates: () => void;
   isLoading: boolean;
   hasPendingItems: boolean;
+  refetchIntermediatesCount: () => void;
 };
 
-export const useClearIntermediates = (
-  shouldShowClearIntermediates: boolean
-): UseClearIntermediatesReturn => {
+export const useClearIntermediates = (shouldShowClearIntermediates: boolean): UseClearIntermediatesReturn => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
-  const { data: intermediatesCount } = useGetIntermediatesCountQuery(
-    undefined,
-    {
-      refetchOnMountOrArgChange: true,
-      skip: !shouldShowClearIntermediates,
-    }
-  );
+  const { data: intermediatesCount, refetch: refetchIntermediatesCount } = useGetIntermediatesCountQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+    skip: !shouldShowClearIntermediates,
+  });
 
   const [_clearIntermediates, { isLoading }] = useClearIntermediatesMutation();
 
   const { data: queueStatus } = useGetQueueStatusQuery();
   const hasPendingItems = useMemo(
-    () =>
-      Boolean(
-        queueStatus &&
-          (queueStatus.queue.in_progress > 0 || queueStatus.queue.pending > 0)
-      ),
+    () => Boolean(queueStatus && (queueStatus.queue.in_progress > 0 || queueStatus.queue.pending > 0)),
     [queueStatus]
   );
 
@@ -70,5 +59,5 @@ export const useClearIntermediates = (
       });
   }, [t, _clearIntermediates, dispatch, hasPendingItems]);
 
-  return { intermediatesCount, clearIntermediates, isLoading, hasPendingItems };
+  return { intermediatesCount, clearIntermediates, isLoading, hasPendingItems, refetchIntermediatesCount };
 };

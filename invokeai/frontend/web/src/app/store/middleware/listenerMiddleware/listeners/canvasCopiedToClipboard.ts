@@ -11,9 +11,7 @@ export const addCanvasCopiedToClipboardListener = () => {
   startAppListening({
     actionCreator: canvasCopiedToClipboard,
     effect: async (action, { dispatch, getState }) => {
-      const moduleLog = $logger
-        .get()
-        .child({ namespace: 'canvasCopiedToClipboardListener' });
+      const moduleLog = $logger.get().child({ namespace: 'canvasCopiedToClipboardListener' });
       const state = getState();
 
       try {

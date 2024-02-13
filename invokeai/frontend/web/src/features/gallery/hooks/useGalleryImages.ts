@@ -2,10 +2,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { moreImagesLoaded } from 'features/gallery/store/gallerySlice';
 import { useCallback, useMemo } from 'react';
-import {
-  useGetBoardAssetsTotalQuery,
-  useGetBoardImagesTotalQuery,
-} from 'services/api/endpoints/boards';
+import { useGetBoardAssetsTotalQuery, useGetBoardImagesTotalQuery } from 'services/api/endpoints/boards';
 import { useListImagesQuery } from 'services/api/endpoints/images';
 
 /**

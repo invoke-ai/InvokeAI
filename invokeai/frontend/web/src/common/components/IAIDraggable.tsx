@@ -1,5 +1,5 @@
-import type { BoxProps } from '@chakra-ui/react';
-import { Box } from '@chakra-ui/react';
+import type { BoxProps } from '@invoke-ai/ui-library';
+import { Box } from '@invoke-ai/ui-library';
 import { useDraggableTypesafe } from 'features/dnd/hooks/typesafeHooks';
 import type { TypesafeDraggableData } from 'features/dnd/types';
 import { memo, useRef } from 'react';

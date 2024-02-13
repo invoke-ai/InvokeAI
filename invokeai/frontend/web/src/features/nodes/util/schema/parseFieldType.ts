@@ -20,8 +20,7 @@ import type { OpenAPIV3_1 } from 'openapi-types';
  * @example
  * refObjectToFieldType({ "$ref": "#/components/schemas/ImageField" }) --> 'ImageField'
  */
-export const refObjectToSchemaName = (refObject: OpenAPIV3_1.ReferenceObject) =>
-  refObject.$ref.split('/').slice(-1)[0];
+export const refObjectToSchemaName = (refObject: OpenAPIV3_1.ReferenceObject) => refObject.$ref.split('/').slice(-1)[0];
 
 const OPENAPI_TO_FIELD_TYPE_MAP: Record<string, string> = {
   integer: 'IntegerField',
@@ -43,9 +42,7 @@ const isCollectionFieldType = (fieldType: string) => {
   return false;
 };
 
-export const parseFieldType = (
-  schemaObject: OpenAPIV3_1SchemaOrRef
-): FieldType => {
+export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType => {
   if (isInvocationFieldSchema(schemaObject)) {
     // Check if this field has an explicit type provided by the node schema
     const { ui_type } = schemaObject;
@@ -58,6 +55,14 @@ export const parseFieldType = (
     }
   }
   if (isSchemaObject(schemaObject)) {
+    if (schemaObject.const) {
+      // Fields with a single const value are defined as `Literal["value"]` in the pydantic schema - it's actually an enum
+      return {
+        name: 'EnumField',
+        isCollection: false,
+        isCollectionOrScalar: false,
+      };
+    }
     if (!schemaObject.type) {
       // if schemaObject has no type, then it should have one of allOf, anyOf, oneOf
 
@@ -67,9 +72,7 @@ export const parseFieldType = (
           // This is a single ref type
           const name = refObjectToSchemaName(allOf[0]);
           if (!name) {
-            throw new FieldParseError(
-              t('nodes.unableToExtractSchemaNameFromRef')
-            );
+            throw new FieldParseError(t('nodes.unableToExtractSchemaNameFromRef'));
           }
           return {
             name,
@@ -92,9 +95,7 @@ export const parseFieldType = (
           if (isRefObject(filteredAnyOf[0])) {
             const name = refObjectToSchemaName(filteredAnyOf[0]);
             if (!name) {
-              throw new FieldParseError(
-                t('nodes.unableToExtractSchemaNameFromRef')
-              );
+              throw new FieldParseError(t('nodes.unableToExtractSchemaNameFromRef'));
             }
 
             return {
@@ -134,10 +135,7 @@ export const parseFieldType = (
           if (isRefObject(first) && isRefObject(second)) {
             firstType = refObjectToSchemaName(first);
             secondType = refObjectToSchemaName(second);
-          } else if (
-            isNonArraySchemaObject(first) &&
-            isNonArraySchemaObject(second)
-          ) {
+          } else if (isNonArraySchemaObject(first) && isNonArraySchemaObject(second)) {
             firstType = first.type;
             secondType = second.type;
           }
@@ -148,10 +146,7 @@ export const parseFieldType = (
           if (isRefObject(first) && isRefObject(second)) {
             firstType = refObjectToSchemaName(first);
             secondType = refObjectToSchemaName(second);
-          } else if (
-            isNonArraySchemaObject(first) &&
-            isNonArraySchemaObject(second)
-          ) {
+          } else if (isNonArraySchemaObject(first) && isNonArraySchemaObject(second)) {
             firstType = first.type;
             secondType = second.type;
           }
@@ -209,9 +204,7 @@ export const parseFieldType = (
         // This is a ref object, extract the type name
         const name = refObjectToSchemaName(schemaObject.items);
         if (!name) {
-          throw new FieldParseError(
-            t('nodes.unableToExtractSchemaNameFromRef')
-          );
+          throw new FieldParseError(t('nodes.unableToExtractSchemaNameFromRef'));
         }
         return {
           name,

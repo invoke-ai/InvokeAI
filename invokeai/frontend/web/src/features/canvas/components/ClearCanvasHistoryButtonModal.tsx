@@ -1,7 +1,5 @@
-import { useDisclosure } from '@chakra-ui/react';
+import { Button, ConfirmationAlertDialog, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvConfirmationAlertDialog } from 'common/components/InvConfirmationAlertDialog/InvConfirmationAlertDialog';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { clearCanvasHistory } from 'features/canvas/store/canvasSlice';
 import { memo, useCallback } from 'react';
@@ -13,22 +11,14 @@ const ClearCanvasHistoryButtonModal = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const acceptCallback = useCallback(
-    () => dispatch(clearCanvasHistory()),
-    [dispatch]
-  );
+  const acceptCallback = useCallback(() => dispatch(clearCanvasHistory()), [dispatch]);
 
   return (
     <>
-      <InvButton
-        onClick={onOpen}
-        size="sm"
-        leftIcon={<PiTrashSimpleFill />}
-        isDisabled={isStaging}
-      >
+      <Button onClick={onOpen} size="sm" leftIcon={<PiTrashSimpleFill />} isDisabled={isStaging}>
         {t('unifiedCanvas.clearCanvasHistory')}
-      </InvButton>
-      <InvConfirmationAlertDialog
+      </Button>
+      <ConfirmationAlertDialog
         isOpen={isOpen}
         onClose={onClose}
         title={t('unifiedCanvas.clearCanvasHistory')}
@@ -38,7 +28,7 @@ const ClearCanvasHistoryButtonModal = () => {
         <p>{t('unifiedCanvas.clearCanvasHistoryMessage')}</p>
         <br />
         <p>{t('unifiedCanvas.clearCanvasHistoryConfirm')}</p>
-      </InvConfirmationAlertDialog>
+      </ConfirmationAlertDialog>
     </>
   );
 };

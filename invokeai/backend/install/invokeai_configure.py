@@ -849,7 +849,7 @@ def migrate_if_needed(opt: Namespace, root: Path) -> bool:
 
 
 # -------------------------------------
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="InvokeAI model downloader")
     parser.add_argument(
         "--skip-sd-weights",

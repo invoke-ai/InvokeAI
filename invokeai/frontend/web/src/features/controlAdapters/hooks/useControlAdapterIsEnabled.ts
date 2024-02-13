@@ -11,8 +11,7 @@ export const useControlAdapterIsEnabled = (id: string) => {
     () =>
       createSelector(
         selectControlAdaptersSlice,
-        (controlAdapters) =>
-          selectControlAdapterById(controlAdapters, id)?.isEnabled ?? false
+        (controlAdapters) => selectControlAdapterById(controlAdapters, id)?.isEnabled ?? false
       ),
     [id]
   );

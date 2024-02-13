@@ -1,9 +1,5 @@
-import { Divider, Flex } from '@chakra-ui/react';
+import { Button, Divider, Flex, FormControl, FormErrorMessage, FormLabel, Input, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvInput } from 'common/components/InvInput/InvInput';
-import { InvText } from 'common/components/InvText/wrapper';
 import BaseModelSelect from 'features/modelManager/subpanels/shared/BaseModelSelect';
 import ModelVariantSelect from 'features/modelManager/subpanels/shared/ModelVariantSelect';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
@@ -88,58 +84,48 @@ const DiffusersModelEdit = (props: DiffusersModelEditProps) => {
   return (
     <Flex flexDirection="column" rowGap={4} width="100%">
       <Flex flexDirection="column">
-        <InvText fontSize="lg" fontWeight="bold">
+        <Text fontSize="lg" fontWeight="bold">
           {model.model_name}
-        </InvText>
-        <InvText fontSize="sm" color="base.400">
+        </Text>
+        <Text fontSize="sm" color="base.400">
           {MODEL_TYPE_MAP[model.base_model]} {t('modelManager.model')}
-        </InvText>
+        </Text>
       </Flex>
       <Divider />
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <Flex flexDirection="column" overflowY="scroll" gap={4}>
-          <InvControl
-            label={t('modelManager.name')}
-            isInvalid={Boolean(errors.model_name)}
-            error={errors.model_name?.message}
-          >
-            <InvInput
+          <FormControl isInvalid={Boolean(errors.model_name)}>
+            <FormLabel>{t('modelManager.name')}</FormLabel>
+            <Input
               {...register('model_name', {
-                validate: (value) =>
-                  value.trim().length > 3 || 'Must be at least 3 characters',
+                validate: (value) => value.trim().length > 3 || 'Must be at least 3 characters',
               })}
             />
-          </InvControl>
-          <InvControl label={t('modelManager.description')}>
-            <InvInput {...register('description')} />
-          </InvControl>
-          <BaseModelSelect<DiffusersModelConfig>
-            control={control}
-            name="base_model"
-          />
-          <ModelVariantSelect<DiffusersModelConfig>
-            control={control}
-            name="variant"
-          />
-          <InvControl
-            label={t('modelManager.modelLocation')}
-            isInvalid={Boolean(errors.path)}
-            error={errors.path?.message}
-          >
-            <InvInput
+            {errors.model_name?.message && <FormErrorMessage>{errors.model_name?.message}</FormErrorMessage>}
+          </FormControl>
+          <FormControl>
+            <FormLabel>{t('modelManager.description')}</FormLabel>
+            <Input {...register('description')} />
+          </FormControl>
+          <BaseModelSelect<DiffusersModelConfig> control={control} name="base_model" />
+          <ModelVariantSelect<DiffusersModelConfig> control={control} name="variant" />
+          <FormControl isInvalid={Boolean(errors.path)}>
+            <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
+            <Input
               {...register('path', {
-                validate: (value) =>
-                  value.trim().length > 0 || 'Must provide a path',
+                validate: (value) => value.trim().length > 0 || 'Must provide a path',
               })}
             />
-          </InvControl>
-          <InvControl label={t('modelManager.vaeLocation')}>
-            <InvInput {...register('vae')} />
-          </InvControl>
-          <InvButton type="submit" isLoading={isLoading}>
+            {errors.path?.message && <FormErrorMessage>{errors.path?.message}</FormErrorMessage>}
+          </FormControl>
+          <FormControl>
+            <FormLabel>{t('modelManager.vaeLocation')}</FormLabel>
+            <Input {...register('vae')} />
+          </FormControl>
+          <Button type="submit" isLoading={isLoading}>
             {t('modelManager.updateModel')}
-          </InvButton>
+          </Button>
         </Flex>
       </form>
     </Flex>

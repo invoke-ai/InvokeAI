@@ -1,9 +1,5 @@
-import type {
-  BaseQueryFn,
-  FetchArgs,
-  FetchBaseQueryError,
-  TagDescription,
-} from '@reduxjs/toolkit/query/react';
+import type { FetchBaseQueryArgs } from '@reduxjs/toolkit/dist/query/fetchBaseQuery';
+import type { BaseQueryFn, FetchArgs, FetchBaseQueryError, TagDescription } from '@reduxjs/toolkit/query/react';
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
@@ -40,6 +36,7 @@ export const tagTypes = [
   'SDXLRefinerModel',
   'Workflow',
   'WorkflowsRecent',
+  'Schema',
   // This is invalidated on reconnect. It should be used for queries that have changing data,
   // especially related to the queue and generation.
   'FetchOnReconnect',
@@ -47,17 +44,17 @@ export const tagTypes = [
 export type ApiTagDescription = TagDescription<(typeof tagTypes)[number]>;
 export const LIST_TAG = 'LIST';
 
-const dynamicBaseQuery: BaseQueryFn<
-  string | FetchArgs,
-  unknown,
-  FetchBaseQueryError
-> = async (args, api, extraOptions) => {
+const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
+  args,
+  api,
+  extraOptions
+) => {
   const baseUrl = $baseUrl.get();
   const authToken = $authToken.get();
   const projectId = $projectId.get();
 
-  const rawBaseQuery = fetchBaseQuery({
-    baseUrl: `${baseUrl ?? ''}/api/v1`,
+  const fetchBaseQueryArgs: FetchBaseQueryArgs = {
+    baseUrl: baseUrl ? `${baseUrl}/api/v1` : `${window.location.href.replace(/\/$/, '')}/api/v1`,
     prepareHeaders: (headers) => {
       if (authToken) {
         headers.set('Authorization', `Bearer ${authToken}`);
@@ -68,7 +65,17 @@ const dynamicBaseQuery: BaseQueryFn<
 
       return headers;
     },
-  });
+  };
+
+  // When fetching the openapi.json, we need to remove circular references from the JSON.
+  if (
+    (args instanceof Object && args.url.includes('openapi.json')) ||
+    (typeof args === 'string' && args.includes('openapi.json'))
+  ) {
+    fetchBaseQueryArgs.jsonReplacer = getCircularReplacer();
+  }
+
+  const rawBaseQuery = fetchBaseQuery(fetchBaseQueryArgs);
 
   return rawBaseQuery(args, api, extraOptions);
 };
@@ -79,3 +86,25 @@ export const api = createApi({
   tagTypes,
   endpoints: () => ({}),
 });
+
+function getCircularReplacer() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ancestors: Record<string, any>[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return function (key: string, value: any) {
+    if (typeof value !== 'object' || value === null) {
+      return value;
+    }
+    // `this` is the object that value is contained in, i.e., its direct parent.
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore don't think it's possible to not have TS complain about this...
+    while (ancestors.length > 0 && ancestors.at(-1) !== this) {
+      ancestors.pop();
+    }
+    if (ancestors.includes(value)) {
+      return '[Circular]';
+    }
+    ancestors.push(value);
+    return value;
+  };
+}

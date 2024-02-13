@@ -1,9 +1,5 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  $isDrawing,
-  $isMovingStage,
-  $tool,
-} from 'features/canvas/store/canvasNanostore';
+import { $isDrawing, $isMovingStage, $tool } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { addLine } from 'features/canvas/store/canvasSlice';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';

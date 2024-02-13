@@ -22,32 +22,30 @@ const zRejectedForbiddenAction = z.object({
     .optional(),
 });
 
-export const authToastMiddleware: Middleware =
-  (api: MiddlewareAPI) => (next) => (action) => {
-    if (isRejectedWithValue(action)) {
-      try {
-        const parsed = zRejectedForbiddenAction.parse(action);
-        if (parsed.meta?.arg?.endpointName === 'getImageDTO') {
-          // do not show toast if problem is image access
-          return;
-        }
-
-        const { dispatch } = api;
-        const customMessage =
-          parsed.payload.data.detail !== 'Forbidden'
-            ? parsed.payload.data.detail
-            : undefined;
-        dispatch(
-          addToast({
-            title: t('common.somethingWentWrong'),
-            status: 'error',
-            description: customMessage,
-          })
-        );
-      } catch (error) {
-        // no-op
+export const authToastMiddleware: Middleware = (api: MiddlewareAPI) => (next) => (action) => {
+  if (isRejectedWithValue(action)) {
+    try {
+      const parsed = zRejectedForbiddenAction.parse(action);
+      const endpointName = parsed.meta?.arg?.endpointName;
+      if (endpointName === 'getImageDTO') {
+        // do not show toast if problem is image access
+        return;
       }
-    }
 
-    return next(action);
-  };
+      const { dispatch } = api;
+      const customMessage = parsed.payload.data.detail !== 'Forbidden' ? parsed.payload.data.detail : undefined;
+      dispatch(
+        addToast({
+          id: `auth-error-toast-${endpointName}`,
+          title: t('common.somethingWentWrong'),
+          status: 'error',
+          description: customMessage,
+        })
+      );
+    } catch (error) {
+      // no-op
+    }
+  }
+
+  return next(action);
+};

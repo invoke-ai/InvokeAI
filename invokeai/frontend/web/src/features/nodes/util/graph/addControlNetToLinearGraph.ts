@@ -9,17 +9,10 @@ import type {
   NonNullableGraph,
 } from 'services/api/types';
 
-import {
-  CANVAS_COHERENCE_DENOISE_LATENTS,
-  CONTROL_NET_COLLECT,
-} from './constants';
+import { CANVAS_COHERENCE_DENOISE_LATENTS, CONTROL_NET_COLLECT } from './constants';
 import { upsertMetadata } from './metadata';
 
-export const addControlNetToLinearGraph = (
-  state: RootState,
-  graph: NonNullableGraph,
-  baseNodeId: string
-): void => {
+export const addControlNetToLinearGraph = (state: RootState, graph: NonNullableGraph, baseNodeId: string): void => {
   const validControlNets = selectValidControlNets(state.controlAdapters).filter(
     (ca) => ca.model?.base_model === state.generation.model?.base_model
   );
@@ -102,9 +95,7 @@ export const addControlNetToLinearGraph = (
 
       graph.nodes[controlNetNode.id] = controlNetNode as ControlNetInvocation;
 
-      controlNetMetadata.push(
-        omit(controlNetNode, ['id', 'type', 'is_intermediate']) as ControlField
-      );
+      controlNetMetadata.push(omit(controlNetNode, ['id', 'type', 'is_intermediate']) as ControlField);
 
       graph.edges.push({
         source: { node_id: controlNetNode.id, field: 'control' },

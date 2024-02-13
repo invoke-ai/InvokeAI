@@ -16,16 +16,11 @@ export const addWatermarkerToGraph = (
 ): void => {
   const activeTabName = activeTabNameSelector(state);
 
-  const is_intermediate =
-    activeTabName === 'unifiedCanvas' ? !state.canvas.shouldAutoSave : false;
+  const is_intermediate = activeTabName === 'unifiedCanvas' ? !state.canvas.shouldAutoSave : false;
 
-  const nodeToAddTo = graph.nodes[nodeIdToAddTo] as
-    | LatentsToImageInvocation
-    | undefined;
+  const nodeToAddTo = graph.nodes[nodeIdToAddTo] as LatentsToImageInvocation | undefined;
 
-  const nsfwCheckerNode = graph.nodes[NSFW_CHECKER] as
-    | ImageNSFWBlurInvocation
-    | undefined;
+  const nsfwCheckerNode = graph.nodes[NSFW_CHECKER] as ImageNSFWBlurInvocation | undefined;
 
   if (!nodeToAddTo) {
     // something has gone terribly awry

@@ -1,4 +1,4 @@
-import { Box } from '@chakra-ui/react';
+import { Box } from '@invoke-ai/ui-library';
 import { memo, useMemo } from 'react';
 
 type Props = {

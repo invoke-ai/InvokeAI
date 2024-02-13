@@ -8,6 +8,4 @@ declare global {
   }
 }
 
-export const $store = atom<
-  Readonly<ReturnType<typeof createStore>> | undefined
->();
+export const $store = atom<Readonly<ReturnType<typeof createStore>> | undefined>();

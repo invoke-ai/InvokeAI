@@ -1,11 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import type {
-  AppConfig,
-  NumericalParameterConfig,
-  PartialAppConfig,
-} from 'app/types/invokeai';
+import type { AppConfig, NumericalParameterConfig, PartialAppConfig } from 'app/types/invokeai';
 import { merge } from 'lodash-es';
 
 const baseDimensionConfig: NumericalParameterConfig = {
@@ -23,13 +19,7 @@ export const initialConfigState: AppConfig = {
   shouldFetchMetadataFromApi: false,
   disabledTabs: [],
   disabledFeatures: ['lightbox', 'faceRestore', 'batches', 'bulkDownload'],
-  disabledSDFeatures: [
-    'variation',
-    'symmetry',
-    'hires',
-    'perlinNoise',
-    'noiseThreshold',
-  ],
+  disabledSDFeatures: ['variation', 'symmetry', 'hires', 'perlinNoise', 'noiseThreshold'],
   nodesAllowlist: undefined,
   nodesDenylist: undefined,
   canRestoreDeletedImagesFromBin: true,
@@ -186,7 +176,5 @@ export const configSlice = createSlice({
 });
 
 export const { configChanged } = configSlice.actions;
-
-export default configSlice.reducer;
 
 export const selectConfigSlice = (state: RootState) => state.config;

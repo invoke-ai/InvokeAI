@@ -23,7 +23,7 @@
         - [Primitive Types](#primitive-types)
         - [Complex Types](#complex-types)
         - [Collection Types](#collection-types)
-        - [Polymorphic Types](#polymorphic-types)
+        - [Collection or Scalar Types](#collection-or-scalar-types)
         - [Optional Fields](#optional-fields)
       - [Building Field Input Templates](#building-field-input-templates)
       - [Building Field Output Templates](#building-field-output-templates)

@@ -17,22 +17,19 @@ const accept: Accept = {
   'image/jpeg': ['.jpg', '.jpeg', '.png'],
 };
 
-const selectPostUploadAction = createMemoizedSelector(
-  activeTabNameSelector,
-  (activeTabName) => {
-    let postUploadAction: PostUploadAction = { type: 'TOAST' };
+const selectPostUploadAction = createMemoizedSelector(activeTabNameSelector, (activeTabName) => {
+  let postUploadAction: PostUploadAction = { type: 'TOAST' };
 
-    if (activeTabName === 'unifiedCanvas') {
-      postUploadAction = { type: 'SET_CANVAS_INITIAL_IMAGE' };
-    }
-
-    if (activeTabName === 'img2img') {
-      postUploadAction = { type: 'SET_INITIAL_IMAGE' };
-    }
-
-    return postUploadAction;
+  if (activeTabName === 'unifiedCanvas') {
+    postUploadAction = { type: 'SET_CANVAS_INITIAL_IMAGE' };
   }
-);
+
+  if (activeTabName === 'img2img') {
+    postUploadAction = { type: 'SET_INITIAL_IMAGE' };
+  }
+
+  return postUploadAction;
+});
 
 export const useFullscreenDropzone = () => {
   const { t } = useTranslation();
@@ -147,9 +144,7 @@ export const useFullscreenDropzone = () => {
         // Set the files on the dropzone.inputRef
         dropzone.inputRef.current.files = e.clipboardData.files;
         // Dispatch the change event, dropzone catches this and we get to use its own validation
-        dropzone.inputRef.current?.dispatchEvent(
-          new Event('change', { bubbles: true })
-        );
+        dropzone.inputRef.current?.dispatchEvent(new Event('change', { bubbles: true }));
       }
     };
 

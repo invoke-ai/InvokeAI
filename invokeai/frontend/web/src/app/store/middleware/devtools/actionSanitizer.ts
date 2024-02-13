@@ -2,7 +2,7 @@ import type { UnknownAction } from '@reduxjs/toolkit';
 import { isAnyGraphBuilt } from 'features/nodes/store/actions';
 import { nodeTemplatesBuilt } from 'features/nodes/store/nodeTemplatesSlice';
 import { cloneDeep } from 'lodash-es';
-import { receivedOpenAPISchema } from 'services/api/thunks/schema';
+import { appInfoApi } from 'services/api/endpoints/appInfo';
 import type { Graph } from 'services/api/types';
 import { socketGeneratorProgress } from 'services/events/actions';
 
@@ -18,7 +18,7 @@ export const actionSanitizer = <A extends UnknownAction>(action: A): A => {
     }
   }
 
-  if (receivedOpenAPISchema.fulfilled.match(action)) {
+  if (appInfoApi.endpoints.getOpenAPISchema.matchFulfilled(action)) {
     return {
       ...action,
       payload: '<OpenAPI schema omitted>',
@@ -35,8 +35,7 @@ export const actionSanitizer = <A extends UnknownAction>(action: A): A => {
   if (socketGeneratorProgress.match(action)) {
     const sanitized = cloneDeep(action);
     if (sanitized.payload.data.progress_image) {
-      sanitized.payload.data.progress_image.dataURL =
-        '<Progress image omitted>';
+      sanitized.payload.data.progress_image.dataURL = '<Progress image omitted>';
     }
     return sanitized;
   }

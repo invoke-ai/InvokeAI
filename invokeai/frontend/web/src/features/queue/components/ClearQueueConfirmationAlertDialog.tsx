@@ -1,6 +1,5 @@
-import type { UseDisclosureReturn } from '@chakra-ui/react';
-import { InvConfirmationAlertDialog } from 'common/components/InvConfirmationAlertDialog/InvConfirmationAlertDialog';
-import { InvText } from 'common/components/InvText/wrapper';
+import type { UseDisclosureReturn } from '@invoke-ai/ui-library';
+import { ConfirmationAlertDialog, Text } from '@invoke-ai/ui-library';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,17 +13,17 @@ const ClearQueueButton = ({ disclosure }: Props) => {
   const { clearQueue } = useClearQueue();
 
   return (
-    <InvConfirmationAlertDialog
+    <ConfirmationAlertDialog
       isOpen={disclosure.isOpen}
       onClose={disclosure.onClose}
       title={t('queue.clearTooltip')}
       acceptCallback={clearQueue}
       acceptButtonText={t('queue.clear')}
     >
-      <InvText>{t('queue.clearQueueAlertDialog')}</InvText>
+      <Text>{t('queue.clearQueueAlertDialog')}</Text>
       <br />
-      <InvText>{t('queue.clearQueueAlertDialog2')}</InvText>
-    </InvConfirmationAlertDialog>
+      <Text>{t('queue.clearQueueAlertDialog2')}</Text>
+    </ConfirmationAlertDialog>
   );
 };
 

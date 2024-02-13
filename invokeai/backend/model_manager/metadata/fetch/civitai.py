@@ -170,6 +170,8 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
         if model_id is None:
             version_url = CIVITAI_VERSION_ENDPOINT + str(version_id)
             version = self._requests.get(version_url).json()
+            if error := version.get("error"):
+                raise UnknownMetadataException(error)
             model_id = version["modelId"]
 
         model_url = CIVITAI_MODEL_ENDPOINT + str(model_id)

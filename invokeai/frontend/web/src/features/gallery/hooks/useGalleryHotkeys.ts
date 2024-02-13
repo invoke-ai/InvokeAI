@@ -1,37 +1,45 @@
+import { useAppSelector } from 'app/store/storeHooks';
+import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 /**
  * Registers gallery hotkeys. This hook is a singleton.
  */
 export const useGalleryHotkeys = () => {
+  const activeTabName = useAppSelector(activeTabNameSelector);
+  const isStaging = useAppSelector(isStagingSelector);
+  // block navigation on Unified Canvas tab when staging new images
+  const canNavigateGallery = useMemo(() => {
+    return activeTabName !== 'unifiedCanvas' || !isStaging;
+  }, [activeTabName, isStaging]);
+
   const {
     areMoreImagesAvailable,
     handleLoadMoreImages,
     queryResult: { isFetching },
   } = useGalleryImages();
 
-  const {
-    handleLeftImage,
-    handleRightImage,
-    handleUpImage,
-    handleDownImage,
-    isOnLastImage,
-    areImagesBelowCurrent,
-  } = useGalleryNavigation();
+  const { handleLeftImage, handleRightImage, handleUpImage, handleDownImage, isOnLastImage, areImagesBelowCurrent } =
+    useGalleryNavigation();
 
   useHotkeys(
     'left',
     () => {
-      handleLeftImage();
+      canNavigateGallery && handleLeftImage();
     },
-    [handleLeftImage]
+    [handleLeftImage, canNavigateGallery]
   );
 
   useHotkeys(
     'right',
     () => {
+      if (!canNavigateGallery) {
+        return;
+      }
       if (isOnLastImage && areMoreImagesAvailable && !isFetching) {
         handleLoadMoreImages();
         return;
@@ -40,13 +48,7 @@ export const useGalleryHotkeys = () => {
         handleRightImage();
       }
     },
-    [
-      isOnLastImage,
-      areMoreImagesAvailable,
-      handleLoadMoreImages,
-      isFetching,
-      handleRightImage,
-    ]
+    [isOnLastImage, areMoreImagesAvailable, handleLoadMoreImages, isFetching, handleRightImage, canNavigateGallery]
   );
 
   useHotkeys(
@@ -68,12 +70,6 @@ export const useGalleryHotkeys = () => {
       handleDownImage();
     },
     { preventDefault: true },
-    [
-      areImagesBelowCurrent,
-      areMoreImagesAvailable,
-      handleLoadMoreImages,
-      isFetching,
-      handleDownImage,
-    ]
+    [areImagesBelowCurrent, areMoreImagesAvailable, handleLoadMoreImages, isFetching, handleDownImage]
   );
 };

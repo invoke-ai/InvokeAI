@@ -11,8 +11,7 @@ export const useControlAdapterControlImage = (id: string) => {
     () =>
       createSelector(
         selectControlAdaptersSlice,
-        (controlAdapters) =>
-          selectControlAdapterById(controlAdapters, id)?.controlImage
+        (controlAdapters) => selectControlAdapterById(controlAdapters, id)?.controlImage
       ),
     [id]
   );

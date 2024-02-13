@@ -1,4 +1,4 @@
-import type { UseToastOptions } from '@chakra-ui/react';
+import type { UseToastOptions } from '@invoke-ai/ui-library';
 import type { EntityState } from '@reduxjs/toolkit';
 import type { components, paths } from 'services/api/schema';
 import type { O } from 'ts-toolbelt';
@@ -7,21 +7,16 @@ type s = components['schemas'];
 
 export type ImageCache = EntityState<ImageDTO, string>;
 
-export type ListImagesArgs = NonNullable<
-  paths['/api/v1/images/']['get']['parameters']['query']
->;
+export type ListImagesArgs = NonNullable<paths['/api/v1/images/']['get']['parameters']['query']>;
 
 export type DeleteBoardResult =
   paths['/api/v1/boards/{board_id}']['delete']['responses']['200']['content']['application/json'];
 
-export type ListBoardsArg = NonNullable<
-  paths['/api/v1/boards/']['get']['parameters']['query']
->;
+export type ListBoardsArg = NonNullable<paths['/api/v1/boards/']['get']['parameters']['query']>;
 
-export type UpdateBoardArg =
-  paths['/api/v1/boards/{board_id}']['patch']['parameters']['path'] & {
-    changes: paths['/api/v1/boards/{board_id}']['patch']['requestBody']['content']['application/json'];
-  };
+export type UpdateBoardArg = paths['/api/v1/boards/{board_id}']['patch']['parameters']['path'] & {
+  changes: paths['/api/v1/boards/{board_id}']['patch']['requestBody']['content']['application/json'];
+};
 
 export type BatchConfig =
   paths['/api/v1/queue/{queue_id}/enqueue_batch']['post']['requestBody']['content']['application/json'];
@@ -45,17 +40,13 @@ export type ImageChanges = s['ImageRecordChanges'];
 export type ImageCategory = s['ImageCategory'];
 export type ResourceOrigin = s['ResourceOrigin'];
 export type ImageField = s['ImageField'];
-export type OffsetPaginatedResults_BoardDTO_ =
-  s['OffsetPaginatedResults_BoardDTO_'];
-export type OffsetPaginatedResults_ImageDTO_ =
-  s['OffsetPaginatedResults_ImageDTO_'];
+export type OffsetPaginatedResults_BoardDTO_ = s['OffsetPaginatedResults_BoardDTO_'];
+export type OffsetPaginatedResults_ImageDTO_ = s['OffsetPaginatedResults_ImageDTO_'];
 
 // Models
-export type ModelType =
-  s['invokeai__backend__model_management__models__base__ModelType'];
+export type ModelType = s['invokeai__backend__model_management__models__base__ModelType'];
 export type SubModelType = s['SubModelType'];
-export type BaseModelType =
-  s['invokeai__backend__model_management__models__base__BaseModelType'];
+export type BaseModelType = s['invokeai__backend__model_management__models__base__BaseModelType'];
 export type MainModelField = s['MainModelField'];
 export type VAEModelField = s['VAEModelField'];
 export type LoRAModelField = s['LoRAModelField'];
@@ -70,17 +61,12 @@ export type IPAdapterField = s['IPAdapterField'];
 // Model Configs
 export type LoRAModelConfig = s['LoRAModelConfig'];
 export type VaeModelConfig = s['VaeModelConfig'];
-export type ControlNetModelCheckpointConfig =
-  s['ControlNetModelCheckpointConfig'];
-export type ControlNetModelDiffusersConfig =
-  s['ControlNetModelDiffusersConfig'];
-export type ControlNetModelConfig =
-  | ControlNetModelCheckpointConfig
-  | ControlNetModelDiffusersConfig;
+export type ControlNetModelCheckpointConfig = s['ControlNetModelCheckpointConfig'];
+export type ControlNetModelDiffusersConfig = s['ControlNetModelDiffusersConfig'];
+export type ControlNetModelConfig = ControlNetModelCheckpointConfig | ControlNetModelDiffusersConfig;
 export type IPAdapterModelInvokeAIConfig = s['IPAdapterModelInvokeAIConfig'];
 export type IPAdapterModelConfig = IPAdapterModelInvokeAIConfig;
-export type T2IAdapterModelDiffusersConfig =
-  s['T2IAdapterModelDiffusersConfig'];
+export type T2IAdapterModelDiffusersConfig = s['T2IAdapterModelDiffusersConfig'];
 export type T2IAdapterModelConfig = T2IAdapterModelDiffusersConfig;
 export type TextualInversionModelConfig = s['TextualInversionModelConfig'];
 export type DiffusersModelConfig =
@@ -160,27 +146,19 @@ export type ControlNetInvocation = s['ControlNetInvocation'];
 export type T2IAdapterInvocation = s['T2IAdapterInvocation'];
 export type IPAdapterInvocation = s['IPAdapterInvocation'];
 export type CannyImageProcessorInvocation = s['CannyImageProcessorInvocation'];
-export type ColorMapImageProcessorInvocation =
-  s['ColorMapImageProcessorInvocation'];
-export type ContentShuffleImageProcessorInvocation =
-  s['ContentShuffleImageProcessorInvocation'];
+export type ColorMapImageProcessorInvocation = s['ColorMapImageProcessorInvocation'];
+export type ContentShuffleImageProcessorInvocation = s['ContentShuffleImageProcessorInvocation'];
+export type DepthAnythingImageProcessorInvocation = s['DepthAnythingImageProcessorInvocation'];
 export type HedImageProcessorInvocation = s['HedImageProcessorInvocation'];
-export type LineartAnimeImageProcessorInvocation =
-  s['LineartAnimeImageProcessorInvocation'];
-export type LineartImageProcessorInvocation =
-  s['LineartImageProcessorInvocation'];
-export type MediapipeFaceProcessorInvocation =
-  s['MediapipeFaceProcessorInvocation'];
-export type MidasDepthImageProcessorInvocation =
-  s['MidasDepthImageProcessorInvocation'];
+export type LineartAnimeImageProcessorInvocation = s['LineartAnimeImageProcessorInvocation'];
+export type LineartImageProcessorInvocation = s['LineartImageProcessorInvocation'];
+export type MediapipeFaceProcessorInvocation = s['MediapipeFaceProcessorInvocation'];
+export type MidasDepthImageProcessorInvocation = s['MidasDepthImageProcessorInvocation'];
 export type MlsdImageProcessorInvocation = s['MlsdImageProcessorInvocation'];
-export type NormalbaeImageProcessorInvocation =
-  s['NormalbaeImageProcessorInvocation'];
-export type OpenposeImageProcessorInvocation =
-  s['OpenposeImageProcessorInvocation'];
+export type NormalbaeImageProcessorInvocation = s['NormalbaeImageProcessorInvocation'];
+export type DWOpenposeImageProcessorInvocation = s['DWOpenposeImageProcessorInvocation'];
 export type PidiImageProcessorInvocation = s['PidiImageProcessorInvocation'];
-export type ZoeDepthImageProcessorInvocation =
-  s['ZoeDepthImageProcessorInvocation'];
+export type ZoeDepthImageProcessorInvocation = s['ZoeDepthImageProcessorInvocation'];
 
 // Node Outputs
 export type ImageOutput = s['ImageOutput'];
@@ -235,8 +213,4 @@ type TypeGuard<T> = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type TypeGuardFor<T extends TypeGuard<any>> = T extends TypeGuard<
-  infer U
->
-  ? U
-  : never;
+export type TypeGuardFor<T extends TypeGuard<any>> = T extends TypeGuard<infer U> ? U : never;

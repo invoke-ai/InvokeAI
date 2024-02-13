@@ -1,12 +1,7 @@
 import graphlib from '@dagrejs/graphlib';
 import type { Edge, Node } from 'reactflow';
 
-export const getIsGraphAcyclic = (
-  source: string,
-  target: string,
-  nodes: Node[],
-  edges: Edge[]
-) => {
+export const getIsGraphAcyclic = (source: string, target: string, nodes: Node[], edges: Edge[]) => {
   // construct graphlib graph from editor state
   const g = new graphlib.Graph();
 

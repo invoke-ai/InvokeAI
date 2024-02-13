@@ -1,5 +1,5 @@
+import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { redo } from 'features/canvas/store/canvasSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback } from 'react';
@@ -31,7 +31,7 @@ const IAICanvasRedoButton = () => {
   );
 
   return (
-    <InvIconButton
+    <IconButton
       aria-label={`${t('unifiedCanvas.redo')} (Ctrl+Shift+Z)`}
       tooltip={`${t('unifiedCanvas.redo')} (Ctrl+Shift+Z)`}
       icon={<PiArrowClockwiseBold />}

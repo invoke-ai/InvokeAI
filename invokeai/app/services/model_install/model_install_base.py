@@ -165,8 +165,8 @@ class ModelInstallJob(BaseModel):
     )
     source: ModelSource = Field(description="Source (URL, repo_id, or local path) of model")
     local_path: Path = Field(description="Path to locally-downloaded model; may be the same as the source")
-    bytes: Optional[int] = Field(
-        default=None, description="For a remote model, the number of bytes downloaded so far (may not be available)"
+    bytes: int = Field(
+        default=0, description="For a remote model, the number of bytes downloaded so far (may not be available)"
     )
     total_bytes: int = Field(default=0, description="Total size of the model to be installed")
     source_metadata: Optional[AnyModelRepoMetadata] = Field(

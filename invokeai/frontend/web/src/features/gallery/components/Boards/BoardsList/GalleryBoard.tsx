@@ -1,28 +1,14 @@
-import type { SystemStyleObject } from '@chakra-ui/react';
-import {
-  Box,
-  Editable,
-  EditableInput,
-  EditablePreview,
-  Flex,
-  Icon,
-  Image,
-} from '@chakra-ui/react';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Box, Editable, EditableInput, EditablePreview, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
-import { InvText } from 'common/components/InvText/wrapper';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import SelectionOverlay from 'common/components/SelectionOverlay';
 import type { AddToBoardDropData } from 'features/dnd/types';
 import AutoAddIcon from 'features/gallery/components/Boards/AutoAddIcon';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
-import {
-  autoAddBoardIdChanged,
-  boardIdSelected,
-  selectGallerySlice,
-} from 'features/gallery/store/gallerySlice';
+import { autoAddBoardIdChanged, boardIdSelected, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImagesSquare } from 'react-icons/pi';
@@ -48,21 +34,11 @@ interface GalleryBoardProps {
   setBoardToDelete: (board?: BoardDTO) => void;
 }
 
-const GalleryBoard = ({
-  board,
-  isSelected,
-  setBoardToDelete,
-}: GalleryBoardProps) => {
+const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps) => {
   const dispatch = useAppDispatch();
-  const autoAssignBoardOnClick = useAppSelector(
-    (s) => s.gallery.autoAssignBoardOnClick
-  );
+  const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
   const selectIsSelectedForAutoAdd = useMemo(
-    () =>
-      createSelector(
-        selectGallerySlice,
-        (gallery) => board.board_id === gallery.autoAddBoardId
-      ),
+    () => createSelector(selectGallerySlice, (gallery) => board.board_id === gallery.autoAddBoardId),
     [board.board_id]
   );
 
@@ -86,9 +62,7 @@ const GalleryBoard = ({
     } asset${assetsTotal.total === 1 ? '' : 's'}`;
   }, [assetsTotal, imagesTotal]);
 
-  const { currentData: coverImage } = useGetImageDTOQuery(
-    board.cover_image_name ?? skipToken
-  );
+  const { currentData: coverImage } = useGetImageDTOQuery(board.cover_image_name ?? skipToken);
 
   const { board_name, board_id } = board;
   const [localBoardName, setLocalBoardName] = useState(board_name);
@@ -100,8 +74,7 @@ const GalleryBoard = ({
     }
   }, [board_id, autoAssignBoardOnClick, dispatch]);
 
-  const [updateBoard, { isLoading: isUpdateBoardLoading }] =
-    useUpdateBoardMutation();
+  const [updateBoard, { isLoading: isUpdateBoardLoading }] = useUpdateBoardMutation();
 
   const droppableData: AddToBoardDropData = useMemo(
     () => ({
@@ -157,13 +130,9 @@ const GalleryBoard = ({
         w="full"
         h="full"
       >
-        <BoardContextMenu
-          board={board}
-          board_id={board_id}
-          setBoardToDelete={setBoardToDelete}
-        >
+        <BoardContextMenu board={board} board_id={board_id} setBoardToDelete={setBoardToDelete}>
           {(ref) => (
-            <InvTooltip label={tooltip} openDelay={1000}>
+            <Tooltip label={tooltip} openDelay={1000}>
               <Flex
                 ref={ref}
                 onClick={handleSelectBoard}
@@ -188,26 +157,12 @@ const GalleryBoard = ({
                     borderBottomRadius="lg"
                   />
                 ) : (
-                  <Flex
-                    w="full"
-                    h="full"
-                    justifyContent="center"
-                    alignItems="center"
-                  >
-                    <Icon
-                      boxSize={14}
-                      as={PiImagesSquare}
-                      mt={-6}
-                      opacity={0.7}
-                      color="base.500"
-                    />
+                  <Flex w="full" h="full" justifyContent="center" alignItems="center">
+                    <Icon boxSize={14} as={PiImagesSquare} mt={-6} opacity={0.7} color="base.500" />
                   </Flex>
                 )}
                 {isSelectedForAutoAdd && <AutoAddIcon />}
-                <SelectionOverlay
-                  isSelected={isSelected}
-                  isHovered={isHovered}
-                />
+                <SelectionOverlay isSelected={isSelected} isHovered={isHovered} />
                 <Flex
                   position="absolute"
                   bottom={0}
@@ -243,14 +198,9 @@ const GalleryBoard = ({
                   </Editable>
                 </Flex>
 
-                <IAIDroppable
-                  data={droppableData}
-                  dropLabel={
-                    <InvText fontSize="md">{t('unifiedCanvas.move')}</InvText>
-                  }
-                />
+                <IAIDroppable data={droppableData} dropLabel={<Text fontSize="md">{t('unifiedCanvas.move')}</Text>} />
               </Flex>
-            </InvTooltip>
+            </Tooltip>
           )}
         </BoardContextMenu>
       </Flex>

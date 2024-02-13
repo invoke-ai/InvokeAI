@@ -72,7 +72,12 @@ class MigrateModelYamlToDb1:
                 continue
 
             base_type, model_type, model_name = str(model_key).split("/")
-            hash = FastModelHash.hash(self.config.models_path / stanza.path)
+            try:
+                hash = FastModelHash.hash(self.config.models_path / stanza.path)
+            except OSError:
+                self.logger.warning(f"The model at {stanza.path} is not a valid file or directory. Skipping migration.")
+                continue
+
             assert isinstance(model_key, str)
             new_key = sha1(model_key.encode("utf-8")).hexdigest()
 

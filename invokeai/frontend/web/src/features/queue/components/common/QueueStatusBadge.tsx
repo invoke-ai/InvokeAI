@@ -1,4 +1,4 @@
-import { Badge } from '@chakra-ui/react';
+import { Badge } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { SessionQueueItemStatus } from 'services/api/endpoints/queue';
@@ -13,10 +13,6 @@ const STATUSES = {
 
 const StatusBadge = ({ status }: { status: SessionQueueItemStatus }) => {
   const { t } = useTranslation();
-  return (
-    <Badge colorScheme={STATUSES[status].colorScheme}>
-      {t(STATUSES[status].translationKey)}
-    </Badge>
-  );
+  return <Badge colorScheme={STATUSES[status].colorScheme}>{t(STATUSES[status].translationKey)}</Badge>;
 };
 export default memo(StatusBadge);

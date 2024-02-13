@@ -31,9 +31,7 @@ const IAICanvasObjectRenderer = () => {
               lineJoin="round"
               shadowForStrokeEnabled={false}
               listening={false}
-              globalCompositeOperation={
-                obj.tool === 'brush' ? 'source-over' : 'destination-out'
-              }
+              globalCompositeOperation={obj.tool === 'brush' ? 'source-over' : 'destination-out'}
             />
           );
           if (obj.clip) {

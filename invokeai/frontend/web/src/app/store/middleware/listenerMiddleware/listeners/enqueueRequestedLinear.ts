@@ -11,9 +11,7 @@ import { startAppListening } from '..';
 export const addEnqueueRequestedLinear = () => {
   startAppListening({
     predicate: (action): action is ReturnType<typeof enqueueRequested> =>
-      enqueueRequested.match(action) &&
-      (action.payload.tabName === 'txt2img' ||
-        action.payload.tabName === 'img2img'),
+      enqueueRequested.match(action) && (action.payload.tabName === 'txt2img' || action.payload.tabName === 'img2img'),
     effect: async (action, { getState, dispatch }) => {
       const state = getState();
       const model = state.generation.model;

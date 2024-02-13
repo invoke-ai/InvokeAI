@@ -1,4 +1,4 @@
-import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
+import { MenuItem } from '@invoke-ai/ui-library';
 import WorkflowEditorSettings from 'features/nodes/components/flow/panels/TopRightPanel/WorkflowEditorSettings';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,9 +10,9 @@ const DownloadWorkflowMenuItem = () => {
   return (
     <WorkflowEditorSettings>
       {({ onOpen }) => (
-        <InvMenuItem as="button" icon={<RiSettings4Line />} onClick={onOpen}>
+        <MenuItem as="button" icon={<RiSettings4Line />} onClick={onOpen}>
           {t('nodes.workflowSettings')}
-        </InvMenuItem>
+        </MenuItem>
       )}
     </WorkflowEditorSettings>
   );

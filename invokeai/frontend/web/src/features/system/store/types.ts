@@ -4,12 +4,7 @@ import type { LogLevel } from 'app/logging/logger';
 import type { ProgressImage } from 'services/events/types';
 import { z } from 'zod';
 
-export type SystemStatus =
-  | 'CONNECTED'
-  | 'DISCONNECTED'
-  | 'PROCESSING'
-  | 'ERROR'
-  | 'LOADING_MODEL';
+export type SystemStatus = 'CONNECTED' | 'DISCONNECTED' | 'PROCESSING' | 'ERROR' | 'LOADING_MODEL';
 
 export type DenoiseProgress = {
   session_id: string;
@@ -46,8 +41,7 @@ export const zLanguage = z.enum([
   'zh_Hant',
 ]);
 export type Language = z.infer<typeof zLanguage>;
-export const isLanguage = (v: unknown): v is Language =>
-  zLanguage.safeParse(v).success;
+export const isLanguage = (v: unknown): v is Language => zLanguage.safeParse(v).success;
 
 export interface SystemState {
   _version: 1;

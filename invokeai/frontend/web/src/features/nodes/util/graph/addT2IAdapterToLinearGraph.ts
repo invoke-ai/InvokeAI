@@ -9,17 +9,10 @@ import type {
   T2IAdapterInvocation,
 } from 'services/api/types';
 
-import {
-  CANVAS_COHERENCE_DENOISE_LATENTS,
-  T2I_ADAPTER_COLLECT,
-} from './constants';
+import { CANVAS_COHERENCE_DENOISE_LATENTS, T2I_ADAPTER_COLLECT } from './constants';
 import { upsertMetadata } from './metadata';
 
-export const addT2IAdaptersToLinearGraph = (
-  state: RootState,
-  graph: NonNullableGraph,
-  baseNodeId: string
-): void => {
+export const addT2IAdaptersToLinearGraph = (state: RootState, graph: NonNullableGraph, baseNodeId: string): void => {
   const validT2IAdapters = selectValidT2IAdapters(state.controlAdapters).filter(
     (ca) => ca.model?.base_model === state.generation.model?.base_model
   );
@@ -95,13 +88,7 @@ export const addT2IAdaptersToLinearGraph = (
 
       graph.nodes[t2iAdapterNode.id] = t2iAdapterNode as T2IAdapterInvocation;
 
-      t2iAdapterMetdata.push(
-        omit(t2iAdapterNode, [
-          'id',
-          'type',
-          'is_intermediate',
-        ]) as T2IAdapterField
-      );
+      t2iAdapterMetdata.push(omit(t2iAdapterNode, ['id', 'type', 'is_intermediate']) as T2IAdapterField);
 
       graph.edges.push({
         source: { node_id: t2iAdapterNode.id, field: 't2i_adapter' },

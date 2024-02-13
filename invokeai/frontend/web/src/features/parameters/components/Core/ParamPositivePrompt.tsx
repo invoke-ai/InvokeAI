@@ -1,6 +1,5 @@
-import { Box } from '@chakra-ui/layout';
+import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvTextarea } from 'common/components/InvTextarea/InvTextarea';
 import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/components/ShowDynamicPromptsPreviewButton';
 import { AddEmbeddingButton } from 'features/embedding/AddEmbeddingButton';
 import { EmbeddingPopover } from 'features/embedding/EmbeddingPopover';
@@ -26,15 +25,7 @@ export const ParamPositivePrompt = memo(() => {
     },
     [dispatch]
   );
-  const {
-    onChange,
-    isOpen,
-    onClose,
-    onOpen,
-    onSelectEmbedding,
-    onKeyDown,
-    onFocus,
-  } = usePrompt({
+  const { onChange, isOpen, onClose, onOpen, onSelectEmbedding, onKeyDown, onFocus } = usePrompt({
     prompt,
     textareaRef: textareaRef,
     onChange: handleChange,
@@ -58,7 +49,7 @@ export const ParamPositivePrompt = memo(() => {
       width={textareaRef.current?.clientWidth}
     >
       <Box pos="relative">
-        <InvTextarea
+        <Textarea
           id="prompt"
           name="prompt"
           ref={textareaRef}

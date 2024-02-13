@@ -5,26 +5,20 @@ import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { memo, useEffect, useState } from 'react';
 import { Image as KonvaImage } from 'react-konva';
 
-const progressImageSelector = createMemoizedSelector(
-  [selectSystemSlice, selectCanvasSlice],
-  (system, canvas) => {
-    const { denoiseProgress } = system;
-    const { batchIds } = canvas;
+const progressImageSelector = createMemoizedSelector([selectSystemSlice, selectCanvasSlice], (system, canvas) => {
+  const { denoiseProgress } = system;
+  const { batchIds } = canvas;
 
-    return {
-      progressImage:
-        denoiseProgress && batchIds.includes(denoiseProgress.batch_id)
-          ? denoiseProgress.progress_image
-          : undefined,
-      boundingBox: canvas.layerState.stagingArea.boundingBox,
-    };
-  }
-);
+  return {
+    progressImage:
+      denoiseProgress && batchIds.includes(denoiseProgress.batch_id) ? denoiseProgress.progress_image : undefined,
+    boundingBox: canvas.layerState.stagingArea.boundingBox,
+  };
+});
 
 const IAICanvasIntermediateImage = () => {
   const { progressImage, boundingBox } = useAppSelector(progressImageSelector);
-  const [loadedImageElement, setLoadedImageElement] =
-    useState<HTMLImageElement | null>(null);
+  const [loadedImageElement, setLoadedImageElement] = useState<HTMLImageElement | null>(null);
 
   useEffect(() => {
     if (!progressImage) {

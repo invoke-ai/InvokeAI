@@ -9,14 +9,11 @@ export const initialNodeTemplatesState: NodeTemplatesState = {
   templates: {},
 };
 
-const nodesTemplatesSlice = createSlice({
+export const nodesTemplatesSlice = createSlice({
   name: 'nodeTemplates',
   initialState: initialNodeTemplatesState,
   reducers: {
-    nodeTemplatesBuilt: (
-      state,
-      action: PayloadAction<Record<string, InvocationTemplate>>
-    ) => {
+    nodeTemplatesBuilt: (state, action: PayloadAction<Record<string, InvocationTemplate>>) => {
       state.templates = action.payload;
     },
   },
@@ -24,7 +21,4 @@ const nodesTemplatesSlice = createSlice({
 
 export const { nodeTemplatesBuilt } = nodesTemplatesSlice.actions;
 
-export default nodesTemplatesSlice.reducer;
-
-export const selectNodeTemplatesSlice = (state: RootState) =>
-  state.nodeTemplates;
+export const selectNodeTemplatesSlice = (state: RootState) => state.nodeTemplates;

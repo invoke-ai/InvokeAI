@@ -14,9 +14,7 @@ import { useReactFlow } from 'reactflow';
 
 export const useIsValidConnection = () => {
   const flow = useReactFlow();
-  const shouldValidateGraph = useAppSelector(
-    (s) => s.nodes.shouldValidateGraph
-  );
+  const shouldValidateGraph = useAppSelector((s) => s.nodes.shouldValidateGraph);
   const isValidConnection = useCallback(
     ({ source, sourceHandle, target, targetHandle }: Connection): boolean => {
       const edges = flow.getEdges();

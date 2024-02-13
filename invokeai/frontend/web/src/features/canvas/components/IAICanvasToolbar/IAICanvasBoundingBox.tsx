@@ -1,11 +1,7 @@
+import { useShiftModifier } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { $shift } from 'common/hooks/useGlobalModifiers';
-import {
-  roundDownToMultiple,
-  roundDownToMultipleMin,
-  roundToMultiple,
-} from 'common/util/roundDownToMultiple';
+import { roundDownToMultiple, roundDownToMultipleMin, roundToMultiple } from 'common/util/roundDownToMultiple';
 import {
   $isDrawing,
   $isMouseOverBoundingBox,
@@ -20,10 +16,7 @@ import {
   setBoundingBoxDimensions,
   setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
-import {
-  CANVAS_GRID_SIZE_COARSE,
-  CANVAS_GRID_SIZE_FINE,
-} from 'features/canvas/store/constants';
+import { CANVAS_GRID_SIZE_COARSE, CANVAS_GRID_SIZE_FINE } from 'features/canvas/store/constants';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import type Konva from 'konva';
@@ -41,12 +34,8 @@ type IAICanvasBoundingBoxPreviewProps = GroupConfig;
 const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
   const { ...rest } = props;
   const dispatch = useAppDispatch();
-  const boundingBoxCoordinates = useAppSelector(
-    (s) => s.canvas.boundingBoxCoordinates
-  );
-  const boundingBoxDimensions = useAppSelector(
-    (s) => s.canvas.boundingBoxDimensions
-  );
+  const boundingBoxCoordinates = useAppSelector((s) => s.canvas.boundingBoxCoordinates);
+  const boundingBoxDimensions = useAppSelector((s) => s.canvas.boundingBoxDimensions);
   const stageScale = useAppSelector((s) => s.canvas.stageScale);
   const shouldSnapToGrid = useAppSelector((s) => s.canvas.shouldSnapToGrid);
   const hitStrokeWidth = useAppSelector((s) => 20 / s.canvas.stageScale);
@@ -54,14 +43,12 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const transformerRef = useRef<Konva.Transformer>(null);
   const shapeRef = useRef<Konva.Rect>(null);
-  const shift = useStore($shift);
+  const shift = useShiftModifier();
   const tool = useStore($tool);
   const isDrawing = useStore($isDrawing);
   const isMovingBoundingBox = useStore($isMovingBoundingBox);
   const isTransformingBoundingBox = useStore($isTransformingBoundingBox);
-  const isMouseOverBoundingBoxOutline = useStore(
-    $isMouseOverBoundingBoxOutline
-  );
+  const isMouseOverBoundingBoxOutline = useStore($isMouseOverBoundingBoxOutline);
 
   useEffect(() => {
     if (!transformerRef.current || !shapeRef.current) {
@@ -71,14 +58,8 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
     transformerRef.current.getLayer()?.batchDraw();
   }, []);
 
-  const gridSize = useMemo(
-    () => (shift ? CANVAS_GRID_SIZE_FINE : CANVAS_GRID_SIZE_COARSE),
-    [shift]
-  );
-  const scaledStep = useMemo(
-    () => gridSize * stageScale,
-    [gridSize, stageScale]
-  );
+  const gridSize = useMemo(() => (shift ? CANVAS_GRID_SIZE_FINE : CANVAS_GRID_SIZE_COARSE), [shift]);
+  const scaledStep = useMemo(() => gridSize * stageScale, [gridSize, stageScale]);
 
   useHotkeys(
     'N',
@@ -143,10 +124,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
       const y = Math.round(rect.y());
 
       if (aspectRatio.isLocked) {
-        const newDimensions = calculateNewSize(
-          aspectRatio.value,
-          width * height
-        );
+        const newDimensions = calculateNewSize(aspectRatio.value, width * height);
         dispatch(
           setBoundingBoxDimensions(
             {
@@ -186,14 +164,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
       rect.scaleX(1);
       rect.scaleY(1);
     },
-    [
-      aspectRatio.isLocked,
-      aspectRatio.value,
-      dispatch,
-      shouldSnapToGrid,
-      gridSize,
-      optimalDimension,
-    ]
+    [aspectRatio.isLocked, aspectRatio.value, dispatch, shouldSnapToGrid, gridSize, optimalDimension]
   );
 
   const anchorDragBoundFunc = useCallback(
@@ -255,9 +226,7 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
   }, []);
 
   const handleMouseOut = useCallback(() => {
-    !isTransformingBoundingBox &&
-      !isMovingBoundingBox &&
-      $isMouseOverBoundingBoxOutline.set(false);
+    !isTransformingBoundingBox && !isMovingBoundingBox && $isMouseOverBoundingBoxOutline.set(false);
   }, [isMovingBoundingBox, isTransformingBoundingBox]);
 
   const handleMouseEnterBoundingBox = useCallback(() => {
@@ -269,35 +238,18 @@ const IAICanvasBoundingBox = (props: IAICanvasBoundingBoxPreviewProps) => {
   }, []);
 
   const stroke = useMemo(() => {
-    if (
-      isMouseOverBoundingBoxOutline ||
-      isMovingBoundingBox ||
-      isTransformingBoundingBox
-    ) {
+    if (isMouseOverBoundingBoxOutline || isMovingBoundingBox || isTransformingBoundingBox) {
       return 'rgba(255,255,255,0.5)';
     }
     return 'white';
-  }, [
-    isMouseOverBoundingBoxOutline,
-    isMovingBoundingBox,
-    isTransformingBoundingBox,
-  ]);
+  }, [isMouseOverBoundingBoxOutline, isMovingBoundingBox, isTransformingBoundingBox]);
 
   const strokeWidth = useMemo(() => {
-    if (
-      isMouseOverBoundingBoxOutline ||
-      isMovingBoundingBox ||
-      isTransformingBoundingBox
-    ) {
+    if (isMouseOverBoundingBoxOutline || isMovingBoundingBox || isTransformingBoundingBox) {
       return 6 / stageScale;
     }
     return 1 / stageScale;
-  }, [
-    isMouseOverBoundingBoxOutline,
-    isMovingBoundingBox,
-    isTransformingBoundingBox,
-    stageScale,
-  ]);
+  }, [isMouseOverBoundingBoxOutline, isMovingBoundingBox, isTransformingBoundingBox, stageScale]);
 
   const enabledAnchors = useMemo(() => {
     if (tool !== 'move') {

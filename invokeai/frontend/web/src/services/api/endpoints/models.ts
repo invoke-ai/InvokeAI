@@ -28,9 +28,7 @@ export type DiffusersModelConfigEntity = DiffusersModelConfig & { id: string };
 export type CheckpointModelConfigEntity = CheckpointModelConfig & {
   id: string;
 };
-export type MainModelConfigEntity =
-  | DiffusersModelConfigEntity
-  | CheckpointModelConfigEntity;
+export type MainModelConfigEntity = DiffusersModelConfigEntity | CheckpointModelConfigEntity;
 
 export type LoRAModelConfigEntity = LoRAModelConfig & { id: string };
 
@@ -118,11 +116,9 @@ type AddMainModelArg = {
   body: MainModelConfig;
 };
 
-type AddMainModelResponse =
-  paths['/api/v1/models/add']['post']['responses']['201']['content']['application/json'];
+type AddMainModelResponse = paths['/api/v1/models/add']['post']['responses']['201']['content']['application/json'];
 
-type SyncModelsResponse =
-  paths['/api/v1/models/sync']['post']['responses']['201']['content']['application/json'];
+type SyncModelsResponse = paths['/api/v1/models/sync']['post']['responses']['201']['content']['application/json'];
 
 export type SearchFolderResponse =
   paths['/api/v1/models/search']['get']['responses']['200']['content']['application/json'];
@@ -135,59 +131,42 @@ type SearchFolderArg = operations['search_for_models']['parameters']['query'];
 export const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
-export const mainModelsAdapterSelectors = mainModelsAdapter.getSelectors(
-  undefined,
-  getSelectorsOptions
-);
+export const mainModelsAdapterSelectors = mainModelsAdapter.getSelectors(undefined, getSelectorsOptions);
 export const loraModelsAdapter = createEntityAdapter<LoRAModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
-export const loraModelsAdapterSelectors = loraModelsAdapter.getSelectors(
+export const loraModelsAdapterSelectors = loraModelsAdapter.getSelectors(undefined, getSelectorsOptions);
+export const controlNetModelsAdapter = createEntityAdapter<ControlNetModelConfigEntity>({
+  sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
+});
+export const controlNetModelsAdapterSelectors = controlNetModelsAdapter.getSelectors(undefined, getSelectorsOptions);
+export const ipAdapterModelsAdapter = createEntityAdapter<IPAdapterModelConfigEntity>({
+  sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
+});
+export const ipAdapterModelsAdapterSelectors = ipAdapterModelsAdapter.getSelectors(undefined, getSelectorsOptions);
+export const t2iAdapterModelsAdapter = createEntityAdapter<T2IAdapterModelConfigEntity>({
+  sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
+});
+export const t2iAdapterModelsAdapterSelectors = t2iAdapterModelsAdapter.getSelectors(undefined, getSelectorsOptions);
+export const textualInversionModelsAdapter = createEntityAdapter<TextualInversionModelConfigEntity>({
+  sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
+});
+export const textualInversionModelsAdapterSelectors = textualInversionModelsAdapter.getSelectors(
   undefined,
   getSelectorsOptions
 );
-export const controlNetModelsAdapter =
-  createEntityAdapter<ControlNetModelConfigEntity>({
-    sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
-  });
-export const controlNetModelsAdapterSelectors =
-  controlNetModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-export const ipAdapterModelsAdapter =
-  createEntityAdapter<IPAdapterModelConfigEntity>({
-    sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
-  });
-export const ipAdapterModelsAdapterSelectors =
-  ipAdapterModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-export const t2iAdapterModelsAdapter =
-  createEntityAdapter<T2IAdapterModelConfigEntity>({
-    sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
-  });
-export const t2iAdapterModelsAdapterSelectors =
-  t2iAdapterModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-export const textualInversionModelsAdapter =
-  createEntityAdapter<TextualInversionModelConfigEntity>({
-    sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
-  });
-export const textualInversionModelsAdapterSelectors =
-  textualInversionModelsAdapter.getSelectors(undefined, getSelectorsOptions);
 export const vaeModelsAdapter = createEntityAdapter<VaeModelConfigEntity>({
   sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
 });
-export const vaeModelsAdapterSelectors = vaeModelsAdapter.getSelectors(
-  undefined,
-  getSelectorsOptions
-);
+export const vaeModelsAdapterSelectors = vaeModelsAdapter.getSelectors(undefined, getSelectorsOptions);
 
 export const getModelId = ({
   base_model,
   model_type,
   model_name,
-}: Pick<AnyModelConfig, 'base_model' | 'model_name' | 'model_type'>) =>
-  `${base_model}/${model_type}/${model_name}`;
+}: Pick<AnyModelConfig, 'base_model' | 'model_name' | 'model_type'>) => `${base_model}/${model_type}/${model_name}`;
 
-const createModelEntities = <T extends AnyModelConfigEntity>(
-  models: AnyModelConfig[]
-): T[] => {
+const createModelEntities = <T extends AnyModelConfigEntity>(models: AnyModelConfig[]): T[] => {
   const entityArray: T[] = [];
   models.forEach((model) => {
     const entity = {
@@ -201,10 +180,7 @@ const createModelEntities = <T extends AnyModelConfigEntity>(
 
 export const modelsApi = api.injectEndpoints({
   endpoints: (build) => ({
-    getMainModels: build.query<
-      EntityState<MainModelConfigEntity, string>,
-      BaseModelType[]
-    >({
+    getMainModels: build.query<EntityState<MainModelConfigEntity, string>, BaseModelType[]>({
       query: (base_models) => {
         const params = {
           model_type: 'main',
@@ -215,10 +191,7 @@ export const modelsApi = api.injectEndpoints({
         return `models/?${query}`;
       },
       providesTags: (result) => {
-        const tags: ApiTagDescription[] = [
-          { type: 'MainModel', id: LIST_TAG },
-          'Model',
-        ];
+        const tags: ApiTagDescription[] = [{ type: 'MainModel', id: LIST_TAG }, 'Model'];
 
         if (result) {
           tags.push(
@@ -232,19 +205,11 @@ export const modelsApi = api.injectEndpoints({
         return tags;
       },
       transformResponse: (response: { models: MainModelConfig[] }) => {
-        const entities = createModelEntities<MainModelConfigEntity>(
-          response.models
-        );
-        return mainModelsAdapter.setAll(
-          mainModelsAdapter.getInitialState(),
-          entities
-        );
+        const entities = createModelEntities<MainModelConfigEntity>(response.models);
+        return mainModelsAdapter.setAll(mainModelsAdapter.getInitialState(), entities);
       },
     }),
-    updateMainModels: build.mutation<
-      UpdateMainModelResponse,
-      UpdateMainModelArg
-    >({
+    updateMainModels: build.mutation<UpdateMainModelResponse, UpdateMainModelArg>({
       query: ({ base_model, model_name, body }) => {
         return {
           url: `models/${base_model}/main/${model_name}`,
@@ -254,10 +219,7 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['Model'],
     }),
-    importMainModels: build.mutation<
-      ImportMainModelResponse,
-      ImportMainModelArg
-    >({
+    importMainModels: build.mutation<ImportMainModelResponse, ImportMainModelArg>({
       query: ({ body }) => {
         return {
           url: `models/import`,
@@ -277,10 +239,7 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['Model'],
     }),
-    deleteMainModels: build.mutation<
-      DeleteMainModelResponse,
-      DeleteMainModelArg
-    >({
+    deleteMainModels: build.mutation<DeleteMainModelResponse, DeleteMainModelArg>({
       query: ({ base_model, model_name, model_type }) => {
         return {
           url: `models/${base_model}/${model_type}/${model_name}`,
@@ -289,10 +248,7 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['Model'],
     }),
-    convertMainModels: build.mutation<
-      ConvertMainModelResponse,
-      ConvertMainModelArg
-    >({
+    convertMainModels: build.mutation<ConvertMainModelResponse, ConvertMainModelArg>({
       query: ({ base_model, model_name, convert_dest_directory }) => {
         return {
           url: `models/convert/${base_model}/main/${model_name}`,
@@ -321,16 +277,10 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['Model'],
     }),
-    getLoRAModels: build.query<
-      EntityState<LoRAModelConfigEntity, string>,
-      void
-    >({
+    getLoRAModels: build.query<EntityState<LoRAModelConfigEntity, string>, void>({
       query: () => ({ url: 'models/', params: { model_type: 'lora' } }),
       providesTags: (result) => {
-        const tags: ApiTagDescription[] = [
-          { type: 'LoRAModel', id: LIST_TAG },
-          'Model',
-        ];
+        const tags: ApiTagDescription[] = [{ type: 'LoRAModel', id: LIST_TAG }, 'Model'];
 
         if (result) {
           tags.push(
@@ -344,19 +294,11 @@ export const modelsApi = api.injectEndpoints({
         return tags;
       },
       transformResponse: (response: { models: LoRAModelConfig[] }) => {
-        const entities = createModelEntities<LoRAModelConfigEntity>(
-          response.models
-        );
-        return loraModelsAdapter.setAll(
-          loraModelsAdapter.getInitialState(),
-          entities
-        );
+        const entities = createModelEntities<LoRAModelConfigEntity>(response.models);
+        return loraModelsAdapter.setAll(loraModelsAdapter.getInitialState(), entities);
       },
     }),
-    updateLoRAModels: build.mutation<
-      UpdateLoRAModelResponse,
-      UpdateLoRAModelArg
-    >({
+    updateLoRAModels: build.mutation<UpdateLoRAModelResponse, UpdateLoRAModelArg>({
       query: ({ base_model, model_name, body }) => {
         return {
           url: `models/${base_model}/lora/${model_name}`,
@@ -366,10 +308,7 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: [{ type: 'LoRAModel', id: LIST_TAG }],
     }),
-    deleteLoRAModels: build.mutation<
-      DeleteLoRAModelResponse,
-      DeleteLoRAModelArg
-    >({
+    deleteLoRAModels: build.mutation<DeleteLoRAModelResponse, DeleteLoRAModelArg>({
       query: ({ base_model, model_name }) => {
         return {
           url: `models/${base_model}/lora/${model_name}`,
@@ -378,16 +317,10 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: [{ type: 'LoRAModel', id: LIST_TAG }],
     }),
-    getControlNetModels: build.query<
-      EntityState<ControlNetModelConfigEntity, string>,
-      void
-    >({
+    getControlNetModels: build.query<EntityState<ControlNetModelConfigEntity, string>, void>({
       query: () => ({ url: 'models/', params: { model_type: 'controlnet' } }),
       providesTags: (result) => {
-        const tags: ApiTagDescription[] = [
-          { type: 'ControlNetModel', id: LIST_TAG },
-          'Model',
-        ];
+        const tags: ApiTagDescription[] = [{ type: 'ControlNetModel', id: LIST_TAG }, 'Model'];
 
         if (result) {
           tags.push(
@@ -401,25 +334,14 @@ export const modelsApi = api.injectEndpoints({
         return tags;
       },
       transformResponse: (response: { models: ControlNetModelConfig[] }) => {
-        const entities = createModelEntities<ControlNetModelConfigEntity>(
-          response.models
-        );
-        return controlNetModelsAdapter.setAll(
-          controlNetModelsAdapter.getInitialState(),
-          entities
-        );
+        const entities = createModelEntities<ControlNetModelConfigEntity>(response.models);
+        return controlNetModelsAdapter.setAll(controlNetModelsAdapter.getInitialState(), entities);
       },
     }),
-    getIPAdapterModels: build.query<
-      EntityState<IPAdapterModelConfigEntity, string>,
-      void
-    >({
+    getIPAdapterModels: build.query<EntityState<IPAdapterModelConfigEntity, string>, void>({
       query: () => ({ url: 'models/', params: { model_type: 'ip_adapter' } }),
       providesTags: (result) => {
-        const tags: ApiTagDescription[] = [
-          { type: 'IPAdapterModel', id: LIST_TAG },
-          'Model',
-        ];
+        const tags: ApiTagDescription[] = [{ type: 'IPAdapterModel', id: LIST_TAG }, 'Model'];
 
         if (result) {
           tags.push(
@@ -433,25 +355,14 @@ export const modelsApi = api.injectEndpoints({
         return tags;
       },
       transformResponse: (response: { models: IPAdapterModelConfig[] }) => {
-        const entities = createModelEntities<IPAdapterModelConfigEntity>(
-          response.models
-        );
-        return ipAdapterModelsAdapter.setAll(
-          ipAdapterModelsAdapter.getInitialState(),
-          entities
-        );
+        const entities = createModelEntities<IPAdapterModelConfigEntity>(response.models);
+        return ipAdapterModelsAdapter.setAll(ipAdapterModelsAdapter.getInitialState(), entities);
       },
     }),
-    getT2IAdapterModels: build.query<
-      EntityState<T2IAdapterModelConfigEntity, string>,
-      void
-    >({
+    getT2IAdapterModels: build.query<EntityState<T2IAdapterModelConfigEntity, string>, void>({
       query: () => ({ url: 'models/', params: { model_type: 't2i_adapter' } }),
       providesTags: (result) => {
-        const tags: ApiTagDescription[] = [
-          { type: 'T2IAdapterModel', id: LIST_TAG },
-          'Model',
-        ];
+        const tags: ApiTagDescription[] = [{ type: 'T2IAdapterModel', id: LIST_TAG }, 'Model'];
 
         if (result) {
           tags.push(
@@ -465,22 +376,14 @@ export const modelsApi = api.injectEndpoints({
         return tags;
       },
       transformResponse: (response: { models: T2IAdapterModelConfig[] }) => {
-        const entities = createModelEntities<T2IAdapterModelConfigEntity>(
-          response.models
-        );
-        return t2iAdapterModelsAdapter.setAll(
-          t2iAdapterModelsAdapter.getInitialState(),
-          entities
-        );
+        const entities = createModelEntities<T2IAdapterModelConfigEntity>(response.models);
+        return t2iAdapterModelsAdapter.setAll(t2iAdapterModelsAdapter.getInitialState(), entities);
       },
     }),
     getVaeModels: build.query<EntityState<VaeModelConfigEntity, string>, void>({
       query: () => ({ url: 'models/', params: { model_type: 'vae' } }),
       providesTags: (result) => {
-        const tags: ApiTagDescription[] = [
-          { type: 'VaeModel', id: LIST_TAG },
-          'Model',
-        ];
+        const tags: ApiTagDescription[] = [{ type: 'VaeModel', id: LIST_TAG }, 'Model'];
 
         if (result) {
           tags.push(
@@ -494,25 +397,14 @@ export const modelsApi = api.injectEndpoints({
         return tags;
       },
       transformResponse: (response: { models: VaeModelConfig[] }) => {
-        const entities = createModelEntities<VaeModelConfigEntity>(
-          response.models
-        );
-        return vaeModelsAdapter.setAll(
-          vaeModelsAdapter.getInitialState(),
-          entities
-        );
+        const entities = createModelEntities<VaeModelConfigEntity>(response.models);
+        return vaeModelsAdapter.setAll(vaeModelsAdapter.getInitialState(), entities);
       },
     }),
-    getTextualInversionModels: build.query<
-      EntityState<TextualInversionModelConfigEntity, string>,
-      void
-    >({
+    getTextualInversionModels: build.query<EntityState<TextualInversionModelConfigEntity, string>, void>({
       query: () => ({ url: 'models/', params: { model_type: 'embedding' } }),
       providesTags: (result) => {
-        const tags: ApiTagDescription[] = [
-          { type: 'TextualInversionModel', id: LIST_TAG },
-          'Model',
-        ];
+        const tags: ApiTagDescription[] = [{ type: 'TextualInversionModel', id: LIST_TAG }, 'Model'];
 
         if (result) {
           tags.push(
@@ -525,16 +417,9 @@ export const modelsApi = api.injectEndpoints({
 
         return tags;
       },
-      transformResponse: (response: {
-        models: TextualInversionModelConfig[];
-      }) => {
-        const entities = createModelEntities<TextualInversionModelConfigEntity>(
-          response.models
-        );
-        return textualInversionModelsAdapter.setAll(
-          textualInversionModelsAdapter.getInitialState(),
-          entities
-        );
+      transformResponse: (response: { models: TextualInversionModelConfig[] }) => {
+        const entities = createModelEntities<TextualInversionModelConfigEntity>(response.models);
+        return textualInversionModelsAdapter.setAll(textualInversionModelsAdapter.getInitialState(), entities);
       },
     }),
     getModelsInFolder: build.query<SearchFolderResponse, SearchFolderArg>({

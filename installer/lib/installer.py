@@ -11,7 +11,7 @@ import sys
 import venv
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Union
+from typing import Optional, Tuple
 
 SUPPORTED_PYTHON = ">=3.10.0,<=3.11.100"
 INSTALLER_REQS = ["rich", "semver", "requests", "plumbum", "prompt-toolkit"]
@@ -21,40 +21,20 @@ OS = platform.uname().system
 ARCH = platform.uname().machine
 VERSION = "latest"
 
-### Feature flags
-# Install the virtualenv into the runtime dir
-FF_VENV_IN_RUNTIME = True
-
-# Install the wheel packaged with the installer
-FF_USE_LOCAL_WHEEL = True
-
 
 class Installer:
     """
     Deploys an InvokeAI installation into a given path
     """
 
+    reqs: list[str] = INSTALLER_REQS
+
     def __init__(self) -> None:
-        self.reqs = INSTALLER_REQS
-        self.preflight()
         if os.getenv("VIRTUAL_ENV") is not None:
             print("A virtual environment is already activated. Please 'deactivate' before installation.")
             sys.exit(-1)
         self.bootstrap()
-
-    def preflight(self) -> None:
-        """
-        Preflight checks
-        """
-
-        # TODO
-        # verify python version
-        # on macOS verify XCode tools are present
-        # verify libmesa, libglx on linux
-        # check that the system arch is not i386 (?)
-        # check that the system has a GPU, and the type of GPU
-
-        pass
+        self.available_releases = get_github_releases()
 
     def mktemp_venv(self) -> TemporaryDirectory:
         """
@@ -78,12 +58,9 @@ class Installer:
 
         return venv_dir
 
-    def bootstrap(self, verbose: bool = False) -> TemporaryDirectory:
+    def bootstrap(self, verbose: bool = False) -> TemporaryDirectory | None:
         """
         Bootstrap the installer venv with packages required at install time
-
-        :return: path to the virtual environment directory that was bootstrapped
-        :rtype: TemporaryDirectory
         """
 
         print("Initializing the installer. This may take a minute - please wait...")
@@ -95,39 +72,27 @@ class Installer:
         cmd.extend(self.reqs)
 
         try:
-            res = subprocess.check_output(cmd).decode()
+            # upgrade pip to the latest version to avoid a confusing message
+            res = upgrade_pip(Path(venv_dir.name))
             if verbose:
                 print(res)
+
+            # run the install prerequisites installation
+            res = subprocess.check_output(cmd).decode()
+
+            if verbose:
+                print(res)
+
             return venv_dir
         except subprocess.CalledProcessError as e:
             print(e)
 
-    def app_venv(self, path: str = None):
+    def app_venv(self, venv_parent) -> Path:
         """
         Create a virtualenv for the InvokeAI installation
         """
 
-        # explicit venv location
-        # currently unused in normal operation
-        # useful for testing or special cases
-        if path is not None:
-            venv_dir = Path(path)
-
-        # experimental / testing
-        elif not FF_VENV_IN_RUNTIME:
-            if OS == "Windows":
-                venv_dir_parent = os.getenv("APPDATA", "~/AppData/Roaming")
-            elif OS == "Darwin":
-                # there is no environment variable on macOS to find this
-                # TODO: confirm this is working as expected
-                venv_dir_parent = "~/Library/Application Support"
-            elif OS == "Linux":
-                venv_dir_parent = os.getenv("XDG_DATA_DIR", "~/.local/share")
-            venv_dir = Path(venv_dir_parent).expanduser().resolve() / f"InvokeAI/{VERSION}/venv"
-
-        # stable / current
-        else:
-            venv_dir = self.dest / ".venv"
+        venv_dir = venv_parent / ".venv"
 
         # Prefer to copy python executables
         # so that updates to system python don't break InvokeAI
@@ -141,7 +106,7 @@ class Installer:
         return venv_dir
 
     def install(
-        self, root: str = "~/invokeai", version: str = "latest", yes_to_all=False, find_links: Path = None
+        self, version=None, root: str = "~/invokeai", yes_to_all=False, find_links: Optional[Path] = None
     ) -> None:
         """
         Install the InvokeAI application into the given runtime path
@@ -158,15 +123,20 @@ class Installer:
 
         import messages
 
-        messages.welcome()
+        messages.welcome(self.available_releases)
 
-        default_path = os.environ.get("INVOKEAI_ROOT") or Path(root).expanduser().resolve()
-        self.dest = default_path if yes_to_all else messages.dest_path(root)
+        version = messages.choose_version(self.available_releases)
+
+        auto_dest = Path(os.environ.get("INVOKEAI_ROOT", root)).expanduser().resolve()
+        destination = auto_dest if yes_to_all else messages.dest_path(root)
+        if destination is None:
+            print("Could not find or create the destination directory. Installation cancelled.")
+            sys.exit(0)
 
         # create the venv for the app
-        self.venv = self.app_venv()
+        self.venv = self.app_venv(venv_parent=destination)
 
-        self.instance = InvokeAiInstance(runtime=self.dest, venv=self.venv, version=version)
+        self.instance = InvokeAiInstance(runtime=destination, venv=self.venv, version=version)
 
         # install dependencies and the InvokeAI application
         (extra_index_url, optional_modules) = get_torch_source() if not yes_to_all else (None, None)
@@ -190,7 +160,7 @@ class InvokeAiInstance:
     A single runtime directory *may* be shared by multiple virtual environments, though this isn't currently tested or supported.
     """
 
-    def __init__(self, runtime: Path, venv: Path, version: str) -> None:
+    def __init__(self, runtime: Path, venv: Path, version: str = "stable") -> None:
         self.runtime = runtime
         self.venv = venv
         self.pip = get_pip_from_venv(venv)
@@ -199,6 +169,7 @@ class InvokeAiInstance:
         set_sys_path(venv)
         os.environ["INVOKEAI_ROOT"] = str(self.runtime.expanduser().resolve())
         os.environ["VIRTUAL_ENV"] = str(self.venv.expanduser().resolve())
+        upgrade_pip(venv)
 
     def get(self) -> tuple[Path, Path]:
         """
@@ -212,54 +183,7 @@ class InvokeAiInstance:
 
     def install(self, extra_index_url=None, optional_modules=None, find_links=None):
         """
-        Install this instance, including dependencies and the app itself
-
-        :param extra_index_url: the "--extra-index-url ..." line for pip to look in extra indexes.
-        :type extra_index_url: str
-        """
-
-        import messages
-
-        # install torch first to ensure the correct version gets installed.
-        # works with either source or wheel install with negligible impact on installation times.
-        messages.simple_banner("Installing PyTorch :fire:")
-        self.install_torch(extra_index_url, find_links)
-
-        messages.simple_banner("Installing the InvokeAI Application :art:")
-        self.install_app(extra_index_url, optional_modules, find_links)
-
-    def install_torch(self, extra_index_url=None, find_links=None):
-        """
-        Install PyTorch
-        """
-
-        from plumbum import FG, local
-
-        pip = local[self.pip]
-
-        (
-            pip[
-                "install",
-                "--require-virtualenv",
-                "numpy==1.26.3",  # choose versions that won't be uninstalled during phase 2
-                "urllib3~=1.26.0",
-                "requests~=2.28.0",
-                "torch==2.1.2",
-                "torchmetrics==0.11.4",
-                "torchvision==0.16.2",
-                "--force-reinstall",
-                "--find-links" if find_links is not None else None,
-                find_links,
-                "--extra-index-url" if extra_index_url is not None else None,
-                extra_index_url,
-            ]
-            & FG
-        )
-
-    def install_app(self, extra_index_url=None, optional_modules=None, find_links=None):
-        """
-        Install the application with pip.
-        Supports installation from PyPi or from a local source directory.
+        Install the package from PyPi.
 
         :param extra_index_url: the "--extra-index-url ..." line for pip to look in extra indexes.
         :type extra_index_url: str
@@ -271,53 +195,52 @@ class InvokeAiInstance:
         :type find_links: Path
         """
 
-        ## this only applies to pypi installs; TODO actually use this
-        if self.version == "pre":
+        import messages
+
+        # not currently used, but may be useful for "install most recent version" option
+        if self.version == "prerelease":
             version = None
-            pre = "--pre"
+            pre_flag = "--pre"
+        elif self.version == "stable":
+            version = None
+            pre_flag = None
         else:
             version = self.version
-            pre = None
+            pre_flag = None
 
-        ## TODO: only local wheel will be installed as of now; support for --version arg is TODO
-        if FF_USE_LOCAL_WHEEL:
-            # if no wheel, try to do a source install before giving up
-            try:
-                src = str(next(Path(__file__).parent.glob("InvokeAI-*.whl")))
-            except StopIteration:
-                try:
-                    src = Path(__file__).parents[1].expanduser().resolve()
-                    # if the above directory contains one of these files, we'll do a source install
-                    next(src.glob("pyproject.toml"))
-                    next(src.glob("invokeai"))
-                except StopIteration:
-                    print("Unable to find a wheel or perform a source install. Giving up.")
+        src = "invokeai"
+        if optional_modules:
+            src += optional_modules
+        if version:
+            src += f"=={version}"
 
-        elif version == "source":
-            # this makes an assumption about the location of the installer package in the source tree
-            src = Path(__file__).parents[1].expanduser().resolve()
-        else:
-            # will install from PyPi
-            src = f"invokeai=={version}" if version is not None else "invokeai"
+        messages.simple_banner("Installing the InvokeAI Application :art:")
 
-        from plumbum import FG, local
+        from plumbum import FG, ProcessExecutionError, local  # type: ignore
 
         pip = local[self.pip]
 
-        (
-            pip[
-                "install",
-                "--require-virtualenv",
-                "--use-pep517",
-                str(src) + (optional_modules if optional_modules else ""),
-                "--find-links" if find_links is not None else None,
-                find_links,
-                "--extra-index-url" if extra_index_url is not None else None,
-                extra_index_url,
-                pre,
-            ]
-            & FG
-        )
+        pipeline = pip[
+            "install",
+            "--require-virtualenv",
+            "--force-reinstall",
+            "--use-pep517",
+            str(src),
+            "--find-links" if find_links is not None else None,
+            find_links,
+            "--extra-index-url" if extra_index_url is not None else None,
+            extra_index_url,
+            pre_flag,
+        ]
+
+        try:
+            _ = pipeline & FG
+        except ProcessExecutionError as e:
+            print(f"Error: {e}")
+            print(
+                "Could not install InvokeAI. Please try downloading the latest version of the installer and install again."
+            )
+            sys.exit(1)
 
     def configure(self):
         """
@@ -373,7 +296,6 @@ class InvokeAiInstance:
 
         ext = "bat" if OS == "Windows" else "sh"
 
-        # scripts = ['invoke', 'update']
         scripts = ["invoke"]
 
         for script in scripts:
@@ -408,6 +330,23 @@ def get_pip_from_venv(venv_path: Path) -> str:
     return str(venv_path.expanduser().resolve() / pip)
 
 
+def upgrade_pip(venv_path: Path) -> str | None:
+    """
+    Upgrade the pip executable in the given virtual environment
+    """
+
+    python = "Scripts\\python.exe" if OS == "Windows" else "bin/python"
+    python = str(venv_path.expanduser().resolve() / python)
+
+    try:
+        result = subprocess.check_output([python, "-m", "pip", "install", "--upgrade", "pip"]).decode()
+    except subprocess.CalledProcessError as e:
+        print(e)
+        result = None
+
+    return result
+
+
 def set_sys_path(venv_path: Path) -> None:
     """
     Given a path to a virtual environment, set the sys.path, in a cross-platform fashion,
@@ -431,7 +370,43 @@ def set_sys_path(venv_path: Path) -> None:
     sys.path.append(str(Path(venv_path, lib, "site-packages").expanduser().resolve()))
 
 
-def get_torch_source() -> (Union[str, None], str):
+def get_github_releases() -> tuple[list, list] | None:
+    """
+    Query Github for published (pre-)release versions.
+    Return a tuple where the first element is a list of stable releases and the second element is a list of pre-releases.
+    Return None if the query fails for any reason.
+    """
+
+    import requests
+
+    ## get latest releases using github api
+    url = "https://api.github.com/repos/invoke-ai/InvokeAI/releases"
+    releases, pre_releases = [], []
+    try:
+        res = requests.get(url)
+        res.raise_for_status()
+        tag_info = res.json()
+        for tag in tag_info:
+            if not tag["prerelease"]:
+                releases.append(tag["tag_name"].lstrip("v"))
+            else:
+                pre_releases.append(tag["tag_name"].lstrip("v"))
+    except requests.HTTPError as e:
+        print(f"Error: {e}")
+        print("Could not fetch version information from GitHub. Please check your network connection and try again.")
+        return
+    except Exception as e:
+        print(f"Error: {e}")
+        print("An unexpected error occurred while trying to fetch version information from GitHub. Please try again.")
+        return
+
+    releases.sort(reverse=True)
+    pre_releases.sort(reverse=True)
+
+    return releases, pre_releases
+
+
+def get_torch_source() -> Tuple[str | None, str | None]:
     """
     Determine the extra index URL for pip to use for torch installation.
     This depends on the OS and the graphics accelerator in use.
@@ -446,25 +421,26 @@ def get_torch_source() -> (Union[str, None], str):
     :rtype: list
     """
 
-    from messages import graphical_accelerator
+    from messages import select_gpu
 
-    # device can be one of: "cuda", "rocm", "cpu", "idk"
-    device = graphical_accelerator()
+    # device can be one of: "cuda", "rocm", "cpu", "cuda_and_dml, autodetect"
+    device = select_gpu()
 
     url = None
     optional_modules = "[onnx]"
     if OS == "Linux":
-        if device == "rocm":
-            url = "https://download.pytorch.org/whl/rocm5.4.2"
-        elif device == "cpu":
+        if device.value == "rocm":
+            url = "https://download.pytorch.org/whl/rocm5.6"
+        elif device.value == "cpu":
             url = "https://download.pytorch.org/whl/cpu"
 
-    if device == "cuda":
-        url = "https://download.pytorch.org/whl/cu121"
-        optional_modules = "[xformers,onnx-cuda]"
-    if device == "cuda_and_dml":
-        url = "https://download.pytorch.org/whl/cu121"
-        optional_modules = "[xformers,onnx-directml]"
+    elif OS == "Windows":
+        if device.value == "cuda":
+            url = "https://download.pytorch.org/whl/cu121"
+            optional_modules = "[xformers,onnx-cuda]"
+        if device.value == "cuda_and_dml":
+            url = "https://download.pytorch.org/whl/cu121"
+            optional_modules = "[xformers,onnx-directml]"
 
     # in all other cases, Torch wheels should be coming from PyPi as of Torch 1.13
 

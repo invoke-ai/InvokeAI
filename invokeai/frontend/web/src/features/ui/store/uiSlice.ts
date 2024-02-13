@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 
 import type { InvokeTabName } from './tabMap';
@@ -10,10 +10,10 @@ export const initialUIState: UIState = {
   _version: 1,
   activeTab: 'txt2img',
   shouldShowImageDetails: false,
-  shouldShowExistingModelsInSearch: false,
-  shouldHidePreview: false,
   shouldShowProgressInViewer: true,
   panels: {},
+  accordions: {},
+  expanders: {},
 };
 
 export const uiSlice = createSlice({
@@ -26,23 +26,19 @@ export const uiSlice = createSlice({
     setShouldShowImageDetails: (state, action: PayloadAction<boolean>) => {
       state.shouldShowImageDetails = action.payload;
     },
-    setShouldHidePreview: (state, action: PayloadAction<boolean>) => {
-      state.shouldHidePreview = action.payload;
-    },
-    setShouldShowExistingModelsInSearch: (
-      state,
-      action: PayloadAction<boolean>
-    ) => {
-      state.shouldShowExistingModelsInSearch = action.payload;
-    },
     setShouldShowProgressInViewer: (state, action: PayloadAction<boolean>) => {
       state.shouldShowProgressInViewer = action.payload;
     },
-    panelsChanged: (
-      state,
-      action: PayloadAction<{ name: string; value: string }>
-    ) => {
+    panelsChanged: (state, action: PayloadAction<{ name: string; value: string }>) => {
       state.panels[action.payload.name] = action.payload.value;
+    },
+    accordionStateChanged: (state, action: PayloadAction<{ id: string; isOpen: boolean }>) => {
+      const { id, isOpen } = action.payload;
+      state.accordions[id] = isOpen;
+    },
+    expanderStateChanged: (state, action: PayloadAction<{ id: string; isOpen: boolean }>) => {
+      const { id, isOpen } = action.payload;
+      state.expanders[id] = isOpen;
     },
   },
   extraReducers(builder) {
@@ -55,13 +51,11 @@ export const uiSlice = createSlice({
 export const {
   setActiveTab,
   setShouldShowImageDetails,
-  setShouldShowExistingModelsInSearch,
-  setShouldHidePreview,
   setShouldShowProgressInViewer,
   panelsChanged,
+  accordionStateChanged,
+  expanderStateChanged,
 } = uiSlice.actions;
-
-export default uiSlice.reducer;
 
 export const selectUiSlice = (state: RootState) => state.ui;
 
@@ -71,4 +65,11 @@ export const migrateUIState = (state: any): any => {
     state._version = 1;
   }
   return state;
+};
+
+export const uiPersistConfig: PersistConfig<UIState> = {
+  name: uiSlice.name,
+  initialState: initialUIState,
+  migrate: migrateUIState,
+  persistDenylist: ['shouldShowImageDetails'],
 };

@@ -13,9 +13,7 @@ export const useAddControlAdapter = (type: ControlAdapterType) => {
 
   const firstModel = useMemo(() => {
     // prefer to use a model that matches the base model
-    const firstCompatibleModel = models.filter((m) =>
-      baseModel ? m.base_model === baseModel : true
-    )[0];
+    const firstCompatibleModel = models.filter((m) => (baseModel ? m.base_model === baseModel : true))[0];
 
     if (firstCompatibleModel) {
       return firstCompatibleModel;

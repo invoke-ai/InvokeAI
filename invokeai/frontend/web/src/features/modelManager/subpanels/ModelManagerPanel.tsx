@@ -1,5 +1,4 @@
-import { Flex } from '@chakra-ui/react';
-import { InvText } from 'common/components/InvText/wrapper';
+import { Flex, Text } from '@invoke-ai/ui-library';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_BASE_MODELS } from 'services/api/constants';
@@ -8,10 +7,7 @@ import type {
   LoRAModelConfigEntity,
   MainModelConfigEntity,
 } from 'services/api/endpoints/models';
-import {
-  useGetLoRAModelsQuery,
-  useGetMainModelsQuery,
-} from 'services/api/endpoints/models';
+import { useGetLoRAModelsQuery, useGetMainModelsQuery } from 'services/api/endpoints/models';
 
 import CheckpointModelEdit from './ModelManagerPanel/CheckpointModelEdit';
 import DiffusersModelEdit from './ModelManagerPanel/DiffusersModelEdit';
@@ -35,10 +31,7 @@ const ModelManagerPanel = () => {
 
   return (
     <Flex gap={8} w="full" h="full">
-      <ModelList
-        selectedModelId={selectedModelId}
-        setSelectedModelId={setSelectedModelId}
-      />
+      <ModelList selectedModelId={selectedModelId} setSelectedModelId={setSelectedModelId} />
       <ModelEdit model={model} />
     </Flex>
   );
@@ -57,12 +50,7 @@ const ModelEdit = (props: ModelEditProps) => {
   }
 
   if (model?.model_format === 'diffusers') {
-    return (
-      <DiffusersModelEdit
-        key={model.id}
-        model={model as DiffusersModelConfigEntity}
-      />
-    );
+    return <DiffusersModelEdit key={model.id} model={model as DiffusersModelConfigEntity} />;
   }
 
   if (model?.model_type === 'lora') {
@@ -70,15 +58,8 @@ const ModelEdit = (props: ModelEditProps) => {
   }
 
   return (
-    <Flex
-      w="full"
-      h="full"
-      justifyContent="center"
-      alignItems="center"
-      maxH={96}
-      userSelect="none"
-    >
-      <InvText variant="subtext">{t('modelManager.noModelSelected')}</InvText>
+    <Flex w="full" h="full" justifyContent="center" alignItems="center" maxH={96} userSelect="none">
+      <Text variant="subtext">{t('modelManager.noModelSelected')}</Text>
     </Flex>
   );
 };

@@ -1,13 +1,6 @@
-import { Box, Flex } from '@chakra-ui/react';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { Box, Combobox, Flex, FormControl, FormLabel, IconButton, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
-import { InvText } from 'common/components/InvText/wrapper';
 import { setAdvancedAddScanModel } from 'features/modelManager/store/modelManagerSlice';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,13 +12,11 @@ import type { ManualAddMode } from './AdvancedAddModels';
 import { isManualAddMode } from './AdvancedAddModels';
 
 const ScanAdvancedAddModels = () => {
-  const advancedAddScanModel = useAppSelector(
-    (s) => s.modelmanager.advancedAddScanModel
-  );
+  const advancedAddScanModel = useAppSelector((s) => s.modelmanager.advancedAddScanModel);
 
   const { t } = useTranslation();
 
-  const options: InvSelectOption[] = useMemo(
+  const options: ComboboxOption[] = useMemo(
     () => [
       { label: t('modelManager.diffusersModels'), value: 'diffusers' },
       { label: t('modelManager.checkpointOrSafetensors'), value: 'checkpoint' },
@@ -33,28 +24,21 @@ const ScanAdvancedAddModels = () => {
     [t]
   );
 
-  const [advancedAddMode, setAdvancedAddMode] =
-    useState<ManualAddMode>('diffusers');
+  const [advancedAddMode, setAdvancedAddMode] = useState<ManualAddMode>('diffusers');
 
   const [isCheckpoint, setIsCheckpoint] = useState<boolean>(true);
 
   useEffect(() => {
-    advancedAddScanModel &&
-    ['.ckpt', '.safetensors', '.pth', '.pt'].some((ext) =>
-      advancedAddScanModel.endsWith(ext)
-    )
+    advancedAddScanModel && ['.ckpt', '.safetensors', '.pth', '.pt'].some((ext) => advancedAddScanModel.endsWith(ext))
       ? setAdvancedAddMode('checkpoint')
       : setAdvancedAddMode('diffusers');
   }, [advancedAddScanModel, setAdvancedAddMode, isCheckpoint]);
 
   const dispatch = useAppDispatch();
 
-  const handleClickSetAdvanced = useCallback(
-    () => dispatch(setAdvancedAddScanModel(null)),
-    [dispatch]
-  );
+  const handleClickSetAdvanced = useCallback(() => dispatch(setAdvancedAddScanModel(null)), [dispatch]);
 
-  const handleChangeAddMode = useCallback<InvSelectOnChange>((v) => {
+  const handleChangeAddMode = useCallback<ComboboxOnChange>((v) => {
     if (!isManualAddMode(v?.value)) {
       return;
     }
@@ -66,10 +50,7 @@ const ScanAdvancedAddModels = () => {
     }
   }, []);
 
-  const value = useMemo(
-    () => options.find((o) => o.value === advancedAddMode),
-    [options, advancedAddMode]
-  );
+  const value = useMemo(() => options.find((o) => o.value === advancedAddMode), [options, advancedAddMode]);
 
   if (!advancedAddScanModel) {
     return null;
@@ -88,35 +69,24 @@ const ScanAdvancedAddModels = () => {
       bg="base.800"
     >
       <Flex justifyContent="space-between" alignItems="center">
-        <InvText size="xl" fontWeight="semibold">
-          {isCheckpoint || advancedAddMode === 'checkpoint'
-            ? 'Add Checkpoint Model'
-            : 'Add Diffusers Model'}
-        </InvText>
-        <InvIconButton
+        <Text size="xl" fontWeight="semibold">
+          {isCheckpoint || advancedAddMode === 'checkpoint' ? 'Add Checkpoint Model' : 'Add Diffusers Model'}
+        </Text>
+        <IconButton
           icon={<PiXBold />}
           aria-label={t('modelManager.closeAdvanced')}
           onClick={handleClickSetAdvanced}
           size="sm"
         />
       </Flex>
-      <InvControl label={t('modelManager.modelType')}>
-        <InvSelect
-          value={value}
-          options={options}
-          onChange={handleChangeAddMode}
-        />
-      </InvControl>
+      <FormControl>
+        <FormLabel>{t('modelManager.modelType')}</FormLabel>
+        <Combobox value={value} options={options} onChange={handleChangeAddMode} />
+      </FormControl>
       {isCheckpoint ? (
-        <AdvancedAddCheckpoint
-          key={advancedAddScanModel}
-          model_path={advancedAddScanModel}
-        />
+        <AdvancedAddCheckpoint key={advancedAddScanModel} model_path={advancedAddScanModel} />
       ) : (
-        <AdvancedAddDiffusers
-          key={advancedAddScanModel}
-          model_path={advancedAddScanModel}
-        />
+        <AdvancedAddDiffusers key={advancedAddScanModel} model_path={advancedAddScanModel} />
       )}
     </Box>
   );

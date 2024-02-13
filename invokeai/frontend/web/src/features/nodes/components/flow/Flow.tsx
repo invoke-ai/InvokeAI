@@ -1,6 +1,5 @@
-import { useToken } from '@chakra-ui/react';
+import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useGlobalMenuClose } from 'common/hooks/useGlobalMenuClose';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
@@ -194,17 +193,16 @@ export const Flow = memo(() => {
   // Easiest to just keep track of the last mouse event for this particular feature
   const edgeUpdateMouseEvent = useRef<MouseEvent>();
 
-  const onEdgeUpdateStart: NonNullable<ReactFlowProps['onEdgeUpdateStart']> =
-    useCallback(
-      (e, edge, _handleType) => {
-        // update mouse event
-        edgeUpdateMouseEvent.current = e;
-        // always delete the edge when starting an updated
-        dispatch(edgeDeleted(edge.id));
-        dispatch(edgeChangeStarted());
-      },
-      [dispatch]
-    );
+  const onEdgeUpdateStart: NonNullable<ReactFlowProps['onEdgeUpdateStart']> = useCallback(
+    (e, edge, _handleType) => {
+      // update mouse event
+      edgeUpdateMouseEvent.current = e;
+      // always delete the edge when starting an updated
+      dispatch(edgeDeleted(edge.id));
+      dispatch(edgeChangeStarted());
+    },
+    [dispatch]
+  );
 
   const onEdgeUpdate: OnEdgeUpdateFunc = useCallback(
     (_oldEdge, newConnection) => {
@@ -215,24 +213,23 @@ export const Flow = memo(() => {
     [dispatch]
   );
 
-  const onEdgeUpdateEnd: NonNullable<ReactFlowProps['onEdgeUpdateEnd']> =
-    useCallback(
-      (e, edge, _handleType) => {
-        // Handle the case where user begins a drag but didn't move the cursor -
-        // bc we deleted the edge, we need to add it back
-        if (
-          // ignore touch events
-          !('touches' in e) &&
-          edgeUpdateMouseEvent.current?.clientX === e.clientX &&
-          edgeUpdateMouseEvent.current?.clientY === e.clientY
-        ) {
-          dispatch(edgeAdded(edge));
-        }
-        // reset mouse event
-        edgeUpdateMouseEvent.current = undefined;
-      },
-      [dispatch]
-    );
+  const onEdgeUpdateEnd: NonNullable<ReactFlowProps['onEdgeUpdateEnd']> = useCallback(
+    (e, edge, _handleType) => {
+      // Handle the case where user begins a drag but didn't move the cursor -
+      // bc we deleted the edge, we need to add it back
+      if (
+        // ignore touch events
+        !('touches' in e) &&
+        edgeUpdateMouseEvent.current?.clientX === e.clientX &&
+        edgeUpdateMouseEvent.current?.clientY === e.clientY
+      ) {
+        dispatch(edgeAdded(edge));
+      }
+      // reset mouse event
+      edgeUpdateMouseEvent.current = undefined;
+    },
+    [dispatch]
+  );
 
   // #endregion
 

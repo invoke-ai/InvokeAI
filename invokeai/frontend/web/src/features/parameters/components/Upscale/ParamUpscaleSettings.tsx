@@ -1,14 +1,15 @@
-import { Flex, useDisclosure } from '@chakra-ui/react';
+import {
+  Button,
+  Flex,
+  IconButton,
+  Popover,
+  PopoverBody,
+  PopoverContent,
+  PopoverTrigger,
+  useDisclosure,
+} from '@invoke-ai/ui-library';
 import { upscaleRequested } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import {
-  InvPopover,
-  InvPopoverBody,
-  InvPopoverContent,
-  InvPopoverTrigger,
-} from 'common/components/InvPopover/wrapper';
 import { useIsAllowedToUpscale } from 'features/parameters/hooks/useIsAllowedToUpscale';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { memo, useCallback } from 'react';
@@ -37,31 +38,31 @@ const ParamUpscalePopover = (props: Props) => {
   }, [dispatch, imageDTO, isAllowedToUpscale, onClose]);
 
   return (
-    <InvPopover isOpen={isOpen} onClose={onClose} isLazy>
-      <InvPopoverTrigger>
-        <InvIconButton
+    <Popover isOpen={isOpen} onClose={onClose} isLazy>
+      <PopoverTrigger>
+        <IconButton
           tooltip={t('parameters.upscale')}
           onClick={onOpen}
           icon={<PiFrameCornersBold />}
           aria-label={t('parameters.upscale')}
         />
-      </InvPopoverTrigger>
-      <InvPopoverContent>
-        <InvPopoverBody minW={96}>
+      </PopoverTrigger>
+      <PopoverContent>
+        <PopoverBody minW={96}>
           <Flex flexDirection="column" gap={4}>
             <ParamESRGANModel />
-            <InvButton
+            <Button
               tooltip={detail}
               size="sm"
               isDisabled={!imageDTO || inProgress || !isAllowedToUpscale}
               onClick={handleClickUpscale}
             >
               {t('parameters.upscaleImage')}
-            </InvButton>
+            </Button>
           </Flex>
-        </InvPopoverBody>
-      </InvPopoverContent>
-    </InvPopover>
+        </PopoverBody>
+      </PopoverContent>
+    </Popover>
   );
 };
 

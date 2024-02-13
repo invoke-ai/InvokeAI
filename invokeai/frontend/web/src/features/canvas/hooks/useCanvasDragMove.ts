@@ -1,9 +1,5 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  $isMovingBoundingBox,
-  $isMovingStage,
-  $tool,
-} from 'features/canvas/store/canvasNanostore';
+import { $isMovingBoundingBox, $isMovingStage, $tool } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { setStageCoordinates } from 'features/canvas/store/canvasSlice';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -13,9 +9,7 @@ const useCanvasDrag = () => {
   const dispatch = useAppDispatch();
   const isStaging = useAppSelector(isStagingSelector);
   const handleDragStart = useCallback(() => {
-    if (
-      !(($tool.get() === 'move' || isStaging) && !$isMovingBoundingBox.get())
-    ) {
+    if (!(($tool.get() === 'move' || isStaging) && !$isMovingBoundingBox.get())) {
       return;
     }
     $isMovingStage.set(true);
@@ -36,9 +30,7 @@ const useCanvasDrag = () => {
   );
 
   const handleDragEnd = useCallback(() => {
-    if (
-      !(($tool.get() === 'move' || isStaging) && !$isMovingBoundingBox.get())
-    ) {
+    if (!(($tool.get() === 'move' || isStaging) && !$isMovingBoundingBox.get())) {
       return;
     }
     $isMovingStage.set(false);

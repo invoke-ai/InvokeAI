@@ -1,6 +1,5 @@
-import { Flex } from '@chakra-ui/react';
+import { CompositeSlider, Flex } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { nodeOpacityChanged } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,7 +18,7 @@ const NodeOpacitySlider = () => {
 
   return (
     <Flex alignItems="center">
-      <InvSlider
+      <CompositeSlider
         aria-label={t('nodes.nodeOpacity')}
         value={nodeOpacity}
         defaultValue={1}

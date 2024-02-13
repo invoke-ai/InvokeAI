@@ -24,9 +24,7 @@ export const socketSubscribedSession = createAction<{
   sessionId: string;
 }>('socket/socketSubscribedSession');
 
-export const socketUnsubscribedSession = createAction<{ sessionId: string }>(
-  'socket/socketUnsubscribedSession'
-);
+export const socketUnsubscribedSession = createAction<{ sessionId: string }>('socket/socketUnsubscribedSession');
 
 export const socketInvocationStarted = createAction<{
   data: InvocationStartedEvent;

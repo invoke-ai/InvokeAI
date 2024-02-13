@@ -1,14 +1,7 @@
-import { Flex } from '@chakra-ui/react';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { Combobox, ConfirmationAlertDialog, Flex, FormControl, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvConfirmationAlertDialog } from 'common/components/InvConfirmationAlertDialog/InvConfirmationAlertDialog';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
-import { InvText } from 'common/components/InvText/wrapper';
 import {
   changeBoardReset,
   isModalOpenChanged,
@@ -17,10 +10,7 @@ import {
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
-import {
-  useAddImagesToBoardMutation,
-  useRemoveImagesFromBoardMutation,
-} from 'services/api/endpoints/images';
+import { useAddImagesToBoardMutation, useRemoveImagesFromBoardMutation } from 'services/api/endpoints/images';
 
 const selectImagesToChange = createMemoizedSelector(
   selectChangeBoardModalSlice,
@@ -37,7 +27,7 @@ const ChangeBoardModal = () => {
   const [removeImagesFromBoard] = useRemoveImagesFromBoardMutation();
   const { t } = useTranslation();
 
-  const options = useMemo<InvSelectOption[]>(() => {
+  const options = useMemo<ComboboxOption[]>(() => {
     return [{ label: t('boards.uncategorized'), value: 'none' }].concat(
       (boards ?? []).map((board) => ({
         label: board.board_name,
@@ -46,10 +36,7 @@ const ChangeBoardModal = () => {
     );
   }, [boards, t]);
 
-  const value = useMemo(
-    () => options.find((o) => o.value === selectedBoard),
-    [options, selectedBoard]
-  );
+  const value = useMemo(() => options.find((o) => o.value === selectedBoard), [options, selectedBoard]);
 
   const handleClose = useCallback(() => {
     dispatch(changeBoardReset());
@@ -71,15 +58,9 @@ const ChangeBoardModal = () => {
     }
     setSelectedBoard(null);
     dispatch(changeBoardReset());
-  }, [
-    addImagesToBoard,
-    dispatch,
-    imagesToChange,
-    removeImagesFromBoard,
-    selectedBoard,
-  ]);
+  }, [addImagesToBoard, dispatch, imagesToChange, removeImagesFromBoard, selectedBoard]);
 
-  const onChange = useCallback<InvSelectOnChange>((v) => {
+  const onChange = useCallback<ComboboxOnChange>((v) => {
     if (!v) {
       return;
     }
@@ -87,7 +68,7 @@ const ChangeBoardModal = () => {
   }, []);
 
   return (
-    <InvConfirmationAlertDialog
+    <ConfirmationAlertDialog
       isOpen={isModalOpen}
       onClose={handleClose}
       title={t('boards.changeBoard')}
@@ -96,24 +77,22 @@ const ChangeBoardModal = () => {
       cancelButtonText={t('boards.cancel')}
     >
       <Flex flexDir="column" gap={4}>
-        <InvText>
+        <Text>
           {t('boards.movingImagesToBoard', {
             count: imagesToChange.length,
           })}
           :
-        </InvText>
-        <InvControl isDisabled={isFetching}>
-          <InvSelect
-            placeholder={
-              isFetching ? t('boards.loading') : t('boards.selectBoard')
-            }
+        </Text>
+        <FormControl isDisabled={isFetching}>
+          <Combobox
+            placeholder={isFetching ? t('boards.loading') : t('boards.selectBoard')}
             onChange={onChange}
             value={value}
             options={options}
           />
-        </InvControl>
+        </FormControl>
       </Flex>
-    </InvConfirmationAlertDialog>
+    </ConfirmationAlertDialog>
   );
 };
 

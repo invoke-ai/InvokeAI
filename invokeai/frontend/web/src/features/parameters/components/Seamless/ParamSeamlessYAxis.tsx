@@ -1,6 +1,5 @@
+import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import { setSeamlessYAxis } from 'features/parameters/store/generationSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -18,9 +17,10 @@ const ParamSeamlessYAxis = () => {
   );
 
   return (
-    <InvControl label={t('parameters.seamlessYAxis')}>
-      <InvSwitch isChecked={seamlessYAxis} onChange={handleChange} />
-    </InvControl>
+    <FormControl>
+      <FormLabel>{t('parameters.seamlessYAxis')}</FormLabel>
+      <Switch isChecked={seamlessYAxis} onChange={handleChange} />
+    </FormControl>
   );
 };
 

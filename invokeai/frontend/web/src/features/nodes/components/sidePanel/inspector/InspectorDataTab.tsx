@@ -6,12 +6,9 @@ import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { memo } from 'react';
 
 const selector = createMemoizedSelector(selectNodesSlice, (nodes) => {
-  const lastSelectedNodeId =
-    nodes.selectedNodes[nodes.selectedNodes.length - 1];
+  const lastSelectedNodeId = nodes.selectedNodes[nodes.selectedNodes.length - 1];
 
-  const lastSelectedNode = nodes.nodes.find(
-    (node) => node.id === lastSelectedNodeId
-  );
+  const lastSelectedNode = nodes.nodes.find((node) => node.id === lastSelectedNodeId);
 
   return {
     data: lastSelectedNode?.data,

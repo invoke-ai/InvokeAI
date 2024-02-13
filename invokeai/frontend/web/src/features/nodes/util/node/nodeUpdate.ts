@@ -1,18 +1,12 @@
 import { satisfies } from 'compare-versions';
 import { NodeUpdateError } from 'features/nodes/types/error';
-import type {
-  InvocationNode,
-  InvocationTemplate,
-} from 'features/nodes/types/invocation';
+import type { InvocationNode, InvocationTemplate } from 'features/nodes/types/invocation';
 import { zParsedSemver } from 'features/nodes/types/semver';
 import { cloneDeep, defaultsDeep, keys, pick } from 'lodash-es';
 
 import { buildInvocationNode } from './buildInvocationNode';
 
-export const getNeedsUpdate = (
-  node: InvocationNode,
-  template: InvocationTemplate
-): boolean => {
+export const getNeedsUpdate = (node: InvocationNode, template: InvocationTemplate): boolean => {
   if (node.data.type !== template.type) {
     return true;
   }
@@ -23,10 +17,7 @@ export const getNeedsUpdate = (
  * @param template The invocation template to check against.
  */
 
-export const getMayUpdateNode = (
-  node: InvocationNode,
-  template: InvocationTemplate
-): boolean => {
+export const getMayUpdateNode = (node: InvocationNode, template: InvocationTemplate): boolean => {
   const needsUpdate = getNeedsUpdate(node, template);
   if (!needsUpdate || node.data.type !== template.type) {
     return false;
@@ -44,10 +35,7 @@ export const getMayUpdateNode = (
  * @throws {NodeUpdateError} If the node is not an invocation node.
  */
 
-export const updateNode = (
-  node: InvocationNode,
-  template: InvocationTemplate
-): InvocationNode => {
+export const updateNode = (node: InvocationNode, template: InvocationTemplate): InvocationNode => {
   const mayUpdate = getMayUpdateNode(node, template);
 
   if (!mayUpdate || node.data.type !== template.type) {

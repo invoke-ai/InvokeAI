@@ -27,23 +27,17 @@ export const getImageUsage = (
 ) => {
   const isInitialImage = generation.initialImage?.imageName === image_name;
 
-  const isCanvasImage = canvas.layerState.objects.some(
-    (obj) => obj.kind === 'image' && obj.imageName === image_name
-  );
+  const isCanvasImage = canvas.layerState.objects.some((obj) => obj.kind === 'image' && obj.imageName === image_name);
 
   const isNodesImage = nodes.nodes.filter(isInvocationNode).some((node) => {
     return some(
       node.data.inputs,
-      (input) =>
-        isImageFieldInputInstance(input) &&
-        input.value?.image_name === image_name
+      (input) => isImageFieldInputInstance(input) && input.value?.image_name === image_name
     );
   });
 
   const isControlImage = selectControlAdapterAll(controlAdapters).some(
-    (ca) =>
-      ca.controlImage === image_name ||
-      (isControlNetOrT2IAdapter(ca) && ca.processedControlImage === image_name)
+    (ca) => ca.controlImage === image_name || (isControlNetOrT2IAdapter(ca) && ca.processedControlImage === image_name)
   );
 
   const imageUsage: ImageUsage = {

@@ -1,18 +1,19 @@
 import {
+  Button,
+  ConfirmationAlertDialog,
   Flex,
+  FormControl,
+  FormLabel,
+  Input,
   ListItem,
   Radio,
   RadioGroup,
+  Text,
+  Tooltip,
   UnorderedList,
   useDisclosure,
-} from '@chakra-ui/react';
+} from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvConfirmationAlertDialog } from 'common/components/InvConfirmationAlertDialog/InvConfirmationAlertDialog';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvInput } from 'common/components/InvInput/InvInput';
-import { InvText } from 'common/components/InvText/wrapper';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import type { ChangeEvent } from 'react';
@@ -33,8 +34,7 @@ const ModelConvert = (props: ModelConvertProps) => {
   const { t } = useTranslation();
   const [convertModel, { isLoading }] = useConvertMainModelsMutation();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const [saveLocation, setSaveLocation] =
-    useState<SaveLocation>('InvokeAIRoot');
+  const [saveLocation, setSaveLocation] = useState<SaveLocation>('InvokeAIRoot');
   const [customSaveLocation, setCustomSaveLocation] = useState<string>('');
 
   useEffect(() => {
@@ -48,19 +48,15 @@ const ModelConvert = (props: ModelConvertProps) => {
   const handleChangeSaveLocation = useCallback((v: string) => {
     setSaveLocation(v as SaveLocation);
   }, []);
-  const handleChangeCustomSaveLocation = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      setCustomSaveLocation(e.target.value);
-    },
-    []
-  );
+  const handleChangeCustomSaveLocation = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setCustomSaveLocation(e.target.value);
+  }, []);
 
   const modelConvertHandler = useCallback(() => {
     const queryArg = {
       base_model: model.base_model,
       model_name: model.model_name,
-      convert_dest_directory:
-        saveLocation === 'Custom' ? customSaveLocation : undefined,
+      convert_dest_directory: saveLocation === 'Custom' ? customSaveLocation : undefined,
     };
 
     if (saveLocation === 'Custom' && customSaveLocation === '') {
@@ -78,9 +74,7 @@ const ModelConvert = (props: ModelConvertProps) => {
     dispatch(
       addToast(
         makeToast({
-          title: `${t('modelManager.convertingModelBegin')}: ${
-            model.model_name
-          }`,
+          title: `${t('modelManager.convertingModelBegin')}: ${model.model_name}`,
           status: 'info',
         })
       )
@@ -102,27 +96,17 @@ const ModelConvert = (props: ModelConvertProps) => {
         dispatch(
           addToast(
             makeToast({
-              title: `${t('modelManager.modelConversionFailed')}: ${
-                model.model_name
-              }`,
+              title: `${t('modelManager.modelConversionFailed')}: ${model.model_name}`,
               status: 'error',
             })
           )
         );
       });
-  }, [
-    convertModel,
-    customSaveLocation,
-    dispatch,
-    model.base_model,
-    model.model_name,
-    saveLocation,
-    t,
-  ]);
+  }, [convertModel, customSaveLocation, dispatch, model.base_model, model.model_name, saveLocation, t]);
 
   return (
     <>
-      <InvButton
+      <Button
         onClick={onOpen}
         size="sm"
         aria-label={t('modelManager.convertToDiffusers')}
@@ -130,8 +114,8 @@ const ModelConvert = (props: ModelConvertProps) => {
         isLoading={isLoading}
       >
         🧨 {t('modelManager.convertToDiffusers')}
-      </InvButton>
-      <InvConfirmationAlertDialog
+      </Button>
+      <ConfirmationAlertDialog
         title={`${t('modelManager.convert')} ${model.model_name}`}
         acceptCallback={modelConvertHandler}
         cancelCallback={modelConvertCancelHandler}
@@ -140,50 +124,40 @@ const ModelConvert = (props: ModelConvertProps) => {
         onClose={onClose}
       >
         <Flex flexDirection="column" rowGap={4}>
-          <InvText>{t('modelManager.convertToDiffusersHelpText1')}</InvText>
+          <Text>{t('modelManager.convertToDiffusersHelpText1')}</Text>
           <UnorderedList>
             <ListItem>{t('modelManager.convertToDiffusersHelpText2')}</ListItem>
             <ListItem>{t('modelManager.convertToDiffusersHelpText3')}</ListItem>
             <ListItem>{t('modelManager.convertToDiffusersHelpText4')}</ListItem>
             <ListItem>{t('modelManager.convertToDiffusersHelpText5')}</ListItem>
           </UnorderedList>
-          <InvText>{t('modelManager.convertToDiffusersHelpText6')}</InvText>
+          <Text>{t('modelManager.convertToDiffusersHelpText6')}</Text>
         </Flex>
 
         <Flex flexDir="column" gap={2}>
           <Flex marginTop={4} flexDir="column" gap={2}>
-            <InvText fontWeight="semibold">
-              {t('modelManager.convertToDiffusersSaveLocation')}
-            </InvText>
-            <RadioGroup
-              value={saveLocation}
-              onChange={handleChangeSaveLocation}
-            >
+            <Text fontWeight="semibold">{t('modelManager.convertToDiffusersSaveLocation')}</Text>
+            <RadioGroup value={saveLocation} onChange={handleChangeSaveLocation}>
               <Flex gap={4}>
                 <Radio value="InvokeAIRoot">
-                  <InvTooltip label="Save converted model in the InvokeAI root folder">
+                  <Tooltip label="Save converted model in the InvokeAI root folder">
                     {t('modelManager.invokeRoot')}
-                  </InvTooltip>
+                  </Tooltip>
                 </Radio>
                 <Radio value="Custom">
-                  <InvTooltip label="Save converted model in a custom folder">
-                    {t('modelManager.custom')}
-                  </InvTooltip>
+                  <Tooltip label="Save converted model in a custom folder">{t('modelManager.custom')}</Tooltip>
                 </Radio>
               </Flex>
             </RadioGroup>
           </Flex>
           {saveLocation === 'Custom' && (
-            <InvControl label={t('modelManager.customSaveLocation')}>
-              <InvInput
-                width="full"
-                value={customSaveLocation}
-                onChange={handleChangeCustomSaveLocation}
-              />
-            </InvControl>
+            <FormControl>
+              <FormLabel>{t('modelManager.customSaveLocation')}</FormLabel>
+              <Input width="full" value={customSaveLocation} onChange={handleChangeCustomSaveLocation} />
+            </FormControl>
           )}
         </Flex>
-      </InvConfirmationAlertDialog>
+      </ConfirmationAlertDialog>
     </>
   );
 };

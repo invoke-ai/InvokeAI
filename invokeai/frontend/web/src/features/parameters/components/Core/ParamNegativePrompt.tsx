@@ -1,6 +1,5 @@
-import { Box } from '@chakra-ui/layout';
+import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvTextarea } from 'common/components/InvTextarea/InvTextarea';
 import { AddEmbeddingButton } from 'features/embedding/AddEmbeddingButton';
 import { EmbeddingPopover } from 'features/embedding/EmbeddingPopover';
 import { usePrompt } from 'features/embedding/usePrompt';
@@ -20,12 +19,11 @@ export const ParamNegativePrompt = memo(() => {
     },
     [dispatch]
   );
-  const { onChange, isOpen, onClose, onOpen, onSelectEmbedding, onKeyDown } =
-    usePrompt({
-      prompt,
-      textareaRef,
-      onChange: _onChange,
-    });
+  const { onChange, isOpen, onClose, onOpen, onSelectEmbedding, onKeyDown } = usePrompt({
+    prompt,
+    textareaRef,
+    onChange: _onChange,
+  });
 
   return (
     <EmbeddingPopover
@@ -35,7 +33,7 @@ export const ParamNegativePrompt = memo(() => {
       width={textareaRef.current?.clientWidth}
     >
       <Box pos="relative">
-        <InvTextarea
+        <Textarea
           id="negativePrompt"
           name="negativePrompt"
           ref={textareaRef}

@@ -28,9 +28,7 @@ import { addCoreMetadataNode } from './metadata';
 /**
  * Builds the Canvas tab's Text to Image graph.
  */
-export const buildCanvasTextToImageGraph = (
-  state: RootState
-): NonNullableGraph => {
+export const buildCanvasTextToImageGraph = (state: RootState): NonNullableGraph => {
   const log = logger('nodes');
   const {
     positivePrompt,
@@ -55,9 +53,7 @@ export const buildCanvasTextToImageGraph = (
 
   const fp32 = vaePrecision === 'fp32';
   const is_intermediate = true;
-  const isUsingScaledDimensions = ['auto', 'manual'].includes(
-    boundingBoxScaleMethod
-  );
+  const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);
 
   if (!model) {
     log.error('No model found in state');
@@ -110,12 +106,8 @@ export const buildCanvasTextToImageGraph = (
         id: NOISE,
         is_intermediate,
         seed,
-        width: !isUsingScaledDimensions
-          ? width
-          : scaledBoundingBoxDimensions.width,
-        height: !isUsingScaledDimensions
-          ? height
-          : scaledBoundingBoxDimensions.height,
+        width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
+        height: !isUsingScaledDimensions ? height : scaledBoundingBoxDimensions.height,
         use_cpu,
       },
       [DENOISE_LATENTS]: {
@@ -123,6 +115,7 @@ export const buildCanvasTextToImageGraph = (
         id: DENOISE_LATENTS,
         is_intermediate,
         cfg_scale,
+        cfg_rescale_multiplier,
         scheduler,
         steps,
         denoising_start: 0,
@@ -273,12 +266,8 @@ export const buildCanvasTextToImageGraph = (
       generation_mode: 'txt2img',
       cfg_scale,
       cfg_rescale_multiplier,
-      width: !isUsingScaledDimensions
-        ? width
-        : scaledBoundingBoxDimensions.width,
-      height: !isUsingScaledDimensions
-        ? height
-        : scaledBoundingBoxDimensions.height,
+      width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
+      height: !isUsingScaledDimensions ? height : scaledBoundingBoxDimensions.height,
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
       model,

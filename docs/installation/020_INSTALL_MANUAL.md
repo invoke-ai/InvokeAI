@@ -154,7 +154,7 @@ manager, please follow these steps:
     === "ROCm (AMD)"
 
         ```bash
-        pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.4.2
+        pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.6
         ```
 
     === "CPU (Intel Macs & non-GPU systems)"
@@ -230,13 +230,13 @@ manager, please follow these steps:
         === "local Webserver"
 
             ```bash
-            invokeai --web
+            invokeai-web
             ```
 
         === "Public Webserver"
 
             ```bash
-            invokeai --web --host 0.0.0.0
+            invokeai-web --host 0.0.0.0
             ```
 
         === "CLI"
@@ -313,7 +313,7 @@ code for InvokeAI. For this to work, you will need to install the
 on your system, please see the [Git Installation
 Guide](https://github.com/git-guides/install-git)
 
-You will also need to install the [frontend development toolchain](https://github.com/invoke-ai/InvokeAI/blob/main/docs/contributing/contribution_guides/contributingToFrontend.md).
+You will also need to install the [frontend development toolchain](https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/README.md).
 
 If you have a "normal" installation, you should create a totally separate virtual environment for the git-based installation, else the two may interfere.
 
@@ -345,7 +345,7 @@ installation protocol (important!)
 
     === "ROCm (AMD)"
         ```bash
-        pip install -e . --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.4.2
+        pip install -e . --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.6
         ```
 
     === "CPU (Intel Macs & non-GPU systems)"
@@ -361,7 +361,7 @@ installation protocol (important!)
     Be sure to pass `-e` (for an editable install) and don't forget the
     dot ("."). It is part of the command.
 
-5.  Install the [frontend toolchain](https://github.com/invoke-ai/InvokeAI/blob/main/docs/contributing/contribution_guides/contributingToFrontend.md) and do a production build of the UI as described.
+5.  Install the [frontend toolchain](https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/README.md) and do a production build of the UI as described.
 
 6.  You can now run `invokeai` and its related commands. The code will be
     read from the repository, so that you can edit the .py source files

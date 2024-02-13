@@ -1,4 +1,4 @@
-import { Badge, Flex } from '@chakra-ui/react';
+import { Badge, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useChakraThemeTokens } from 'common/hooks/useChakraThemeTokens';
 import { memo, useMemo } from 'react';
@@ -23,14 +23,7 @@ const InvocationCollapsedEdge = ({
   targetHandleId,
 }: EdgeProps<{ count: number }>) => {
   const selector = useMemo(
-    () =>
-      makeEdgeSelector(
-        source,
-        sourceHandleId,
-        target,
-        targetHandleId,
-        selected
-      ),
+    () => makeEdgeSelector(source, sourceHandleId, target, targetHandleId, selected),
     [selected, source, sourceHandleId, target, targetHandleId]
   );
 
@@ -68,12 +61,7 @@ const InvocationCollapsedEdge = ({
             transform={`translate(-50%, -50%) translate(${labelX}px,${labelY}px)`}
             className="nodrag nopan"
           >
-            <Badge
-              variant="solid"
-              bg="base.500"
-              opacity={isSelected ? 0.8 : 0.5}
-              boxShadow="base"
-            >
+            <Badge variant="solid" bg="base.500" opacity={isSelected ? 0.8 : 0.5} boxShadow="base">
               {data.count}
             </Badge>
           </Flex>

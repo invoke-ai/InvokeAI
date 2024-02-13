@@ -27,9 +27,7 @@ const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
           lineJoin="round"
           shadowForStrokeEnabled={false}
           listening={false}
-          globalCompositeOperation={
-            line.tool === 'brush' ? 'source-over' : 'destination-out'
-          }
+          globalCompositeOperation={line.tool === 'brush' ? 'source-over' : 'destination-out'}
         />
       ))}
     </Group>

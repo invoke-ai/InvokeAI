@@ -1,5 +1,5 @@
-import type { ChakraProps, StatProps } from '@chakra-ui/react';
-import { Stat, StatLabel, StatNumber } from '@chakra-ui/react';
+import type { ChakraProps, StatProps } from '@invoke-ai/ui-library';
+import { Stat, StatLabel, StatNumber } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 
 const sx: ChakraProps['sx'] = {
@@ -14,12 +14,7 @@ type Props = Omit<StatProps, 'children'> & {
   isDisabled?: boolean;
 };
 
-const StatusStatItem = ({
-  label,
-  value,
-  isDisabled = false,
-  ...rest
-}: Props) => (
+const StatusStatItem = ({ label, value, isDisabled = false, ...rest }: Props) => (
   <Stat
     flexGrow={1}
     textOverflow="ellipsis"

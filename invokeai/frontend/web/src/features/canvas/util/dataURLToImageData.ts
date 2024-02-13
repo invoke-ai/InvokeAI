@@ -1,11 +1,7 @@
 /**
  * Gets an ImageData object from an image dataURL by drawing it to a canvas.
  */
-export const dataURLToImageData = async (
-  dataURL: string,
-  width: number,
-  height: number
-): Promise<ImageData> =>
+export const dataURLToImageData = async (dataURL: string, width: number, height: number): Promise<ImageData> =>
   new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas');
     canvas.width = width;

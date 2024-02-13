@@ -1,9 +1,6 @@
 import type { TypesafeActive, TypesafeDroppableData } from 'features/dnd/types';
 
-export const isValidDrop = (
-  overData: TypesafeDroppableData | undefined,
-  active: TypesafeActive | null
-) => {
+export const isValidDrop = (overData: TypesafeDroppableData | undefined, active: TypesafeActive | null) => {
   if (!overData || !active?.data.current) {
     return false;
   }
@@ -30,9 +27,7 @@ export const isValidDrop = (
       // If the board is the same, don't allow the drop
 
       // Check the payload types
-      const isPayloadValid = ['IMAGE_DTO', 'GALLERY_SELECTION'].includes(
-        payloadType
-      );
+      const isPayloadValid = ['IMAGE_DTO', 'GALLERY_SELECTION'].includes(payloadType);
       if (!isPayloadValid) {
         return false;
       }
@@ -59,9 +54,7 @@ export const isValidDrop = (
       // If the board is the same, don't allow the drop
 
       // Check the payload types
-      const isPayloadValid = ['IMAGE_DTO', 'GALLERY_SELECTION'].includes(
-        payloadType
-      );
+      const isPayloadValid = ['IMAGE_DTO', 'GALLERY_SELECTION'].includes(payloadType);
       if (!isPayloadValid) {
         return false;
       }

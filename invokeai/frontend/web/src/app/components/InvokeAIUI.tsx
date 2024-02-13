@@ -10,13 +10,16 @@ import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { $galleryHeader } from 'app/store/nanostores/galleryHeader';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import { $logo } from 'app/store/nanostores/logo';
+import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
 import { $projectId } from 'app/store/nanostores/projectId';
 import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
 import { $store } from 'app/store/nanostores/store';
+import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import { createStore } from 'app/store/store';
 import type { PartialAppConfig } from 'app/types/invokeai';
 import Loading from 'common/components/Loading/Loading';
 import AppDndContext from 'features/dnd/components/AppDndContext';
+import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import type { PropsWithChildren, ReactNode } from 'react';
 import React, { lazy, memo, useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
@@ -28,6 +31,7 @@ const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
 
 interface Props extends PropsWithChildren {
   apiUrl?: string;
+  openAPISchemaUrl?: string;
   token?: string;
   config?: PartialAppConfig;
   customNavComponent?: ReactNode;
@@ -43,10 +47,12 @@ interface Props extends PropsWithChildren {
   socketOptions?: Partial<ManagerOptions & SocketOptions>;
   isDebugging?: boolean;
   logo?: ReactNode;
+  workflowCategories?: WorkflowCategory[];
 }
 
 const InvokeAIUI = ({
   apiUrl,
+  openAPISchemaUrl,
   token,
   config,
   customNavComponent,
@@ -59,6 +65,7 @@ const InvokeAIUI = ({
   socketOptions,
   isDebugging = false,
   logo,
+  workflowCategories,
 }: Props) => {
   useEffect(() => {
     // configure API client token
@@ -124,6 +131,16 @@ const InvokeAIUI = ({
   }, [customNavComponent]);
 
   useEffect(() => {
+    if (openAPISchemaUrl) {
+      $openAPISchemaUrl.set(openAPISchemaUrl);
+    }
+
+    return () => {
+      $openAPISchemaUrl.set(undefined);
+    };
+  }, [openAPISchemaUrl]);
+
+  useEffect(() => {
     if (galleryHeader) {
       $galleryHeader.set(galleryHeader);
     }
@@ -142,6 +159,16 @@ const InvokeAIUI = ({
       $logo.set(undefined);
     };
   }, [logo]);
+
+  useEffect(() => {
+    if (workflowCategories) {
+      $workflowCategories.set(workflowCategories);
+    }
+
+    return () => {
+      $workflowCategories.set([]);
+    };
+  }, [workflowCategories]);
 
   useEffect(() => {
     if (socketOptions) {

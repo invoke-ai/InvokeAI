@@ -9,17 +9,10 @@ import type {
   NonNullableGraph,
 } from 'services/api/types';
 
-import {
-  CANVAS_COHERENCE_DENOISE_LATENTS,
-  IP_ADAPTER_COLLECT,
-} from './constants';
+import { CANVAS_COHERENCE_DENOISE_LATENTS, IP_ADAPTER_COLLECT } from './constants';
 import { upsertMetadata } from './metadata';
 
-export const addIPAdapterToLinearGraph = (
-  state: RootState,
-  graph: NonNullableGraph,
-  baseNodeId: string
-): void => {
+export const addIPAdapterToLinearGraph = (state: RootState, graph: NonNullableGraph, baseNodeId: string): void => {
   const validIPAdapters = selectValidIPAdapters(state.controlAdapters).filter(
     (ca) => ca.model?.base_model === state.generation.model?.base_model
   );
@@ -76,13 +69,7 @@ export const addIPAdapterToLinearGraph = (
 
       graph.nodes[ipAdapterNode.id] = ipAdapterNode as IPAdapterInvocation;
 
-      ipAdapterMetdata.push(
-        omit(ipAdapterNode, [
-          'id',
-          'type',
-          'is_intermediate',
-        ]) as IPAdapterMetadataField
-      );
+      ipAdapterMetdata.push(omit(ipAdapterNode, ['id', 'type', 'is_intermediate']) as IPAdapterMetadataField);
 
       graph.edges.push({
         source: { node_id: ipAdapterNode.id, field: 'ip_adapter' },

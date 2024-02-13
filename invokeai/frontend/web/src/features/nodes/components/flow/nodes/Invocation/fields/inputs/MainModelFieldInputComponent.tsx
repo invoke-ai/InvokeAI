@@ -1,14 +1,9 @@
-import { Flex } from '@chakra-ui/react';
+import { Combobox, Flex, FormControl } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
+import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { SyncModelsIconButton } from 'features/modelManager/components/SyncModels/SyncModelsIconButton';
 import { fieldMainModelValueChanged } from 'features/nodes/store/nodesSlice';
-import type {
-  MainModelFieldInputInstance,
-  MainModelFieldInputTemplate,
-} from 'features/nodes/types/field';
+import type { MainModelFieldInputInstance, MainModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
 import { NON_SDXL_MAIN_MODELS } from 'services/api/constants';
 import type { MainModelConfigEntity } from 'services/api/endpoints/models';
@@ -16,10 +11,7 @@ import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 
 import type { FieldComponentProps } from './types';
 
-type Props = FieldComponentProps<
-  MainModelFieldInputInstance,
-  MainModelFieldInputTemplate
->;
+type Props = FieldComponentProps<MainModelFieldInputInstance, MainModelFieldInputTemplate>;
 
 const MainModelFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
@@ -40,29 +32,24 @@ const MainModelFieldInputComponent = (props: Props) => {
     },
     [dispatch, field.name, nodeId]
   );
-  const { options, value, onChange, placeholder, noOptionsMessage } =
-    useGroupedModelInvSelect({
-      modelEntities: data,
-      onChange: _onChange,
-      isLoading,
-      selectedModel: field.value,
-    });
+  const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
+    modelEntities: data,
+    onChange: _onChange,
+    isLoading,
+    selectedModel: field.value,
+  });
 
   return (
     <Flex w="full" alignItems="center" gap={2}>
-      <InvControl
-        className="nowheel nodrag"
-        isDisabled={!options.length}
-        isInvalid={!value}
-      >
-        <InvSelect
+      <FormControl className="nowheel nodrag" isDisabled={!options.length} isInvalid={!value}>
+        <Combobox
           value={value}
           placeholder={placeholder}
           options={options}
           onChange={onChange}
           noOptionsMessage={noOptionsMessage}
         />
-      </InvControl>
+      </FormControl>
       <SyncModelsIconButton className="nodrag" />
     </Flex>
   );

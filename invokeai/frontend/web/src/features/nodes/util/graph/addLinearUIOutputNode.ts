@@ -1,9 +1,6 @@
 import type { RootState } from 'app/store/store';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import type {
-  LinearUIOutputInvocation,
-  NonNullableGraph,
-} from 'services/api/types';
+import type { LinearUIOutputInvocation, NonNullableGraph } from 'services/api/types';
 
 import {
   CANVAS_OUTPUT,
@@ -17,13 +14,9 @@ import {
 /**
  * Set the `use_cache` field on the linear/canvas graph's final image output node to False.
  */
-export const addLinearUIOutputNode = (
-  state: RootState,
-  graph: NonNullableGraph
-): void => {
+export const addLinearUIOutputNode = (state: RootState, graph: NonNullableGraph): void => {
   const activeTabName = activeTabNameSelector(state);
-  const is_intermediate =
-    activeTabName === 'unifiedCanvas' ? !state.canvas.shouldAutoSave : false;
+  const is_intermediate = activeTabName === 'unifiedCanvas' ? !state.canvas.shouldAutoSave : false;
   const { autoAddBoardId } = state.gallery;
 
   const linearUIOutputNode: LinearUIOutputInvocation = {

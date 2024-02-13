@@ -173,10 +173,10 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Literal, Optional, Union, get_type_hints
+from typing import Any, ClassVar, Dict, List, Literal, Optional, Union
 
 from omegaconf import DictConfig, OmegaConf
-from pydantic import Field, TypeAdapter
+from pydantic import Field
 from pydantic.config import JsonDict
 from pydantic_settings import SettingsConfigDict
 
@@ -251,7 +251,11 @@ class InvokeAIAppConfig(InvokeAISettings):
     log_level           : Literal["debug", "info", "warning", "error", "critical"] = Field(default="info", description="Emit logging messages at this level or  higher", json_schema_extra=Categories.Logging)
     log_sql             : bool = Field(default=False, description="Log SQL queries", json_schema_extra=Categories.Logging)
 
+    # Development
     dev_reload          : bool = Field(default=False, description="Automatically reload when Python sources are changed.", json_schema_extra=Categories.Development)
+    profile_graphs      : bool = Field(default=False, description="Enable graph profiling", json_schema_extra=Categories.Development)
+    profile_prefix      : Optional[str] = Field(default=None, description="An optional prefix for profile output files.", json_schema_extra=Categories.Development)
+    profiles_dir        : Path = Field(default=Path('profiles'), description="Directory for graph profiles", json_schema_extra=Categories.Development)
 
     version             : bool = Field(default=False, description="Show InvokeAI version and exit", json_schema_extra=Categories.Other)
 
@@ -280,6 +284,9 @@ class InvokeAIAppConfig(InvokeAISettings):
     deny_nodes          : Optional[List[str]] = Field(default=None, description="List of nodes to deny. Omit to deny none.", json_schema_extra=Categories.Nodes)
     node_cache_size     : int = Field(default=512, description="How many cached nodes to keep in memory", json_schema_extra=Categories.Nodes)
 
+    # MODEL IMPORT
+    civitai_api_key       : Optional[str] = Field(default=os.environ.get("CIVITAI_API_KEY"), description="API key for CivitAI", json_schema_extra=Categories.Other)
+
     # DEPRECATED FIELDS - STILL HERE IN ORDER TO OBTAN VALUES FROM PRE-3.1 CONFIG FILES
     always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", json_schema_extra=Categories.MemoryPerformance)
     max_cache_size      : Optional[float] = Field(default=None, gt=0, description="Maximum memory amount used by model cache for rapid switching", json_schema_extra=Categories.MemoryPerformance)
@@ -289,6 +296,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     lora_dir            : Optional[Path] = Field(default=None, description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', json_schema_extra=Categories.Paths)
     embedding_dir       : Optional[Path] = Field(default=None, description='Path to a directory of Textual Inversion embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
     controlnet_dir      : Optional[Path] = Field(default=None, description='Path to a directory of ControlNet embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
+
     # this is not referred to in the source code and can be removed entirely
     #free_gpu_mem        : Optional[bool] = Field(default=None, description="If true, purge model from GPU after each generation.", json_schema_extra=Categories.MemoryPerformance)
 
@@ -328,13 +336,9 @@ class InvokeAIAppConfig(InvokeAISettings):
         super().parse_args(argv)
 
         if self.singleton_init and not clobber:
-            hints = get_type_hints(self.__class__)
-            for k in self.singleton_init:
-                setattr(
-                    self,
-                    k,
-                    TypeAdapter(hints[k]).validate_python(self.singleton_init[k]),
-                )
+            # When setting values in this way, set validate_assignment to true if you want to validate the value.
+            for k, v in self.singleton_init.items():
+                setattr(self, k, v)
 
     @classmethod
     def get_config(cls, **kwargs: Any) -> InvokeAIAppConfig:
@@ -448,6 +452,11 @@ class InvokeAIAppConfig(InvokeAISettings):
         """Return true if enable_xformers is false (reversed logic) and attention type is not set to xformers."""
         disabled_in_config = not self.xformers_enabled
         return disabled_in_config and self.attention_type != "xformers"
+
+    @property
+    def profiles_path(self) -> Path:
+        """Path to the graph profiles directory."""
+        return self._resolve(self.profiles_dir)
 
     @staticmethod
     def find_root() -> Path:

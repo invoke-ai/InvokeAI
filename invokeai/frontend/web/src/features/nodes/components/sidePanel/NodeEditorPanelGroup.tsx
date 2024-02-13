@@ -1,6 +1,6 @@
 import 'reactflow/dist/style.css';
 
-import { Flex } from '@chakra-ui/react';
+import { Flex } from '@invoke-ai/ui-library';
 import QueueControls from 'features/queue/components/QueueControls';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
@@ -38,10 +38,7 @@ const NodeEditorPanelGroup = () => {
         <Panel id="workflow" collapsible minSize={25}>
           <WorkflowPanel />
         </Panel>
-        <ResizeHandle
-          orientation="horizontal"
-          onDoubleClick={handleDoubleClickHandle}
-        />
+        <ResizeHandle orientation="horizontal" onDoubleClick={handleDoubleClickHandle} />
         <Panel id="inspector" collapsible minSize={25}>
           <InspectorPanel />
         </Panel>

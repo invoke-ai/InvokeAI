@@ -1,4 +1,4 @@
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
+import { ButtonGroup } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetInvocationCacheStatusQuery } from 'services/api/endpoints/appInfo';
@@ -34,10 +34,10 @@ const InvocationCacheStatus = () => {
         label={t('invocationCache.maxCacheSize')}
         value={cacheStatus?.max_size ?? 0}
       />
-      <InvButtonGroup w={24} orientation="vertical" size="sm">
+      <ButtonGroup w={24} orientation="vertical" size="sm">
         <ClearInvocationCacheButton />
         <ToggleInvocationCacheButton />
-      </InvButtonGroup>
+      </ButtonGroup>
     </StatusStatGroup>
   );
 };

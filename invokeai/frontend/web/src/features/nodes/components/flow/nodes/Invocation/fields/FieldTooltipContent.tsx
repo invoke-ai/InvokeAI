@@ -1,12 +1,8 @@
-import { Flex } from '@chakra-ui/react';
-import { InvText } from 'common/components/InvText/wrapper';
+import { Flex, Text } from '@invoke-ai/ui-library';
 import { useFieldInstance } from 'features/nodes/hooks/useFieldData';
 import { useFieldTemplate } from 'features/nodes/hooks/useFieldTemplate';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
-import {
-  isFieldInputInstance,
-  isFieldInputTemplate,
-} from 'features/nodes/types/field';
+import { isFieldInputInstance, isFieldInputTemplate } from 'features/nodes/types/field';
 import { startCase } from 'lodash-es';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -44,21 +40,21 @@ const FieldTooltipContent = ({ nodeId, fieldName, kind }: Props) => {
 
   return (
     <Flex flexDir="column">
-      <InvText fontWeight="semibold">{fieldTitle}</InvText>
+      <Text fontWeight="semibold">{fieldTitle}</Text>
       {fieldTemplate && (
-        <InvText opacity={0.7} fontStyle="oblique 5deg">
+        <Text opacity={0.7} fontStyle="oblique 5deg">
           {fieldTemplate.description}
-        </InvText>
+        </Text>
       )}
       {fieldTypeName && (
-        <InvText>
+        <Text>
           {t('parameters.type')}: {fieldTypeName}
-        </InvText>
+        </Text>
       )}
       {isInputTemplate && (
-        <InvText>
+        <Text>
           {t('common.input')}: {startCase(fieldTemplate.input)}
-        </InvText>
+        </Text>
       )}
     </Flex>
   );

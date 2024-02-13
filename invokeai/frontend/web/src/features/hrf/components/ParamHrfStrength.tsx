@@ -1,6 +1,5 @@
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setHrfStrength } from 'features/hrf/store/hrfSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,12 +9,8 @@ const ParamHrfStrength = () => {
   const initial = useAppSelector((s) => s.config.sd.hrfStrength.initial);
   const sliderMin = useAppSelector((s) => s.config.sd.hrfStrength.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.hrfStrength.sliderMax);
-  const numberInputMin = useAppSelector(
-    (s) => s.config.sd.hrfStrength.numberInputMin
-  );
-  const numberInputMax = useAppSelector(
-    (s) => s.config.sd.hrfStrength.numberInputMax
-  );
+  const numberInputMin = useAppSelector((s) => s.config.sd.hrfStrength.numberInputMin);
+  const numberInputMax = useAppSelector((s) => s.config.sd.hrfStrength.numberInputMax);
   const coarseStep = useAppSelector((s) => s.config.sd.hrfStrength.coarseStep);
   const fineStep = useAppSelector((s) => s.config.sd.hrfStrength.fineStep);
   const dispatch = useAppDispatch();
@@ -29,8 +24,9 @@ const ParamHrfStrength = () => {
   );
 
   return (
-    <InvControl label={t('parameters.denoisingStrength')}>
-      <InvSlider
+    <FormControl>
+      <FormLabel>{t('parameters.denoisingStrength')}</FormLabel>
+      <CompositeSlider
         min={sliderMin}
         max={sliderMax}
         step={coarseStep}
@@ -39,11 +35,17 @@ const ParamHrfStrength = () => {
         defaultValue={initial}
         onChange={onChange}
         marks
-        withNumberInput
-        numberInputMin={numberInputMin}
-        numberInputMax={numberInputMax}
       />
-    </InvControl>
+      <CompositeNumberInput
+        min={numberInputMin}
+        max={numberInputMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        value={hrfStrength}
+        defaultValue={initial}
+        onChange={onChange}
+      />
+    </FormControl>
   );
 };
 

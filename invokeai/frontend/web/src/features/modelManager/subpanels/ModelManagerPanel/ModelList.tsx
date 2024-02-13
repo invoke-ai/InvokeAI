@@ -1,23 +1,12 @@
-import { Flex, Spinner } from '@chakra-ui/react';
+import { Button, ButtonGroup, Flex, FormControl, FormLabel, Input, Spinner, Text } from '@invoke-ai/ui-library';
 import type { EntityState } from '@reduxjs/toolkit';
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvInput } from 'common/components/InvInput/InvInput';
-import { InvText } from 'common/components/InvText/wrapper';
 import { forEach } from 'lodash-es';
 import type { ChangeEvent, PropsWithChildren } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_BASE_MODELS } from 'services/api/constants';
-import type {
-  LoRAModelConfigEntity,
-  MainModelConfigEntity,
-} from 'services/api/endpoints/models';
-import {
-  useGetLoRAModelsQuery,
-  useGetMainModelsQuery,
-} from 'services/api/endpoints/models';
+import type { LoRAModelConfigEntity, MainModelConfigEntity } from 'services/api/endpoints/models';
+import { useGetLoRAModelsQuery, useGetMainModelsQuery } from 'services/api/endpoints/models';
 
 import ModelListItem from './ModelListItem';
 
@@ -36,44 +25,28 @@ const ModelList = (props: ModelListProps) => {
   const { selectedModelId, setSelectedModelId } = props;
   const { t } = useTranslation();
   const [nameFilter, setNameFilter] = useState<string>('');
-  const [modelFormatFilter, setModelFormatFilter] =
-    useState<CombinedModelFormat>('all');
+  const [modelFormatFilter, setModelFormatFilter] = useState<CombinedModelFormat>('all');
 
-  const { filteredDiffusersModels, isLoadingDiffusersModels } =
-    useGetMainModelsQuery(ALL_BASE_MODELS, {
-      selectFromResult: ({ data, isLoading }) => ({
-        filteredDiffusersModels: modelsFilter(
-          data,
-          'main',
-          'diffusers',
-          nameFilter
-        ),
-        isLoadingDiffusersModels: isLoading,
-      }),
-    });
+  const { filteredDiffusersModels, isLoadingDiffusersModels } = useGetMainModelsQuery(ALL_BASE_MODELS, {
+    selectFromResult: ({ data, isLoading }) => ({
+      filteredDiffusersModels: modelsFilter(data, 'main', 'diffusers', nameFilter),
+      isLoadingDiffusersModels: isLoading,
+    }),
+  });
 
-  const { filteredCheckpointModels, isLoadingCheckpointModels } =
-    useGetMainModelsQuery(ALL_BASE_MODELS, {
-      selectFromResult: ({ data, isLoading }) => ({
-        filteredCheckpointModels: modelsFilter(
-          data,
-          'main',
-          'checkpoint',
-          nameFilter
-        ),
-        isLoadingCheckpointModels: isLoading,
-      }),
-    });
+  const { filteredCheckpointModels, isLoadingCheckpointModels } = useGetMainModelsQuery(ALL_BASE_MODELS, {
+    selectFromResult: ({ data, isLoading }) => ({
+      filteredCheckpointModels: modelsFilter(data, 'main', 'checkpoint', nameFilter),
+      isLoadingCheckpointModels: isLoading,
+    }),
+  });
 
-  const { filteredLoraModels, isLoadingLoraModels } = useGetLoRAModelsQuery(
-    undefined,
-    {
-      selectFromResult: ({ data, isLoading }) => ({
-        filteredLoraModels: modelsFilter(data, 'lora', undefined, nameFilter),
-        isLoadingLoraModels: isLoading,
-      }),
-    }
-  );
+  const { filteredLoraModels, isLoadingLoraModels } = useGetLoRAModelsQuery(undefined, {
+    selectFromResult: ({ data, isLoading }) => ({
+      filteredLoraModels: modelsFilter(data, 'lora', undefined, nameFilter),
+      isLoadingLoraModels: isLoading,
+    }),
+  });
 
   const handleSearchFilter = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setNameFilter(e.target.value);
@@ -82,51 +55,37 @@ const ModelList = (props: ModelListProps) => {
   return (
     <Flex flexDirection="column" rowGap={4} width="50%" minWidth="50%">
       <Flex flexDirection="column" gap={4} paddingInlineEnd={4}>
-        <InvButtonGroup>
-          <InvButton
-            onClick={setModelFormatFilter.bind(null, 'all')}
-            isChecked={modelFormatFilter === 'all'}
-            size="sm"
-          >
+        <ButtonGroup>
+          <Button onClick={setModelFormatFilter.bind(null, 'all')} isChecked={modelFormatFilter === 'all'} size="sm">
             {t('modelManager.allModels')}
-          </InvButton>
-          <InvButton
+          </Button>
+          <Button
             size="sm"
             onClick={setModelFormatFilter.bind(null, 'diffusers')}
             isChecked={modelFormatFilter === 'diffusers'}
           >
             {t('modelManager.diffusersModels')}
-          </InvButton>
-          <InvButton
+          </Button>
+          <Button
             size="sm"
             onClick={setModelFormatFilter.bind(null, 'checkpoint')}
             isChecked={modelFormatFilter === 'checkpoint'}
           >
             {t('modelManager.checkpointModels')}
-          </InvButton>
-          <InvButton
-            size="sm"
-            onClick={setModelFormatFilter.bind(null, 'lora')}
-            isChecked={modelFormatFilter === 'lora'}
-          >
+          </Button>
+          <Button size="sm" onClick={setModelFormatFilter.bind(null, 'lora')} isChecked={modelFormatFilter === 'lora'}>
             {t('modelManager.loraModels')}
-          </InvButton>
-        </InvButtonGroup>
+          </Button>
+        </ButtonGroup>
 
-        <InvControl label={t('modelManager.search')}>
-          <InvInput onChange={handleSearchFilter} />
-        </InvControl>
+        <FormControl>
+          <FormLabel>{t('modelManager.search')}</FormLabel>
+          <Input onChange={handleSearchFilter} />
+        </FormControl>
 
-        <Flex
-          flexDirection="column"
-          gap={4}
-          maxHeight={window.innerHeight - 280}
-          overflow="scroll"
-        >
+        <Flex flexDirection="column" gap={4} maxHeight={window.innerHeight - 280} overflow="scroll">
           {/* Diffusers List */}
-          {isLoadingDiffusersModels && (
-            <FetchingModelsLoader loadingMessage="Loading Diffusers..." />
-          )}
+          {isLoadingDiffusersModels && <FetchingModelsLoader loadingMessage="Loading Diffusers..." />}
           {['all', 'diffusers'].includes(modelFormatFilter) &&
             !isLoadingDiffusersModels &&
             filteredDiffusersModels.length > 0 && (
@@ -138,9 +97,7 @@ const ModelList = (props: ModelListProps) => {
               />
             )}
           {/* Checkpoints List */}
-          {isLoadingCheckpointModels && (
-            <FetchingModelsLoader loadingMessage="Loading Checkpoints..." />
-          )}
+          {isLoadingCheckpointModels && <FetchingModelsLoader loadingMessage="Loading Checkpoints..." />}
           {['all', 'checkpoint'].includes(modelFormatFilter) &&
             !isLoadingCheckpointModels &&
             filteredCheckpointModels.length > 0 && (
@@ -153,19 +110,15 @@ const ModelList = (props: ModelListProps) => {
             )}
 
           {/* LoRAs List */}
-          {isLoadingLoraModels && (
-            <FetchingModelsLoader loadingMessage="Loading LoRAs..." />
+          {isLoadingLoraModels && <FetchingModelsLoader loadingMessage="Loading LoRAs..." />}
+          {['all', 'lora'].includes(modelFormatFilter) && !isLoadingLoraModels && filteredLoraModels.length > 0 && (
+            <ModelListWrapper
+              title="LoRAs"
+              modelList={filteredLoraModels}
+              selected={{ selectedModelId, setSelectedModelId }}
+              key="loras"
+            />
           )}
-          {['all', 'lora'].includes(modelFormatFilter) &&
-            !isLoadingLoraModels &&
-            filteredLoraModels.length > 0 && (
-              <ModelListWrapper
-                title="LoRAs"
-                modelList={filteredLoraModels}
-                selected={{ selectedModelId, setSelectedModelId }}
-                key="loras"
-              />
-            )}
         </Flex>
       </Flex>
     </Flex>
@@ -186,12 +139,9 @@ const modelsFilter = <T extends MainModelConfigEntity | LoRAModelConfigEntity>(
       return;
     }
 
-    const matchesFilter = model.model_name
-      .toLowerCase()
-      .includes(nameFilter.toLowerCase());
+    const matchesFilter = model.model_name.toLowerCase().includes(nameFilter.toLowerCase());
 
-    const matchesFormat =
-      model_format === undefined || model.model_format === model_format;
+    const matchesFormat = model_format === undefined || model.model_format === model_format;
     const matchesType = model.model_type === model_type;
 
     if (matchesFilter && matchesFormat && matchesType) {
@@ -222,9 +172,9 @@ const ModelListWrapper = memo((props: ModelListWrapperProps) => {
   return (
     <StyledModelContainer>
       <Flex gap={2} flexDir="column">
-        <InvText variant="subtext" fontSize="sm">
+        <Text variant="subtext" fontSize="sm">
           {title}
-        </InvText>
+        </Text>
         {modelList.map((model) => (
           <ModelListItem
             key={model.id}
@@ -240,25 +190,15 @@ const ModelListWrapper = memo((props: ModelListWrapperProps) => {
 
 ModelListWrapper.displayName = 'ModelListWrapper';
 
-const FetchingModelsLoader = memo(
-  ({ loadingMessage }: { loadingMessage?: string }) => {
-    return (
-      <StyledModelContainer>
-        <Flex
-          justifyContent="center"
-          alignItems="center"
-          flexDirection="column"
-          p={4}
-          gap={8}
-        >
-          <Spinner />
-          <InvText variant="subtext">
-            {loadingMessage ? loadingMessage : 'Fetching...'}
-          </InvText>
-        </Flex>
-      </StyledModelContainer>
-    );
-  }
-);
+const FetchingModelsLoader = memo(({ loadingMessage }: { loadingMessage?: string }) => {
+  return (
+    <StyledModelContainer>
+      <Flex justifyContent="center" alignItems="center" flexDirection="column" p={4} gap={8}>
+        <Spinner />
+        <Text variant="subtext">{loadingMessage ? loadingMessage : 'Fetching...'}</Text>
+      </Flex>
+    </StyledModelContainer>
+  );
+});
 
 FetchingModelsLoader.displayName = 'FetchingModelsLoader';

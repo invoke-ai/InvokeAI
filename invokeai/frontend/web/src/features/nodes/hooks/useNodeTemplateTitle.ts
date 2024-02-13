@@ -8,21 +8,15 @@ import { useMemo } from 'react';
 export const useNodeTemplateTitle = (nodeId: string) => {
   const selector = useMemo(
     () =>
-      createSelector(
-        selectNodesSlice,
-        selectNodeTemplatesSlice,
-        (nodes, nodeTemplates) => {
-          const node = nodes.nodes.find((node) => node.id === nodeId);
-          if (!isInvocationNode(node)) {
-            return false;
-          }
-          const nodeTemplate = node
-            ? nodeTemplates.templates[node.data.type]
-            : undefined;
-
-          return nodeTemplate?.title;
+      createSelector(selectNodesSlice, selectNodeTemplatesSlice, (nodes, nodeTemplates) => {
+        const node = nodes.nodes.find((node) => node.id === nodeId);
+        if (!isInvocationNode(node)) {
+          return false;
         }
-      ),
+        const nodeTemplate = node ? nodeTemplates.templates[node.data.type] : undefined;
+
+        return nodeTemplate?.title;
+      }),
     [nodeId]
   );
 

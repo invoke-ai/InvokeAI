@@ -1,5 +1,4 @@
-import { Flex } from '@chakra-ui/layout';
-import { InvHeading } from 'common/components/InvHeading/wrapper';
+import { Flex, Heading } from '@invoke-ai/ui-library';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 
@@ -7,29 +6,25 @@ export type StickyScrollableHeadingProps = {
   title: string;
 };
 
-export const StickyScrollableHeading = memo(
-  (props: StickyScrollableHeadingProps) => {
-    return (
-      <Flex ps={2} pb={4} position="sticky" zIndex={1} top={0} bg="base.800">
-        <InvHeading size="sm">{props.title}</InvHeading>
-      </Flex>
-    );
-  }
-);
+export const StickyScrollableHeading = memo((props: StickyScrollableHeadingProps) => {
+  return (
+    <Flex ps={2} pb={4} position="sticky" zIndex={1} top={0} bg="base.800">
+      <Heading size="sm">{props.title}</Heading>
+    </Flex>
+  );
+});
 
 StickyScrollableHeading.displayName = 'StickyScrollableHeading';
 
 export type StickyScrollableContentProps = PropsWithChildren;
 
-export const StickyScrollableContent = memo(
-  (props: StickyScrollableContentProps) => {
-    return (
-      <Flex p={4} borderRadius="base" bg="base.750" flexDir="column" gap={4}>
-        {props.children}
-      </Flex>
-    );
-  }
-);
+export const StickyScrollableContent = memo((props: StickyScrollableContentProps) => {
+  return (
+    <Flex p={4} borderRadius="base" bg="base.750" flexDir="column" gap={4}>
+      {props.children}
+    </Flex>
+  );
+});
 
 StickyScrollableContent.displayName = 'StickyScrollableContent';
 

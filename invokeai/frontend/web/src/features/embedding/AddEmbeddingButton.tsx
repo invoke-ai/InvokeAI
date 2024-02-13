@@ -1,5 +1,4 @@
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCodeBold } from 'react-icons/pi';
@@ -13,15 +12,15 @@ export const AddEmbeddingButton = memo((props: Props) => {
   const { onOpen, isOpen } = props;
   const { t } = useTranslation();
   return (
-    <InvTooltip label={t('embedding.addEmbedding')}>
-      <InvIconButton
+    <Tooltip label={t('embedding.addEmbedding')}>
+      <IconButton
         variant="promptOverlay"
         isDisabled={isOpen}
         aria-label={t('embedding.addEmbedding')}
         icon={<PiCodeBold />}
         onClick={onOpen}
       />
-    </InvTooltip>
+    </Tooltip>
   );
 });
 

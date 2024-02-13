@@ -62,6 +62,7 @@ export const buildCanvasSDXLOutpaintGraph = (
     negativePrompt,
     model,
     cfgScale: cfg_scale,
+    cfgRescaleMultiplier: cfg_rescale_multiplier,
     scheduler,
     steps,
     seed,
@@ -94,17 +95,14 @@ export const buildCanvasSDXLOutpaintGraph = (
 
   const fp32 = vaePrecision === 'fp32';
   const is_intermediate = true;
-  const isUsingScaledDimensions = ['auto', 'manual'].includes(
-    boundingBoxScaleMethod
-  );
+  const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);
 
   let modelLoaderNodeId = SDXL_MODEL_LOADER;
 
   const use_cpu = shouldUseCpuNoise;
 
   // Construct Style Prompt
-  const { positiveStylePrompt, negativeStylePrompt } =
-    getSDXLStylePrompts(state);
+  const { positiveStylePrompt, negativeStylePrompt } = getSDXLStylePrompts(state);
 
   const graph: NonNullableGraph = {
     id: SDXL_CANVAS_OUTPAINT_GRAPH,
@@ -163,10 +161,9 @@ export const buildCanvasSDXLOutpaintGraph = (
         is_intermediate,
         steps: steps,
         cfg_scale: cfg_scale,
+        cfg_rescale_multiplier,
         scheduler: scheduler,
-        denoising_start: refinerModel
-          ? Math.min(refinerStart, 1 - strength)
-          : 1 - strength,
+        denoising_start: refinerModel ? Math.min(refinerStart, 1 - strength) : 1 - strength,
         denoising_end: refinerModel ? refinerStart : 1,
       },
       [CANVAS_COHERENCE_NOISE]: {
@@ -188,6 +185,7 @@ export const buildCanvasSDXLOutpaintGraph = (
         is_intermediate,
         steps: canvasCoherenceSteps,
         cfg_scale: cfg_scale,
+        cfg_rescale_multiplier,
         scheduler: scheduler,
         denoising_start: 1 - canvasCoherenceStrength,
         denoising_end: 1,
@@ -496,10 +494,8 @@ export const buildCanvasSDXLOutpaintGraph = (
 
     (graph.nodes[NOISE] as NoiseInvocation).width = scaledWidth;
     (graph.nodes[NOISE] as NoiseInvocation).height = scaledHeight;
-    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).width =
-      scaledWidth;
-    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).height =
-      scaledHeight;
+    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).width = scaledWidth;
+    (graph.nodes[CANVAS_COHERENCE_NOISE] as NoiseInvocation).height = scaledHeight;
 
     // Connect Nodes
     graph.edges.push(
@@ -593,9 +589,7 @@ export const buildCanvasSDXLOutpaintGraph = (
   } else {
     // Add Images To Nodes
     graph.nodes[INPAINT_INFILL] = {
-      ...(graph.nodes[INPAINT_INFILL] as
-        | InfillTileInvocation
-        | InfillPatchMatchInvocation),
+      ...(graph.nodes[INPAINT_INFILL] as InfillTileInvocation | InfillPatchMatchInvocation),
       image: canvasInitImage,
     };
 
@@ -761,13 +755,7 @@ export const buildCanvasSDXLOutpaintGraph = (
 
   // Add Refiner if enabled
   if (refinerModel) {
-    addSDXLRefinerToGraph(
-      state,
-      graph,
-      CANVAS_COHERENCE_DENOISE_LATENTS,
-      modelLoaderNodeId,
-      canvasInitImage
-    );
+    addSDXLRefinerToGraph(state, graph, CANVAS_COHERENCE_DENOISE_LATENTS, modelLoaderNodeId, canvasInitImage);
     if (seamlessXAxis || seamlessYAxis) {
       modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
     }

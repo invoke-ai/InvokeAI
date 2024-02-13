@@ -1,11 +1,8 @@
+import { IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
-import {
-  getIsSizeTooLarge,
-  getIsSizeTooSmall,
-} from 'features/parameters/util/optimalDimension';
+import { getIsSizeTooLarge, getIsSizeTooSmall } from 'features/parameters/util/optimalDimension';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RiSparklingFill } from 'react-icons/ri';
@@ -36,7 +33,7 @@ export const SetOptimalSizeButton = memo(() => {
   }, [isSizeTooLarge, isSizeTooSmall, t]);
 
   return (
-    <InvIconButton
+    <IconButton
       tooltip={tooltip}
       aria-label={t('parameters.setToOptimalSize')}
       onClick={onClick}

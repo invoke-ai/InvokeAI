@@ -1,30 +1,21 @@
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { Combobox, FormControl } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
 import { fieldBoardValueChanged } from 'features/nodes/store/nodesSlice';
-import type {
-  BoardFieldInputInstance,
-  BoardFieldInputTemplate,
-} from 'features/nodes/types/field';
+import type { BoardFieldInputInstance, BoardFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 
 import type { FieldComponentProps } from './types';
 
-const BoardFieldInputComponent = (
-  props: FieldComponentProps<BoardFieldInputInstance, BoardFieldInputTemplate>
-) => {
+const BoardFieldInputComponent = (props: FieldComponentProps<BoardFieldInputInstance, BoardFieldInputTemplate>) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const { options, hasBoards } = useListAllBoardsQuery(undefined, {
     selectFromResult: ({ data }) => {
-      const options: InvSelectOption[] = [
+      const options: ComboboxOption[] = [
         {
           label: 'None',
           value: 'none',
@@ -42,7 +33,7 @@ const BoardFieldInputComponent = (
     },
   });
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!v) {
         return;
@@ -58,23 +49,20 @@ const BoardFieldInputComponent = (
     [dispatch, field.name, nodeId]
   );
 
-  const value = useMemo(
-    () => options.find((o) => o.value === field.value?.board_id),
-    [options, field.value]
-  );
+  const value = useMemo(() => options.find((o) => o.value === field.value?.board_id), [options, field.value]);
 
   const noOptionsMessage = useCallback(() => t('boards.noMatching'), [t]);
 
   return (
-    <InvControl className="nowheel nodrag" isDisabled={!hasBoards}>
-      <InvSelect
+    <FormControl className="nowheel nodrag" isDisabled={!hasBoards}>
+      <Combobox
         value={value}
         options={options}
         onChange={onChange}
         placeholder={t('boards.selectBoard')}
         noOptionsMessage={noOptionsMessage}
       />
-    </InvControl>
+    </FormControl>
   );
 };
 

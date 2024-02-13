@@ -1,10 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
-import {
-  roundDownToMultiple,
-  roundToMultiple,
-} from 'common/util/roundDownToMultiple';
+import type { PersistConfig, RootState } from 'app/store/store';
+import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import calculateCoordinates from 'features/canvas/util/calculateCoordinates';
 import calculateScale from 'features/canvas/util/calculateScale';
 import { STAGE_PADDING_PERCENTAGE } from 'features/canvas/util/constants';
@@ -14,10 +11,7 @@ import { initialAspectRatioState } from 'features/parameters/components/ImageSiz
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import { modelChanged } from 'features/parameters/store/generationSlice';
 import type { PayloadActionWithOptimalDimension } from 'features/parameters/store/types';
-import {
-  getIsSizeOptimal,
-  getOptimalDimension,
-} from 'features/parameters/util/optimalDimension';
+import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { clamp, cloneDeep } from 'lodash-es';
 import type { RgbaColor } from 'react-colorful';
@@ -105,10 +99,7 @@ const setBoundingBoxDimensionsReducer = (
   };
   state.boundingBoxDimensions = newDimensions;
   if (state.boundingBoxScaleMethod === 'auto') {
-    const scaledDimensions = getScaledBoundingBoxDimensions(
-      newDimensions,
-      optimalDimension
-    );
+    const scaledDimensions = getScaledBoundingBoxDimensions(newDimensions, optimalDimension);
     state.scaledBoundingBoxDimensions = scaledDimensions;
   }
 };
@@ -131,9 +122,7 @@ export const canvasSlice = createSlice({
     },
     clearMask: (state) => {
       state.pastLayerStates.push(cloneDeep(state.layerState));
-      state.layerState.objects = state.layerState.objects.filter(
-        (obj) => !isCanvasMaskLine(obj)
-      );
+      state.layerState.objects = state.layerState.objects.filter((obj) => !isCanvasMaskLine(obj));
       state.futureLayerStates = [];
       state.shouldPreserveMaskedArea = false;
     },
@@ -157,32 +146,17 @@ export const canvasSlice = createSlice({
         const { stageDimensions } = state;
 
         const newBoundingBoxDimensions = {
-          width: roundDownToMultiple(
-            clamp(width, CANVAS_GRID_SIZE_FINE, optimalDimension),
-            CANVAS_GRID_SIZE_FINE
-          ),
-          height: roundDownToMultiple(
-            clamp(height, CANVAS_GRID_SIZE_FINE, optimalDimension),
-            CANVAS_GRID_SIZE_FINE
-          ),
+          width: roundDownToMultiple(clamp(width, CANVAS_GRID_SIZE_FINE, optimalDimension), CANVAS_GRID_SIZE_FINE),
+          height: roundDownToMultiple(clamp(height, CANVAS_GRID_SIZE_FINE, optimalDimension), CANVAS_GRID_SIZE_FINE),
         };
 
         const newBoundingBoxCoordinates = {
-          x: roundToMultiple(
-            width / 2 - newBoundingBoxDimensions.width / 2,
-            CANVAS_GRID_SIZE_FINE
-          ),
-          y: roundToMultiple(
-            height / 2 - newBoundingBoxDimensions.height / 2,
-            CANVAS_GRID_SIZE_FINE
-          ),
+          x: roundToMultiple(width / 2 - newBoundingBoxDimensions.width / 2, CANVAS_GRID_SIZE_FINE),
+          y: roundToMultiple(height / 2 - newBoundingBoxDimensions.height / 2, CANVAS_GRID_SIZE_FINE),
         };
 
         if (state.boundingBoxScaleMethod === 'auto') {
-          const scaledDimensions = getScaledBoundingBoxDimensions(
-            newBoundingBoxDimensions,
-            optimalDimension
-          );
+          const scaledDimensions = getScaledBoundingBoxDimensions(newBoundingBoxDimensions, optimalDimension);
           state.scaledBoundingBoxDimensions = scaledDimensions;
         }
 
@@ -247,10 +221,7 @@ export const canvasSlice = createSlice({
     setStageScale: (state, action: PayloadAction<number>) => {
       state.stageScale = action.payload;
     },
-    setShouldDarkenOutsideBoundingBox: (
-      state,
-      action: PayloadAction<boolean>
-    ) => {
+    setShouldDarkenOutsideBoundingBox: (state, action: PayloadAction<boolean>) => {
       state.shouldDarkenOutsideBoundingBox = action.payload;
     },
     clearCanvasHistory: (state) => {
@@ -306,8 +277,7 @@ export const canvasSlice = createSlice({
         imageName: image.image_name,
       });
 
-      state.layerState.stagingArea.selectedImageIndex =
-        state.layerState.stagingArea.images.length - 1;
+      state.layerState.stagingArea.selectedImageIndex = state.layerState.stagingArea.images.length - 1;
 
       state.futureLayerStates = [];
     },
@@ -318,9 +288,7 @@ export const canvasSlice = createSlice({
         state.pastLayerStates.shift();
       }
 
-      state.layerState.stagingArea = cloneDeep(
-        cloneDeep(initialLayerState)
-      ).stagingArea;
+      state.layerState.stagingArea = cloneDeep(cloneDeep(initialLayerState)).stagingArea;
 
       state.futureLayerStates = [];
       state.shouldShowStagingOutline = true;
@@ -328,8 +296,7 @@ export const canvasSlice = createSlice({
       state.batchIds = [];
     },
     addFillRect: (state) => {
-      const { boundingBoxCoordinates, boundingBoxDimensions, brushColor } =
-        state;
+      const { boundingBoxCoordinates, boundingBoxDimensions, brushColor } = state;
 
       state.pastLayerStates.push(cloneDeep(state.layerState));
 
@@ -365,12 +332,8 @@ export const canvasSlice = createSlice({
 
       state.futureLayerStates = [];
     },
-    addLine: (
-      state,
-      action: PayloadAction<{ points: number[]; tool: CanvasTool }>
-    ) => {
-      const { layer, brushColor, brushSize, shouldRestrictStrokesToBox } =
-        state;
+    addLine: (state, action: PayloadAction<{ points: number[]; tool: CanvasTool }>) => {
+      const { layer, brushColor, brushSize, shouldRestrictStrokesToBox } = state;
       const { points, tool } = action.payload;
 
       if (tool === 'move' || tool === 'colorPicker') {
@@ -380,8 +343,7 @@ export const canvasSlice = createSlice({
       const newStrokeWidth = brushSize / 2;
 
       // set & then spread this to only conditionally add the "color" key
-      const newColor =
-        layer === 'base' && tool === 'brush' ? { color: brushColor } : {};
+      const newColor = layer === 'base' && tool === 'brush' ? { color: brushColor } : {};
 
       state.pastLayerStates.push(cloneDeep(state.layerState));
 
@@ -488,10 +450,7 @@ export const canvasSlice = createSlice({
         1
       );
     },
-    canvasResized: (
-      state,
-      action: PayloadAction<{ width: number; height: number }>
-    ) => {
+    canvasResized: (state, action: PayloadAction<{ width: number; height: number }>) => {
       state.stageDimensions = {
         width: Math.floor(action.payload.width),
         height: Math.floor(action.payload.height),
@@ -540,8 +499,7 @@ export const canvasSlice = createSlice({
       const nextIndex = state.layerState.stagingArea.selectedImageIndex + 1;
       const lastIndex = state.layerState.stagingArea.images.length - 1;
 
-      state.layerState.stagingArea.selectedImageIndex =
-        nextIndex > lastIndex ? 0 : nextIndex;
+      state.layerState.stagingArea.selectedImageIndex = nextIndex > lastIndex ? 0 : nextIndex;
     },
     prevStagingAreaImage: (state) => {
       if (!state.layerState.stagingArea.images.length) {
@@ -551,8 +509,7 @@ export const canvasSlice = createSlice({
       const prevIndex = state.layerState.stagingArea.selectedImageIndex - 1;
       const lastIndex = state.layerState.stagingArea.images.length - 1;
 
-      state.layerState.stagingArea.selectedImageIndex =
-        prevIndex < 0 ? lastIndex : prevIndex;
+      state.layerState.stagingArea.selectedImageIndex = prevIndex < 0 ? lastIndex : prevIndex;
     },
     commitStagingAreaImage: (state) => {
       if (!state.layerState.stagingArea.images.length) {
@@ -582,19 +539,13 @@ export const canvasSlice = createSlice({
       state.batchIds = [];
     },
     setBoundingBoxScaleMethod: {
-      reducer: (
-        state,
-        action: PayloadActionWithOptimalDimension<BoundingBoxScaleMethod>
-      ) => {
+      reducer: (state, action: PayloadActionWithOptimalDimension<BoundingBoxScaleMethod>) => {
         const boundingBoxScaleMethod = action.payload;
         const { optimalDimension } = action.meta;
         state.boundingBoxScaleMethod = boundingBoxScaleMethod;
 
         if (boundingBoxScaleMethod === 'auto') {
-          const scaledDimensions = getScaledBoundingBoxDimensions(
-            state.boundingBoxDimensions,
-            optimalDimension
-          );
+          const scaledDimensions = getScaledBoundingBoxDimensions(state.boundingBoxDimensions, optimalDimension);
           state.scaledBoundingBoxDimensions = scaledDimensions;
         }
       },
@@ -605,25 +556,15 @@ export const canvasSlice = createSlice({
         },
       }),
     },
-    setScaledBoundingBoxDimensions: (
-      state,
-      action: PayloadAction<Partial<Dimensions>>
-    ) => {
+    setScaledBoundingBoxDimensions: (state, action: PayloadAction<Partial<Dimensions>>) => {
       state.scaledBoundingBoxDimensions = {
         ...state.scaledBoundingBoxDimensions,
         ...action.payload,
       };
     },
     setBoundingBoxDimensions: {
-      reducer: (
-        state,
-        action: PayloadActionWithOptimalDimension<Partial<Dimensions>>
-      ) => {
-        setBoundingBoxDimensionsReducer(
-          state,
-          action.payload,
-          action.meta.optimalDimension
-        );
+      reducer: (state, action: PayloadActionWithOptimalDimension<Partial<Dimensions>>) => {
+        setBoundingBoxDimensionsReducer(state, action.payload, action.meta.optimalDimension);
       },
       prepare: (payload: Partial<Dimensions>, optimalDimension: number) => ({
         payload,
@@ -660,10 +601,7 @@ export const canvasSlice = createSlice({
     setShouldAntialias: (state, action: PayloadAction<boolean>) => {
       state.shouldAntialias = action.payload;
     },
-    setShouldCropToBoundingBoxOnSave: (
-      state,
-      action: PayloadAction<boolean>
-    ) => {
+    setShouldCropToBoundingBoxOnSave: (state, action: PayloadAction<boolean>) => {
       state.shouldCropToBoundingBoxOnSave = action.payload;
     },
     setColorPickerColor: (state, action: PayloadAction<RgbaColor>) => {
@@ -688,9 +626,7 @@ export const canvasSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(modelChanged, (state, action) => {
-      if (
-        action.meta.previousModel?.base_model === action.payload?.base_model
-      ) {
+      if (action.meta.previousModel?.base_model === action.payload?.base_model) {
         // The base model hasn't changed, we don't need to optimize the size
         return;
       }
@@ -716,25 +652,15 @@ export const canvasSlice = createSlice({
       }
 
       if (batch_status.in_progress === 0 && batch_status.pending === 0) {
-        state.batchIds = state.batchIds.filter(
-          (id) => id !== batch_status.batch_id
-        );
+        state.batchIds = state.batchIds.filter((id) => id !== batch_status.batch_id);
       }
     });
-    builder.addMatcher(
-      queueApi.endpoints.clearQueue.matchFulfilled,
-      (state) => {
-        state.batchIds = [];
-      }
-    );
-    builder.addMatcher(
-      queueApi.endpoints.cancelByBatchIds.matchFulfilled,
-      (state, action) => {
-        state.batchIds = state.batchIds.filter(
-          (id) => !action.meta.arg.originalArgs.batch_ids.includes(id)
-        );
-      }
-    );
+    builder.addMatcher(queueApi.endpoints.clearQueue.matchFulfilled, (state) => {
+      state.batchIds = [];
+    });
+    builder.addMatcher(queueApi.endpoints.cancelByBatchIds.matchFulfilled, (state, action) => {
+      state.batchIds = state.batchIds.filter((id) => !action.meta.arg.originalArgs.batch_ids.includes(id));
+    });
   },
 });
 
@@ -793,8 +719,6 @@ export const {
   scaledBoundingBoxDimensionsReset,
 } = canvasSlice.actions;
 
-export default canvasSlice.reducer;
-
 export const selectCanvasSlice = (state: RootState) => state.canvas;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -804,4 +728,11 @@ export const migrateCanvasState = (state: any): any => {
     state.aspectRatio = initialAspectRatioState;
   }
   return state;
+};
+
+export const canvasPersistConfig: PersistConfig<CanvasState> = {
+  name: canvasSlice.name,
+  initialState: initialCanvasState,
+  migrate: migrateCanvasState,
+  persistDenylist: [],
 };

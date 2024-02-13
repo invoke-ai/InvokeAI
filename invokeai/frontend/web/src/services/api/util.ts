@@ -1,18 +1,12 @@
 import { createEntityAdapter } from '@reduxjs/toolkit';
 import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
 import { dateComparator } from 'common/util/dateComparator';
-import {
-  ASSETS_CATEGORIES,
-  IMAGE_CATEGORIES,
-} from 'features/gallery/store/types';
+import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import queryString from 'query-string';
 
 import type { ImageCache, ImageDTO, ListImagesArgs } from './types';
 
-export const getIsImageInDateRange = (
-  data: ImageCache | undefined,
-  imageDTO: ImageDTO
-) => {
+export const getIsImageInDateRange = (data: ImageCache | undefined, imageDTO: ImageDTO) => {
   if (!data) {
     return false;
   }
@@ -37,8 +31,7 @@ export const getIsImageInDateRange = (
   }
 
   if (imageDTO.starred) {
-    const lastStarredImage =
-      cachedStarredImages[cachedStarredImages.length - 1];
+    const lastStarredImage = cachedStarredImages[cachedStarredImages.length - 1];
     // if starring or already starred, want to look in list of starred images
     if (!lastStarredImage) {
       return true;
@@ -47,8 +40,7 @@ export const getIsImageInDateRange = (
     const oldestDate = new Date(lastStarredImage.created_at);
     return createdDate >= oldestDate;
   } else {
-    const lastUnstarredImage =
-      cachedUnstarredImages[cachedUnstarredImages.length - 1];
+    const lastUnstarredImage = cachedUnstarredImages[cachedUnstarredImages.length - 1];
     // if unstarring or already unstarred, want to look in list of unstarred images
     if (!lastUnstarredImage) {
       return false;
@@ -83,10 +75,7 @@ export const imagesAdapter = createEntityAdapter<ImageDTO, string>({
 });
 
 // Create selectors for the adapter.
-export const imagesSelectors = imagesAdapter.getSelectors(
-  undefined,
-  getSelectorsOptions
-);
+export const imagesSelectors = imagesAdapter.getSelectors(undefined, getSelectorsOptions);
 
 // Helper to create the url for the listImages endpoint. Also we use it to create the cache key.
 export const getListImagesUrl = (queryArgs: ListImagesArgs) =>

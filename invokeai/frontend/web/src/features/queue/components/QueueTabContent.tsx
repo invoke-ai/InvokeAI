@@ -1,4 +1,4 @@
-import { Box, Flex } from '@chakra-ui/react';
+import { Box, Flex } from '@invoke-ai/ui-library';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 
@@ -8,8 +8,7 @@ import QueueStatus from './QueueStatus';
 import QueueTabQueueControls from './QueueTabQueueControls';
 
 const QueueTabContent = () => {
-  const isInvocationCacheEnabled =
-    useFeatureStatus('invocationCache').isFeatureEnabled;
+  const isInvocationCacheEnabled = useFeatureStatus('invocationCache').isFeatureEnabled;
 
   return (
     <Flex borderRadius="base" w="full" h="full" flexDir="column" gap={2}>

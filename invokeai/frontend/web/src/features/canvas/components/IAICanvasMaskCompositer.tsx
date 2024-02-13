@@ -9,30 +9,22 @@ import { isNumber } from 'lodash-es';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Rect } from 'react-konva';
 
-export const canvasMaskCompositerSelector = createMemoizedSelector(
-  selectCanvasSlice,
-  (canvas) => {
-    return {
-      stageCoordinates: canvas.stageCoordinates,
-      stageDimensions: canvas.stageDimensions,
-    };
-  }
-);
+export const canvasMaskCompositerSelector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
+  return {
+    stageCoordinates: canvas.stageCoordinates,
+    stageDimensions: canvas.stageDimensions,
+  };
+});
 
 type IAICanvasMaskCompositerProps = RectConfig;
 
 const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
   const { ...rest } = props;
 
-  const { stageCoordinates, stageDimensions } = useAppSelector(
-    canvasMaskCompositerSelector
-  );
+  const { stageCoordinates, stageDimensions } = useAppSelector(canvasMaskCompositerSelector);
   const stageScale = useAppSelector((s) => s.canvas.stageScale);
-  const maskColorString = useAppSelector((s) =>
-    rgbaColorToString(s.canvas.maskColor)
-  );
-  const [fillPatternImage, setFillPatternImage] =
-    useState<HTMLImageElement | null>(null);
+  const maskColorString = useAppSelector((s) => rgbaColorToString(s.canvas.maskColor));
+  const [fillPatternImage, setFillPatternImage] = useState<HTMLImageElement | null>(null);
 
   const [offset, setOffset] = useState<number>(0);
 
@@ -66,10 +58,7 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
     return () => clearInterval(timer);
   }, []);
 
-  const fillPatternScale = useMemo(
-    () => ({ x: 1 / stageScale, y: 1 / stageScale }),
-    [stageScale]
-  );
+  const fillPatternScale = useMemo(() => ({ x: 1 / stageScale, y: 1 / stageScale }), [stageScale]);
 
   if (
     !fillPatternImage ||

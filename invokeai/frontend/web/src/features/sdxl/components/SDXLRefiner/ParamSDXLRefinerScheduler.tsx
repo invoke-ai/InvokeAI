@@ -1,7 +1,6 @@
+import type { ComboboxOnChange } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type { InvSelectOnChange } from 'common/components/InvSelect/types';
 import { SCHEDULER_OPTIONS } from 'features/parameters/types/constants';
 import { isParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import { setRefinerScheduler } from 'features/sdxl/store/sdxlSlice';
@@ -13,7 +12,7 @@ const ParamSDXLRefinerScheduler = () => {
   const { t } = useTranslation();
   const refinerScheduler = useAppSelector((s) => s.sdxl.refinerScheduler);
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!isParameterScheduler(v?.value)) {
         return;
@@ -23,19 +22,13 @@ const ParamSDXLRefinerScheduler = () => {
     [dispatch]
   );
 
-  const value = useMemo(
-    () => SCHEDULER_OPTIONS.find((o) => o.value === refinerScheduler),
-    [refinerScheduler]
-  );
+  const value = useMemo(() => SCHEDULER_OPTIONS.find((o) => o.value === refinerScheduler), [refinerScheduler]);
 
   return (
-    <InvControl label={t('sdxl.scheduler')}>
-      <InvSelect
-        value={value}
-        options={SCHEDULER_OPTIONS}
-        onChange={onChange}
-      />
-    </InvControl>
+    <FormControl>
+      <FormLabel>{t('sdxl.scheduler')}</FormLabel>
+      <Combobox value={value} options={SCHEDULER_OPTIONS} onChange={onChange} />
+    </FormControl>
   );
 };
 

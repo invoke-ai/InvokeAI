@@ -1,3 +1,4 @@
+import { cloneDeep, merge } from 'lodash-es';
 import { ClickScrollPlugin, OverlayScrollbars } from 'overlayscrollbars';
 import type { UseOverlayScrollbarsParams } from 'overlayscrollbars-react';
 
@@ -15,4 +16,13 @@ export const overlayScrollbarsParams: UseOverlayScrollbarsParams = {
     },
     overflow: { x: 'hidden' },
   },
+};
+
+export const getOverlayScrollbarsParams = (
+  overflowX: 'hidden' | 'scroll' = 'hidden',
+  overflowY: 'hidden' | 'scroll' = 'scroll'
+) => {
+  const params = cloneDeep(overlayScrollbarsParams);
+  merge(params, { options: { overflow: { y: overflowY, x: overflowX } } });
+  return params;
 };

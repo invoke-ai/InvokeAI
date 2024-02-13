@@ -1,5 +1,5 @@
+import { FormControlGroup } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvControlGroup } from 'common/components/InvControl/InvControlGroup';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 
@@ -18,10 +18,10 @@ export const HrfSettings = memo(() => {
   return (
     <>
       <ParamHrfToggle />
-      <InvControlGroup isDisabled={!hrfEnabled}>
+      <FormControlGroup isDisabled={!hrfEnabled}>
         <ParamHrfStrength />
         <ParamHrfMethod />
-      </InvControlGroup>
+      </FormControlGroup>
     </>
   );
 });

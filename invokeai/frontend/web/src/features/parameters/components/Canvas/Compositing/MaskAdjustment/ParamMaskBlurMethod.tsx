@@ -1,26 +1,26 @@
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setMaskBlurMethod } from 'features/parameters/store/generationSlice';
 import { isParameterMaskBlurMethod } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
-const options: InvSelectOption[] = [
-  { label: 'Box Blur', value: 'box' },
-  { label: 'Gaussian Blur', value: 'gaussian' },
-];
 
 const ParamMaskBlurMethod = () => {
   const maskBlurMethod = useAppSelector((s) => s.generation.maskBlurMethod);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const options: ComboboxOption[] = useMemo(
+    () => [
+      { label: t('parameters.boxBlur'), value: 'box' },
+      { label: t('parameters.gaussianBlur'), value: 'gaussian' },
+    ],
+    [t]
+  );
+
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!isParameterMaskBlurMethod(v?.value)) {
         return;
@@ -30,18 +30,15 @@ const ParamMaskBlurMethod = () => {
     [dispatch]
   );
 
-  const value = useMemo(
-    () => options.find((o) => o.value === maskBlurMethod),
-    [maskBlurMethod]
-  );
+  const value = useMemo(() => options.find((o) => o.value === maskBlurMethod), [maskBlurMethod, options]);
 
   return (
-    <InvControl
-      label={t('parameters.maskBlurMethod')}
-      feature="compositingBlurMethod"
-    >
-      <InvSelect value={value} onChange={onChange} options={options} />
-    </InvControl>
+    <FormControl>
+      <InformationalPopover feature="compositingBlurMethod">
+        <FormLabel>{t('parameters.maskBlurMethod')}</FormLabel>
+      </InformationalPopover>
+      <Combobox value={value} onChange={onChange} options={options} />
+    </FormControl>
   );
 };
 

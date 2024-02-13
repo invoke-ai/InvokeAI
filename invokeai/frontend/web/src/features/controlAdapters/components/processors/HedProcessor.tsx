@@ -1,6 +1,4 @@
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
-import { InvSwitch } from 'common/components/InvSwitch/wrapper';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type { RequiredHedImageProcessorInvocation } from 'features/controlAdapters/store/types';
@@ -10,8 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './common/ProcessorWrapper';
 
-const DEFAULTS = CONTROLNET_PROCESSORS.hed_image_processor
-  .default as RequiredHedImageProcessorInvocation;
+const DEFAULTS = CONTROLNET_PROCESSORS.hed_image_processor.default as RequiredHedImageProcessorInvocation;
 
 type HedProcessorProps = {
   controlNetId: string;
@@ -51,37 +48,46 @@ const HedPreprocessor = (props: HedProcessorProps) => {
 
   return (
     <ProcessorWrapper>
-      <InvControl
-        label={t('controlnet.detectResolution')}
-        isDisabled={!isEnabled}
-      >
-        <InvSlider
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.detectResolution')}</FormLabel>
+        <CompositeSlider
           value={detect_resolution}
           defaultValue={DEFAULTS.detect_resolution}
           onChange={handleDetectResolutionChanged}
           min={0}
           max={4096}
           marks
-          withNumberInput
         />
-      </InvControl>
-      <InvControl
-        label={t('controlnet.imageResolution')}
-        isDisabled={!isEnabled}
-      >
-        <InvSlider
+        <CompositeNumberInput
+          value={detect_resolution}
+          defaultValue={DEFAULTS.detect_resolution}
+          onChange={handleDetectResolutionChanged}
+          min={0}
+          max={4096}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.imageResolution')}</FormLabel>
+        <CompositeSlider
           value={image_resolution}
           onChange={handleImageResolutionChanged}
           defaultValue={DEFAULTS.image_resolution}
           min={0}
           max={4096}
           marks
-          withNumberInput
         />
-      </InvControl>
-      <InvControl label={t('controlnet.scribble')} isDisabled={!isEnabled}>
-        <InvSwitch isChecked={scribble} onChange={handleScribbleChanged} />
-      </InvControl>
+        <CompositeNumberInput
+          value={image_resolution}
+          onChange={handleImageResolutionChanged}
+          defaultValue={DEFAULTS.image_resolution}
+          min={0}
+          max={4096}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.scribble')}</FormLabel>
+        <Switch isChecked={scribble} onChange={handleScribbleChanged} />
+      </FormControl>
     </ProcessorWrapper>
   );
 };

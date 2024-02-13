@@ -85,12 +85,8 @@ export const validateWorkflow = (
     // Validate each edge. If the edge is invalid, we must remove it to prevent runtime errors with reactflow.
     const sourceNode = keyedNodes[edge.source];
     const targetNode = keyedNodes[edge.target];
-    const sourceTemplate = sourceNode
-      ? invocationTemplates[sourceNode.data.type]
-      : undefined;
-    const targetTemplate = targetNode
-      ? invocationTemplates[targetNode.data.type]
-      : undefined;
+    const sourceTemplate = sourceNode ? invocationTemplates[sourceNode.data.type] : undefined;
+    const targetTemplate = targetNode ? invocationTemplates[targetNode.data.type] : undefined;
     const issues: string[] = [];
 
     if (!sourceNode) {
@@ -112,12 +108,7 @@ export const validateWorkflow = (
       );
     }
 
-    if (
-      sourceNode &&
-      sourceTemplate &&
-      edge.type === 'default' &&
-      !(edge.sourceHandle in sourceTemplate.outputs)
-    ) {
+    if (sourceNode && sourceTemplate && edge.type === 'default' && !(edge.sourceHandle in sourceTemplate.outputs)) {
       // The edge's source/output node field does not exist
       issues.push(
         t('nodes.sourceNodeFieldDoesNotExist', {
@@ -146,12 +137,7 @@ export const validateWorkflow = (
       );
     }
 
-    if (
-      targetNode &&
-      targetTemplate &&
-      edge.type === 'default' &&
-      !(edge.targetHandle in targetTemplate.inputs)
-    ) {
+    if (targetNode && targetTemplate && edge.type === 'default' && !(edge.targetHandle in targetTemplate.inputs)) {
       // The edge's target/input node field does not exist
       issues.push(
         t('nodes.targetNodeFieldDoesNotExist', {
@@ -164,14 +150,8 @@ export const validateWorkflow = (
     if (issues.length) {
       // This edge has some issues. Remove it.
       delete edges[i];
-      const source =
-        edge.type === 'default'
-          ? `${edge.source}.${edge.sourceHandle}`
-          : edge.source;
-      const target =
-        edge.type === 'default'
-          ? `${edge.source}.${edge.targetHandle}`
-          : edge.target;
+      const source = edge.type === 'default' ? `${edge.source}.${edge.sourceHandle}` : edge.source;
+      const target = edge.type === 'default' ? `${edge.source}.${edge.targetHandle}` : edge.target;
       warnings.push({
         message: t('nodes.deletedInvalidEdge', { source, target }),
         issues,

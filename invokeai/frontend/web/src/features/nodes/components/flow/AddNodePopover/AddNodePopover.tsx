@@ -1,27 +1,13 @@
 import 'reactflow/dist/style.css';
 
-import { Flex } from '@chakra-ui/react';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { Combobox, Flex, Popover, PopoverAnchor, PopoverBody, PopoverContent } from '@invoke-ai/ui-library';
 import { useAppToaster } from 'app/components/Toaster';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { SelectInstance } from 'chakra-react-select';
-import {
-  InvPopover,
-  InvPopoverAnchor,
-  InvPopoverBody,
-  InvPopoverContent,
-} from 'common/components/InvPopover/wrapper';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type {
-  InvSelectOnChange,
-  InvSelectOption,
-} from 'common/components/InvSelect/types';
 import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
-import {
-  addNodePopoverClosed,
-  addNodePopoverOpened,
-  nodeAdded,
-} from 'features/nodes/store/nodesSlice';
+import { addNodePopoverClosed, addNodePopoverOpened, nodeAdded } from 'features/nodes/store/nodesSlice';
 import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { validateSourceAndTargetTypes } from 'features/nodes/store/util/validateSourceAndTargetTypes';
 import { filter, map, memoize, some } from 'lodash-es';
@@ -45,87 +31,74 @@ const createRegex = memoize(
     )
 );
 
-const filterOption = memoize(
-  (option: FilterOptionOption<InvSelectOption>, inputValue: string) => {
-    if (!inputValue) {
-      return true;
-    }
-    const regex = createRegex(inputValue);
-    return (
-      regex.test(option.label) ||
-      regex.test(option.data.description ?? '') ||
-      (option.data.tags ?? []).some((tag) => regex.test(tag))
-    );
+const filterOption = memoize((option: FilterOptionOption<ComboboxOption>, inputValue: string) => {
+  if (!inputValue) {
+    return true;
   }
-);
+  const regex = createRegex(inputValue);
+  return (
+    regex.test(option.label) ||
+    regex.test(option.data.description ?? '') ||
+    (option.data.tags ?? []).some((tag) => regex.test(tag))
+  );
+});
 
 const AddNodePopover = () => {
   const dispatch = useAppDispatch();
   const buildInvocation = useBuildNode();
   const toaster = useAppToaster();
   const { t } = useTranslation();
-  const selectRef = useRef<SelectInstance<InvSelectOption> | null>(null);
+  const selectRef = useRef<SelectInstance<ComboboxOption> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const fieldFilter = useAppSelector((s) => s.nodes.connectionStartFieldType);
-  const handleFilter = useAppSelector(
-    (s) => s.nodes.connectionStartParams?.handleType
-  );
+  const handleFilter = useAppSelector((s) => s.nodes.connectionStartParams?.handleType);
 
-  const selector = createMemoizedSelector(
-    selectNodeTemplatesSlice,
-    (nodeTemplates) => {
-      // If we have a connection in progress, we need to filter the node choices
-      const filteredNodeTemplates = fieldFilter
-        ? filter(nodeTemplates.templates, (template) => {
-            const handles =
-              handleFilter == 'source' ? template.inputs : template.outputs;
+  const selector = createMemoizedSelector(selectNodeTemplatesSlice, (nodeTemplates) => {
+    // If we have a connection in progress, we need to filter the node choices
+    const filteredNodeTemplates = fieldFilter
+      ? filter(nodeTemplates.templates, (template) => {
+          const handles = handleFilter === 'source' ? template.inputs : template.outputs;
 
-            return some(handles, (handle) => {
-              const sourceType =
-                handleFilter == 'source' ? fieldFilter : handle.type;
-              const targetType =
-                handleFilter == 'target' ? fieldFilter : handle.type;
+          return some(handles, (handle) => {
+            const sourceType = handleFilter === 'source' ? fieldFilter : handle.type;
+            const targetType = handleFilter === 'target' ? fieldFilter : handle.type;
 
-              return validateSourceAndTargetTypes(sourceType, targetType);
-            });
-          })
-        : map(nodeTemplates.templates);
+            return validateSourceAndTargetTypes(sourceType, targetType);
+          });
+        })
+      : map(nodeTemplates.templates);
 
-      const options: InvSelectOption[] = map(
-        filteredNodeTemplates,
-        (template) => {
-          return {
-            label: template.title,
-            value: template.type,
-            description: template.description,
-            tags: template.tags,
-          };
-        }
-      );
+    const options: ComboboxOption[] = map(filteredNodeTemplates, (template) => {
+      return {
+        label: template.title,
+        value: template.type,
+        description: template.description,
+        tags: template.tags,
+      };
+    });
 
-      //We only want these nodes if we're not filtered
-      if (fieldFilter === null) {
-        options.push({
-          label: t('nodes.currentImage'),
-          value: 'current_image',
-          description: t('nodes.currentImageDescription'),
-          tags: ['progress'],
-        });
+    //We only want these nodes if we're not filtered
+    if (fieldFilter === null) {
+      options.push({
+        label: t('nodes.currentImage'),
+        value: 'current_image',
+        description: t('nodes.currentImageDescription'),
+        tags: ['progress'],
+      });
 
-        options.push({
-          label: t('nodes.notes'),
-          value: 'notes',
-          description: t('nodes.notesDescription'),
-          tags: ['notes'],
-        });
-      }
-
-      options.sort((a, b) => a.label.localeCompare(b.label));
-
-      return { options };
+      options.push({
+        label: t('nodes.notes'),
+        value: 'notes',
+        description: t('nodes.notesDescription'),
+        tags: ['notes'],
+      });
     }
-  );
+
+    options.sort((a, b) => a.label.localeCompare(b.label));
+
+    return { options };
+  });
 
   const { options } = useAppSelector(selector);
   const isOpen = useAppSelector((s) => s.nodes.isAddNodePopoverOpen);
@@ -149,7 +122,7 @@ const AddNodePopover = () => {
     [dispatch, buildInvocation, toaster, t]
   );
 
-  const onChange = useCallback<InvSelectOnChange>(
+  const onChange = useCallback<ComboboxOnChange>(
     (v) => {
       if (!v) {
         return;
@@ -197,7 +170,7 @@ const AddNodePopover = () => {
   const noOptionsMessage = useCallback(() => t('nodes.noMatchingNodes'), [t]);
 
   return (
-    <InvPopover
+    <Popover
       isOpen={isOpen}
       onClose={onClose}
       placement="bottom"
@@ -206,16 +179,12 @@ const AddNodePopover = () => {
       closeOnBlur={true}
       returnFocusOnClose={true}
       initialFocusRef={inputRef}
+      isLazy
     >
-      <InvPopoverAnchor>
-        <Flex
-          position="absolute"
-          top="15%"
-          insetInlineStart="50%"
-          pointerEvents="none"
-        />
-      </InvPopoverAnchor>
-      <InvPopoverContent
+      <PopoverAnchor>
+        <Flex position="absolute" top="15%" insetInlineStart="50%" pointerEvents="none" />
+      </PopoverAnchor>
+      <PopoverContent
         p={0}
         top={-1}
         shadow="dark-lg"
@@ -223,8 +192,8 @@ const AddNodePopover = () => {
         borderWidth="2px"
         borderStyle="solid"
       >
-        <InvPopoverBody w="32rem" p={0}>
-          <InvSelect
+        <PopoverBody w="32rem" p={0}>
+          <Combobox
             menuIsOpen={isOpen}
             selectRef={selectRef}
             value={null}
@@ -238,9 +207,9 @@ const AddNodePopover = () => {
             inputRef={inputRef}
             closeMenuOnSelect={false}
           />
-        </InvPopoverBody>
-      </InvPopoverContent>
-    </InvPopover>
+        </PopoverBody>
+      </PopoverContent>
+    </Popover>
   );
 };
 

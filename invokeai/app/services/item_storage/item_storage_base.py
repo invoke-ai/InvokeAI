@@ -1,9 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Generic, Optional, TypeVar
+from typing import Callable, Generic, TypeVar
 
 from pydantic import BaseModel
-
-from invokeai.app.services.shared.pagination import PaginatedResults
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -22,26 +20,26 @@ class ItemStorageABC(ABC, Generic[T]):
 
     @abstractmethod
     def get(self, item_id: str) -> T:
-        """Gets the item, parsing it into a Pydantic model"""
-        pass
-
-    @abstractmethod
-    def get_raw(self, item_id: str) -> Optional[str]:
-        """Gets the raw item as a string, skipping Pydantic parsing"""
+        """
+        Gets the item.
+        :param item_id: the id of the item to get
+        :raises ItemNotFoundError: if the item is not found
+        """
         pass
 
     @abstractmethod
     def set(self, item: T) -> None:
-        """Sets the item"""
+        """
+        Sets the item. The id will be extracted based on id_field.
+        :param item: the item to set
+        """
         pass
 
     @abstractmethod
-    def list(self, page: int = 0, per_page: int = 10) -> PaginatedResults[T]:
-        """Gets a paginated list of items"""
-        pass
-
-    @abstractmethod
-    def search(self, query: str, page: int = 0, per_page: int = 10) -> PaginatedResults[T]:
+    def delete(self, item_id: str) -> None:
+        """
+        Deletes the item, if it exists.
+        """
         pass
 
     def on_changed(self, on_changed: Callable[[T], None]) -> None:

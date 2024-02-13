@@ -5,12 +5,7 @@ import { memo } from 'react';
 import { Group, Rect } from 'react-konva';
 
 const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
-  const {
-    boundingBoxCoordinates,
-    boundingBoxDimensions,
-    stageDimensions,
-    stageCoordinates,
-  } = canvas;
+  const { boundingBoxCoordinates, boundingBoxDimensions, stageDimensions, stageCoordinates } = canvas;
 
   return {
     boundingBoxCoordinates,
@@ -21,15 +16,8 @@ const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
 });
 
 const IAICanvasBoundingBoxOverlay = () => {
-  const {
-    boundingBoxCoordinates,
-    boundingBoxDimensions,
-    stageCoordinates,
-    stageDimensions,
-  } = useAppSelector(selector);
-  const shouldDarkenOutsideBoundingBox = useAppSelector(
-    (s) => s.canvas.shouldDarkenOutsideBoundingBox
-  );
+  const { boundingBoxCoordinates, boundingBoxDimensions, stageCoordinates, stageDimensions } = useAppSelector(selector);
+  const shouldDarkenOutsideBoundingBox = useAppSelector((s) => s.canvas.shouldDarkenOutsideBoundingBox);
   const stageScale = useAppSelector((s) => s.canvas.stageScale);
 
   return (
