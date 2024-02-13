@@ -5,7 +5,7 @@ import uuid
 import numpy as np
 
 
-def get_timestamp():
+def get_timestamp() -> int:
     return int(datetime.datetime.now(datetime.timezone.utc).timestamp())
 
 
@@ -20,16 +20,16 @@ def get_datetime_from_iso_timestamp(iso_timestamp: str) -> datetime.datetime:
 SEED_MAX = np.iinfo(np.uint32).max
 
 
-def get_random_seed():
+def get_random_seed() -> int:
     rng = np.random.default_rng(seed=None)
     return int(rng.integers(0, SEED_MAX))
 
 
-def uuid_string():
+def uuid_string() -> str:
     res = uuid.uuid4()
     return str(res)
 
 
-def is_optional(value: typing.Any):
+def is_optional(value: typing.Any) -> bool:
     """Checks if a value is typed as Optional. Note that Optional is sugar for Union[x, None]."""
     return typing.get_origin(value) is typing.Union and type(None) in typing.get_args(value)
