@@ -7,7 +7,7 @@ import WorkflowInfoTooltipContent from './viewMode/WorkflowInfoTooltipContent';
 import { WorkflowWarning } from './viewMode/WorkflowWarning';
 
 export const WorkflowName = () => {
-  const { name, isTouched } = useAppSelector((s) => s.workflow);
+  const { name, isTouched, mode } = useAppSelector((s) => s.workflow);
   const { t } = useTranslation();
 
   return (
@@ -24,7 +24,7 @@ export const WorkflowName = () => {
         </Text>
       )}
 
-      {isTouched && (
+      {isTouched && mode === 'edit' && (
         <Tooltip label="Workflow has unsaved changes">
           <Flex>
             <Icon as={PiDotOutlineFill} boxSize="20px" sx={{ color: 'invokeYellow.500' }} />

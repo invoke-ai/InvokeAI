@@ -3,10 +3,11 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesDeleted } from 'features/nodes/store/nodesSlice';
-import type { WorkflowMode, WorkflowsState as WorkflowState } from 'features/nodes/store/types';
+import type { OriginalFieldValue, WorkflowMode, WorkflowsState as WorkflowState } from 'features/nodes/store/types';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import type { WorkflowCategory, WorkflowV2 } from 'features/nodes/types/workflow';
 import { cloneDeep, isEqual, uniqBy } from 'lodash-es';
+import { AnyNode, isInvocationNode } from '../types/invocation';
 
 export const blankWorkflow: Omit<WorkflowV2, 'nodes' | 'edges'> = {
   name: '',
@@ -25,6 +26,7 @@ export const initialWorkflowState: WorkflowState = {
   _version: 1,
   isTouched: false,
   mode: 'view',
+  originalExposedFieldValues: [],
   ...blankWorkflow,
 };
 
@@ -89,7 +91,25 @@ export const workflowSlice = createSlice({
   extraReducers: (builder) => {
     builder.addCase(workflowLoaded, (state, action) => {
       const { nodes: _nodes, edges: _edges, ...workflowExtra } = action.payload;
-      return { ...initialWorkflowState, ...cloneDeep(workflowExtra) };
+
+      const originalExposedFieldValues = workflowExtra.exposedFields.reduce((acc: OriginalFieldValue[], field) => {
+        const nodeIndex = _nodes.findIndex((n) => n.id === field.nodeId);
+        const node = _nodes?.[nodeIndex];
+
+        if (isInvocationNode(node)) {
+          const input = node?.data?.inputs[field.fieldName];
+          const originalExposedFieldValue = {
+            nodeId: field.nodeId,
+            fieldName: field.fieldName,
+            value: input?.value,
+          };
+          acc.push(originalExposedFieldValue);
+        }
+
+        return acc;
+      }, []);
+
+      return { ...initialWorkflowState, ...cloneDeep(workflowExtra), originalExposedFieldValues };
     });
 
     builder.addCase(nodesDeleted, (state, action) => {

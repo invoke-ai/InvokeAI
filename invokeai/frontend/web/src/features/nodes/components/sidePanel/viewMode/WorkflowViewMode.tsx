@@ -5,8 +5,8 @@ import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
 import { t } from 'i18next';
-
 import WorkflowField from './WorkflowField';
+import { useGetOpenAPISchemaQuery } from '../../../../../services/api/endpoints/appInfo';
 
 const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
   return {
@@ -16,12 +16,15 @@ const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
 });
 
 export const WorkflowViewMode = () => {
+  const { isLoading } = useGetOpenAPISchemaQuery();
   const { fields } = useAppSelector(selector);
   return (
     <Box position="relative" w="full" h="full">
       <ScrollableContent>
         <Flex position="relative" flexDir="column" alignItems="flex-start" p={1} gap={2} h="full" w="full">
-          {fields.length ? (
+          {isLoading ? (
+            <IAINoContentFallback label={t('nodes.loadingNodes')} icon={null} />
+          ) : fields.length ? (
             fields.map(({ nodeId, fieldName }) => (
               <WorkflowField key={`${nodeId}.${fieldName}`} nodeId={nodeId} fieldName={fieldName} />
             ))

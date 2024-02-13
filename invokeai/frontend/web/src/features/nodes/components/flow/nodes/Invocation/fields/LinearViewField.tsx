@@ -1,16 +1,18 @@
-import { Flex, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { Flex, Text, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { workflowExposedFieldRemoved } from 'features/nodes/store/workflowSlice';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiInfoBold, PiTrashSimpleBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiInfoBold, PiTrashSimpleBold } from 'react-icons/pi';
 
 import EditableFieldTitle from './EditableFieldTitle';
 import FieldTooltipContent from './FieldTooltipContent';
 import InputFieldRenderer from './InputFieldRenderer';
+import { useFieldInstance } from '../../../../../hooks/useFieldData';
+import { fieldValueReset } from '../../../../../store/nodesSlice';
 
 type Props = {
   nodeId: string;
@@ -19,11 +21,22 @@ type Props = {
 
 const LinearViewField = ({ nodeId, fieldName }: Props) => {
   const dispatch = useAppDispatch();
+  const fieldInstance = useFieldInstance(nodeId, fieldName);
+  const { originalExposedFieldValues } = useAppSelector((s) => s.workflow);
   const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
   const { t } = useTranslation();
+
   const handleRemoveField = useCallback(() => {
     dispatch(workflowExposedFieldRemoved({ nodeId, fieldName }));
   }, [dispatch, fieldName, nodeId]);
+
+  const originalValue = useMemo(() => {
+    return originalExposedFieldValues.find((originalValues) => originalValues.nodeId === nodeId)?.value;
+  }, [originalExposedFieldValues, nodeId]);
+
+  const handleResetField = useCallback(() => {
+    dispatch(fieldValueReset({ nodeId, fieldName, value: originalValue }));
+  }, [dispatch, fieldName, nodeId, originalValue]);
 
   return (
     <Flex
@@ -39,6 +52,16 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
       <Flex>
         <EditableFieldTitle nodeId={nodeId} fieldName={fieldName} kind="input" />
         <Spacer />
+        {originalValue !== fieldInstance?.value && (
+          <IconButton
+            aria-label={t('nodes.resetToDefaultValue')}
+            tooltip={t('nodes.resetToDefaultValue')}
+            variant="ghost"
+            size="sm"
+            onClick={handleResetField}
+            icon={<PiArrowCounterClockwiseBold />}
+          />
+        )}
         <Tooltip
           label={<FieldTooltipContent nodeId={nodeId} fieldName={fieldName} kind="input" />}
           openDelay={HANDLE_TOOLTIP_OPEN_DELAY}

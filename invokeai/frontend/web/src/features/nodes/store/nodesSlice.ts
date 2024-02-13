@@ -18,6 +18,7 @@ import type {
   MainModelFieldValue,
   SchedulerFieldValue,
   SDXLRefinerModelFieldValue,
+  StatefulFieldValue,
   StringFieldValue,
   T2IAdapterModelFieldValue,
   VAEModelFieldValue,
@@ -36,6 +37,7 @@ import {
   zMainModelFieldValue,
   zSchedulerFieldValue,
   zSDXLRefinerModelFieldValue,
+  zStatefulFieldValue,
   zStringFieldValue,
   zT2IAdapterModelFieldValue,
   zVAEModelFieldValue,
@@ -478,6 +480,9 @@ export const nodesSlice = createSlice({
     selectedEdgesChanged: (state, action: PayloadAction<string[]>) => {
       state.selectedEdges = action.payload;
     },
+    fieldValueReset: (state, action: FieldValueAction<StatefulFieldValue>) => {
+      fieldValueReducer(state, action, zStatefulFieldValue);
+    },
     fieldStringValueChanged: (state, action: FieldValueAction<StringFieldValue>) => {
       fieldValueReducer(state, action, zStringFieldValue);
     },
@@ -760,6 +765,7 @@ export const {
   edgesChanged,
   edgesDeleted,
   edgeUpdated,
+  fieldValueReset,
   fieldBoardValueChanged,
   fieldBooleanValueChanged,
   fieldColorValueChanged,
