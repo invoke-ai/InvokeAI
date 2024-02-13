@@ -698,7 +698,9 @@ export const imagesApi = api.injectEndpoints({
         }
       },
     }),
-
+    /**
+     * Upload a multiple images.
+     */
     uploadMultipleImages: build.mutation<
       ImageDTO[],
       {
@@ -744,50 +746,45 @@ export const imagesApi = api.injectEndpoints({
            * - *add* to no_board/assets
            * - update the image's board's assets total
            */
-
-          const { data: imageDTOs } = await queryFulfilled;
-          imageDTOs.forEach((imageDTO) => {
-            if (imageDTO.is_intermediate) {
-              // Don't add it to anything
-              return;
-            }
-
-            // *add* to `getImageDTO`
-            dispatch(
-              imagesApi.util.upsertQueryData(
-                'getImageDTO',
-                imageDTO.image_name,
-                imageDTO
-              )
-            );
-
-            const categories = getCategories(imageDTO);
-
-            // *add* to no_board/assets
-            dispatch(
-              imagesApi.util.updateQueryData(
-                'listImages',
-                {
-                  board_id: imageDTO.board_id ?? 'none',
-                  categories,
-                },
-                (draft) => {
-                  imagesAdapter.addOne(draft, imageDTO);
-                }
-              )
-            );
-
-            // increment new board's total
-            dispatch(
-              boardsApi.util.updateQueryData(
-                'getBoardAssetsTotal',
-                imageDTO.board_id ?? 'none',
-                (draft) => {
-                  draft.total += 1;
-                }
-              )
-            );
-          });
+          //   const { data: imageDTOs } = await queryFulfilled;
+          //   imageDTOs.forEach((imageDTO) => {
+          //     if (imageDTO.is_intermediate) {
+          //       // Don't add it to anything
+          //       return;
+          //     }
+          //     // *add* to `getImageDTO`
+          //     dispatch(
+          //       imagesApi.util.upsertQueryData(
+          //         'getImageDTO',
+          //         imageDTO.image_name,
+          //         imageDTO
+          //       )
+          //     );
+          //     const categories = getCategories(imageDTO);
+          //     // *add* to no_board/assets
+          //     dispatch(
+          //       imagesApi.util.updateQueryData(
+          //         'listImages',
+          //         {
+          //           board_id: imageDTO.board_id ?? 'none',
+          //           categories,
+          //         },
+          //         (draft) => {
+          //           imagesAdapter.addOne(draft, imageDTO);
+          //         }
+          //       )
+          //     );
+          //     // increment new board's total
+          //     dispatch(
+          //       boardsApi.util.updateQueryData(
+          //         'getBoardAssetsTotal',
+          //         imageDTO.board_id ?? 'none',
+          //         (draft) => {
+          //           draft.total += 1;
+          //         }
+          //       )
+          //     );
+          //   });
         } catch (error) {
           console.error('Error in onQueryStarted:', error);
           // query failed, no action needed
