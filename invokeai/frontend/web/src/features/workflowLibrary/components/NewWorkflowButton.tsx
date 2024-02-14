@@ -6,7 +6,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiFlowArrowBold } from 'react-icons/pi';
+import { PiFilePlusBold } from 'react-icons/pi';
 
 const NewWorkflowButton = () => {
   const { t } = useTranslation();
@@ -43,7 +43,7 @@ const NewWorkflowButton = () => {
       <IconButton
         aria-label={t('nodes.newWorkflow')}
         tooltip={t('nodes.newWorkflow')}
-        icon={<PiFlowArrowBold />}
+        icon={<PiFilePlusBold />}
         onClick={onClick}
         pointerEvents="auto"
       />

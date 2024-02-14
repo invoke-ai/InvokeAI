@@ -5,7 +5,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiFlowArrowBold } from 'react-icons/pi';
+import { PiFilePlusBold } from 'react-icons/pi';
 
 const NewWorkflowMenuItem = () => {
   const { t } = useTranslation();
@@ -38,7 +38,7 @@ const NewWorkflowMenuItem = () => {
 
   return (
     <>
-      <MenuItem as="button" icon={<PiFlowArrowBold />} onClick={onClick}>
+      <MenuItem as="button" icon={<PiFilePlusBold />} onClick={onClick}>
         {t('nodes.newWorkflow')}
       </MenuItem>
 
