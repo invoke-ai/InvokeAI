@@ -159,7 +159,7 @@ export const addHrfToGraph = (state: RootState, graph: NonNullableGraph): void =
     },
     {
       source: {
-        node_id: isAutoVae ? MAIN_MODEL_LOADER : isSeamlessEnabled ? SEAMLESS : VAE_LOADER,
+        node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -260,7 +260,7 @@ export const addHrfToGraph = (state: RootState, graph: NonNullableGraph): void =
   graph.edges.push(
     {
       source: {
-        node_id: isAutoVae ? MAIN_MODEL_LOADER : isSeamlessEnabled ? SEAMLESS : VAE_LOADER,
+        node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -323,7 +323,7 @@ export const addHrfToGraph = (state: RootState, graph: NonNullableGraph): void =
   graph.edges.push(
     {
       source: {
-        node_id: isAutoVae ? MAIN_MODEL_LOADER : isSeamlessEnabled ? SEAMLESS : VAE_LOADER,
+        node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
         field: 'vae',
       },
       destination: {
