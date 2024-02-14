@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Set
 import requests
 from pydantic.networks import AnyHttpUrl
 from requests import HTTPError
-from tqdm import tqdm, std
+from tqdm import tqdm
 
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.util.misc import get_iso_timestamp
