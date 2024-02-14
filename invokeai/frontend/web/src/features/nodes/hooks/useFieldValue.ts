@@ -12,7 +12,7 @@ export const useFieldValue = (nodeId: string, fieldName: string) => {
         if (!isInvocationNode(node)) {
           return;
         }
-        return node?.data.inputs[fieldName]?.value
+        return node?.data.inputs[fieldName]?.value;
       }),
     [fieldName, nodeId]
   );

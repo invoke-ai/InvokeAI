@@ -27,15 +27,15 @@ export const ModeToggle = () => {
           onClick={onClickEdit}
           icon={<PiPencilBold />}
           colorScheme="invokeBlue"
-          />
-          )}
+        />
+      )}
       {mode === 'edit' && (
         <IconButton
-        aria-label={t('nodes.viewMode')}
-        tooltip={t('nodes.viewMode')}
-        onClick={onClickView}
-        icon={<PiEyeBold />}
-        colorScheme="invokeBlue"
+          aria-label={t('nodes.viewMode')}
+          tooltip={t('nodes.viewMode')}
+          onClick={onClickView}
+          icon={<PiEyeBold />}
+          colorScheme="invokeBlue"
         />
       )}
     </Flex>
