@@ -22,6 +22,7 @@ import { generationPersistConfig, generationSlice } from 'features/parameters/st
 import { postprocessingPersistConfig, postprocessingSlice } from 'features/parameters/store/postprocessingSlice';
 import { queueSlice } from 'features/queue/store/queueSlice';
 import { sdxlPersistConfig, sdxlSlice } from 'features/sdxl/store/sdxlSlice';
+import { showcaseSlice } from 'features/showcase/store/showcaseSlice';
 import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';
 import { uiPersistConfig, uiSlice } from 'features/ui/store/uiSlice';
@@ -51,6 +52,7 @@ const allReducers = {
   [systemSlice.name]: systemSlice.reducer,
   [configSlice.name]: configSlice.reducer,
   [uiSlice.name]: uiSlice.reducer,
+  [showcaseSlice.name]: showcaseSlice.reducer,
   [controlAdaptersSlice.name]: controlAdaptersSlice.reducer,
   [dynamicPromptsSlice.name]: dynamicPromptsSlice.reducer,
   [deleteImageModalSlice.name]: deleteImageModalSlice.reducer,

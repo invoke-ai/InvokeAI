@@ -13,7 +13,7 @@ import { useRecallParameters } from 'features/parameters/hooks/useRecallParamete
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { setActiveTab } from 'features/ui/store/uiSlice';
+import { setActiveTab, setShouldShowShowcase } from 'features/ui/store/uiSlice';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
 import { memo, useCallback } from 'react';
 import { flushSync } from 'react-dom';
@@ -50,6 +50,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const customStarUi = useStore($customStarUI);
   const { downloadImage } = useDownloadImage();
   const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(imageDTO?.image_name);
+  const showShowcase = useAppSelector((s) => s.ui.showShowcase);
 
   const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } = useGetAndLoadEmbeddedWorkflow({});
 
@@ -148,6 +149,14 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     downloadImage(imageDTO.image_url, imageDTO.image_name);
   }, [downloadImage, imageDTO.image_name, imageDTO.image_url]);
 
+  const handleOpenInShowcase = useCallback(() => {
+    dispatch(setShouldShowShowcase(imageDTO));
+  }, [dispatch, imageDTO]);
+
+  const handleCloseShowcase = useCallback(() => {
+    dispatch(setShouldShowShowcase(null));
+  }, [dispatch]);
+
   return (
     <>
       <MenuItem as="a" href={imageDTO.image_url} target="_blank" icon={<PiShareFatBold />}>
@@ -161,6 +170,17 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       <MenuItem icon={<PiDownloadSimpleBold />} onClickCapture={handleDownloadImage}>
         {t('parameters.downloadImage')}
       </MenuItem>
+
+      {!showShowcase ? (
+        <MenuItem icon={<PiShareFatBold />} onClickCapture={handleOpenInShowcase}>
+          {t('common.openShowcase')}
+        </MenuItem>
+      ) : (
+        <MenuItem color="warning.300" icon={<PiShareFatBold />} onClickCapture={handleCloseShowcase}>
+          {t('common.closeShowcase')}
+        </MenuItem>
+      )}
+
       <MenuDivider />
       <MenuItem
         icon={getAndLoadEmbeddedWorkflowResult.isLoading ? <SpinnerIcon /> : <PiFlowArrowBold />}

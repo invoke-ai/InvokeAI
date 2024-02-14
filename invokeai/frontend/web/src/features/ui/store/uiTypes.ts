@@ -1,3 +1,5 @@
+import type { ImageDTO } from 'services/api/types';
+
 import type { InvokeTabName } from './tabMap';
 
 export interface UIState {
@@ -17,6 +19,10 @@ export interface UIState {
    * Whether or not to show progress in the viewer.
    */
   shouldShowProgressInViewer: boolean;
+  /**
+   * Whether or not to show the seamless checker.
+   */
+  showShowcase: ImageDTO | null;
   /**
    * The react-resizable-panels state. The shape is managed by react-resizable-panels.
    */

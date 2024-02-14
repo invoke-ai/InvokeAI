@@ -2,6 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
+import type { ImageDTO } from 'services/api/types';
 
 import type { InvokeTabName } from './tabMap';
 import type { UIState } from './uiTypes';
@@ -11,6 +12,7 @@ export const initialUIState: UIState = {
   activeTab: 'txt2img',
   shouldShowImageDetails: false,
   shouldShowProgressInViewer: true,
+  showShowcase: null,
   panels: {},
   accordions: {},
   expanders: {},
@@ -28,6 +30,9 @@ export const uiSlice = createSlice({
     },
     setShouldShowProgressInViewer: (state, action: PayloadAction<boolean>) => {
       state.shouldShowProgressInViewer = action.payload;
+    },
+    setShouldShowShowcase: (state, action: PayloadAction<ImageDTO | null>) => {
+      state.showShowcase = action.payload;
     },
     panelsChanged: (state, action: PayloadAction<{ name: string; value: string }>) => {
       state.panels[action.payload.name] = action.payload.value;
@@ -52,6 +57,7 @@ export const {
   setActiveTab,
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
+  setShouldShowShowcase,
   panelsChanged,
   accordionStateChanged,
   expanderStateChanged,

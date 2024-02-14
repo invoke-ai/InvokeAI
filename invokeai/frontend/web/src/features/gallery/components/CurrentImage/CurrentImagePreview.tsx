@@ -9,6 +9,7 @@ import ProgressImage from 'features/gallery/components/CurrentImage/ProgressImag
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
+import Showcase from 'features/showcase/components/Showcase';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { CSSProperties } from 'react';
@@ -27,6 +28,7 @@ const CurrentImagePreview = () => {
   const imageName = useAppSelector(selectLastSelectedImageName);
   const hasDenoiseProgress = useAppSelector((s) => Boolean(s.system.denoiseProgress));
   const shouldShowProgressInViewer = useAppSelector((s) => s.ui.shouldShowProgressInViewer);
+  const showShowcase = useAppSelector((s) => s.ui.showShowcase);
 
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
 
@@ -67,42 +69,51 @@ const CurrentImagePreview = () => {
   }, []);
 
   return (
-    <Flex
-      onMouseOver={handleMouseOver}
-      onMouseOut={handleMouseOut}
-      width="full"
-      height="full"
-      alignItems="center"
-      justifyContent="center"
-      position="relative"
-    >
-      {hasDenoiseProgress && shouldShowProgressInViewer ? (
-        <ProgressImage />
-      ) : (
-        <IAIDndImage
-          imageDTO={imageDTO}
-          droppableData={droppableData}
-          draggableData={draggableData}
-          isUploadDisabled={true}
-          fitContainer
-          useThumbailFallback
-          dropLabel={t('gallery.setCurrentImage')}
-          noContentFallback={<IAINoContentFallback icon={PiImageBold} label={t('gallery.noImageSelected')} />}
-          dataTestId="image-preview"
-        />
-      )}
-      {shouldShowImageDetails && imageDTO && (
-        <Box position="absolute" top="0" width="full" height="full" borderRadius="base">
-          <ImageMetadataViewer image={imageDTO} />
-        </Box>
-      )}
-      <AnimatePresence>
-        {!shouldShowImageDetails && imageDTO && shouldShowNextPrevButtons && (
-          <motion.div key="nextPrevButtons" initial={initial} animate={animate} exit={exit} style={motionStyles}>
-            <NextPrevImageButtons />
-          </motion.div>
+    <Flex sx={{ width: 'full', height: 'full', position: 'relative' }}>
+      <Flex
+        onMouseOver={handleMouseOver}
+        onMouseOut={handleMouseOut}
+        width="full"
+        height="full"
+        alignItems="center"
+        justifyContent="center"
+        position="relative"
+      >
+        {hasDenoiseProgress && shouldShowProgressInViewer ? (
+          <ProgressImage />
+        ) : (
+          <>
+            <IAIDndImage
+              imageDTO={imageDTO}
+              droppableData={droppableData}
+              draggableData={draggableData}
+              isUploadDisabled={true}
+              fitContainer
+              useThumbailFallback
+              dropLabel={t('gallery.setCurrentImage')}
+              noContentFallback={<IAINoContentFallback icon={PiImageBold} label={t('gallery.noImageSelected')} />}
+              dataTestId="image-preview"
+            />
+          </>
         )}
-      </AnimatePresence>
+        {showShowcase && imageDTO && (
+          <Box position="absolute" top="0" width="full" height="full" borderRadius="base">
+            <Showcase imageDTO={imageDTO} />
+          </Box>
+        )}
+        {shouldShowImageDetails && imageDTO && (
+          <Box position="absolute" top="0" width="full" height="full" borderRadius="base">
+            <ImageMetadataViewer image={imageDTO} />
+          </Box>
+        )}
+        <AnimatePresence>
+          {!shouldShowImageDetails && imageDTO && shouldShowNextPrevButtons && (
+            <motion.div key="nextPrevButtons" initial={initial} animate={animate} exit={exit} style={motionStyles}>
+              <NextPrevImageButtons />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </Flex>
     </Flex>
   );
 };

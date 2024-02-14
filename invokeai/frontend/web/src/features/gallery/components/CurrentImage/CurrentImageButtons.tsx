@@ -16,7 +16,11 @@ import { initialImageSelected } from 'features/parameters/store/actions';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
-import { setShouldShowImageDetails, setShouldShowProgressInViewer } from 'features/ui/store/uiSlice';
+import {
+  setShouldShowImageDetails,
+  setShouldShowProgressInViewer,
+  setShouldShowShowcase,
+} from 'features/ui/store/uiSlice';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -29,6 +33,7 @@ import {
   PiHourglassHighBold,
   PiInfoBold,
   PiPlantBold,
+  PiProjectorScreen,
   PiQuotesBold,
   PiRulerBold,
 } from 'react-icons/pi';
@@ -50,6 +55,7 @@ const CurrentImageButtons = () => {
   const isConnected = useAppSelector((s) => s.system.isConnected);
   const shouldShowImageDetails = useAppSelector((s) => s.ui.shouldShowImageDetails);
   const shouldShowProgressInViewer = useAppSelector((s) => s.ui.shouldShowProgressInViewer);
+  const showShowcase = useAppSelector((s) => s.ui.showShowcase);
   const lastSelectedImage = useAppSelector(selectLastSelectedImage);
   const shouldDisableToolbarButtons = useAppSelector(selectShouldDisableToolbarButtons);
 
@@ -65,6 +71,16 @@ const CurrentImageButtons = () => {
   const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(lastSelectedImage?.image_name);
 
   const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } = useGetAndLoadEmbeddedWorkflow({});
+
+  const toggleShowcase = useCallback(() => {
+    if (imageDTO && !showShowcase) {
+      dispatch(setShouldShowShowcase(imageDTO));
+    } else {
+      dispatch(setShouldShowShowcase(null));
+    }
+  }, [dispatch, showShowcase, imageDTO]);
+
+  useHotkeys('shift+s', toggleShowcase);
 
   const handleLoadWorkflow = useCallback(() => {
     if (!lastSelectedImage || !lastSelectedImage.has_workflow) {
@@ -201,6 +217,15 @@ const CurrentImageButtons = () => {
             <MenuList>{imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}</MenuList>
           </Menu>
         </ButtonGroup>
+
+        <IconButton
+          icon={<PiProjectorScreen />}
+          tooltip={`${!showShowcase ? t('common.openShowcase') : t('common.closeShowcase')} (Shift+S)`}
+          aria-label={`${!showShowcase ? t('common.openShowcase') : t('common.closeShowcase')} (Shift+S)`}
+          isDisabled={!imageDTO}
+          onClick={toggleShowcase}
+          isChecked={showShowcase !== null}
+        />
 
         <ButtonGroup isDisabled={shouldDisableToolbarButtons}>
           <IconButton

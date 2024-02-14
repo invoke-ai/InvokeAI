@@ -131,6 +131,8 @@
         "nodesDesc": "A node based system for the generation of images is under development currently. Stay tuned for updates about this amazing feature.",
         "notInstalled": "Not $t(common.installed)",
         "openInNewTab": "Open in New Tab",
+        "openShowcase": "Open Showcase",
+        "closeShowcase": "Close Showcase",
         "orderBy": "Order By",
         "outpaint": "outpaint",
         "outputs": "Outputs",
@@ -1609,6 +1611,9 @@
                 "Scales the selected area to the size best suited for the model before the image generation process."
             ]
         }
+    },
+    "showcase": {
+        "seamlessChecker": "Seamless Checker"
     },
     "ui": {
         "hideProgressImages": "Hide Progress Images",
