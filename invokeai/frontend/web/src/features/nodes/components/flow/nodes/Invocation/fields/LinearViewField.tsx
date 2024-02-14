@@ -1,12 +1,11 @@
 import { Flex, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
-import { useFieldInstance } from 'features/nodes/hooks/useFieldData';
+import { useFieldOriginalValue } from 'features/nodes/hooks/useFieldOriginalValue';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
-import { fieldValueReset } from 'features/nodes/store/nodesSlice';
 import { workflowExposedFieldRemoved } from 'features/nodes/store/workflowSlice';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiInfoBold, PiTrashSimpleBold } from 'react-icons/pi';
 
@@ -21,22 +20,13 @@ type Props = {
 
 const LinearViewField = ({ nodeId, fieldName }: Props) => {
   const dispatch = useAppDispatch();
-  const fieldInstance = useFieldInstance(nodeId, fieldName);
-  const { originalExposedFieldValues } = useAppSelector((s) => s.workflow);
+  const { isValueChanged, onReset } = useFieldOriginalValue(nodeId, fieldName);
   const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
   const { t } = useTranslation();
 
   const handleRemoveField = useCallback(() => {
     dispatch(workflowExposedFieldRemoved({ nodeId, fieldName }));
   }, [dispatch, fieldName, nodeId]);
-
-  const originalValue = useMemo(() => {
-    return originalExposedFieldValues.find((originalValues) => originalValues.nodeId === nodeId)?.value;
-  }, [originalExposedFieldValues, nodeId]);
-
-  const handleResetField = useCallback(() => {
-    dispatch(fieldValueReset({ nodeId, fieldName, value: originalValue }));
-  }, [dispatch, fieldName, nodeId, originalValue]);
 
   return (
     <Flex
@@ -52,13 +42,13 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
       <Flex>
         <EditableFieldTitle nodeId={nodeId} fieldName={fieldName} kind="input" />
         <Spacer />
-        {originalValue !== fieldInstance?.value && (
+        {isValueChanged && (
           <IconButton
             aria-label={t('nodes.resetToDefaultValue')}
             tooltip={t('nodes.resetToDefaultValue')}
             variant="ghost"
             size="sm"
-            onClick={handleResetField}
+            onClick={onReset}
             icon={<PiArrowCounterClockwiseBold />}
           />
         )}

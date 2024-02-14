@@ -3,11 +3,15 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesDeleted } from 'features/nodes/store/nodesSlice';
-import type { OriginalFieldValue, WorkflowMode, WorkflowsState as WorkflowState } from 'features/nodes/store/types';
+import type {
+  FieldIdentifierWithValue,
+  WorkflowMode,
+  WorkflowsState as WorkflowState,
+} from 'features/nodes/store/types';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import type { WorkflowCategory, WorkflowV2 } from 'features/nodes/types/workflow';
-import { cloneDeep, isEqual, uniqBy } from 'lodash-es';
+import { cloneDeep, isEqual, omit, uniqBy } from 'lodash-es';
 
 export const blankWorkflow: Omit<WorkflowV2, 'nodes' | 'edges'> = {
   name: '',
@@ -37,15 +41,20 @@ export const workflowSlice = createSlice({
     workflowModeChanged: (state, action: PayloadAction<WorkflowMode>) => {
       state.mode = action.payload;
     },
-    workflowExposedFieldAdded: (state, action: PayloadAction<FieldIdentifier>) => {
+    workflowExposedFieldAdded: (state, action: PayloadAction<FieldIdentifierWithValue>) => {
       state.exposedFields = uniqBy(
-        state.exposedFields.concat(action.payload),
+        state.exposedFields.concat(omit(action.payload, 'value')),
+        (field) => `${field.nodeId}-${field.fieldName}`
+      );
+      state.originalExposedFieldValues = uniqBy(
+        state.originalExposedFieldValues.concat(action.payload),
         (field) => `${field.nodeId}-${field.fieldName}`
       );
       state.isTouched = true;
     },
     workflowExposedFieldRemoved: (state, action: PayloadAction<FieldIdentifier>) => {
       state.exposedFields = state.exposedFields.filter((field) => !isEqual(field, action.payload));
+      state.originalExposedFieldValues = state.originalExposedFieldValues.filter((field) => !isEqual(omit(field, 'value'), action.payload));
       state.isTouched = true;
     },
     workflowNameChanged: (state, action: PayloadAction<string>) => {
@@ -90,27 +99,33 @@ export const workflowSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(workflowLoaded, (state, action) => {
-      const { nodes: _nodes, edges: _edges, ...workflowExtra } = action.payload;
+      const { nodes, edges: _edges, ...workflowExtra } = action.payload;
 
-      const originalExposedFieldValues = workflowExtra.exposedFields.reduce((acc: OriginalFieldValue[], field) => {
-        const nodeIndex = _nodes.findIndex((n) => n.id === field.nodeId);
-        const node = _nodes?.[nodeIndex];
+      const originalExposedFieldValues: FieldIdentifierWithValue[] = [];
 
-        if (isInvocationNode(node)) {
-          const input = node?.data?.inputs[field.fieldName];
-          const originalExposedFieldValue = {
-            nodeId: field.nodeId,
-            fieldName: field.fieldName,
-            value: input?.value,
-          };
-          acc.push(originalExposedFieldValue);
+      workflowExtra.exposedFields.forEach((field) => {
+        const node = nodes.find((n) => n.id === field.nodeId);
+
+        if (!isInvocationNode(node)) {
+          return;
         }
 
-        return acc;
-      }, []);
+        const input = node.data.inputs[field.fieldName];
+
+        if (!input) {
+          return;
+        }
+
+        const originalExposedFieldValue = {
+          nodeId: field.nodeId,
+          fieldName: field.fieldName,
+          value: input.value,
+        };
+        originalExposedFieldValues.push(originalExposedFieldValue);
+      });
 
       return {
-        ...initialWorkflowState,
+        ...cloneDeep(initialWorkflowState),
         ...cloneDeep(workflowExtra),
         originalExposedFieldValues,
         mode: state.mode,
