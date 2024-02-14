@@ -59,6 +59,10 @@ export const workflowSlice = createSlice({
       );
       state.isTouched = true;
     },
+    workflowExposedFieldsReordered: (state, action: PayloadAction<FieldIdentifier[]>) => {
+      state.exposedFields = action.payload;
+      state.isTouched = true;
+    },
     workflowNameChanged: (state, action: PayloadAction<string>) => {
       state.name = action.payload;
       state.isTouched = true;
@@ -175,6 +179,7 @@ export const {
   workflowModeChanged,
   workflowExposedFieldAdded,
   workflowExposedFieldRemoved,
+  workflowExposedFieldsReordered,
   workflowNameChanged,
   workflowCategoryChanged,
   workflowDescriptionChanged,
