@@ -23,7 +23,7 @@ const DndSortable = (props: Props) => {
   const sensors = useSensors(mouseSensor, touchSensor);
 
   return (
-    <DndContextTypesafe sensors={sensors}>
+    <DndContextTypesafe onDragEnd={props.onDragEnd} sensors={sensors}>
       <SortableContext items={props.items}>{props.children}</SortableContext>
     </DndContextTypesafe>
   );

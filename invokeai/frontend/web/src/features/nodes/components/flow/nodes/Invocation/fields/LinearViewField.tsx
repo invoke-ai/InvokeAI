@@ -23,7 +23,7 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
   const dispatch = useAppDispatch();
   const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
   const { t } = useTranslation();
-
+  
   const handleRemoveField = useCallback(() => {
     dispatch(workflowExposedFieldRemoved({ nodeId, fieldName }));
   }, [dispatch, fieldName, nodeId]);
