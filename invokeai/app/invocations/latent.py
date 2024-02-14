@@ -710,7 +710,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             source_node_id = graph_execution_state.prepared_source_mapping[self.id]
 
             # get the unet's config so that we can pass the base to dispatch_progress()
-            unet_config = context.services.model_manager.store.get_model(**self.unet.unet.model_dump())
+            unet_config = context.services.model_manager.store.get_model(self.unet.unet.key)
 
             def step_callback(state: PipelineIntermediateState) -> None:
                 self.dispatch_progress(context, source_node_id, state, unet_config.base)
@@ -738,7 +738,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 # Apply the LoRA after unet has been moved to its target device for faster patching.
                 ModelPatcher.apply_lora_unet(unet, _lora_loader()),
             ):
-                assert isinstance(unet, torch.Tensor)
+                assert isinstance(unet, UNet2DConditionModel)
                 latents = latents.to(device=unet.device, dtype=unet.dtype)
                 if noise is not None:
                     noise = noise.to(device=unet.device, dtype=unet.dtype)
@@ -842,7 +842,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata):
         )
 
         with set_seamless(vae_info.model, self.vae.seamless_axes), vae_info as vae:
-            assert isinstance(vae, torch.Tensor)
+            assert isinstance(vae, torch.nn.Module)
             latents = latents.to(vae.device)
             if self.fp32:
                 vae.to(dtype=torch.float32)

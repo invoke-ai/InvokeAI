@@ -499,7 +499,7 @@ class ModelManager(object):
             model_class=model_class,
             base_model=base_model,
             model_type=model_type,
-            submodel=submodel_type,
+            submodel_type=submodel_type,
         )
 
         if model_key not in self.cache_keys:
