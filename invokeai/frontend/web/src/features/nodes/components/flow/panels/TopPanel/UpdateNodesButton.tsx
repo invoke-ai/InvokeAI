@@ -25,6 +25,7 @@ const UpdateNodesButton = () => {
       icon={<PiWarningBold />}
       onClick={handleClickUpdateNodes}
       pointerEvents="auto"
+      colorScheme="warning"
     />
   );
 };
