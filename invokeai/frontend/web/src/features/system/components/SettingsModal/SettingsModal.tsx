@@ -101,9 +101,11 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const clearStorage = useClearStorage();
 
   const handleOpenSettingsModel = useCallback(() => {
-    refetchIntermediatesCount();
+    if (shouldShowClearIntermediates) {
+      refetchIntermediatesCount();
+    }
     _onSettingsModalOpen();
-  }, [_onSettingsModalOpen, refetchIntermediatesCount]);
+  }, [_onSettingsModalOpen, refetchIntermediatesCount, shouldShowClearIntermediates]);
 
   const handleClickResetWebUI = useCallback(() => {
     clearStorage();

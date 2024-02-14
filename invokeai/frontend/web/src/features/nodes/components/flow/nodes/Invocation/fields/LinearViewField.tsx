@@ -8,7 +8,7 @@ import { workflowExposedFieldRemoved } from 'features/nodes/store/workflowSlice'
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiInfoBold, PiTrashSimpleBold, PiDotsSixVerticalBold } from 'react-icons/pi';
+import { PiDotsSixVerticalBold, PiInfoBold, PiTrashSimpleBold } from 'react-icons/pi';
 
 import EditableFieldTitle from './EditableFieldTitle';
 import FieldTooltipContent from './FieldTooltipContent';

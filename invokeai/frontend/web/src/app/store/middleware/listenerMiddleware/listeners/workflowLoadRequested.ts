@@ -6,7 +6,6 @@ import { WorkflowMigrationError, WorkflowVersionError } from 'features/nodes/typ
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import { setActiveTab } from 'features/ui/store/uiSlice';
 import { t } from 'i18next';
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
@@ -53,7 +52,6 @@ export const addWorkflowLoadRequestedListener = () => {
           });
         }
 
-        dispatch(setActiveTab('nodes'));
         requestAnimationFrame(() => {
           $flow.get()?.fitView();
         });

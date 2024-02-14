@@ -540,7 +540,7 @@ class Graph(BaseModel):
         except NodeNotFoundError:
             return False
 
-    def get_node(self, node_path: str) -> InvocationsUnion:
+    def get_node(self, node_path: str) -> BaseInvocation:
         """Gets a node from the graph using a node path."""
         # Materialized graphs may have nodes at the top level
         graph, node_id = self._get_graph_and_node(node_path)
@@ -891,7 +891,7 @@ class GraphExecutionState(BaseModel):
         # If next is still none, there's no next node, return None
         return next_node
 
-    def complete(self, node_id: str, output: InvocationOutputsUnion):
+    def complete(self, node_id: str, output: BaseInvocationOutput) -> None:
         """Marks a node as complete"""
 
         if node_id not in self.execution_graph.nodes:
