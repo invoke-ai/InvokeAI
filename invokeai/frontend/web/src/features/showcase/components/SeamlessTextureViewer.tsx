@@ -46,7 +46,7 @@ export default function SeamlessTextureViewer(props: SeamlessTextureViewerProps)
   }, [handleScroll, tileCount, gridWidth, props]);
 
   return (
-    <Grid width="100%" templateColumns={`repeat(auto-fill, minmax(${gridWidth}px, 1fr))`}>
+    <Grid width="100%" templateColumns={`repeat(auto-fill, minmax(${gridWidth}px, 1fr))`} position="relative">
       {tiles.map((tileIndex) => (
         <Image
           key={tileIndex}

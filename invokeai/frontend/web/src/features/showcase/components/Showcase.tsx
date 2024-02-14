@@ -21,10 +21,6 @@ function Showcase(props: ShowcaseProps) {
   const shouldShowProgressInViewer = useAppSelector((s) => s.ui.shouldShowProgressInViewer);
   const hasDenoiseProgress = useAppSelector((s) => Boolean(s.system.denoiseProgress));
 
-  // const closeShowcase = useCallback(() => {
-  //   dispatch(setShouldShowShowcase(null));
-  // }, [dispatch]);
-
   const handleShowSeamless = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => dispatch(setShowSeamless(e.target.checked)),
     [dispatch]
@@ -68,13 +64,14 @@ function Showcase(props: ShowcaseProps) {
         <Flex
           sx={{
             position: 'absolute',
-            top: 16,
+            top: '38px',
             left: 0,
             w: '256px',
             h: '256px',
             margin: 2,
             borderRadius: 4,
             overflow: 'clip',
+            bg: 'base.850',
           }}
         >
           <ProgressImage />
