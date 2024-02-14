@@ -154,7 +154,7 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error("Image record not found")
             raise
         except Exception as e:
-            self.__invoker.services.logger.error("Problem getting image DTO")
+            self.__invoker.services.logger.error("Problem getting image metadata")
             raise e
 
     def get_workflow(self, image_name: str) -> Optional[WorkflowWithoutID]:
