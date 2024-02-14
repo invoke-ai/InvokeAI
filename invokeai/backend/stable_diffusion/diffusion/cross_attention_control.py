@@ -533,18 +533,6 @@ class SwapCrossAttnContext:
     mask: torch.Tensor  # in the target space of the index_map
     cross_attention_types_to_do: list[CrossAttentionType] = field(default_factory=list)
 
-    def __int__(
-        self,
-        cac_types_to_do: [CrossAttentionType],
-        modified_text_embeddings: torch.Tensor,
-        index_map: torch.Tensor,
-        mask: torch.Tensor,
-    ):
-        self.cross_attention_types_to_do = cac_types_to_do
-        self.modified_text_embeddings = modified_text_embeddings
-        self.index_map = index_map
-        self.mask = mask
-
     def wants_cross_attention_control(self, attn_type: CrossAttentionType) -> bool:
         return attn_type in self.cross_attention_types_to_do
 
