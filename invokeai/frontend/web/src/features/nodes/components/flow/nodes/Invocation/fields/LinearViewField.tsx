@@ -31,7 +31,7 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: `${nodeId}.${fieldName}` });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
   };
 

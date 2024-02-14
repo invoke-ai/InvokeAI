@@ -32,7 +32,6 @@ const AppDndContext = (props: PropsWithChildren) => {
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
-      console.log('handling drag end', event.active.data.current);
       log.trace({ dragData: parseify(event.active.data.current) }, 'Drag ended');
       const overData = event.over?.data.current;
       if (!activeDragData || !overData) {
