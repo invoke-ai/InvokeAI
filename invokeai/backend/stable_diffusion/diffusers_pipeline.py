@@ -591,7 +591,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             step_index=step_index,
             total_step_count=total_step_count,
             conditioning_data=conditioning_data,
-            # extra:
             down_block_additional_residuals=down_block_additional_residuals,  # for ControlNet
             mid_block_additional_residual=mid_block_additional_residual,  # for ControlNet
             down_intrablock_additional_residuals=down_intrablock_additional_residuals,  # for T2I-Adapter
