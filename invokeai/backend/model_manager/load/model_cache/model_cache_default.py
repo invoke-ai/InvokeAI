@@ -303,18 +303,18 @@ class ModelCache(ModelCacheBase[AnyModel]):
         in_vram_models = 0
         locked_in_vram_models = 0
         for cache_record in self._cached_models.values():
-            assert hasattr(cache_record.model, "device")
-            if cache_record.model.device == self.storage_device:
-                in_ram_models += 1
-            else:
-                in_vram_models += 1
-            if cache_record.locked:
-                locked_in_vram_models += 1
+            if hasattr(cache_record.model, "device"):
+                if cache_record.model.device == self.storage_device:
+                    in_ram_models += 1
+                else:
+                    in_vram_models += 1
+                if cache_record.locked:
+                    locked_in_vram_models += 1
 
-        self.logger.debug(
-            f"Current VRAM/RAM usage: {vram}/{ram}; models_in_ram/models_in_vram(locked) ="
-            f" {in_ram_models}/{in_vram_models}({locked_in_vram_models})"
-        )
+                self.logger.debug(
+                    f"Current VRAM/RAM usage: {vram}/{ram}; models_in_ram/models_in_vram(locked) ="
+                    f" {in_ram_models}/{in_vram_models}({locked_in_vram_models})"
+                )
 
     def make_room(self, model_size: int) -> None:
         """Make enough room in the cache to accommodate a new model of indicated size."""
