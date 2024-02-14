@@ -58,7 +58,7 @@ export const addVAEToGraph = (
   ) {
     graph.edges.push({
       source: {
-        node_id: isAutoVae ? modelLoaderNodeId : isSeamlessEnabled ? SEAMLESS : VAE_LOADER,
+        node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -76,7 +76,7 @@ export const addVAEToGraph = (
   ) {
     graph.edges.push({
       source: {
-        node_id: isAutoVae ? modelLoaderNodeId : isSeamlessEnabled ? SEAMLESS : VAE_LOADER,
+        node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -94,7 +94,7 @@ export const addVAEToGraph = (
   ) {
     graph.edges.push({
       source: {
-        node_id: isAutoVae ? modelLoaderNodeId : isSeamlessEnabled ? SEAMLESS : VAE_LOADER,
+        node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -113,7 +113,7 @@ export const addVAEToGraph = (
     graph.edges.push(
       {
         source: {
-          node_id: isAutoVae ? modelLoaderNodeId : isSeamlessEnabled ? SEAMLESS : VAE_LOADER,
+          node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
           field: 'vae',
         },
         destination: {
@@ -123,7 +123,7 @@ export const addVAEToGraph = (
       },
       {
         source: {
-          node_id: isAutoVae ? modelLoaderNodeId : isSeamlessEnabled ? SEAMLESS : VAE_LOADER,
+          node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
           field: 'vae',
         },
         destination: {
@@ -133,7 +133,7 @@ export const addVAEToGraph = (
       },
       {
         source: {
-          node_id: isAutoVae ? modelLoaderNodeId : isSeamlessEnabled ? SEAMLESS : VAE_LOADER,
+          node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
           field: 'vae',
         },
         destination: {
@@ -147,7 +147,7 @@ export const addVAEToGraph = (
     if (canvasCoherenceMode !== 'unmasked') {
       graph.edges.push({
         source: {
-          node_id: isAutoVae ? modelLoaderNodeId : isSeamlessEnabled ? SEAMLESS : VAE_LOADER,
+          node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
           field: 'vae',
         },
         destination: {
@@ -162,7 +162,7 @@ export const addVAEToGraph = (
     if (graph.id === SDXL_CANVAS_INPAINT_GRAPH || graph.id === SDXL_CANVAS_OUTPAINT_GRAPH) {
       graph.edges.push({
         source: {
-          node_id: isAutoVae ? modelLoaderNodeId : isSeamlessEnabled ? SEAMLESS : VAE_LOADER,
+          node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
           field: 'vae',
         },
         destination: {
