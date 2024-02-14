@@ -545,15 +545,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     # Otherwise, set the IP-Adapter's scale to 0, so it has no effect.
                     ip_adapter_unet_patcher.set_scale(i, 0.0)
 
-        # Handle ControlNet(s) and T2I-Adapter(s)
+        # Handle ControlNet(s)
         down_block_additional_residuals = None
         mid_block_additional_residual = None
-        down_intrablock_additional_residuals = None
-        # if control_data is not None and t2i_adapter_data is not None:
-        # TODO(ryand): This is a limitation of the UNet2DConditionModel API, not a fundamental incompatibility
-        # between ControlNets and T2I-Adapters. We will try to fix this upstream in diffusers.
-        #    raise Exception("ControlNet(s) and T2I-Adapter(s) cannot be used simultaneously (yet).")
-        # elif control_data is not None:
         if control_data is not None:
             down_block_additional_residuals, mid_block_additional_residual = self.invokeai_diffuser.do_controlnet_step(
                 control_data=control_data,
@@ -563,7 +557,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 total_step_count=total_step_count,
                 conditioning_data=conditioning_data,
             )
-        # elif t2i_adapter_data is not None:
+
+        # Handle T2I-Adapter(s)
+        down_intrablock_additional_residuals = None
         if t2i_adapter_data is not None:
             accum_adapter_state = None
             for single_t2i_adapter_data in t2i_adapter_data:
@@ -589,7 +585,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     for idx, value in enumerate(single_t2i_adapter_data.adapter_state):
                         accum_adapter_state[idx] += value * t2i_adapter_weight
 
-            # down_block_additional_residuals = accum_adapter_state
             down_intrablock_additional_residuals = accum_adapter_state
 
         uc_noise_pred, c_noise_pred = self.invokeai_diffuser.do_unet_step(
