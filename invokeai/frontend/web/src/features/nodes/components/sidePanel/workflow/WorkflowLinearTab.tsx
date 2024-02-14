@@ -1,15 +1,15 @@
-
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { DndContext } from '@dnd-kit/core';
+import { arrayMove, SortableContext } from '@dnd-kit/sortable';
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppSelector } from 'app/store/storeHooks';
-import IAIDroppable from 'common/components/IAIDroppable';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import type { TypesafeDroppableData } from 'features/dnd/types';
+import type { DragEndEvent } from 'features/dnd/types';
 import LinearViewField from 'features/nodes/components/flow/nodes/Invocation/fields/LinearViewField';
-import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
-import { memo, useMemo } from 'react';
+import { selectWorkflowSlice, workflowExposedFieldsReordered } from 'features/nodes/store/workflowSlice';
+import { FieldIdentifier } from 'features/nodes/types/field';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 
@@ -19,32 +19,46 @@ const WorkflowLinearTab = () => {
   const fields = useAppSelector(selector);
   const { isLoading } = useGetOpenAPISchemaQuery();
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
 
-  const droppableData = useMemo<TypesafeDroppableData | undefined>(
-    () => ({
-      id: 'current-image',
-      actionType: 'SET_CURRENT_IMAGE',
-    }),
-    []
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      console.log({ active, over });
+      const fieldsStrings = fields.map((field) => `${field.nodeId}.${field.fieldName}`);
+
+      if (over && active.id !== over.id) {
+        const oldIndex = fieldsStrings.indexOf(active.id as string);
+        const newIndex = fieldsStrings.indexOf(over.id as string);
+
+        const newFields = arrayMove(fieldsStrings, oldIndex, newIndex)
+          .map((field) => fields.find((obj) => `${obj.nodeId}.${obj.fieldName}` === field))
+          .filter((field) => field) as FieldIdentifier[];
+
+        dispatch(workflowExposedFieldsReordered(newFields));
+      }
+    },
+    [dispatch, fields]
   );
 
   return (
     <Box position="relative" w="full" h="full">
-      <IAIDroppable data={droppableData} disabled={false} dropLabel="drop label" />
       <ScrollableContent>
-        <SortableContext items={fields.map((field) => field.nodeId)} strategy={verticalListSortingStrategy}>
-          <Flex position="relative" flexDir="column" alignItems="flex-start" p={1} gap={2} h="full" w="full">
-            {isLoading ? (
-              <IAINoContentFallback label={t('nodes.loadingNodes')} icon={null} />
-            ) : fields.length ? (
-              fields.map(({ nodeId, fieldName }) => (
-                <LinearViewField key={`${nodeId}.${fieldName}`} nodeId={nodeId} fieldName={fieldName} />
-              ))
-            ) : (
-              <IAINoContentFallback label={t('nodes.noFieldsLinearview')} icon={null} />
-            )}
-          </Flex>
-        </SortableContext>
+        <DndContext onDragEnd={handleDragEnd}>
+          <SortableContext items={fields.map((field) => `${field.nodeId}.${field.fieldName}`)}>
+            <Flex position="relative" flexDir="column" alignItems="flex-start" p={1} gap={2} h="full" w="full">
+              {isLoading ? (
+                <IAINoContentFallback label={t('nodes.loadingNodes')} icon={null} />
+              ) : fields.length ? (
+                fields.map(({ nodeId, fieldName }) => (
+                  <LinearViewField key={`${nodeId}.${fieldName}`} nodeId={nodeId} fieldName={fieldName} />
+                ))
+              ) : (
+                <IAINoContentFallback label={t('nodes.noFieldsLinearview')} icon={null} />
+              )}
+            </Flex>
+          </SortableContext>
+        </DndContext>
       </ScrollableContent>
     </Box>
   );

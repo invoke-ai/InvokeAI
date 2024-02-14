@@ -42,11 +42,8 @@ export const workflowSlice = createSlice({
       state.exposedFields = state.exposedFields.filter((field) => !isEqual(field, action.payload));
       state.isTouched = true;
     },
-    workflowExposedFieldsReordered: (state, action: PayloadAction<string>) => {
-      state.exposedFields = action.payload.split(',').map((id) => {
-        const [nodeId, fieldName] = id.split('.');
-        return { nodeId, fieldName };
-      });
+    workflowExposedFieldsReordered: (state, action: PayloadAction<FieldIdentifier[]>) => {
+      state.exposedFields = action.payload;
       state.isTouched = true;
     },
     workflowNameChanged: (state, action: PayloadAction<string>) => {
@@ -113,6 +110,7 @@ export const workflowSlice = createSlice({
 export const {
   workflowExposedFieldAdded,
   workflowExposedFieldRemoved,
+  workflowExposedFieldsReordered,
   workflowNameChanged,
   workflowCategoryChanged,
   workflowDescriptionChanged,

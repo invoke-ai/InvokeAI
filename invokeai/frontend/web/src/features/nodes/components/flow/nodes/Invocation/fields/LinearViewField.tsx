@@ -23,11 +23,12 @@ const LinearViewField = ({ nodeId, fieldName }: Props) => {
   const dispatch = useAppDispatch();
   const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
   const { t } = useTranslation();
+
   const handleRemoveField = useCallback(() => {
     dispatch(workflowExposedFieldRemoved({ nodeId, fieldName }));
   }, [dispatch, fieldName, nodeId]);
 
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: nodeId });
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: `${nodeId}.${fieldName}` });
 
   const style = {
     transform: CSS.Transform.toString(transform),
