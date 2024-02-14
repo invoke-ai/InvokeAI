@@ -1,12 +1,10 @@
-import { Flex, FormControl, FormLabel, IconButton, Image, Switch } from '@invoke-ai/ui-library';
+import { Flex, FormControl, FormLabel, Image, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ProgressImage from 'features/gallery/components/CurrentImage/ProgressImage';
 import { setShowSeamless } from 'features/showcase/store/showcaseSlice';
-import { setShouldShowShowcase } from 'features/ui/store/uiSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiXBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
 import SeamlessTextureViewer from './SeamlessTextureViewer';
@@ -23,9 +21,9 @@ function Showcase(props: ShowcaseProps) {
   const shouldShowProgressInViewer = useAppSelector((s) => s.ui.shouldShowProgressInViewer);
   const hasDenoiseProgress = useAppSelector((s) => Boolean(s.system.denoiseProgress));
 
-  const closeShowcase = useCallback(() => {
-    dispatch(setShouldShowShowcase(null));
-  }, [dispatch]);
+  // const closeShowcase = useCallback(() => {
+  //   dispatch(setShouldShowShowcase(null));
+  // }, [dispatch]);
 
   const handleShowSeamless = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => dispatch(setShowSeamless(e.target.checked)),
@@ -40,15 +38,13 @@ function Showcase(props: ShowcaseProps) {
         position: 'relative',
         background: 'base.850',
         flexDir: 'column',
-        gap: 2,
       }}
     >
-      <Flex sx={{ background: 'base.900', borderRadius: 'base', p: 2 }}>
+      <Flex sx={{ borderRadius: 'base', borderTopRadius: 0, p: 2, borderTop: '2px', borderColor: 'base.800' }}>
         <FormControl sx={{ gap: 0, pl: 2 }}>
           <FormLabel>{t('showcase.seamlessChecker')}</FormLabel>
           <Switch isChecked={showSeamless} onChange={handleShowSeamless} />
         </FormControl>
-        <IconButton icon={<PiXBold fontSize={12} />} onClick={closeShowcase} aria-label={t('common.close')} />
       </Flex>
       <Flex
         sx={{
