@@ -131,7 +131,7 @@
         "nodesDesc": "A node based system for the generation of images is under development currently. Stay tuned for updates about this amazing feature.",
         "notInstalled": "Not $t(common.installed)",
         "openInNewTab": "Open in New Tab",
-        "openShowcase": "Open Showcase",
+        "openShowcase": "Open in Showcase",
         "closeShowcase": "Close Showcase",
         "orderBy": "Order By",
         "outpaint": "outpaint",

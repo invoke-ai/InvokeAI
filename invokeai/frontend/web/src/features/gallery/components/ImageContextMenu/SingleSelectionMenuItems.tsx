@@ -1,6 +1,7 @@
 import { Flex, MenuDivider, MenuItem, Spinner } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppToaster } from 'app/components/Toaster';
+import { galleryImageClicked } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
@@ -50,7 +51,6 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const customStarUi = useStore($customStarUI);
   const { downloadImage } = useDownloadImage();
   const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(imageDTO?.image_name);
-  const showShowcase = useAppSelector((s) => s.ui.showShowcase);
 
   const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } = useGetAndLoadEmbeddedWorkflow({});
 
@@ -150,12 +150,16 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   }, [downloadImage, imageDTO.image_name, imageDTO.image_url]);
 
   const handleOpenInShowcase = useCallback(() => {
+    dispatch(
+      galleryImageClicked({
+        imageDTO,
+        shiftKey: false,
+        ctrlKey: false,
+        metaKey: false,
+      })
+    );
     dispatch(setShouldShowShowcase(imageDTO));
   }, [dispatch, imageDTO]);
-
-  const handleCloseShowcase = useCallback(() => {
-    dispatch(setShouldShowShowcase(null));
-  }, [dispatch]);
 
   return (
     <>
@@ -171,15 +175,9 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         {t('parameters.downloadImage')}
       </MenuItem>
 
-      {!showShowcase ? (
-        <MenuItem icon={<PiShareFatBold />} onClickCapture={handleOpenInShowcase}>
-          {t('common.openShowcase')}
-        </MenuItem>
-      ) : (
-        <MenuItem color="warning.300" icon={<PiShareFatBold />} onClickCapture={handleCloseShowcase}>
-          {t('common.closeShowcase')}
-        </MenuItem>
-      )}
+      <MenuItem icon={<PiShareFatBold />} onClickCapture={handleOpenInShowcase}>
+        {t('common.openShowcase')}
+      </MenuItem>
 
       <MenuDivider />
       <MenuItem
