@@ -21,7 +21,7 @@ from .baseinvocation import (
 
 class ModelInfo(BaseModel):
     key: str = Field(description="Key of model as returned by ModelRecordServiceBase.get_model()")
-    submodel: Optional[SubModelType] = Field(default=None, description="Info to load submodel")
+    submodel_type: Optional[SubModelType] = Field(default=None, description="Info to load submodel")
 
 
 class LoraInfo(ModelInfo):
@@ -113,22 +113,22 @@ class MainModelLoaderInvocation(BaseInvocation):
             unet=UNetField(
                 unet=ModelInfo(
                     key=key,
-                    submodel=SubModelType.UNet,
+                    submodel_type=SubModelType.UNet,
                 ),
                 scheduler=ModelInfo(
                     key=key,
-                    submodel=SubModelType.Scheduler,
+                    submodel_type=SubModelType.Scheduler,
                 ),
                 loras=[],
             ),
             clip=ClipField(
                 tokenizer=ModelInfo(
                     key=key,
-                    submodel=SubModelType.Tokenizer,
+                    submodel_type=SubModelType.Tokenizer,
                 ),
                 text_encoder=ModelInfo(
                     key=key,
-                    submodel=SubModelType.TextEncoder,
+                    submodel_type=SubModelType.TextEncoder,
                 ),
                 loras=[],
                 skipped_layers=0,
@@ -136,7 +136,7 @@ class MainModelLoaderInvocation(BaseInvocation):
             vae=VaeField(
                 vae=ModelInfo(
                     key=key,
-                    submodel=SubModelType.Vae,
+                    submodel_type=SubModelType.Vae,
                 ),
             ),
         )
@@ -191,7 +191,7 @@ class LoraLoaderInvocation(BaseInvocation):
             output.unet.loras.append(
                 LoraInfo(
                     key=lora_key,
-                    submodel=None,
+                    submodel_type=None,
                     weight=self.weight,
                 )
             )
@@ -201,7 +201,7 @@ class LoraLoaderInvocation(BaseInvocation):
             output.clip.loras.append(
                 LoraInfo(
                     key=lora_key,
-                    submodel=None,
+                    submodel_type=None,
                     weight=self.weight,
                 )
             )
@@ -274,7 +274,7 @@ class SDXLLoraLoaderInvocation(BaseInvocation):
             output.unet.loras.append(
                 LoraInfo(
                     key=lora_key,
-                    submodel=None,
+                    submodel_type=None,
                     weight=self.weight,
                 )
             )
@@ -284,7 +284,7 @@ class SDXLLoraLoaderInvocation(BaseInvocation):
             output.clip.loras.append(
                 LoraInfo(
                     key=lora_key,
-                    submodel=None,
+                    submodel_type=None,
                     weight=self.weight,
                 )
             )
@@ -294,7 +294,7 @@ class SDXLLoraLoaderInvocation(BaseInvocation):
             output.clip2.loras.append(
                 LoraInfo(
                     key=lora_key,
-                    submodel=None,
+                    submodel_type=None,
                     weight=self.weight,
                 )
             )

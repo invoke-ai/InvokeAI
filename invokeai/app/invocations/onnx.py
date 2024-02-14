@@ -415,29 +415,29 @@ class OnnxModelLoaderInvocation(BaseInvocation):
         model_key = self.model.key
 
         # TODO: not found exceptions
-        if not context.services.model_records.exists(model_key):
+        if not context.services.model_manager.store.exists(model_key):
             raise Exception(f"Unknown model: {model_key}")
 
         return ONNXModelLoaderOutput(
             unet=UNetField(
                 unet=ModelInfo(
                     key=model_key,
-                    submodel=SubModelType.UNet,
+                    submodel_type=SubModelType.UNet,
                 ),
                 scheduler=ModelInfo(
                     key=model_key,
-                    submodel=SubModelType.Scheduler,
+                    submodel_type=SubModelType.Scheduler,
                 ),
                 loras=[],
             ),
             clip=ClipField(
                 tokenizer=ModelInfo(
                     key=model_key,
-                    submodel=SubModelType.Tokenizer,
+                    submodel_type=SubModelType.Tokenizer,
                 ),
                 text_encoder=ModelInfo(
                     key=model_key,
-                    submodel=SubModelType.TextEncoder,
+                    submodel_type=SubModelType.TextEncoder,
                 ),
                 loras=[],
                 skipped_layers=0,
@@ -445,13 +445,13 @@ class OnnxModelLoaderInvocation(BaseInvocation):
             vae_decoder=VaeField(
                 vae=ModelInfo(
                     key=model_key,
-                    submodel=SubModelType.VaeDecoder,
+                    submodel_type=SubModelType.VaeDecoder,
                 ),
             ),
             vae_encoder=VaeField(
                 vae=ModelInfo(
                     key=model_key,
-                    submodel=SubModelType.VaeEncoder,
+                    submodel_type=SubModelType.VaeEncoder,
                 ),
             ),
         )
