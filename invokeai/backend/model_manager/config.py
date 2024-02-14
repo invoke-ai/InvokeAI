@@ -123,11 +123,11 @@ class ModelRepoVariant(str, Enum):
 class ModelConfigBase(BaseModel):
     """Base class for model configuration information."""
 
-    path: str
-    name: str
-    base: BaseModelType
-    type: ModelType
-    format: ModelFormat
+    path: str = Field(description="filesystem path to the model file or directory")
+    name: str = Field(description="model name")
+    base: BaseModelType = Field(description="base model")
+    type: ModelType = Field(description="type of the model")
+    format: ModelFormat = Field(description="model format")
     key: str = Field(description="unique key for model", default="<NOKEY>")
     original_hash: Optional[str] = Field(
         description="original fasthash of model contents", default=None
@@ -135,9 +135,9 @@ class ModelConfigBase(BaseModel):
     current_hash: Optional[str] = Field(
         description="current fasthash of model contents", default=None
     )  # if model is converted or otherwise modified, this will hold updated hash
-    description: Optional[str] = Field(default=None)
-    source: Optional[str] = Field(description="Model download source (URL or repo_id)", default=None)
-    last_modified: Optional[float] = Field(description="Timestamp for modification time", default_factory=time.time)
+    description: Optional[str] = Field(description="human readable description of the model", default=None)
+    source: Optional[str] = Field(description="model original source (path, URL or repo_id)", default=None)
+    last_modified: Optional[float] = Field(description="timestamp for modification time", default_factory=time.time)
 
     model_config = ConfigDict(
         use_enum_values=False,
