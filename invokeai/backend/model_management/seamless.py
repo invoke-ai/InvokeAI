@@ -30,7 +30,7 @@ def set_seamless(model: Union[UNet2DConditionModel, AutoencoderKL], seamless_axe
     # Callable: (input: Tensor, weight: Tensor, bias: Optional[Tensor]) -> Tensor
     to_restore: list[tuple[nn.Conv2d | nn.ConvTranspose2d, Callable]] = []
     try:
-        # Hard coded to skip down block layers, allowing for seamless tiling at the expense of prompt adherence 
+        # Hard coded to skip down block layers, allowing for seamless tiling at the expense of prompt adherence
         skipped_layers = 1
         for m_name, m in model.named_modules():
             if not isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
