@@ -90,10 +90,7 @@ export type GallerySelectionDraggableData = BaseDragData & {
   payload: { boardId: BoardId };
 };
 
-export type TypesafeDraggableData =
-  | NodeFieldDraggableData
-  | ImageDraggableData
-  | GallerySelectionDraggableData;
+export type TypesafeDraggableData = NodeFieldDraggableData | ImageDraggableData | GallerySelectionDraggableData;
 
 export interface UseDroppableTypesafeArguments extends Omit<UseDroppableArguments, 'data'> {
   data?: TypesafeDroppableData;
