@@ -1,6 +1,6 @@
 import type { DragEndEvent } from '@dnd-kit/core';
 import { MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { SortableContext } from '@dnd-kit/sortable';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 
@@ -24,7 +24,9 @@ const DndSortable = (props: Props) => {
 
   return (
     <DndContextTypesafe onDragEnd={props.onDragEnd} sensors={sensors}>
-      <SortableContext items={props.items}>{props.children}</SortableContext>
+      <SortableContext items={props.items} strategy={verticalListSortingStrategy}>
+        {props.children}
+      </SortableContext>
     </DndContextTypesafe>
   );
 };
