@@ -68,6 +68,11 @@ export const useHotkeyData = (): HotkeyGroup[] => {
           hotkeys: [['F']],
         },
         {
+          title: t('hotkeys.toggleShowcase.title'),
+          desc: t('hotkeys.toggleShowcase.desc'),
+          hotkeys: [['Shift', 'S']],
+        },
+        {
           title: t('hotkeys.changeTabs.title'),
           desc: t('hotkeys.changeTabs.desc'),
           hotkeys: [['1 - 6']],

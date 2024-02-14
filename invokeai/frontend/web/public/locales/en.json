@@ -644,6 +644,10 @@
             "desc": "Toggles Snap to Grid",
             "title": "Toggle Snap"
         },
+        "toggleShowcase": {
+            "desc": "Open and close the Showcase",
+            "title": "Toggle Showcase"
+        },
         "undoStroke": {
             "desc": "Undo a brush stroke",
             "title": "Undo Stroke"
