@@ -2,7 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { workflowLoaded } from 'features/nodes/store/actions';
-import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesDeleted } from 'features/nodes/store/nodesSlice';
+import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesChanged, nodesDeleted } from 'features/nodes/store/nodesSlice';
 import type {
   FieldIdentifierWithValue,
   WorkflowMode,
@@ -54,7 +54,9 @@ export const workflowSlice = createSlice({
     },
     workflowExposedFieldRemoved: (state, action: PayloadAction<FieldIdentifier>) => {
       state.exposedFields = state.exposedFields.filter((field) => !isEqual(field, action.payload));
-      state.originalExposedFieldValues = state.originalExposedFieldValues.filter((field) => !isEqual(omit(field, 'value'), action.payload));
+      state.originalExposedFieldValues = state.originalExposedFieldValues.filter(
+        (field) => !isEqual(omit(field, 'value'), action.payload)
+      );
       state.isTouched = true;
     },
     workflowNameChanged: (state, action: PayloadAction<string>) => {
@@ -139,6 +141,29 @@ export const workflowSlice = createSlice({
     });
 
     builder.addCase(nodeEditorReset, () => cloneDeep(initialWorkflowState));
+
+    builder.addCase(nodesChanged, (state, action) => {
+      // Not all changes to nodes should result in the workflow being marked touched
+      const filteredChanges = action.payload.filter((change) => {
+        // We always want to mark the workflow as touched if a node is added, removed, or reset
+        if (['add', 'remove', 'reset'].includes(change.type)) {
+          return true;
+        }
+
+        // Position changes can change the position and the dragging status of the node - ignore if the change doesn't
+        // affect the position
+        if (change.type === 'position' && (change.position || change.positionAbsolute)) {
+          return true;
+        }
+
+        // This change isn't relevant
+        return false;
+      });
+
+      if (filteredChanges.length > 0) {
+        state.isTouched = true;
+      }
+    });
 
     builder.addMatcher(isAnyNodeOrEdgeMutation, (state) => {
       state.isTouched = true;

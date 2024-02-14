@@ -840,7 +840,6 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   nodeIsOpenChanged,
   nodeLabelChanged,
   nodeNotesChanged,
-  nodesChanged,
   nodesDeleted,
   nodeUseCacheChanged,
   notesNodeValueChanged,
