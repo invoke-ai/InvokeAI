@@ -3,7 +3,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import SaveWorkflowButton from 'features/nodes/components/flow/panels/TopPanel/SaveWorkflowButton';
 import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
-import NewWorkflowButton from 'features/workflowLibrary/components/NewWorkflowButton';
+import { NewWorkflowButton } from 'features/workflowLibrary/components/NewWorkflowButton';
 
 import { ModeToggle } from './ModeToggle';
 
