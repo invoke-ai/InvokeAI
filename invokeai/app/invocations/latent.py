@@ -812,7 +812,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
 
         with set_seamless(vae_info.model, self.vae.seamless_axes), vae_info as vae:
-            assert isinstance(vae, torch.Tensor)
+            assert isinstance(vae, torch.nn.Module)
             latents = latents.to(vae.device)
             if self.fp32:
                 vae.to(dtype=torch.float32)
