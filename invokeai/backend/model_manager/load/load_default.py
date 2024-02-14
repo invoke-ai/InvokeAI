@@ -169,6 +169,8 @@ class ModelLoader(ModelLoaderBase):
                 if config.get("model_type", None) == "clip_vision_model":
                     class_name = config.get("architectures")[0]
                     return self._hf_definition_to_type(module="transformers", class_name=class_name)
+                if not class_name:
+                    raise InvalidModelConfigException("Unable to decifer Load Class based on given config.json")
             except KeyError as e:
                 raise InvalidModelConfigException("An expected config.json file is missing from this model.") from e
 
