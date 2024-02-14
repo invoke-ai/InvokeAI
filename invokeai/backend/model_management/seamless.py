@@ -42,7 +42,7 @@ def set_seamless(model: Union[UNet2DConditionModel, AutoencoderKL], seamless_axe
                 block_num = int(block_num)
                 resnet_num = int(resnet_num)
 
-                if block_num >= len(model.down_blocks)  - skipped_layers:
+                if block_num >= len(model.down_blocks) - skipped_layers:
                     continue
 
                 # Skip the second resnet (could be configurable)
