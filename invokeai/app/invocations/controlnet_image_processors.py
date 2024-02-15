@@ -39,7 +39,6 @@ from invokeai.app.invocations.util import validate_begin_end_step, validate_weig
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.depth_anything import DepthAnythingDetector
 from invokeai.backend.image_util.dw_openpose import DWOpenposeDetector
-from invokeai.backend.model_management.models.base import BaseModelType
 
 from .baseinvocation import (
     BaseInvocation,
