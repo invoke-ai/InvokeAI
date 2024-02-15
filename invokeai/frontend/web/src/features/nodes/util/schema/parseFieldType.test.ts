@@ -284,13 +284,13 @@ describe('refObjectToSchemaName', async () => {
 });
 
 describe.concurrent('parseFieldType', async () => {
-  it.each(primitiveTypes)('parses primitive types ($name)', ({ schema, expected }) => {
+  it.each(primitiveTypes)('parses primitive types ($name)', ({ schema, expected }: ParseFieldTypeTestCase) => {
     expect(parseFieldType(schema)).toEqual(expected);
   });
-  it.each(complexTypes)('parses complex types ($name)', ({ schema, expected }) => {
+  it.each(complexTypes)('parses complex types ($name)', ({ schema, expected }: ParseFieldTypeTestCase) => {
     expect(parseFieldType(schema)).toEqual(expected);
   });
-  it.each(specialCases)('parses special case types ($name)', ({ schema, expected }) => {
+  it.each(specialCases)('parses special case types ($name)', ({ schema, expected }: ParseFieldTypeTestCase) => {
     expect(parseFieldType(schema)).toEqual(expected);
   });
 
