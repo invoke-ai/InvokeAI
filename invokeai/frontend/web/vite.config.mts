@@ -84,7 +84,10 @@ export default defineConfig(({ mode }) => {
       },
     },
     test: {
-      //
+      typecheck: {
+        enabled: true,
+        ignoreSourceErrors: true,
+      },
     },
   };
 });
