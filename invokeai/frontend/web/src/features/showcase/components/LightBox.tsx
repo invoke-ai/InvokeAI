@@ -31,7 +31,7 @@ const LightBox = (props: LightBoxProps) => {
   const handleZoomScroll = useCallback(
     (e: WheelEvent) => {
       e.preventDefault();
-      const zoomFactor = e.deltaY > 0 ? zoomPercent : 1 / zoomPercent;
+      const zoomFactor = e.deltaY > 0 ? 1 / zoomPercent : zoomPercent;
       setZoomLevel(zoomLevel * zoomFactor);
     },
     [zoomLevel, zoomPercent]
