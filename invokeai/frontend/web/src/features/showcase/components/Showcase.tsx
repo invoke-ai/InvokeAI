@@ -1,4 +1,4 @@
-import { Flex, FormControl, FormLabel, Image, Switch } from '@invoke-ai/ui-library';
+import { Flex, FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ProgressImage from 'features/gallery/components/CurrentImage/ProgressImage';
 import { setShowSeamless } from 'features/showcase/store/showcaseSlice';
@@ -7,6 +7,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ImageDTO } from 'services/api/types';
 
+import LightBox from './LightBox';
 import SeamlessTextureViewer from './SeamlessTextureViewer';
 
 type ShowcaseProps = {
@@ -56,7 +57,7 @@ function Showcase(props: ShowcaseProps) {
           <SeamlessTextureViewer imageDTO={imageDTO} />
         ) : (
           <Flex p={4}>
-            <Image src={imageDTO.image_url} w="auto" h="auto" objectFit="contain" />
+            <LightBox imageDTO={imageDTO} />
           </Flex>
         )}
       </Flex>

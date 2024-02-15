@@ -1617,7 +1617,10 @@
         }
     },
     "showcase": {
-        "seamlessChecker": "Seamless Checker"
+        "seamlessChecker": "Seamless Checker",
+        "zoomIn": "Zoom In",
+        "zoomOut": "Zoom Out",
+        "resetZoom": "Reset Zoom"
     },
     "ui": {
         "hideProgressImages": "Hide Progress Images",

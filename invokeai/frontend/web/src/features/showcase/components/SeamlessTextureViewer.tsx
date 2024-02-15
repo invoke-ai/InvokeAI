@@ -1,5 +1,6 @@
 import { Grid, Image } from '@invoke-ai/ui-library';
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusedMouseWheel } from 'features/showcase/hooks/useFocusedMouseWheel';
+import { useCallback, useRef, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
 type SeamlessTextureViewerProps = {
@@ -9,11 +10,12 @@ type SeamlessTextureViewerProps = {
 export default function SeamlessTextureViewer(props: SeamlessTextureViewerProps) {
   const [tileCount, setTileCount] = useState(150);
   const [gridWidth, setGridWidth] = useState(256);
+  const seamlessViewerRef = useRef<HTMLDivElement | null>(null);
 
   const tiles = Array.from({ length: tileCount }, (_, index) => index);
 
   const handleScroll = useCallback(
-    (e: WheelEvent, tileCount: number, gridWidth: number, props: { imageDTO: ImageDTO }) => {
+    (e: WheelEvent) => {
       e.preventDefault();
       const delta = e.deltaY;
       const zoomFactor = 0.25;
@@ -34,19 +36,18 @@ export default function SeamlessTextureViewer(props: SeamlessTextureViewerProps)
       }
       setGridWidth(newGridWidth);
     },
-    []
+    [gridWidth, tileCount, props.imageDTO.width]
   );
 
-  useEffect(() => {
-    const handleWheel = (e: WheelEvent) => handleScroll(e, tileCount, gridWidth, props);
-    window.addEventListener('wheel', handleWheel, { passive: false });
-    return () => {
-      window.removeEventListener('wheel', handleWheel);
-    };
-  }, [handleScroll, tileCount, gridWidth, props]);
+  useFocusedMouseWheel(seamlessViewerRef, handleScroll);
 
   return (
-    <Grid width="100%" templateColumns={`repeat(auto-fill, minmax(${gridWidth}px, 1fr))`} position="relative">
+    <Grid
+      width="100%"
+      templateColumns={`repeat(auto-fill, minmax(${gridWidth}px, 1fr))`}
+      position="relative"
+      ref={seamlessViewerRef}
+    >
       {tiles.map((tileIndex) => (
         <Image
           key={tileIndex}
