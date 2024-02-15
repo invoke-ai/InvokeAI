@@ -76,7 +76,7 @@ const LightBox = (props: LightBoxProps) => {
         onMouseUp={handleMousePanUp}
         onMouseMove={handleMousePanMove}
       />
-      <Flex sx={{ position: 'absolute', top: 2, left: '38%', gap: 2, margin: 'auto' }}>
+      <Flex sx={{ position: 'absolute', top: 2, w: 'full', h: 'max-content', gap: 2, justifyContent: 'center' }}>
         <ButtonGroup>
           <IconButton
             icon={<PiScan />}
