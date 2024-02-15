@@ -116,9 +116,12 @@ class InvokeAIDiffuserComponent:
         timestep: torch.Tensor,
         step_index: int,
         total_step_count: int,
-        conditioning_data,
+        conditioning_data: ConditioningData,
     ):
         down_block_res_samples, mid_block_res_sample = None, None
+        # HACK(ryan): Currently, we just take the first text embedding if there's more than one. We should probably
+        # concatenate all of the embeddings for the ControlNet, but not apply embedding masks.
+        text_embeddings = conditioning_data.text_embeddings[0]
 
         # control_data should be type List[ControlNetData]
         # this loop covers both ControlNet (one ControlNetData in list)
@@ -149,28 +152,28 @@ class InvokeAIDiffuserComponent:
                 added_cond_kwargs = None
 
                 if cfg_injection:  # only applying ControlNet to conditional instead of in unconditioned
-                    if type(conditioning_data.text_embeddings) is SDXLConditioningInfo:
+                    if type(text_embeddings) is SDXLConditioningInfo:
                         added_cond_kwargs = {
-                            "text_embeds": conditioning_data.text_embeddings.pooled_embeds,
-                            "time_ids": conditioning_data.text_embeddings.add_time_ids,
+                            "text_embeds": text_embeddings.pooled_embeds,
+                            "time_ids": text_embeddings.add_time_ids,
                         }
-                    encoder_hidden_states = conditioning_data.text_embeddings.embeds
+                    encoder_hidden_states = text_embeddings.embeds
                     encoder_attention_mask = None
                 else:
-                    if type(conditioning_data.text_embeddings) is SDXLConditioningInfo:
+                    if type(text_embeddings) is SDXLConditioningInfo:
                         added_cond_kwargs = {
                             "text_embeds": torch.cat(
                                 [
                                     # TODO: how to pad? just by zeros? or even truncate?
                                     conditioning_data.unconditioned_embeddings.pooled_embeds,
-                                    conditioning_data.text_embeddings.pooled_embeds,
+                                    text_embeddings.pooled_embeds,
                                 ],
                                 dim=0,
                             ),
                             "time_ids": torch.cat(
                                 [
                                     conditioning_data.unconditioned_embeddings.add_time_ids,
-                                    conditioning_data.text_embeddings.add_time_ids,
+                                    text_embeddings.add_time_ids,
                                 ],
                                 dim=0,
                             ),
@@ -180,7 +183,7 @@ class InvokeAIDiffuserComponent:
                         encoder_attention_mask,
                     ) = self._concat_conditionings_for_batch(
                         conditioning_data.unconditioned_embeddings.embeds,
-                        conditioning_data.text_embeddings.embeds,
+                        text_embeddings.embeds,
                     )
                 if isinstance(control_datum.weight, list):
                     # if controlnet has multiple weights, use the weight for the current step
@@ -346,6 +349,9 @@ class InvokeAIDiffuserComponent:
         x_twice = torch.cat([x] * 2)
         sigma_twice = torch.cat([sigma] * 2)
 
+        assert len(conditioning_data.text_embeddings) == 1
+        text_embeddings = conditioning_data.text_embeddings[0]
+
         cross_attention_kwargs = None
         if conditioning_data.ip_adapter_conditioning is not None:
             # Note that we 'stack' to produce tensors of shape (batch_size, num_ip_images, seq_len, token_len).
@@ -359,27 +365,27 @@ class InvokeAIDiffuserComponent:
             }
 
         added_cond_kwargs = None
-        if type(conditioning_data.text_embeddings) is SDXLConditioningInfo:
+        if type(text_embeddings) is SDXLConditioningInfo:
             added_cond_kwargs = {
                 "text_embeds": torch.cat(
                     [
                         # TODO: how to pad? just by zeros? or even truncate?
                         conditioning_data.unconditioned_embeddings.pooled_embeds,
-                        conditioning_data.text_embeddings.pooled_embeds,
+                        text_embeddings.pooled_embeds,
                     ],
                     dim=0,
                 ),
                 "time_ids": torch.cat(
                     [
                         conditioning_data.unconditioned_embeddings.add_time_ids,
-                        conditioning_data.text_embeddings.add_time_ids,
+                        text_embeddings.add_time_ids,
                     ],
                     dim=0,
                 ),
             }
 
         both_conditionings, encoder_attention_mask = self._concat_conditionings_for_batch(
-            conditioning_data.unconditioned_embeddings.embeds, conditioning_data.text_embeddings.embeds
+            conditioning_data.unconditioned_embeddings.embeds, text_embeddings.embeds
         )
         both_results = self.model_forward_callback(
             x_twice,
@@ -408,6 +414,10 @@ class InvokeAIDiffuserComponent:
         """Runs the conditioned and unconditioned UNet forward passes sequentially for lower memory usage at the cost of
         slower execution speed.
         """
+
+        assert len(conditioning_data.text_embeddings) == 1
+        text_embeddings = conditioning_data.text_embeddings[0]
+
         # Since we are running the conditioned and unconditioned passes sequentially, we need to split the ControlNet
         # and T2I-Adapter residuals into two chunks.
         uncond_down_block, cond_down_block = None, None
@@ -465,7 +475,7 @@ class InvokeAIDiffuserComponent:
 
         # Prepare SDXL conditioning kwargs for the unconditioned pass.
         added_cond_kwargs = None
-        is_sdxl = type(conditioning_data.text_embeddings) is SDXLConditioningInfo
+        is_sdxl = type(text_embeddings) is SDXLConditioningInfo
         if is_sdxl:
             added_cond_kwargs = {
                 "text_embeds": conditioning_data.unconditioned_embeddings.pooled_embeds,
@@ -509,15 +519,15 @@ class InvokeAIDiffuserComponent:
         added_cond_kwargs = None
         if is_sdxl:
             added_cond_kwargs = {
-                "text_embeds": conditioning_data.text_embeddings.pooled_embeds,
-                "time_ids": conditioning_data.text_embeddings.add_time_ids,
+                "text_embeds": text_embeddings.pooled_embeds,
+                "time_ids": text_embeddings.add_time_ids,
             }
 
         # Run conditioned UNet denoising (i.e. positive prompt).
         conditioned_next_x = self.model_forward_callback(
             x,
             sigma,
-            conditioning_data.text_embeddings.embeds,
+            text_embeddings.embeds,
             cross_attention_kwargs=cross_attention_kwargs,
             down_block_additional_residuals=cond_down_block,
             mid_block_additional_residual=cond_mid_block,

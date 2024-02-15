@@ -62,7 +62,7 @@ class IPAdapterConditioningInfo:
 @dataclass
 class ConditioningData:
     unconditioned_embeddings: BasicConditioningInfo
-    text_embeddings: BasicConditioningInfo
+    text_embeddings: list[BasicConditioningInfo]
     """
     Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
     `guidance_scale` is defined as `w` of equation 2. of [Imagen Paper](https://arxiv.org/pdf/2205.11487.pdf).
@@ -81,10 +81,6 @@ class ConditioningData:
     postprocessing_settings: Optional[PostprocessingSettings] = None
 
     ip_adapter_conditioning: Optional[list[IPAdapterConditioningInfo]] = None
-
-    @property
-    def dtype(self):
-        return self.text_embeddings.dtype
 
     def add_scheduler_args_if_applicable(self, scheduler, **kwargs):
         scheduler_args = dict(self.scheduler_args)

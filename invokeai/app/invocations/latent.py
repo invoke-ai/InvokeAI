@@ -40,7 +40,11 @@ from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
 from invokeai.backend.model_management.models import ModelType, SilenceWarnings
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData, IPAdapterConditioningInfo
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    BasicConditioningInfo,
+    ConditioningData,
+    IPAdapterConditioningInfo,
+)
 
 from ...backend.model_management.lora import ModelPatcher
 from ...backend.model_management.models import BaseModelType
@@ -330,15 +334,22 @@ class DenoiseLatentsInvocation(BaseInvocation):
         unet,
         seed,
     ) -> ConditioningData:
-        positive_cond_data = context.services.latents.get(self.positive_conditioning.conditioning_name)
-        c = positive_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
+        # self.positive_conditioning could be a list or a single ConditioningField. Normalize to a list here.
+        positive_conditioning_list = self.positive_conditioning
+        if not isinstance(positive_conditioning_list, list):
+            positive_conditioning_list = [positive_conditioning_list]
+
+        text_embeddings: list[BasicConditioningInfo] = []
+        for positive_conditioning in positive_conditioning_list:
+            positive_cond_data = context.services.latents.get(positive_conditioning.conditioning_name)
+            text_embeddings.append(positive_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype))
 
         negative_cond_data = context.services.latents.get(self.negative_conditioning.conditioning_name)
         uc = negative_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
 
         conditioning_data = ConditioningData(
             unconditioned_embeddings=uc,
-            text_embeddings=c,
+            text_embeddings=text_embeddings,
             guidance_scale=self.cfg_scale,
             guidance_rescale_multiplier=self.cfg_rescale_multiplier,
             postprocessing_settings=PostprocessingSettings(
