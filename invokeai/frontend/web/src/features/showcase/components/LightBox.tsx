@@ -59,11 +59,11 @@ const LightBox = (props: LightBoxProps) => {
   }, [resetPan, resetZoom]);
 
   return (
-    <Flex sx={{ width: '100%', height: '100%', position: 'relative' }}>
+    <Flex sx={{ width: '100%', height: '100%', position: 'relative' }} onMouseLeave={handleMousePanUp}>
       <Image
         ref={imageRef}
         src={imageDTO.image_url}
-        w="auto"
+        w="100%"
         h="auto"
         objectFit="contain"
         style={{
@@ -75,6 +75,7 @@ const LightBox = (props: LightBoxProps) => {
         onMouseDown={handleMousePanDown}
         onMouseUp={handleMousePanUp}
         onMouseMove={handleMousePanMove}
+        onMouseLeave={handleMousePanUp}
       />
       <Flex sx={{ position: 'absolute', top: 2, w: 'full', h: 'max-content', gap: 2, justifyContent: 'center' }}>
         <ButtonGroup>
