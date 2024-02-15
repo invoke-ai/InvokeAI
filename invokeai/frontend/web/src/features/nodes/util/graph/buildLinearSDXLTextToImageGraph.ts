@@ -109,6 +109,7 @@ export const buildLinearSDXLTextToImageGraph = (state: RootState): NonNullableGr
         type: 'denoise_latents',
         id: SDXL_DENOISE_LATENTS,
         cfg_scale,
+        cfg_rescale_multiplier,
         scheduler,
         steps,
         denoising_start: 0,

@@ -1,7 +1,7 @@
 import type { RootState } from 'app/store/store';
 import type { LoRAMetadataItem } from 'features/nodes/types/metadata';
 import { zLoRAMetadataItem } from 'features/nodes/types/metadata';
-import { forEach, size } from 'lodash-es';
+import { filter, size } from 'lodash-es';
 import type { NonNullableGraph, SDXLLoraLoaderInvocation } from 'services/api/types';
 
 import {
@@ -31,8 +31,8 @@ export const addSDXLLoRAsToGraph = (
    * So we need to inject a LoRA chain into the graph.
    */
 
-  const { loras } = state.lora;
-  const loraCount = size(loras);
+  const enabledLoRAs = filter(state.lora.loras, (l) => l.isEnabled ?? false);
+  const loraCount = size(enabledLoRAs);
 
   if (loraCount === 0) {
     return;
@@ -59,7 +59,7 @@ export const addSDXLLoRAsToGraph = (
   let lastLoraNodeId = '';
   let currentLoraIndex = 0;
 
-  forEach(loras, (lora) => {
+  enabledLoRAs.forEach((lora) => {
     const { model_name, base_model, weight } = lora;
     const currentLoraNodeId = `${LORA_LOADER}_${model_name.replace('.', '_')}`;
 
