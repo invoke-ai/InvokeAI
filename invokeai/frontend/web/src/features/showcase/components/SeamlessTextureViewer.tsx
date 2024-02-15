@@ -53,7 +53,7 @@ export default function SeamlessTextureViewer(props: SeamlessTextureViewerProps)
           key={tileIndex}
           src={props.imageDTO.image_url}
           alt={`Tile ${tileIndex + 1}`}
-          sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          sx={{ width: '100%', height: 'auto', objectFit: 'cover' }}
         />
       ))}
     </Grid>
