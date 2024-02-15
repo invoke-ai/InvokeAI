@@ -22,6 +22,8 @@ class ImageUploadData(BaseModel):
     workflow: Optional[WorkflowWithoutID] = None
     width: Optional[int] = None
     height: Optional[int] = None
+    starred: Optional[bool] = False
+    node_id: Optional[str] = None
 
     class Config:
         arbitrary_types_allowed = True

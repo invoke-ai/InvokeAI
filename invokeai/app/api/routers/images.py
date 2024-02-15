@@ -26,7 +26,7 @@ IMAGE_MAX_AGE = 31536000
     "/upload_multiple",
     operation_id="upload_multiple_images",
     responses={
-        200: {"description": "The images are being prepared for upload"},
+        201: {"description": "The images are being prepared for upload"},
         415: {"description": "Images upload failed"},
     },
     status_code=201,  

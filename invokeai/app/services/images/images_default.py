@@ -127,7 +127,19 @@ class ImageService(ImageServiceABC):
                 image_data.image_name = image_name
                 # if image_data.image.size[0] < 5000:  # Fail condition: fail if width or height is too large
                 #     raise Exception("Intentional failure for testing: Image size too large")
-                self.__invoker.services.image_records.save_many_records([image_data])
+                self.__invoker.services.image_records.save(
+                    image_name=image_data.image_name,
+                    image_origin=image_data.image_origin,
+                    image_category=image_data.image_category,
+                    width=image_data.width,
+                    height=image_data.height,
+                    has_workflow=image_data.workflow is not None,
+                    is_intermediate=image_data.is_intermediate,
+                    metadata=image_data.metadata,
+                    node_id=image_data.node_id,
+                    session_id=image_data.session_id,
+                    starred=image_data.starred,
+                )
 
                 if image_data.board_id is not None:
                     self.__invoker.services.board_image_records.add_image_to_board(board_id=image_data.board_id, image_name=image_data.image_name)
