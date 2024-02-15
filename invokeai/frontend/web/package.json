@@ -154,6 +154,7 @@
     "rollup-plugin-visualizer": "^5.12.0",
     "storybook": "^7.6.10",
     "ts-toolbelt": "^9.6.0",
+    "tsafe": "^1.6.6",
     "typescript": "^5.3.3",
     "vite": "^5.0.12",
     "vite-plugin-css-injected-by-js": "^3.3.1",

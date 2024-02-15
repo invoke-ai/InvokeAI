@@ -300,6 +300,9 @@ devDependencies:
   ts-toolbelt:
     specifier: ^9.6.0
     version: 9.6.0
+  tsafe:
+    specifier: ^1.6.6
+    version: 1.6.6
   typescript:
     specifier: ^5.3.3
     version: 5.3.3
@@ -13503,6 +13506,10 @@ packages:
 
   /ts-toolbelt@9.6.0:
     resolution: {integrity: sha512-nsZd8ZeNUzukXPlJmTBwUAuABDe/9qtVDelJeT/qW0ow3ZS3BsQJtNkan1802aM9Uf68/Y8ljw86Hu0h5IUW3w==}
+    dev: true
+
+  /tsafe@1.6.6:
+    resolution: {integrity: sha512-gzkapsdbMNwBnTIjgO758GujLCj031IgHK/PKr2mrmkCSJMhSOR5FeOuSxKLMUoYc0vAA4RGEYYbjt/v6afD3g==}
     dev: true
 
   /tsconfck@3.0.1(typescript@5.3.3):
