@@ -76,6 +76,7 @@ const LightBox = (props: LightBoxProps) => {
         onMouseUp={handleMousePanUp}
         onMouseMove={handleMousePanMove}
         onMouseLeave={handleMousePanUp}
+        onDoubleClick={resetView}
       />
       <Flex sx={{ position: 'absolute', top: 2, w: 'full', h: 'max-content', gap: 2, justifyContent: 'center' }}>
         <ButtonGroup>
