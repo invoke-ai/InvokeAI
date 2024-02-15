@@ -1006,6 +1006,7 @@
         "resetToDefaultValue": "Reset to default value",
         "reloadNodeTemplates": "Reload Node Templates",
         "removeLinearView": "Remove from Linear View",
+        "reorderLinearView": "Reorder Linear View",
         "newWorkflow": "New Workflow",
         "newWorkflowDesc": "Create a new workflow?",
         "newWorkflowDesc2": "Your current workflow has unsaved changes.",
