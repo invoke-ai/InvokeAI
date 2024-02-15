@@ -1,6 +1,6 @@
 import { Grid, Image } from '@invoke-ai/ui-library';
 import { useFocusedMouseWheel } from 'features/showcase/hooks/useFocusedMouseWheel';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
 type SeamlessTextureViewerProps = {
@@ -14,29 +14,57 @@ export default function SeamlessTextureViewer(props: SeamlessTextureViewerProps)
 
   const tiles = Array.from({ length: tileCount }, (_, index) => index);
 
+  const calculateTotalTiles = (gridWidth: number) => {
+    const seamlessViewerElement = seamlessViewerRef.current;
+
+    if (!seamlessViewerElement) {
+      return 0;
+    }
+
+    const totalItems =
+      Math.ceil(seamlessViewerElement.offsetWidth / gridWidth) *
+      Math.ceil(seamlessViewerElement.offsetHeight / gridWidth);
+
+    return totalItems;
+  };
+
+  useEffect(() => {
+    const seamlessViewerElement = seamlessViewerRef.current;
+    if (!seamlessViewerElement) {
+      return;
+    }
+
+    const seamlessViewerObserver = new ResizeObserver(() => {
+      const totalItems = calculateTotalTiles(gridWidth);
+      setTileCount(totalItems);
+    });
+
+    seamlessViewerObserver.observe(seamlessViewerElement);
+
+    return () => {
+      seamlessViewerObserver.disconnect();
+    };
+  }, [gridWidth]);
+
   const handleScroll = useCallback(
     (e: WheelEvent) => {
       e.preventDefault();
       const delta = e.deltaY;
       const zoomFactor = 0.25;
 
-      const minTileCount = 10;
-      const maxTileCount = 100;
-      const newTileCount = Math.min(Math.max(tileCount + Math.sign(delta) * 10, minTileCount), maxTileCount);
-
-      const minGridWidth = 100;
+      const minGridWidth = 128;
       const maxGridWidth = props.imageDTO.width;
       const newGridWidth = Math.min(
         Math.max(gridWidth - Math.sign(delta) * zoomFactor * gridWidth, minGridWidth),
         maxGridWidth
       );
 
-      if (newGridWidth > props.imageDTO.width) {
-        setTileCount(newTileCount);
-      }
+      const totalItems = calculateTotalTiles(newGridWidth);
+
       setGridWidth(newGridWidth);
+      setTileCount(totalItems);
     },
-    [gridWidth, tileCount, props.imageDTO.width]
+    [gridWidth, props.imageDTO.width]
   );
 
   useFocusedMouseWheel(seamlessViewerRef, handleScroll);
@@ -45,6 +73,7 @@ export default function SeamlessTextureViewer(props: SeamlessTextureViewerProps)
     <Grid
       width="100%"
       templateColumns={`repeat(auto-fill, minmax(${gridWidth}px, 1fr))`}
+      autoRows="max-content"
       position="relative"
       ref={seamlessViewerRef}
     >
