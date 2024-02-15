@@ -3,10 +3,11 @@
 
 from typing import Optional
 
-from invokeai.app.invocations.baseinvocation import InvocationContext
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.invocation_processor.invocation_processor_common import CanceledException
+from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import ModelRecordServiceBase, UnknownModelException
+from invokeai.app.services.shared.invocation_context import InvocationContextData
 from invokeai.backend.model_manager import AnyModel, AnyModelConfig, BaseModelType, ModelType, SubModelType
 from invokeai.backend.model_manager.load import AnyModelLoader, LoadedModel, ModelCache, ModelConvertCache
 from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
@@ -46,6 +47,9 @@ class ModelLoadService(ModelLoadServiceBase):
             ),
         )
 
+    def start(self, invoker: Invoker) -> None:
+        self._invoker = invoker
+
     @property
     def ram_cache(self) -> ModelCacheBase[AnyModel]:
         """Return the RAM cache used by this loader."""
@@ -60,7 +64,7 @@ class ModelLoadService(ModelLoadServiceBase):
         self,
         key: str,
         submodel_type: Optional[SubModelType] = None,
-        context: Optional[InvocationContext] = None,
+        context_data: Optional[InvocationContextData] = None,
     ) -> LoadedModel:
         """
         Given a model's key, load it and return the LoadedModel object.
@@ -70,7 +74,7 @@ class ModelLoadService(ModelLoadServiceBase):
         :param context: Invocation context used for event reporting
         """
         config = self._store.get_model(key)
-        return self.load_model_by_config(config, submodel_type, context)
+        return self.load_model_by_config(config, submodel_type, context_data)
 
     def load_model_by_attr(
         self,
@@ -78,7 +82,7 @@ class ModelLoadService(ModelLoadServiceBase):
         base_model: BaseModelType,
         model_type: ModelType,
         submodel: Optional[SubModelType] = None,
-        context: Optional[InvocationContext] = None,
+        context_data: Optional[InvocationContextData] = None,
     ) -> LoadedModel:
         """
         Given a model's attributes, search the database for it, and if found, load and return the LoadedModel object.
@@ -109,7 +113,7 @@ class ModelLoadService(ModelLoadServiceBase):
         self,
         model_config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
-        context: Optional[InvocationContext] = None,
+        context_data: Optional[InvocationContextData] = None,
     ) -> LoadedModel:
         """
         Given a model's configuration, load it and return the LoadedModel object.
@@ -118,15 +122,15 @@ class ModelLoadService(ModelLoadServiceBase):
         :param submodel: For main (pipeline models), the submodel to fetch.
         :param context: Invocation context used for event reporting
         """
-        if context:
+        if context_data:
             self._emit_load_event(
-                context=context,
+                context_data=context_data,
                 model_config=model_config,
             )
         loaded_model = self._any_loader.load_model(model_config, submodel_type)
-        if context:
+        if context_data:
             self._emit_load_event(
-                context=context,
+                context_data=context_data,
                 model_config=model_config,
                 loaded=True,
             )
@@ -134,26 +138,28 @@ class ModelLoadService(ModelLoadServiceBase):
 
     def _emit_load_event(
         self,
-        context: InvocationContext,
+        context_data: InvocationContextData,
         model_config: AnyModelConfig,
         loaded: Optional[bool] = False,
     ) -> None:
-        if context.services.queue.is_canceled(context.graph_execution_state_id):
+        if not self._invoker:
+            return
+        if self._invoker.services.queue.is_canceled(context_data.session_id):
             raise CanceledException()
 
         if not loaded:
-            context.services.events.emit_model_load_started(
-                queue_id=context.queue_id,
-                queue_item_id=context.queue_item_id,
-                queue_batch_id=context.queue_batch_id,
-                graph_execution_state_id=context.graph_execution_state_id,
+            self._invoker.services.events.emit_model_load_started(
+                queue_id=context_data.queue_id,
+                queue_item_id=context_data.queue_item_id,
+                queue_batch_id=context_data.batch_id,
+                graph_execution_state_id=context_data.session_id,
                 model_config=model_config,
             )
         else:
-            context.services.events.emit_model_load_completed(
-                queue_id=context.queue_id,
-                queue_item_id=context.queue_item_id,
-                queue_batch_id=context.queue_batch_id,
-                graph_execution_state_id=context.graph_execution_state_id,
+            self._invoker.services.events.emit_model_load_completed(
+                queue_id=context_data.queue_id,
+                queue_item_id=context_data.queue_item_id,
+                queue_batch_id=context_data.batch_id,
+                graph_execution_state_id=context_data.session_id,
                 model_config=model_config,
             )
