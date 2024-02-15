@@ -4,7 +4,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from invokeai.app.invocations.baseinvocation import InvocationContext
+from invokeai.app.services.shared.invocation_context import InvocationContextData
 from invokeai.backend.model_manager import AnyModel, AnyModelConfig, BaseModelType, ModelType, SubModelType
 from invokeai.backend.model_manager.load import LoadedModel
 from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
@@ -19,14 +19,14 @@ class ModelLoadServiceBase(ABC):
         self,
         key: str,
         submodel_type: Optional[SubModelType] = None,
-        context: Optional[InvocationContext] = None,
+        context_data: Optional[InvocationContextData] = None,
     ) -> LoadedModel:
         """
         Given a model's key, load it and return the LoadedModel object.
 
         :param key: Key of model config to be fetched.
         :param submodel: For main (pipeline models), the submodel to fetch.
-        :param context: Invocation context used for event reporting
+        :param context_data: Invocation context data used for event reporting
         """
         pass
 
@@ -35,14 +35,14 @@ class ModelLoadServiceBase(ABC):
         self,
         model_config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
-        context: Optional[InvocationContext] = None,
+        context_data: Optional[InvocationContextData] = None,
     ) -> LoadedModel:
         """
         Given a model's configuration, load it and return the LoadedModel object.
 
         :param model_config: Model configuration record (as returned by ModelRecordBase.get_model())
         :param submodel: For main (pipeline models), the submodel to fetch.
-        :param context: Invocation context used for event reporting
+        :param context_data: Invocation context data used for event reporting
         """
         pass
 
@@ -53,7 +53,7 @@ class ModelLoadServiceBase(ABC):
         base_model: BaseModelType,
         model_type: ModelType,
         submodel: Optional[SubModelType] = None,
-        context: Optional[InvocationContext] = None,
+        context_data: Optional[InvocationContextData] = None,
     ) -> LoadedModel:
         """
         Given a model's attributes, search the database for it, and if found, load and return the LoadedModel object.
@@ -66,7 +66,7 @@ class ModelLoadServiceBase(ABC):
         :param base_model: Base model
         :param model_type: Type of the model
         :param submodel: For main (pipeline models), the submodel to fetch
-        :param context: The invocation context.
+        :param context_data: The invocation context data.
 
         Exceptions: UnknownModelException -- model with these attributes not known
                     NotImplementedException -- a model loader was not provided at initialization time
