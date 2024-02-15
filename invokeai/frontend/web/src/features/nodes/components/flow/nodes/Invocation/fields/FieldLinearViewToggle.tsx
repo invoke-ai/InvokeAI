@@ -1,6 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useFieldValue } from 'features/nodes/hooks/useFieldValue';
 import {
   selectWorkflowSlice,
   workflowExposedFieldAdded,
@@ -18,7 +19,7 @@ type Props = {
 const FieldLinearViewToggle = ({ nodeId, fieldName }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
+  const value = useFieldValue(nodeId, fieldName);
   const selectIsExposed = useMemo(
     () =>
       createSelector(selectWorkflowSlice, (workflow) => {
@@ -30,8 +31,8 @@ const FieldLinearViewToggle = ({ nodeId, fieldName }: Props) => {
   const isExposed = useAppSelector(selectIsExposed);
 
   const handleExposeField = useCallback(() => {
-    dispatch(workflowExposedFieldAdded({ nodeId, fieldName }));
-  }, [dispatch, fieldName, nodeId]);
+    dispatch(workflowExposedFieldAdded({ nodeId, fieldName, value }));
+  }, [dispatch, fieldName, nodeId, value]);
 
   const handleUnexposeField = useCallback(() => {
     dispatch(workflowExposedFieldRemoved({ nodeId, fieldName }));
