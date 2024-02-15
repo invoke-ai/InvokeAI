@@ -16,7 +16,7 @@ type Props = {
 
 const WorkflowField = ({ nodeId, fieldName }: Props) => {
   const label = useFieldLabel(nodeId, fieldName);
-  const fieldTemplateTitle = useFieldTemplateTitle(nodeId, fieldName, 'input');
+  const fieldTemplateTitle = useFieldTemplateTitle(nodeId, fieldName, 'inputs');
   const { isValueChanged, onReset } = useFieldOriginalValue(nodeId, fieldName);
 
   return (
@@ -36,7 +36,7 @@ const WorkflowField = ({ nodeId, fieldName }: Props) => {
           />
         )}
         <Tooltip
-          label={<FieldTooltipContent nodeId={nodeId} fieldName={fieldName} kind="input" />}
+          label={<FieldTooltipContent nodeId={nodeId} fieldName={fieldName} kind="inputs" />}
           openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
           placement="top"
         >
