@@ -43,7 +43,7 @@ class SDXLModelLoaderInvocation(BaseInvocation):
         model_key = self.model.key
 
         # TODO: not found exceptions
-        if not context.services.model_manager.store.exists(model_key):
+        if not context.models.exists(model_key):
             raise Exception(f"Unknown model: {model_key}")
 
         return SDXLModelLoaderOutput(
@@ -112,7 +112,7 @@ class SDXLRefinerModelLoaderInvocation(BaseInvocation):
         model_key = self.model.key
 
         # TODO: not found exceptions
-        if not context.services.model_manager.store.exists(model_key):
+        if not context.models.exists(model_key):
             raise Exception(f"Unknown model: {model_key}")
 
         return SDXLRefinerModelLoaderOutput(

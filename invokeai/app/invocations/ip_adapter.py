@@ -14,8 +14,7 @@ from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_management.models.base import BaseModelType, ModelType
-from invokeai.backend.model_management.models.ip_adapter import get_ip_adapter_image_encoder_model_id
+from invokeai.backend.model_manager.config import BaseModelType, ModelType
 
 
 # LS: Consider moving these two classes into model.py
@@ -90,10 +89,10 @@ class IPAdapterInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> IPAdapterOutput:
         # Lookup the CLIP Vision encoder that is intended to be used with the IP-Adapter model.
-        ip_adapter_info = context.services.model_manager.store.get_model(self.ip_adapter_model.key)
+        ip_adapter_info = context.models.get_config(self.ip_adapter_model.key)
         image_encoder_model_id = ip_adapter_info.image_encoder_model_id
         image_encoder_model_name = image_encoder_model_id.split("/")[-1].strip()
-        image_encoder_models = context.services.model_manager.store.search_by_attr(
+        image_encoder_models = context.models.search_by_attrs(
             model_name=image_encoder_model_name, base_model=BaseModelType.Any, model_type=ModelType.CLIPVision
         )
         assert len(image_encoder_models) == 1
