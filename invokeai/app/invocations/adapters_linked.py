@@ -19,7 +19,7 @@ def append_list(new_item, items, item_cls):
     """Add an item to an exiting item or list of items then output as a list of items."""
 
     result = []
-    if items is None or len(items) == 0 or (isinstance(items, list) and len(items) == 0):
+    if items is None or (isinstance(items, list) and len(items) == 0):
         pass
     elif isinstance(items, item_cls):
         result.append(items)

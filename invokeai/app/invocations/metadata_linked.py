@@ -1,22 +1,33 @@
+import json
 from typing import Any, Literal, Optional, Union
 
 from pydantic import model_validator
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
+    BaseInvocationOutput,
     Classification,
     Input,
     InputField,
     InvocationContext,
     MetadataField,
+    OutputField,
     UIType,
     WithMetadata,
     invocation,
+    invocation_output,
 )
-from invokeai.app.invocations.latent import SAMPLER_NAME_VALUES, SchedulerOutput
-from invokeai.app.invocations.metadata import MetadataOutput
-from invokeai.app.invocations.model import VaeField
-from invokeai.app.invocations.primitives import BooleanOutput, FloatOutput, ImageField, IntegerOutput, StringOutput
+from invokeai.app.invocations.latent import SAMPLER_NAME_VALUES, DenoiseLatentsInvocation, SchedulerOutput
+from invokeai.app.invocations.metadata import LoRAMetadataField, MetadataOutput
+from invokeai.app.invocations.model import LoRAModelField, MainModelField, VaeField
+from invokeai.app.invocations.primitives import (
+    BooleanOutput,
+    FloatOutput,
+    ImageField,
+    IntegerOutput,
+    LatentsOutput,
+    StringOutput,
+)
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.version import __version__
 
@@ -90,6 +101,8 @@ def validate_custom_label(
         "MetadataToFloatInvocation",
         "MetadataToBoolInvocation",
         "MetadataToSchedulerInvocation",
+        "MetadataToModelInvocation",
+        "MetadataToSDXLModelInvocation",
     ],
 ):
     if model.label == CUSTOM_LABEL:
@@ -318,3 +331,156 @@ class MetadataToSchedulerInvocation(BaseInvocation, WithMetadata):
         output = data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
 
         return SchedulerOutput(scheduler=output)
+
+
+@invocation_output("metadata_to_model_output")
+class MetadataToModelOutput(BaseInvocationOutput):
+    """String to main model output"""
+
+    model: MainModelField = OutputField(description=FieldDescriptions.main_model, title="Model")
+    name: str = OutputField(description="Model Name", title="Name")
+
+
+@invocation_output("metadata_to_sdxl_model_output")
+class MetadataToSDXLModelOutput(BaseInvocationOutput):
+    """String to SDXL main model output"""
+
+    model: MainModelField = OutputField(
+        description=FieldDescriptions.main_model, title="Model", ui_type=UIType.SDXLMainModel
+    )
+    name: str = OutputField(description="Model Name", title="Name")
+
+
+@invocation(
+    "metadata_to_model",
+    title="Metadata To Model",
+    tags=["metadata"],
+    category="metadata",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
+class MetadataToModelInvocation(BaseInvocation, WithMetadata):
+    """Extracts a Model value of a label from metadata"""
+
+    label: CORE_LABELS_MODEL = InputField(
+        default="model",
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+    custom_label: Optional[str] = InputField(
+        default=None,
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+    default_value: MainModelField = InputField(
+        description="The default model to use if not found in the metadata",
+    )
+
+    _validate_custom_label = model_validator(mode="after")(validate_custom_label)
+
+    def invoke(self, context: InvocationContext) -> MetadataToModelOutput:
+        data = {} if self.metadata is None else self.metadata.model_dump()
+        model = MainModelField.model_validate_json(
+            data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
+        )
+
+        return MetadataToModelOutput(model=model, name=f"{model.base_model}: {model.model_name}")
+
+
+@invocation(
+    "metadata_to_sdxl_model",
+    title="Metadata To SDXL Model",
+    tags=["metadata"],
+    category="metadata",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
+class MetadataToSDXLModelInvocation(BaseInvocation, WithMetadata):
+    """Extracts a SDXL Model value of a label from metadata"""
+
+    label: CORE_LABELS_MODEL = InputField(
+        default="model",
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+    custom_label: Optional[str] = InputField(
+        default=None,
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+    default_value: MainModelField = InputField(
+        description="The default SDXL Model to use if not found in the metadata", ui_type=UIType.SDXLMainModel
+    )
+
+    _validate_custom_label = model_validator(mode="after")(validate_custom_label)
+
+    def invoke(self, context: InvocationContext) -> MetadataToSDXLModelOutput:
+        data = {} if self.metadata is None else self.metadata.model_dump()
+        model = MainModelField.model_validate_json(
+            data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
+        )
+
+        return MetadataToSDXLModelOutput(model=model, name=f"{model.base_model}: {model.model_name}")
+
+
+@invocation_output("latents_meta_output")
+class LatentsMetaOutput(LatentsOutput, MetadataOutput):
+    """Latents + metadata"""
+
+
+@invocation(
+    "denoise_latents_meta",
+    title="Denoise Latents + metadata",
+    tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
+    category="latents",
+    version="1.0.0",
+)
+class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
+        def _to_json(obj):
+            if not isinstance(obj, list):
+                obj = [obj]
+
+            return [
+                item.model_dump(exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"})
+                for item in obj
+            ]
+
+        def _loras_to_json(obj):
+            if not isinstance(obj, list):
+                obj = [obj]
+
+            return [
+                LoRAMetadataField(
+                    lora=LoRAModelField(model_name=item.model_name, base_model=item.base_model), weight=item.weight
+                ).model_dump(exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"})
+                for item in obj
+            ]
+
+        obj = super().invoke(context)
+
+        md = {} if self.metadata is None else self.metadata.model_dump()
+        md.update({"width": obj.width})
+        md.update({"height": obj.height})
+        md.update({"steps": self.steps})
+        md.update({"cfg_scale": self.cfg_scale})
+        md.update({"cfg_rescale_multiplier": self.cfg_rescale_multiplier})
+        md.update({"denoising_start": self.denoising_start})
+        md.update({"denoising_end": self.denoising_end})
+        md.update({"scheduler": self.scheduler})
+        md.update({"model": self.unet.unet})
+        if self.control is not None:
+            md.update({"controlnets": _to_json(self.control)})
+        if self.ip_adapter is not None:
+            md.update({"ipAdapters": _to_json(self.ip_adapter)})
+        if self.t2i_adapter is not None:
+            md.update({"t2iAdapters": _to_json(self.t2i_adapter)})
+        if len(self.unet.loras) > 0:
+            md.update({"loras": _loras_to_json(self.unet.loras)})
+        if self.noise is not None:
+            md.update({"seed": self.noise.seed})
+
+        params = obj.__dict__.copy()
+        del params["type"]
+
+        return LatentsMetaOutput(**params, metadata=MetadataField.model_validate(md))
