@@ -52,27 +52,29 @@ export type SchedulerField = z.infer<typeof zSchedulerField>;
 
 // #region Model-related schemas
 export const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
-export const zModelType = z.enum(['main', 'vae', 'lora', 'controlnet', 'embedding']);
+export const zModelType = z.enum([
+  'main',
+  'vae',
+  'lora',
+  'controlnet',
+  'embedding',
+  'ip_adapter',
+  'clip_vision',
+  't2i_adapter',
+  'onnx', // TODO(psyche): Remove this when removed from backend
+]);
 export const zModelName = z.string().min(3);
 export const zModelIdentifier = z.object({
-  model_name: zModelName,
-  base_model: zBaseModel,
+  key: z.string().min(1),
 });
 export type BaseModel = z.infer<typeof zBaseModel>;
 export type ModelType = z.infer<typeof zModelType>;
 export type ModelIdentifier = z.infer<typeof zModelIdentifier>;
 
-export const zMainModelField = z.object({
-  model_name: zModelName,
-  base_model: zBaseModel,
-  model_type: z.literal('main'),
-});
-export const zSDXLRefinerModelField = z.object({
-  model_name: z.string().min(1),
-  base_model: z.literal('sdxl-refiner'),
-  model_type: z.literal('main'),
-});
+export const zMainModelField = zModelIdentifier;
 export type MainModelField = z.infer<typeof zMainModelField>;
+
+export const zSDXLRefinerModelField = zModelIdentifier;
 export type SDXLRefinerModelField = z.infer<typeof zSDXLRefinerModelField>;
 
 export const zSubModelType = z.enum([
@@ -92,8 +94,7 @@ export type SubModelType = z.infer<typeof zSubModelType>;
 export const zVAEModelField = zModelIdentifier;
 
 export const zModelInfo = zModelIdentifier.extend({
-  model_type: zModelType,
-  submodel: zSubModelType.optional(),
+  submodel_type: zSubModelType.nullish(),
 });
 export type ModelInfo = z.infer<typeof zModelInfo>;
 
