@@ -69,7 +69,7 @@ const LightBox = (props: LightBoxProps) => {
         style={{
           scale: `${zoomLevel}`,
           translate: `${panPosition.x}px ${panPosition.y}px`,
-          transition: 'all 0.1s ease-out',
+          transition: 'scale 0.1s ease-out',
           cursor: 'move',
         }}
         onMouseDown={handleMousePanDown}
