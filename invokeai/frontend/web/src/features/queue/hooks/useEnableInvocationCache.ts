@@ -1,4 +1,5 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { addToast } from 'features/system/store/systemSlice';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,7 +8,8 @@ import { useEnableInvocationCacheMutation, useGetInvocationCacheStatusQuery } fr
 export const useEnableInvocationCache = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const { data: cacheStatus } = useGetInvocationCacheStatusQuery();
+  const isCacheEnabled = useFeatureStatus('invocationCache').isFeatureEnabled;
+  const { data: cacheStatus } = useGetInvocationCacheStatusQuery(undefined, { skip: isCacheEnabled });
   const isConnected = useAppSelector((s) => s.system.isConnected);
   const [trigger, { isLoading }] = useEnableInvocationCacheMutation({
     fixedCacheKey: 'enableInvocationCache',

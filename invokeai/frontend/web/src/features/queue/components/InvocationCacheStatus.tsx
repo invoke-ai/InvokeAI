@@ -1,4 +1,5 @@
 import { ButtonGroup } from '@invoke-ai/ui-library';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetInvocationCacheStatusQuery } from 'services/api/endpoints/appInfo';
@@ -10,7 +11,8 @@ import ToggleInvocationCacheButton from './ToggleInvocationCacheButton';
 
 const InvocationCacheStatus = () => {
   const { t } = useTranslation();
-  const { data: cacheStatus } = useGetInvocationCacheStatusQuery(undefined);
+  const isCacheEnabled = useFeatureStatus('invocationCache').isFeatureEnabled;
+  const { data: cacheStatus } = useGetInvocationCacheStatusQuery(undefined, { skip: isCacheEnabled });
 
   return (
     <StatusStatGroup>
