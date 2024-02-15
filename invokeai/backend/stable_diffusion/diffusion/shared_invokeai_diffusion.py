@@ -17,13 +17,11 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
 )
 
 from .cross_attention_control import (
-    Context,
     CrossAttentionType,
+    CrossAttnControlContext,
     SwapCrossAttnContext,
-    get_cross_attention_modules,
     setup_cross_attention_control_attention_processors,
 )
-from .cross_attention_map_saving import AttentionMapSaver
 
 ModelForwardCallback: TypeAlias = Union[
     # x, t, conditioning, Optional[cross-attention kwargs]
@@ -69,14 +67,12 @@ class InvokeAIDiffuserComponent:
         self,
         unet: UNet2DConditionModel,
         extra_conditioning_info: Optional[ExtraConditioningInfo],
-        step_count: int,
     ):
         old_attn_processors = unet.attn_processors
 
         try:
-            self.cross_attention_control_context = Context(
+            self.cross_attention_control_context = CrossAttnControlContext(
                 arguments=extra_conditioning_info.cross_attention_control_args,
-                step_count=step_count,
             )
             setup_cross_attention_control_attention_processors(
                 unet,
@@ -87,27 +83,6 @@ class InvokeAIDiffuserComponent:
         finally:
             self.cross_attention_control_context = None
             unet.set_attn_processor(old_attn_processors)
-            # TODO resuscitate attention map saving
-            # self.remove_attention_map_saving()
-
-    def setup_attention_map_saving(self, saver: AttentionMapSaver):
-        def callback(slice, dim, offset, slice_size, key):
-            if dim is not None:
-                # sliced tokens attention map saving is not implemented
-                return
-            saver.add_attention_maps(slice, key)
-
-        tokens_cross_attention_modules = get_cross_attention_modules(self.model, CrossAttentionType.TOKENS)
-        for identifier, module in tokens_cross_attention_modules:
-            key = "down" if identifier.startswith("down") else "up" if identifier.startswith("up") else "mid"
-            module.set_attention_slice_calculated_callback(
-                lambda slice, dim, offset, slice_size, key=key: callback(slice, dim, offset, slice_size, key)
-            )
-
-    def remove_attention_map_saving(self):
-        tokens_cross_attention_modules = get_cross_attention_modules(self.model, CrossAttentionType.TOKENS)
-        for _, module in tokens_cross_attention_modules:
-            module.set_attention_slice_calculated_callback(None)
 
     def do_controlnet_step(
         self,
