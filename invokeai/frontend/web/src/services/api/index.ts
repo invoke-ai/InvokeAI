@@ -52,10 +52,22 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
   const baseUrl = $baseUrl.get();
   const authToken = $authToken.get();
   const projectId = $projectId.get();
+  const isOpenAPIRequest =
+    (args instanceof Object && args.url.includes('openapi.json')) ||
+    (typeof args === 'string' && args.includes('openapi.json'));
 
   const fetchBaseQueryArgs: FetchBaseQueryArgs = {
     baseUrl: baseUrl ? `${baseUrl}/api/v1` : `${window.location.href.replace(/\/$/, '')}/api/v1`,
-    prepareHeaders: (headers) => {
+  };
+
+  // When fetching the openapi.json, we need to remove circular references from the JSON.
+  if (isOpenAPIRequest) {
+    fetchBaseQueryArgs.jsonReplacer = getCircularReplacer();
+  }
+
+  // openapi.json isn't protected by authorization, but all other requests need to include the auth token and project id.
+  if (!isOpenAPIRequest) {
+    fetchBaseQueryArgs.prepareHeaders = (headers) => {
       if (authToken) {
         headers.set('Authorization', `Bearer ${authToken}`);
       }
@@ -64,15 +76,7 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
       }
 
       return headers;
-    },
-  };
-
-  // When fetching the openapi.json, we need to remove circular references from the JSON.
-  if (
-    (args instanceof Object && args.url.includes('openapi.json')) ||
-    (typeof args === 'string' && args.includes('openapi.json'))
-  ) {
-    fetchBaseQueryArgs.jsonReplacer = getCircularReplacer();
+    };
   }
 
   const rawBaseQuery = fetchBaseQuery(fetchBaseQueryArgs);
