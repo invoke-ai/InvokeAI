@@ -1621,7 +1621,9 @@
         "seamlessChecker": "Seamless Checker",
         "zoomIn": "Zoom In",
         "zoomOut": "Zoom Out",
-        "resetZoom": "Reset Zoom"
+        "resetPosition": "Reset Position",
+        "resetZoom": "Reset Zoom",
+        "resetView": "Reset View"
     },
     "ui": {
         "hideProgressImages": "Hide Progress Images",
