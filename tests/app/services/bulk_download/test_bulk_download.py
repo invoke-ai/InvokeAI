@@ -151,6 +151,42 @@ def test_handler_image_names(tmp_path: Path, monkeypatch: Any, mock_image_dto: I
     )
 
 
+def test_generate_id(monkeypatch: Any):
+    """Test that the generate_id method generates a unique id."""
+
+    bulk_download_service = BulkDownloadService("test")
+
+    monkeypatch.setattr("invokeai.app.services.bulk_download.bulk_download_default.uuid_string", lambda: "test")
+
+    assert bulk_download_service.generate_item_id(None) == "test"
+
+
+def test_generate_id_with_board_id(monkeypatch: Any, mock_invoker: Invoker):
+    """Test that the generate_id method generates a unique id with a board id."""
+
+    bulk_download_service = BulkDownloadService("test")
+    bulk_download_service.start(mock_invoker)
+
+    def mock_board_get(*args, **kwargs):
+        return BoardRecord(board_id="12345", board_name="test_board_name", created_at="None", updated_at="None")
+
+    monkeypatch.setattr(mock_invoker.services.board_records, "get", mock_board_get)
+
+    monkeypatch.setattr("invokeai.app.services.bulk_download.bulk_download_default.uuid_string", lambda: "test")
+
+    assert bulk_download_service.generate_item_id("12345") == "test_board_name_test"
+
+
+def test_generate_id_with_default_board_id(monkeypatch: Any):
+    """Test that the generate_id method generates a unique id with a board id."""
+
+    bulk_download_service = BulkDownloadService("test")
+
+    monkeypatch.setattr("invokeai.app.services.bulk_download.bulk_download_default.uuid_string", lambda: "test")
+
+    assert bulk_download_service.generate_item_id("none") == "Uncategorized_test"
+
+
 def test_handler_board_id(tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker):
     """Test that the handler creates the zip file correctly when given a board id."""
 
@@ -159,7 +195,7 @@ def test_handler_board_id(tmp_path: Path, monkeypatch: Any, mock_image_dto: Imag
     )
 
     def mock_board_get(*args, **kwargs):
-        return BoardRecord(board_id="12345", board_name="test", created_at="None", updated_at="None")
+        return BoardRecord(board_id="12345", board_name="test_board_name", created_at="None", updated_at="None")
 
     monkeypatch.setattr(mock_invoker.services.board_records, "get", mock_board_get)
 
@@ -193,14 +229,14 @@ def test_handler_board_id_default(tmp_path: Path, monkeypatch: Any, mock_image_d
     bulk_download_service.start(mock_invoker)
     bulk_download_service.handler([], "none", None)
 
-    expected_zip_path: Path = tmp_path / "bulk_downloads" / "Uncategorized.zip"
+    expected_zip_path: Path = tmp_path / "bulk_downloads" / "test.zip"
 
     assert_handler_success(
         expected_zip_path, expected_image_path, mock_image_contents, tmp_path, mock_invoker.services.events
     )
 
 
-def test_handler_bulk_download__item_id_given(
+def test_handler_bulk_download_item_id_given(
     tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker
 ):
     """Test that the handler creates the zip file correctly when given a pregenerated bulk download item id."""
@@ -348,35 +384,6 @@ def execute_handler_test_on_error(
     assert event_bus.events[0].event_name == "bulk_download_started"
     assert event_bus.events[1].event_name == "bulk_download_failed"
     assert event_bus.events[1].payload["error"] == error.__str__()
-
-
-def test_get_board_name(tmp_path: Path, monkeypatch: Any, mock_invoker: Invoker):
-    """Test that the get_board_name function returns the correct board name."""
-
-    expected_board_name = "board1"
-
-    def mock_get(*args, **kwargs):
-        return BoardRecord(board_id="12345", board_name=expected_board_name, created_at="None", updated_at="None")
-
-    monkeypatch.setattr(mock_invoker.services.board_records, "get", mock_get)
-
-    bulk_download_service = BulkDownloadService(tmp_path)
-    bulk_download_service.start(mock_invoker)
-    board_name = bulk_download_service.get_clean_board_name("12345")
-
-    assert board_name == expected_board_name
-
-
-def test_get_board_name_default(tmp_path: Path, mock_invoker: Invoker):
-    """Test that the get_board_name function returns the correct board name."""
-
-    expected_board_name = "Uncategorized"
-
-    bulk_download_service = BulkDownloadService(tmp_path)
-    bulk_download_service.start(mock_invoker)
-    board_name = bulk_download_service.get_clean_board_name("none")
-
-    assert board_name == expected_board_name
 
 
 def test_delete(tmp_path: Path):

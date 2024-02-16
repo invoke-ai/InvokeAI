@@ -13,7 +13,6 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID, WorkflowWithoutIDValidator
-from invokeai.app.util.misc import uuid_string
 
 from ..dependencies import ApiDependencies
 
@@ -395,10 +394,7 @@ async def download_images_from_list(
 ) -> ImagesDownloaded:
     if (image_names is None or len(image_names) == 0) and board_id is None:
         raise HTTPException(status_code=400, detail="No images or board id specified.")
-    bulk_download_item_id: str = uuid_string() if board_id is None else board_id
-    board_name: str = (
-        "" if board_id is None else ApiDependencies.invoker.services.bulk_download.get_clean_board_name(board_id)
-    )
+    bulk_download_item_id: str = ApiDependencies.invoker.services.bulk_download.generate_item_id(board_id)
 
     # Type narrowing handled above ^, we know that image_names is not None, trying to keep null checks at the boundaries
     background_tasks.add_task(
@@ -409,7 +405,7 @@ async def download_images_from_list(
     )
     return ImagesDownloaded(
         response="Your images are preparing to be downloaded",
-        bulk_download_item_name=bulk_download_item_id if board_id is None else board_name + ".zip",
+        bulk_download_item_name=bulk_download_item_id + ".zip",
     )
 
 
