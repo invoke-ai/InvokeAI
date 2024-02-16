@@ -2,11 +2,7 @@ import { Flex, Text } from '@invoke-ai/ui-library';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_BASE_MODELS } from 'services/api/constants';
-import type {
-  DiffusersModelConfig,
-  LoRAConfig,
-  MainModelConfig,
-} from 'services/api/endpoints/models';
+import type { DiffusersModelConfig, LoRAConfig, MainModelConfig } from 'services/api/endpoints/models';
 import { useGetLoRAModelsQuery, useGetMainModelsQuery } from 'services/api/endpoints/models';
 
 import CheckpointModelEdit from './ModelManagerPanel/CheckpointModelEdit';
