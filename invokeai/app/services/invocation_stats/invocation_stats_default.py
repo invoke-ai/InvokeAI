@@ -46,8 +46,6 @@ class InvocationStatsService(InvocationStatsServiceBase):
         # This is to handle case of the model manager not being initialized, which happens
         # during some tests.
         services = self._invoker.services
-        if services.model_manager is None or services.model_manager.load is None:
-            yield None
         if not self._stats.get(graph_execution_state_id):
             # First time we're seeing this graph_execution_state_id.
             self._stats[graph_execution_state_id] = GraphExecutionStats()

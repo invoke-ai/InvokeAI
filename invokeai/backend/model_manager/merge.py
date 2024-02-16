@@ -39,10 +39,7 @@ class ModelMerger(object):
 
     def __init__(self, installer: ModelInstallServiceBase):
         """
-        Initialize a ModelMerger object.
-
-        :param store: Underlying storage manager for the running process.
-        :param config: InvokeAIAppConfig object (if not provided, default will be selected).
+        Initialize a ModelMerger object with the model installer.
         """
         self._installer = installer
 

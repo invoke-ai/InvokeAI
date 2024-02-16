@@ -14,6 +14,7 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadQueueService
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.model_install import ModelInstallService, ModelInstallServiceBase
+from invokeai.app.services.model_metadata import ModelMetadataStoreBase, ModelMetadataStoreSQL
 from invokeai.app.services.model_records import ModelRecordServiceSQL
 from invokeai.backend.model_manager.config import (
     BaseModelType,
@@ -21,7 +22,6 @@ from invokeai.backend.model_manager.config import (
     ModelType,
 )
 from invokeai.backend.model_manager.load import AnyModelLoader, ModelCache, ModelConvertCache
-from invokeai.backend.model_manager.metadata import ModelMetadataStore
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager_2.model_metadata.metadata_examples import (
     RepoCivitaiModelMetadata1,
@@ -104,7 +104,7 @@ def mm2_loader(mm2_app_config: InvokeAIAppConfig, mm2_record_store: ModelRecordS
 def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceSQL:
     logger = InvokeAILogger.get_logger(config=mm2_app_config)
     db = create_mock_sqlite_database(mm2_app_config, logger)
-    store = ModelRecordServiceSQL(db)
+    store = ModelRecordServiceSQL(db, ModelMetadataStoreSQL(db))
     # add five simple config records to the database
     raw1 = {
         "path": "/tmp/foo1",
@@ -163,15 +163,14 @@ def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceSQL
 
 
 @pytest.fixture
-def mm2_metadata_store(mm2_record_store: ModelRecordServiceSQL) -> ModelMetadataStore:
-    db = mm2_record_store._db  # to ensure we are sharing the same database
-    return ModelMetadataStore(db)
+def mm2_metadata_store(mm2_record_store: ModelRecordServiceSQL) -> ModelMetadataStoreBase:
+    return mm2_record_store.metadata_store
 
 
 @pytest.fixture
 def mm2_session(embedding_file: Path, diffusers_dir: Path) -> Session:
     """This fixtures defines a series of mock URLs for testing download and installation."""
-    sess = TestSession()
+    sess: Session = TestSession()
     sess.mount(
         "https://test.com/missing_model.safetensors",
         TestAdapter(
@@ -258,8 +257,7 @@ def mm2_installer(mm2_app_config: InvokeAIAppConfig, mm2_session: Session) -> Mo
     logger = InvokeAILogger.get_logger()
     db = create_mock_sqlite_database(mm2_app_config, logger)
     events = DummyEventService()
-    store = ModelRecordServiceSQL(db)
-    metadata_store = ModelMetadataStore(db)
+    store = ModelRecordServiceSQL(db, ModelMetadataStoreSQL(db))
 
     download_queue = DownloadQueueService(requests_session=mm2_session)
     download_queue.start()
@@ -268,7 +266,6 @@ def mm2_installer(mm2_app_config: InvokeAIAppConfig, mm2_session: Session) -> Mo
         app_config=mm2_app_config,
         record_store=store,
         download_queue=download_queue,
-        metadata_store=metadata_store,
         event_bus=events,
         session=mm2_session,
     )
