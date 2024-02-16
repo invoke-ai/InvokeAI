@@ -61,11 +61,13 @@ export type IPAdapterField = S['IPAdapterField'];
 // Model Configs
 
 // TODO(MM2): Can we make key required in the pydantic model?
-type KeyRequired<T extends {key?: string}> = SetRequired<T, 'key'>;
+type KeyRequired<T extends { key?: string }> = SetRequired<T, 'key'>;
 export type LoRAConfig = KeyRequired<S['LoRAConfig']>;
 // TODO(MM2): Can we rename this from Vae -> VAE
 export type VAEConfig = KeyRequired<S['VaeCheckpointConfig']> | KeyRequired<S['VaeDiffusersConfig']>;
-export type ControlNetConfig = KeyRequired<S['ControlNetDiffusersConfig']> | KeyRequired<S['ControlNetCheckpointConfig']>;
+export type ControlNetConfig =
+  | KeyRequired<S['ControlNetDiffusersConfig']>
+  | KeyRequired<S['ControlNetCheckpointConfig']>;
 export type IPAdapterConfig = KeyRequired<S['IPAdapterConfig']>;
 // TODO(MM2): Can we rename this to T2IAdapterConfig
 export type T2IAdapterConfig = KeyRequired<S['T2IConfig']>;
