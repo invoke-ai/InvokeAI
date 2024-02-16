@@ -32,6 +32,7 @@ To use a community workflow, download the the `.json` node graph file and load i
     + [Image to Character Art Image Nodes](#image-to-character-art-image-nodes)
     + [Image Picker](#image-picker)
     + [Image Resize Plus](#image-resize-plus)
+    + [Latent Upscale](#latent-upscale)
     + [Load Video Frame](#load-video-frame)
     + [Make 3D](#make-3d)
     + [Mask Operations](#mask-operations)
@@ -289,6 +290,13 @@ Node Link: https://github.com/VeyDlin/image-resize-plus-node
 View:
 </br><img src="https://raw.githubusercontent.com/VeyDlin/image-resize-plus-node/master/.readme/node.png" width="500" />
 
+
+--------------------------------
+### Latent Upscale
+
+**Description:** This node uses a small (~2.4mb) model to upscale the latents used in a Stable Diffusion 1.5 or Stable Diffusion XL image generation, rather than the typical interpolation method, avoiding the traditional downsides of the latent upscale technique.
+
+**Node Link:** [https://github.com/gogurtenjoyer/latent-upscale](https://github.com/gogurtenjoyer/latent-upscale)
 
 --------------------------------
 ### Load Video Frame
