@@ -39,21 +39,21 @@ class LoadedModel:
     """Context manager object that mediates transfer from RAM<->VRAM."""
 
     config: AnyModelConfig
-    locker: ModelLockerBase
+    _locker: ModelLockerBase
 
     def __enter__(self) -> AnyModel:
         """Context entry."""
-        self.locker.lock()
+        self._locker.lock()
         return self.model
 
     def __exit__(self, *args: Any, **kwargs: Any) -> None:
         """Context exit."""
-        self.locker.unlock()
+        self._locker.unlock()
 
     @property
     def model(self) -> AnyModel:
         """Return the model without locking it."""
-        return self.locker.model
+        return self._locker.model
 
 
 class ModelLoaderBase(ABC):

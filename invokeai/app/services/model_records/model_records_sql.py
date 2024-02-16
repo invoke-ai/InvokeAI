@@ -54,8 +54,9 @@ from invokeai.backend.model_manager.config import (
     ModelFormat,
     ModelType,
 )
-from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore, UnknownMetadataException
+from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, UnknownMetadataException
 
+from ..model_metadata import ModelMetadataStoreBase, ModelMetadataStoreSQL
 from ..shared.sqlite.sqlite_database import SqliteDatabase
 from .model_records_base import (
     DuplicateModelException,
@@ -69,7 +70,7 @@ from .model_records_base import (
 class ModelRecordServiceSQL(ModelRecordServiceBase):
     """Implementation of the ModelConfigStore ABC using a SQL database."""
 
-    def __init__(self, db: SqliteDatabase):
+    def __init__(self, db: SqliteDatabase, metadata_store: ModelMetadataStoreBase):
         """
         Initialize a new object from preexisting sqlite3 connection and threading lock objects.
 
@@ -78,6 +79,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         super().__init__()
         self._db = db
         self._cursor = db.conn.cursor()
+        self._metadata_store = metadata_store
 
     @property
     def db(self) -> SqliteDatabase:
@@ -157,7 +159,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 self._db.conn.rollback()
                 raise e
 
-    def update_model(self, key: str, config: Union[dict, AnyModelConfig]) -> AnyModelConfig:
+    def update_model(self, key: str, config: Union[Dict[str, Any], AnyModelConfig]) -> AnyModelConfig:
         """
         Update the model, returning the updated version.
 
@@ -307,9 +309,9 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         return results
 
     @property
-    def metadata_store(self) -> ModelMetadataStore:
+    def metadata_store(self) -> ModelMetadataStoreBase:
         """Return a ModelMetadataStore initialized on the same database."""
-        return ModelMetadataStore(self._db)
+        return self._metadata_store
 
     def get_metadata(self, key: str) -> Optional[AnyModelRepoMetadata]:
         """
@@ -330,18 +332,18 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         :param tags: Set of tags to search for. All tags must be present.
         """
-        store = ModelMetadataStore(self._db)
+        store = ModelMetadataStoreSQL(self._db)
         keys = store.search_by_tag(tags)
         return [self.get_model(x) for x in keys]
 
     def list_tags(self) -> Set[str]:
         """Return a unique set of all the model tags in the metadata database."""
-        store = ModelMetadataStore(self._db)
+        store = ModelMetadataStoreSQL(self._db)
         return store.list_tags()
 
     def list_all_metadata(self) -> List[Tuple[str, AnyModelRepoMetadata]]:
         """List metadata for all models that have it."""
-        store = ModelMetadataStore(self._db)
+        store = ModelMetadataStoreSQL(self._db)
         return store.list_all_metadata()
 
     def list_models(

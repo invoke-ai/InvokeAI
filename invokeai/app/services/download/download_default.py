@@ -194,7 +194,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         """Block until the indicated job has reached terminal state, or when timeout limit reached."""
         start = time.time()
         while not job.in_terminal_state:
-            if self._job_completed_event.wait(timeout=5):  # in case we miss an event
+            if self._job_completed_event.wait(timeout=0.25):  # in case we miss an event
                 self._job_completed_event.clear()
             if timeout > 0 and time.time() - start > timeout:
                 raise TimeoutError("Timeout exceeded")
