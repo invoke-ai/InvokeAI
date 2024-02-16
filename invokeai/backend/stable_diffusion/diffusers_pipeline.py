@@ -25,6 +25,7 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.ip_adapter.unet_patcher import UNetPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData
+from invokeai.backend.stable_diffusion.diffusion.regional_prompt_attention import apply_regional_prompt_attn
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 
 from ..util import auto_detect_slice_size, normalize_device
@@ -415,20 +416,19 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             )
 
         ip_adapter_unet_patcher = None
+        self.use_ip_adapter = use_ip_adapter
         if use_cross_attention_control:
             attn_ctx = self.invokeai_diffuser.custom_attention_context(
                 self.invokeai_diffuser.model,
                 extra_conditioning_info=extra_conditioning_info,
             )
-            self.use_ip_adapter = False
         elif use_ip_adapter:
             # TODO(ryand): Should we raise an exception if both custom attention and IP-Adapter attention are active?
             # As it is now, the IP-Adapter will silently be skipped.
             ip_adapter_unet_patcher = UNetPatcher([ipa.ip_adapter_model for ipa in ip_adapter_data])
             attn_ctx = ip_adapter_unet_patcher.apply_ip_adapter_attention(self.invokeai_diffuser.model)
-            self.use_ip_adapter = True
         elif use_regional_prompting:
-            raise NotImplementedError("Regional prompting is not yet supported.")
+            attn_ctx = apply_regional_prompt_attn(self.invokeai_diffuser.model)
         else:
             attn_ctx = nullcontext()
 

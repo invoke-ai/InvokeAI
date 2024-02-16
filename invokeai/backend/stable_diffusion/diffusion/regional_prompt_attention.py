@@ -1,7 +1,9 @@
+from contextlib import contextmanager
 from typing import Optional
 
 import torch
 import torch.nn.functional as F
+from diffusers import UNet2DConditionModel
 from diffusers.models.attention_processor import Attention, AttnProcessor2_0
 from diffusers.utils import USE_PEFT_BACKEND
 
@@ -17,7 +19,10 @@ class RegionalPromptAttnProcessor2_0(AttnProcessor2_0):
         attention_mask: Optional[torch.FloatTensor] = None,
         temb: Optional[torch.FloatTensor] = None,
         scale: float = 1.0,
+        regional_prompt_data=None,
     ) -> torch.FloatTensor:
+        assert regional_prompt_data is None
+
         residual = hidden_states
         if attn.spatial_norm is not None:
             hidden_states = attn.spatial_norm(hidden_states, temb)
@@ -83,3 +88,16 @@ class RegionalPromptAttnProcessor2_0(AttnProcessor2_0):
         hidden_states = hidden_states / attn.rescale_output_factor
 
         return hidden_states
+
+
+@contextmanager
+def apply_regional_prompt_attn(unet: UNet2DConditionModel):
+    """A context manager that patches `unet` with RegionalPromptAttnProcessor2_0 attention processors."""
+
+    orig_attn_processors = unet.attn_processors
+
+    try:
+        unet.set_attn_processor(RegionalPromptAttnProcessor2_0())
+        yield None
+    finally:
+        unet.set_attn_processor(orig_attn_processors)

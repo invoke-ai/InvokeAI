@@ -10,6 +10,7 @@ from typing_extensions import TypeAlias
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    BasicConditioningInfo,
     ConditioningData,
     ExtraConditioningInfo,
     PostprocessingSettings,
@@ -309,6 +310,55 @@ class InvokeAIDiffuserComponent:
 
     # methods below are called from do_diffusion_step and should be considered private to this class.
 
+    def _prepare_text_embeddings(
+        self, text_embeddings: list[Union[BasicConditioningInfo, SDXLConditioningInfo]]
+    ) -> Union[BasicConditioningInfo, SDXLConditioningInfo]:
+        if len(text_embeddings) == 1:
+            # If there is only one text embedding, we can just return it.
+            # We short-circuit here, because there are some features that are only supported when there is a single
+            # text_embedding provided.
+            return text_embeddings[0]
+
+        is_sdxl = type(text_embeddings[0]) is SDXLConditioningInfo
+
+        text_embedding = []
+        pooled_embedding = None
+        add_time_ids = None
+
+        for text_embedding_info in text_embeddings:
+            # TODO(ryand): Having to check this feels super hacky.
+            # Extra conditioning is not supported when there are multiple text embeddings.
+            assert (
+                text_embedding_info.extra_conditioning is None
+                or not text_embedding_info.extra_conditioning.wants_cross_attention_control
+            )
+
+            if is_sdxl:
+                # We just use the the first SDXLConditioningInfo's pooled_embeds and add_time_ids.
+                # TODO(ryand): Think about this some more. If we can't use the pooled_embeds and add_time_ids from all
+                # the conditioning info, then we shouldn't allow it to be passed in.
+                if pooled_embedding is None:
+                    pooled_embedding = text_embedding_info.pooled_embeds
+                if add_time_ids is None:
+                    add_time_ids = text_embedding_info.add_time_ids
+
+            text_embedding.append(text_embedding_info.embeds)
+
+        text_embedding = torch.cat(text_embedding, dim=1)
+        assert len(text_embedding.shape) == 3  # batch_size, seq_len, token_len
+
+        if is_sdxl:
+            return SDXLConditioningInfo(
+                embeds=text_embedding,
+                extra_conditioning=None,
+                pooled_embeds=pooled_embedding,
+                add_time_ids=add_time_ids,
+            )
+        return BasicConditioningInfo(
+            embeds=text_embedding,
+            extra_conditioning=None,
+        )
+
     def _apply_standard_conditioning(
         self,
         x,
@@ -324,8 +374,9 @@ class InvokeAIDiffuserComponent:
         x_twice = torch.cat([x] * 2)
         sigma_twice = torch.cat([sigma] * 2)
 
-        assert len(conditioning_data.text_embeddings) == 1
-        text_embeddings = conditioning_data.text_embeddings[0]
+        text_embeddings = self._prepare_text_embeddings(conditioning_data.text_embeddings)
+        if len(conditioning_data.text_embeddings) > 1:
+            cross_attention_kwargs = {"regional_prompt_data": None}
 
         cross_attention_kwargs = None
         if conditioning_data.ip_adapter_conditioning is not None:
