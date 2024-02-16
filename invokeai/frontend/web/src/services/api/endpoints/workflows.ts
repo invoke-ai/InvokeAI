@@ -5,7 +5,7 @@ import { api, buildV1Url, LIST_TAG } from '..';
 /**
  * Builds an endpoint URL for the workflows router
  * @example
- * buildWorkflowsUrl('some-path') 
+ * buildWorkflowsUrl('some-path')
  * // '/api/v1/workflows/some-path'
  */
 const buildWorkflowsUrl = (path: string = '') => buildV1Url(`workflows/${path}`);
