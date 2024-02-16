@@ -76,9 +76,9 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
         },
         // proxy nodes api
-        '/api/v1': {
-          target: 'http://127.0.0.1:9090/api/v1',
-          rewrite: (path) => path.replace(/^\/api\/v1/, ''),
+        '/api/': {
+          target: 'http://127.0.0.1:9090/api/',
+          rewrite: (path) => path.replace(/^\/api/, ''),
           changeOrigin: true,
         },
       },
