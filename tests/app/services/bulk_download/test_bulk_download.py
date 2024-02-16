@@ -22,7 +22,7 @@ from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.backend.util.logging import InvokeAILogger
-from tests.fixtures.event_service import DummyEventService, mock_event_service  # noqa: F401,F811
+from tests.fixtures.event_service import DummyEventService
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 
