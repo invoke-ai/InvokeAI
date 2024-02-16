@@ -5,7 +5,6 @@ from typing_extensions import Self
 
 from invokeai.app.services.invoker import Invoker
 from invokeai.backend.model_manager.load import ModelCache, ModelConvertCache
-from invokeai.backend.model_manager.metadata import ModelMetadataStore
 from invokeai.backend.util.logging import InvokeAILogger
 
 from ..config import InvokeAIAppConfig
@@ -13,8 +12,7 @@ from ..download import DownloadQueueServiceBase
 from ..events.events_base import EventServiceBase
 from ..model_install import ModelInstallService, ModelInstallServiceBase
 from ..model_load import ModelLoadService, ModelLoadServiceBase
-from ..model_records import ModelRecordServiceBase, ModelRecordServiceSQL
-from ..shared.sqlite.sqlite_database import SqliteDatabase
+from ..model_records import ModelRecordServiceBase
 from .model_manager_base import ModelManagerServiceBase
 
 
@@ -64,7 +62,7 @@ class ModelManagerService(ModelManagerServiceBase):
     def build_model_manager(
         cls,
         app_config: InvokeAIAppConfig,
-        db: SqliteDatabase,
+        model_record_service: ModelRecordServiceBase,
         download_queue: DownloadQueueServiceBase,
         events: EventServiceBase,
     ) -> Self:
@@ -82,19 +80,16 @@ class ModelManagerService(ModelManagerServiceBase):
         convert_cache = ModelConvertCache(
             cache_path=app_config.models_convert_cache_path, max_size=app_config.convert_cache_size
         )
-        record_store = ModelRecordServiceSQL(db=db)
         loader = ModelLoadService(
             app_config=app_config,
-            record_store=record_store,
+            record_store=model_record_service,
             ram_cache=ram_cache,
             convert_cache=convert_cache,
         )
-        record_store._loader = loader  # yeah, there is a circular reference here
         installer = ModelInstallService(
             app_config=app_config,
-            record_store=record_store,
+            record_store=model_record_service,
             download_queue=download_queue,
-            metadata_store=ModelMetadataStore(db=db),
             event_bus=events,
         )
-        return cls(store=record_store, install=installer, load=loader)
+        return cls(store=model_record_service, install=installer, load=loader)
