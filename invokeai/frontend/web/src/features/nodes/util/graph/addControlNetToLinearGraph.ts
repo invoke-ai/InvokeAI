@@ -14,7 +14,7 @@ import { upsertMetadata } from './metadata';
 
 export const addControlNetToLinearGraph = (state: RootState, graph: NonNullableGraph, baseNodeId: string): void => {
   const validControlNets = selectValidControlNets(state.controlAdapters).filter(
-    (ca) => ca.model?.base_model === state.generation.model?.base_model
+    (ca) => ca.model?.base === state.generation.model?.base
   );
 
   // const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as

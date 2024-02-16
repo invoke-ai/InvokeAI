@@ -1,6 +1,14 @@
 import type { paths } from 'services/api/schema';
 
-import { api, LIST_TAG } from '..';
+import { api, buildV1Url, LIST_TAG } from '..';
+
+/**
+ * Builds an endpoint URL for the workflows router
+ * @example
+ * buildWorkflowsUrl('some-path')
+ * // '/api/v1/workflows/some-path'
+ */
+const buildWorkflowsUrl = (path: string = '') => buildV1Url(`workflows/${path}`);
 
 export const workflowsApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -8,7 +16,7 @@ export const workflowsApi = api.injectEndpoints({
       paths['/api/v1/workflows/i/{workflow_id}']['get']['responses']['200']['content']['application/json'],
       string
     >({
-      query: (workflow_id) => `workflows/i/${workflow_id}`,
+      query: (workflow_id) => buildWorkflowsUrl(`i/${workflow_id}`),
       providesTags: (result, error, workflow_id) => [{ type: 'Workflow', id: workflow_id }, 'FetchOnReconnect'],
       onQueryStarted: async (arg, api) => {
         const { dispatch, queryFulfilled } = api;
@@ -22,7 +30,7 @@ export const workflowsApi = api.injectEndpoints({
     }),
     deleteWorkflow: build.mutation<void, string>({
       query: (workflow_id) => ({
-        url: `workflows/i/${workflow_id}`,
+        url: buildWorkflowsUrl(`i/${workflow_id}`),
         method: 'DELETE',
       }),
       invalidatesTags: (result, error, workflow_id) => [
@@ -36,7 +44,7 @@ export const workflowsApi = api.injectEndpoints({
       paths['/api/v1/workflows/']['post']['requestBody']['content']['application/json']['workflow']
     >({
       query: (workflow) => ({
-        url: 'workflows/',
+        url: buildWorkflowsUrl(),
         method: 'POST',
         body: { workflow },
       }),
@@ -50,7 +58,7 @@ export const workflowsApi = api.injectEndpoints({
       paths['/api/v1/workflows/i/{workflow_id}']['patch']['requestBody']['content']['application/json']['workflow']
     >({
       query: (workflow) => ({
-        url: `workflows/i/${workflow.id}`,
+        url: buildWorkflowsUrl(`i/${workflow.id}`),
         method: 'PATCH',
         body: { workflow },
       }),
@@ -65,7 +73,7 @@ export const workflowsApi = api.injectEndpoints({
       NonNullable<paths['/api/v1/workflows/']['get']['parameters']['query']>
     >({
       query: (params) => ({
-        url: 'workflows/',
+        url: buildWorkflowsUrl(),
         params,
       }),
       providesTags: ['FetchOnReconnect', { type: 'Workflow', id: LIST_TAG }],

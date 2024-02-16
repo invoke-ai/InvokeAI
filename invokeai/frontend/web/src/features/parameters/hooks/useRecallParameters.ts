@@ -464,17 +464,15 @@ export const useRecallParameters = () => {
         return { lora: null, error: 'Invalid LoRA model' };
       }
 
-      const { base_model, model_name } = loraMetadataItem.lora;
+      const { lora } = loraMetadataItem;
 
-      const matchingLoRA = loraModels
-        ? loraModelsAdapterSelectors.selectById(loraModels, `${base_model}/lora/${model_name}`)
-        : undefined;
+      const matchingLoRA = loraModels ? loraModelsAdapterSelectors.selectById(loraModels, lora.key) : undefined;
 
       if (!matchingLoRA) {
         return { lora: null, error: 'LoRA model is not installed' };
       }
 
-      const isCompatibleBaseModel = matchingLoRA?.base_model === (newModel ?? model)?.base_model;
+      const isCompatibleBaseModel = matchingLoRA?.base === (newModel ?? model)?.base;
 
       if (!isCompatibleBaseModel) {
         return {
@@ -520,17 +518,14 @@ export const useRecallParameters = () => {
         controlnetMetadataItem;
 
       const matchingControlNetModel = controlNetModels
-        ? controlNetModelsAdapterSelectors.selectById(
-            controlNetModels,
-            `${control_model.base_model}/controlnet/${control_model.model_name}`
-          )
+        ? controlNetModelsAdapterSelectors.selectById(controlNetModels, control_model.key)
         : undefined;
 
       if (!matchingControlNetModel) {
         return { controlnet: null, error: 'ControlNet model is not installed' };
       }
 
-      const isCompatibleBaseModel = matchingControlNetModel?.base_model === (newModel ?? model)?.base_model;
+      const isCompatibleBaseModel = matchingControlNetModel?.base === (newModel ?? model)?.base;
 
       if (!isCompatibleBaseModel) {
         return {
@@ -597,17 +592,14 @@ export const useRecallParameters = () => {
         t2iAdapterMetadataItem;
 
       const matchingT2IAdapterModel = t2iAdapterModels
-        ? t2iAdapterModelsAdapterSelectors.selectById(
-            t2iAdapterModels,
-            `${t2i_adapter_model.base_model}/t2i_adapter/${t2i_adapter_model.model_name}`
-          )
+        ? t2iAdapterModelsAdapterSelectors.selectById(t2iAdapterModels, t2i_adapter_model.key)
         : undefined;
 
       if (!matchingT2IAdapterModel) {
         return { controlnet: null, error: 'ControlNet model is not installed' };
       }
 
-      const isCompatibleBaseModel = matchingT2IAdapterModel?.base_model === (newModel ?? model)?.base_model;
+      const isCompatibleBaseModel = matchingT2IAdapterModel?.base === (newModel ?? model)?.base;
 
       if (!isCompatibleBaseModel) {
         return {
@@ -672,17 +664,14 @@ export const useRecallParameters = () => {
       const { image, ip_adapter_model, weight, begin_step_percent, end_step_percent } = ipAdapterMetadataItem;
 
       const matchingIPAdapterModel = ipAdapterModels
-        ? ipAdapterModelsAdapterSelectors.selectById(
-            ipAdapterModels,
-            `${ip_adapter_model.base_model}/ip_adapter/${ip_adapter_model.model_name}`
-          )
+        ? ipAdapterModelsAdapterSelectors.selectById(ipAdapterModels, ip_adapter_model.key)
         : undefined;
 
       if (!matchingIPAdapterModel) {
         return { ipAdapter: null, error: 'IP Adapter model is not installed' };
       }
 
-      const isCompatibleBaseModel = matchingIPAdapterModel?.base_model === (newModel ?? model)?.base_model;
+      const isCompatibleBaseModel = matchingIPAdapterModel?.base === (newModel ?? model)?.base;
 
       if (!isCompatibleBaseModel) {
         return {

@@ -6,12 +6,12 @@ import { refinerModelChanged, selectSdxlSlice } from 'features/sdxl/store/sdxlSl
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { REFINER_BASE_MODELS } from 'services/api/constants';
-import type { MainModelConfigEntity } from 'services/api/endpoints/models';
+import type { MainModelConfig } from 'services/api/endpoints/models';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
 
 const selectModel = createMemoizedSelector(selectSdxlSlice, (sdxl) => sdxl.refinerModel);
 
-const optionsFilter = (model: MainModelConfigEntity) => model.base_model === 'sdxl-refiner';
+const optionsFilter = (model: MainModelConfig) => model.base_model === 'sdxl-refiner';
 
 const ParamSDXLRefinerModelSelect = () => {
   const dispatch = useAppDispatch();
@@ -19,7 +19,7 @@ const ParamSDXLRefinerModelSelect = () => {
   const { t } = useTranslation();
   const { data, isLoading } = useGetMainModelsQuery(REFINER_BASE_MODELS);
   const _onChange = useCallback(
-    (model: MainModelConfigEntity | null) => {
+    (model: MainModelConfig | null) => {
       if (!model) {
         dispatch(refinerModelChanged(null));
         return;

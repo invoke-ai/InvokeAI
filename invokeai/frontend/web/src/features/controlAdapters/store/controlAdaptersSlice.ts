@@ -236,7 +236,8 @@ export const controlAdaptersSlice = createSlice({
       let processorType: ControlAdapterProcessorType | undefined = undefined;
 
       for (const modelSubstring in CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS) {
-        if (model.model_name.includes(modelSubstring)) {
+        // TODO(MM2): matching modelSubstring to the model key is no longer a valid way to figure out the default processorType
+        if (model.key.includes(modelSubstring)) {
           processorType = CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS[modelSubstring];
           break;
         }
@@ -359,7 +360,8 @@ export const controlAdaptersSlice = createSlice({
         let processorType: ControlAdapterProcessorType | undefined = undefined;
 
         for (const modelSubstring in CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS) {
-          if (cn.model?.model_name.includes(modelSubstring)) {
+          // TODO(MM2): matching modelSubstring to the model key is no longer a valid way to figure out the default processorType
+          if (cn.model?.key.includes(modelSubstring)) {
             processorType = CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS[modelSubstring];
             break;
           }

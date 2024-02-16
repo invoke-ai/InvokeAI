@@ -1,5 +1,6 @@
 import { NUMPY_RAND_MAX } from 'app/constants';
 import {
+  zBaseModel,
   zControlNetModelField,
   zIPAdapterModelField,
   zLoRAModelField,
@@ -104,48 +105,48 @@ export const isParameterAspectRatio = (val: unknown): val is ParameterAspectRati
 // #endregion
 
 // #region Model
-export const zParameterModel = zMainModelField;
+export const zParameterModel = zMainModelField.extend({ base: zBaseModel });
 export type ParameterModel = z.infer<typeof zParameterModel>;
 export const isParameterModel = (val: unknown): val is ParameterModel => zParameterModel.safeParse(val).success;
 // #endregion
 
 // #region SDXL Refiner Model
-export const zParameterSDXLRefinerModel = zSDXLRefinerModelField;
+export const zParameterSDXLRefinerModel = zSDXLRefinerModelField.extend({ base: zBaseModel });
 export type ParameterSDXLRefinerModel = z.infer<typeof zParameterSDXLRefinerModel>;
 export const isParameterSDXLRefinerModel = (val: unknown): val is ParameterSDXLRefinerModel =>
   zParameterSDXLRefinerModel.safeParse(val).success;
 // #endregion
 
 // #region VAE Model
-export const zParameterVAEModel = zVAEModelField;
+export const zParameterVAEModel = zVAEModelField.extend({ base: zBaseModel });
 export type ParameterVAEModel = z.infer<typeof zParameterVAEModel>;
 export const isParameterVAEModel = (val: unknown): val is ParameterVAEModel =>
   zParameterVAEModel.safeParse(val).success;
 // #endregion
 
 // #region LoRA Model
-export const zParameterLoRAModel = zLoRAModelField;
+export const zParameterLoRAModel = zLoRAModelField.extend({ base: zBaseModel });
 export type ParameterLoRAModel = z.infer<typeof zParameterLoRAModel>;
 export const isParameterLoRAModel = (val: unknown): val is ParameterLoRAModel =>
   zParameterLoRAModel.safeParse(val).success;
 // #endregion
 
 // #region ControlNet Model
-export const zParameterControlNetModel = zControlNetModelField;
+export const zParameterControlNetModel = zControlNetModelField.extend({ base: zBaseModel });
 export type ParameterControlNetModel = z.infer<typeof zParameterLoRAModel>;
 export const isParameterControlNetModel = (val: unknown): val is ParameterControlNetModel =>
   zParameterControlNetModel.safeParse(val).success;
 // #endregion
 
 // #region IP Adapter Model
-export const zParameterIPAdapterModel = zIPAdapterModelField;
+export const zParameterIPAdapterModel = zIPAdapterModelField.extend({ base: zBaseModel });
 export type ParameterIPAdapterModel = z.infer<typeof zParameterIPAdapterModel>;
 export const isParameterIPAdapterModel = (val: unknown): val is ParameterIPAdapterModel =>
   zParameterIPAdapterModel.safeParse(val).success;
 // #endregion
 
 // #region T2I Adapter Model
-export const zParameterT2IAdapterModel = zT2IAdapterModelField;
+export const zParameterT2IAdapterModel = zT2IAdapterModelField.extend({ base: zBaseModel });
 export type ParameterT2IAdapterModel = z.infer<typeof zParameterT2IAdapterModel>;
 export const isParameterT2IAdapterModel = (val: unknown): val is ParameterT2IAdapterModel =>
   zParameterT2IAdapterModel.safeParse(val).success;

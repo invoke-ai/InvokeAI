@@ -208,8 +208,8 @@ const ImageMetadataActions = (props: Props) => {
       {metadata.seed !== undefined && metadata.seed !== null && (
         <ImageMetadataItem label={t('metadata.seed')} value={metadata.seed} onClick={handleRecallSeed} />
       )}
-      {metadata.model !== undefined && metadata.model !== null && metadata.model.model_name && (
-        <ImageMetadataItem label={t('metadata.model')} value={metadata.model.model_name} onClick={handleRecallModel} />
+      {metadata.model !== undefined && metadata.model !== null && metadata.model.key && (
+        <ImageMetadataItem label={t('metadata.model')} value={metadata.model.key} onClick={handleRecallModel} />
       )}
       {metadata.width && (
         <ImageMetadataItem label={t('metadata.width')} value={metadata.width} onClick={handleRecallWidth} />
@@ -222,7 +222,7 @@ const ImageMetadataActions = (props: Props) => {
       )}
       <ImageMetadataItem
         label={t('metadata.vae')}
-        value={metadata.vae?.model_name ?? 'Default'}
+        value={metadata.vae?.key ?? 'Default'}
         onClick={handleRecallVaeModel}
       />
       {metadata.steps && (
@@ -269,7 +269,7 @@ const ImageMetadataActions = (props: Props) => {
               <ImageMetadataItem
                 key={index}
                 label="LoRA"
-                value={`${lora.lora.model_name} - ${lora.weight}`}
+                value={`${lora.lora.key} - ${lora.weight}`}
                 onClick={handleRecallLoRA.bind(null, lora)}
               />
             );
@@ -279,7 +279,7 @@ const ImageMetadataActions = (props: Props) => {
         <ImageMetadataItem
           key={index}
           label="ControlNet"
-          value={`${controlnet.control_model?.model_name} - ${controlnet.control_weight}`}
+          value={`${controlnet.control_model?.key} - ${controlnet.control_weight}`}
           onClick={handleRecallControlNet.bind(null, controlnet)}
         />
       ))}
@@ -287,7 +287,7 @@ const ImageMetadataActions = (props: Props) => {
         <ImageMetadataItem
           key={index}
           label="IP Adapter"
-          value={`${ipAdapter.ip_adapter_model?.model_name} - ${ipAdapter.weight}`}
+          value={`${ipAdapter.ip_adapter_model?.key} - ${ipAdapter.weight}`}
           onClick={handleRecallIPAdapter.bind(null, ipAdapter)}
         />
       ))}
@@ -295,7 +295,7 @@ const ImageMetadataActions = (props: Props) => {
         <ImageMetadataItem
           key={index}
           label="T2I Adapter"
-          value={`${t2iAdapter.t2i_adapter_model?.model_name} - ${t2iAdapter.weight}`}
+          value={`${t2iAdapter.t2i_adapter_model?.key} - ${t2iAdapter.weight}`}
           onClick={handleRecallT2IAdapter.bind(null, t2iAdapter)}
         />
       ))}

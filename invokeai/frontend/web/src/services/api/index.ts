@@ -54,7 +54,7 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
   const projectId = $projectId.get();
 
   const fetchBaseQueryArgs: FetchBaseQueryArgs = {
-    baseUrl: baseUrl ? `${baseUrl}/api/v1` : `${window.location.href.replace(/\/$/, '')}/api/v1`,
+    baseUrl: baseUrl || window.location.href.replace(/\/$/, ''),
     prepareHeaders: (headers) => {
       if (authToken) {
         headers.set('Authorization', `Bearer ${authToken}`);
@@ -108,3 +108,6 @@ function getCircularReplacer() {
     return value;
   };
 }
+
+export const buildV1Url = (path: string): string => `api/v1/${path}`;
+export const buildV2Url = (path: string): string => `api/v2/${path}`;
