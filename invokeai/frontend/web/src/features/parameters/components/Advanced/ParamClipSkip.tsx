@@ -29,17 +29,17 @@ const ParamClipSkip = () => {
     if (!model) {
       return CLIP_SKIP_MAP['sd-1'].maxClip;
     }
-    return CLIP_SKIP_MAP[model.base_model].maxClip;
+    return CLIP_SKIP_MAP[model.base].maxClip;
   }, [model]);
 
   const sliderMarks = useMemo(() => {
     if (!model) {
       return CLIP_SKIP_MAP['sd-1'].markers;
     }
-    return CLIP_SKIP_MAP[model.base_model].markers;
+    return CLIP_SKIP_MAP[model.base].markers;
   }, [model]);
 
-  if (model?.base_model === 'sdxl') {
+  if (model?.base === 'sdxl') {
     return null;
   }
 

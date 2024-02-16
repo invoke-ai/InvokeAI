@@ -8,12 +8,12 @@ import { memo, useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
+import type { LoRAConfig } from 'services/api/endpoints/models';
 import { useUpdateLoRAModelsMutation } from 'services/api/endpoints/models';
-import type { LoRAModelConfig } from 'services/api/types';
+import type { LoRAConfig } from 'services/api/types';
 
 type LoRAModelEditProps = {
-  model: LoRAModelConfigEntity;
+  model: LoRAConfig;
 };
 
 const LoRAModelEdit = (props: LoRAModelEditProps) => {
@@ -30,7 +30,7 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
     control,
     formState: { errors },
     reset,
-  } = useForm<LoRAModelConfig>({
+  } = useForm<LoRAConfig>({
     defaultValues: {
       model_name: model.model_name ? model.model_name : '',
       base_model: model.base_model,
@@ -42,7 +42,7 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
     mode: 'onChange',
   });
 
-  const onSubmit = useCallback<SubmitHandler<LoRAModelConfig>>(
+  const onSubmit = useCallback<SubmitHandler<LoRAConfig>>(
     (values) => {
       const responseBody = {
         base_model: model.base_model,
@@ -53,7 +53,7 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
       updateLoRAModel(responseBody)
         .unwrap()
         .then((payload) => {
-          reset(payload as LoRAModelConfig, { keepDefaultValues: true });
+          reset(payload as LoRAConfig, { keepDefaultValues: true });
           dispatch(
             addToast(
               makeToast({
@@ -106,7 +106,7 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
             <FormLabel>{t('modelManager.description')}</FormLabel>
             <Input {...register('description')} />
           </FormControl>
-          <BaseModelSelect<LoRAModelConfig> control={control} name="base_model" />
+          <BaseModelSelect<LoRAConfig> control={control} name="base_model" />
 
           <FormControl isInvalid={Boolean(errors.path)}>
             <FormLabel>{t('modelManager.modelLocation')}</FormLabel>

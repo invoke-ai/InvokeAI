@@ -3,10 +3,10 @@ import type { EntityState } from '@reduxjs/toolkit';
 import { map } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AnyModelConfigEntity } from 'services/api/endpoints/models';
+import type { AnyModelConfig } from 'services/api/endpoints/models';
 import { getModelId } from 'services/api/endpoints/models';
 
-type UseModelComboboxArg<T extends AnyModelConfigEntity> = {
+type UseModelComboboxArg<T extends AnyModelConfig> = {
   modelEntities: EntityState<T, string> | undefined;
   selectedModel?: Pick<T, 'base_model' | 'model_name' | 'model_type'> | null;
   onChange: (value: T | null) => void;
@@ -23,7 +23,7 @@ type UseModelComboboxReturn = {
   noOptionsMessage: () => string;
 };
 
-export const useModelCombobox = <T extends AnyModelConfigEntity>(
+export const useModelCombobox = <T extends AnyModelConfig>(
   arg: UseModelComboboxArg<T>
 ): UseModelComboboxReturn => {
   const { t } = useTranslation();

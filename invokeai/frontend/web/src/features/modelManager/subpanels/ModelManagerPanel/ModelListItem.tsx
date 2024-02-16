@@ -15,11 +15,11 @@ import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
-import type { LoRAModelConfigEntity, MainModelConfigEntity } from 'services/api/endpoints/models';
+import type { LoRAConfig, MainModelConfig } from 'services/api/endpoints/models';
 import { useDeleteLoRAModelsMutation, useDeleteMainModelsMutation } from 'services/api/endpoints/models';
 
 type ModelListItemProps = {
-  model: MainModelConfigEntity | LoRAModelConfigEntity;
+  model: MainModelConfig | LoRAConfig;
   isSelected: boolean;
   setSelectedModelId: (v: string | undefined) => void;
 };
