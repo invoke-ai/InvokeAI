@@ -18,7 +18,9 @@ from invokeai.app.services.events import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import ModelRecordServiceBase
 from invokeai.backend.model_manager import AnyModelConfig, ModelRepoVariant
-from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore
+from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
+
+from ..model_metadata import ModelMetadataStoreBase
 
 
 class InstallStatus(str, Enum):
@@ -243,7 +245,7 @@ class ModelInstallServiceBase(ABC):
         app_config: InvokeAIAppConfig,
         record_store: ModelRecordServiceBase,
         download_queue: DownloadQueueServiceBase,
-        metadata_store: ModelMetadataStore,
+        metadata_store: ModelMetadataStoreBase,
         event_bus: Optional["EventServiceBase"] = None,
     ):
         """

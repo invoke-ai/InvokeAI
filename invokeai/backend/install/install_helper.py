@@ -25,6 +25,7 @@ from invokeai.app.services.model_install import (
     ModelSource,
     URLModelSource,
 )
+from invokeai.app.services.model_metadata import ModelMetadataStoreSQL
 from invokeai.app.services.model_records import ModelRecordServiceBase, ModelRecordServiceSQL
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.backend.model_manager import (
@@ -45,7 +46,7 @@ def initialize_record_store(app_config: InvokeAIAppConfig) -> ModelRecordService
     logger = InvokeAILogger.get_logger(config=app_config)
     image_files = DiskImageFileStorage(f"{app_config.output_path}/images")
     db = init_db(config=app_config, logger=logger, image_files=image_files)
-    obj: ModelRecordServiceBase = ModelRecordServiceSQL(db)
+    obj: ModelRecordServiceBase = ModelRecordServiceSQL(db, ModelMetadataStoreSQL(db))
     return obj
 
 
@@ -54,12 +55,10 @@ def initialize_installer(
 ) -> ModelInstallServiceBase:
     """Return an initialized ModelInstallService object."""
     record_store = initialize_record_store(app_config)
-    metadata_store = record_store.metadata_store
     download_queue = DownloadQueueService()
     installer = ModelInstallService(
         app_config=app_config,
         record_store=record_store,
-        metadata_store=metadata_store,
         download_queue=download_queue,
         event_bus=event_bus,
     )
@@ -287,14 +286,14 @@ class InstallHelper(object):
                 model_name=model_name,
             )
             if len(matches) > 1:
-                print(
-                    f"{model_to_remove} is ambiguous. Please use model_base/model_type/model_name (e.g. sd-1/main/my_model) to disambiguate."
+                self._logger.error(
+                    "{model_to_remove} is ambiguous. Please use model_base/model_type/model_name (e.g. sd-1/main/my_model) to disambiguate"
                 )
             elif not matches:
-                print(f"{model_to_remove}: unknown model")
+                self._logger.error(f"{model_to_remove}: unknown model")
             else:
                 for m in matches:
-                    print(f"Deleting {m.type}:{m.name}")
+                    self._logger.info(f"Deleting {m.type}:{m.name}")
                     installer.delete(m.key)
 
         installer.wait_for_installs()
