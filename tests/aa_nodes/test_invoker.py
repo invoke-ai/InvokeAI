@@ -1,4 +1,5 @@
 import logging
+from unittest.mock import Mock
 
 import pytest
 
@@ -65,7 +66,7 @@ def mock_services() -> InvocationServices:
         invocation_cache=MemoryInvocationCache(max_cache_size=0),
         latents=None,  # type: ignore
         logger=logging,  # type: ignore
-        model_manager=None,  # type: ignore
+        model_manager=Mock(),  # type: ignore
         download_queue=None,  # type: ignore
         names=None,  # type: ignore
         performance_statistics=InvocationStatsService(),
