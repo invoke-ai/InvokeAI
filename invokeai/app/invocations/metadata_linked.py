@@ -116,7 +116,7 @@ def validate_custom_label(
     title="Metadata Item Linked",
     tags=["metadata"],
     category="metadata",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Beta,
 )
 class MetadataItemLinkedInvocation(BaseInvocation, WithMetadata):
@@ -356,7 +356,7 @@ class MetadataToSDXLModelOutput(BaseInvocationOutput):
     title="Metadata To Model",
     tags=["metadata"],
     category="metadata",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Beta,
 )
 class MetadataToModelInvocation(BaseInvocation, WithMetadata):
@@ -380,8 +380,8 @@ class MetadataToModelInvocation(BaseInvocation, WithMetadata):
 
     def invoke(self, context: InvocationContext) -> MetadataToModelOutput:
         data = {} if self.metadata is None else self.metadata.model_dump()
-        model = MainModelField.model_validate_json(
-            data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
+        model = MainModelField(
+            **data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
         )
 
         return MetadataToModelOutput(model=model, name=f"{model.base_model}: {model.model_name}")
@@ -392,7 +392,7 @@ class MetadataToModelInvocation(BaseInvocation, WithMetadata):
     title="Metadata To SDXL Model",
     tags=["metadata"],
     category="metadata",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Beta,
 )
 class MetadataToSDXLModelInvocation(BaseInvocation, WithMetadata):
@@ -416,8 +416,8 @@ class MetadataToSDXLModelInvocation(BaseInvocation, WithMetadata):
 
     def invoke(self, context: InvocationContext) -> MetadataToSDXLModelOutput:
         data = {} if self.metadata is None else self.metadata.model_dump()
-        model = MainModelField.model_validate_json(
-            data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
+        model = MainModelField(
+            **data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
         )
 
         return MetadataToSDXLModelOutput(model=model, name=f"{model.base_model}: {model.model_name}")
