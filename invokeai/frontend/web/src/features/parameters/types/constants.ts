@@ -17,8 +17,8 @@ export const MODEL_TYPE_MAP = {
  */
 export const MODEL_TYPE_SHORT_MAP = {
   any: 'Any',
-  'sd-1': 'SD1',
-  'sd-2': 'SD2',
+  'sd-1': 'SD1.X',
+  'sd-2': 'SD2.X',
   sdxl: 'SDXL',
   'sdxl-refiner': 'SDXLR',
 };
