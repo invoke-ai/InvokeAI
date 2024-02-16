@@ -56,7 +56,7 @@ const selector = createMemoizedSelector(
     if (hrfEnabled) {
       badges.push('HiRes Fix');
     }
-    return { badges, activeTabName, isSDXL: model?.base_model === 'sdxl' };
+    return { badges, activeTabName, isSDXL: model?.base === 'sdxl' };
   }
 );
 

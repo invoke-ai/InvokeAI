@@ -14,7 +14,7 @@ import { upsertMetadata } from './metadata';
 
 export const addT2IAdaptersToLinearGraph = (state: RootState, graph: NonNullableGraph, baseNodeId: string): void => {
   const validT2IAdapters = selectValidT2IAdapters(state.controlAdapters).filter(
-    (ca) => ca.model?.base_model === state.generation.model?.base_model
+    (ca) => ca.model?.base === state.generation.model?.base
   );
 
   if (validT2IAdapters.length) {

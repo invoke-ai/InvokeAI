@@ -11,12 +11,7 @@ import { selectGenerationSlice } from 'features/parameters/store/generationSlice
 import { pick } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type {
-  ControlNetModelConfigEntity,
-  IPAdapterModelConfigEntity,
-  T2IAdapterModelConfigEntity,
-} from 'services/api/endpoints/models';
-import type { AnyModelConfig } from 'services/api/types';
+import type { AnyModelConfig, ControlNetConfig, IPAdapterConfig, T2IAdapterConfig } from 'services/api/types';
 
 type ParamControlAdapterModelProps = {
   id: string;
@@ -29,21 +24,21 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   const controlAdapterType = useControlAdapterType(id);
   const model = useControlAdapterModel(id);
   const dispatch = useAppDispatch();
-  const currentBaseModel = useAppSelector((s) => s.generation.model?.base_model);
+  const currentBaseModel = useAppSelector((s) => s.generation.model?.base);
   const mainModel = useAppSelector(selectMainModel);
   const { t } = useTranslation();
 
   const models = useControlAdapterModelEntities(controlAdapterType);
 
   const _onChange = useCallback(
-    (model: ControlNetModelConfigEntity | IPAdapterModelConfigEntity | T2IAdapterModelConfigEntity | null) => {
+    (model: ControlNetConfig | IPAdapterConfig | T2IAdapterConfig | null) => {
       if (!model) {
         return;
       }
       dispatch(
         controlAdapterModelChanged({
           id,
-          model: pick(model, 'base_model', 'model_name'),
+          model: pick(model, 'base', 'key'),
         })
       );
     },
@@ -57,7 +52,7 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
 
   const getIsDisabled = useCallback(
     (model: AnyModelConfig): boolean => {
-      const isCompatible = currentBaseModel === model.base_model;
+      const isCompatible = currentBaseModel === model.base;
       const hasMainModel = Boolean(currentBaseModel);
       return !hasMainModel || !isCompatible;
     },
@@ -73,7 +68,7 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
 
   return (
     <Tooltip label={value?.description}>
-      <FormControl isDisabled={!isEnabled} isInvalid={!value || mainModel?.base_model !== model?.base_model}>
+      <FormControl isDisabled={!isEnabled} isInvalid={!value || mainModel?.base !== model?.base}>
         <Combobox
           options={options}
           placeholder={t('controlnet.selectModel')}

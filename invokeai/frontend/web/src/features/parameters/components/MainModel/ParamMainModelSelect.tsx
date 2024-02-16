@@ -9,7 +9,7 @@ import { pick } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
-import type { MainModelConfigEntity } from 'services/api/endpoints/models';
+import type { MainModelConfig } from 'services/api/endpoints/models';
 import { getModelId, mainModelsAdapterSelectors, useGetMainModelsQuery } from 'services/api/endpoints/models';
 
 const selectModel = createMemoizedSelector(selectGenerationSlice, (generation) => generation.model);
@@ -26,7 +26,7 @@ const ParamMainModelSelect = () => {
     return mainModelsAdapterSelectors.selectById(data, getModelId(model))?.description;
   }, [data, model]);
   const _onChange = useCallback(
-    (model: MainModelConfigEntity | null) => {
+    (model: MainModelConfig | null) => {
       if (!model) {
         return;
       }

@@ -14,7 +14,7 @@ import { upsertMetadata } from './metadata';
 
 export const addIPAdapterToLinearGraph = (state: RootState, graph: NonNullableGraph, baseNodeId: string): void => {
   const validIPAdapters = selectValidIPAdapters(state.controlAdapters).filter(
-    (ca) => ca.model?.base_model === state.generation.model?.base_model
+    (ca) => ca.model?.base === state.generation.model?.base
   );
 
   if (validIPAdapters.length) {

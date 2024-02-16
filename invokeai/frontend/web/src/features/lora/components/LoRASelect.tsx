@@ -7,7 +7,7 @@ import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { loraAdded, selectLoraSlice } from 'features/lora/store/loraSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
+import type { LoRAConfig } from 'services/api/endpoints/models';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
 
 const selectAddedLoRAs = createMemoizedSelector(selectLoraSlice, (lora) => lora.loras);
@@ -19,7 +19,7 @@ const LoRASelect = () => {
   const addedLoRAs = useAppSelector(selectAddedLoRAs);
   const currentBaseModel = useAppSelector((s) => s.generation.model?.base_model);
 
-  const getIsDisabled = (lora: LoRAModelConfigEntity): boolean => {
+  const getIsDisabled = (lora: LoRAConfig): boolean => {
     const isCompatible = currentBaseModel === lora.base_model;
     const isAdded = Boolean(addedLoRAs[lora.id]);
     const hasMainModel = Boolean(currentBaseModel);
@@ -27,7 +27,7 @@ const LoRASelect = () => {
   };
 
   const _onChange = useCallback(
-    (lora: LoRAModelConfigEntity | null) => {
+    (lora: LoRAConfig | null) => {
       if (!lora) {
         return;
       }

@@ -19,7 +19,7 @@ export const addEnqueueRequestedLinear = () => {
 
       let graph;
 
-      if (model && model.base_model === 'sdxl') {
+      if (model && model.base === 'sdxl') {
         if (action.payload.tabName === 'txt2img') {
           graph = buildLinearSDXLTextToImageGraph(state);
         } else {

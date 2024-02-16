@@ -3,9 +3,9 @@ import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_BASE_MODELS } from 'services/api/constants';
 import type {
-  DiffusersModelConfigEntity,
-  LoRAModelConfigEntity,
-  MainModelConfigEntity,
+  DiffusersModelConfig,
+  LoRAConfig,
+  MainModelConfig,
 } from 'services/api/endpoints/models';
 import { useGetLoRAModelsQuery, useGetMainModelsQuery } from 'services/api/endpoints/models';
 
@@ -38,7 +38,7 @@ const ModelManagerPanel = () => {
 };
 
 type ModelEditProps = {
-  model: MainModelConfigEntity | LoRAModelConfigEntity | undefined;
+  model: MainModelConfig | LoRAConfig | undefined;
 };
 
 const ModelEdit = (props: ModelEditProps) => {
@@ -50,7 +50,7 @@ const ModelEdit = (props: ModelEditProps) => {
   }
 
   if (model?.model_format === 'diffusers') {
-    return <DiffusersModelEdit key={model.id} model={model as DiffusersModelConfigEntity} />;
+    return <DiffusersModelEdit key={model.id} model={model as DiffusersModelConfig} />;
   }
 
   if (model?.model_type === 'lora') {

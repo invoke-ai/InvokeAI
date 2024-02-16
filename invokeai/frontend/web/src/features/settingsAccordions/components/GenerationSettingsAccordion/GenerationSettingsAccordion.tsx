@@ -35,9 +35,10 @@ const badgesSelector = createMemoizedSelector(selectLoraSlice, selectGenerationS
   const enabledLoRAsCount = filter(lora.loras, (l) => !!l.isEnabled).length;
   const loraTabBadges = enabledLoRAsCount ? [enabledLoRAsCount] : [];
   const accordionBadges: (string | number)[] = [];
+  // TODO(MM2): fetch model name
   if (generation.model) {
-    accordionBadges.push(generation.model.model_name);
-    accordionBadges.push(generation.model.base_model);
+    accordionBadges.push(generation.model.key);
+    accordionBadges.push(generation.model.base);
   }
 
   return { loraTabBadges, accordionBadges };

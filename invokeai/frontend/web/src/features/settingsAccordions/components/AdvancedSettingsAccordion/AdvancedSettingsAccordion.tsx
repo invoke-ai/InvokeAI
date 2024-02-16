@@ -24,7 +24,8 @@ const formLabelProps2: FormLabelProps = {
 const selectBadges = createMemoizedSelector(selectGenerationSlice, (generation) => {
   const badges: (string | number)[] = [];
   if (generation.vae) {
-    let vaeBadge = generation.vae.model_name;
+    // TODO(MM2): Fetch the vae name
+    let vaeBadge = generation.vae.key;
     if (generation.vaePrecision === 'fp16') {
       vaeBadge += ` ${generation.vaePrecision}`;
     }
