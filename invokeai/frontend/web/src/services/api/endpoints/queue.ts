@@ -7,7 +7,15 @@ import queryString from 'query-string';
 import type { components, paths } from 'services/api/schema';
 
 import type { ApiTagDescription } from '..';
-import { api } from '..';
+import { api, buildV1Url } from '..';
+
+/**
+ * Builds an endpoint URL for the queue router
+ * @example
+ * buildQueueUrl('some-path')
+ * // '/api/v1/queue/queue_id/some-path'
+ */
+const buildQueueUrl = (path: string = '') => buildV1Url(`queue/${$queueId.get()}/${path}`);
 
 const getListQueueItemsUrl = (queryArgs?: paths['/api/v1/queue/{queue_id}/list']['get']['parameters']['query']) => {
   const query = queryArgs
@@ -17,10 +25,10 @@ const getListQueueItemsUrl = (queryArgs?: paths['/api/v1/queue/{queue_id}/list']
     : undefined;
 
   if (query) {
-    return `queue/${$queueId.get()}/list?${query}`;
+    return buildQueueUrl(`list?${query}`);
   }
 
-  return `queue/${$queueId.get()}/list`;
+  return buildQueueUrl('list');
 };
 
 export type SessionQueueItemStatus = NonNullable<
@@ -58,7 +66,7 @@ export const queueApi = api.injectEndpoints({
       paths['/api/v1/queue/{queue_id}/enqueue_batch']['post']['requestBody']['content']['application/json']
     >({
       query: (arg) => ({
-        url: `queue/${$queueId.get()}/enqueue_batch`,
+        url: buildQueueUrl('enqueue_batch'),
         body: arg,
         method: 'POST',
       }),
@@ -78,7 +86,7 @@ export const queueApi = api.injectEndpoints({
       void
     >({
       query: () => ({
-        url: `queue/${$queueId.get()}/processor/resume`,
+        url: buildQueueUrl('processor/resume'),
         method: 'PUT',
       }),
       invalidatesTags: ['CurrentSessionQueueItem', 'SessionQueueStatus'],
@@ -88,7 +96,7 @@ export const queueApi = api.injectEndpoints({
       void
     >({
       query: () => ({
-        url: `queue/${$queueId.get()}/processor/pause`,
+        url: buildQueueUrl('processor/pause'),
         method: 'PUT',
       }),
       invalidatesTags: ['CurrentSessionQueueItem', 'SessionQueueStatus'],
@@ -98,7 +106,7 @@ export const queueApi = api.injectEndpoints({
       void
     >({
       query: () => ({
-        url: `queue/${$queueId.get()}/prune`,
+        url: buildQueueUrl('prune'),
         method: 'PUT',
       }),
       invalidatesTags: ['SessionQueueStatus', 'BatchStatus'],
@@ -117,7 +125,7 @@ export const queueApi = api.injectEndpoints({
       void
     >({
       query: () => ({
-        url: `queue/${$queueId.get()}/clear`,
+        url: buildQueueUrl('clear'),
         method: 'PUT',
       }),
       invalidatesTags: [
@@ -142,7 +150,7 @@ export const queueApi = api.injectEndpoints({
       void
     >({
       query: () => ({
-        url: `queue/${$queueId.get()}/current`,
+        url: buildQueueUrl('current'),
         method: 'GET',
       }),
       providesTags: (result) => {
@@ -158,7 +166,7 @@ export const queueApi = api.injectEndpoints({
       void
     >({
       query: () => ({
-        url: `queue/${$queueId.get()}/next`,
+        url: buildQueueUrl('next'),
         method: 'GET',
       }),
       providesTags: (result) => {
@@ -174,7 +182,7 @@ export const queueApi = api.injectEndpoints({
       void
     >({
       query: () => ({
-        url: `queue/${$queueId.get()}/status`,
+        url: buildQueueUrl('status'),
         method: 'GET',
       }),
       providesTags: ['SessionQueueStatus', 'FetchOnReconnect'],
@@ -184,7 +192,7 @@ export const queueApi = api.injectEndpoints({
       { batch_id: string }
     >({
       query: ({ batch_id }) => ({
-        url: `queue/${$queueId.get()}/b/${batch_id}/status`,
+        url: buildQueueUrl(`/b/${batch_id}/status`),
         method: 'GET',
       }),
       providesTags: (result) => {
@@ -200,7 +208,7 @@ export const queueApi = api.injectEndpoints({
       number
     >({
       query: (item_id) => ({
-        url: `queue/${$queueId.get()}/i/${item_id}`,
+        url: buildQueueUrl(`i/${item_id}`),
         method: 'GET',
       }),
       providesTags: (result) => {
@@ -216,7 +224,7 @@ export const queueApi = api.injectEndpoints({
       number
     >({
       query: (item_id) => ({
-        url: `queue/${$queueId.get()}/i/${item_id}/cancel`,
+        url: buildQueueUrl(`i/${item_id}/cancel`),
         method: 'PUT',
       }),
       onQueryStarted: async (item_id, { dispatch, queryFulfilled }) => {
@@ -253,7 +261,7 @@ export const queueApi = api.injectEndpoints({
       paths['/api/v1/queue/{queue_id}/cancel_by_batch_ids']['put']['requestBody']['content']['application/json']
     >({
       query: (body) => ({
-        url: `queue/${$queueId.get()}/cancel_by_batch_ids`,
+        url: buildQueueUrl('cancel_by_batch_ids'),
         method: 'PUT',
         body,
       }),
@@ -279,7 +287,7 @@ export const queueApi = api.injectEndpoints({
         method: 'GET',
       }),
       serializeQueryArgs: () => {
-        return `queue/${$queueId.get()}/list`;
+        return buildQueueUrl('list');
       },
       transformResponse: (response: components['schemas']['CursorPaginatedResults_SessionQueueItemDTO_']) =>
         queueItemsAdapter.addMany(

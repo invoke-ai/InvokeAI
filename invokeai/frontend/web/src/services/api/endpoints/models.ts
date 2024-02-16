@@ -19,7 +19,10 @@ import type {
 } from 'services/api/types';
 
 import type { ApiTagDescription, tagTypes } from '..';
-import { api, LIST_TAG } from '..';
+import { api, buildV2Url, LIST_TAG } from '..';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export const getModelId = (input: any): any => input;
 
 type UpdateMainModelArg = {
   base_model: BaseModelType;
@@ -35,6 +38,8 @@ type UpdateLoRAModelArg = {
 
 type UpdateMainModelResponse =
   paths['/api/v2/models/i/{key}']['patch']['responses']['200']['content']['application/json'];
+
+type ListModelsArg = NonNullable<paths['/api/models_v2/']['get']['parameters']['query']>;
 
 type UpdateLoRAModelResponse = UpdateMainModelResponse;
 
@@ -152,17 +157,25 @@ const buildTransformResponse =
     return adapter.setAll(adapter.getInitialState(), response.models);
   };
 
+/**
+ * Builds an endpoint URL for the models router
+ * @example
+ * buildModelsUrl('some-path')
+ * // '/api/v1/models/some-path'
+ */
+const buildModelsUrl = (path: string = '') => buildV2Url(`models/${path}`);
+
 export const modelsApi = api.injectEndpoints({
   endpoints: (build) => ({
     getMainModels: build.query<EntityState<MainModelConfig, string>, BaseModelType[]>({
       query: (base_models) => {
-        const params = {
+        const params: ListModelsArg = {
           model_type: 'main',
           base_models,
         };
 
         const query = queryString.stringify(params, { arrayFormat: 'none' });
-        return `models/?${query}`;
+        return buildModelsUrl(`?${query}`);
       },
       providesTags: buildProvidesTags<MainModelConfig>('MainModel'),
       transformResponse: buildTransformResponse<MainModelConfig>(mainModelsAdapter),
@@ -170,7 +183,7 @@ export const modelsApi = api.injectEndpoints({
     updateMainModels: build.mutation<UpdateMainModelResponse, UpdateMainModelArg>({
       query: ({ base_model, model_name, body }) => {
         return {
-          url: `models/${base_model}/main/${model_name}`,
+          url: buildModelsUrl(`${base_model}/main/${model_name}`),
           method: 'PATCH',
           body: body,
         };
@@ -180,7 +193,7 @@ export const modelsApi = api.injectEndpoints({
     importMainModels: build.mutation<ImportMainModelResponse, ImportMainModelArg>({
       query: ({ body }) => {
         return {
-          url: `models/import`,
+          url: buildModelsUrl('import'),
           method: 'POST',
           body: body,
         };
@@ -190,7 +203,7 @@ export const modelsApi = api.injectEndpoints({
     addMainModels: build.mutation<AddMainModelResponse, AddMainModelArg>({
       query: ({ body }) => {
         return {
-          url: `models/add`,
+          url: buildModelsUrl('add'),
           method: 'POST',
           body: body,
         };
@@ -200,7 +213,7 @@ export const modelsApi = api.injectEndpoints({
     deleteMainModels: build.mutation<DeleteMainModelResponse, DeleteMainModelArg>({
       query: ({ base_model, model_name, model_type }) => {
         return {
-          url: `models/${base_model}/${model_type}/${model_name}`,
+          url: buildModelsUrl(`${base_model}/${model_type}/${model_name}`),
           method: 'DELETE',
         };
       },
@@ -209,7 +222,7 @@ export const modelsApi = api.injectEndpoints({
     convertMainModels: build.mutation<ConvertMainModelResponse, ConvertMainModelArg>({
       query: ({ base_model, model_name, convert_dest_directory }) => {
         return {
-          url: `models/convert/${base_model}/main/${model_name}`,
+          url: buildModelsUrl(`convert/${base_model}/main/${model_name}`),
           method: 'PUT',
           params: { convert_dest_directory },
         };
@@ -219,7 +232,7 @@ export const modelsApi = api.injectEndpoints({
     mergeMainModels: build.mutation<MergeMainModelResponse, MergeMainModelArg>({
       query: ({ base_model, body }) => {
         return {
-          url: `models/merge/${base_model}`,
+          url: buildModelsUrl(`merge/${base_model}`),
           method: 'PUT',
           body: body,
         };
@@ -229,21 +242,21 @@ export const modelsApi = api.injectEndpoints({
     syncModels: build.mutation<SyncModelsResponse, void>({
       query: () => {
         return {
-          url: `models/sync`,
+          url: buildModelsUrl('sync'),
           method: 'POST',
         };
       },
       invalidatesTags: ['Model'],
     }),
     getLoRAModels: build.query<EntityState<LoRAConfig, string>, void>({
-      query: () => ({ url: 'models/', params: { model_type: 'lora' } }),
+      query: () => ({ url: buildModelsUrl(), params: { model_type: 'lora' } }),
       providesTags: buildProvidesTags<LoRAConfig>('LoRAModel'),
       transformResponse: buildTransformResponse<LoRAConfig>(loraModelsAdapter),
     }),
     updateLoRAModels: build.mutation<UpdateLoRAModelResponse, UpdateLoRAModelArg>({
       query: ({ base_model, model_name, body }) => {
         return {
-          url: `models/${base_model}/lora/${model_name}`,
+          url: buildModelsUrl(`${base_model}/lora/${model_name}`),
           method: 'PATCH',
           body: body,
         };
@@ -253,34 +266,34 @@ export const modelsApi = api.injectEndpoints({
     deleteLoRAModels: build.mutation<DeleteLoRAModelResponse, DeleteLoRAModelArg>({
       query: ({ base_model, model_name }) => {
         return {
-          url: `models/${base_model}/lora/${model_name}`,
+          url: buildModelsUrl(`${base_model}/lora/${model_name}`),
           method: 'DELETE',
         };
       },
       invalidatesTags: [{ type: 'LoRAModel', id: LIST_TAG }],
     }),
     getControlNetModels: build.query<EntityState<ControlNetConfig, string>, void>({
-      query: () => ({ url: 'models/', params: { model_type: 'controlnet' } }),
+      query: () => ({ url: buildModelsUrl(), params: { model_type: 'controlnet' } }),
       providesTags: buildProvidesTags<ControlNetConfig>('ControlNetModel'),
       transformResponse: buildTransformResponse<ControlNetConfig>(controlNetModelsAdapter),
     }),
     getIPAdapterModels: build.query<EntityState<IPAdapterConfig, string>, void>({
-      query: () => ({ url: 'models/', params: { model_type: 'ip_adapter' } }),
+      query: () => ({ url: buildModelsUrl(), params: { model_type: 'ip_adapter' } }),
       providesTags: buildProvidesTags<IPAdapterConfig>('IPAdapterModel'),
       transformResponse: buildTransformResponse<IPAdapterConfig>(ipAdapterModelsAdapter),
     }),
     getT2IAdapterModels: build.query<EntityState<T2IAdapterConfig, string>, void>({
-      query: () => ({ url: 'models/', params: { model_type: 't2i_adapter' } }),
+      query: () => ({ url: buildModelsUrl(), params: { model_type: 't2i_adapter' } }),
       providesTags: buildProvidesTags<T2IAdapterConfig>('T2IAdapterModel'),
       transformResponse: buildTransformResponse<T2IAdapterConfig>(t2iAdapterModelsAdapter),
     }),
     getVaeModels: build.query<EntityState<VAEConfig, string>, void>({
-      query: () => ({ url: 'models/', params: { model_type: 'vae' } }),
+      query: () => ({ url: buildModelsUrl(), params: { model_type: 'vae' } }),
       providesTags: buildProvidesTags<VAEConfig>('VaeModel'),
       transformResponse: buildTransformResponse<VAEConfig>(vaeModelsAdapter),
     }),
     getTextualInversionModels: build.query<EntityState<TextualInversionConfig, string>, void>({
-      query: () => ({ url: 'models/', params: { model_type: 'embedding' } }),
+      query: () => ({ url: buildModelsUrl(), params: { model_type: 'embedding' } }),
       providesTags: buildProvidesTags<TextualInversionConfig>('TextualInversionModel'),
       transformResponse: buildTransformResponse<TextualInversionConfig>(textualInversionModelsAdapter),
     }),
@@ -288,14 +301,14 @@ export const modelsApi = api.injectEndpoints({
       query: (arg) => {
         const folderQueryStr = queryString.stringify(arg, {});
         return {
-          url: `/models/search?${folderQueryStr}`,
+          url: buildModelsUrl(`search?${folderQueryStr}`),
         };
       },
     }),
     getCheckpointConfigs: build.query<CheckpointConfigsResponse, void>({
       query: () => {
         return {
-          url: `/models/ckpt_confs`,
+          url: buildModelsUrl(`ckpt_confs`),
         };
       },
     }),

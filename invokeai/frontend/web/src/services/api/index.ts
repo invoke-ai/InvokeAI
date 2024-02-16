@@ -112,3 +112,6 @@ function getCircularReplacer() {
     return value;
   };
 }
+
+export const buildV1Url = (path: string): string => `api/v1/${path}`;
+export const buildV2Url = (path: string): string => `api/v2/${path}`;
