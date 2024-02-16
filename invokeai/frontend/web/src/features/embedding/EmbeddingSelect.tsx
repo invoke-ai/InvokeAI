@@ -6,18 +6,18 @@ import type { EmbeddingSelectProps } from 'features/embedding/types';
 import { t } from 'i18next';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { TextualInversionModelConfigEntity } from 'services/api/endpoints/models';
 import { useGetTextualInversionModelsQuery } from 'services/api/endpoints/models';
+import type { TextualInversionConfig } from 'services/api/types';
 
 const noOptionsMessage = () => t('embedding.noMatchingEmbedding');
 
 export const EmbeddingSelect = memo(({ onSelect, onClose }: EmbeddingSelectProps) => {
   const { t } = useTranslation();
 
-  const currentBaseModel = useAppSelector((s) => s.generation.model?.base_model);
+  const currentBaseModel = useAppSelector((s) => s.generation.model?.base);
 
   const getIsDisabled = useCallback(
-    (embedding: TextualInversionModelConfigEntity): boolean => {
+    (embedding: TextualInversionConfig): boolean => {
       const isCompatible = currentBaseModel === embedding.base_model;
       const hasMainModel = Boolean(currentBaseModel);
       return !hasMainModel || !isCompatible;
@@ -27,7 +27,7 @@ export const EmbeddingSelect = memo(({ onSelect, onClose }: EmbeddingSelectProps
   const { data, isLoading } = useGetTextualInversionModelsQuery();
 
   const _onChange = useCallback(
-    (embedding: TextualInversionModelConfigEntity | null) => {
+    (embedding: TextualInversionConfig | null) => {
       if (!embedding) {
         return;
       }

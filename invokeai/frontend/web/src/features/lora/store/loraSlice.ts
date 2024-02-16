@@ -2,10 +2,9 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
-import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
+import type { LoRAConfig } from 'services/api/types';
 
 export type LoRA = ParameterLoRAModel & {
-  id: string;
   weight: number;
   isEnabled?: boolean;
 };
@@ -29,40 +28,40 @@ export const loraSlice = createSlice({
   name: 'lora',
   initialState: initialLoraState,
   reducers: {
-    loraAdded: (state, action: PayloadAction<LoRAModelConfigEntity>) => {
-      const { model_name, id, base_model } = action.payload;
-      state.loras[id] = { id, model_name, base_model, ...defaultLoRAConfig };
+    loraAdded: (state, action: PayloadAction<LoRAConfig>) => {
+      const { key, base } = action.payload;
+      state.loras[key] = { key, base, ...defaultLoRAConfig };
     },
-    loraRecalled: (state, action: PayloadAction<LoRAModelConfigEntity & { weight: number }>) => {
-      const { model_name, id, base_model, weight } = action.payload;
-      state.loras[id] = { id, model_name, base_model, weight, isEnabled: true };
+    loraRecalled: (state, action: PayloadAction<LoRAConfig & { weight: number }>) => {
+      const { key, base, weight } = action.payload;
+      state.loras[key] = { key, base, weight, isEnabled: true };
     },
     loraRemoved: (state, action: PayloadAction<string>) => {
-      const id = action.payload;
-      delete state.loras[id];
+      const key = action.payload;
+      delete state.loras[key];
     },
     lorasCleared: (state) => {
       state.loras = {};
     },
-    loraWeightChanged: (state, action: PayloadAction<{ id: string; weight: number }>) => {
-      const { id, weight } = action.payload;
-      const lora = state.loras[id];
+    loraWeightChanged: (state, action: PayloadAction<{ key: string; weight: number }>) => {
+      const { key, weight } = action.payload;
+      const lora = state.loras[key];
       if (!lora) {
         return;
       }
       lora.weight = weight;
     },
     loraWeightReset: (state, action: PayloadAction<string>) => {
-      const id = action.payload;
-      const lora = state.loras[id];
+      const key = action.payload;
+      const lora = state.loras[key];
       if (!lora) {
         return;
       }
       lora.weight = defaultLoRAConfig.weight;
     },
-    loraIsEnabledChanged: (state, action: PayloadAction<Pick<LoRA, 'id' | 'isEnabled'>>) => {
-      const { id, isEnabled } = action.payload;
-      const lora = state.loras[id];
+    loraIsEnabledChanged: (state, action: PayloadAction<Pick<LoRA, 'key' | 'isEnabled'>>) => {
+      const { key, isEnabled } = action.payload;
+      const lora = state.loras[key];
       if (!lora) {
         return;
       }

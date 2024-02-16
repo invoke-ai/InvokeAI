@@ -4,7 +4,7 @@ import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldLoRAModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type { LoRAModelFieldInputInstance, LoRAModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
-import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
+import type { LoRAConfig } from 'services/api/endpoints/models';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
 
 import type { FieldComponentProps } from './types';
@@ -16,7 +16,7 @@ const LoRAModelFieldInputComponent = (props: Props) => {
   const dispatch = useAppDispatch();
   const { data, isLoading } = useGetLoRAModelsQuery();
   const _onChange = useCallback(
-    (value: LoRAModelConfigEntity | null) => {
+    (value: LoRAConfig | null) => {
       if (!value) {
         return;
       }

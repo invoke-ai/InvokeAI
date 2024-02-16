@@ -44,7 +44,7 @@ export const LoRACard = memo((props: LoRACardProps) => {
       <CardHeader>
         <Flex alignItems="center" justifyContent="space-between" width="100%" gap={2}>
           <Text noOfLines={1} wordBreak="break-all" color={lora.isEnabled ? 'base.200' : 'base.500'}>
-            {lora.model_name}
+            {lora.key}
           </Text>
           <Flex alignItems="center" gap={2}>
             <Switch size="sm" onChange={handleSetLoraToggle} isChecked={lora.isEnabled} />

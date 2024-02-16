@@ -10,13 +10,7 @@ export const ReduxInit = memo((props: PropsWithChildren) => {
   const dispatch = useAppDispatch();
   useGlobalModifiersInit();
   useEffect(() => {
-    dispatch(
-      modelChanged({
-        model_name: 'test_model',
-        base_model: 'sd-1',
-        model_type: 'main',
-      })
-    );
+    dispatch(modelChanged({ key: 'test_model', base: 'sd-1' }));
   }, []);
 
   return props.children;

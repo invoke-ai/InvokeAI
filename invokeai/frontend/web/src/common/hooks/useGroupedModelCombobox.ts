@@ -5,10 +5,10 @@ import type { GroupBase } from 'chakra-react-select';
 import { groupBy, map, reduce } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AnyModelConfigEntity } from 'services/api/endpoints/models';
+import type { AnyModelConfig } from 'services/api/endpoints/models';
 import { getModelId } from 'services/api/endpoints/models';
 
-type UseGroupedModelComboboxArg<T extends AnyModelConfigEntity> = {
+type UseGroupedModelComboboxArg<T extends AnyModelConfig> = {
   modelEntities: EntityState<T, string> | undefined;
   selectedModel?: Pick<T, 'base_model' | 'model_name' | 'model_type'> | null;
   onChange: (value: T | null) => void;
@@ -24,7 +24,7 @@ type UseGroupedModelComboboxReturn = {
   noOptionsMessage: () => string;
 };
 
-export const useGroupedModelCombobox = <T extends AnyModelConfigEntity>(
+export const useGroupedModelCombobox = <T extends AnyModelConfig>(
   arg: UseGroupedModelComboboxArg<T>
 ): UseGroupedModelComboboxReturn => {
   const { t } = useTranslation();
