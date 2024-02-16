@@ -30,9 +30,9 @@ class BulkDownloadBase(ABC):
         """
         Starts a a bulk download job.
 
-        :param invoker: The Invoker that holds all the services, required to be passed as a parameter to avoid circular dependencies.
         :param image_names: A list of image names to include in the zip file.
         :param board_id: The ID of the board. If provided, all images associated with the board will be included in the zip file.
+        :param bulk_download_item_id: The bulk_download_item_id that will be used to retrieve the bulk download item when it is prepared, if none is provided a uuid will be generated.
         """
 
     @abstractmethod
@@ -45,12 +45,12 @@ class BulkDownloadBase(ABC):
         """
 
     @abstractmethod
-    def get_clean_board_name(self, board_id: str) -> str:
+    def generate_item_id(self, board_id: Optional[str]) -> str:
         """
-        Get the name of the board.
+        Generate an item ID for a bulk download item.
 
-        :param board_id: The ID of the board.
-        :return: The name of the board.
+        :param board_id: The ID of the board whose name is to be included in the item id.
+        :return: The generated item ID.
         """
 
     @abstractmethod
@@ -61,12 +61,8 @@ class BulkDownloadBase(ABC):
         This method is responsible for stopping the BulkDownloadService and performing any necessary cleanup
         operations to remove any remnants or resources associated with the service.
 
-        Args:
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
-
-        Returns:
-            None
+        :param *args: Variable length argument list.
+        :param **kwargs: Arbitrary keyword arguments.
         """
 
     @abstractmethod

@@ -50,19 +50,15 @@ class BulkDownloadService(BulkDownloadBase):
         """
 
         bulk_download_id: str = DEFAULT_BULK_DOWNLOAD_ID
-        if bulk_download_item_id is None:
-            bulk_download_item_id = uuid_string() if board_id is None else board_id
+        bulk_download_item_id = uuid_string() if bulk_download_item_id is None else bulk_download_item_id
 
         self._signal_job_started(bulk_download_id, bulk_download_item_id)
 
         try:
-            board_name: str = ""
             image_dtos: list[ImageDTO] = []
 
             if board_id:
-                board_name = self.get_clean_board_name(board_id)
-
-                # -1 is the default value for limit, which means no limit, is_intermediate only gives us completed images
+                # -1 is the default value for limit, which means no limit, is_intermediate False only gives us completed images
                 image_dtos = self.__invoker.services.images.get_many(
                     offset=0,
                     limit=-1,
@@ -71,9 +67,7 @@ class BulkDownloadService(BulkDownloadBase):
                 ).items
             else:
                 image_dtos = [self.__invoker.services.images.get_dto(image_name) for image_name in image_names]
-            bulk_download_item_name: str = self._create_zip_file(
-                image_dtos, bulk_download_item_id if board_id is None else board_name
-            )
+            bulk_download_item_name: str = self._create_zip_file(image_dtos, bulk_download_item_id)
             self._signal_job_completed(bulk_download_id, bulk_download_item_id, bulk_download_item_name)
         except (ImageRecordNotFoundException, BoardRecordNotFoundException, BulkDownloadException) as e:
             self._signal_job_failed(bulk_download_id, bulk_download_item_id, e)
@@ -82,7 +76,10 @@ class BulkDownloadService(BulkDownloadBase):
             self.__invoker.services.logger.error("Problem bulk downloading images.")
             raise e
 
-    def get_clean_board_name(self, board_id: str) -> str:
+    def generate_item_id(self, board_id: Optional[str]) -> str:
+        return uuid_string() if board_id is None else self._get_clean_board_name(board_id) + "_" + uuid_string()
+
+    def _get_clean_board_name(self, board_id: str) -> str:
         if board_id == "none":
             return "Uncategorized"
 
@@ -109,7 +106,7 @@ class BulkDownloadService(BulkDownloadBase):
     # from https://stackoverflow.com/questions/7406102/create-sane-safe-filename-from-any-unsafe-string
     def _clean_string_to_path_safe(self, s: str) -> str:
         """Clean a string to be path safe."""
-        return "".join([c for c in s if c.isalpha() or c.isdigit() or c == " "]).rstrip()
+        return "".join([c for c in s if c.isalpha() or c.isdigit() or c == " " or c == "_" or c == "-"]).rstrip()
 
     def _signal_job_started(self, bulk_download_id: str, bulk_download_item_id: str) -> None:
         """Signal that a bulk download job has started."""
@@ -166,11 +163,11 @@ class BulkDownloadService(BulkDownloadBase):
         :return: The path to the bulk download file.
         """
         path = str(self.__bulk_downloads_folder / bulk_download_item_name)
-        if not self.validate_path(path):
+        if not self._is_valid_path(path):
             raise BulkDownloadTargetException()
         return path
 
-    def validate_path(self, path: Union[str, Path]) -> bool:
+    def _is_valid_path(self, path: Union[str, Path]) -> bool:
         """Validates the path given for a bulk download."""
         path = path if isinstance(path, Path) else Path(path)
         return path.exists()

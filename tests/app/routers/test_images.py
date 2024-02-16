@@ -71,17 +71,10 @@ class MockApiDependencies(ApiDependencies):
 def test_download_images_from_list(monkeypatch: Any, mock_invoker: Invoker) -> None:
     prepare_download_images_test(monkeypatch, mock_invoker)
 
-    def mock_uuid_string():
-        return "test"
-
-    # You have to patch the function within the module it's being imported into. This is strange, but it works.
-    # See http://www.gregreda.com/2021/06/28/mocking-imported-module-function-python/
-    monkeypatch.setattr("invokeai.app.api.routers.images.uuid_string", mock_uuid_string)
-
     response = client.post("/api/v1/images/download", json={"image_names": ["test.png"]})
     json_response = response.json()
     assert response.status_code == 202
-    assert json_response["bulk_download_item_name"] == "test"
+    assert json_response["bulk_download_item_name"] == "test.zip"
 
 
 def test_download_images_from_board_id_empty_image_name_list(monkeypatch: Any, mock_invoker: Invoker) -> None:
@@ -101,6 +94,10 @@ def test_download_images_from_board_id_empty_image_name_list(monkeypatch: Any, m
 
 def prepare_download_images_test(monkeypatch: Any, mock_invoker: Invoker) -> None:
     monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr(
+        "invokeai.app.api.routers.images.ApiDependencies.invoker.services.bulk_download.generate_item_id",
+        lambda arg: "test",
+    )
 
     def mock_add_task(*args, **kwargs):
         return None
