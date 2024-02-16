@@ -57,7 +57,7 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
     (typeof args === 'string' && args.includes('openapi.json'));
 
   const fetchBaseQueryArgs: FetchBaseQueryArgs = {
-    baseUrl: baseUrl ? `${baseUrl}/api/v1` : `${window.location.href.replace(/\/$/, '')}/api/v1`,
+baseUrl: baseUrl || window.location.href.replace(/\/$/, ''),
   };
 
   // When fetching the openapi.json, we need to remove circular references from the JSON.
@@ -112,3 +112,6 @@ function getCircularReplacer() {
     return value;
   };
 }
+
+export const buildV1Url = (path: string): string => `api/v1/${path}`;
+export const buildV2Url = (path: string): string => `api/v2/${path}`;
