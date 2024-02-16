@@ -23,9 +23,7 @@ type UseModelComboboxReturn = {
   noOptionsMessage: () => string;
 };
 
-export const useModelCombobox = <T extends AnyModelConfig>(
-  arg: UseModelComboboxArg<T>
-): UseModelComboboxReturn => {
+export const useModelCombobox = <T extends AnyModelConfig>(arg: UseModelComboboxArg<T>): UseModelComboboxReturn => {
   const { t } = useTranslation();
   const { modelEntities, selectedModel, getIsDisabled, onChange, isLoading, optionsFilter = () => true } = arg;
   const options = useMemo<ComboboxOption[]>(() => {
