@@ -17,7 +17,9 @@ from invokeai.backend.model_manager import (
     ModelFormat,
     ModelType,
 )
-from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore
+from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
+
+from ..model_metadata import ModelMetadataStoreBase
 
 
 class DuplicateModelException(Exception):
@@ -109,7 +111,7 @@ class ModelRecordServiceBase(ABC):
 
     @property
     @abstractmethod
-    def metadata_store(self) -> ModelMetadataStore:
+    def metadata_store(self) -> ModelMetadataStoreBase:
         """Return a ModelMetadataStore initialized on the same database."""
         pass
 

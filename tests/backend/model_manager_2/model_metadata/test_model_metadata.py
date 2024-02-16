@@ -8,6 +8,7 @@ import pytest
 from pydantic.networks import HttpUrl
 from requests.sessions import Session
 
+from invokeai.app.services.model_metadata import ModelMetadataStoreBase
 from invokeai.backend.model_manager.config import ModelRepoVariant
 from invokeai.backend.model_manager.metadata import (
     CivitaiMetadata,
@@ -15,14 +16,13 @@ from invokeai.backend.model_manager.metadata import (
     CommercialUsage,
     HuggingFaceMetadata,
     HuggingFaceMetadataFetch,
-    ModelMetadataStore,
     UnknownMetadataException,
 )
 from invokeai.backend.model_manager.util import select_hf_files
 from tests.backend.model_manager_2.model_manager_2_fixtures import *  # noqa F403
 
 
-def test_metadata_store_put_get(mm2_metadata_store: ModelMetadataStore) -> None:
+def test_metadata_store_put_get(mm2_metadata_store: ModelMetadataStoreBase) -> None:
     tags = {"text-to-image", "diffusers"}
     input_metadata = HuggingFaceMetadata(
         name="sdxl-vae",
@@ -40,7 +40,7 @@ def test_metadata_store_put_get(mm2_metadata_store: ModelMetadataStore) -> None:
     assert mm2_metadata_store.list_tags() == tags
 
 
-def test_metadata_store_update(mm2_metadata_store: ModelMetadataStore) -> None:
+def test_metadata_store_update(mm2_metadata_store: ModelMetadataStoreBase) -> None:
     input_metadata = HuggingFaceMetadata(
         name="sdxl-vae",
         author="stabilityai",
@@ -57,7 +57,7 @@ def test_metadata_store_update(mm2_metadata_store: ModelMetadataStore) -> None:
     assert input_metadata == output_metadata
 
 
-def test_metadata_search(mm2_metadata_store: ModelMetadataStore) -> None:
+def test_metadata_search(mm2_metadata_store: ModelMetadataStoreBase) -> None:
     metadata1 = HuggingFaceMetadata(
         name="sdxl-vae",
         author="stabilityai",

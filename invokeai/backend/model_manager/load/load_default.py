@@ -75,7 +75,7 @@ class ModelLoader(ModelLoaderBase):
 
         model_path = self._convert_if_needed(model_config, model_path, submodel_type)
         locker = self._load_if_needed(model_config, model_path, submodel_type)
-        return LoadedModel(config=model_config, locker=locker)
+        return LoadedModel(config=model_config, _locker=locker)
 
     def _get_model_path(
         self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None
