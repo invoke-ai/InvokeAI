@@ -509,19 +509,20 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         t2i_adapter_data = []
         for t2i_adapter_field in t2i_adapter:
-            t2i_adapter_model_info = context.models.load(key=t2i_adapter_field.t2i_adapter_model.key)
+            t2i_adapter_model_config = context.models.get_config(key=t2i_adapter_field.t2i_adapter_model.key)
+            t2i_adapter_loaded_model = context.models.load(key=t2i_adapter_field.t2i_adapter_model.key)
             image = context.images.get_pil(t2i_adapter_field.image.image_name)
 
             # The max_unet_downscale is the maximum amount that the UNet model downscales the latent image internally.
-            if t2i_adapter_model_info.base == BaseModelType.StableDiffusion1:
+            if t2i_adapter_model_config.base == BaseModelType.StableDiffusion1:
                 max_unet_downscale = 8
-            elif t2i_adapter_model_info.base == BaseModelType.StableDiffusionXL:
+            elif t2i_adapter_model_config.base == BaseModelType.StableDiffusionXL:
                 max_unet_downscale = 4
             else:
-                raise ValueError(f"Unexpected T2I-Adapter base model type: '{t2i_adapter_model_info.base}'.")
+                raise ValueError(f"Unexpected T2I-Adapter base model type: '{t2i_adapter_model_config.base}'.")
 
             t2i_adapter_model: T2IAdapter
-            with t2i_adapter_model_info as t2i_adapter_model:
+            with t2i_adapter_loaded_model as t2i_adapter_model:
                 total_downscale_factor = t2i_adapter_model.total_downscale_factor
 
                 # Resize the T2I-Adapter input image.
