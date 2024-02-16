@@ -10,11 +10,12 @@ type SeamlessTextureViewerProps = {
 export default function SeamlessTextureViewer(props: SeamlessTextureViewerProps) {
   const [tileCount, setTileCount] = useState(150);
   const [gridWidth, setGridWidth] = useState(256);
+
   const seamlessViewerRef = useRef<HTMLDivElement | null>(null);
 
   const tiles = Array.from({ length: tileCount }, (_, index) => index);
 
-  const calculateTotalTiles = (gridWidth: number) => {
+  const calculateTotalTiles = useCallback(() => {
     const seamlessViewerElement = seamlessViewerRef.current;
 
     if (!seamlessViewerElement) {
@@ -22,11 +23,11 @@ export default function SeamlessTextureViewer(props: SeamlessTextureViewerProps)
     }
 
     const totalItems =
-      Math.ceil(seamlessViewerElement.offsetWidth / gridWidth) *
-      Math.ceil(seamlessViewerElement.offsetHeight / gridWidth);
+      Math.ceil(seamlessViewerElement.offsetWidth / (props.imageDTO.width / 10)) *
+      Math.ceil(seamlessViewerElement.offsetHeight / (props.imageDTO.height / 10));
 
     return totalItems;
-  };
+  }, [props.imageDTO.width, props.imageDTO.height]);
 
   useEffect(() => {
     const seamlessViewerElement = seamlessViewerRef.current;
@@ -35,7 +36,7 @@ export default function SeamlessTextureViewer(props: SeamlessTextureViewerProps)
     }
 
     const seamlessViewerObserver = new ResizeObserver(() => {
-      const totalItems = calculateTotalTiles(gridWidth);
+      const totalItems = calculateTotalTiles();
       setTileCount(totalItems);
     });
 
@@ -44,7 +45,7 @@ export default function SeamlessTextureViewer(props: SeamlessTextureViewerProps)
     return () => {
       seamlessViewerObserver.disconnect();
     };
-  }, [gridWidth]);
+  }, [calculateTotalTiles]);
 
   const handleScroll = useCallback(
     (e: WheelEvent) => {
@@ -59,12 +60,12 @@ export default function SeamlessTextureViewer(props: SeamlessTextureViewerProps)
         maxGridWidth
       );
 
-      const totalItems = calculateTotalTiles(newGridWidth);
+      const totalItems = calculateTotalTiles();
 
       setGridWidth(newGridWidth);
       setTileCount(totalItems);
     },
-    [gridWidth, props.imageDTO.width]
+    [gridWidth, props.imageDTO.width, calculateTotalTiles]
   );
 
   useFocusedMouseWheel(seamlessViewerRef, handleScroll);
