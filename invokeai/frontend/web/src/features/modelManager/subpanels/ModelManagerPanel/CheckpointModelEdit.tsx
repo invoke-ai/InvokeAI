@@ -21,14 +21,14 @@ import { memo, useCallback, useEffect, useState } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import type { CheckpointModelConfigEntity } from 'services/api/endpoints/models';
+import type { CheckpointModelConfig } from 'services/api/endpoints/models';
 import { useGetCheckpointConfigsQuery, useUpdateMainModelsMutation } from 'services/api/endpoints/models';
 import type { CheckpointModelConfig } from 'services/api/types';
 
 import ModelConvert from './ModelConvert';
 
 type CheckpointModelEditProps = {
-  model: CheckpointModelConfigEntity;
+  model: CheckpointModelConfig;
 };
 
 const CheckpointModelEdit = (props: CheckpointModelEditProps) => {

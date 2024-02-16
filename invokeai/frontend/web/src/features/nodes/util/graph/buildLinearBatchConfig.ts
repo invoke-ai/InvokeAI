@@ -105,7 +105,7 @@ export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, 
     });
   }
 
-  if (shouldConcatSDXLStylePrompt && model?.base_model === 'sdxl') {
+  if (shouldConcatSDXLStylePrompt && model?.base === 'sdxl') {
     if (graph.nodes[POSITIVE_CONDITIONING]) {
       firstBatchDatumList.push({
         node_path: POSITIVE_CONDITIONING,
