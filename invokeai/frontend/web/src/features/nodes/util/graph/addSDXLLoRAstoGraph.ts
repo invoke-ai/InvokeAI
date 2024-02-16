@@ -31,6 +31,7 @@ export const addSDXLLoRAsToGraph = (
    * So we need to inject a LoRA chain into the graph.
    */
 
+  // TODO(MM2): check base model
   const enabledLoRAs = filter(state.lora.loras, (l) => l.isEnabled ?? false);
   const loraCount = size(enabledLoRAs);
 
@@ -60,20 +61,20 @@ export const addSDXLLoRAsToGraph = (
   let currentLoraIndex = 0;
 
   enabledLoRAs.forEach((lora) => {
-    const { model_name, base_model, weight } = lora;
-    const currentLoraNodeId = `${LORA_LOADER}_${model_name.replace('.', '_')}`;
+    const { key, weight } = lora;
+    const currentLoraNodeId = `${LORA_LOADER}_${key}`;
 
     const loraLoaderNode: SDXLLoraLoaderInvocation = {
       type: 'sdxl_lora_loader',
       id: currentLoraNodeId,
       is_intermediate: true,
-      lora: { model_name, base_model },
+      lora: { key },
       weight,
     };
 
     loraMetadata.push(
       zLoRAMetadataItem.parse({
-        lora: { model_name, base_model },
+        lora: { key },
         weight,
       })
     );

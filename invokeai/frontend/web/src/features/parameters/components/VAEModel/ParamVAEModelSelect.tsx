@@ -7,7 +7,7 @@ import { selectGenerationSlice, vaeSelected } from 'features/parameters/store/ge
 import { pick } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { VaeModelConfigEntity } from 'services/api/endpoints/models';
+import type { VAEConfig } from 'services/api/endpoints/models';
 import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
 
 const selector = createMemoizedSelector(selectGenerationSlice, (generation) => {
@@ -21,7 +21,7 @@ const ParamVAEModelSelect = () => {
   const { model, vae } = useAppSelector(selector);
   const { data, isLoading } = useGetVaeModelsQuery();
   const getIsDisabled = useCallback(
-    (vae: VaeModelConfigEntity): boolean => {
+    (vae: VAEConfig): boolean => {
       const isCompatible = model?.base_model === vae.base_model;
       const hasMainModel = Boolean(model?.base_model);
       return !hasMainModel || !isCompatible;
@@ -29,7 +29,7 @@ const ParamVAEModelSelect = () => {
     [model?.base_model]
   );
   const _onChange = useCallback(
-    (vae: VaeModelConfigEntity | null) => {
+    (vae: VAEConfig | null) => {
       dispatch(vaeSelected(vae ? pick(vae, 'base_model', 'model_name') : null));
     },
     [dispatch]

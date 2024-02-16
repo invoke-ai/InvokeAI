@@ -4,7 +4,7 @@ import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldT2IAdapterModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type { T2IAdapterModelFieldInputInstance, T2IAdapterModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
-import type { T2IAdapterModelConfigEntity } from 'services/api/endpoints/models';
+import type { T2IAdapterConfig } from 'services/api/endpoints/models';
 import { useGetT2IAdapterModelsQuery } from 'services/api/endpoints/models';
 
 import type { FieldComponentProps } from './types';
@@ -18,7 +18,7 @@ const T2IAdapterModelFieldInputComponent = (
   const { data: t2iAdapterModels } = useGetT2IAdapterModelsQuery();
 
   const _onChange = useCallback(
-    (value: T2IAdapterModelConfigEntity | null) => {
+    (value: T2IAdapterConfig | null) => {
       if (!value) {
         return;
       }

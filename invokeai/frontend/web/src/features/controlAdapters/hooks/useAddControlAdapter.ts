@@ -6,14 +6,14 @@ import { useCallback, useMemo } from 'react';
 import { useControlAdapterModels } from './useControlAdapterModels';
 
 export const useAddControlAdapter = (type: ControlAdapterType) => {
-  const baseModel = useAppSelector((s) => s.generation.model?.base_model);
+  const baseModel = useAppSelector((s) => s.generation.model?.base);
   const dispatch = useAppDispatch();
 
   const models = useControlAdapterModels(type);
 
   const firstModel = useMemo(() => {
     // prefer to use a model that matches the base model
-    const firstCompatibleModel = models.filter((m) => (baseModel ? m.base_model === baseModel : true))[0];
+    const firstCompatibleModel = models.filter((m) => (baseModel ? m.base === baseModel : true))[0];
 
     if (firstCompatibleModel) {
       return firstCompatibleModel;

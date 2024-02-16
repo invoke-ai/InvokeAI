@@ -9,12 +9,12 @@ import { memo, useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import type { DiffusersModelConfigEntity } from 'services/api/endpoints/models';
+import type { DiffusersModelConfig } from 'services/api/endpoints/models';
 import { useUpdateMainModelsMutation } from 'services/api/endpoints/models';
 import type { DiffusersModelConfig } from 'services/api/types';
 
 type DiffusersModelEditProps = {
-  model: DiffusersModelConfigEntity;
+  model: DiffusersModelConfig;
 };
 
 const DiffusersModelEdit = (props: DiffusersModelEditProps) => {

@@ -2,6 +2,7 @@ import type { UseToastOptions } from '@invoke-ai/ui-library';
 import type { EntityState } from '@reduxjs/toolkit';
 import type { components, paths } from 'services/api/schema';
 import type { O } from 'ts-toolbelt';
+import type { SetRequired } from 'type-fest';
 
 export type S = components['schemas'];
 
@@ -54,40 +55,34 @@ export type LoRAModelFormat = S['LoRAModelFormat'];
 export type ControlNetModelField = S['ControlNetModelField'];
 export type IPAdapterModelField = S['IPAdapterModelField'];
 export type T2IAdapterModelField = S['T2IAdapterModelField'];
-export type ModelsList = S['invokeai__app__api__routers__models__ModelsList'];
 export type ControlField = S['ControlField'];
 export type IPAdapterField = S['IPAdapterField'];
 
 // Model Configs
-export type LoRAModelConfig = S['LoRAModelConfig'];
-export type VaeModelConfig = S['VaeModelConfig'];
-export type ControlNetModelCheckpointConfig = S['ControlNetModelCheckpointConfig'];
-export type ControlNetModelDiffusersConfig = S['ControlNetModelDiffusersConfig'];
-export type ControlNetModelConfig = ControlNetModelCheckpointConfig | ControlNetModelDiffusersConfig;
-export type IPAdapterModelInvokeAIConfig = S['IPAdapterModelInvokeAIConfig'];
-export type IPAdapterModelConfig = IPAdapterModelInvokeAIConfig;
-export type T2IAdapterModelDiffusersConfig = S['T2IAdapterModelDiffusersConfig'];
-export type T2IAdapterModelConfig = T2IAdapterModelDiffusersConfig;
-export type TextualInversionModelConfig = S['TextualInversionModelConfig'];
-export type DiffusersModelConfig =
-  | S['StableDiffusion1ModelDiffusersConfig']
-  | S['StableDiffusion2ModelDiffusersConfig']
-  | S['StableDiffusionXLModelDiffusersConfig'];
-export type CheckpointModelConfig =
-  | S['StableDiffusion1ModelCheckpointConfig']
-  | S['StableDiffusion2ModelCheckpointConfig']
-  | S['StableDiffusionXLModelCheckpointConfig'];
+
+// TODO(MM2): Can we make key required in the pydantic model?
+type KeyRequired<T extends {key?: string}> = SetRequired<T, 'key'>;
+export type LoRAConfig = KeyRequired<S['LoRAConfig']>;
+// TODO(MM2): Can we rename this from Vae -> VAE
+export type VAEConfig = KeyRequired<S['VaeCheckpointConfig']> | KeyRequired<S['VaeDiffusersConfig']>;
+export type ControlNetConfig = KeyRequired<S['ControlNetDiffusersConfig']> | KeyRequired<S['ControlNetCheckpointConfig']>;
+export type IPAdapterConfig = KeyRequired<S['IPAdapterConfig']>;
+// TODO(MM2): Can we rename this to T2IAdapterConfig
+export type T2IAdapterConfig = KeyRequired<S['T2IConfig']>;
+export type TextualInversionConfig = KeyRequired<S['TextualInversionConfig']>;
+export type DiffusersModelConfig = KeyRequired<S['MainDiffusersConfig']>;
+export type CheckpointModelConfig = KeyRequired<S['MainCheckpointConfig']>;
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
-  | LoRAModelConfig
-  | VaeModelConfig
-  | ControlNetModelConfig
-  | IPAdapterModelConfig
-  | T2IAdapterModelConfig
-  | TextualInversionModelConfig
+  | LoRAConfig
+  | VAEConfig
+  | ControlNetConfig
+  | IPAdapterConfig
+  | T2IAdapterConfig
+  | TextualInversionConfig
   | MainModelConfig;
 
-export type MergeModelConfig = S['Body_merge_models'];
+export type MergeModelConfig = S['Body_merge'];
 export type ImportModelConfig = S['Body_import_model'];
 
 // Graphs

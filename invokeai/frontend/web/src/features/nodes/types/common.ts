@@ -67,11 +67,13 @@ export const zModelName = z.string().min(3);
 export const zModelIdentifier = z.object({
   key: z.string().min(1),
 });
+export const zModelFieldBase = zModelIdentifier;
+export const zModelIdentifierWithBase = zModelIdentifier.extend({ base: zBaseModel });
 export type BaseModel = z.infer<typeof zBaseModel>;
 export type ModelType = z.infer<typeof zModelType>;
 export type ModelIdentifier = z.infer<typeof zModelIdentifier>;
-
-export const zMainModelField = zModelIdentifier;
+export type ModelIdentifierWithBase = z.infer<typeof zModelIdentifierWithBase>;
+export const zMainModelField = zModelFieldBase;
 export type MainModelField = z.infer<typeof zMainModelField>;
 
 export const zSDXLRefinerModelField = zModelIdentifier;
@@ -91,23 +93,23 @@ export const zSubModelType = z.enum([
 ]);
 export type SubModelType = z.infer<typeof zSubModelType>;
 
-export const zVAEModelField = zModelIdentifier;
+export const zVAEModelField = zModelFieldBase;
 
 export const zModelInfo = zModelIdentifier.extend({
   submodel_type: zSubModelType.nullish(),
 });
 export type ModelInfo = z.infer<typeof zModelInfo>;
 
-export const zLoRAModelField = zModelIdentifier;
+export const zLoRAModelField = zModelFieldBase;
 export type LoRAModelField = z.infer<typeof zLoRAModelField>;
 
-export const zControlNetModelField = zModelIdentifier;
+export const zControlNetModelField = zModelFieldBase;
 export type ControlNetModelField = z.infer<typeof zControlNetModelField>;
 
-export const zIPAdapterModelField = zModelIdentifier;
+export const zIPAdapterModelField = zModelFieldBase;
 export type IPAdapterModelField = z.infer<typeof zIPAdapterModelField>;
 
-export const zT2IAdapterModelField = zModelIdentifier;
+export const zT2IAdapterModelField = zModelFieldBase;
 export type T2IAdapterModelField = z.infer<typeof zT2IAdapterModelField>;
 
 export const zLoraInfo = zModelInfo.extend({

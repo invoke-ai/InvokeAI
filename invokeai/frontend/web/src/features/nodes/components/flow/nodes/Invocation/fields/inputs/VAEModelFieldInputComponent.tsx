@@ -5,7 +5,7 @@ import { SyncModelsIconButton } from 'features/modelManager/components/SyncModel
 import { fieldVaeModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type { VAEModelFieldInputInstance, VAEModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
-import type { VaeModelConfigEntity } from 'services/api/endpoints/models';
+import type { VAEConfig } from 'services/api/endpoints/models';
 import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
 
 import type { FieldComponentProps } from './types';
@@ -17,7 +17,7 @@ const VAEModelFieldInputComponent = (props: Props) => {
   const dispatch = useAppDispatch();
   const { data, isLoading } = useGetVaeModelsQuery();
   const _onChange = useCallback(
-    (value: VaeModelConfigEntity | null) => {
+    (value: VAEConfig | null) => {
       if (!value) {
         return;
       }

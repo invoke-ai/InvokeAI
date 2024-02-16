@@ -5,7 +5,7 @@ import type { ChangeEvent, PropsWithChildren } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_BASE_MODELS } from 'services/api/constants';
-import type { LoRAModelConfigEntity, MainModelConfigEntity } from 'services/api/endpoints/models';
+import type { LoRAConfig, MainModelConfig } from 'services/api/endpoints/models';
 import { useGetLoRAModelsQuery, useGetMainModelsQuery } from 'services/api/endpoints/models';
 
 import ModelListItem from './ModelListItem';
@@ -127,7 +127,7 @@ const ModelList = (props: ModelListProps) => {
 
 export default memo(ModelList);
 
-const modelsFilter = <T extends MainModelConfigEntity | LoRAModelConfigEntity>(
+const modelsFilter = <T extends MainModelConfig | LoRAConfig>(
   data: EntityState<T, string> | undefined,
   model_type: ModelType,
   model_format: ModelFormat | undefined,
@@ -163,7 +163,7 @@ StyledModelContainer.displayName = 'StyledModelContainer';
 
 type ModelListWrapperProps = {
   title: string;
-  modelList: MainModelConfigEntity[] | LoRAModelConfigEntity[];
+  modelList: MainModelConfig[] | LoRAConfig[];
   selected: ModelListProps;
 };
 

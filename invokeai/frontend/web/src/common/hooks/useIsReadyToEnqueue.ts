@@ -105,7 +105,7 @@ const selector = createMemoizedSelector(
               number: i + 1,
             })
           );
-        } else if (ca.model.base_model !== model?.base_model) {
+        } else if (ca.model.base !== model?.base) {
           // This should never happen, just a sanity check
           reasons.push(
             i18n.t('parameters.invoke.incompatibleBaseModelForControlAdapter', {
