@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 from invokeai.app.services.invoker import Invoker
 
@@ -18,11 +17,9 @@ class BulkDownloadBase(ABC):
         """
 
     @abstractmethod
-    def __init__(self, output_folder: Union[str, Path]):
+    def __init__(self):
         """
         Create BulkDownloadBase object.
-
-        :param output_folder: The path to the output folder where the bulk download files can be temporarily stored.
         """
 
     @abstractmethod

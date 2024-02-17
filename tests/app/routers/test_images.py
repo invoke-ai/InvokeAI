@@ -31,7 +31,7 @@ def mock_services(tmp_path: Path) -> InvocationServices:
         board_images=None,  # type: ignore
         board_records=SqliteBoardRecordStorage(db=db),
         boards=None,  # type: ignore
-        bulk_download=BulkDownloadService(tmp_path),
+        bulk_download=BulkDownloadService(),
         configuration=None,  # type: ignore
         events=None,  # type: ignore
         graph_execution_manager=None,  # type: ignore
