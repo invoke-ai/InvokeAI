@@ -2,10 +2,15 @@
 
 import copy
 import itertools
-from typing import Annotated, Any, Optional, TypeVar, Union, get_args, get_origin, get_type_hints
+from typing import Any, Optional, TypeVar, Union, get_args, get_origin, get_type_hints
 
 import networkx as nx
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    field_validator,
+    model_validator,
+)
 from pydantic.fields import Field
 
 # Importing * is bad karma but needed here for node detection
@@ -260,20 +265,23 @@ class CollectInvocation(BaseInvocation):
         return CollectInvocationOutput(collection=copy.copy(self.collection))
 
 
-InvocationsUnion: Any = BaseInvocation.get_invocations_union()
-InvocationOutputsUnion: Any = BaseInvocationOutput.get_outputs_union()
-
-
 class Graph(BaseModel):
     id: str = Field(description="The id of this graph", default_factory=uuid_string)
     # TODO: use a list (and never use dict in a BaseModel) because pydantic/fastapi hates me
-    nodes: dict[str, Annotated[InvocationsUnion, Field(discriminator="type")]] = Field(
-        description="The nodes in this graph", default_factory=dict
-    )
+    nodes: dict[str, BaseInvocation] = Field(description="The nodes in this graph", default_factory=dict)
     edges: list[Edge] = Field(
         description="The connections between nodes and their fields in this graph",
         default_factory=list,
     )
+
+    @field_validator("nodes", mode="plain")
+    @classmethod
+    def validate_nodes(cls, v: dict[str, Any]):
+        nodes: dict[str, BaseInvocation] = {}
+        typeadapter = BaseInvocation.get_typeadapter()
+        for node_id, node in v.items():
+            nodes[node_id] = typeadapter.validate_python(node)
+        return nodes
 
     def add_node(self, node: BaseInvocation) -> None:
         """Adds a node to a graph
@@ -824,9 +832,7 @@ class GraphExecutionState(BaseModel):
     )
 
     # The results of executed nodes
-    results: dict[str, Annotated[InvocationOutputsUnion, Field(discriminator="type")]] = Field(
-        description="The results of node executions", default_factory=dict
-    )
+    results: dict[str, BaseInvocationOutput] = Field(description="The results of node executions", default_factory=dict)
 
     # Errors raised when executing nodes
     errors: dict[str, str] = Field(description="Errors raised when executing nodes", default_factory=dict)
@@ -842,6 +848,15 @@ class GraphExecutionState(BaseModel):
         description="The map of original graph nodes to prepared nodes",
         default_factory=dict,
     )
+
+    @field_validator("results", mode="plain")
+    @classmethod
+    def validate_results(cls, v: dict[str, BaseInvocationOutput]):
+        results: dict[str, BaseInvocationOutput] = {}
+        typeadapter = BaseInvocationOutput.get_typeadapter()
+        for result_id, result in v.items():
+            results[result_id] = typeadapter.validate_python(result)
+        return results
 
     @field_validator("graph")
     def graph_is_valid(cls, v: Graph):
@@ -1247,6 +1262,6 @@ class LibraryGraph(BaseModel):
         return values
 
 
-GraphInvocation.model_rebuild(force=True)
 Graph.model_rebuild(force=True)
+GraphInvocation.model_rebuild(force=True)
 GraphExecutionState.model_rebuild(force=True)
