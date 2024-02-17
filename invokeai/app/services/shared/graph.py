@@ -7,7 +7,6 @@ from typing import Annotated, Any, Optional, TypeVar, Union, get_args, get_origi
 import networkx as nx
 from pydantic import (
     BaseModel,
-    ConfigDict,
     GetJsonSchemaHandler,
     field_validator,
 )
@@ -803,22 +802,6 @@ class GraphExecutionState(BaseModel):
         json_schema = handler(GraphExecutionState.__pydantic_core_schema__)
         json_schema = handler.resolve_ref_schema(json_schema)
         return json_schema
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "required": [
-                "id",
-                "graph",
-                "execution_graph",
-                "executed",
-                "executed_history",
-                "results",
-                "errors",
-                "prepared_source_mapping",
-                "source_prepared_mapping",
-            ]
-        }
-    )
 
     def next(self) -> Optional[BaseInvocation]:
         """Gets the next node ready to execute."""
