@@ -10,8 +10,7 @@ from safetensors.torch import load_file
 from typing_extensions import Self
 
 from invokeai.backend.model_manager import BaseModelType
-
-from .embedding_base import EmbeddingModelRaw
+from .raw_model import RawModel
 
 
 class LoRALayerBase:
@@ -367,9 +366,7 @@ class IA3Layer(LoRALayerBase):
 
 AnyLoRALayer = Union[LoRALayer, LoHALayer, LoKRLayer, FullLayer, IA3Layer]
 
-
-# TODO: rename all methods used in model logic with Info postfix and remove here Raw postfix
-class LoRAModelRaw(EmbeddingModelRaw):  # (torch.nn.Module):
+class LoRAModelRaw(RawModel):  # (torch.nn.Module):
     _name: str
     layers: Dict[str, AnyLoRALayer]
 

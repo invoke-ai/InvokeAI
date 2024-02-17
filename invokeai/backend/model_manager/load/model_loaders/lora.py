@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.embeddings.lora import LoRAModelRaw
+from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,

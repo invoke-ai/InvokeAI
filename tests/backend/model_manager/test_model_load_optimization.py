@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from invokeai.backend.model_management.model_load_optimizations import _no_op, skip_torch_weight_init
+from invokeai.backend.model_manager.load.optimizations import _no_op, skip_torch_weight_init
 
 
 @pytest.mark.parametrize(
