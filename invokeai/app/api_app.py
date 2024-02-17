@@ -50,7 +50,6 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         images,
         model_manager,
         session_queue,
-        sessions,
         utilities,
         workflows,
     )
@@ -110,8 +109,6 @@ async def shutdown_event() -> None:
 
 
 # Include all routers
-app.include_router(sessions.session_router, prefix="/api")
-
 app.include_router(utilities.utilities_router, prefix="/api")
 app.include_router(model_manager.model_manager_router, prefix="/api")
 app.include_router(download_queue.download_queue_router, prefix="/api")

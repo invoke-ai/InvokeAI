@@ -1,9 +1,9 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import torch
 from PIL import Image
 
-from invokeai.app.services.invocation_processor.invocation_processor_common import CanceledException, ProgressImage
+from invokeai.app.services.session_processor.session_processor_common import CanceledException, ProgressImage
 from invokeai.backend.model_manager.config import BaseModelType
 
 from ...backend.stable_diffusion import PipelineIntermediateState
@@ -11,7 +11,6 @@ from ...backend.util.util import image_to_dataURL
 
 if TYPE_CHECKING:
     from invokeai.app.services.events.events_base import EventServiceBase
-    from invokeai.app.services.invocation_queue.invocation_queue_base import InvocationQueueABC
     from invokeai.app.services.shared.invocation_context import InvocationContextData
 
 
@@ -34,10 +33,10 @@ def stable_diffusion_step_callback(
     context_data: "InvocationContextData",
     intermediate_state: PipelineIntermediateState,
     base_model: BaseModelType,
-    invocation_queue: "InvocationQueueABC",
     events: "EventServiceBase",
+    is_canceled: Callable[[], bool],
 ) -> None:
-    if invocation_queue.is_canceled(context_data.session_id):
+    if is_canceled():
         raise CanceledException
 
     # Some schedulers report not only the noisy latents at the current timestep,
