@@ -4,7 +4,6 @@ from logging import Logger
 
 import torch
 
-from invokeai.app.services.item_storage.item_storage_memory import ItemStorageMemory
 from invokeai.app.services.object_serializer.object_serializer_disk import ObjectSerializerDisk
 from invokeai.app.services.object_serializer.object_serializer_forward_cache import ObjectSerializerForwardCache
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
@@ -22,8 +21,6 @@ from ..services.image_files.image_files_disk import DiskImageFileStorage
 from ..services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from ..services.images.images_default import ImageService
 from ..services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
-from ..services.invocation_processor.invocation_processor_default import DefaultInvocationProcessor
-from ..services.invocation_queue.invocation_queue_memory import MemoryInvocationQueue
 from ..services.invocation_services import InvocationServices
 from ..services.invocation_stats.invocation_stats_default import InvocationStatsService
 from ..services.invoker import Invoker
@@ -33,7 +30,6 @@ from ..services.model_records import ModelRecordServiceSQL
 from ..services.names.names_default import SimpleNameService
 from ..services.session_processor.session_processor_default import DefaultSessionProcessor
 from ..services.session_queue.session_queue_sqlite import SqliteSessionQueue
-from ..services.shared.graph import GraphExecutionState
 from ..services.urls.urls_default import LocalUrlService
 from ..services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from .events import FastAPIEventService
@@ -85,7 +81,6 @@ class ApiDependencies:
         board_records = SqliteBoardRecordStorage(db=db)
         boards = BoardService()
         events = FastAPIEventService(event_handler_id)
-        graph_execution_manager = ItemStorageMemory[GraphExecutionState]()
         image_records = SqliteImageRecordStorage(db=db)
         images = ImageService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
@@ -105,8 +100,6 @@ class ApiDependencies:
         )
         names = SimpleNameService()
         performance_statistics = InvocationStatsService()
-        processor = DefaultInvocationProcessor()
-        queue = MemoryInvocationQueue()
         session_processor = DefaultSessionProcessor()
         session_queue = SqliteSessionQueue(db=db)
         urls = LocalUrlService()
@@ -119,7 +112,6 @@ class ApiDependencies:
             boards=boards,
             configuration=configuration,
             events=events,
-            graph_execution_manager=graph_execution_manager,
             image_files=image_files,
             image_records=image_records,
             images=images,
@@ -129,8 +121,6 @@ class ApiDependencies:
             download_queue=download_queue_service,
             names=names,
             performance_statistics=performance_statistics,
-            processor=processor,
-            queue=queue,
             session_processor=session_processor,
             session_queue=session_queue,
             urls=urls,

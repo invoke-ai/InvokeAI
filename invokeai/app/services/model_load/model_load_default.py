@@ -4,7 +4,6 @@
 from typing import Optional, Type
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.invocation_processor.invocation_processor_common import CanceledException
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.invocation_context import InvocationContextData
 from invokeai.backend.model_manager import AnyModel, AnyModelConfig, SubModelType
@@ -95,8 +94,6 @@ class ModelLoadService(ModelLoadServiceBase):
     ) -> None:
         if not self._invoker:
             return
-        if self._invoker.services.queue.is_canceled(context_data.session_id):
-            raise CanceledException()
 
         if not loaded:
             self._invoker.services.events.emit_model_load_started(
