@@ -1,6 +1,6 @@
 import pytest
 
-from invokeai.backend.model_management.libc_util import LibcUtil, Struct_mallinfo2
+from invokeai.backend.model_manager.util.libc_util import LibcUtil, Struct_mallinfo2
 
 
 def test_libc_util_mallinfo2():

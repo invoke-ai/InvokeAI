@@ -6,24 +6,27 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import pytest
+from pytest import FixtureRequest
 from pydantic import BaseModel
 from requests.sessions import Session
 from requests_testadapter import TestAdapter, TestSession
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.download import DownloadQueueService
+from invokeai.app.services.download import DownloadQueueServiceBase, DownloadQueueService
 from invokeai.app.services.events.events_base import EventServiceBase
+from invokeai.app.services.model_manager import ModelManagerServiceBase, ModelManagerService
+from invokeai.app.services.model_load import ModelLoadServiceBase, ModelLoadService
 from invokeai.app.services.model_install import ModelInstallService, ModelInstallServiceBase
 from invokeai.app.services.model_metadata import ModelMetadataStoreBase, ModelMetadataStoreSQL
-from invokeai.app.services.model_records import ModelRecordServiceSQL
+from invokeai.app.services.model_records import ModelRecordServiceBase, ModelRecordServiceSQL
 from invokeai.backend.model_manager.config import (
     BaseModelType,
     ModelFormat,
     ModelType,
 )
-from invokeai.backend.model_manager.load import AnyModelLoader, ModelCache, ModelConvertCache
+from invokeai.backend.model_manager.load import ModelCache, ModelConvertCache
 from invokeai.backend.util.logging import InvokeAILogger
-from tests.backend.model_manager_2.model_metadata.metadata_examples import (
+from tests.backend.model_manager.model_metadata.metadata_examples import (
     RepoCivitaiModelMetadata1,
     RepoCivitaiVersionMetadata1,
     RepoHFMetadata1,
@@ -86,22 +89,71 @@ def mm2_app_config(mm2_root_dir: Path) -> InvokeAIAppConfig:
     app_config = InvokeAIAppConfig(
         root=mm2_root_dir,
         models_dir=mm2_root_dir / "models",
+        log_level="info",
     )
     return app_config
 
 
 @pytest.fixture
-def mm2_loader(mm2_app_config: InvokeAIAppConfig, mm2_record_store: ModelRecordServiceSQL) -> AnyModelLoader:
-    logger = InvokeAILogger.get_logger(config=mm2_app_config)
+def mm2_download_queue(mm2_session: Session,
+                       request: FixtureRequest
+                       ) -> DownloadQueueServiceBase:
+    download_queue = DownloadQueueService(requests_session=mm2_session)
+    download_queue.start()
+
+    def stop_queue() -> None:
+        download_queue.stop()
+
+    request.addfinalizer(stop_queue)
+    return download_queue
+
+@pytest.fixture
+def mm2_metadata_store(mm2_record_store: ModelRecordServiceSQL) -> ModelMetadataStoreBase:
+    return mm2_record_store.metadata_store
+
+@pytest.fixture
+def mm2_loader(mm2_app_config: InvokeAIAppConfig, mm2_record_store: ModelRecordServiceBase) -> ModelLoadServiceBase:
     ram_cache = ModelCache(
-        logger=logger, max_cache_size=mm2_app_config.ram_cache_size, max_vram_cache_size=mm2_app_config.vram_cache_size
+        logger=InvokeAILogger.get_logger(),
+        max_cache_size=mm2_app_config.ram_cache_size,
+        max_vram_cache_size=mm2_app_config.vram_cache_size
     )
     convert_cache = ModelConvertCache(mm2_app_config.models_convert_cache_path)
-    return AnyModelLoader(app_config=mm2_app_config, logger=logger, ram_cache=ram_cache, convert_cache=convert_cache)
+    return ModelLoadService(app_config=mm2_app_config,
+                            record_store=mm2_record_store,
+                            ram_cache=ram_cache,
+                            convert_cache=convert_cache,
+                          )
+
+@pytest.fixture
+def mm2_installer(mm2_app_config: InvokeAIAppConfig,
+                  mm2_download_queue: DownloadQueueServiceBase,
+                  mm2_session: Session,
+                  request: FixtureRequest,
+                  ) -> ModelInstallServiceBase:
+    logger = InvokeAILogger.get_logger()
+    db = create_mock_sqlite_database(mm2_app_config, logger)
+    events = DummyEventService()
+    store = ModelRecordServiceSQL(db, ModelMetadataStoreSQL(db))
+
+    installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=store,
+        download_queue=mm2_download_queue,
+        event_bus=events,
+        session=mm2_session,
+    )
+    installer.start()
+
+    def stop_installer() -> None:
+        installer.stop()
+
+    request.addfinalizer(stop_installer)
+    return installer
 
 
 @pytest.fixture
-def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceSQL:
+def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBase:
     logger = InvokeAILogger.get_logger(config=mm2_app_config)
     db = create_mock_sqlite_database(mm2_app_config, logger)
     store = ModelRecordServiceSQL(db, ModelMetadataStoreSQL(db))
@@ -161,11 +213,15 @@ def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceSQL
     store.add_model("test_config_5", raw5)
     return store
 
-
 @pytest.fixture
-def mm2_metadata_store(mm2_record_store: ModelRecordServiceSQL) -> ModelMetadataStoreBase:
-    return mm2_record_store.metadata_store
-
+def mm2_model_manager(mm2_record_store: ModelRecordServiceBase,
+                      mm2_installer: ModelInstallServiceBase,
+                      mm2_loader: ModelLoadServiceBase) -> ModelManagerServiceBase:
+    return ModelManagerService(
+        store=mm2_record_store,
+        install=mm2_installer,
+        load=mm2_loader
+    )
 
 @pytest.fixture
 def mm2_session(embedding_file: Path, diffusers_dir: Path) -> Session:
@@ -252,22 +308,3 @@ def mm2_session(embedding_file: Path, diffusers_dir: Path) -> Session:
     return sess
 
 
-@pytest.fixture
-def mm2_installer(mm2_app_config: InvokeAIAppConfig, mm2_session: Session) -> ModelInstallServiceBase:
-    logger = InvokeAILogger.get_logger()
-    db = create_mock_sqlite_database(mm2_app_config, logger)
-    events = DummyEventService()
-    store = ModelRecordServiceSQL(db, ModelMetadataStoreSQL(db))
-
-    download_queue = DownloadQueueService(requests_session=mm2_session)
-    download_queue.start()
-
-    installer = ModelInstallService(
-        app_config=mm2_app_config,
-        record_store=store,
-        download_queue=download_queue,
-        event_bus=events,
-        session=mm2_session,
-    )
-    installer.start()
-    return installer
