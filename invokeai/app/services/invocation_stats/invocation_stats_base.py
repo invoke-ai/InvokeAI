@@ -3,7 +3,7 @@
 
 Usage:
 
-statistics = InvocationStatsService(graph_execution_manager)
+statistics = InvocationStatsService()
 with statistics.collect_stats(invocation, graph_execution_state.id):
       ... execute graphs...
 statistics.log_stats()
@@ -60,12 +60,8 @@ class InvocationStatsServiceBase(ABC):
         pass
 
     @abstractmethod
-    def reset_stats(self, graph_execution_state_id: str) -> None:
-        """
-        Reset all statistics for the indicated graph.
-        :param graph_execution_state_id: The id of the session whose stats to reset.
-        :raises GESStatsNotFoundError: if the graph isn't tracked in the stats.
-        """
+    def reset_stats(self):
+        """Reset all stored statistics."""
         pass
 
     @abstractmethod
