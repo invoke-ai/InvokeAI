@@ -47,6 +47,12 @@ def mock_image_dto() -> ImageDTO:
 
 
 @pytest.fixture
+def mock_event_service() -> DummyEventService:
+    """Create a dummy event service."""
+    return DummyEventService()
+
+
+@pytest.fixture
 def mock_services(mock_event_service: DummyEventService) -> InvocationServices:
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
     logger = InvokeAILogger.get_logger()
