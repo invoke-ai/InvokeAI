@@ -82,7 +82,7 @@ class ApiDependencies:
         board_records = SqliteBoardRecordStorage(db=db)
         boards = BoardService()
         events = FastAPIEventService(event_handler_id)
-        bulk_download = BulkDownloadService(output_folder=f"{output_folder}")
+        bulk_download = BulkDownloadService()
         image_records = SqliteImageRecordStorage(db=db)
         images = ImageService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
