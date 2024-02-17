@@ -1,4 +1,3 @@
-import json
 from typing import Any, Literal, Optional, Union
 
 from pydantic import model_validator
@@ -19,7 +18,7 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.latent import SAMPLER_NAME_VALUES, DenoiseLatentsInvocation, SchedulerOutput
 from invokeai.app.invocations.metadata import LoRAMetadataField, MetadataOutput
-from invokeai.app.invocations.model import LoRAModelField, MainModelField, VaeField
+from invokeai.app.invocations.model import LoRAModelField, MainModelField, ModelInfo, VaeField, VAEModelField, VAEOutput
 from invokeai.app.invocations.primitives import (
     BooleanOutput,
     FloatOutput,
@@ -29,6 +28,7 @@ from invokeai.app.invocations.primitives import (
     StringOutput,
 )
 from invokeai.app.shared.fields import FieldDescriptions
+from invokeai.backend.model_management.models.base import ModelType
 from invokeai.version import __version__
 
 CUSTOM_LABEL: str = "* CUSTOM LABEL *"
@@ -92,6 +92,11 @@ CORE_LABELS_MODEL = Literal[
     "model",
 ]
 
+CORE_LABELS_VAE = Literal[
+    f"{CUSTOM_LABEL}",
+    "vae",
+]
+
 
 def validate_custom_label(
     model: Union[
@@ -103,6 +108,7 @@ def validate_custom_label(
         "MetadataToSchedulerInvocation",
         "MetadataToModelInvocation",
         "MetadataToSDXLModelInvocation",
+        "MetadataToVAEInvocation",
     ],
 ):
     if model.label == CUSTOM_LABEL:
@@ -384,7 +390,19 @@ class MetadataToModelInvocation(BaseInvocation, WithMetadata):
             **data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
         )
 
-        return MetadataToModelOutput(model=model, name=f"{model.base_model}: {model.model_name}")
+        base_model = model.base_model
+        model_name = model.model_name
+        model_type = ModelType.Main
+
+        # TODO: not found exceptions
+        if not context.services.model_manager.model_exists(
+            model_name=model_name,
+            base_model=base_model,
+            model_type=model_type,
+        ):
+            raise Exception(f"Unknown {base_model} {model_type} model: {model_name}")
+
+        return MetadataToModelOutput(model=model, name=f"{base_model}: {model_name}")
 
 
 @invocation(
@@ -420,7 +438,18 @@ class MetadataToSDXLModelInvocation(BaseInvocation, WithMetadata):
             **data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
         )
 
-        return MetadataToSDXLModelOutput(model=model, name=f"{model.base_model}: {model.model_name}")
+        base_model = model.base_model
+        model_name = model.model_name
+        model_type = ModelType.Main
+
+        if not context.services.model_manager.model_exists(
+            model_name=model_name,
+            base_model=base_model,
+            model_type=model_type,
+        ):
+            raise Exception(f"Unknown {base_model} {model_type} model: {model_name}")
+
+        return MetadataToSDXLModelOutput(model=model, name=f"{base_model}: {model_name}")
 
 
 @invocation_output("latents_meta_output")
@@ -484,3 +513,58 @@ class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
         del params["type"]
 
         return LatentsMetaOutput(**params, metadata=MetadataField.model_validate(md))
+
+
+@invocation(
+    "metadata_to_vae",
+    title="Metadata To VAE",
+    tags=["metadata"],
+    category="metadata",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
+class MetadataToVAEInvocation(BaseInvocation, WithMetadata):
+    """Extracts a VAE value of a label from metadata"""
+
+    label: CORE_LABELS_VAE = InputField(
+        default="vae",
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+    custom_label: Optional[str] = InputField(
+        default=None,
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+    default_value: VAEModelField = InputField(
+        description="The default VAE to use if not found in the metadata",
+    )
+
+    _validate_custom_label = model_validator(mode="after")(validate_custom_label)
+
+    def invoke(self, context: InvocationContext) -> VAEOutput:
+        data = {} if self.metadata is None else self.metadata.model_dump()
+        model = VAEModelField(
+            **data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
+        )
+
+        base_model = model.base_model
+        model_name = model.model_name
+        model_type = ModelType.Vae
+
+        if not context.services.model_manager.model_exists(
+            base_model=base_model,
+            model_name=model_name,
+            model_type=model_type,
+        ):
+            raise Exception(f"Unknown vae name: {model_name}!")
+
+        return VAEOutput(
+            vae=VaeField(
+                vae=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                )
+            )
+        )

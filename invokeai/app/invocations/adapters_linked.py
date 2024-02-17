@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocationOutput,
