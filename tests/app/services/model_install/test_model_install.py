@@ -20,7 +20,7 @@ from invokeai.app.services.model_install import (
 )
 from invokeai.app.services.model_records import UnknownModelException
 from invokeai.backend.model_manager.config import BaseModelType, ModelFormat, ModelType
-from tests.backend.model_manager_2.model_manager_2_fixtures import *  # noqa F403
+from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 
 OS = platform.uname().system
 

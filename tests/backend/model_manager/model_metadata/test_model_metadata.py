@@ -19,7 +19,7 @@ from invokeai.backend.model_manager.metadata import (
     UnknownMetadataException,
 )
 from invokeai.backend.model_manager.util import select_hf_files
-from tests.backend.model_manager_2.model_manager_2_fixtures import *  # noqa F403
+from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 
 
 def test_metadata_store_put_get(mm2_metadata_store: ModelMetadataStoreBase) -> None:

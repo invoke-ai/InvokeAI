@@ -8,6 +8,7 @@ import numpy as np
 import onnx
 from onnx import numpy_helper
 from onnxruntime import InferenceSession, SessionOptions, get_available_providers
+from ..raw_model import RawModel
 
 ONNX_WEIGHTS_NAME = "model.onnx"
 

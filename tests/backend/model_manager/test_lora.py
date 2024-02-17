@@ -5,8 +5,8 @@
 import pytest
 import torch
 
-from invokeai.backend.model_management.lora import ModelPatcher
-from invokeai.backend.model_management.models.lora import LoRALayer, LoRAModelRaw
+from invokeai.backend.model_patcher import ModelPatcher
+from invokeai.backend.lora import LoRALayer, LoRAModelRaw
 
 
 @pytest.mark.parametrize(
