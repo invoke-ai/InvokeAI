@@ -23,15 +23,11 @@ if TYPE_CHECKING:
     from .image_records.image_records_base import ImageRecordStorageBase
     from .images.images_base import ImageServiceABC
     from .invocation_cache.invocation_cache_base import InvocationCacheBase
-    from .invocation_processor.invocation_processor_base import InvocationProcessorABC
-    from .invocation_queue.invocation_queue_base import InvocationQueueABC
     from .invocation_stats.invocation_stats_base import InvocationStatsServiceBase
-    from .item_storage.item_storage_base import ItemStorageABC
     from .model_manager.model_manager_base import ModelManagerServiceBase
     from .names.names_base import NameServiceBase
     from .session_processor.session_processor_base import SessionProcessorBase
     from .session_queue.session_queue_base import SessionQueueBase
-    from .shared.graph import GraphExecutionState
     from .urls.urls_base import UrlServiceBase
     from .workflow_records.workflow_records_base import WorkflowRecordsStorageBase
 
@@ -47,16 +43,13 @@ class InvocationServices:
         board_records: "BoardRecordStorageBase",
         configuration: "InvokeAIAppConfig",
         events: "EventServiceBase",
-        graph_execution_manager: "ItemStorageABC[GraphExecutionState]",
         images: "ImageServiceABC",
         image_files: "ImageFileStorageBase",
         image_records: "ImageRecordStorageBase",
         logger: "Logger",
         model_manager: "ModelManagerServiceBase",
         download_queue: "DownloadQueueServiceBase",
-        processor: "InvocationProcessorABC",
         performance_statistics: "InvocationStatsServiceBase",
-        queue: "InvocationQueueABC",
         session_queue: "SessionQueueBase",
         session_processor: "SessionProcessorBase",
         invocation_cache: "InvocationCacheBase",
@@ -72,16 +65,13 @@ class InvocationServices:
         self.board_records = board_records
         self.configuration = configuration
         self.events = events
-        self.graph_execution_manager = graph_execution_manager
         self.images = images
         self.image_files = image_files
         self.image_records = image_records
         self.logger = logger
         self.model_manager = model_manager
         self.download_queue = download_queue
-        self.processor = processor
         self.performance_statistics = performance_statistics
-        self.queue = queue
         self.session_queue = session_queue
         self.session_processor = session_processor
         self.invocation_cache = invocation_cache

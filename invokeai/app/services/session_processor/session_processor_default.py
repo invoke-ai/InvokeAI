@@ -1,4 +1,5 @@
 import traceback
+from contextlib import suppress
 from threading import BoundedSemaphore, Thread
 from threading import Event as ThreadEvent
 from typing import Optional
@@ -7,7 +8,11 @@ from fastapi_events.handlers.local import local_handler
 from fastapi_events.typing import Event as FastAPIEvent
 
 from invokeai.app.services.events.events_base import EventServiceBase
+from invokeai.app.services.invocation_stats.invocation_stats_common import GESStatsNotFoundError
+from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
+from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
+from invokeai.app.util.profiler import Profiler
 
 from ..invoker import Invoker
 from .session_processor_base import SessionProcessorBase
@@ -19,123 +24,237 @@ THREAD_LIMIT = 1
 
 class DefaultSessionProcessor(SessionProcessorBase):
     def start(self, invoker: Invoker) -> None:
-        self.__invoker: Invoker = invoker
-        self.__queue_item: Optional[SessionQueueItem] = None
+        self._invoker: Invoker = invoker
+        self._queue_item: Optional[SessionQueueItem] = None
 
-        self.__resume_event = ThreadEvent()
-        self.__stop_event = ThreadEvent()
-        self.__poll_now_event = ThreadEvent()
+        self._resume_event = ThreadEvent()
+        self._stop_event = ThreadEvent()
+        self._poll_now_event = ThreadEvent()
+        self._cancel_event = ThreadEvent()
 
         local_handler.register(event_name=EventServiceBase.queue_event, _func=self._on_queue_event)
 
-        self.__threadLimit = BoundedSemaphore(THREAD_LIMIT)
-        self.__thread = Thread(
+        self._thread_limit = BoundedSemaphore(THREAD_LIMIT)
+        self._thread = Thread(
             name="session_processor",
-            target=self.__process,
+            target=self._process,
             kwargs={
-                "stop_event": self.__stop_event,
-                "poll_now_event": self.__poll_now_event,
-                "resume_event": self.__resume_event,
+                "stop_event": self._stop_event,
+                "poll_now_event": self._poll_now_event,
+                "resume_event": self._resume_event,
+                "cancel_event": self._cancel_event,
             },
         )
-        self.__thread.start()
+        self._thread.start()
 
     def stop(self, *args, **kwargs) -> None:
-        self.__stop_event.set()
+        self._stop_event.set()
 
     def _poll_now(self) -> None:
-        self.__poll_now_event.set()
+        self._poll_now_event.set()
 
     async def _on_queue_event(self, event: FastAPIEvent) -> None:
         event_name = event[1]["event"]
 
-        # This was a match statement, but match is not supported on python 3.9
-        if event_name in [
-            "graph_execution_state_complete",
-            "invocation_error",
-            "session_retrieval_error",
-            "invocation_retrieval_error",
-        ]:
-            self.__queue_item = None
-            self._poll_now()
-        elif (
-            event_name == "session_canceled"
-            and self.__queue_item is not None
-            and self.__queue_item.session_id == event[1]["data"]["graph_execution_state_id"]
-        ):
-            self.__queue_item = None
+        if event_name == "session_canceled" or event_name == "queue_cleared":
+            # These both mean we should cancel the current session.
+            self._cancel_event.set()
             self._poll_now()
         elif event_name == "batch_enqueued":
             self._poll_now()
-        elif event_name == "queue_cleared":
-            self.__queue_item = None
-            self._poll_now()
 
     def resume(self) -> SessionProcessorStatus:
-        if not self.__resume_event.is_set():
-            self.__resume_event.set()
+        if not self._resume_event.is_set():
+            self._resume_event.set()
         return self.get_status()
 
     def pause(self) -> SessionProcessorStatus:
-        if self.__resume_event.is_set():
-            self.__resume_event.clear()
+        if self._resume_event.is_set():
+            self._resume_event.clear()
         return self.get_status()
 
     def get_status(self) -> SessionProcessorStatus:
         return SessionProcessorStatus(
-            is_started=self.__resume_event.is_set(),
-            is_processing=self.__queue_item is not None,
+            is_started=self._resume_event.is_set(),
+            is_processing=self._queue_item is not None,
         )
 
-    def __process(
+    def _process(
         self,
         stop_event: ThreadEvent,
         poll_now_event: ThreadEvent,
         resume_event: ThreadEvent,
+        cancel_event: ThreadEvent,
     ):
+        # Outermost processor try block; any unhandled exception is a fatal processor error
         try:
+            self._thread_limit.acquire()
             stop_event.clear()
             resume_event.set()
-            self.__threadLimit.acquire()
-            queue_item: Optional[SessionQueueItem] = None
+            cancel_event.clear()
+
+            # If profiling is enabled, create a profiler. The same profiler will be used for all sessions. Internally,
+            # the profiler will create a new profile for each session.
+            profiler = (
+                Profiler(
+                    logger=self._invoker.services.logger,
+                    output_dir=self._invoker.services.configuration.profiles_path,
+                    prefix=self._invoker.services.configuration.profile_prefix,
+                )
+                if self._invoker.services.configuration.profile_graphs
+                else None
+            )
+
+            # Helper function to stop the profiler and save the stats
+            def stats_cleanup(graph_execution_state_id: str) -> None:
+                if profiler:
+                    profile_path = profiler.stop()
+                    stats_path = profile_path.with_suffix(".json")
+                    self._invoker.services.performance_statistics.dump_stats(
+                        graph_execution_state_id=graph_execution_state_id, output_path=stats_path
+                    )
+                # We'll get a GESStatsNotFoundError if we try to log stats for an untracked graph, but in the processor
+                # we don't care about that - suppress the error.
+                with suppress(GESStatsNotFoundError):
+                    self._invoker.services.performance_statistics.log_stats(graph_execution_state_id)
+                    self._invoker.services.performance_statistics.reset_stats()
+
             while not stop_event.is_set():
                 poll_now_event.clear()
+                # Middle processor try block; any unhandled exception is a non-fatal processor error
                 try:
-                    # do not dequeue if there is already a session running
-                    if self.__queue_item is None and resume_event.is_set():
-                        queue_item = self.__invoker.services.session_queue.dequeue()
+                    # Get the next session to process
+                    self._queue_item = self._invoker.services.session_queue.dequeue()
+                    if self._queue_item is not None and resume_event.is_set():
+                        self._invoker.services.logger.debug(f"Executing queue item {self._queue_item.item_id}")
+                        cancel_event.clear()
 
-                        if queue_item is not None:
-                            self.__invoker.services.logger.debug(f"Executing queue item {queue_item.item_id}")
-                            self.__queue_item = queue_item
-                            self.__invoker.services.graph_execution_manager.set(queue_item.session)
-                            self.__invoker.invoke(
-                                session_queue_batch_id=queue_item.batch_id,
-                                session_queue_id=queue_item.queue_id,
-                                session_queue_item_id=queue_item.item_id,
-                                graph_execution_state=queue_item.session,
-                                workflow=queue_item.workflow,
-                                invoke_all=True,
+                        # If profiling is enabled, start the profiler
+                        if profiler is not None:
+                            profiler.start(profile_id=self._queue_item.session_id)
+
+                        # Prepare invocations and take the first
+                        invocation = self._queue_item.session.next()
+
+                        # Loop over invocations until the session is complete or canceled
+                        while invocation is not None and not cancel_event.is_set():
+                            # get the source node id to provide to clients (the prepared node id is not as useful)
+                            source_node_id = self._queue_item.session.prepared_source_mapping[invocation.id]
+
+                            # Send starting event
+                            self._invoker.services.events.emit_invocation_started(
+                                queue_batch_id=self._queue_item.batch_id,
+                                queue_item_id=self._queue_item.item_id,
+                                queue_id=self._queue_item.queue_id,
+                                graph_execution_state_id=self._queue_item.session_id,
+                                node=invocation.model_dump(),
+                                source_node_id=source_node_id,
                             )
-                            queue_item = None
 
-                    if queue_item is None:
-                        self.__invoker.services.logger.debug("Waiting for next polling interval or event")
+                            # Innermost processor try block; any unhandled exception is an invocation error & will fail the graph
+                            try:
+                                with self._invoker.services.performance_statistics.collect_stats(
+                                    invocation, self._queue_item.session.id
+                                ):
+                                    # Build invocation context (the node-facing API)
+                                    context_data = InvocationContextData(
+                                        invocation=invocation,
+                                        source_node_id=source_node_id,
+                                        session_id=self._queue_item.session.id,
+                                        workflow=self._queue_item.workflow,
+                                        queue_id=self._queue_item.queue_id,
+                                        queue_item_id=self._queue_item.item_id,
+                                        batch_id=self._queue_item.batch_id,
+                                    )
+                                    context = build_invocation_context(
+                                        context_data=context_data,
+                                        services=self._invoker.services,
+                                        cancel_event=self._cancel_event,
+                                    )
+
+                                    # Invoke the node
+                                    outputs = invocation.invoke_internal(
+                                        context=context, services=self._invoker.services
+                                    )
+
+                                    # Save outputs and history
+                                    self._queue_item.session.complete(invocation.id, outputs)
+
+                                    # Send complete event
+                                    self._invoker.services.events.emit_invocation_complete(
+                                        queue_batch_id=self._queue_item.batch_id,
+                                        queue_item_id=self._queue_item.item_id,
+                                        queue_id=self._queue_item.queue_id,
+                                        graph_execution_state_id=self._queue_item.session.id,
+                                        node=invocation.model_dump(),
+                                        source_node_id=source_node_id,
+                                        result=outputs.model_dump(),
+                                    )
+
+                            except KeyboardInterrupt:
+                                pass
+
+                            except CanceledException:
+                                pass
+
+                            except Exception as e:
+                                error = traceback.format_exc()
+
+                                # Save error
+                                self._queue_item.session.set_node_error(invocation.id, error)
+                                self._invoker.services.logger.error("Error while invoking:\n%s" % e)
+
+                                # Send error event
+                                self._invoker.services.events.emit_invocation_error(
+                                    queue_batch_id=self._queue_item.session_id,
+                                    queue_item_id=self._queue_item.item_id,
+                                    queue_id=self._queue_item.queue_id,
+                                    graph_execution_state_id=self._queue_item.session.id,
+                                    node=invocation.model_dump(),
+                                    source_node_id=source_node_id,
+                                    error_type=e.__class__.__name__,
+                                    error=error,
+                                )
+                                pass
+
+                            if self._queue_item.session.is_complete() or cancel_event.is_set():
+                                # Send complete event
+                                self._invoker.services.events.emit_graph_execution_complete(
+                                    queue_batch_id=self._queue_item.batch_id,
+                                    queue_item_id=self._queue_item.item_id,
+                                    queue_id=self._queue_item.queue_id,
+                                    graph_execution_state_id=self._queue_item.session.id,
+                                )
+                                # Save the stats and stop the profiler if it's running
+                                stats_cleanup(self._queue_item.session.id)
+                                invocation = None
+                            else:
+                                # Prepare the next invocation
+                                invocation = self._queue_item.session.next()
+
+                        # The session is complete, immediately poll for next session
+                        self._queue_item = None
+                        poll_now_event.set()
+                    else:
+                        # The queue was empty, wait for next polling interval or event to try again
+                        self._invoker.services.logger.debug("Waiting for next polling interval or event")
                         poll_now_event.wait(POLLING_INTERVAL)
                         continue
                 except Exception as e:
-                    self.__invoker.services.logger.error(f"Error in session processor: {e}")
-                    if queue_item is not None:
-                        self.__invoker.services.session_queue.cancel_queue_item(
-                            queue_item.item_id, error=traceback.format_exc()
+                    # Non-fatal error in processor, cancel the queue item and wait for next polling interval or event
+                    self._invoker.services.logger.error(f"Error in session processor: {e}")
+                    if self._queue_item is not None:
+                        self._invoker.services.session_queue.cancel_queue_item(
+                            self._queue_item.item_id, error=traceback.format_exc()
                         )
                     poll_now_event.wait(POLLING_INTERVAL)
                     continue
         except Exception as e:
-            self.__invoker.services.logger.error(f"Fatal Error in session processor: {e}")
+            # Fatal error in processor, log and pass - we're done here
+            self._invoker.services.logger.error(f"Fatal Error in session processor: {e}")
             pass
         finally:
             stop_event.clear()
             poll_now_event.clear()
-            self.__queue_item = None
-            self.__threadLimit.release()
+            self._queue_item = None
+            self._thread_limit.release()
