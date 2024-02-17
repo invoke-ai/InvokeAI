@@ -8,10 +8,9 @@ from invokeai.app.services.session_queue.session_queue_common import (
     NodeFieldValue,
     calc_session_count,
     create_session_nfv_tuples,
-    populate_graph,
     prepare_values_to_insert,
 )
-from invokeai.app.services.shared.graph import Graph, GraphExecutionState, GraphInvocation
+from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from tests.aa_nodes.test_nodes import PromptTestInvocation
 
 
@@ -39,28 +38,28 @@ def batch_graph() -> Graph:
     return g
 
 
-def test_populate_graph_with_subgraph():
-    g1 = Graph()
-    g1.add_node(PromptTestInvocation(id="1", prompt="Banana sushi"))
-    g1.add_node(PromptTestInvocation(id="2", prompt="Banana sushi"))
-    n1 = PromptTestInvocation(id="1", prompt="Banana snake")
-    subgraph = Graph()
-    subgraph.add_node(n1)
-    g1.add_node(GraphInvocation(id="3", graph=subgraph))
+# def test_populate_graph_with_subgraph():
+#     g1 = Graph()
+#     g1.add_node(PromptTestInvocation(id="1", prompt="Banana sushi"))
+#     g1.add_node(PromptTestInvocation(id="2", prompt="Banana sushi"))
+#     n1 = PromptTestInvocation(id="1", prompt="Banana snake")
+#     subgraph = Graph()
+#     subgraph.add_node(n1)
+#     g1.add_node(GraphInvocation(id="3", graph=subgraph))
 
-    nfvs = [
-        NodeFieldValue(node_path="1", field_name="prompt", value="Strawberry sushi"),
-        NodeFieldValue(node_path="2", field_name="prompt", value="Strawberry sunday"),
-        NodeFieldValue(node_path="3.1", field_name="prompt", value="Strawberry snake"),
-    ]
+#     nfvs = [
+#         NodeFieldValue(node_path="1", field_name="prompt", value="Strawberry sushi"),
+#         NodeFieldValue(node_path="2", field_name="prompt", value="Strawberry sunday"),
+#         NodeFieldValue(node_path="3.1", field_name="prompt", value="Strawberry snake"),
+#     ]
 
-    g2 = populate_graph(g1, nfvs)
+#     g2 = populate_graph(g1, nfvs)
 
-    # do not mutate g1
-    assert g1 is not g2
-    assert g2.get_node("1").prompt == "Strawberry sushi"
-    assert g2.get_node("2").prompt == "Strawberry sunday"
-    assert g2.get_node("3.1").prompt == "Strawberry snake"
+#     # do not mutate g1
+#     assert g1 is not g2
+#     assert g2.get_node("1").prompt == "Strawberry sushi"
+#     assert g2.get_node("2").prompt == "Strawberry sunday"
+#     assert g2.get_node("3.1").prompt == "Strawberry snake"
 
 
 def test_create_sessions_from_batch_with_runs(batch_data_collection, batch_graph):
