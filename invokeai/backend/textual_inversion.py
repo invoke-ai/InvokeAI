@@ -8,11 +8,9 @@ from compel.embeddings_provider import BaseTextualInversionManager
 from safetensors.torch import load_file
 from transformers import CLIPTokenizer
 from typing_extensions import Self
+from .raw_model import RawModel
 
-from .embedding_base import EmbeddingModelRaw
-
-
-class TextualInversionModelRaw(EmbeddingModelRaw):
+class TextualInversionModelRaw(RawModel):
     embedding: torch.Tensor  # [n, 768]|[n, 1280]
     embedding_2: Optional[torch.Tensor] = None  # [n, 768]|[n, 1280]   - for SDXL models
 
