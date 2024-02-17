@@ -26,7 +26,7 @@ from invokeai.backend.model_manager.config import (
 )
 from invokeai.backend.model_manager.metadata import BaseMetadata
 from invokeai.backend.util.logging import InvokeAILogger
-from tests.backend.model_manager_2.model_manager_2_fixtures import *  # noqa F403
+from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 

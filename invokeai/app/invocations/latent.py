@@ -42,8 +42,8 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
-from invokeai.backend.embeddings.lora import LoRAModelRaw
-from invokeai.backend.embeddings.model_patcher import ModelPatcher
+from invokeai.backend.lora import LoRAModelRaw
+from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
 from invokeai.backend.model_manager import BaseModelType, LoadedModel
 from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless

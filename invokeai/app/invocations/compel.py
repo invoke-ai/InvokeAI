@@ -11,9 +11,9 @@ from invokeai.app.invocations.primitives import ConditioningField, ConditioningO
 from invokeai.app.services.model_records import UnknownModelException
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.ti_utils import extract_ti_triggers_from_prompt
-from invokeai.backend.embeddings.lora import LoRAModelRaw
-from invokeai.backend.embeddings.model_patcher import ModelPatcher
-from invokeai.backend.embeddings.textual_inversion import TextualInversionModelRaw
+from invokeai.backend.lora import LoRAModelRaw
+from invokeai.backend.model_patcher import ModelPatcher
+from invokeai.backend.textual_inversion import TextualInversionModelRaw
 from invokeai.backend.model_manager import ModelType
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,

@@ -8,9 +8,7 @@ import torch
 from picklescan.scanner import scan_file_path
 
 import invokeai.backend.util.logging as logger
-from invokeai.backend.model_management.models.base import read_checkpoint_meta
-from invokeai.backend.model_management.models.ip_adapter import IPAdapterModelFormat
-from invokeai.backend.model_management.util import lora_token_vector_length
+from .util.model_util import lora_token_vector_length, read_checkpoint_meta
 from invokeai.backend.util.util import SilenceWarnings
 
 from .config import (
@@ -54,7 +52,6 @@ LEGACY_CONFIGS: Dict[BaseModelType, Dict[ModelVariantType, Union[str, Dict[Sched
         ModelVariantType.Normal: "sd_xl_refiner.yaml",
     },
 }
-
 
 class ProbeBase(object):
     """Base class for probes."""
@@ -653,8 +650,8 @@ class LoRAFolderProbe(FolderProbeBase):
 
 
 class IPAdapterFolderProbe(FolderProbeBase):
-    def get_format(self) -> IPAdapterModelFormat:
-        return IPAdapterModelFormat.InvokeAI.value
+    def get_format(self) -> ModelFormat:
+        return ModelFormat.InvokeAI
 
     def get_base_type(self) -> BaseModelType:
         model_file = self.model_path / "ip_adapter.bin"

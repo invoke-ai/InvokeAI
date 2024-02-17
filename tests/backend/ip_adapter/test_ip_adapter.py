@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from invokeai.backend.ip_adapter.unet_patcher import UNetPatcher
-from invokeai.backend.model_management.models.base import BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager import BaseModelType, ModelType, SubModelType
 from invokeai.backend.util.test_utils import install_and_load_model
 
 

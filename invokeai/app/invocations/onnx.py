@@ -15,7 +15,7 @@ from invokeai.app.invocations.primitives import ConditioningField, ConditioningO
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
-from invokeai.backend.embeddings.model_patcher import ONNXModelPatcher
+from invokeai.backend.model_patcher import ONNXModelPatcher
 from invokeai.backend.model_manager import ModelType, SubModelType
 
 from ...backend.stable_diffusion import PipelineIntermediateState

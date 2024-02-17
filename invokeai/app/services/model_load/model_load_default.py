@@ -20,11 +20,11 @@ class ModelLoadService(ModelLoadServiceBase):
     """Wrapper around AnyModelLoader."""
 
     def __init__(
-        self,
-        app_config: InvokeAIAppConfig,
-        record_store: ModelRecordServiceBase,
-        ram_cache: Optional[ModelCacheBase[AnyModel]] = None,
-        convert_cache: Optional[ModelConvertCacheBase] = None,
+            self,
+            app_config: InvokeAIAppConfig,
+            record_store: ModelRecordServiceBase,
+            ram_cache: ModelCacheBase[AnyModel],
+            convert_cache: ModelConvertCacheBase,
     ):
         """Initialize the model load service."""
         logger = InvokeAILogger.get_logger(self.__class__.__name__)
@@ -33,17 +33,8 @@ class ModelLoadService(ModelLoadServiceBase):
         self._any_loader = AnyModelLoader(
             app_config=app_config,
             logger=logger,
-            ram_cache=ram_cache
-            or ModelCache(
-                max_cache_size=app_config.ram_cache_size,
-                max_vram_cache_size=app_config.vram_cache_size,
-                logger=logger,
-            ),
-            convert_cache=convert_cache
-            or ModelConvertCache(
-                cache_path=app_config.models_convert_cache_path,
-                max_size=app_config.convert_cache_size,
-            ),
+            ram_cache=ram_cache,
+            convert_cache=convert_cache,
         )
 
     @property

@@ -3,7 +3,7 @@ from PIL import Image
 
 from invokeai.app.services.invocation_processor.invocation_processor_common import CanceledException, ProgressImage
 
-from ...backend.model_management.models import BaseModelType
+from ...backend.model_manager import BaseModelType
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.util.util import image_to_dataURL
 from ..invocations.baseinvocation import InvocationContext

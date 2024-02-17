@@ -10,6 +10,7 @@ from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionWeights
 
 from .resampler import Resampler
+from ..raw_model import RawModel
 
 
 class ImageProjModel(torch.nn.Module):
@@ -91,7 +92,7 @@ class MLPProjModel(torch.nn.Module):
         return clip_extra_context_tokens
 
 
-class IPAdapter:
+class IPAdapter(RawModel):
     """IP-Adapter: https://arxiv.org/pdf/2308.06721.pdf"""
 
     def __init__(

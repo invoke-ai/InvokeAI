@@ -1,8 +1,7 @@
 import pytest
 
-from invokeai.backend.model_management.libc_util import Struct_mallinfo2
-from invokeai.backend.model_management.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
-
+from invokeai.backend.model_manager.util.libc_util import Struct_mallinfo2
+from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
 
 def test_memory_snapshot_capture():
     """Smoke test of MemorySnapshot.capture()."""
@@ -26,6 +25,7 @@ snapshots = [
 def test_get_pretty_snapshot_diff(snapshot_1, snapshot_2):
     """Test that get_pretty_snapshot_diff() works with various combinations of missing MemorySnapshot fields."""
     msg = get_pretty_snapshot_diff(snapshot_1, snapshot_2)
+    print(msg)
 
     expected_lines = 0
     if snapshot_1 is not None and snapshot_2 is not None:
