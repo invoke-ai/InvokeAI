@@ -19,7 +19,6 @@ from .bulk_download_base import BulkDownloadBase
 
 
 class BulkDownloadService(BulkDownloadBase):
-    __output_folder: Path
     __temp_directory: TemporaryDirectory
     __bulk_downloads_folder: Path
     __event_bus: EventServiceBase
@@ -29,15 +28,11 @@ class BulkDownloadService(BulkDownloadBase):
         self.__invoker = invoker
         self.__event_bus = invoker.services.events
 
-    def __init__(
-        self,
-        output_folder: Union[str, Path],
-    ):
+    def __init__(self):
         """
         Initialize the downloader object.
         """
-        self.__output_folder: Path = output_folder if isinstance(output_folder, Path) else Path(output_folder)
-        self.__temp_directory = TemporaryDirectory(dir=self.__output_folder)
+        self.__temp_directory = TemporaryDirectory()
         self.__bulk_downloads_folder = Path(self.__temp_directory.name) / "bulk_downloads"
         self.__bulk_downloads_folder.mkdir(parents=True, exist_ok=True)
 
