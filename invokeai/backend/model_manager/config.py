@@ -28,12 +28,11 @@ from diffusers import ModelMixin
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from typing_extensions import Annotated, Any, Dict
 
-from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
+from ..raw_model import RawModel
 
-from ..embeddings.embedding_base import EmbeddingModelRaw
-from ..ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
-
-AnyModel = Union[ModelMixin, torch.nn.Module, IAIOnnxRuntimeModel, IPAdapter, IPAdapterPlus, EmbeddingModelRaw]
+# ModelMixin is the base class for all diffusers and transformers models
+# RawModel is the InvokeAI wrapper class for ip_adapters, loras, textual_inversion and onnx runtime
+AnyModel = Union[ModelMixin, RawModel, torch.nn.Module]
 
 
 class InvalidModelConfigException(Exception):
