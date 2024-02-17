@@ -23,7 +23,7 @@ from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
-from invokeai.app.services.shared.graph import Graph, GraphExecutionState, GraphInvocation
+from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 
 
 @pytest.fixture
@@ -32,17 +32,6 @@ def simple_graph():
     g.add_node(PromptTestInvocation(id="1", prompt="Banana sushi"))
     g.add_node(TextToImageTestInvocation(id="2"))
     g.add_edge(create_edge("1", "prompt", "2", "prompt"))
-    return g
-
-
-@pytest.fixture
-def graph_with_subgraph():
-    sub_g = Graph()
-    sub_g.add_node(PromptTestInvocation(id="1", prompt="Banana sushi"))
-    sub_g.add_node(TextToImageTestInvocation(id="2"))
-    sub_g.add_edge(create_edge("1", "prompt", "2", "prompt"))
-    g = Graph()
-    g.add_node(GraphInvocation(id="1", graph=sub_g))
     return g
 
 
