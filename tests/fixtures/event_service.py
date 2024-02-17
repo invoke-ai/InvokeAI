@@ -1,6 +1,5 @@
 from typing import Any, Dict, List
 
-import pytest
 from pydantic import BaseModel
 
 from invokeai.app.services.events.events_base import EventServiceBase
@@ -26,9 +25,3 @@ class DummyEventService(EventServiceBase):
     def dispatch(self, event_name: str, payload: Any) -> None:
         """Dispatch an event by appending it to self.events."""
         self.events.append(DummyEvent(event_name=payload["event"], payload=payload["data"]))
-
-
-@pytest.fixture
-def mock_event_service() -> DummyEventService:
-    """Create a dummy event service."""
-    return DummyEventService()
