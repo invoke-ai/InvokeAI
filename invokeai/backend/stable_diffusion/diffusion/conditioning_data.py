@@ -63,6 +63,8 @@ class IPAdapterConditioningInfo:
 class ConditioningData:
     unconditioned_embeddings: BasicConditioningInfo
     text_embeddings: list[BasicConditioningInfo]
+    text_embedding_masks: list[Optional[torch.Tensor]]
+
     """
     Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
     `guidance_scale` is defined as `w` of equation 2. of [Imagen Paper](https://arxiv.org/pdf/2205.11487.pdf).

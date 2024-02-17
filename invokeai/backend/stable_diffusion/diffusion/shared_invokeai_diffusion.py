@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import math
 from contextlib import contextmanager
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Tuple, Union
 
 import torch
+import torchvision
 from diffusers import UNet2DConditionModel
 from typing_extensions import TypeAlias
 
@@ -16,6 +17,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     PostprocessingSettings,
     SDXLConditioningInfo,
 )
+from invokeai.backend.stable_diffusion.diffusion.regional_prompt_attention import Range, RegionalPromptData
 
 from .cross_attention_control import (
     CrossAttentionType,
@@ -308,26 +310,43 @@ class InvokeAIDiffuserComponent:
 
         return torch.cat([unconditioning, conditioning]), encoder_attention_mask
 
-    # methods below are called from do_diffusion_step and should be considered private to this class.
+    def _preprocess_regional_prompt_mask(
+        self, mask: Optional[torch.Tensor], target_height: int, target_width: int
+    ) -> torch.Tensor:
+        if mask is None:
+            # HACK(ryand): Figure out how to know the target device/dtype.
+            return torch.ones((1, 1, target_height, target_width), dtype=torch.float16, device="cuda")
+        else:
+            # HACK(ryand): It would make more sense to do NEAREST resising with an integer dtype, and probably on the
+            # CPU.
+            tf = torchvision.transforms.Resize(
+                (target_height, target_width), interpolation=torchvision.transforms.InterpolationMode.NEAREST
+            )
+            mask = mask.unsqueeze(0).unsqueeze(0)  # Shape: (h, w) -> (1, 1, h, w)
+            mask = tf(mask)
+
+        return mask
 
     def _prepare_text_embeddings(
-        self, text_embeddings: list[Union[BasicConditioningInfo, SDXLConditioningInfo]]
-    ) -> Union[BasicConditioningInfo, SDXLConditioningInfo]:
-        if len(text_embeddings) == 1:
-            # If there is only one text embedding, we can just return it.
-            # We short-circuit here, because there are some features that are only supported when there is a single
-            # text_embedding provided.
-            return text_embeddings[0]
-
+        self,
+        text_embeddings: list[Union[BasicConditioningInfo, SDXLConditioningInfo]],
+        masks: list[Optional[torch.Tensor]],
+        target_height: int,
+        target_width: int,
+    ) -> Tuple[Union[BasicConditioningInfo, SDXLConditioningInfo], Optional[RegionalPromptData]]:
         is_sdxl = type(text_embeddings[0]) is SDXLConditioningInfo
+
+        all_masks_are_none = all(mask is None for mask in masks)
 
         text_embedding = []
         pooled_embedding = None
         add_time_ids = None
+        processed_masks = []
+        cur_text_embedding_len = 0
+        embedding_ranges: list[Range] = []
 
-        for text_embedding_info in text_embeddings:
-            # TODO(ryand): Having to check this feels super hacky.
-            # Extra conditioning is not supported when there are multiple text embeddings.
+        for text_embedding_info, mask in zip(text_embeddings, masks, strict=True):
+            # HACK(ryand): Figure out the intended relationship between CAC and other conditioning features.
             assert (
                 text_embedding_info.extra_conditioning is None
                 or not text_embedding_info.extra_conditioning.wants_cross_attention_control
@@ -343,9 +362,23 @@ class InvokeAIDiffuserComponent:
                     add_time_ids = text_embedding_info.add_time_ids
 
             text_embedding.append(text_embedding_info.embeds)
+            embedding_ranges.append(
+                Range(start=cur_text_embedding_len, end=cur_text_embedding_len + text_embedding_info.embeds.shape[1])
+            )
+            cur_text_embedding_len += text_embedding_info.embeds.shape[1]
+
+            if not all_masks_are_none:
+                processed_masks.append(self._preprocess_regional_prompt_mask(mask, target_height, target_width))
 
         text_embedding = torch.cat(text_embedding, dim=1)
         assert len(text_embedding.shape) == 3  # batch_size, seq_len, token_len
+
+        regional_prompt_data = None
+        if not all_masks_are_none:
+            # TODO(ryand): Think about at what point a batch dimension should be added to the masks.
+            processed_masks = torch.cat(processed_masks, dim=1)
+
+            regional_prompt_data = RegionalPromptData(masks=processed_masks, embedding_ranges=embedding_ranges)
 
         if is_sdxl:
             return SDXLConditioningInfo(
@@ -353,11 +386,11 @@ class InvokeAIDiffuserComponent:
                 extra_conditioning=None,
                 pooled_embeds=pooled_embedding,
                 add_time_ids=add_time_ids,
-            )
+            ), regional_prompt_data
         return BasicConditioningInfo(
             embeds=text_embedding,
             extra_conditioning=None,
-        )
+        ), regional_prompt_data
 
     def _apply_standard_conditioning(
         self,
@@ -374,11 +407,20 @@ class InvokeAIDiffuserComponent:
         x_twice = torch.cat([x] * 2)
         sigma_twice = torch.cat([sigma] * 2)
 
-        text_embeddings = self._prepare_text_embeddings(conditioning_data.text_embeddings)
-        if len(conditioning_data.text_embeddings) > 1:
-            cross_attention_kwargs = {"regional_prompt_data": None}
-
+        # HACK(ryand): We should only have to call _prepare_text_embeddings once, but we currently re-run it on every
+        # denoising step.
         cross_attention_kwargs = None
+        _, _, h, w = x.shape
+        text_embeddings, regional_prompt_data = self._prepare_text_embeddings(
+            text_embeddings=conditioning_data.text_embeddings,
+            masks=conditioning_data.text_embedding_masks,
+            target_height=h,
+            target_width=w,
+        )
+        if regional_prompt_data is not None:
+            cross_attention_kwargs = {"regional_prompt_data": regional_prompt_data}
+
+        # TODO(ryand): Figure out interactions between regional prompting and IP-Adapter conditioning.
         if conditioning_data.ip_adapter_conditioning is not None:
             # Note that we 'stack' to produce tensors of shape (batch_size, num_ip_images, seq_len, token_len).
             cross_attention_kwargs = {

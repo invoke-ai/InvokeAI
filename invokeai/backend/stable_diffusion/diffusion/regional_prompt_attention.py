@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import Optional
 
 import torch
@@ -6,6 +7,26 @@ import torch.nn.functional as F
 from diffusers import UNet2DConditionModel
 from diffusers.models.attention_processor import Attention, AttnProcessor2_0
 from diffusers.utils import USE_PEFT_BACKEND
+
+
+@dataclass
+class Range:
+    start: int
+    end: int
+
+
+@dataclass
+class RegionalPromptData:
+    # The region masks for each prompt.
+    # shape: (batch_size, num_prompts, height, width)
+    # dtype: float*
+    # The mask is set to 1.0 in regions where the prompt should be applied, and 0.0 elsewhere.
+    masks: torch.Tensor
+
+    # The embedding ranges for each prompt.
+    # The i'th mask is applied to the embeddings in:
+    # encoder_hidden_states[:, embedding_ranges[i].start:embedding_ranges[i].end, :]
+    embedding_ranges: list[Range]
 
 
 class RegionalPromptAttnProcessor2_0(AttnProcessor2_0):
@@ -19,10 +40,8 @@ class RegionalPromptAttnProcessor2_0(AttnProcessor2_0):
         attention_mask: Optional[torch.FloatTensor] = None,
         temb: Optional[torch.FloatTensor] = None,
         scale: float = 1.0,
-        regional_prompt_data=None,
+        regional_prompt_data: Optional[RegionalPromptData] = None,
     ) -> torch.FloatTensor:
-        assert regional_prompt_data is None
-
         residual = hidden_states
         if attn.spatial_norm is not None:
             hidden_states = attn.spatial_norm(hidden_states, temb)
