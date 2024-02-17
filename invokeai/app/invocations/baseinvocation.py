@@ -8,13 +8,26 @@ import warnings
 from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import signature
-from types import UnionType
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterable, Literal, Optional, Type, TypeVar, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Callable,
+    ClassVar,
+    Iterable,
+    Literal,
+    Optional,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import semver
-from pydantic import BaseModel, ConfigDict, Field, create_model
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, create_model
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
+from typing_extensions import TypeAliasType
 
 from invokeai.app.invocations.fields import (
     FieldKind,
@@ -84,6 +97,7 @@ class BaseInvocationOutput(BaseModel):
     """
 
     _output_classes: ClassVar[set[BaseInvocationOutput]] = set()
+    _typeadapter: ClassVar[Optional[TypeAdapter[Any]]] = None
 
     @classmethod
     def register_output(cls, output: BaseInvocationOutput) -> None:
@@ -96,10 +110,14 @@ class BaseInvocationOutput(BaseModel):
         return cls._output_classes
 
     @classmethod
-    def get_outputs_union(cls) -> UnionType:
-        """Gets a union of all invocation outputs."""
-        outputs_union = Union[tuple(cls._output_classes)]  # type: ignore [valid-type]
-        return outputs_union  # type: ignore [return-value]
+    def get_typeadapter(cls) -> TypeAdapter[Any]:
+        """Gets a pydantc TypeAdapter for the union of all invocation output types."""
+        if not cls._typeadapter:
+            InvocationOutputsUnion = TypeAliasType(
+                "InvocationOutputsUnion", Annotated[Union[tuple(cls._output_classes)], Field(discriminator="type")]
+            )
+            cls._typeadapter = TypeAdapter(InvocationOutputsUnion)
+        return cls._typeadapter
 
     @classmethod
     def get_output_types(cls) -> Iterable[str]:
@@ -148,6 +166,7 @@ class BaseInvocation(ABC, BaseModel):
     """
 
     _invocation_classes: ClassVar[set[BaseInvocation]] = set()
+    _typeadapter: ClassVar[Optional[TypeAdapter[Any]]] = None
 
     @classmethod
     def get_type(cls) -> str:
@@ -160,10 +179,14 @@ class BaseInvocation(ABC, BaseModel):
         cls._invocation_classes.add(invocation)
 
     @classmethod
-    def get_invocations_union(cls) -> UnionType:
-        """Gets a union of all invocation types."""
-        invocations_union = Union[tuple(cls._invocation_classes)]  # type: ignore [valid-type]
-        return invocations_union  # type: ignore [return-value]
+    def get_typeadapter(cls) -> TypeAdapter[Any]:
+        """Gets a pydantc TypeAdapter for the union of all invocation types."""
+        if not cls._typeadapter:
+            InvocationsUnion = TypeAliasType(
+                "InvocationsUnion", Annotated[Union[tuple(cls._invocation_classes)], Field(discriminator="type")]
+            )
+            cls._typeadapter = TypeAdapter(InvocationsUnion)
+        return cls._typeadapter
 
     @classmethod
     def get_invocations(cls) -> Iterable[BaseInvocation]:
