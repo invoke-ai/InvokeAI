@@ -7,6 +7,7 @@ from invokeai.app.services.board_records.board_records_common import BoardRecord
 from invokeai.app.services.bulk_download.bulk_download_common import (
     DEFAULT_BULK_DOWNLOAD_ID,
     BulkDownloadException,
+    BulkDownloadParametersException,
     BulkDownloadTargetException,
 )
 from invokeai.app.services.events.events_base import EventServiceBase
@@ -36,7 +37,9 @@ class BulkDownloadService(BulkDownloadBase):
         self.__bulk_downloads_folder = Path(self.__temp_directory.name) / "bulk_downloads"
         self.__bulk_downloads_folder.mkdir(parents=True, exist_ok=True)
 
-    def handler(self, image_names: list[str], board_id: Optional[str], bulk_download_item_id: Optional[str]) -> None:
+    def handler(
+        self, image_names: Optional[list[str]], board_id: Optional[str], bulk_download_item_id: Optional[str]
+    ) -> None:
         """
         Create a zip file containing the images specified by the given image names or board id.
 
@@ -53,15 +56,12 @@ class BulkDownloadService(BulkDownloadBase):
             image_dtos: list[ImageDTO] = []
 
             if board_id:
-                # -1 is the default value for limit, which means no limit, is_intermediate False only gives us completed images
-                image_dtos = self.__invoker.services.images.get_many(
-                    offset=0,
-                    limit=-1,
-                    board_id=board_id,
-                    is_intermediate=False,
-                ).items
+                image_dtos = self._board_handler(board_id)
+            elif image_names:
+                image_dtos = self._image_handler(image_names)
             else:
-                image_dtos = [self.__invoker.services.images.get_dto(image_name) for image_name in image_names]
+                raise BulkDownloadParametersException()
+
             bulk_download_item_name: str = self._create_zip_file(image_dtos, bulk_download_item_id)
             self._signal_job_completed(bulk_download_id, bulk_download_item_id, bulk_download_item_name)
         except (ImageRecordNotFoundException, BoardRecordNotFoundException, BulkDownloadException) as e:
@@ -70,6 +70,19 @@ class BulkDownloadService(BulkDownloadBase):
             self._signal_job_failed(bulk_download_id, bulk_download_item_id, e)
             self.__invoker.services.logger.error("Problem bulk downloading images.")
             raise e
+
+    def _image_handler(self, image_names: list[str]) -> list[ImageDTO]:
+        return [self.__invoker.services.images.get_dto(image_name) for image_name in image_names]
+
+    def _board_handler(self, board_id: str) -> list[ImageDTO]:
+        # -1 is the default value for limit, which means no limit, is_intermediate False only gives us completed images
+        image_dtos = self.__invoker.services.images.get_many(
+            offset=0,
+            limit=-1,
+            board_id=board_id,
+            is_intermediate=False,
+        ).items
+        return image_dtos
 
     def generate_item_id(self, board_id: Optional[str]) -> str:
         return uuid_string() if board_id is None else self._get_clean_board_name(board_id) + "_" + uuid_string()
