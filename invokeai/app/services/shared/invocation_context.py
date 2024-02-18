@@ -6,6 +6,7 @@ from PIL.Image import Image
 from torch import Tensor
 
 from invokeai.app.invocations.fields import MetadataField, WithBoard, WithMetadata
+from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
@@ -194,19 +195,19 @@ class ImagesInterface(InvocationContextInterface):
             node_id=self._context_data.invocation.id,
         )
 
-    def get_pil(self, image_name: str, format: str | None = None) -> Image:
+    def get_pil(self, image_name: str, mode: IMAGE_MODES | None = None) -> Image:
         """
         Gets an image as a PIL Image object.
 
         :param image_name: The name of the image to get.
-        :param format: The color format to convert the image to. If None, the original format is used.
+        :param mode: The color mode to convert the image to. If None, the original mode is used.
         """
         image = self._services.images.get_pil_image(image_name)
-        if format and format != image.mode:
+        if mode and mode != image.mode:
             try:
-                image = image.convert(format)
+                image = image.convert(mode)
             except ValueError:
-                self._services.logger.warning(f"Could not convert image from {image.mode} to {format}. Using original format.")
+                self._services.logger.warning(f"Could not convert image from {image.mode} to {mode}. Using original mode instead.")
         return image
 
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
