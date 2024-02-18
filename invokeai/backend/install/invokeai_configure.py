@@ -84,6 +84,8 @@ _, MAX_VRAM = torch.cuda.mem_get_info() if HAS_CUDA else (0.0, 0.0)
 MAX_VRAM /= GB
 MAX_RAM = psutil.virtual_memory().total / GB
 
+FORCE_FULL_PRECISION = False
+
 INIT_FILE_PREAMBLE = """# InvokeAI initialization file
 # This is the InvokeAI initialization file, which contains command-line default values.
 # Feel free to edit. If anything goes wrong, you can re-initialize this file by deleting
@@ -111,9 +113,6 @@ then run one of the following commands to start InvokeAI.
 
 Web UI:
    invokeai-web
-
-Command-line client:
-   invokeai
 
 If you installed using an installation script, run:
   {config.root_path}/invoke.{"bat" if sys.platform == "win32" else "sh"}
@@ -408,7 +407,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             begin_entry_at=3,
             max_height=2,
             relx=30,
-            max_width=56,
+            max_width=80,
             scroll_exit=True,
         )
         self.add_widget_intelligent(
@@ -664,7 +663,6 @@ https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENS
         generation_options = [GENERATION_OPT_CHOICES[x] for x in self.generation_options.value]
         for v in GENERATION_OPT_CHOICES:
             setattr(new_opts, v, v in generation_options)
-
         return new_opts
 
 
@@ -695,9 +693,6 @@ class EditOptApplication(npyscreen.NPSAppManaged):
                 cycle_widgets=False,
             )
 
-    def new_opts(self) -> Namespace:
-        return self.options.marshall_arguments()
-
 
 def default_ramcache() -> float:
     """Run a heuristic for the default RAM cache based on installed RAM."""
@@ -712,6 +707,7 @@ def default_ramcache() -> float:
 def default_startup_options(init_file: Path) -> InvokeAIAppConfig:
     opts = InvokeAIAppConfig.get_config()
     opts.ram = default_ramcache()
+    opts.precision = "float32" if FORCE_FULL_PRECISION else choose_precision(torch.device(choose_torch_device()))
     return opts
 
 
@@ -760,7 +756,8 @@ def initialize_rootdir(root: Path, yes_to_all: bool = False):
 def run_console_ui(
     program_opts: Namespace, initfile: Path, install_helper: InstallHelper
 ) -> Tuple[Optional[Namespace], Optional[InstallSelections]]:
-    invokeai_opts = default_startup_options(initfile)
+    first_time = not (config.root_path / "invokeai.yaml").exists()
+    invokeai_opts = default_startup_options(initfile) if first_time else config
     invokeai_opts.root = program_opts.root
 
     if not set_min_terminal_size(MIN_COLS, MIN_LINES):
@@ -773,7 +770,7 @@ def run_console_ui(
     if editApp.user_cancelled:
         return (None, None)
     else:
-        return (editApp.new_opts(), editApp.install_selections)
+        return (editApp.new_opts, editApp.install_selections)
 
 
 # -------------------------------------
@@ -785,7 +782,7 @@ def write_opts(opts: InvokeAIAppConfig, init_file: Path) -> None:
     new_config = InvokeAIAppConfig.get_config()
     new_config.root = config.root
 
-    for key, value in opts.model_dump().items():
+    for key, value in vars(opts).items():
         if hasattr(new_config, key):
             setattr(new_config, key, value)
 
@@ -869,7 +866,8 @@ def migrate_if_needed(opt: Namespace, root: Path) -> bool:
 
 
 # -------------------------------------
-def main():
+def main() -> None:
+    global FORCE_FULL_PRECISION  # FIXME
     parser = argparse.ArgumentParser(description="InvokeAI model downloader")
     parser.add_argument(
         "--skip-sd-weights",
@@ -921,17 +919,16 @@ def main():
         help="path to root of install directory",
     )
     opt = parser.parse_args()
-
     invoke_args = []
     if opt.root:
         invoke_args.extend(["--root", opt.root])
     if opt.full_precision:
         invoke_args.extend(["--precision", "float32"])
     config.parse_args(invoke_args)
-    config.precision = "float32" if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
     logger = InvokeAILogger().get_logger(config=config)
 
     errors = set()
+    FORCE_FULL_PRECISION = opt.full_precision  # FIXME global
 
     try:
         # if we do a root migration/upgrade, then we are keeping previous
