@@ -1,6 +1,6 @@
 import io
 import traceback
-from typing import Optional, cast
+from typing import Optional
 
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
@@ -396,10 +396,9 @@ async def download_images_from_list(
         raise HTTPException(status_code=400, detail="No images or board id specified.")
     bulk_download_item_id: str = ApiDependencies.invoker.services.bulk_download.generate_item_id(board_id)
 
-    # Type narrowing handled above ^, we know that image_names is not None, trying to keep null checks at the boundaries
     background_tasks.add_task(
         ApiDependencies.invoker.services.bulk_download.handler,
-        cast(list[str], image_names),
+        image_names,
         board_id,
         bulk_download_item_id,
     )

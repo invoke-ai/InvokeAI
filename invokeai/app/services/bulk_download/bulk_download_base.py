@@ -23,7 +23,9 @@ class BulkDownloadBase(ABC):
         """
 
     @abstractmethod
-    def handler(self, image_names: list[str], board_id: Optional[str], bulk_download_item_id: Optional[str]) -> None:
+    def handler(
+        self, image_names: Optional[list[str]], board_id: Optional[str], bulk_download_item_id: Optional[str]
+    ) -> None:
         """
         Starts a a bulk download job.
 
