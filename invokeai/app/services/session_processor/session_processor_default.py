@@ -192,9 +192,20 @@ class DefaultSessionProcessor(SessionProcessorBase):
                                     )
 
                             except KeyboardInterrupt:
+                                # TODO(psyche): should we set the cancel event here and/or cancel the queue item?
                                 pass
 
                             except CanceledException:
+                                # When the user cancels the graph, we first set the cancel event. The event is checked
+                                # between invocations, in this loop. Some invocations are long-running, and we need to
+                                # be able to cancel them mid-execution.
+                                #
+                                # For example, denoising is a long-running invocation with many steps. A step callback
+                                # is executed after each step. This step callback checks if the canceled event is set,
+                                # then raises a CanceledException to stop execution immediately.
+                                #
+                                # When we get a CanceledException, we don't need to do anything - just pass and let the
+                                # loop go to its next iteration, and the cancel event will be handled correctly.
                                 pass
 
                             except Exception as e:
