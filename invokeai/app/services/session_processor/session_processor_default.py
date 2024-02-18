@@ -249,18 +249,20 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         self._invoker.services.logger.debug("Waiting for next polling interval or event")
                         poll_now_event.wait(self._polling_interval)
                         continue
-                except Exception as e:
+                except Exception:
                     # Non-fatal error in processor, cancel the queue item and wait for next polling interval or event
-                    self._invoker.services.logger.error(f"Error in session processor: {e}")
+                    self._invoker.services.logger.error(
+                        f"Non-fatal error in session processor:\n{traceback.format_exc()}"
+                    )
                     if self._queue_item is not None:
                         self._invoker.services.session_queue.cancel_queue_item(
                             self._queue_item.item_id, error=traceback.format_exc()
                         )
                     poll_now_event.wait(self._polling_interval)
                     continue
-        except Exception as e:
+        except Exception:
             # Fatal error in processor, log and pass - we're done here
-            self._invoker.services.logger.error(f"Fatal Error in session processor: {e}")
+            self._invoker.services.logger.error(f"Fatal Error in session processor:\n{traceback.format_exc()}")
             pass
         finally:
             stop_event.clear()
