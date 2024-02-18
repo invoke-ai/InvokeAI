@@ -143,8 +143,12 @@ class ImageProcessorInvocation(BaseInvocation, WithMetadata, WithBoard):
         # superclass just passes through image without processing
         return image
 
+    def load_image(self, context: InvocationContext) -> Image.Image:
+        # allows override for any special formatting specific to the preprocessor
+        return context.images.get_pil(self.image.image_name, "RGB")
+
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        raw_image = context.images.get_pil(self.image.image_name, "RGB")
+        raw_image = self.load_image(context)
         # image type should be PIL.PngImagePlugin.PngImageFile ?
         processed_image = self.run_processor(raw_image)
 
@@ -180,6 +184,10 @@ class CannyImageProcessorInvocation(ImageProcessorInvocation):
     high_threshold: int = InputField(
         default=200, ge=0, le=255, description="The high threshold of the Canny pixel gradient (0-255)"
     )
+
+    def load_image(self, context: InvocationContext) -> Image.Image:
+        # Keep alpha channel for Canny processing to detect edges of transparent areas
+        return context.images.get_pil(self.image.image_name, "RGBA")
 
     def run_processor(self, image):
         canny_processor = CannyDetector()
