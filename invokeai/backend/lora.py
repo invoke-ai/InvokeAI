@@ -10,6 +10,7 @@ from safetensors.torch import load_file
 from typing_extensions import Self
 
 from invokeai.backend.model_manager import BaseModelType
+
 from .raw_model import RawModel
 
 
@@ -365,6 +366,7 @@ class IA3Layer(LoRALayerBase):
 
 
 AnyLoRALayer = Union[LoRALayer, LoHALayer, LoKRLayer, FullLayer, IA3Layer]
+
 
 class LoRAModelRaw(RawModel):  # (torch.nn.Module):
     _name: str

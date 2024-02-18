@@ -35,7 +35,7 @@ class Struct_mallinfo2(ctypes.Structure):
         ("keepcost", ctypes.c_size_t),
     ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         s = ""
         s += f"{'arena': <10}= {(self.arena/2**30):15.5f}   # Non-mmapped space allocated (GB) (uordblks + fordblks)\n"
         s += f"{'ordblks': <10}= {(self.ordblks): >15}   # Number of free chunks\n"
@@ -62,7 +62,7 @@ class LibcUtil:
     TODO: Improve cross-OS compatibility of this class.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._libc = ctypes.cdll.LoadLibrary("libc.so.6")
 
     def mallinfo2(self) -> Struct_mallinfo2:
@@ -72,4 +72,5 @@ class LibcUtil:
         """
         mallinfo2 = self._libc.mallinfo2
         mallinfo2.restype = Struct_mallinfo2
-        return mallinfo2()
+        result: Struct_mallinfo2 = mallinfo2()
+        return result

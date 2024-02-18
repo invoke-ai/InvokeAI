@@ -1,7 +1,8 @@
 import pytest
 
-from invokeai.backend.model_manager.util.libc_util import Struct_mallinfo2
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
+from invokeai.backend.model_manager.util.libc_util import Struct_mallinfo2
+
 
 def test_memory_snapshot_capture():
     """Smoke test of MemorySnapshot.capture()."""

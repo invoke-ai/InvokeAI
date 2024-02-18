@@ -9,8 +9,8 @@ from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
 from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionWeights
 
-from .resampler import Resampler
 from ..raw_model import RawModel
+from .resampler import Resampler
 
 
 class ImageProjModel(torch.nn.Module):
