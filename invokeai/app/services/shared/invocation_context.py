@@ -194,13 +194,20 @@ class ImagesInterface(InvocationContextInterface):
             node_id=self._context_data.invocation.id,
         )
 
-    def get_pil(self, image_name: str) -> Image:
+    def get_pil(self, image_name: str, format: str | None = None) -> Image:
         """
         Gets an image as a PIL Image object.
 
         :param image_name: The name of the image to get.
+        :param format: The color format to convert the image to. If None, the original format is used.
         """
-        return self._services.images.get_pil_image(image_name)
+        image = self._services.images.get_pil_image(image_name)
+        if format and format != image.mode:
+            try:
+                image = image.convert(format)
+            except ValueError:
+                self._services.logger.warning(f"Could not convert image from {image.mode} to {format}. Using original format.")
+        return image
 
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
         """
