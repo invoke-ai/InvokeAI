@@ -213,7 +213,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
                                 # Save error
                                 self._queue_item.session.set_node_error(invocation.id, error)
-                                self._invoker.services.logger.error("Error while invoking:\n%s" % e)
+                                self._invoker.services.logger.error(
+                                    f"Error while invoking session {self._queue_item.session_id}, invocation {invocation.id} ({invocation.get_type()}):\n{e}"
+                                )
 
                                 # Send error event
                                 self._invoker.services.events.emit_invocation_error(
