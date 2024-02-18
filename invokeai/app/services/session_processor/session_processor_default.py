@@ -139,7 +139,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         # Loop over invocations until the session is complete or canceled
                         while invocation is not None and not cancel_event.is_set():
                             # get the source node id to provide to clients (the prepared node id is not as useful)
-                            source_node_id = self._queue_item.session.prepared_source_mapping[invocation.id]
+                            source_invocation_id = self._queue_item.session.prepared_source_mapping[invocation.id]
 
                             # Send starting event
                             self._invoker.services.events.emit_invocation_started(
@@ -148,7 +148,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                                 queue_id=self._queue_item.queue_id,
                                 graph_execution_state_id=self._queue_item.session_id,
                                 node=invocation.model_dump(),
-                                source_node_id=source_node_id,
+                                source_node_id=source_invocation_id,
                             )
 
                             # Innermost processor try block; any unhandled exception is an invocation error & will fail the graph
@@ -159,12 +159,8 @@ class DefaultSessionProcessor(SessionProcessorBase):
                                     # Build invocation context (the node-facing API)
                                     context_data = InvocationContextData(
                                         invocation=invocation,
-                                        source_node_id=source_node_id,
-                                        session_id=self._queue_item.session.id,
-                                        workflow=self._queue_item.workflow,
-                                        queue_id=self._queue_item.queue_id,
-                                        queue_item_id=self._queue_item.item_id,
-                                        batch_id=self._queue_item.batch_id,
+                                        source_invocation_id=source_invocation_id,
+                                        queue_item=self._queue_item,
                                     )
                                     context = build_invocation_context(
                                         context_data=context_data,
@@ -187,7 +183,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                                         queue_id=self._queue_item.queue_id,
                                         graph_execution_state_id=self._queue_item.session.id,
                                         node=invocation.model_dump(),
-                                        source_node_id=source_node_id,
+                                        source_node_id=source_invocation_id,
                                         result=outputs.model_dump(),
                                     )
 
@@ -224,7 +220,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                                     queue_id=self._queue_item.queue_id,
                                     graph_execution_state_id=self._queue_item.session.id,
                                     node=invocation.model_dump(),
-                                    source_node_id=source_node_id,
+                                    source_node_id=source_invocation_id,
                                     error_type=e.__class__.__name__,
                                     error=error,
                                 )
