@@ -16,6 +16,7 @@ from invokeai.app.invocations.fields import (
     WithMetadata,
 )
 from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
@@ -261,9 +262,6 @@ class ImageChannelInvocation(BaseInvocation, WithMetadata, WithBoard):
         image_dto = context.images.save(image=channel_image)
 
         return ImageOutput.build(image_dto)
-
-
-IMAGE_MODES = Literal["L", "RGB", "RGBA", "CMYK", "YCbCr", "LAB", "HSV", "I", "F"]
 
 
 @invocation(

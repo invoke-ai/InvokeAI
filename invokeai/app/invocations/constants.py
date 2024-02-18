@@ -12,3 +12,6 @@ The ratio of image:latent dimensions is LATENT_SCALE_FACTOR:1, or 8:1.
 
 SCHEDULER_NAME_VALUES = Literal[tuple(SCHEDULER_MAP.keys())]
 """A literal type representing the valid scheduler names."""
+
+IMAGE_MODES = Literal["L", "RGB", "RGBA", "CMYK", "YCbCr", "LAB", "HSV", "I", "F"]
+"""A literal type for PIL image modes supported by Invoke"""
