@@ -144,7 +144,7 @@ class ImageProcessorInvocation(BaseInvocation, WithMetadata, WithBoard):
         return image
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        raw_image = context.images.get_pil(self.image.image_name)
+        raw_image = context.images.get_pil(self.image.image_name, "RGB")
         # image type should be PIL.PngImagePlugin.PngImageFile ?
         processed_image = self.run_processor(raw_image)
 
