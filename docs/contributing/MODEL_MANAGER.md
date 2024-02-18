@@ -1531,23 +1531,29 @@ Here is a typical initialization pattern:
 
 ```
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.model_records import ModelRecordServiceBase
-from invokeai.app.services.model_load import ModelLoadService
+from invokeai.app.services.model_load import ModelLoadService, ModelLoaderRegistry
 
 config = InvokeAIAppConfig.get_config()
-store = ModelRecordServiceBase.open(config)
-loader = ModelLoadService(config, store)
+ram_cache = ModelCache(
+	max_cache_size=config.ram_cache_size, max_vram_cache_size=config.vram_cache_size, logger=logger
+)
+convert_cache = ModelConvertCache(
+	cache_path=config.models_convert_cache_path, max_size=config.convert_cache_size
+)
+loader = ModelLoadService(
+	app_config=config,
+	ram_cache=ram_cache,
+	convert_cache=convert_cache,
+	registry=ModelLoaderRegistry
+)
 ```
 
-Note that we are relying on the contents of the application
-configuration to choose the implementation of
-`ModelRecordServiceBase`.
+### load_model(model_config, [submodel_type], [context]) -> LoadedModel
 
-### load_model_by_key(key, [submodel_type], [context]) -> LoadedModel
-
-The `load_model_by_key()` method receives the unique key that
-identifies the model.  It loads the model into memory, gets the model
-ready for use, and returns a `LoadedModel` object.
+The `load_model()` method takes an `AnyModelConfig` returned by
+`ModelRecordService.get_model()` and returns the corresponding loaded
+model.  It loads the model into memory, gets the model ready for use,
+and returns a `LoadedModel` object.
 
 The optional second argument, `subtype` is a `SubModelType` string
 enum, such as "vae". It is mandatory when used with a main model, and
@@ -1593,25 +1599,6 @@ with model_info as vae:
 - `ModelNotFoundException`  -- key in database but model not found at path
 - `NotImplementedException` -- the loader doesn't know how to load this type of model
   
-### load_model_by_attr(model_name, base_model, model_type, [submodel], [context]) -> LoadedModel
-
-This is similar to `load_model_by_key`, but instead it accepts the
-combination of the model's name, type and base, which it passes to the
-model record config store for retrieval. If successful, this method
-returns a `LoadedModel`. It can raise the following exceptions:
-
-```
-UnknownModelException -- model with these attributes not known
-NotImplementedException -- the loader doesn't know how to load this type of model
-ValueError -- more than one model matches this combination of base/type/name
-```
-
-### load_model_by_config(config, [submodel], [context]) -> LoadedModel
-
-This method takes an `AnyModelConfig` returned by
-ModelRecordService.get_model() and returns the corresponding loaded
-model. It may raise a `NotImplementedException`.
-
 ### Emitting model loading events
 
 When the `context` argument is passed to `load_model_*()`, it will
@@ -1656,7 +1643,7 @@ onnx models.
 
 To install a new loader, place it in
 `invokeai/backend/model_manager/load/model_loaders`. Inherit from
-`ModelLoader` and use the `@AnyModelLoader.register()` decorator to
+`ModelLoader` and use the `@ModelLoaderRegistry.register()` decorator to
 indicate what type of models the loader can handle.
 
 Here is a complete example from `generic_diffusers.py`, which is able
@@ -1674,12 +1661,11 @@ from invokeai.backend.model_manager import (
     ModelType,
     SubModelType,
 )
-from ..load_base import AnyModelLoader
-from ..load_default import ModelLoader
+from .. import ModelLoader, ModelLoaderRegistry
 
 
-@AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.CLIPVision, format=ModelFormat.Diffusers)
-@AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.T2IAdapter, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.CLIPVision, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T2IAdapter, format=ModelFormat.Diffusers)
 class GenericDiffusersLoader(ModelLoader):
     """Class to load simple diffusers models."""
 
@@ -1728,3 +1714,74 @@ model. It does whatever it needs to do to get the model into diffusers
 format, and returns the Path of the resulting model. (The path should
 ordinarily be the same as `output_path`.)
 
+## The ModelManagerService object
+
+For convenience, the API provides a `ModelManagerService` object which
+gives a single point of access to the major model manager
+services. This object is created at initialization time and can be
+found in the global `ApiDependencies.invoker.services.model_manager`
+object, or in `context.services.model_manager` from within an
+invocation.
+
+In the examples below, we have retrieved the manager using:
+```
+mm = ApiDependencies.invoker.services.model_manager
+```
+
+The following properties and methods will be available:
+
+### mm.store
+
+This retrieves the `ModelRecordService` associated with the
+manager. Example:
+
+```
+configs = mm.store.get_model_by_attr(name='stable-diffusion-v1-5')
+```
+
+### mm.install
+
+This retrieves the `ModelInstallService` associated with the manager.
+Example:
+
+```
+job = mm.install.heuristic_import(`https://civitai.com/models/58390/detail-tweaker-lora-lora`)
+```
+
+### mm.load
+
+This retrieves the `ModelLoaderService` associated with the manager. Example:
+
+```
+configs = mm.store.get_model_by_attr(name='stable-diffusion-v1-5')
+assert len(configs) > 0
+
+loaded_model = mm.load.load_model(configs[0])
+```
+
+The model manager also offers a few convenience shortcuts for loading
+models:
+
+### mm.load_model_by_config(model_config, [submodel], [context]) -> LoadedModel
+
+Same as `mm.load.load_model()`.
+
+### mm.load_model_by_attr(model_name, base_model, model_type, [submodel], [context]) -> LoadedModel
+
+This accepts the combination of the model's name, type and base, which
+it passes to the model record config store for retrieval. If a unique
+model config is found, this method returns a `LoadedModel`. It can
+raise the following exceptions:
+
+```
+UnknownModelException -- model with these attributes not known
+NotImplementedException -- the loader doesn't know how to load this type of model
+ValueError -- more than one model matches this combination of base/type/name
+```
+
+### mm.load_model_by_key(key, [submodel], [context]) -> LoadedModel
+
+This method takes a model key, looks it up using the
+`ModelRecordServiceBase` object in `mm.store`, and passes the returned
+model configuration to `load_model_by_config()`.  It may raise a
+`NotImplementedException`.

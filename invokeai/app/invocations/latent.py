@@ -42,10 +42,10 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
-from invokeai.backend.lora import LoRAModelRaw
-from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
+from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import BaseModelType, LoadedModel
+from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData, IPAdapterConditioningInfo
 from invokeai.backend.util.silence_warnings import SilenceWarnings
@@ -162,7 +162,7 @@ class CreateDenoiseMaskInvocation(BaseInvocation):
         )
 
         if image_tensor is not None:
-            vae_info = context.services.model_manager.load.load_model_by_key(
+            vae_info = context.services.model_manager.load_model_by_key(
                 **self.vae.vae.model_dump(),
                 context=context,
             )
@@ -195,7 +195,7 @@ def get_scheduler(
     seed: int,
 ) -> Scheduler:
     scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP["ddim"])
-    orig_scheduler_info = context.services.model_manager.load.load_model_by_key(
+    orig_scheduler_info = context.services.model_manager.load_model_by_key(
         **scheduler_info.model_dump(),
         context=context,
     )
@@ -429,7 +429,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         controlnet_data = []
         for control_info in control_list:
             control_model = exit_stack.enter_context(
-                context.services.model_manager.load.load_model_by_key(
+                context.services.model_manager.load_model_by_key(
                     key=control_info.control_model.key,
                     context=context,
                 )
@@ -495,13 +495,13 @@ class DenoiseLatentsInvocation(BaseInvocation):
         conditioning_data.ip_adapter_conditioning = []
         for single_ip_adapter in ip_adapter:
             ip_adapter_model: Union[IPAdapter, IPAdapterPlus] = exit_stack.enter_context(
-                context.services.model_manager.load.load_model_by_key(
+                context.services.model_manager.load_model_by_key(
                     key=single_ip_adapter.ip_adapter_model.key,
                     context=context,
                 )
             )
 
-            image_encoder_model_info = context.services.model_manager.load.load_model_by_key(
+            image_encoder_model_info = context.services.model_manager.load_model_by_key(
                 key=single_ip_adapter.image_encoder_model.key,
                 context=context,
             )
@@ -557,7 +557,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         t2i_adapter_data = []
         for t2i_adapter_field in t2i_adapter:
-            t2i_adapter_model_info = context.services.model_manager.load.load_model_by_key(
+            t2i_adapter_model_info = context.services.model_manager.load_model_by_key(
                 key=t2i_adapter_field.t2i_adapter_model.key,
                 context=context,
             )
@@ -717,7 +717,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
             def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
                 for lora in self.unet.loras:
-                    lora_info = context.services.model_manager.load.load_model_by_key(
+                    lora_info = context.services.model_manager.load_model_by_key(
                         **lora.model_dump(exclude={"weight"}),
                         context=context,
                     )
@@ -725,7 +725,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     del lora_info
                 return
 
-            unet_info = context.services.model_manager.load.load_model_by_key(
+            unet_info = context.services.model_manager.load_model_by_key(
                 **self.unet.unet.model_dump(),
                 context=context,
             )
@@ -836,7 +836,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.services.latents.get(self.latents.latents_name)
 
-        vae_info = context.services.model_manager.load.load_model_by_key(
+        vae_info = context.services.model_manager.load_model_by_key(
             **self.vae.vae.model_dump(),
             context=context,
         )
@@ -1079,7 +1079,7 @@ class ImageToLatentsInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
 
-        vae_info = context.services.model_manager.load.load_model_by_key(
+        vae_info = context.services.model_manager.load_model_by_key(
             **self.vae.vae.model_dump(),
             context=context,
         )
@@ -1290,7 +1290,7 @@ class IdealSizeInvocation(BaseInvocation):
         return tuple((x - x % multiple_of) for x in args)
 
     def invoke(self, context: InvocationContext) -> IdealSizeOutput:
-        unet_config = context.services.model_manager.load.load_model_by_key(
+        unet_config = context.services.model_manager.load_model_by_key(
             **self.unet.unet.model_dump(),
             context=context,
         )

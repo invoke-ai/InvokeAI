@@ -5,9 +5,9 @@ from typing import Optional, Union
 import pytest
 import torch
 
-from invokeai.app.services.model_records import UnknownModelException
 from invokeai.app.services.model_manager import ModelManagerServiceBase
-from invokeai.backend.model_manager import BaseModelType, ModelType, SubModelType, LoadedModel
+from invokeai.app.services.model_records import UnknownModelException
+from invokeai.backend.model_manager import BaseModelType, LoadedModel, ModelType, SubModelType
 
 
 @pytest.fixture(scope="session")
@@ -16,12 +16,12 @@ def torch_device():
 
 
 def install_and_load_model(
-        model_manager: ModelManagerServiceBase,
-        model_path_id_or_url: Union[str, Path],
-        model_name: str,
-        base_model: BaseModelType,
-        model_type: ModelType,
-        submodel_type: Optional[SubModelType] = None,
+    model_manager: ModelManagerServiceBase,
+    model_path_id_or_url: Union[str, Path],
+    model_name: str,
+    base_model: BaseModelType,
+    model_type: ModelType,
+    submodel_type: Optional[SubModelType] = None,
 ) -> LoadedModel:
     """Install a model if it is not already installed, then get the LoadedModel for that model.
 
@@ -42,7 +42,9 @@ def install_and_load_model(
     # If the requested model is already installed, return its LoadedModel
     with contextlib.suppress(UnknownModelException):
         # TODO: Replace with wrapper call
-        loaded_model: LoadedModel = model_manager.load.load_model_by_attr(name=model_name, base=base_model, type=model_type)
+        loaded_model: LoadedModel = model_manager.load.load_model_by_attr(
+            name=model_name, base=base_model, type=model_type
+        )
         return loaded_model
 
     # Install the requested model.

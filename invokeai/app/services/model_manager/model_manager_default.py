@@ -1,10 +1,14 @@
 # Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Team
 """Implementation of ModelManagerServiceBase."""
 
+from typing import Optional
+
 from typing_extensions import Self
 
+from invokeai.app.invocations.baseinvocation import InvocationContext
 from invokeai.app.services.invoker import Invoker
-from invokeai.backend.model_manager.load import ModelCache, ModelConvertCache
+from invokeai.backend.model_manager import AnyModelConfig, BaseModelType, LoadedModel, ModelType, SubModelType
+from invokeai.backend.model_manager.load import ModelCache, ModelConvertCache, ModelLoaderRegistry
 from invokeai.backend.util.logging import InvokeAILogger
 
 from ..config import InvokeAIAppConfig
@@ -12,7 +16,7 @@ from ..download import DownloadQueueServiceBase
 from ..events.events_base import EventServiceBase
 from ..model_install import ModelInstallService, ModelInstallServiceBase
 from ..model_load import ModelLoadService, ModelLoadServiceBase
-from ..model_records import ModelRecordServiceBase
+from ..model_records import ModelRecordServiceBase, UnknownModelException
 from .model_manager_base import ModelManagerServiceBase
 
 
@@ -58,6 +62,56 @@ class ModelManagerService(ModelManagerServiceBase):
             if hasattr(service, "stop"):
                 service.stop(invoker)
 
+    def load_model_by_config(
+        self,
+        model_config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+        context: Optional[InvocationContext] = None,
+    ) -> LoadedModel:
+        return self.load.load_model(model_config, submodel_type, context)
+
+    def load_model_by_key(
+        self,
+        key: str,
+        submodel_type: Optional[SubModelType] = None,
+        context: Optional[InvocationContext] = None,
+    ) -> LoadedModel:
+        config = self.store.get_model(key)
+        return self.load.load_model(config, submodel_type, context)
+
+    def load_model_by_attr(
+        self,
+        model_name: str,
+        base_model: BaseModelType,
+        model_type: ModelType,
+        submodel: Optional[SubModelType] = None,
+        context: Optional[InvocationContext] = None,
+    ) -> LoadedModel:
+        """
+        Given a model's attributes, search the database for it, and if found, load and return the LoadedModel object.
+
+        This is provided for API compatability with the get_model() method
+        in the original model manager. However, note that LoadedModel is
+        not the same as the original ModelInfo that ws returned.
+
+        :param model_name: Name of to be fetched.
+        :param base_model: Base model
+        :param model_type: Type of the model
+        :param submodel: For main (pipeline models), the submodel to fetch
+        :param context: The invocation context.
+
+        Exceptions: UnknownModelException -- model with this key not known
+                    NotImplementedException -- a model loader was not provided at initialization time
+                    ValueError -- more than one model matches this combination
+        """
+        configs = self.store.search_by_attr(model_name, base_model, model_type)
+        if len(configs) == 0:
+            raise UnknownModelException(f"{base_model}/{model_type}/{model_name}: Unknown model")
+        elif len(configs) > 1:
+            raise ValueError(f"{base_model}/{model_type}/{model_name}: More than one model matches.")
+        else:
+            return self.load.load_model(configs[0], submodel, context)
+
     @classmethod
     def build_model_manager(
         cls,
@@ -82,9 +136,9 @@ class ModelManagerService(ModelManagerServiceBase):
         )
         loader = ModelLoadService(
             app_config=app_config,
-            record_store=model_record_service,
             ram_cache=ram_cache,
             convert_cache=convert_cache,
+            registry=ModelLoaderRegistry,
         )
         installer = ModelInstallService(
             app_config=app_config,

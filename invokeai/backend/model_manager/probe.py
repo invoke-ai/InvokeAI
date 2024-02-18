@@ -8,7 +8,6 @@ import torch
 from picklescan.scanner import scan_file_path
 
 import invokeai.backend.util.logging as logger
-from .util.model_util import lora_token_vector_length, read_checkpoint_meta
 from invokeai.backend.util.util import SilenceWarnings
 
 from .config import (
@@ -23,6 +22,7 @@ from .config import (
     SchedulerPredictionType,
 )
 from .hash import FastModelHash
+from .util.model_util import lora_token_vector_length, read_checkpoint_meta
 
 CkptType = Dict[str, Any]
 
@@ -52,6 +52,7 @@ LEGACY_CONFIGS: Dict[BaseModelType, Dict[ModelVariantType, Union[str, Dict[Sched
         ModelVariantType.Normal: "sd_xl_refiner.yaml",
     },
 }
+
 
 class ProbeBase(object):
     """Base class for probes."""

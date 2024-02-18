@@ -47,7 +47,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         boards,
         download_queue,
         images,
-        model_manager_v2,
+        model_manager,
         session_queue,
         sessions,
         utilities,
@@ -114,7 +114,7 @@ async def shutdown_event() -> None:
 app.include_router(sessions.session_router, prefix="/api")
 
 app.include_router(utilities.utilities_router, prefix="/api")
-app.include_router(model_manager_v2.model_manager_v2_router, prefix="/api")
+app.include_router(model_manager.model_manager_router, prefix="/api")
 app.include_router(download_queue.download_queue_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
 app.include_router(boards.boards_router, prefix="/api")
@@ -176,21 +176,23 @@ def custom_openapi() -> dict[str, Any]:
         invoker_schema["class"] = "invocation"
         openapi_schema["components"]["schemas"][f"{output_type_title}"]["class"] = "output"
 
-    from invokeai.backend.model_management.models import get_model_config_enums
+    # This code no longer seems to be necessary?
+    # Leave it here just in case
+    #
+    # from invokeai.backend.model_manager import get_model_config_formats
+    # formats = get_model_config_formats()
+    # for model_config_name, enum_set in formats.items():
 
-    for model_config_format_enum in set(get_model_config_enums()):
-        name = model_config_format_enum.__qualname__
+    #     if model_config_name in openapi_schema["components"]["schemas"]:
+    #         # print(f"Config with name {name} already defined")
+    #         continue
 
-        if name in openapi_schema["components"]["schemas"]:
-            # print(f"Config with name {name} already defined")
-            continue
-
-        openapi_schema["components"]["schemas"][name] = {
-            "title": name,
-            "description": "An enumeration.",
-            "type": "string",
-            "enum": [v.value for v in model_config_format_enum],
-        }
+    #     openapi_schema["components"]["schemas"][model_config_name] = {
+    #         "title": model_config_name,
+    #         "description": "An enumeration.",
+    #         "type": "string",
+    #         "enum": [v.value for v in enum_set],
+    #     }
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema

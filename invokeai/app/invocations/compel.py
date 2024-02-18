@@ -12,14 +12,14 @@ from invokeai.app.services.model_records import UnknownModelException
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.app.util.ti_utils import extract_ti_triggers_from_prompt
 from invokeai.backend.lora import LoRAModelRaw
-from invokeai.backend.model_patcher import ModelPatcher
-from invokeai.backend.textual_inversion import TextualInversionModelRaw
 from invokeai.backend.model_manager import ModelType
+from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     ExtraConditioningInfo,
     SDXLConditioningInfo,
 )
+from invokeai.backend.textual_inversion import TextualInversionModelRaw
 from invokeai.backend.util.devices import torch_dtype
 
 from .baseinvocation import (
@@ -71,18 +71,18 @@ class CompelInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        tokenizer_info = context.services.model_manager.load.load_model_by_key(
+        tokenizer_info = context.services.model_manager.load_model_by_key(
             **self.clip.tokenizer.model_dump(),
             context=context,
         )
-        text_encoder_info = context.services.model_manager.load.load_model_by_key(
+        text_encoder_info = context.services.model_manager.load_model_by_key(
             **self.clip.text_encoder.model_dump(),
             context=context,
         )
 
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
             for lora in self.clip.loras:
-                lora_info = context.services.model_manager.load.load_model_by_key(
+                lora_info = context.services.model_manager.load_model_by_key(
                     **lora.model_dump(exclude={"weight"}), context=context
                 )
                 assert isinstance(lora_info.model, LoRAModelRaw)
@@ -96,7 +96,7 @@ class CompelInvocation(BaseInvocation):
         for trigger in extract_ti_triggers_from_prompt(self.prompt):
             name = trigger[1:-1]
             try:
-                loaded_model = context.services.model_manager.load.load_model_by_key(
+                loaded_model = context.services.model_manager.load_model_by_key(
                     **self.clip.text_encoder.model_dump(),
                     context=context,
                 ).model
@@ -172,11 +172,11 @@ class SDXLPromptInvocationBase:
         lora_prefix: str,
         zero_on_empty: bool,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[ExtraConditioningInfo]]:
-        tokenizer_info = context.services.model_manager.load.load_model_by_key(
+        tokenizer_info = context.services.model_manager.load_model_by_key(
             **clip_field.tokenizer.model_dump(),
             context=context,
         )
-        text_encoder_info = context.services.model_manager.load.load_model_by_key(
+        text_encoder_info = context.services.model_manager.load_model_by_key(
             **clip_field.text_encoder.model_dump(),
             context=context,
         )
@@ -204,7 +204,7 @@ class SDXLPromptInvocationBase:
 
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
             for lora in clip_field.loras:
-                lora_info = context.services.model_manager.load.load_model_by_key(
+                lora_info = context.services.model_manager.load_model_by_key(
                     **lora.model_dump(exclude={"weight"}), context=context
                 )
                 lora_model = lora_info.model
@@ -219,7 +219,7 @@ class SDXLPromptInvocationBase:
         for trigger in extract_ti_triggers_from_prompt(prompt):
             name = trigger[1:-1]
             try:
-                ti_model = context.services.model_manager.load.load_model_by_attr(
+                ti_model = context.services.model_manager.load_model_by_attr(
                     model_name=name,
                     base_model=text_encoder_info.config.base,
                     model_type=ModelType.TextualInversion,

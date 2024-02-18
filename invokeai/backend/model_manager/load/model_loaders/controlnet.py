@@ -13,13 +13,13 @@ from invokeai.backend.model_manager import (
     ModelType,
 )
 from invokeai.backend.model_manager.convert_ckpt_to_diffusers import convert_controlnet_to_diffusers
-from invokeai.backend.model_manager.load.load_base import AnyModelLoader
 
+from .. import ModelLoaderRegistry
 from .generic_diffusers import GenericDiffusersLoader
 
 
-@AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.ControlNet, format=ModelFormat.Diffusers)
-@AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.ControlNet, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)
 class ControlnetLoader(GenericDiffusersLoader):
     """Class to load ControlNet models."""
 
