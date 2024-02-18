@@ -35,7 +35,7 @@ from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
 
 from ..dependencies import ApiDependencies
 
-model_manager_v2_router = APIRouter(prefix="/v2/models", tags=["model_manager_v2"])
+model_manager_router = APIRouter(prefix="/v2/models", tags=["model_manager"])
 
 
 class ModelsList(BaseModel):
@@ -135,7 +135,7 @@ example_model_metadata = {
 ##############################################################################
 
 
-@model_manager_v2_router.get(
+@model_manager_router.get(
     "/",
     operation_id="list_model_records",
 )
@@ -164,7 +164,7 @@ async def list_model_records(
     return ModelsList(models=found_models)
 
 
-@model_manager_v2_router.get(
+@model_manager_router.get(
     "/i/{key}",
     operation_id="get_model_record",
     responses={
@@ -188,7 +188,7 @@ async def get_model_record(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@model_manager_v2_router.get("/summary", operation_id="list_model_summary")
+@model_manager_router.get("/summary", operation_id="list_model_summary")
 async def list_model_summary(
     page: int = Query(default=0, description="The page to get"),
     per_page: int = Query(default=10, description="The number of models per page"),
@@ -200,7 +200,7 @@ async def list_model_summary(
     return results
 
 
-@model_manager_v2_router.get(
+@model_manager_router.get(
     "/meta/i/{key}",
     operation_id="get_model_metadata",
     responses={
@@ -223,7 +223,7 @@ async def get_model_metadata(
     return result
 
 
-@model_manager_v2_router.get(
+@model_manager_router.get(
     "/tags",
     operation_id="list_tags",
 )
@@ -234,7 +234,7 @@ async def list_tags() -> Set[str]:
     return result
 
 
-@model_manager_v2_router.get(
+@model_manager_router.get(
     "/tags/search",
     operation_id="search_by_metadata_tags",
 )
@@ -247,7 +247,7 @@ async def search_by_metadata_tags(
     return ModelsList(models=results)
 
 
-@model_manager_v2_router.patch(
+@model_manager_router.patch(
     "/i/{key}",
     operation_id="update_model_record",
     responses={
@@ -281,7 +281,7 @@ async def update_model_record(
     return model_response
 
 
-@model_manager_v2_router.delete(
+@model_manager_router.delete(
     "/i/{key}",
     operation_id="del_model_record",
     responses={
@@ -311,7 +311,7 @@ async def del_model_record(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@model_manager_v2_router.post(
+@model_manager_router.post(
     "/i/",
     operation_id="add_model_record",
     responses={
@@ -349,7 +349,7 @@ async def add_model_record(
     return result
 
 
-@model_manager_v2_router.post(
+@model_manager_router.post(
     "/heuristic_import",
     operation_id="heuristic_import_model",
     responses={
@@ -416,7 +416,7 @@ async def heuristic_import(
     return result
 
 
-@model_manager_v2_router.post(
+@model_manager_router.post(
     "/install",
     operation_id="import_model",
     responses={
@@ -516,7 +516,7 @@ async def import_model(
     return result
 
 
-@model_manager_v2_router.get(
+@model_manager_router.get(
     "/import",
     operation_id="list_model_install_jobs",
 )
@@ -544,7 +544,7 @@ async def list_model_install_jobs() -> List[ModelInstallJob]:
     return jobs
 
 
-@model_manager_v2_router.get(
+@model_manager_router.get(
     "/import/{id}",
     operation_id="get_model_install_job",
     responses={
@@ -564,7 +564,7 @@ async def get_model_install_job(id: int = Path(description="Model install id")) 
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@model_manager_v2_router.delete(
+@model_manager_router.delete(
     "/import/{id}",
     operation_id="cancel_model_install_job",
     responses={
@@ -583,7 +583,7 @@ async def cancel_model_install_job(id: int = Path(description="Model install job
     installer.cancel_job(job)
 
 
-@model_manager_v2_router.patch(
+@model_manager_router.patch(
     "/import",
     operation_id="prune_model_install_jobs",
     responses={
@@ -597,7 +597,7 @@ async def prune_model_install_jobs() -> Response:
     return Response(status_code=204)
 
 
-@model_manager_v2_router.patch(
+@model_manager_router.patch(
     "/sync",
     operation_id="sync_models_to_config",
     responses={
@@ -616,7 +616,7 @@ async def sync_models_to_config() -> Response:
     return Response(status_code=204)
 
 
-@model_manager_v2_router.put(
+@model_manager_router.put(
     "/convert/{key}",
     operation_id="convert_model",
     responses={
@@ -694,7 +694,7 @@ async def convert_model(
     return new_config
 
 
-@model_manager_v2_router.put(
+@model_manager_router.put(
     "/merge",
     operation_id="merge",
     responses={
