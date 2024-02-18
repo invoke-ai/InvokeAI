@@ -388,11 +388,6 @@ class UtilInterface(InvocationContextInterface):
         :param base_model: The base model for the current denoising step.
         """
 
-        # The step callback needs access to the events and the invocation queue services, but this
-        # represents a dangerous level of access.
-        #
-        # We wrap the step callback so that nodes do not have direct access to these services.
-
         stable_diffusion_step_callback(
             context_data=self._context_data,
             intermediate_state=intermediate_state,
@@ -458,7 +453,6 @@ def build_invocation_context(
     """
 
     def is_canceled() -> bool:
-        """Checks if the current invocation has been canceled."""
         return cancel_event.is_set()
 
     logger = LoggerInterface(services=services, context_data=context_data)
