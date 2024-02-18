@@ -40,12 +40,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.depth_anything import DepthAnythingDetector
 from invokeai.backend.image_util.dw_openpose import DWOpenposeDetector
 
-from .baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    invocation,
-    invocation_output,
-)
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 
 CONTROLNET_MODE_VALUES = Literal["balanced", "more_prompt", "more_control", "unbalanced"]
 CONTROLNET_RESIZE_VALUES = Literal[
@@ -593,9 +588,7 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
         depth_anything_detector = DepthAnythingDetector()
         depth_anything_detector.load_model(model_size=self.model_size)
 
-        if image.mode == "RGBA":
-            image = image.convert("RGB")
-
+        image = image.convert("RGB") if image.mode != "RGB" else image
         processed_image = depth_anything_detector(image=image, resolution=self.resolution, offload=self.offload)
         return processed_image
 
@@ -615,7 +608,8 @@ class DWOpenposeImageProcessorInvocation(ImageProcessorInvocation):
     draw_hands: bool = InputField(default=False)
     image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
 
-    def run_processor(self, image):
+    def run_processor(self, image: Image.Image):
+        image = image.convert("RGB") if image.mode != "RGB" else image
         dw_openpose = DWOpenposeDetector()
         processed_image = dw_openpose(
             image,
