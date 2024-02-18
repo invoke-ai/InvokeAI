@@ -437,11 +437,12 @@ class InvocationContext:
         """Provides utility methods."""
         self.boards = boards
         """Provides methods to interact with boards."""
+        self.is_canceled = is_canceled
+        """Checks if the current invocation has been canceled."""
         self._data = context_data
         """Provides data about the current queue item and invocation. This is an internal API and may change without warning."""
         self._services = services
         """Provides access to the full application services. This is an internal API and may change without warning."""
-        self._is_canceled = is_canceled
 
 
 def build_invocation_context(
@@ -457,6 +458,7 @@ def build_invocation_context(
     """
 
     def is_canceled() -> bool:
+        """Checks if the current invocation has been canceled."""
         return cancel_event.is_set()
 
     logger = LoggerInterface(services=services, context_data=context_data)
