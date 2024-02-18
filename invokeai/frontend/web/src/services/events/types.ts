@@ -156,7 +156,7 @@ export type InvocationRetrievalErrorEvent = {
  *
  * @example socket.on('queue_item_status_changed', (data: QueueItemStatusChangedEvent) => { ... }
  */
-export type QueueItemStatusChangedEvent = {
+export type  QueueItemStatusChangedEvent = {
   queue_id: string;
   queue_item: {
     queue_id: string;
@@ -191,7 +191,7 @@ export type QueueItemStatusChangedEvent = {
     failed: number;
     canceled: number;
     total: number;
-  };
+  }; 
 };
 
 export type ClientEmitSubscribeQueue = {
@@ -200,6 +200,31 @@ export type ClientEmitSubscribeQueue = {
 
 export type ClientEmitUnsubscribeQueue = {
   queue_id: string;
+};
+
+export type BulkDownloadStartedEvent = {
+  bulk_download_id: string;
+  bulk_download_item_id: string;
+};
+
+export type BulkDownloadCompletedEvent = {
+  bulk_download_id: string;
+  bulk_download_item_id: string;
+  bulk_download_item_name: string;
+};
+
+export type BulkDownloadFailedEvent = {
+  bulk_download_id: string;
+  bulk_download_item_id: string;
+  error: string;
+}
+
+export type ClientEmitSubscribeBulkDownload = {
+  bulk_download_id: string;
+};
+
+export type ClientEmitUnsubscribeBulkDownload = {
+  bulk_download_id: string;
 };
 
 export type ServerToClientEvents = {
@@ -213,6 +238,9 @@ export type ServerToClientEvents = {
   session_retrieval_error: (payload: SessionRetrievalErrorEvent) => void;
   invocation_retrieval_error: (payload: InvocationRetrievalErrorEvent) => void;
   queue_item_status_changed: (payload: QueueItemStatusChangedEvent) => void;
+  bulk_download_started: (payload: BulkDownloadStartedEvent) => void;
+  bulk_download_completed: (payload: BulkDownloadCompletedEvent) => void;
+  bulk_download_failed: (payload: BulkDownloadFailedEvent) => void;
 };
 
 export type ClientToServerEvents = {
@@ -220,4 +248,6 @@ export type ClientToServerEvents = {
   disconnect: () => void;
   subscribe_queue: (payload: ClientEmitSubscribeQueue) => void;
   unsubscribe_queue: (payload: ClientEmitUnsubscribeQueue) => void;
+  subscribe_bulk_download: (payload: ClientEmitSubscribeBulkDownload) => void;
+  unsubscribe_bulk_download: (payload: ClientEmitUnsubscribeBulkDownload) => void;
 };
