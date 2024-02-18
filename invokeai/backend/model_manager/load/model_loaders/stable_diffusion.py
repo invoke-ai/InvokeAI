@@ -19,13 +19,14 @@ from invokeai.backend.model_manager import (
 )
 from invokeai.backend.model_manager.config import MainCheckpointConfig
 from invokeai.backend.model_manager.convert_ckpt_to_diffusers import convert_ckpt_to_diffusers
-from invokeai.backend.model_manager.load.load_base import AnyModelLoader
-from invokeai.backend.model_manager.load.load_default import ModelLoader
+
+from .. import ModelLoaderRegistry
+from .generic_diffusers import GenericDiffusersLoader
 
 
-@AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.Main, format=ModelFormat.Diffusers)
-@AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.Main, format=ModelFormat.Checkpoint)
-class StableDiffusionDiffusersModel(ModelLoader):
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Main, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Main, format=ModelFormat.Checkpoint)
+class StableDiffusionDiffusersModel(GenericDiffusersLoader):
     """Class to load main models."""
 
     model_base_to_model_type = {
@@ -43,7 +44,7 @@ class StableDiffusionDiffusersModel(ModelLoader):
     ) -> AnyModel:
         if not submodel_type is not None:
             raise Exception("A submodel type must be provided when loading main pipelines.")
-        load_class = self._get_hf_load_class(model_path, submodel_type)
+        load_class = self.get_hf_load_class(model_path, submodel_type)
         variant = model_variant.value if model_variant else None
         model_path = model_path / submodel_type.value
         result: AnyModel = load_class.from_pretrained(

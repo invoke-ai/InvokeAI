@@ -1,12 +1,15 @@
 """Utilities for parsing model files, used mostly by probe.py"""
 
 import json
-import torch
-from typing import Union
 from pathlib import Path
+from typing import Dict, Optional, Union
+
+import safetensors
+import torch
 from picklescan.scanner import scan_file_path
 
-def _fast_safetensors_reader(path: str):
+
+def _fast_safetensors_reader(path: str) -> Dict[str, torch.Tensor]:
     checkpoint = {}
     device = torch.device("meta")
     with open(path, "rb") as f:
@@ -37,10 +40,12 @@ def _fast_safetensors_reader(path: str):
 
     return checkpoint
 
-def read_checkpoint_meta(path: Union[str, Path], scan: bool = False):
+
+def read_checkpoint_meta(path: Union[str, Path], scan: bool = False) -> Dict[str, torch.Tensor]:
     if str(path).endswith(".safetensors"):
         try:
-            checkpoint = _fast_safetensors_reader(path)
+            path_str = path.as_posix() if isinstance(path, Path) else path
+            checkpoint = _fast_safetensors_reader(path_str)
         except Exception:
             # TODO: create issue for support "meta"?
             checkpoint = safetensors.torch.load_file(path, device="cpu")
@@ -52,14 +57,15 @@ def read_checkpoint_meta(path: Union[str, Path], scan: bool = False):
         checkpoint = torch.load(path, map_location=torch.device("meta"))
     return checkpoint
 
-def lora_token_vector_length(checkpoint: dict) -> int:
+
+def lora_token_vector_length(checkpoint: Dict[str, torch.Tensor]) -> Optional[int]:
     """
     Given a checkpoint in memory, return the lora token vector length
 
     :param checkpoint: The checkpoint
     """
 
-    def _get_shape_1(key: str, tensor, checkpoint) -> int:
+    def _get_shape_1(key: str, tensor: torch.Tensor, checkpoint: Dict[str, torch.Tensor]) -> Optional[int]:
         lora_token_vector_length = None
 
         if "." not in key:

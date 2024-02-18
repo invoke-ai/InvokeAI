@@ -8,7 +8,9 @@ from compel.embeddings_provider import BaseTextualInversionManager
 from safetensors.torch import load_file
 from transformers import CLIPTokenizer
 from typing_extensions import Self
+
 from .raw_model import RawModel
+
 
 class TextualInversionModelRaw(RawModel):
     embedding: torch.Tensor  # [n, 768]|[n, 1280]

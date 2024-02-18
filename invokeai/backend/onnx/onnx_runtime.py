@@ -8,6 +8,7 @@ import numpy as np
 import onnx
 from onnx import numpy_helper
 from onnxruntime import InferenceSession, SessionOptions, get_available_providers
+
 from ..raw_model import RawModel
 
 ONNX_WEIGHTS_NAME = "model.onnx"
@@ -15,7 +16,7 @@ ONNX_WEIGHTS_NAME = "model.onnx"
 
 # NOTE FROM LS: This was copied from Stalker's original implementation.
 # I have not yet gone through and fixed all the type hints
-class IAIOnnxRuntimeModel:
+class IAIOnnxRuntimeModel(RawModel):
     class _tensor_access:
         def __init__(self, model):  # type: ignore
             self.model = model

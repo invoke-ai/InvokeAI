@@ -281,7 +281,7 @@ class ModelsInterface(InvocationContextInterface):
         # The model manager emits events as it loads the model. It needs the context data to build
         # the event payloads.
 
-        return self._services.model_manager.load.load_model_by_key(
+        return self._services.model_manager.load_model_by_key(
             key=key, submodel_type=submodel_type, context_data=self._context_data
         )
 
@@ -296,7 +296,7 @@ class ModelsInterface(InvocationContextInterface):
         :param model_type: Type of the model
         :param submodel: For main (pipeline models), the submodel to fetch
         """
-        return self._services.model_manager.load.load_model_by_attr(
+        return self._services.model_manager.load_model_by_attr(
             model_name=model_name,
             base_model=base_model,
             model_type=model_type,
