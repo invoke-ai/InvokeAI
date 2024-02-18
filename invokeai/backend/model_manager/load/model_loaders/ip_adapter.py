@@ -15,11 +15,10 @@ from invokeai.backend.model_manager import (
     ModelType,
     SubModelType,
 )
-from invokeai.backend.model_manager.load.load_base import AnyModelLoader
-from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.load import ModelLoader, ModelLoaderRegistry
 
 
-@AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.IPAdapter, format=ModelFormat.InvokeAI)
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.IPAdapter, format=ModelFormat.InvokeAI)
 class IPAdapterInvokeAILoader(ModelLoader):
     """Class to load IP Adapter diffusers models."""
 
