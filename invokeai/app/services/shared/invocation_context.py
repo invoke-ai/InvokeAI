@@ -13,7 +13,6 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
-from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.model_manager.load.load_base import LoadedModel
@@ -23,6 +22,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation
+    from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 
 """
 The InvocationContext provides access to various services and data about the current invocation.
@@ -49,20 +49,12 @@ Note: The docstrings are in weird places, but that's where they must be to get I
 
 @dataclass
 class InvocationContextData:
+    queue_item: "SessionQueueItem"
+    """The queue item that is being executed."""
     invocation: "BaseInvocation"
     """The invocation that is being executed."""
-    session_id: str
-    """The session that is being executed."""
-    queue_id: str
-    """The queue in which the session is being executed."""
-    source_node_id: str
-    """The ID of the node from which the currently executing invocation was prepared."""
-    queue_item_id: int
-    """The ID of the queue item that is being executed."""
-    batch_id: str
-    """The ID of the batch that is being executed."""
-    workflow: Optional[WorkflowWithoutID] = None
-    """The workflow associated with this queue item, if any."""
+    source_invocation_id: str
+    """The ID of the invocation from which the currently executing invocation was prepared."""
 
 
 class InvocationContextInterface:
@@ -191,8 +183,8 @@ class ImagesInterface(InvocationContextInterface):
             board_id=board_id_,
             metadata=metadata_,
             image_origin=ResourceOrigin.INTERNAL,
-            workflow=self._context_data.workflow,
-            session_id=self._context_data.session_id,
+            workflow=self._context_data.queue_item.workflow,
+            session_id=self._context_data.queue_item.session_id,
             node_id=self._context_data.invocation.id,
         )
 
