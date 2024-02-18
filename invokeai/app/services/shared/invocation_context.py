@@ -247,7 +247,7 @@ class ConditioningInterface(InvocationContextInterface):
         """
         Saves a conditioning data object, returning its name.
 
-        :param conditioning_context_data: The conditioning data to save.
+        :param conditioning_data: The conditioning data to save.
         """
 
         name = self._services.conditioning.save(obj=conditioning_data)
@@ -412,25 +412,25 @@ class InvocationContext:
         services: InvocationServices,
     ) -> None:
         self.images = images
-        """Provides methods to save, get and update images and their metadata."""
+        """Methods to save, get and update images and their metadata."""
         self.tensors = tensors
-        """Provides methods to save and get tensors, including image, noise, masks, and masked images."""
+        """Methods to save and get tensors, including image, noise, masks, and masked images."""
         self.conditioning = conditioning
-        """Provides methods to save and get conditioning data."""
+        """Methods to save and get conditioning data."""
         self.models = models
-        """Provides methods to check if a model exists, get a model, and get a model's info."""
+        """Methods to check if a model exists, get a model, and get a model's info."""
         self.logger = logger
-        """Provides access to the app logger."""
+        """The app logger."""
         self.config = config
-        """Provides access to the app's config."""
+        """The app config."""
         self.util = util
-        """Provides utility methods."""
+        """Utility methods, including a method to check if an invocation was canceled and step callbacks."""
         self.boards = boards
-        """Provides methods to interact with boards."""
+        """Methods to interact with boards."""
         self._data = data
-        """Provides data about the current queue item and invocation. This is an internal API and may change without warning."""
+        """An internal API providing access to data about the current queue item and invocation. You probably shouldn't use this. It may change without warning."""
         self._services = services
-        """Provides access to the full application services. This is an internal API and may change without warning."""
+        """An internal API providing access to all application services. You probably shouldn't use this. It may change without warning."""
 
 
 def build_invocation_context(
@@ -441,8 +441,8 @@ def build_invocation_context(
     """
     Builds the invocation context for a specific invocation execution.
 
-    :param invocation_services: The invocation services to wrap.
-    :param invocation_context_data: The invocation context data.
+    :param services: The invocation services to wrap.
+    :param data: The invocation context data.
     """
 
     logger = LoggerInterface(services=services, data=data)
