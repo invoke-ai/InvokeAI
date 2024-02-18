@@ -43,7 +43,7 @@ from invokeai.frontend.install.widgets import (
 warnings.filterwarnings("ignore", category=UserWarning)  # noqa: E402
 config = InvokeAIAppConfig.get_config()
 logger = InvokeAILogger.get_logger("ModelInstallService")
-logger.setLevel("WARNING")
+# logger.setLevel("WARNING")
 # logger.setLevel('DEBUG')
 
 # build a table mapping all non-printable characters to None
