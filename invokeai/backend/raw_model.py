@@ -10,5 +10,6 @@ The term 'raw' was introduced to describe a wrapper around a torch.nn.Module
 that adds additional methods and attributes.
 """
 
+
 class RawModel:
     """Base class for 'Raw' model wrappers."""

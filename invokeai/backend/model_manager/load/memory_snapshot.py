@@ -55,7 +55,7 @@ class MemorySnapshot:
             vram = None
 
         try:
-            malloc_info = LibcUtil().mallinfo2()  # type: ignore
+            malloc_info = LibcUtil().mallinfo2()
         except (OSError, AttributeError):
             # OSError: This is expected in environments that do not have the 'libc.so.6' shared library.
             # AttributeError: This is expected in environments that have `libc.so.6` but do not have the `mallinfo2` (e.g. glibc < 2.33)
