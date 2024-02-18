@@ -86,7 +86,7 @@ def invoke_next(g: GraphExecutionState, services: InvocationServices) -> tuple[B
         InvocationContext(
             conditioning=None,
             config=None,
-            context_data=None,
+            data=None,
             images=None,
             tensors=None,
             logger=None,

@@ -157,13 +157,13 @@ class DefaultSessionProcessor(SessionProcessorBase):
                                     invocation, self._queue_item.session.id
                                 ):
                                     # Build invocation context (the node-facing API)
-                                    context_data = InvocationContextData(
+                                    data = InvocationContextData(
                                         invocation=invocation,
                                         source_invocation_id=source_invocation_id,
                                         queue_item=self._queue_item,
                                     )
                                     context = build_invocation_context(
-                                        context_data=context_data,
+                                        data=data,
                                         services=self._invoker.services,
                                         cancel_event=self._cancel_event,
                                     )
