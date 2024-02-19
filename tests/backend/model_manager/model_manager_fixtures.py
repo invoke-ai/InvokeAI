@@ -112,7 +112,7 @@ def mm2_metadata_store(mm2_record_store: ModelRecordServiceSQL) -> ModelMetadata
 
 
 @pytest.fixture
-def mm2_loader(mm2_app_config: InvokeAIAppConfig, mm2_record_store: ModelRecordServiceBase) -> ModelLoadServiceBase:
+def mm2_loader(mm2_app_config: InvokeAIAppConfig) -> ModelLoadServiceBase:
     ram_cache = ModelCache(
         logger=InvokeAILogger.get_logger(),
         max_cache_size=mm2_app_config.ram_cache_size,

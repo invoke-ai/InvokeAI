@@ -98,3 +98,8 @@ class ModelManagerServiceBase(ABC):
         context_data: Optional[InvocationContextData] = None,
     ) -> LoadedModel:
         pass
+
+    @property
+    @abstractmethod
+    def gpu_count(self) -> int:
+        """Return the number of GPUs we are configured to use."""

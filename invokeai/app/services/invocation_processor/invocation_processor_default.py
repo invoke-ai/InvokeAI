@@ -24,8 +24,10 @@ class DefaultInvocationProcessor(InvocationProcessorABC):
     __threadLimit: BoundedSemaphore
 
     def start(self, invoker: Invoker) -> None:
-        # if we do want multithreading at some point, we could make this configurable
-        self.__threadLimit = BoundedSemaphore(1)
+        # LS - this will probably break
+        # but the idea is to enable multithreading up to the number of available
+        # GPUs. Nodes will block on model loading if no GPU is free.
+        self.__threadLimit = BoundedSemaphore(invoker.services.model_manager.gpu_count)
         self.__invoker = invoker
         self.__stop_event = Event()
         self.__invoker_thread = Thread(

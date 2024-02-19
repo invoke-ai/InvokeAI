@@ -2,9 +2,15 @@
 Base class and implementation of a class that moves models in and out of VRAM.
 """
 
+from typing import Optional
+
+import torch
+
 from invokeai.backend.model_manager import AnyModel
 
 from .model_cache_base import CacheRecord, ModelCacheBase, ModelLockerBase
+
+MAX_GPU_WAIT = 600  # wait up to 10 minutes for a GPU to become free
 
 
 class ModelLocker(ModelLockerBase):
@@ -19,6 +25,7 @@ class ModelLocker(ModelLockerBase):
         """
         self._cache = cache
         self._cache_entry = cache_entry
+        self._execution_device: Optional[torch.device] = None
 
     @property
     def model(self) -> AnyModel:
@@ -37,10 +44,12 @@ class ModelLocker(ModelLockerBase):
             if self._cache.lazy_offloading:
                 self._cache.offload_unlocked_models(self._cache_entry.size)
 
-            self._cache.move_model_to_device(self._cache_entry, self._cache.execution_device)
+            # We wait for a gpu to be free - may raise a TimeoutError
+            self._execution_device = self._cache.acquire_execution_device(MAX_GPU_WAIT)
+            self._cache.move_model_to_device(self._cache_entry, self._execution_device)
             self._cache_entry.loaded = True
 
-            self._cache.logger.debug(f"Locking {self._cache_entry.key} in {self._cache.execution_device}")
+            self._cache.logger.debug(f"Locking {self._cache_entry.key} in {self._execution_device}")
             self._cache.print_cuda_stats()
 
         except Exception:
@@ -54,6 +63,8 @@ class ModelLocker(ModelLockerBase):
             return
 
         self._cache_entry.unlock()
+        if self._execution_device:
+            self._cache.release_execution_device(self._execution_device)
         if not self._cache.lazy_offloading:
             self._cache.offload_unlocked_models(self._cache_entry.size)
             self._cache.print_cuda_stats()

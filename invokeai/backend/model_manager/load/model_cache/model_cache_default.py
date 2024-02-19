@@ -25,7 +25,8 @@ import sys
 import time
 from contextlib import suppress
 from logging import Logger
-from typing import Dict, List, Optional
+from threading import BoundedSemaphore, Lock
+from typing import Dict, List, Optional, Set
 
 import torch
 
@@ -61,8 +62,8 @@ class ModelCache(ModelCacheBase[AnyModel]):
         self,
         max_cache_size: float = DEFAULT_MAX_CACHE_SIZE,
         max_vram_cache_size: float = DEFAULT_MAX_VRAM_CACHE_SIZE,
-        execution_device: torch.device = torch.device("cuda"),
         storage_device: torch.device = torch.device("cpu"),
+        execution_devices: Optional[Set[torch.device]] = None,
         precision: torch.dtype = torch.float16,
         sequential_offload: bool = False,
         lazy_offloading: bool = True,
@@ -74,7 +75,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         Initialize the model RAM cache.
 
         :param max_cache_size: Maximum size of the RAM cache [6.0 GB]
-        :param execution_device: Torch device to load active model into [torch.device('cuda')]
+        :param execution_devices: Set of torch device to load active model into [calculated]
         :param storage_device: Torch device to save inactive model in [torch.device('cpu')]
         :param precision: Precision for loaded models [torch.float16]
         :param lazy_offloading: Keep model in VRAM until another model needs to be loaded
@@ -89,7 +90,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         self._precision: torch.dtype = precision
         self._max_cache_size: float = max_cache_size
         self._max_vram_cache_size: float = max_vram_cache_size
-        self._execution_device: torch.device = execution_device
+        self._execution_devices: Set[torch.device] = execution_devices or self._get_execution_devices()
         self._storage_device: torch.device = storage_device
         self._logger = logger or InvokeAILogger.get_logger(self.__class__.__name__)
         self._log_memory_usage = log_memory_usage or self._logger.level == logging.DEBUG
@@ -98,6 +99,10 @@ class ModelCache(ModelCacheBase[AnyModel]):
 
         self._cached_models: Dict[str, CacheRecord[AnyModel]] = {}
         self._cache_stack: List[str] = []
+
+        self._lock = Lock()
+        self._free_execution_device = BoundedSemaphore(len(self._execution_devices))
+        self._busy_execution_devices: Set[torch.device] = set()
 
     @property
     def logger(self) -> Logger:
@@ -115,9 +120,24 @@ class ModelCache(ModelCacheBase[AnyModel]):
         return self._storage_device
 
     @property
-    def execution_device(self) -> torch.device:
-        """Return the exection device (e.g. "cuda" for VRAM)."""
-        return self._execution_device
+    def execution_devices(self) -> Set[torch.device]:
+        """Return the set of available execution devices."""
+        return self._execution_devices
+
+    def acquire_execution_device(self, timeout: int = 0) -> torch.device:
+        """Acquire and return an execution device (e.g. "cuda" for VRAM)."""
+        with self._lock:
+            self._free_execution_device.acquire(timeout=timeout)
+            free_devices = self.execution_devices - self._busy_execution_devices
+            chosen_device = list(free_devices)[0]
+            self._busy_execution_devices.add(chosen_device)
+        return chosen_device
+
+    def release_execution_device(self, device: torch.device) -> None:
+        """Mark this execution device as unused."""
+        with self._lock:
+            self._free_execution_device.release()
+            self._busy_execution_devices.remove(device)
 
     @property
     def max_cache_size(self) -> float:
@@ -405,3 +425,13 @@ class ModelCache(ModelCacheBase[AnyModel]):
             mps.empty_cache()
 
         self.logger.debug(f"After making room: cached_models={len(self._cached_models)}")
+
+    @staticmethod
+    def _get_execution_devices() -> Set[torch.device]:
+        default_device = choose_torch_device()
+        if default_device != torch.device("cuda"):
+            return {default_device}
+
+        # we get here if the default device is cuda, and return each of the
+        # cuda devices.
+        return {torch.device(f"cuda:{x}") for x in range(0, torch.cuda.device_count())}

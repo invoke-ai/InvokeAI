@@ -112,6 +112,11 @@ class ModelManagerService(ModelManagerServiceBase):
         else:
             return self.load.load_model(configs[0], submodel, context_data)
 
+    @property
+    def gpu_count(self) -> int:
+        """Return the number of GPUs we are using."""
+        return self.load.gpu_count
+
     @classmethod
     def build_model_manager(
         cls,
