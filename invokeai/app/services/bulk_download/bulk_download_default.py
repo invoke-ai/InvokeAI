@@ -49,8 +49,9 @@ class BulkDownloadService(BulkDownloadBase):
 
         bulk_download_id: str = DEFAULT_BULK_DOWNLOAD_ID
         bulk_download_item_id = uuid_string() if bulk_download_item_id is None else bulk_download_item_id
+        bulk_download_item_name = bulk_download_item_id + ".zip"
 
-        self._signal_job_started(bulk_download_id, bulk_download_item_id)
+        self._signal_job_started(bulk_download_id, bulk_download_item_id, bulk_download_item_name)
 
         try:
             image_dtos: list[ImageDTO] = []
@@ -64,10 +65,15 @@ class BulkDownloadService(BulkDownloadBase):
 
             bulk_download_item_name: str = self._create_zip_file(image_dtos, bulk_download_item_id)
             self._signal_job_completed(bulk_download_id, bulk_download_item_id, bulk_download_item_name)
-        except (ImageRecordNotFoundException, BoardRecordNotFoundException, BulkDownloadException) as e:
-            self._signal_job_failed(bulk_download_id, bulk_download_item_id, e)
+        except (
+            ImageRecordNotFoundException,
+            BoardRecordNotFoundException,
+            BulkDownloadException,
+            BulkDownloadParametersException,
+        ) as e:
+            self._signal_job_failed(bulk_download_id, bulk_download_item_id, bulk_download_item_name, e)
         except Exception as e:
-            self._signal_job_failed(bulk_download_id, bulk_download_item_id, e)
+            self._signal_job_failed(bulk_download_id, bulk_download_item_id, bulk_download_item_name, e)
             self.__invoker.services.logger.error("Problem bulk downloading images.")
             raise e
 
@@ -116,13 +122,16 @@ class BulkDownloadService(BulkDownloadBase):
         """Clean a string to be path safe."""
         return "".join([c for c in s if c.isalpha() or c.isdigit() or c == " " or c == "_" or c == "-"]).rstrip()
 
-    def _signal_job_started(self, bulk_download_id: str, bulk_download_item_id: str) -> None:
+    def _signal_job_started(
+        self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+    ) -> None:
         """Signal that a bulk download job has started."""
         if self.__event_bus:
             assert bulk_download_id is not None
             self.__event_bus.emit_bulk_download_started(
                 bulk_download_id=bulk_download_id,
                 bulk_download_item_id=bulk_download_item_id,
+                bulk_download_item_name=bulk_download_item_name,
             )
 
     def _signal_job_completed(
@@ -138,7 +147,9 @@ class BulkDownloadService(BulkDownloadBase):
                 bulk_download_item_name=bulk_download_item_name,
             )
 
-    def _signal_job_failed(self, bulk_download_id: str, bulk_download_item_id: str, exception: Exception) -> None:
+    def _signal_job_failed(
+        self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str, exception: Exception
+    ) -> None:
         """Signal that a bulk download job has failed."""
         if self.__event_bus:
             assert bulk_download_id is not None
@@ -146,6 +157,7 @@ class BulkDownloadService(BulkDownloadBase):
             self.__event_bus.emit_bulk_download_failed(
                 bulk_download_id=bulk_download_id,
                 bulk_download_item_id=bulk_download_item_id,
+                bulk_download_item_name=bulk_download_item_name,
                 error=str(exception),
             )
 
