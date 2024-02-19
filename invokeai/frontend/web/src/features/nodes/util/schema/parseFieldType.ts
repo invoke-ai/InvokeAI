@@ -55,6 +55,14 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
     }
   }
   if (isSchemaObject(schemaObject)) {
+    if (schemaObject.const) {
+      // Fields with a single const value are defined as `Literal["value"]` in the pydantic schema - it's actually an enum
+      return {
+        name: 'EnumField',
+        isCollection: false,
+        isCollectionOrScalar: false,
+      };
+    }
     if (!schemaObject.type) {
       // if schemaObject has no type, then it should have one of allOf, anyOf, oneOf
 

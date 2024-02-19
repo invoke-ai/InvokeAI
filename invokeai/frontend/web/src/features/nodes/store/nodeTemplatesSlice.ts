@@ -9,7 +9,7 @@ export const initialNodeTemplatesState: NodeTemplatesState = {
   templates: {},
 };
 
-const nodesTemplatesSlice = createSlice({
+export const nodesTemplatesSlice = createSlice({
   name: 'nodeTemplates',
   initialState: initialNodeTemplatesState,
   reducers: {
@@ -20,7 +20,5 @@ const nodesTemplatesSlice = createSlice({
 });
 
 export const { nodeTemplatesBuilt } = nodesTemplatesSlice.actions;
-
-export default nodesTemplatesSlice.reducer;
 
 export const selectNodeTemplatesSlice = (state: RootState) => state.nodeTemplates;

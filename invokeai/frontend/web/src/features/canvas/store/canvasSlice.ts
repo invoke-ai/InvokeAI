@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import calculateCoordinates from 'features/canvas/util/calculateCoordinates';
 import calculateScale from 'features/canvas/util/calculateScale';
@@ -719,8 +719,6 @@ export const {
   scaledBoundingBoxDimensionsReset,
 } = canvasSlice.actions;
 
-export default canvasSlice.reducer;
-
 export const selectCanvasSlice = (state: RootState) => state.canvas;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -730,4 +728,11 @@ export const migrateCanvasState = (state: any): any => {
     state.aspectRatio = initialAspectRatioState;
   }
   return state;
+};
+
+export const canvasPersistConfig: PersistConfig<CanvasState> = {
+  name: canvasSlice.name,
+  initialState: initialCanvasState,
+  migrate: migrateCanvasState,
+  persistDenylist: [],
 };

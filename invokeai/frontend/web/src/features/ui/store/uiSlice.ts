@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 
 import type { InvokeTabName } from './tabMap';
@@ -57,8 +57,6 @@ export const {
   expanderStateChanged,
 } = uiSlice.actions;
 
-export default uiSlice.reducer;
-
 export const selectUiSlice = (state: RootState) => state.ui;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -67,4 +65,11 @@ export const migrateUIState = (state: any): any => {
     state._version = 1;
   }
   return state;
+};
+
+export const uiPersistConfig: PersistConfig<UIState> = {
+  name: uiSlice.name,
+  initialState: initialUIState,
+  migrate: migrateUIState,
+  persistDenylist: ['shouldShowImageDetails'],
 };

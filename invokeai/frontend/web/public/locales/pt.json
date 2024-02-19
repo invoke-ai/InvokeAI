@@ -1,22 +1,9 @@
 {
     "common": {
-        "langArabic": "العربية",
         "reportBugLabel": "Reportar Bug",
         "settingsLabel": "Configurações",
-        "langBrPortuguese": "Português do Brasil",
         "languagePickerLabel": "Seletor de Idioma",
-        "langDutch": "Nederlands",
-        "langEnglish": "English",
         "hotkeysLabel": "Hotkeys",
-        "langPolish": "Polski",
-        "langFrench": "Français",
-        "langGerman": "Deutsch",
-        "langItalian": "Italiano",
-        "langJapanese": "日本語",
-        "langSimplifiedChinese": "简体中文",
-        "langSpanish": "Espanhol",
-        "langRussian": "Русский",
-        "langUkranian": "Украї́нська",
         "img2img": "Imagem para Imagem",
         "unifiedCanvas": "Tela Unificada",
         "nodes": "Nós",
@@ -60,8 +47,7 @@
         "statusMergingModels": "Mesclando Modelos",
         "statusMergedModels": "Modelos Mesclados",
         "loading": "A carregar",
-        "loadingInvokeAI": "A carregar Invoke AI",
-        "langPortuguese": "Português"
+        "loadingInvokeAI": "A carregar Invoke AI"
     },
     "gallery": {
         "galleryImageResetSize": "Resetar Imagem",

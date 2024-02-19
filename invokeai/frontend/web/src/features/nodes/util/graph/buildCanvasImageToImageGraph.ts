@@ -123,6 +123,7 @@ export const buildCanvasImageToImageGraph = (state: RootState, initialImage: Ima
         id: DENOISE_LATENTS,
         is_intermediate,
         cfg_scale,
+        cfg_rescale_multiplier,
         scheduler,
         steps,
         denoising_start: 1 - strength,

@@ -123,6 +123,7 @@ export const buildLinearImageToImageGraph = (state: RootState): NonNullableGraph
         type: 'denoise_latents',
         id: DENOISE_LATENTS,
         cfg_scale,
+        cfg_rescale_multiplier,
         scheduler,
         steps,
         denoising_start: 1 - strength,

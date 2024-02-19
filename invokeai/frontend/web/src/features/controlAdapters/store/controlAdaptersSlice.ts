@@ -1,7 +1,7 @@
 import type { PayloadAction, Update } from '@reduxjs/toolkit';
 import { createEntityAdapter, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import { buildControlAdapter } from 'features/controlAdapters/util/buildControlAdapter';
 import type {
   ParameterControlNetModel,
@@ -424,8 +424,6 @@ export const {
   controlAdapterModelCleared,
 } = controlAdaptersSlice.actions;
 
-export default controlAdaptersSlice.reducer;
-
 export const isAnyControlAdapterAdded = isAnyOf(
   controlAdapterAdded,
   controlAdapterAddedFromImage,
@@ -440,4 +438,11 @@ export const migrateControlAdaptersState = (state: any): any => {
     state._version = 1;
   }
   return state;
+};
+
+export const controlAdaptersPersistConfig: PersistConfig<ControlAdaptersState> = {
+  name: controlAdaptersSlice.name,
+  initialState: initialControlAdaptersState,
+  migrate: migrateControlAdaptersState,
+  persistDenylist: ['pendingControlImages'],
 };

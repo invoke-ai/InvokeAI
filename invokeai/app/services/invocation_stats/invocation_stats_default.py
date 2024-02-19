@@ -9,6 +9,7 @@ import torch
 import invokeai.backend.util.logging as logger
 from invokeai.app.invocations.baseinvocation import BaseInvocation
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.item_storage.item_storage_common import ItemNotFoundError
 from invokeai.backend.model_management.model_cache import CacheStats
 
 from .invocation_stats_base import InvocationStatsServiceBase
@@ -63,7 +64,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
         finally:
             # Record state after the invocation.
             node_stats = NodeExecutionStats(
-                invocation_type=invocation.type,
+                invocation_type=invocation.get_type(),
                 start_time=start_time,
                 end_time=time.time(),
                 start_ram_gb=start_ram / GB,
@@ -78,11 +79,11 @@ class InvocationStatsService(InvocationStatsServiceBase):
         This shouldn't be necessary, but we don't have totally robust upstream handling of graph completions/errors, so
         for now we call this function periodically to prevent them from accumulating.
         """
-        to_prune = []
+        to_prune: list[str] = []
         for graph_execution_state_id in self._stats:
             try:
                 graph_execution_state = self._invoker.services.graph_execution_manager.get(graph_execution_state_id)
-            except Exception:
+            except ItemNotFoundError:
                 # TODO(ryand): What would cause this? Should this exception just be allowed to propagate?
                 logger.warning(f"Failed to get graph state for {graph_execution_state_id}.")
                 continue
@@ -105,9 +106,9 @@ class InvocationStatsService(InvocationStatsServiceBase):
             del self._stats[graph_execution_state_id]
             del self._cache_stats[graph_execution_state_id]
         except KeyError as e:
-            msg = f"Attempted to clear statistics for unknown graph {graph_execution_state_id}: {e}."
-            logger.error(msg)
-            raise GESStatsNotFoundError(msg) from e
+            raise GESStatsNotFoundError(
+                f"Attempted to clear statistics for unknown graph {graph_execution_state_id}: {e}."
+            ) from e
 
     def get_stats(self, graph_execution_state_id: str) -> InvocationStatsSummary:
         graph_stats_summary = self._get_graph_summary(graph_execution_state_id)
@@ -135,9 +136,9 @@ class InvocationStatsService(InvocationStatsServiceBase):
         try:
             cache_stats = self._cache_stats[graph_execution_state_id]
         except KeyError as e:
-            msg = f"Attempted to get model cache statistics for unknown graph {graph_execution_state_id}: {e}."
-            logger.error(msg)
-            raise GESStatsNotFoundError(msg) from e
+            raise GESStatsNotFoundError(
+                f"Attempted to get model cache statistics for unknown graph {graph_execution_state_id}: {e}."
+            ) from e
 
         return ModelCacheStatsSummary(
             cache_hits=cache_stats.hits,
@@ -153,9 +154,9 @@ class InvocationStatsService(InvocationStatsServiceBase):
         try:
             graph_stats = self._stats[graph_execution_state_id]
         except KeyError as e:
-            msg = f"Attempted to get graph statistics for unknown graph {graph_execution_state_id}: {e}."
-            logger.error(msg)
-            raise GESStatsNotFoundError(msg) from e
+            raise GESStatsNotFoundError(
+                f"Attempted to get graph statistics for unknown graph {graph_execution_state_id}: {e}."
+            ) from e
 
         return graph_stats.get_graph_stats_summary(graph_execution_state_id)
 
@@ -163,8 +164,8 @@ class InvocationStatsService(InvocationStatsServiceBase):
         try:
             graph_stats = self._stats[graph_execution_state_id]
         except KeyError as e:
-            msg = f"Attempted to get node statistics for unknown graph {graph_execution_state_id}: {e}."
-            logger.error(msg)
-            raise GESStatsNotFoundError(msg) from e
+            raise GESStatsNotFoundError(
+                f"Attempted to get node statistics for unknown graph {graph_execution_state_id}: {e}."
+            ) from e
 
         return graph_stats.get_node_stats_summaries()

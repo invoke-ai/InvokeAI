@@ -14,6 +14,7 @@ import {
   SDXL_IMAGE_TO_IMAGE_GRAPH,
   SDXL_TEXT_TO_IMAGE_GRAPH,
   SEAMLESS,
+  VAE_LOADER,
 } from './constants';
 import { upsertMetadata } from './metadata';
 
@@ -23,7 +24,8 @@ export const addSeamlessToLinearGraph = (
   modelLoaderNodeId: string
 ): void => {
   // Remove Existing UNet Connections
-  const { seamlessXAxis, seamlessYAxis } = state.generation;
+  const { seamlessXAxis, seamlessYAxis, vae } = state.generation;
+  const isAutoVae = !vae;
 
   graph.nodes[SEAMLESS] = {
     id: SEAMLESS,
@@ -31,6 +33,15 @@ export const addSeamlessToLinearGraph = (
     seamless_x: seamlessXAxis,
     seamless_y: seamlessYAxis,
   } as SeamlessModeInvocation;
+
+  if (!isAutoVae) {
+    graph.nodes[VAE_LOADER] = {
+      type: 'vae_loader',
+      id: VAE_LOADER,
+      is_intermediate: true,
+      vae_model: vae,
+    };
+  }
 
   if (seamlessXAxis) {
     upsertMetadata(graph, {
@@ -75,7 +86,7 @@ export const addSeamlessToLinearGraph = (
     },
     {
       source: {
-        node_id: modelLoaderNodeId,
+        node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
         field: 'vae',
       },
       destination: {

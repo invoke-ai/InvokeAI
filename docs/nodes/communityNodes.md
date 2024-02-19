@@ -14,6 +14,7 @@ To use a community workflow, download the the `.json` node graph file and load i
 
 - Community Nodes
     + [Adapters-Linked](#adapters-linked-nodes)
+    + [Autostereogram](#autostereogram-nodes)
     + [Average Images](#average-images)
     + [Clean Image Artifacts After Cut](#clean-image-artifacts-after-cut)
     + [Close Color Mask](#close-color-mask) 
@@ -31,6 +32,7 @@ To use a community workflow, download the the `.json` node graph file and load i
     + [Image to Character Art Image Nodes](#image-to-character-art-image-nodes)
     + [Image Picker](#image-picker)
     + [Image Resize Plus](#image-resize-plus)
+    + [Latent Upscale](#latent-upscale)
     + [Load Video Frame](#load-video-frame)
     + [Make 3D](#make-3d)
     + [Mask Operations](#mask-operations)
@@ -41,6 +43,7 @@ To use a community workflow, download the the `.json` node graph file and load i
     + [Oobabooga](#oobabooga)
     + [Prompt Tools](#prompt-tools)
     + [Remote Image](#remote-image)
+    + [BriaAI Background Remove](#briaai-remove-background)
     + [Remove Background](#remove-background)    
     + [Retroize](#retroize)
     + [Size Stepper Nodes](#size-stepper-nodes)
@@ -66,6 +69,17 @@ To use a community workflow, download the the `.json` node graph file and load i
 Note: These are inherited from the core nodes so any update to the core nodes should be reflected in these. 
 
 **Node Link:** https://github.com/skunkworxdark/adapters-linked-nodes
+
+--------------------------------
+### Autostereogram Nodes
+
+**Description:** Generate autostereogram images from a depth map. This is not a very practically useful node but more a 90s nostalgic indulgence as I used to love these images as a kid.
+
+**Node Link:** https://github.com/skunkworxdark/autostereogram_nodes
+
+**Example Usage:**
+</br>
+<img src="https://github.com/skunkworxdark/autostereogram_nodes/blob/main/images/spider.png" width="200" /> -> <img src="https://github.com/skunkworxdark/autostereogram_nodes/blob/main/images/spider-depth.png" width="200" /> -> <img src="https://github.com/skunkworxdark/autostereogram_nodes/raw/main/images/spider-dots.png" width="200" /> <img src="https://github.com/skunkworxdark/autostereogram_nodes/raw/main/images/spider-pattern.png" width="200" />
 
 --------------------------------
 ### Average Images
@@ -278,6 +292,13 @@ View:
 
 
 --------------------------------
+### Latent Upscale
+
+**Description:** This node uses a small (~2.4mb) model to upscale the latents used in a Stable Diffusion 1.5 or Stable Diffusion XL image generation, rather than the typical interpolation method, avoiding the traditional downsides of the latent upscale technique.
+
+**Node Link:** [https://github.com/gogurtenjoyer/latent-upscale](https://github.com/gogurtenjoyer/latent-upscale)
+
+--------------------------------
 ### Load Video Frame
 
 **Description:** This is a video frame image provider + indexer/video creation nodes for hooking up to iterators and ranges and ControlNets and such for invokeAI node experimentation. Think animation + ControlNet outputs.
@@ -421,6 +442,17 @@ See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/mai
 - *Post Image to Remote Server* - Lets you upload an image to a remote server using an HTTP POST request, eg for storage, display or further processing.
 
 **Node Link:** https://github.com/fieldOfView/InvokeAI-remote_image
+
+--------------------------------
+
+### BriaAI Remove Background
+
+**Description**: Implements one click background removal with BriaAI's new version 1.4 model which seems to be be producing better results than any other previous background removal tool.
+
+**Node Link:** https://github.com/blessedcoolant/invoke_bria_rmbg
+
+**View**
+<img src="https://raw.githubusercontent.com/blessedcoolant/invoke_bria_rmbg/main/assets/preview.jpg" />
 
 --------------------------------
 ### Remove Background

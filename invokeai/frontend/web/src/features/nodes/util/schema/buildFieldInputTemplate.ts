@@ -373,6 +373,8 @@ const buildEnumFieldInputTemplate: FieldInputTemplateBuilder<EnumFieldInputTempl
     } else {
       options = firstAnyOf.enum ?? [];
     }
+  } else if (schemaObject.const) {
+    options = [schemaObject.const];
   } else {
     options = schemaObject.enum ?? [];
   }

@@ -20,17 +20,26 @@ class ItemStorageABC(ABC, Generic[T]):
 
     @abstractmethod
     def get(self, item_id: str) -> T:
-        """Gets the item, parsing it into a Pydantic model"""
+        """
+        Gets the item.
+        :param item_id: the id of the item to get
+        :raises ItemNotFoundError: if the item is not found
+        """
         pass
 
     @abstractmethod
     def set(self, item: T) -> None:
-        """Sets the item"""
+        """
+        Sets the item. The id will be extracted based on id_field.
+        :param item: the item to set
+        """
         pass
 
     @abstractmethod
     def delete(self, item_id: str) -> None:
-        """Deletes the item"""
+        """
+        Deletes the item, if it exists.
+        """
         pass
 
     def on_changed(self, on_changed: Callable[[T], None]) -> None:

@@ -9,6 +9,7 @@ import {
   workflowSaved,
 } from 'features/nodes/store/workflowSlice';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
+import { newWorkflowSaved } from 'features/workflowLibrary/store/actions';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCreateWorkflowMutation, workflowsApi } from 'services/api/endpoints/workflows';
@@ -56,6 +57,7 @@ export const useSaveWorkflowAs: UseSaveWorkflowAs = () => {
         dispatch(workflowNameChanged(data.workflow.name));
         dispatch(workflowCategoryChanged(data.workflow.meta.category));
         dispatch(workflowSaved());
+        dispatch(newWorkflowSaved({ category }));
 
         onSuccess && onSuccess();
         toast.update(toastRef.current, {

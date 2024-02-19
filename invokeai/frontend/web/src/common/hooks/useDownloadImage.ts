@@ -1,19 +1,28 @@
+import { useStore } from '@nanostores/react';
 import { useAppToaster } from 'app/components/Toaster';
+import { $authToken } from 'app/store/nanostores/authToken';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { imageDownloaded } from 'features/gallery/store/actions';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { useImageUrlToBlob } from './useImageUrlToBlob';
 
 export const useDownloadImage = () => {
   const toaster = useAppToaster();
   const { t } = useTranslation();
-  const imageUrlToBlob = useImageUrlToBlob();
+  const dispatch = useAppDispatch();
+  const authToken = useStore($authToken);
 
   const downloadImage = useCallback(
     async (image_url: string, image_name: string) => {
       try {
-        const blob = await imageUrlToBlob(image_url);
-
+        const requestOpts = authToken
+          ? {
+              headers: {
+                Authorization: `Bearer ${authToken}`,
+              },
+            }
+          : {};
+        const blob = await fetch(image_url, requestOpts).then((resp) => resp.blob());
         if (!blob) {
           throw new Error('Unable to create Blob');
         }
@@ -26,6 +35,7 @@ export const useDownloadImage = () => {
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
+        dispatch(imageDownloaded());
       } catch (err) {
         toaster({
           title: t('toast.problemDownloadingImage'),
@@ -36,7 +46,7 @@ export const useDownloadImage = () => {
         });
       }
     },
-    [t, toaster, imageUrlToBlob]
+    [t, toaster, dispatch, authToken]
   );
 
   return { downloadImage };

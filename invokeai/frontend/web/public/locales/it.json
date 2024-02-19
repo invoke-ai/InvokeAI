@@ -7,7 +7,6 @@
         "img2img": "Immagine a Immagine",
         "unifiedCanvas": "Tela unificata",
         "nodes": "Editor del flusso di lavoro",
-        "langItalian": "Italiano",
         "nodesDesc": "Attualmente è in fase di sviluppo un sistema basato su nodi per la generazione di immagini. Resta sintonizzato per gli aggiornamenti su questa fantastica funzionalità.",
         "postProcessing": "Post-elaborazione",
         "postProcessDesc1": "Invoke AI offre un'ampia varietà di funzionalità di post-elaborazione. Ampliamento Immagine e Restaura Volti sono già disponibili nell'interfaccia Web. È possibile accedervi dal menu 'Opzioni avanzate' delle schede 'Testo a Immagine' e 'Immagine a Immagine'. È inoltre possibile elaborare le immagini direttamente, utilizzando i pulsanti di azione dell'immagine sopra la visualizzazione dell'immagine corrente o nel visualizzatore.",
@@ -43,26 +42,11 @@
         "statusModelChanged": "Modello cambiato",
         "githubLabel": "GitHub",
         "discordLabel": "Discord",
-        "langArabic": "Arabo",
-        "langEnglish": "Inglese",
-        "langFrench": "Francese",
-        "langGerman": "Tedesco",
-        "langJapanese": "Giapponese",
-        "langPolish": "Polacco",
-        "langBrPortuguese": "Portoghese Basiliano",
-        "langRussian": "Russo",
-        "langUkranian": "Ucraino",
-        "langSpanish": "Spagnolo",
         "statusMergingModels": "Fusione Modelli",
         "statusMergedModels": "Modelli fusi",
-        "langSimplifiedChinese": "Cinese semplificato",
-        "langDutch": "Olandese",
         "statusModelConverted": "Modello Convertito",
         "statusConvertingModel": "Conversione Modello",
-        "langKorean": "Coreano",
-        "langPortuguese": "Portoghese",
         "loading": "Caricamento in corso",
-        "langHebrew": "Ebraico",
         "loadingInvokeAI": "Caricamento Invoke AI",
         "postprocessing": "Post Elaborazione",
         "txt2img": "Testo a Immagine",
@@ -76,7 +60,6 @@
         "dontAskMeAgain": "Non chiedermelo più",
         "imagePrompt": "Prompt Immagine",
         "darkMode": "Modalità scura",
-        "lightMode": "Modalità chiara",
         "batch": "Gestione Lotto",
         "modelManager": "Gestore modello",
         "communityLabel": "Comunità",
@@ -812,7 +795,8 @@
         "workflowDeleted": "Flusso di lavoro eliminato",
         "problemRetrievingWorkflow": "Problema nel recupero del flusso di lavoro",
         "resetInitialImage": "Reimposta l'immagine iniziale",
-        "uploadInitialImage": "Carica l'immagine iniziale"
+        "uploadInitialImage": "Carica l'immagine iniziale",
+        "problemDownloadingImage": "Impossibile scaricare l'immagine"
     },
     "tooltip": {
         "feature": {
@@ -1151,7 +1135,14 @@
         "newWorkflow": "Nuovo flusso di lavoro",
         "newWorkflowDesc": "Creare un nuovo flusso di lavoro?",
         "newWorkflowDesc2": "Il flusso di lavoro attuale presenta modifiche non salvate.",
-        "unsupportedAnyOfLength": "unione di troppi elementi ({{count}})"
+        "unsupportedAnyOfLength": "unione di troppi elementi ({{count}})",
+        "clearWorkflowDesc": "Cancellare questo flusso di lavoro e avviarne uno nuovo?",
+        "clearWorkflow": "Cancella il flusso di lavoro",
+        "clearWorkflowDesc2": "Il tuo flusso di lavoro attuale presenta modifiche non salvate.",
+        "viewMode": "Utilizzare nella vista lineare",
+        "reorderLinearView": "Riordina la vista lineare",
+        "editMode": "Modifica nell'editor del flusso di lavoro",
+        "resetToDefaultValue": "Ripristina il valore predefinito"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1208,7 +1199,6 @@
         "f": "F",
         "h": "A",
         "prompt": "Prompt",
-        "openPoseDescription": "Stima della posa umana utilizzando Openpose",
         "resizeMode": "Ridimensionamento",
         "weight": "Peso",
         "selectModel": "Seleziona un modello",
@@ -1255,7 +1245,11 @@
         "large": "Grande",
         "small": "Piccolo",
         "depthAnythingDescription": "Generazione di mappe di profondità utilizzando la tecnica Depth Anything",
-        "modelSize": "Dimensioni del modello"
+        "modelSize": "Dimensioni del modello",
+        "dwOpenposeDescription": "Stima della posa umana utilizzando DW Openpose",
+        "face": "Viso",
+        "body": "Corpo",
+        "hands": "Mani"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -1689,7 +1683,9 @@
         "downloadWorkflow": "Salva su file",
         "uploadWorkflow": "Carica da file",
         "projectWorkflows": "Flussi di lavoro del progetto",
-        "noWorkflows": "Nessun flusso di lavoro"
+        "noWorkflows": "Nessun flusso di lavoro",
+        "workflowCleared": "Flusso di lavoro cancellato",
+        "saveWorkflowToProject": "Salva flusso di lavoro nel progetto"
     },
     "app": {
         "storeNotInitialized": "Il negozio non è inizializzato"

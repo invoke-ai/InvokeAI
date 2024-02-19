@@ -5,7 +5,7 @@ import type { ImageDTO } from 'services/api/types';
 
 import { initialDeleteImageState } from './initialState';
 
-const deleteImageModal = createSlice({
+export const deleteImageModalSlice = createSlice({
   name: 'deleteImageModal',
   initialState: initialDeleteImageState,
   reducers: {
@@ -22,8 +22,6 @@ const deleteImageModal = createSlice({
   },
 });
 
-export const { isModalOpenChanged, imagesToDeleteSelected, imageDeletionCanceled } = deleteImageModal.actions;
-
-export default deleteImageModal.reducer;
+export const { isModalOpenChanged, imagesToDeleteSelected, imageDeletionCanceled } = deleteImageModalSlice.actions;
 
 export const selectDeleteImageModalSlice = (state: RootState) => state.deleteImageModal;

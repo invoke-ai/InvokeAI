@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
 import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
 
@@ -35,7 +35,7 @@ export const loraSlice = createSlice({
     },
     loraRecalled: (state, action: PayloadAction<LoRAModelConfigEntity & { weight: number }>) => {
       const { model_name, id, base_model, weight } = action.payload;
-      state.loras[id] = { id, model_name, base_model, weight };
+      state.loras[id] = { id, model_name, base_model, weight, isEnabled: true };
     },
     loraRemoved: (state, action: PayloadAction<string>) => {
       const id = action.payload;
@@ -81,8 +81,6 @@ export const {
   loraRecalled,
 } = loraSlice.actions;
 
-export default loraSlice.reducer;
-
 export const selectLoraSlice = (state: RootState) => state.lora;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -91,4 +89,11 @@ export const migrateLoRAState = (state: any): any => {
     state._version = 1;
   }
   return state;
+};
+
+export const loraPersistConfig: PersistConfig<LoraState> = {
+  name: loraSlice.name,
+  initialState: initialLoraState,
+  migrate: migrateLoRAState,
+  persistDenylist: [],
 };

@@ -1,8 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import { workflowLoaded } from 'features/nodes/store/actions';
-import { nodeTemplatesBuilt } from 'features/nodes/store/nodeTemplatesSlice';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
   BoardFieldValue,
@@ -19,6 +18,7 @@ import type {
   MainModelFieldValue,
   SchedulerFieldValue,
   SDXLRefinerModelFieldValue,
+  StatefulFieldValue,
   StringFieldValue,
   T2IAdapterModelFieldValue,
   VAEModelFieldValue,
@@ -37,6 +37,7 @@ import {
   zMainModelFieldValue,
   zSchedulerFieldValue,
   zSDXLRefinerModelFieldValue,
+  zStatefulFieldValue,
   zStringFieldValue,
   zT2IAdapterModelFieldValue,
   zVAEModelFieldValue,
@@ -65,7 +66,6 @@ import {
   SelectionMode,
   updateEdge,
 } from 'reactflow';
-import { receivedOpenAPISchema } from 'services/api/thunks/schema';
 import {
   socketGeneratorProgress,
   socketInvocationComplete,
@@ -92,7 +92,6 @@ export const initialNodesState: NodesState = {
   _version: 1,
   nodes: [],
   edges: [],
-  isReady: false,
   connectionStartParams: null,
   connectionStartFieldType: null,
   connectionMade: false,
@@ -139,7 +138,7 @@ const fieldValueReducer = <T extends FieldValue>(
   input.value = result.data;
 };
 
-const nodesSlice = createSlice({
+export const nodesSlice = createSlice({
   name: 'nodes',
   initialState: initialNodesState,
   reducers: {
@@ -481,6 +480,9 @@ const nodesSlice = createSlice({
     selectedEdgesChanged: (state, action: PayloadAction<string[]>) => {
       state.selectedEdges = action.payload;
     },
+    fieldValueReset: (state, action: FieldValueAction<StatefulFieldValue>) => {
+      fieldValueReducer(state, action, zStatefulFieldValue);
+    },
     fieldStringValueChanged: (state, action: FieldValueAction<StringFieldValue>) => {
       fieldValueReducer(state, action, zStringFieldValue);
     },
@@ -677,10 +679,6 @@ const nodesSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addCase(receivedOpenAPISchema.pending, (state) => {
-      state.isReady = false;
-    });
-
     builder.addCase(workflowLoaded, (state, action) => {
       const { nodes, edges } = action.payload;
       state.nodes = applyNodeChanges(
@@ -752,9 +750,6 @@ const nodesSlice = createSlice({
         });
       }
     });
-    builder.addCase(nodeTemplatesBuilt, (state) => {
-      state.isReady = true;
-    });
   },
 });
 
@@ -770,6 +765,7 @@ export const {
   edgesChanged,
   edgesDeleted,
   edgeUpdated,
+  fieldValueReset,
   fieldBoardValueChanged,
   fieldBooleanValueChanged,
   fieldColorValueChanged,
@@ -844,15 +840,12 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   nodeIsOpenChanged,
   nodeLabelChanged,
   nodeNotesChanged,
-  nodesChanged,
   nodesDeleted,
   nodeUseCacheChanged,
   notesNodeValueChanged,
   selectionPasted,
   edgeAdded
 );
-
-export default nodesSlice.reducer;
 
 export const selectNodesSlice = (state: RootState) => state.nodes;
 
@@ -862,4 +855,21 @@ export const migrateNodesState = (state: any): any => {
     state._version = 1;
   }
   return state;
+};
+
+export const nodesPersistConfig: PersistConfig<NodesState> = {
+  name: nodesSlice.name,
+  initialState: initialNodesState,
+  migrate: migrateNodesState,
+  persistDenylist: [
+    'connectionStartParams',
+    'connectionStartFieldType',
+    'selectedNodes',
+    'selectedEdges',
+    'nodesToCopy',
+    'edgesToCopy',
+    'connectionMade',
+    'modifyingEdge',
+    'addNewNodePosition',
+  ],
 };

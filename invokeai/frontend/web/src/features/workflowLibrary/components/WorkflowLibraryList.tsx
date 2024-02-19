@@ -1,5 +1,6 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import {
+  Box,
   Button,
   ButtonGroup,
   Combobox,
@@ -28,6 +29,8 @@ import { useListWorkflowsQuery } from 'services/api/endpoints/workflows';
 import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
 import { z } from 'zod';
+
+import UploadWorkflowButton from './UploadWorkflowButton';
 
 const PER_PAGE = 10;
 
@@ -221,11 +224,16 @@ const WorkflowLibraryList = () => {
         <IAINoContentFallback label={t('workflows.noWorkflows')} />
       )}
       <Divider />
-      {data && (
-        <Flex w="full" justifyContent="space-around">
-          <WorkflowLibraryPagination data={data} page={page} setPage={setPage} />
-        </Flex>
-      )}
+
+      <Flex w="full">
+        <Box flex="1">
+          <UploadWorkflowButton />
+        </Box>
+        <Box flex="1" textAlign="center">
+          {data && <WorkflowLibraryPagination data={data} page={page} setPage={setPage} />}
+        </Box>
+        <Box flex="1"></Box>
+      </Flex>
     </>
   );
 };

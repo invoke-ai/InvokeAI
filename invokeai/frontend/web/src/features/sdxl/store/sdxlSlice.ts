@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import type {
   ParameterNegativeStylePromptSDXL,
   ParameterPositiveStylePromptSDXL,
@@ -36,7 +36,7 @@ export const initialSDXLState: SDXLState = {
   refinerStart: 0.8,
 };
 
-const sdxlSlice = createSlice({
+export const sdxlSlice = createSlice({
   name: 'sdxl',
   initialState: initialSDXLState,
   reducers: {
@@ -86,8 +86,6 @@ export const {
   setRefinerStart,
 } = sdxlSlice.actions;
 
-export default sdxlSlice.reducer;
-
 export const selectSdxlSlice = (state: RootState) => state.sdxl;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -96,4 +94,11 @@ export const migrateSDXLState = (state: any): any => {
     state._version = 1;
   }
   return state;
+};
+
+export const sdxlPersistConfig: PersistConfig<SDXLState> = {
+  name: sdxlSlice.name,
+  initialState: initialSDXLState,
+  migrate: migrateSDXLState,
+  persistDenylist: [],
 };

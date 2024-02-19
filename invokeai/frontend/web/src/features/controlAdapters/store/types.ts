@@ -11,6 +11,7 @@ import type {
   ColorMapImageProcessorInvocation,
   ContentShuffleImageProcessorInvocation,
   DepthAnythingImageProcessorInvocation,
+  DWOpenposeImageProcessorInvocation,
   HedImageProcessorInvocation,
   LineartAnimeImageProcessorInvocation,
   LineartImageProcessorInvocation,
@@ -18,7 +19,6 @@ import type {
   MidasDepthImageProcessorInvocation,
   MlsdImageProcessorInvocation,
   NormalbaeImageProcessorInvocation,
-  OpenposeImageProcessorInvocation,
   PidiImageProcessorInvocation,
   ZoeDepthImageProcessorInvocation,
 } from 'services/api/types';
@@ -40,7 +40,7 @@ export type ControlAdapterProcessorNode =
   | MidasDepthImageProcessorInvocation
   | MlsdImageProcessorInvocation
   | NormalbaeImageProcessorInvocation
-  | OpenposeImageProcessorInvocation
+  | DWOpenposeImageProcessorInvocation
   | PidiImageProcessorInvocation
   | ZoeDepthImageProcessorInvocation;
 
@@ -143,11 +143,11 @@ export type RequiredNormalbaeImageProcessorInvocation = O.Required<
 >;
 
 /**
- * The Openpose processor node, with parameters flagged as required
+ * The DW Openpose processor node, with parameters flagged as required
  */
-export type RequiredOpenposeImageProcessorInvocation = O.Required<
-  OpenposeImageProcessorInvocation,
-  'type' | 'detect_resolution' | 'image_resolution' | 'hand_and_face'
+export type RequiredDWOpenposeImageProcessorInvocation = O.Required<
+  DWOpenposeImageProcessorInvocation,
+  'type' | 'image_resolution' | 'draw_body' | 'draw_face' | 'draw_hands'
 >;
 
 /**
@@ -179,7 +179,7 @@ export type RequiredControlAdapterProcessorNode =
       | RequiredMidasDepthImageProcessorInvocation
       | RequiredMlsdImageProcessorInvocation
       | RequiredNormalbaeImageProcessorInvocation
-      | RequiredOpenposeImageProcessorInvocation
+      | RequiredDWOpenposeImageProcessorInvocation
       | RequiredPidiImageProcessorInvocation
       | RequiredZoeDepthImageProcessorInvocation,
       'id'
@@ -299,10 +299,10 @@ export const isNormalbaeImageProcessorInvocation = (obj: unknown): obj is Normal
 };
 
 /**
- * Type guard for OpenposeImageProcessorInvocation
+ * Type guard for DWOpenposeImageProcessorInvocation
  */
-export const isOpenposeImageProcessorInvocation = (obj: unknown): obj is OpenposeImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'openpose_image_processor') {
+export const isDWOpenposeImageProcessorInvocation = (obj: unknown): obj is DWOpenposeImageProcessorInvocation => {
+  if (isObject(obj) && 'type' in obj && obj.type === 'dw_openpose_image_processor') {
     return true;
   }
   return false;

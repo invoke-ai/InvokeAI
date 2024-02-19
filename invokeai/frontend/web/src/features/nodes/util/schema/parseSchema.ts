@@ -12,6 +12,7 @@ import {
 import { t } from 'i18next';
 import { reduce } from 'lodash-es';
 import type { OpenAPIV3_1 } from 'openapi-types';
+import { serializeError } from 'serialize-error';
 
 import { buildFieldInputTemplate } from './buildFieldInputTemplate';
 import { buildFieldOutputTemplate } from './buildFieldOutputTemplate';
@@ -103,7 +104,10 @@ export const parseSchema = (
           const fieldType = parseFieldType(property);
 
           if (isReservedFieldType(fieldType.name)) {
-            // Skip processing this reserved field
+            logger('nodes').trace(
+              { node: type, field: propertyName, schema: parseify(property) },
+              'Skipped reserved input field'
+            );
             return inputsAccumulator;
           }
 
@@ -122,6 +126,20 @@ export const parseSchema = (
                 node: type,
                 field: propertyName,
                 message: e.message,
+              })
+            );
+          } else {
+            logger('nodes').warn(
+              {
+                node: type,
+                field: propertyName,
+                schema: parseify(property),
+                error: serializeError(e),
+              },
+              t('nodes.inputFieldTypeParseError', {
+                node: type,
+                field: propertyName,
+                message: 'unknown error',
               })
             );
           }
@@ -201,6 +219,20 @@ export const parseSchema = (
                 node: type,
                 field: propertyName,
                 message: e.message,
+              })
+            );
+          } else {
+            logger('nodes').warn(
+              {
+                node: type,
+                field: propertyName,
+                schema: parseify(property),
+                error: serializeError(e),
+              },
+              t('nodes.outputFieldTypeParseError', {
+                node: type,
+                field: propertyName,
+                message: 'unknown error',
               })
             );
           }

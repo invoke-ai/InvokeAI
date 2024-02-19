@@ -3,6 +3,7 @@ import re
 import pytest
 from pydantic import BaseModel
 
+from invokeai.app.services.item_storage.item_storage_common import ItemNotFoundError
 from invokeai.app.services.item_storage.item_storage_memory import ItemStorageMemory
 
 
@@ -17,19 +18,19 @@ def item_storage_memory():
 
 
 def test_item_storage_memory_initializes():
-    item_storage_memory = ItemStorageMemory()
+    item_storage_memory = ItemStorageMemory[MockItemModel]()
     assert item_storage_memory._items == {}
     assert item_storage_memory._id_field == "id"
     assert item_storage_memory._max_items == 10
 
-    item_storage_memory = ItemStorageMemory(id_field="bananas", max_items=20)
+    item_storage_memory = ItemStorageMemory[MockItemModel](id_field="bananas", max_items=20)
     assert item_storage_memory._id_field == "bananas"
     assert item_storage_memory._max_items == 20
 
     with pytest.raises(ValueError, match=re.escape("max_items must be at least 1")):
-        item_storage_memory = ItemStorageMemory(max_items=0)
+        item_storage_memory = ItemStorageMemory[MockItemModel](max_items=0)
     with pytest.raises(ValueError, match=re.escape("id_field must not be empty")):
-        item_storage_memory = ItemStorageMemory(id_field="")
+        item_storage_memory = ItemStorageMemory[MockItemModel](id_field="")
 
 
 def test_item_storage_memory_sets(item_storage_memory: ItemStorageMemory[MockItemModel]):
@@ -58,8 +59,8 @@ def test_item_storage_memory_gets(item_storage_memory: ItemStorageMemory[MockIte
     item = item_storage_memory.get("2")
     assert item == item_2
 
-    item = item_storage_memory.get("3")
-    assert item is None
+    with pytest.raises(ItemNotFoundError, match=re.escape("Item with id 3 not found")):
+        item_storage_memory.get("3")
 
 
 def test_item_storage_memory_deletes(item_storage_memory: ItemStorageMemory[MockItemModel]):
@@ -73,7 +74,7 @@ def test_item_storage_memory_deletes(item_storage_memory: ItemStorageMemory[Mock
 
 
 def test_item_storage_memory_respects_max():
-    item_storage_memory = ItemStorageMemory(max_items=3)
+    item_storage_memory = ItemStorageMemory[MockItemModel](max_items=3)
     for i in range(10):
         item_storage_memory.set(MockItemModel(id=str(i), value=i))
     assert item_storage_memory._items == {

@@ -1,15 +1,16 @@
 from collections import OrderedDict
 from contextlib import suppress
-from typing import Generic, Optional, TypeVar
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
 from invokeai.app.services.item_storage.item_storage_base import ItemStorageABC
+from invokeai.app.services.item_storage.item_storage_common import ItemNotFoundError
 
 T = TypeVar("T", bound=BaseModel)
 
 
-class ItemStorageMemory(ItemStorageABC, Generic[T]):
+class ItemStorageMemory(ItemStorageABC[T], Generic[T]):
     """
     Provides a simple in-memory storage for items, with a maximum number of items to store.
     The storage uses the LRU strategy to evict items from storage when the max has been reached.
@@ -25,12 +26,13 @@ class ItemStorageMemory(ItemStorageABC, Generic[T]):
         self._items: OrderedDict[str, T] = OrderedDict()
         self._max_items = max_items
 
-    def get(self, item_id: str) -> Optional[T]:
+    def get(self, item_id: str) -> T:
         # If the item exists, move it to the end of the OrderedDict.
         item = self._items.pop(item_id, None)
-        if item is not None:
-            self._items[item_id] = item
-        return self._items.get(item_id)
+        if item is None:
+            raise ItemNotFoundError(item_id)
+        self._items[item_id] = item
+        return item
 
     def set(self, item: T) -> None:
         item_id = getattr(item, self._id_field)

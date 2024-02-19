@@ -1,5 +1,6 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -27,7 +28,9 @@ export const ParamWidth = memo(() => {
 
   return (
     <FormControl>
-      <FormLabel>{t('parameters.width')}</FormLabel>
+      <InformationalPopover feature="paramWidth">
+        <FormLabel>{t('parameters.width')}</FormLabel>
+      </InformationalPopover>
       <CompositeSlider
         value={ctx.width}
         onChange={onChange}
