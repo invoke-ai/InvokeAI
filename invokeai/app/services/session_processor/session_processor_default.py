@@ -21,7 +21,7 @@ from .session_processor_common import SessionProcessorStatus
 
 
 class DefaultSessionProcessor(SessionProcessorBase):
-    def start(self, invoker: Invoker, thread_limit: int = 1, polling_interval: int = 1) -> None:
+    def start(self, invoker: Invoker, polling_interval: int = 1) -> None:
         self._invoker: Invoker = invoker
         self._queue_item: Optional[SessionQueueItem] = None
         self._invocation: Optional[BaseInvocation] = None
@@ -33,8 +33,8 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
         local_handler.register(event_name=EventServiceBase.queue_event, _func=self._on_queue_event)
 
-        self._thread_limit = thread_limit
-        self._thread_semaphore = BoundedSemaphore(thread_limit)
+        self._thread_limit = self._invoker.services.model_manager.load.gpu_count
+        self._thread_semaphore = BoundedSemaphore(self._thread_limit)
         self._polling_interval = polling_interval
 
         # If profiling is enabled, create a profiler. The same profiler will be used for all sessions. Internally,

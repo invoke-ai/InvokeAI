@@ -1,6 +1,7 @@
 # Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Team
 
 from abc import ABC, abstractmethod
+from typing import Optional, Set
 
 import torch
 from typing_extensions import Self
@@ -31,7 +32,7 @@ class ModelManagerServiceBase(ABC):
         model_record_service: ModelRecordServiceBase,
         download_queue: DownloadQueueServiceBase,
         events: EventServiceBase,
-        execution_device: torch.device,
+        execution_devices: Optional[Set[torch.device]] = None,
     ) -> Self:
         """
         Construct the model manager service instance.

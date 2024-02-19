@@ -10,7 +10,7 @@ model will be cleared and (re)loaded from disk when next needed.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from logging import Logger
-from typing import Dict, Generic, Optional, TypeVar
+from typing import Dict, Generic, Optional, Set, TypeVar
 
 import torch
 
@@ -89,8 +89,24 @@ class ModelCacheBase(ABC, Generic[T]):
 
     @property
     @abstractmethod
-    def execution_device(self) -> torch.device:
-        """Return the exection device (e.g. "cuda" for VRAM)."""
+    def execution_devices(self) -> Set[torch.device]:
+        """Return the set of available execution devices."""
+        pass
+
+    @abstractmethod
+    def acquire_execution_device(self, timeout: int = 0) -> torch.device:
+        """
+        Pick the next available execution device.
+
+        If all devices are currently engaged (locked), then
+        block until timeout seconds have passed and raise a
+        TimeoutError if no devices are available.
+        """
+        pass
+
+    @abstractmethod
+    def release_execution_device(self, device: torch.device) -> None:
+        """Release a previously-acquired execution device."""
         pass
 
     @property
