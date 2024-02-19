@@ -1138,7 +1138,11 @@
         "unsupportedAnyOfLength": "unione di troppi elementi ({{count}})",
         "clearWorkflowDesc": "Cancellare questo flusso di lavoro e avviarne uno nuovo?",
         "clearWorkflow": "Cancella il flusso di lavoro",
-        "clearWorkflowDesc2": "Il tuo flusso di lavoro attuale presenta modifiche non salvate."
+        "clearWorkflowDesc2": "Il tuo flusso di lavoro attuale presenta modifiche non salvate.",
+        "viewMode": "Utilizzare nella vista lineare",
+        "reorderLinearView": "Riordina la vista lineare",
+        "editMode": "Modifica nell'editor del flusso di lavoro",
+        "resetToDefaultValue": "Ripristina il valore predefinito"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1241,7 +1245,11 @@
         "large": "Grande",
         "small": "Piccolo",
         "depthAnythingDescription": "Generazione di mappe di profondità utilizzando la tecnica Depth Anything",
-        "modelSize": "Dimensioni del modello"
+        "modelSize": "Dimensioni del modello",
+        "dwOpenposeDescription": "Stima della posa umana utilizzando DW Openpose",
+        "face": "Viso",
+        "body": "Corpo",
+        "hands": "Mani"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
