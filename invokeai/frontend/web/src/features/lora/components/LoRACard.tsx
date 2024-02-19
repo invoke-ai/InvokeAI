@@ -25,18 +25,18 @@ export const LoRACard = memo((props: LoRACardProps) => {
 
   const handleChange = useCallback(
     (v: number) => {
-      dispatch(loraWeightChanged({ id: lora.id, weight: v }));
+      dispatch(loraWeightChanged({ key: lora.key, weight: v }));
     },
-    [dispatch, lora.id]
+    [dispatch, lora.key]
   );
 
   const handleSetLoraToggle = useCallback(() => {
-    dispatch(loraIsEnabledChanged({ id: lora.id, isEnabled: !lora.isEnabled }));
-  }, [dispatch, lora.id, lora.isEnabled]);
+    dispatch(loraIsEnabledChanged({ key: lora.key, isEnabled: !lora.isEnabled }));
+  }, [dispatch, lora.key, lora.isEnabled]);
 
   const handleRemoveLora = useCallback(() => {
-    dispatch(loraRemoved(lora.id));
-  }, [dispatch, lora.id]);
+    dispatch(loraRemoved(lora.key));
+  }, [dispatch, lora.key]);
 
   return (
     <Card variant="lora">

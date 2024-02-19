@@ -2,15 +2,16 @@ import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import type { EntityState } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { GroupBase } from 'chakra-react-select';
+import type { ModelIdentifierWithBase } from 'features/nodes/types/common';
 import { groupBy, map, reduce } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AnyModelConfig } from 'services/api/endpoints/models';
 import { getModelId } from 'services/api/endpoints/models';
+import type { AnyModelConfig } from 'services/api/types';
 
 type UseGroupedModelComboboxArg<T extends AnyModelConfig> = {
   modelEntities: EntityState<T, string> | undefined;
-  selectedModel?: Pick<T, 'base_model' | 'model_name' | 'model_type'> | null;
+  selectedModel?: ModelIdentifierWithBase | null;
   onChange: (value: T | null) => void;
   getIsDisabled?: (model: T) => boolean;
   isLoading?: boolean;
@@ -28,7 +29,7 @@ export const useGroupedModelCombobox = <T extends AnyModelConfig>(
   arg: UseGroupedModelComboboxArg<T>
 ): UseGroupedModelComboboxReturn => {
   const { t } = useTranslation();
-  const base_model = useAppSelector((s) => s.generation.model?.base_model ?? 'sdxl');
+  const base_model = useAppSelector((s) => s.generation.model?.base ?? 'sdxl');
   const { modelEntities, selectedModel, getIsDisabled, onChange, isLoading } = arg;
   const options = useMemo<GroupBase<ComboboxOption>[]>(() => {
     if (!modelEntities) {
@@ -42,8 +43,8 @@ export const useGroupedModelCombobox = <T extends AnyModelConfig>(
         acc.push({
           label,
           options: val.map((model) => ({
-            label: model.model_name,
-            value: model.id,
+            label: model.name,
+            value: model.key,
             isDisabled: getIsDisabled ? getIsDisabled(model) : false,
           })),
         });
