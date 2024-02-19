@@ -39,7 +39,7 @@ type UpdateLoRAModelArg = {
 type UpdateMainModelResponse =
   paths['/api/v2/models/i/{key}']['patch']['responses']['200']['content']['application/json'];
 
-type ListModelsArg = NonNullable<paths['/api/models_v2/']['get']['parameters']['query']>;
+type ListModelsArg = NonNullable<paths['/api/v2/models/']['get']['parameters']['query']>;
 
 type UpdateLoRAModelResponse = UpdateMainModelResponse;
 
