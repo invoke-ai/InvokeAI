@@ -81,7 +81,7 @@
         "outputs": "Ausgabe",
         "data": "Daten",
         "safetensors": "Safe-Tensors",
-        "outpaint": "Ausmalen",
+        "outpaint": "Outpaint (Außen ausmalen)",
         "details": "Details",
         "format": "Format",
         "unknown": "Unbekannt",
@@ -110,17 +110,17 @@
         "nextPage": "Nächste Seite",
         "unknownError": "Unbekannter Fehler",
         "unsaved": "Nicht gespeichert",
-        "aboutDesc": "Verwenden Sie Invoke für die Arbeit? Dann siehe hier:",
+        "aboutDesc": "Verwenden Sie Invoke für die Arbeit? Siehe hier:",
         "localSystem": "Lokales System",
         "orderBy": "Ordnen nach",
-        "saveAs": "Speicher als",
+        "saveAs": "Speichern als",
         "updated": "Aktualisiert",
         "copy": "Kopieren",
         "aboutHeading": "Nutzen Sie Ihre kreative Energie"
     },
     "gallery": {
         "generations": "Erzeugungen",
-        "showGenerations": "Zeige Erzeugnisse",
+        "showGenerations": "Zeige Ergebnisse",
         "uploads": "Uploads",
         "showUploads": "Zeige Uploads",
         "galleryImageSize": "Bildgröße",
@@ -150,9 +150,9 @@
         "problemDeletingImagesDesc": "Ein oder mehrere Bilder konnten nicht gelöscht werden",
         "starImage": "Bild markieren",
         "assets": "Ressourcen",
-        "unstarImage": "Markierung Entfernen",
+        "unstarImage": "Markierung entfernen",
         "image": "Bild",
-        "deleteSelection": "Lösche markierte",
+        "deleteSelection": "Lösche Auswahl",
         "dropToUpload": "$t(gallery.drop) zum hochladen",
         "dropOrUpload": "$t(gallery.drop) oder hochladen",
         "drop": "Ablegen",
@@ -590,7 +590,15 @@
         "general": "Allgemein",
         "hiresStrength": "High Res Stärke",
         "hidePreview": "Verstecke Vorschau",
-        "showPreview": "Zeige Vorschau"
+        "showPreview": "Zeige Vorschau",
+        "aspect": "Seitenverhältnis",
+        "aspectRatio": "Seitenverhältnis",
+        "scheduler": "Planer",
+        "aspectRatioFree": "Frei",
+        "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (kann zu groß sein)",
+        "lockAspectRatio": "Seitenverhältnis sperren",
+        "swapDimensions": "Seitenverhältnis umkehren",
+        "setToOptimalSize": "Optimiere Größe für Modell"
     },
     "settings": {
         "displayInProgress": "Bilder in Bearbeitung anzeigen",
@@ -606,7 +614,9 @@
         "useSlidersForAll": "Schieberegler für alle Optionen verwenden",
         "showAdvancedOptions": "Erweiterte Optionen anzeigen",
         "alternateCanvasLayout": "Alternatives Leinwand-Layout",
-        "clearIntermediatesDesc1": "Das Löschen der Zwischenprodukte setzt Leinwand und ControlNet zurück."
+        "clearIntermediatesDesc1": "Das Löschen der Zwischenprodukte setzt Leinwand und ControlNet zurück.",
+        "favoriteSchedulers": "Lieblings-Planer",
+        "favoriteSchedulersPlaceholder": "Keine Planer favorisiert"
     },
     "toast": {
         "tempFoldersEmptied": "Temp-Ordner geleert",
@@ -733,23 +743,23 @@
     "accessibility": {
         "modelSelect": "Modell-Auswahl",
         "uploadImage": "Bild hochladen",
-        "previousImage": "Voriges Bild",
+        "previousImage": "Vorheriges Bild",
         "useThisParameter": "Benutze diesen Parameter",
-        "copyMetadataJson": "Kopiere Metadaten JSON",
+        "copyMetadataJson": "Kopiere JSON-Metadaten",
         "zoomIn": "Vergrößern",
         "rotateClockwise": "Im Uhrzeigersinn drehen",
         "flipHorizontally": "Horizontal drehen",
         "flipVertically": "Vertikal drehen",
         "modifyConfig": "Optionen einstellen",
         "toggleAutoscroll": "Auroscroll ein/ausschalten",
-        "toggleLogViewer": "Log Betrachter ein/ausschalten",
+        "toggleLogViewer": "Log-Betrachter ein/ausschalten",
         "showOptionsPanel": "Seitenpanel anzeigen",
         "reset": "Zurücksetzten",
         "nextImage": "Nächstes Bild",
         "zoomOut": "Verkleinern",
         "rotateCounterClockwise": "Gegen den Uhrzeigersinn drehen",
-        "showGalleryPanel": "Galeriefenster anzeigen",
-        "exitViewer": "Betrachten beenden",
+        "showGalleryPanel": "Galerie-Panel anzeigen",
+        "exitViewer": "Betrachter beenden",
         "menu": "Menü",
         "loadMore": "Mehr laden",
         "invokeProgressBar": "Invoke Fortschrittsanzeige",
@@ -759,7 +769,7 @@
         "about": "Über"
     },
     "boards": {
-        "autoAddBoard": "Automatisches Hinzufügen zum Ordner",
+        "autoAddBoard": "Automatisches Hinzufügen zum Board",
         "topMessage": "Dieser Ordner enthält Bilder die in den folgenden Funktionen verwendet werden:",
         "move": "Bewegen",
         "menuItemAutoAdd": "Auto-Hinzufügen zu diesem Ordner",
@@ -768,13 +778,13 @@
         "noMatching": "Keine passenden Ordner",
         "selectBoard": "Ordner aussuchen",
         "cancel": "Abbrechen",
-        "addBoard": "Ordner hinzufügen",
+        "addBoard": "Board hinzufügen",
         "uncategorized": "Ohne Kategorie",
         "downloadBoard": "Ordner runterladen",
         "changeBoard": "Ordner wechseln",
         "loading": "Laden...",
         "clearSearch": "Suche leeren",
-        "bottomMessage": "Durch das Löschen dieses Ordners und seiner Bilder werden alle Funktionen zurückgesetzt, die sie derzeit verwenden.",
+        "bottomMessage": "Löschen des Boards und seiner Bilder setzt alle Funktionen zurück, die sie gerade verwenden.",
         "deleteBoardOnly": "Nur Ordner löschen",
         "deleteBoard": "Löschen Ordner",
         "deleteBoardAndImages": "Löschen Ordner und Bilder",
@@ -865,11 +875,11 @@
         "maxFaces": "Maximale Anzahl Gesichter",
         "resizeSimple": "Größe ändern (einfach)",
         "large": "Groß",
-        "modelSize": "Modell Größe",
+        "modelSize": "Modellgröße",
         "small": "Klein",
         "base": "Basis",
-        "depthAnything": "Depth Anything / \"Tiefe irgendwas\"",
-        "depthAnythingDescription": "Erstellung einer Tiefenkarte mit der Depth Anything-Technik"
+        "depthAnything": "Depth Anything",
+        "depthAnythingDescription": "Erstellung einer Tiefenkarte mit der Depth-Anything-Technik"
     },
     "queue": {
         "status": "Status",
@@ -904,7 +914,7 @@
         "batchValues": "Stapel Werte",
         "queueCountPrediction": "{{promptsCount}} Prompts × {{iterations}} Iterationen -> {{count}} Generationen",
         "queuedCount": "{{pending}} wartenden Elemente",
-        "clearQueueAlertDialog": "Die Warteschlange leeren, stoppt den aktuellen Prozess und leert die Warteschlange komplett.",
+        "clearQueueAlertDialog": "\"Die Warteschlange leeren\" stoppt den aktuellen Prozess und leert die Warteschlange komplett.",
         "completedIn": "Fertig in",
         "cancelBatchSucceeded": "Stapel abgebrochen",
         "cancelBatch": "Stapel stoppen",
@@ -913,20 +923,20 @@
         "cancelBatchFailed": "Problem beim Abbruch vom Stapel",
         "clearQueueAlertDialog2": "Warteschlange wirklich leeren?",
         "pruneSucceeded": "{{item_count}} abgeschlossene Elemente aus der Warteschlange entfernt",
-        "pauseSucceeded": "Prozessor angehalten",
+        "pauseSucceeded": "Prozess angehalten",
         "cancelFailed": "Problem beim Stornieren des Auftrags",
-        "pauseFailed": "Problem beim Anhalten des Prozessors",
+        "pauseFailed": "Problem beim Anhalten des Prozesses",
         "front": "Vorne",
         "pruneTooltip": "Bereinigen Sie {{item_count}} abgeschlossene Aufträge",
-        "resumeFailed": "Problem beim wieder aufnehmen von Prozessor",
+        "resumeFailed": "Problem beim Fortsetzen des Prozesses",
         "pruneFailed": "Problem beim leeren der Warteschlange",
-        "pauseTooltip": "Pause von Prozessor",
+        "pauseTooltip": "Prozess anhalten",
         "back": "Hinten",
-        "resumeSucceeded": "Prozessor wieder aufgenommen",
-        "resumeTooltip": "Prozessor wieder aufnehmen",
+        "resumeSucceeded": "Prozess wird fortgesetzt",
+        "resumeTooltip": "Prozess wieder aufnehmen",
         "time": "Zeit",
-        "batchQueuedDesc_one": "{{count}} Eintrag ans {{direction}} der Wartschlange hinzugefügt",
-        "batchQueuedDesc_other": "{{count}} Einträge ans {{direction}} der Wartschlange hinzugefügt",
+        "batchQueuedDesc_one": "{{count}} Eintrag an {{direction}} der Wartschlange hinzugefügt",
+        "batchQueuedDesc_other": "{{count}} Einträge an {{direction}} der Wartschlange hinzugefügt",
         "openQueue": "Warteschlange öffnen",
         "batchFailedToQueue": "Fehler beim Einreihen in die Stapelverarbeitung",
         "batchFieldValues": "Stapelverarbeitungswerte",
@@ -965,7 +975,7 @@
     },
     "popovers": {
         "noiseUseCPU": {
-            "heading": "Nutze Prozessor rauschen",
+            "heading": "Nutze CPU-Rauschen",
             "paragraphs": [
                 "Entscheidet, ob auf der CPU oder GPU Rauschen erzeugt wird.",
                 "Mit aktiviertem CPU-Rauschen wird ein bestimmter Seedwert das gleiche Bild auf jeder Maschine erzeugen.",
@@ -1084,12 +1094,18 @@
                 "Wie stark wird das ControlNet das generierte Bild beeinflussen wird."
             ],
             "heading": "Einfluss"
+        },
+        "paramScheduler": {
+            "paragraphs": [
+                "\"Planer\" definiert, wie iterativ Rauschen zu einem Bild hinzugefügt wird, oder wie ein Sample bei der Ausgabe eines Modells aktualisiert wird."
+            ],
+            "heading": "Planer"
         }
     },
     "ui": {
         "lockRatio": "Verhältnis sperren",
-        "hideProgressImages": "Verstecke Prozess Bild",
-        "showProgressImages": "Zeige Prozess Bild",
+        "hideProgressImages": "Fortschrittsbilder verbergen",
+        "showProgressImages": "Fortschrittsbilder anzeigen",
         "swapSizes": "Tausche Größen"
     },
     "invocationCache": {
@@ -1336,12 +1352,12 @@
         },
         "control": {
             "title": "Kontrolle",
-            "controlAdaptersTab": "Kontroll Adapter",
-            "ipTab": "Bild Beschreibung"
+            "controlAdaptersTab": "Kontroll-Adapter",
+            "ipTab": "Bild-Prompts"
         },
         "compositing": {
             "coherenceTab": "Kohärenzpass",
-            "infillTab": "Füllung",
+            "infillTab": "Füllung / Infill",
             "title": "Compositing"
         }
     },
@@ -1379,5 +1395,12 @@
     },
     "app": {
         "storeNotInitialized": "App-Store ist nicht initialisiert"
+    },
+    "sdxl": {
+        "concatPromptStyle": "Verknüpfen von Prompt & Stil",
+        "scheduler": "Planer"
+    },
+    "dynamicPrompts": {
+        "showDynamicPrompts": "Dynamische Prompts anzeigen"
     }
 }
