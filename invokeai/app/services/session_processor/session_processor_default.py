@@ -176,7 +176,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                                     )
 
                             except KeyboardInterrupt:
-                                # TODO(psyche): should we set the cancel event here and/or cancel the queue item?
+                                # TODO(MM2): Create an event for this
                                 pass
 
                             except CanceledException:
