@@ -2,6 +2,7 @@ import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { loraAdded, selectLoraSlice } from 'features/lora/store/loraSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -57,7 +58,9 @@ const LoRASelect = () => {
 
   return (
     <FormControl isDisabled={!options.length}>
-      <FormLabel>{t('models.lora')} </FormLabel>
+      <InformationalPopover feature="lora">
+        <FormLabel>{t('models.lora')} </FormLabel>
+      </InformationalPopover>
       <Combobox
         placeholder={placeholder}
         value={null}
