@@ -18,7 +18,7 @@ export const EmbeddingSelect = memo(({ onSelect, onClose }: EmbeddingSelectProps
 
   const getIsDisabled = useCallback(
     (embedding: TextualInversionConfig): boolean => {
-      const isCompatible = currentBaseModel === embedding.base_model;
+      const isCompatible = currentBaseModel === embedding.base;
       const hasMainModel = Boolean(currentBaseModel);
       return !hasMainModel || !isCompatible;
     },
@@ -31,7 +31,7 @@ export const EmbeddingSelect = memo(({ onSelect, onClose }: EmbeddingSelectProps
       if (!embedding) {
         return;
       }
-      onSelect(embedding.model_name);
+      onSelect(embedding.key);
     },
     [onSelect]
   );
