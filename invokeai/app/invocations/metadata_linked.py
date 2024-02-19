@@ -1,3 +1,4 @@
+import copy
 from typing import Any, Literal, Optional, Union
 
 from pydantic import model_validator
@@ -18,7 +19,20 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.latent import SAMPLER_NAME_VALUES, DenoiseLatentsInvocation, SchedulerOutput
 from invokeai.app.invocations.metadata import LoRAMetadataField, MetadataOutput
-from invokeai.app.invocations.model import LoRAModelField, MainModelField, ModelInfo, VaeField, VAEModelField, VAEOutput
+from invokeai.app.invocations.model import (
+    ClipField,
+    LoRAModelField,
+    LoraInfo,
+    LoraLoaderOutput,
+    MainModelField,
+    ModelInfo,
+    ModelLoaderOutput,
+    SDXLLoraLoaderOutput,
+    UNetField,
+    VaeField,
+    VAEModelField,
+    VAEOutput,
+)
 from invokeai.app.invocations.primitives import (
     BooleanOutput,
     FloatOutput,
@@ -27,8 +41,9 @@ from invokeai.app.invocations.primitives import (
     LatentsOutput,
     StringOutput,
 )
+from invokeai.app.invocations.sdxl import SDXLModelLoaderOutput
 from invokeai.app.shared.fields import FieldDescriptions
-from invokeai.backend.model_management.models.base import ModelType
+from invokeai.backend.model_management.models.base import ModelType, SubModelType
 from invokeai.version import __version__
 
 CUSTOM_LABEL: str = "* CUSTOM LABEL *"
@@ -345,6 +360,9 @@ class MetadataToModelOutput(BaseInvocationOutput):
 
     model: MainModelField = OutputField(description=FieldDescriptions.main_model, title="Model")
     name: str = OutputField(description="Model Name", title="Name")
+    unet: UNetField = OutputField(description=FieldDescriptions.unet, title="UNet")
+    vae: VaeField = OutputField(description=FieldDescriptions.vae, title="VAE")
+    clip: ClipField = OutputField(description=FieldDescriptions.clip, title="CLIP")
 
 
 @invocation_output("metadata_to_sdxl_model_output")
@@ -355,6 +373,10 @@ class MetadataToSDXLModelOutput(BaseInvocationOutput):
         description=FieldDescriptions.main_model, title="Model", ui_type=UIType.SDXLMainModel
     )
     name: str = OutputField(description="Model Name", title="Name")
+    unet: UNetField = OutputField(description=FieldDescriptions.unet, title="UNet")
+    clip: ClipField = OutputField(description=FieldDescriptions.clip, title="CLIP 1")
+    clip2: ClipField = OutputField(description=FieldDescriptions.clip, title="CLIP 2")
+    vae: VaeField = OutputField(description=FieldDescriptions.vae, title="VAE")
 
 
 @invocation(
@@ -362,7 +384,7 @@ class MetadataToSDXLModelOutput(BaseInvocationOutput):
     title="Metadata To Model",
     tags=["metadata"],
     category="metadata",
-    version="1.0.1",
+    version="1.1.0",
     classification=Classification.Beta,
 )
 class MetadataToModelInvocation(BaseInvocation, WithMetadata):
@@ -402,7 +424,49 @@ class MetadataToModelInvocation(BaseInvocation, WithMetadata):
         ):
             raise Exception(f"Unknown {base_model} {model_type} model: {model_name}")
 
-        return MetadataToModelOutput(model=model, name=f"{base_model}: {model_name}")
+        return MetadataToModelOutput(
+            model=model,
+            name=f"{base_model}: {model_name}",
+            unet=UNetField(
+                unet=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.UNet,
+                ),
+                scheduler=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.Scheduler,
+                ),
+                loras=[],
+            ),
+            clip=ClipField(
+                tokenizer=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.Tokenizer,
+                ),
+                text_encoder=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.TextEncoder,
+                ),
+                loras=[],
+                skipped_layers=0,
+            ),
+            vae=VaeField(
+                vae=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.Vae,
+                ),
+            ),
+        )
 
 
 @invocation(
@@ -410,7 +474,7 @@ class MetadataToModelInvocation(BaseInvocation, WithMetadata):
     title="Metadata To SDXL Model",
     tags=["metadata"],
     category="metadata",
-    version="1.0.1",
+    version="1.1.0",
     classification=Classification.Beta,
 )
 class MetadataToSDXLModelInvocation(BaseInvocation, WithMetadata):
@@ -449,7 +513,65 @@ class MetadataToSDXLModelInvocation(BaseInvocation, WithMetadata):
         ):
             raise Exception(f"Unknown {base_model} {model_type} model: {model_name}")
 
-        return MetadataToSDXLModelOutput(model=model, name=f"{base_model}: {model_name}")
+        return MetadataToSDXLModelOutput(
+            model=model,
+            name=f"{base_model}: {model_name}",
+            unet=UNetField(
+                unet=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.UNet,
+                ),
+                scheduler=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.Scheduler,
+                ),
+                loras=[],
+            ),
+            clip=ClipField(
+                tokenizer=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.Tokenizer,
+                ),
+                text_encoder=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.TextEncoder,
+                ),
+                loras=[],
+                skipped_layers=0,
+            ),
+            clip2=ClipField(
+                tokenizer=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.Tokenizer2,
+                ),
+                text_encoder=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.TextEncoder2,
+                ),
+                loras=[],
+                skipped_layers=0,
+            ),
+            vae=VaeField(
+                vae=ModelInfo(
+                    model_name=model_name,
+                    base_model=base_model,
+                    model_type=model_type,
+                    submodel=SubModelType.Vae,
+                ),
+            ),
+        )
 
 
 @invocation_output("latents_meta_output")
@@ -520,7 +642,7 @@ class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
     title="Metadata To VAE",
     tags=["metadata"],
     category="metadata",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Beta,
 )
 class MetadataToVAEInvocation(BaseInvocation, WithMetadata):
@@ -530,41 +652,209 @@ class MetadataToVAEInvocation(BaseInvocation, WithMetadata):
         default="vae",
         description=FieldDescriptions.metadata_item_label,
         input=Input.Direct,
+        ui_order=0,
     )
     custom_label: Optional[str] = InputField(
         default=None,
         description=FieldDescriptions.metadata_item_label,
         input=Input.Direct,
+        ui_order=1,
     )
-    default_value: VAEModelField = InputField(
+    default_vae: VaeField = InputField(
         description="The default VAE to use if not found in the metadata",
+        ui_order=2,
     )
 
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
     def invoke(self, context: InvocationContext) -> VAEOutput:
         data = {} if self.metadata is None else self.metadata.model_dump()
-        model = VAEModelField(
-            **data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
-        )
-
-        base_model = model.base_model
-        model_name = model.model_name
-        model_type = ModelType.Vae
+        key = self.custom_label if self.label == CUSTOM_LABEL else self.label
+        if key in data:
+            model = VAEModelField(**data.get(key, ""))
+            vae = VaeField(
+                vae=ModelInfo(
+                    model_name=model.model_name,
+                    base_model=model.base_model,
+                    model_type=ModelType.Vae,
+                ),
+            )
+        else:
+            vae = self.default_vae
 
         if not context.services.model_manager.model_exists(
-            base_model=base_model,
-            model_name=model_name,
-            model_type=model_type,
+            base_model=vae.vae.base_model,
+            model_name=vae.vae.model_name,
+            model_type=vae.vae.model_type,
         ):
-            raise Exception(f"Unknown vae name: {model_name}!")
+            raise Exception(f"Unknown vae name: {vae.vae.model_name}!")
 
-        return VAEOutput(
-            vae=VaeField(
-                vae=ModelInfo(
-                    model_name=model_name,
-                    base_model=base_model,
-                    model_type=model_type,
+        return VAEOutput(vae=vae)
+
+
+@invocation(
+    "metadata_to_loras",
+    title="Metadata To LoRAs",
+    tags=["metadata"],
+    category="metadata",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
+class MetadataToLorasInvocation(BaseInvocation, WithMetadata):
+    """Extracts a Loras value of a label from metadata"""
+
+    unet: Optional[UNetField] = InputField(
+        default=None,
+        description=FieldDescriptions.unet,
+        input=Input.Connection,
+        title="UNet",
+    )
+    clip: Optional[ClipField] = InputField(
+        default=None,
+        description=FieldDescriptions.clip,
+        input=Input.Connection,
+        title="CLIP",
+    )
+
+    def invoke(self, context: InvocationContext) -> LoraLoaderOutput:
+        data = {} if self.metadata is None else self.metadata.model_dump()
+        key = "loras"
+        if key in data:
+            loras = data.get(key, "")
+        else:
+            loras = []
+
+        output = LoraLoaderOutput()
+
+        if self.unet is not None:
+            output.unet = copy.deepcopy(self.unet)
+
+        if self.clip is not None:
+            output.clip = copy.deepcopy(self.clip)
+
+        for x in loras:
+            lora = LoRAMetadataField(**x)
+            if not context.services.model_manager.model_exists(
+                base_model=lora.lora.base_model,
+                model_name=lora.lora.model_name,
+                model_type=ModelType.Lora,
+            ):
+                raise Exception(f"Unknown lora {lora.lora.base_model}:{lora.lora.model_name}")
+
+            if self.unet is not None:
+                output.unet.loras.append(
+                    LoraInfo(
+                        base_model=lora.lora.base_model,
+                        model_name=lora.lora.model_name,
+                        model_type=ModelType.Lora,
+                        submodel=None,
+                        weight=lora.weight,
+                    )
                 )
-            )
-        )
+
+            if self.clip is not None:
+                output.clip.loras.append(
+                    LoraInfo(
+                        base_model=lora.lora.base_model,
+                        model_name=lora.lora.model_name,
+                        model_type=ModelType.Lora,
+                        submodel=None,
+                        weight=lora.weight,
+                    )
+                )
+
+        return output
+
+
+@invocation(
+    "metadata_to_sdlx_loras",
+    title="Metadata To SDXL LoRAs",
+    tags=["metadata"],
+    category="metadata",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
+class MetadataToSDXLLorasInvocation(BaseInvocation, WithMetadata):
+    """Extracts a SDXL Loras value of a label from metadata"""
+
+    unet: Optional[UNetField] = InputField(
+        default=None,
+        description=FieldDescriptions.unet,
+        input=Input.Connection,
+        title="UNet",
+    )
+    clip: Optional[ClipField] = InputField(
+        default=None,
+        description=FieldDescriptions.clip,
+        input=Input.Connection,
+        title="CLIP 1",
+    )
+    clip2: Optional[ClipField] = InputField(
+        default=None,
+        description=FieldDescriptions.clip,
+        input=Input.Connection,
+        title="CLIP 2",
+    )
+
+    def invoke(self, context: InvocationContext) -> SDXLLoraLoaderOutput:
+        data = {} if self.metadata is None else self.metadata.model_dump()
+        key = "loras"
+        if key in data:
+            loras = data.get(key, "")
+        else:
+            loras = []
+
+        output = SDXLLoraLoaderOutput()
+
+        if self.unet is not None:
+            output.unet = copy.deepcopy(self.unet)
+
+        if self.clip is not None:
+            output.clip = copy.deepcopy(self.clip)
+
+        if self.clip2 is not None:
+            output.clip2 = copy.deepcopy(self.clip2)
+
+        for x in loras:
+            lora = LoRAMetadataField(**x)
+            if not context.services.model_manager.model_exists(
+                base_model=lora.lora.base_model,
+                model_name=lora.lora.model_name,
+                model_type=ModelType.Lora,
+            ):
+                raise Exception(f"Unknown LoRA {lora.lora.base_model}:{lora.lora.model_name}")
+
+            if self.unet is not None:
+                output.unet.loras.append(
+                    LoraInfo(
+                        base_model=lora.lora.base_model,
+                        model_name=lora.lora.model_name,
+                        model_type=ModelType.Lora,
+                        submodel=None,
+                        weight=lora.weight,
+                    )
+                )
+
+            if self.clip is not None:
+                output.clip.loras.append(
+                    LoraInfo(
+                        base_model=lora.lora.base_model,
+                        model_name=lora.lora.model_name,
+                        model_type=ModelType.Lora,
+                        submodel=None,
+                        weight=lora.weight,
+                    )
+                )
+
+            if self.clip2 is not None:
+                output.clip2.loras.append(
+                    LoraInfo(
+                        base_model=lora.lora.base_model,
+                        model_name=lora.lora.model_name,
+                        model_type=ModelType.Lora,
+                        submodel=None,
+                        weight=lora.weight,
+                    )
+                )
+
+        return output
