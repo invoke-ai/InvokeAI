@@ -6,33 +6,44 @@ default: help
 help:
 	@echo Developer commands:
 	@echo
-	@echo "ruff           Run ruff, fixing any safely-fixable errors and formatting"
-	@echo "ruff-unsafe    Run ruff, fixing all fixable errors and formatting"
-	@echo "mypy           Run mypy using the config in pyproject.toml to identify type mismatches and other coding errors"
-	@echo "mypy-all       Run mypy ignoring the config in pyproject.tom but still ignoring missing imports"
-	@echo "frontend-build Build the frontend in order to run on localhost:9090"
-	@echo "frontend-dev   Run the frontend in developer mode on localhost:5173"
-	@echo "installer-zip  Build the installer .zip file for the current version"
-	@echo "tag-release    Tag the GitHub repository with the current version (use at release time only!)"
+	@echo "ruff              Run ruff, fixing any safely-fixable errors and formatting"
+	@echo "ruff-unsafe       Run ruff, fixing all fixable errors and formatting"
+	@echo "mypy              Run mypy using the config in pyproject.toml to identify type mismatches and other coding errors"
+	@echo "mypy-all          Run mypy ignoring the config in pyproject.tom but still ignoring missing imports"
+	@echo "test"             Run the unit tests.
+	@echo "frontend-install" Install the pnpm modules needed for the front end
+	@echo "frontend-build    Build the frontend in order to run on localhost:9090"
+	@echo "frontend-dev      Run the frontend in developer mode on localhost:5173"
+	@echo "installer-zip     Build the installer .zip file for the current version"
+	@echo "tag-release       Tag the GitHub repository with the current version (use at release time only!)"
 
 # Runs ruff, fixing any safely-fixable errors and formatting
 ruff:
-		ruff check . --fix
-		ruff format .
+	ruff check . --fix
+	ruff format .
 
 # Runs ruff, fixing all errors it can fix and formatting
 ruff-unsafe:
-		ruff check . --fix --unsafe-fixes
-		ruff format .
+	ruff check . --fix --unsafe-fixes
+	ruff format .
 
 # Runs mypy, using the config in pyproject.toml
 mypy:
-		mypy scripts/invokeai-web.py
+	mypy scripts/invokeai-web.py
 
 # Runs mypy, ignoring the config in pyproject.toml but still ignoring missing (untyped) imports
 # (many files are ignored by the config, so this is useful for checking all files)
 mypy-all:
-		mypy scripts/invokeai-web.py --config-file= --ignore-missing-imports
+	mypy scripts/invokeai-web.py --config-file= --ignore-missing-imports
+
+# Run the unit tests
+test:
+	pytest ./tests
+
+# Install the pnpm modules needed for the front end
+frontend-install:
+	rm -rf invokeai/frontend/web/node_modules
+	cd invokeai/frontend/web && pnpm install
 
 # Build the frontend
 frontend-build:
