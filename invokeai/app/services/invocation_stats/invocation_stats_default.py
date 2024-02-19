@@ -2,7 +2,7 @@ import json
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import Generator
 
 import psutil
 import torch
@@ -41,7 +41,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
         self._invoker = invoker
 
     @contextmanager
-    def collect_stats(self, invocation: BaseInvocation, graph_execution_state_id: str) -> Iterator[None]:
+    def collect_stats(self, invocation: BaseInvocation, graph_execution_state_id: str) -> Generator[None, None, None]:
         # This is to handle case of the model manager not being initialized, which happens
         # during some tests.
         services = self._invoker.services
