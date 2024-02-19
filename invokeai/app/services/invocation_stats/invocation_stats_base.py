@@ -30,7 +30,7 @@ writes to the system log is stored in InvocationServices.performance_statistics.
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Iterator
+from typing import ContextManager
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation
 from invokeai.app.services.invocation_stats.invocation_stats_common import InvocationStatsSummary
@@ -50,7 +50,7 @@ class InvocationStatsServiceBase(ABC):
         self,
         invocation: BaseInvocation,
         graph_execution_state_id: str,
-    ) -> Iterator[None]:
+    ) -> ContextManager[None]:
         """
         Return a context object that will capture the statistics on the execution
         of invocaation. Use with: to place around the part of the code that executes the invocation.
