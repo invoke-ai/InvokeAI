@@ -156,7 +156,7 @@ export type InvocationRetrievalErrorEvent = {
  *
  * @example socket.on('queue_item_status_changed', (data: QueueItemStatusChangedEvent) => { ... }
  */
-export type  QueueItemStatusChangedEvent = {
+export type QueueItemStatusChangedEvent = {
   queue_id: string;
   queue_item: {
     queue_id: string;
@@ -191,7 +191,7 @@ export type  QueueItemStatusChangedEvent = {
     failed: number;
     canceled: number;
     total: number;
-  }; 
+  };
 };
 
 export type ClientEmitSubscribeQueue = {
@@ -205,6 +205,7 @@ export type ClientEmitUnsubscribeQueue = {
 export type BulkDownloadStartedEvent = {
   bulk_download_id: string;
   bulk_download_item_id: string;
+  bulk_download_item_name: string;
 };
 
 export type BulkDownloadCompletedEvent = {
@@ -216,8 +217,9 @@ export type BulkDownloadCompletedEvent = {
 export type BulkDownloadFailedEvent = {
   bulk_download_id: string;
   bulk_download_item_id: string;
+  bulk_download_item_name: string;
   error: string;
-}
+};
 
 export type ClientEmitSubscribeBulkDownload = {
   bulk_download_id: string;
