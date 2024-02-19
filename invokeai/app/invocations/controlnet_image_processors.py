@@ -591,7 +591,7 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
     def run_processor(self, image: Image.Image):
         depth_anything_detector = DepthAnythingDetector()
         depth_anything_detector.load_model(model_size=self.model_size)
-        
+
         processed_image = depth_anything_detector(image=image, resolution=self.resolution, offload=self.offload)
         return processed_image
 
