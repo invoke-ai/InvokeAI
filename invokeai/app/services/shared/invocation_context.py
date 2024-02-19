@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, Optional
 from PIL.Image import Image
 from torch import Tensor
 
-from invokeai.app.invocations.fields import MetadataField, WithBoard, WithMetadata
 from invokeai.app.invocations.constants import IMAGE_MODES
+from invokeai.app.invocations.fields import MetadataField, WithBoard, WithMetadata
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
@@ -207,7 +207,9 @@ class ImagesInterface(InvocationContextInterface):
             try:
                 image = image.convert(mode)
             except ValueError:
-                self._services.logger.warning(f"Could not convert image from {image.mode} to {mode}. Using original mode instead.")
+                self._services.logger.warning(
+                    f"Could not convert image from {image.mode} to {mode}. Using original mode instead."
+                )
         return image
 
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
