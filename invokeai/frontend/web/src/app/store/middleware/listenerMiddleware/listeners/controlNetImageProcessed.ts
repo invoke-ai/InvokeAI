@@ -51,6 +51,7 @@ export const addControlNetImageProcessedListener = () => {
                 image: { image_name: ca.controlImage },
               },
             },
+            edges: [],
           },
           runs: 1,
         },
