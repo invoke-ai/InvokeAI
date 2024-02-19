@@ -1217,16 +1217,14 @@
         "clipSkip": {
             "paragraphs": [
                 "Kies hoeveel CLIP-modellagen je wilt overslaan.",
-                "Bepaalde modellen werken beter met bepaalde Overslaan CLIP-instellingen.",
-                "Een hogere waarde geeft meestal een minder gedetailleerde afbeelding."
+                "Bepaalde modellen werken beter met bepaalde Overslaan CLIP-instellingen."
             ],
             "heading": "Overslaan CLIP"
         },
         "paramModel": {
             "heading": "Model",
             "paragraphs": [
-                "Model gebruikt voor de ontruisingsstappen.",
-                "Verschillende modellen zijn meestal getraind om zich te specialiseren in het maken van bepaalde esthetische resultaten en materiaal."
+                "Model gebruikt voor de ontruisingsstappen."
             ]
         },
         "compositingCoherencePass": {

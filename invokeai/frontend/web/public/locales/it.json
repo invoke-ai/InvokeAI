@@ -1411,8 +1411,7 @@
         "clipSkip": {
             "paragraphs": [
                 "Scegli quanti livelli del modello CLIP saltare.",
-                "Alcuni modelli funzionano meglio con determinate impostazioni di CLIP Skip.",
-                "Un valore più alto in genere produce un'immagine meno dettagliata."
+                "Alcuni modelli funzionano meglio con determinate impostazioni di CLIP Skip."
             ]
         },
         "compositingCoherencePass": {
@@ -1528,8 +1527,7 @@
         "paramModel": {
             "heading": "Modello",
             "paragraphs": [
-                "Modello utilizzato per i passaggi di riduzione del rumore.",
-                "Diversi modelli sono generalmente addestrati per specializzarsi nella produzione di particolari risultati e contenuti estetici."
+                "Modello utilizzato per i passaggi di riduzione del rumore."
             ]
         },
         "paramDenoisingStrength": {

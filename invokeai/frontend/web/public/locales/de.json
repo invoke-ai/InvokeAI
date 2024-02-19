@@ -985,8 +985,7 @@
         "paramModel": {
             "heading": "Modell",
             "paragraphs": [
-                "Modell für die Entrauschungsschritte.",
-                "Verschiedene Modelle werden in der Regel so trainiert, dass sie sich auf die Erzeugung bestimmter Ästhetik und/oder Inhalte spezialisiert."
+                "Modell für die Entrauschungsschritte."
             ]
         },
         "paramIterations": {
