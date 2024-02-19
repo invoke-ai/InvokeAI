@@ -32,8 +32,8 @@ dependencies:
     specifier: ^5.0.16
     version: 5.0.16
   '@invoke-ai/ui-library':
-    specifier: ^0.0.18
-    version: 0.0.18(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@fontsource-variable/inter@5.0.16)(@internationalized/date@3.5.1)(@types/react@18.2.48)(i18next@23.7.16)(react-dom@18.2.0)(react@18.2.0)
+    specifier: ^0.0.21
+    version: 0.0.21(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@fontsource-variable/inter@5.0.16)(@internationalized/date@3.5.2)(@types/react@18.2.48)(i18next@23.7.16)(react-dom@18.2.0)(react@18.2.0)
   '@mantine/form':
     specifier: 6.0.21
     version: 6.0.21(react@18.2.0)
@@ -344,7 +344,7 @@ packages:
       '@jridgewell/trace-mapping': 0.3.21
     dev: true
 
-  /@ark-ui/anatomy@1.3.0(@internationalized/date@3.5.1):
+  /@ark-ui/anatomy@1.3.0(@internationalized/date@3.5.2):
     resolution: {integrity: sha512-1yG2MrzUlix6KthjQMCNiHnkXrWwEdFAX6D+HqGJaNu0XvaGul2J+wDNtjsdX+gxiWu1nXXEEOAWlFVYMUf65w==}
     dependencies:
       '@zag-js/accordion': 0.32.1
@@ -356,7 +356,7 @@ packages:
       '@zag-js/color-utils': 0.32.1
       '@zag-js/combobox': 0.32.1
       '@zag-js/date-picker': 0.32.1
-      '@zag-js/date-utils': 0.32.1(@internationalized/date@3.5.1)
+      '@zag-js/date-utils': 0.32.1(@internationalized/date@3.5.2)
       '@zag-js/dialog': 0.32.1
       '@zag-js/editable': 0.32.1
       '@zag-js/file-upload': 0.32.1
@@ -383,13 +383,13 @@ packages:
       - '@internationalized/date'
     dev: false
 
-  /@ark-ui/react@1.3.0(@internationalized/date@3.5.1)(react-dom@18.2.0)(react@18.2.0):
+  /@ark-ui/react@1.3.0(@internationalized/date@3.5.2)(react-dom@18.2.0)(react@18.2.0):
     resolution: {integrity: sha512-JHjNoIX50+mUCTaEGMjfGQWGGi31pKsV646jZJlR/1xohpYJigzg8BvO97cTsVk8fwtur+cm11gz3Nf7f5QUnA==}
     peerDependencies:
       react: '>=18.0.0'
       react-dom: '>=18.0.0'
     dependencies:
-      '@ark-ui/anatomy': 1.3.0(@internationalized/date@3.5.1)
+      '@ark-ui/anatomy': 1.3.0(@internationalized/date@3.5.2)
       '@zag-js/accordion': 0.32.1
       '@zag-js/avatar': 0.32.1
       '@zag-js/carousel': 0.32.1
@@ -399,7 +399,7 @@ packages:
       '@zag-js/combobox': 0.32.1
       '@zag-js/core': 0.32.1
       '@zag-js/date-picker': 0.32.1
-      '@zag-js/date-utils': 0.32.1(@internationalized/date@3.5.1)
+      '@zag-js/date-utils': 0.32.1(@internationalized/date@3.5.2)
       '@zag-js/dialog': 0.32.1
       '@zag-js/editable': 0.32.1
       '@zag-js/file-upload': 0.32.1
@@ -1709,6 +1709,13 @@ packages:
     dependencies:
       regenerator-runtime: 0.14.1
 
+  /@babel/runtime@7.23.9:
+    resolution: {integrity: sha512-0CX6F+BI2s9dkUqr08KFrAIZgNFj75rdBU/DjCyYLIaV/quFjkk6T+EJ2LkZHyZTbEV4L5p97mNkUsHl2wLFAw==}
+    engines: {node: '>=6.9.0'}
+    dependencies:
+      regenerator-runtime: 0.14.1
+    dev: false
+
   /@babel/template@7.22.15:
     resolution: {integrity: sha512-QPErUVm4uyJa60rkI73qneDacvdvzxshT3kksGqlGWYdOTIUOwJ7RDUL8sGqslY1uXWSL6xMFKEXDS3ox2uF0w==}
     engines: {node: '>=6.9.0'}
@@ -1969,7 +1976,7 @@ packages:
     dependencies:
       '@chakra-ui/dom-utils': 2.1.0
       react: 18.2.0
-      react-focus-lock: 2.9.6(@types/react@18.2.48)(react@18.2.0)
+      react-focus-lock: 2.11.1(@types/react@18.2.48)(react@18.2.0)
     transitivePeerDependencies:
       - '@types/react'
     dev: false
@@ -3013,7 +3020,7 @@ packages:
       '@types/react':
         optional: true
     dependencies:
-      '@babel/runtime': 7.23.8
+      '@babel/runtime': 7.23.9
       '@emotion/babel-plugin': 11.11.0
       '@emotion/is-prop-valid': 1.2.1
       '@emotion/react': 11.11.3(@types/react@18.2.48)(react@18.2.0)
@@ -3560,16 +3567,16 @@ packages:
     resolution: {integrity: sha512-dvuCeX5fC9dXgJn9t+X5atfmgQAzUOWqS1254Gh0m6i8wKd10ebXkfNKiRK+1GWi/yTvvLDHpoxLr0xxxeslWw==}
     dev: true
 
-  /@internationalized/date@3.5.1:
-    resolution: {integrity: sha512-LUQIfwU9e+Fmutc/DpRTGXSdgYZLBegi4wygCWDSVmUdLTaMHsQyASDiJtREwanwKuQLq0hY76fCJ9J/9I2xOQ==}
+  /@internationalized/date@3.5.2:
+    resolution: {integrity: sha512-vo1yOMUt2hzp63IutEaTUxROdvQg1qlMRsbCvbay2AK2Gai7wIgCyK5weEX3nHkiLgo4qCXHijFNC/ILhlRpOQ==}
     dependencies:
-      '@swc/helpers': 0.5.3
+      '@swc/helpers': 0.5.6
     dev: false
 
-  /@internationalized/number@3.5.0:
-    resolution: {integrity: sha512-ZY1BW8HT9WKYvaubbuqXbbDdHhOUMfE2zHHFJeTppid0S+pc8HtdIxFxaYMsGjCb4UsF+MEJ4n2TfU7iHnUK8w==}
+  /@internationalized/number@3.5.1:
+    resolution: {integrity: sha512-N0fPU/nz15SwR9IbfJ5xaS9Ss/O5h1sVXMZf43vc9mxEG48ovglvvzBjF53aHlq20uoR6c+88CrIXipU/LSzwg==}
     dependencies:
-      '@swc/helpers': 0.5.3
+      '@swc/helpers': 0.5.6
     dev: false
 
   /@invoke-ai/eslint-config-react@0.0.13(@typescript-eslint/eslint-plugin@6.19.0)(@typescript-eslint/parser@6.19.0)(eslint-config-prettier@9.1.0)(eslint-plugin-import@2.29.1)(eslint-plugin-react-hooks@4.6.0)(eslint-plugin-react-refresh@0.4.5)(eslint-plugin-react@7.33.2)(eslint-plugin-simple-import-sort@10.0.0)(eslint-plugin-storybook@0.6.15)(eslint-plugin-unused-imports@3.0.0)(eslint@8.56.0):
@@ -3608,14 +3615,14 @@ packages:
       prettier: 3.2.4
     dev: true
 
-  /@invoke-ai/ui-library@0.0.18(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@fontsource-variable/inter@5.0.16)(@internationalized/date@3.5.1)(@types/react@18.2.48)(i18next@23.7.16)(react-dom@18.2.0)(react@18.2.0):
-    resolution: {integrity: sha512-Yme+2+pzYy3TPb7ZT0hYmBwahH29ZRSVIxLKSexh3BsbJXbTzGssRQU78QvK6Ymxemgbso3P8Rs+IW0zNhQKjQ==}
+  /@invoke-ai/ui-library@0.0.21(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@fontsource-variable/inter@5.0.16)(@internationalized/date@3.5.2)(@types/react@18.2.48)(i18next@23.7.16)(react-dom@18.2.0)(react@18.2.0):
+    resolution: {integrity: sha512-tCvgkBPDt0gNq+8IcR03e/Mw7R8Mb/SMXTqx3FEIxlTQEo93A/D38dKXeDCzTdx4sQ+sknfB+JLBbHs6sg5hhQ==}
     peerDependencies:
       '@fontsource-variable/inter': ^5.0.16
       react: ^18.2.0
       react-dom: ^18.2.0
     dependencies:
-      '@ark-ui/react': 1.3.0(@internationalized/date@3.5.1)(react-dom@18.2.0)(react@18.2.0)
+      '@ark-ui/react': 1.3.0(@internationalized/date@3.5.2)(react-dom@18.2.0)(react@18.2.0)
       '@chakra-ui/anatomy': 2.2.2
       '@chakra-ui/icons': 2.1.1(@chakra-ui/system@2.6.2)(react@18.2.0)
       '@chakra-ui/layout': 2.3.1(@chakra-ui/system@2.6.2)(react@18.2.0)
@@ -3631,11 +3638,11 @@ packages:
       framer-motion: 10.18.0(react-dom@18.2.0)(react@18.2.0)
       lodash-es: 4.17.21
       nanostores: 0.9.5
-      overlayscrollbars: 2.4.7
-      overlayscrollbars-react: 0.5.4(overlayscrollbars@2.4.7)(react@18.2.0)
+      overlayscrollbars: 2.5.0
+      overlayscrollbars-react: 0.5.4(overlayscrollbars@2.5.0)(react@18.2.0)
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
-      react-i18next: 14.0.1(i18next@23.7.16)(react-dom@18.2.0)(react@18.2.0)
+      react-i18next: 14.0.5(i18next@23.7.16)(react-dom@18.2.0)(react@18.2.0)
       react-icons: 5.0.1(react@18.2.0)
       react-select: 5.8.0(@types/react@18.2.48)(react-dom@18.2.0)(react@18.2.0)
     transitivePeerDependencies:
@@ -5634,8 +5641,8 @@ packages:
     resolution: {integrity: sha512-9F4ys4C74eSTEUNndnER3VJ15oru2NumfQxS8geE+f3eB5xvfxpWyqE5XlVnxb/R14uoXi6SLbBwwiDSkv+XEw==}
     dev: true
 
-  /@swc/helpers@0.5.3:
-    resolution: {integrity: sha512-FaruWX6KdudYloq1AHD/4nU+UsMTdNE8CKyrseXWEcgjDAbvkwJg2QGPAnfIJLIWsjZOSPLOAykK6fuYp4vp4A==}
+  /@swc/helpers@0.5.6:
+    resolution: {integrity: sha512-aYX01Ke9hunpoCexYAgQucEpARGQ5w/cqHFrIR+e9gdKb1QWTsVJuTJ2ozQzIAxLyRQe/m+2RqzkyOOGiMKRQA==}
     dependencies:
       tslib: 2.6.2
     dev: false
@@ -6754,10 +6761,10 @@ packages:
   /@zag-js/date-picker@0.32.1:
     resolution: {integrity: sha512-n/hYmF+/R4+NuyfPRzCgeuLT6LJihKSuKzK29STPWy3sC/tBBHiqhNv1/4UKbatHUJXdBW2XF+N8Rw08RffcFQ==}
     dependencies:
-      '@internationalized/date': 3.5.1
+      '@internationalized/date': 3.5.2
       '@zag-js/anatomy': 0.32.1
       '@zag-js/core': 0.32.1
-      '@zag-js/date-utils': 0.32.1(@internationalized/date@3.5.1)
+      '@zag-js/date-utils': 0.32.1(@internationalized/date@3.5.2)
       '@zag-js/dismissable': 0.32.1
       '@zag-js/dom-event': 0.32.1
       '@zag-js/dom-query': 0.32.1
@@ -6769,12 +6776,12 @@ packages:
       '@zag-js/utils': 0.32.1
     dev: false
 
-  /@zag-js/date-utils@0.32.1(@internationalized/date@3.5.1):
+  /@zag-js/date-utils@0.32.1(@internationalized/date@3.5.2):
     resolution: {integrity: sha512-dbBDRSVr5pRUw3rXndyGuSshZiWqQI5JQO4D2KIFGkXzorj6WzoOpcO910Z7AdM/9cCAMpCjUrka8d8o9BpJBg==}
     peerDependencies:
       '@internationalized/date': '>=3.0.0'
     dependencies:
-      '@internationalized/date': 3.5.1
+      '@internationalized/date': 3.5.2
     dev: false
 
   /@zag-js/dialog@0.32.1:
@@ -6917,7 +6924,7 @@ packages:
   /@zag-js/number-input@0.32.1:
     resolution: {integrity: sha512-atyIOvoMITb4hZtQym7yD6I7grvPW83UeMFO8hCQg3HWwd2zR4+63mouWuyMoWb4QrzVFRVQBaU8OG5xGlknEw==}
     dependencies:
-      '@internationalized/number': 3.5.0
+      '@internationalized/number': 3.5.1
       '@zag-js/anatomy': 0.32.1
       '@zag-js/core': 0.32.1
       '@zag-js/dom-event': 0.32.1
@@ -9537,8 +9544,8 @@ packages:
     engines: {node: '>=0.4.0'}
     dev: true
 
-  /focus-lock@1.0.0:
-    resolution: {integrity: sha512-a8Ge6cdKh9za/GZR/qtigTAk7SrGore56EFcoMshClsh7FLk1zwszc/ltuMfKhx56qeuyL/jWQ4J4axou0iJ9w==}
+  /focus-lock@1.3.2:
+    resolution: {integrity: sha512-kFI92jZVqa8rP4Yer2sLNlUDcOdEFxYum2tIIr4eCH0XF+pOmlg0xiY4tkbDmHJXt3phtbJoWs1L6PgUVk97rA==}
     engines: {node: '>=10'}
     dependencies:
       tslib: 2.6.2
@@ -11431,13 +11438,13 @@ packages:
       react: 18.2.0
     dev: false
 
-  /overlayscrollbars-react@0.5.4(overlayscrollbars@2.4.7)(react@18.2.0):
+  /overlayscrollbars-react@0.5.4(overlayscrollbars@2.5.0)(react@18.2.0):
     resolution: {integrity: sha512-FPKx9XnXovTnI4+2JXig5uEaTLSEJ6svOwPzIfBBXTHBRNsz2+WhYUmfM0K/BNYxjgDEwuPm+NQhEoOA0RoG1g==}
     peerDependencies:
       overlayscrollbars: ^2.0.0
       react: '>=16.8.0'
     dependencies:
-      overlayscrollbars: 2.4.7
+      overlayscrollbars: 2.5.0
       react: 18.2.0
     dev: false
 
@@ -11445,8 +11452,8 @@ packages:
     resolution: {integrity: sha512-C7tmhetwMv9frEvIT/RfkAVEgbjRNz/Gh2zE8BVmN+jl35GRaAnz73rlGQCMRoC2arpACAXyMNnJkzHb7GBrcA==}
     dev: false
 
-  /overlayscrollbars@2.4.7:
-    resolution: {integrity: sha512-02X2/nHno35dzebCx+EO2tRDaKAOltZqUKdUqvq3Pt8htCuhJbYi+mjr0CYerVeGRRoZ2Uo6/8XrNg//DJJ+GA==}
+  /overlayscrollbars@2.5.0:
+    resolution: {integrity: sha512-CWVC2dwS07XZfLHDm5GmZN1iYggiJ8Vufnvzwt0gwR9Yz1hVckKeTxg7VILZeYVGhDYJHZ1Xc8Xfys5dWZ1qiA==}
     dev: false
 
   /p-limit@2.3.0:
@@ -11949,7 +11956,7 @@ packages:
     peerDependencies:
       react: ^15.3.0 || ^16.0.0 || ^17.0.0 || ^18.0.0
     dependencies:
-      '@babel/runtime': 7.23.8
+      '@babel/runtime': 7.23.9
       react: 18.2.0
     dev: false
 
@@ -12035,8 +12042,8 @@ packages:
     resolution: {integrity: sha512-nsO+KSNgo1SbJqJEYRE9ERzo7YtYbou/OqjSQKxV7jcKox7+usiUVZOAC+XnDOABXggQTno0Y1CpVnuWEc1boQ==}
     dev: false
 
-  /react-focus-lock@2.9.6(@types/react@18.2.48)(react@18.2.0):
-    resolution: {integrity: sha512-B7gYnCjHNrNYwY2juS71dHbf0+UpXXojt02svxybj8N5bxceAkzPChKEncHuratjUHkIFNCn06k2qj1DRlzTug==}
+  /react-focus-lock@2.11.1(@types/react@18.2.48)(react@18.2.0):
+    resolution: {integrity: sha512-IXLwnTBrLTlKTpASZXqqXJ8oymWrgAlOfuuDYN4XCuN1YJ72dwX198UCaF1QqGUk5C3QOnlMik//n3ufcfe8Ig==}
     peerDependencies:
       '@types/react': ^16.8.0 || ^17.0.0 || ^18.0.0
       react: ^16.8.0 || ^17.0.0 || ^18.0.0
@@ -12044,9 +12051,9 @@ packages:
       '@types/react':
         optional: true
     dependencies:
-      '@babel/runtime': 7.23.8
+      '@babel/runtime': 7.23.9
       '@types/react': 18.2.48
-      focus-lock: 1.0.0
+      focus-lock: 1.3.2
       prop-types: 15.8.1
       react: 18.2.0
       react-clientside-effect: 1.2.6(react@18.2.0)
@@ -12093,8 +12100,8 @@ packages:
       react-dom: 18.2.0(react@18.2.0)
     dev: false
 
-  /react-i18next@14.0.1(i18next@23.7.16)(react-dom@18.2.0)(react@18.2.0):
-    resolution: {integrity: sha512-TMV8hFismBmpMdIehoFHin/okfvgjFhp723RYgIqB4XyhDobVMyukyM3Z8wtTRmajyFMZrBl/OaaXF2P6WjUAw==}
+  /react-i18next@14.0.5(i18next@23.7.16)(react-dom@18.2.0)(react@18.2.0):
+    resolution: {integrity: sha512-5+bQSeEtgJrMBABBL5lO7jPdSNAbeAZ+MlFWDw//7FnVacuVu3l9EeWFzBQvZsKy+cihkbThWOAThEdH8YjGEw==}
     peerDependencies:
       i18next: '>= 23.2.3'
       react: '>= 16.8.0'
@@ -12106,7 +12113,7 @@ packages:
       react-native:
         optional: true
     dependencies:
-      '@babel/runtime': 7.23.8
+      '@babel/runtime': 7.23.9
       html-parse-stringify: 3.0.1
       i18next: 23.7.16
       react: 18.2.0
@@ -12204,6 +12211,23 @@ packages:
       react: 18.2.0
       react-style-singleton: 2.2.1(@types/react@18.2.48)(react@18.2.0)
       tslib: 2.6.2
+    dev: true
+
+  /react-remove-scroll-bar@2.3.5(@types/react@18.2.48)(react@18.2.0):
+    resolution: {integrity: sha512-3cqjOqg6s0XbOjWvmasmqHch+RLxIEk2r/70rzGXuz3iIGQsQheEQyqYCBb5EECoD01Vo2SIbDqW4paLeLTASw==}
+    engines: {node: '>=10'}
+    peerDependencies:
+      '@types/react': ^16.8.0 || ^17.0.0 || ^18.0.0
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+    dependencies:
+      '@types/react': 18.2.48
+      react: 18.2.0
+      react-style-singleton: 2.2.1(@types/react@18.2.48)(react@18.2.0)
+      tslib: 2.6.2
+    dev: false
 
   /react-remove-scroll@2.5.5(@types/react@18.2.48)(react@18.2.0):
     resolution: {integrity: sha512-ImKhrzJJsyXJfBZ4bzu8Bwpka14c/fQt0k+cyFp/PBhTfyDnU5hjOtM4AG/0AMyy8oKzOTR0lDgJIM7pYXI0kw==}
@@ -12236,7 +12260,7 @@ packages:
     dependencies:
       '@types/react': 18.2.48
       react: 18.2.0
-      react-remove-scroll-bar: 2.3.4(@types/react@18.2.48)(react@18.2.0)
+      react-remove-scroll-bar: 2.3.5(@types/react@18.2.48)(react@18.2.0)
       react-style-singleton: 2.2.1(@types/react@18.2.48)(react@18.2.0)
       tslib: 2.6.2
       use-callback-ref: 1.3.1(@types/react@18.2.48)(react@18.2.0)

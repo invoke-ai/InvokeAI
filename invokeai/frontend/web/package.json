@@ -57,7 +57,7 @@
     "@dnd-kit/sortable": "^8.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@fontsource-variable/inter": "^5.0.16",
-    "@invoke-ai/ui-library": "^0.0.18",
+    "@invoke-ai/ui-library": "^0.0.21",
     "@mantine/form": "6.0.21",
     "@nanostores/react": "^0.7.1",
     "@reduxjs/toolkit": "2.0.1",
