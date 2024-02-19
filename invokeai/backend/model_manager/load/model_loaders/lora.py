@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.embeddings.lora import LoRAModelRaw
+from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,
@@ -18,13 +18,13 @@ from invokeai.backend.model_manager import (
     SubModelType,
 )
 from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
-from invokeai.backend.model_manager.load.load_base import AnyModelLoader
-from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
 
+from .. import ModelLoader, ModelLoaderRegistry
 
-@AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.Lora, format=ModelFormat.Diffusers)
-@AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.Lora, format=ModelFormat.Lycoris)
+
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Lora, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Lora, format=ModelFormat.Lycoris)
 class LoraLoader(ModelLoader):
     """Class to load LoRA models."""
 

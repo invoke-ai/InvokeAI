@@ -68,7 +68,7 @@ class InvokeAISettings(BaseSettings):
         return OmegaConf.to_yaml(conf)
 
     @classmethod
-    def add_parser_arguments(cls, parser) -> None:
+    def add_parser_arguments(cls, parser: ArgumentParser) -> None:
         """Dynamically create arguments for a settings parser."""
         if "type" in get_type_hints(cls):
             settings_stanza = get_args(get_type_hints(cls)["type"])[0]

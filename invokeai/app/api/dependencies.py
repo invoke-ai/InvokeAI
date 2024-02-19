@@ -28,6 +28,8 @@ from ..services.invocation_services import InvocationServices
 from ..services.invocation_stats.invocation_stats_default import InvocationStatsService
 from ..services.invoker import Invoker
 from ..services.model_manager.model_manager_default import ModelManagerService
+from ..services.model_metadata import ModelMetadataStoreSQL
+from ..services.model_records import ModelRecordServiceSQL
 from ..services.names.names_default import SimpleNameService
 from ..services.session_processor.session_processor_default import DefaultSessionProcessor
 from ..services.session_queue.session_queue_sqlite import SqliteSessionQueue
@@ -94,8 +96,12 @@ class ApiDependencies:
             ObjectSerializerDisk[ConditioningFieldData](output_folder / "conditioning", ephemeral=True)
         )
         download_queue_service = DownloadQueueService(event_bus=events)
+        model_metadata_service = ModelMetadataStoreSQL(db=db)
         model_manager = ModelManagerService.build_model_manager(
-            app_config=configuration, db=db, download_queue=download_queue_service, events=events
+            app_config=configuration,
+            model_record_service=ModelRecordServiceSQL(db=db, metadata_store=model_metadata_service),
+            download_queue=download_queue_service,
+            events=events,
         )
         names = SimpleNameService()
         performance_statistics = InvocationStatsService()

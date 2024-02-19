@@ -54,8 +54,8 @@ class LicenseRestrictions(BaseModel):
     AllowDifferentLicense: bool = Field(
         description="if true, derivatives of this model be redistributed under a different license", default=False
     )
-    AllowCommercialUse: CommercialUsage = Field(
-        description="Type of commercial use allowed or 'No' if no commercial use is allowed.", default_factory=set
+    AllowCommercialUse: Optional[CommercialUsage] = Field(
+        description="Type of commercial use allowed or 'No' if no commercial use is allowed.", default=None
     )
 
 
@@ -139,7 +139,10 @@ class CivitaiMetadata(ModelMetadataWithFiles):
     @property
     def allow_commercial_use(self) -> bool:
         """Return True if commercial use is allowed."""
-        return self.restrictions.AllowCommercialUse != CommercialUsage("None")
+        if self.restrictions.AllowCommercialUse is None:
+            return False
+        else:
+            return self.restrictions.AllowCommercialUse != CommercialUsage("None")
 
     @property
     def allow_derivatives(self) -> bool:

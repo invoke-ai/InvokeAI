@@ -20,7 +20,7 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase, TqdmProgress
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase, ModelRecordServiceSQL
+from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
@@ -33,7 +33,6 @@ from invokeai.backend.model_manager.metadata import (
     AnyModelRepoMetadata,
     CivitaiMetadataFetch,
     HuggingFaceMetadataFetch,
-    ModelMetadataStore,
     ModelMetadataWithFiles,
     RemoteModelFile,
 )
@@ -65,7 +64,6 @@ class ModelInstallService(ModelInstallServiceBase):
         app_config: InvokeAIAppConfig,
         record_store: ModelRecordServiceBase,
         download_queue: DownloadQueueServiceBase,
-        metadata_store: Optional[ModelMetadataStore] = None,
         event_bus: Optional[EventServiceBase] = None,
         session: Optional[Session] = None,
     ):
@@ -93,14 +91,7 @@ class ModelInstallService(ModelInstallServiceBase):
         self._running = False
         self._session = session
         self._next_job_id = 0
-        # There may not necessarily be a metadata store initialized
-        # so we create one and initialize it with the same sql database
-        # used by the record store service.
-        if metadata_store:
-            self._metadata_store = metadata_store
-        else:
-            assert isinstance(record_store, ModelRecordServiceSQL)
-            self._metadata_store = ModelMetadataStore(record_store.db)
+        self._metadata_store = record_store.metadata_store  # for convenience
 
     @property
     def app_config(self) -> InvokeAIAppConfig:  # noqa D102
@@ -259,7 +250,7 @@ class ModelInstallService(ModelInstallServiceBase):
         """Block until all installation jobs are done."""
         start = time.time()
         while len(self._download_cache) > 0:
-            if self._downloads_changed_event.wait(timeout=5):  # in case we miss an event
+            if self._downloads_changed_event.wait(timeout=0.25):  # in case we miss an event
                 self._downloads_changed_event.clear()
             if timeout > 0 and time.time() - start > timeout:
                 raise TimeoutError("Timeout exceeded")

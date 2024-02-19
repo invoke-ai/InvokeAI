@@ -13,7 +13,7 @@ from typing import Any, List, Optional, Set
 
 import torch
 from diffusers import AutoPipelineForText2Image
-from diffusers import logging as dlogging
+from diffusers.utils import logging as dlogging
 
 from invokeai.app.services.model_install import ModelInstallServiceBase
 from invokeai.backend.util.devices import choose_torch_device, torch_dtype
@@ -39,10 +39,7 @@ class ModelMerger(object):
 
     def __init__(self, installer: ModelInstallServiceBase):
         """
-        Initialize a ModelMerger object.
-
-        :param store: Underlying storage manager for the running process.
-        :param config: InvokeAIAppConfig object (if not provided, default will be selected).
+        Initialize a ModelMerger object with the model installer.
         """
         self._installer = installer
 
@@ -79,7 +76,7 @@ class ModelMerger(object):
                 custom_pipeline="checkpoint_merger",
                 torch_dtype=dtype,
                 variant=variant,
-            )
+            )  # type: ignore
             merged_pipe = pipe.merge(
                 pretrained_model_name_or_path_list=model_paths,
                 alpha=alpha,

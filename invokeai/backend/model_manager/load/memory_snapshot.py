@@ -5,7 +5,7 @@ import psutil
 import torch
 from typing_extensions import Self
 
-from invokeai.backend.model_management.libc_util import LibcUtil, Struct_mallinfo2
+from ..util.libc_util import LibcUtil, Struct_mallinfo2
 
 GB = 2**30  # 1 GB
 
@@ -55,7 +55,7 @@ class MemorySnapshot:
             vram = None
 
         try:
-            malloc_info = LibcUtil().mallinfo2()  # type: ignore
+            malloc_info = LibcUtil().mallinfo2()
         except (OSError, AttributeError):
             # OSError: This is expected in environments that do not have the 'libc.so.6' shared library.
             # AttributeError: This is expected in environments that have `libc.so.6` but do not have the `mallinfo2` (e.g. glibc < 2.33)
@@ -97,4 +97,4 @@ def get_pretty_snapshot_diff(snapshot_1: Optional[MemorySnapshot], snapshot_2: O
     if snapshot_1.vram is not None and snapshot_2.vram is not None:
         msg += get_msg_line("VRAM", snapshot_1.vram, snapshot_2.vram)
 
-    return "\n" + msg if len(msg) > 0 else msg
+    return msg

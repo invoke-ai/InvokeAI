@@ -5,7 +5,6 @@
 from pathlib import Path
 from typing import Optional, Tuple
 
-from invokeai.backend.embeddings.textual_inversion import TextualInversionModelRaw
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,
@@ -15,12 +14,15 @@ from invokeai.backend.model_manager import (
     ModelType,
     SubModelType,
 )
-from invokeai.backend.model_manager.load.load_base import AnyModelLoader
-from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.textual_inversion import TextualInversionModelRaw
+
+from .. import ModelLoader, ModelLoaderRegistry
 
 
-@AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.TextualInversion, format=ModelFormat.EmbeddingFile)
-@AnyModelLoader.register(base=BaseModelType.Any, type=ModelType.TextualInversion, format=ModelFormat.EmbeddingFolder)
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.TextualInversion, format=ModelFormat.EmbeddingFile)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.Any, type=ModelType.TextualInversion, format=ModelFormat.EmbeddingFolder
+)
 class TextualInversionLoader(ModelLoader):
     """Class to load TI models."""
 

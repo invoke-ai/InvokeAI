@@ -17,16 +17,16 @@ from invokeai.app.invocations.primitives import ConditioningOutput
 from invokeai.app.services.model_records import UnknownModelException
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.ti_utils import extract_ti_triggers_from_prompt
-from invokeai.backend.embeddings.lora import LoRAModelRaw
-from invokeai.backend.embeddings.model_patcher import ModelPatcher
-from invokeai.backend.embeddings.textual_inversion import TextualInversionModelRaw
+from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import ModelType
+from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     ConditioningFieldData,
     ExtraConditioningInfo,
     SDXLConditioningInfo,
 )
+from invokeai.backend.textual_inversion import TextualInversionModelRaw
 from invokeai.backend.util.devices import torch_dtype
 
 from .baseinvocation import (
