@@ -164,7 +164,6 @@ export type IntegerOutput = S['IntegerOutput'];
 export type IterateInvocationOutput = S['IterateInvocationOutput'];
 export type CollectInvocationOutput = S['CollectInvocationOutput'];
 export type LatentsOutput = S['LatentsOutput'];
-export type GraphInvocationOutput = S['GraphInvocationOutput'];
 
 // Post-image upload actions, controls workflows when images are uploaded
 
