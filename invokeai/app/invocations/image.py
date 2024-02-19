@@ -7,6 +7,7 @@ import cv2
 import numpy
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
+from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import (
     ColorField,
     FieldDescriptions,
@@ -16,7 +17,6 @@ from invokeai.app.invocations.fields import (
     WithMetadata,
 )
 from invokeai.app.invocations.primitives import ImageOutput
-from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
