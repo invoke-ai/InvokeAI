@@ -423,10 +423,6 @@ class MediapipeFaceProcessorInvocation(ImageProcessorInvocation):
     min_confidence: float = InputField(default=0.5, ge=0, le=1, description="Minimum confidence for face detection")
 
     def run_processor(self, image):
-        # MediaPipeFaceDetector throws an error if image has alpha channel
-        #     so convert to RGB if needed
-        if image.mode == "RGBA":
-            image = image.convert("RGB")
         mediapipe_face_processor = MediapipeFaceDetector()
         processed_image = mediapipe_face_processor(image, max_faces=self.max_faces, min_confidence=self.min_confidence)
         return processed_image
@@ -595,8 +591,7 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
     def run_processor(self, image: Image.Image):
         depth_anything_detector = DepthAnythingDetector()
         depth_anything_detector.load_model(model_size=self.model_size)
-
-        image = image.convert("RGB") if image.mode != "RGB" else image
+        
         processed_image = depth_anything_detector(image=image, resolution=self.resolution, offload=self.offload)
         return processed_image
 
@@ -617,7 +612,6 @@ class DWOpenposeImageProcessorInvocation(ImageProcessorInvocation):
     image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
 
     def run_processor(self, image: Image.Image):
-        image = image.convert("RGB") if image.mode != "RGB" else image
         dw_openpose = DWOpenposeDetector()
         processed_image = dw_openpose(
             image,
