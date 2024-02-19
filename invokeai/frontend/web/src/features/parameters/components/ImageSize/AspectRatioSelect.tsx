@@ -1,6 +1,7 @@
 import type { ComboboxOption, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import type { SingleValue } from 'chakra-react-select';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { ASPECT_RATIO_OPTIONS } from 'features/parameters/components/ImageSize/constants';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { isAspectRatioID } from 'features/parameters/components/ImageSize/types';
@@ -28,7 +29,9 @@ export const AspectRatioSelect = memo(() => {
 
   return (
     <FormControl>
-      <FormLabel>{t('parameters.aspect')}</FormLabel>
+      <InformationalPopover feature="paramAspect">
+        <FormLabel>{t('parameters.aspect')}</FormLabel>
+      </InformationalPopover>
       <Combobox value={value} onChange={onChange} options={ASPECT_RATIO_OPTIONS} sx={selectStyles} />
     </FormControl>
   );

@@ -10,6 +10,7 @@ import {
   Text,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { loraIsEnabledChanged, loraRemoved, loraWeightChanged } from 'features/lora/store/loraSlice';
 import { memo, useCallback } from 'react';
@@ -57,29 +58,31 @@ export const LoRACard = memo((props: LoRACardProps) => {
           </Flex>
         </Flex>
       </CardHeader>
-      <CardBody>
-        <CompositeSlider
-          value={lora.weight}
-          onChange={handleChange}
-          min={-1}
-          max={2}
-          step={0.01}
-          marks={marks}
-          defaultValue={0.75}
-          isDisabled={!lora.isEnabled}
-        />
-        <CompositeNumberInput
-          value={lora.weight}
-          onChange={handleChange}
-          min={-5}
-          max={5}
-          step={0.01}
-          w={20}
-          flexShrink={0}
-          defaultValue={0.75}
-          isDisabled={!lora.isEnabled}
-        />
-      </CardBody>
+      <InformationalPopover feature="loraWeight">
+        <CardBody>
+          <CompositeSlider
+            value={lora.weight}
+            onChange={handleChange}
+            min={-1}
+            max={2}
+            step={0.01}
+            marks={marks}
+            defaultValue={0.75}
+            isDisabled={!lora.isEnabled}
+          />
+          <CompositeNumberInput
+            value={lora.weight}
+            onChange={handleChange}
+            min={-5}
+            max={5}
+            step={0.01}
+            w={20}
+            flexShrink={0}
+            defaultValue={0.75}
+            isDisabled={!lora.isEnabled}
+          />
+        </CardBody>
+      </InformationalPopover>
     </Card>
   );
 });

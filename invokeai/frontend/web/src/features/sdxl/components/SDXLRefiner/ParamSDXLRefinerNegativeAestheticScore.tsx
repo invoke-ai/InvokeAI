@@ -1,5 +1,6 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setRefinerNegativeAestheticScore } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +15,9 @@ const ParamSDXLRefinerNegativeAestheticScore = () => {
 
   return (
     <FormControl>
-      <FormLabel>{t('sdxl.negAestheticScore')}</FormLabel>
+      <InformationalPopover feature="refinerNegativeAestheticScore">
+        <FormLabel>{t('sdxl.negAestheticScore')}</FormLabel>
+      </InformationalPopover>
       <CompositeSlider
         min={1}
         max={10}

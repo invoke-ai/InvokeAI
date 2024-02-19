@@ -1424,9 +1424,8 @@
         "clipSkip": {
             "heading": "CLIP Skip",
             "paragraphs": [
-                "Choose how many layers of the CLIP model to skip.",
-                "Some models work better with certain CLIP Skip settings.",
-                "A higher value typically results in a less detailed image."
+                "How many layers of the CLIP model to skip.",
+                "Certain models are better suited to be used with CLIP Skip."
             ]
         },
         "paramNegativeConditioning": {
@@ -1446,7 +1445,8 @@
         "paramScheduler": {
             "heading": "Scheduler",
             "paragraphs": [
-                "Scheduler defines how to iteratively add noise to an image or how to update a sample based on a model's output."
+                "Scheduler used during the generation process.",
+                "Each scheduler defines how to iteratively add noise to an image or how to update a sample based on a model's output."
             ]
         },
         "compositingBlur": {
@@ -1463,37 +1463,19 @@
         },
         "compositingCoherenceMode": {
             "heading": "Mode",
-            "paragraphs": ["The mode of the Coherence Pass."]
+            "paragraphs": ["Method used to create a coherent image with the newly generated masked area."]
         },
         "compositingCoherenceSteps": {
             "heading": "Steps",
-            "paragraphs": ["Number of denoising steps used in the Coherence Pass.", "Same as the main Steps parameter."]
+            "paragraphs": ["Number of steps in the Coherence Pass.", "Similar to Generation Steps."]
         },
         "compositingStrength": {
             "heading": "Strength",
-            "paragraphs": [
-                "Denoising strength for the Coherence Pass.",
-                "Same as the Image to Image Denoising Strength parameter."
-            ]
+            "paragraphs": ["Amount of noise added for the Coherence Pass.", "Similar to Denoising Strength."]
         },
         "compositingMaskAdjustments": {
             "heading": "Mask Adjustments",
             "paragraphs": ["Adjust the mask."]
-        },
-        "controlNetBeginEnd": {
-            "heading": "Begin / End Step Percentage",
-            "paragraphs": [
-                "Which steps of the denoising process will have the ControlNet applied.",
-                "ControlNets applied at the beginning of the process guide composition, and ControlNets applied at the end guide details."
-            ]
-        },
-        "controlNetControlMode": {
-            "heading": "Control Mode",
-            "paragraphs": ["Lends more weight to either the prompt or ControlNet."]
-        },
-        "controlNetResizeMode": {
-            "heading": "Resize Mode",
-            "paragraphs": ["How the ControlNet image will be fit to the image output size."]
         },
         "controlNet": {
             "heading": "ControlNet",
@@ -1501,9 +1483,32 @@
                 "ControlNets provide guidance to the generation process, helping create images with controlled composition, structure, or style, depending on the model selected."
             ]
         },
+        "controlNetBeginEnd": {
+            "heading": "Begin / End Step Percentage",
+            "paragraphs": [
+                "The part of the of the denoising process that will have the Control Adapter applied.",
+                "Generally, Control Adapters applied at the start of the process guide composition, and Control Adapters applied at the end guide details."
+            ]
+        },
+        "controlNetControlMode": {
+            "heading": "Control Mode",
+            "paragraphs": ["Lend more weight to either the prompt or ControlNet."]
+        },
+        "controlNetProcessor": {
+            "heading": "Processor",
+            "paragraphs": [
+                "Method of processing the input image to guide the generation process. Different processors will providedifferent effects or styles in your generated images."
+            ]
+        },
+        "controlNetResizeMode": {
+            "heading": "Resize Mode",
+            "paragraphs": ["Method to fit Control Adapter's input image size to the output generation size."]
+        },
         "controlNetWeight": {
             "heading": "Weight",
-            "paragraphs": ["How strongly the ControlNet will impact the generated image."]
+            "paragraphs": [
+                "Weight of the Control Adapter. Higher weight will lead to larger impacts on the final image."
+            ]
         },
         "dynamicPrompts": {
             "heading": "Dynamic Prompts",
@@ -1526,13 +1531,23 @@
                 "Per Image will use a unique seed for each image. This provides more variation."
             ]
         },
+        "imageFit": {
+            "heading": "Fit Initial Image to Output Size",
+            "paragraphs": [
+                "Resizes the initial image to the width and height of the output image. Recommended to enable."
+            ]
+        },
         "infillMethod": {
             "heading": "Infill Method",
-            "paragraphs": ["Method to infill the selected area."]
+            "paragraphs": ["Method of infilling during the Outpainting or Inpainting process."]
         },
         "lora": {
-            "heading": "LoRA Weight",
-            "paragraphs": ["Higher LoRA weight will lead to larger impacts on the final image."]
+            "heading": "LoRA",
+            "paragraphs": ["Lightweight models that are used in conjunction with base models."]
+        },
+        "loraWeight": {
+            "heading": "Weight",
+            "paragraphs": ["Weight of the LoRA. Higher weight will lead to larger impacts on the final image."]
         },
         "noiseUseCPU": {
             "heading": "Use CPU Noise",
@@ -1542,14 +1557,25 @@
                 "There is no performance impact to enabling CPU Noise."
             ]
         },
+        "paramAspect": {
+            "heading": "Aspect",
+            "paragraphs": [
+                "Aspect ratio of the generated image. Changing the ratio will update the Width and Height accordingly.",
+                "“Optimize” will set the Width and Height to optimal dimensions for the chosen model."
+            ]
+        },
         "paramCFGScale": {
             "heading": "CFG Scale",
-            "paragraphs": ["Controls how much your prompt influences the generation process."]
+            "paragraphs": [
+                "Controls how much the prompt influences the generation process.",
+                "High CFG Scale values can result in over-saturation and distorted generation results. "
+            ]
         },
         "paramCFGRescaleMultiplier": {
             "heading": "CFG Rescale Multiplier",
             "paragraphs": [
-                "Rescale multiplier for CFG guidance, used for models trained using zero-terminal SNR (ztsnr). Suggested value 0.7."
+                "Rescale multiplier for CFG guidance, used for models trained using zero-terminal SNR (ztsnr).",
+                "Suggested value of 0.7 for these models."
             ]
         },
         "paramDenoisingStrength": {
@@ -1557,6 +1583,16 @@
             "paragraphs": [
                 "How much noise is added to the input image.",
                 "0 will result in an identical image, while 1 will result in a completely new image."
+            ]
+        },
+        "paramHeight": {
+            "heading": "Height",
+            "paragraphs": ["Height of the generated image. Must be a multiple of 8."]
+        },
+        "paramHrf": {
+            "heading": "Enable High Resolution Fix",
+            "paragraphs": [
+                "Generate high quality images at a larger resolution than optimal for the model. Generally used to prevent duplication in the generated image."
             ]
         },
         "paramIterations": {
@@ -1569,8 +1605,7 @@
         "paramModel": {
             "heading": "Model",
             "paragraphs": [
-                "Model used for the denoising steps.",
-                "Different models are typically trained to specialize in producing particular aesthetic results and content."
+                "Model used for generation. Different models are trained to specialize in producing different aesthetic results and content."
             ]
         },
         "paramRatio": {
@@ -1584,7 +1619,7 @@
             "heading": "Seed",
             "paragraphs": [
                 "Controls the starting noise used for generation.",
-                "Disable “Random Seed” to produce identical results with the same generation settings."
+                "Disable the “Random” option to produce identical results with the same generation settings."
             ]
         },
         "paramSteps": {
@@ -1594,6 +1629,10 @@
                 "Higher step counts will typically create better images but will require more generation time."
             ]
         },
+        "paramUpscaleMethod": {
+            "heading": "Upscale Method",
+            "paragraphs": ["Method used to upscale the image for High Resolution Fix."]
+        },
         "paramVAE": {
             "heading": "VAE",
             "paragraphs": ["Model used for translating AI output into the final image."]
@@ -1601,14 +1640,82 @@
         "paramVAEPrecision": {
             "heading": "VAE Precision",
             "paragraphs": [
-                "The precision used during VAE encoding and decoding. FP16/half precision is more efficient, at the expense of minor image variations."
+                "The precision used during VAE encoding and decoding.",
+                "Fp16/Half precision is more efficient, at the expense of minor image variations."
+            ]
+        },
+        "paramWidth": {
+            "heading": "Width",
+            "paragraphs": ["Width of the generated image. Must be a multiple of 8."]
+        },
+        "patchmatchDownScaleSize": {
+            "heading": "Downscale",
+            "paragraphs": [
+                "How much downscaling occurs before infilling.",
+                "Higher downscaling will improve performance and reduce quality."
+            ]
+        },
+        "refinerModel": {
+            "heading": "Refiner Model",
+            "paragraphs": [
+                "Model used during the refiner portion of the generation process.",
+                "Similar to the Generation Model."
+            ]
+        },
+        "refinerPositiveAestheticScore": {
+            "heading": "Positive Aesthetic Score",
+            "paragraphs": [
+                "Weight generations to be more similar to images with a high aesthetic score, based on the training data."
+            ]
+        },
+        "refinerNegativeAestheticScore": {
+            "heading": "Negative Aesthetic Score",
+            "paragraphs": [
+                "Weight generations to be more similar to images with a low aesthetic score, based on the training data."
+            ]
+        },
+        "refinerScheduler": {
+            "heading": "Scheduler",
+            "paragraphs": [
+                "Scheduler used during the refiner portion of the generation process.",
+                "Similar to the Generation Scheduler."
+            ]
+        },
+        "refinerStart": {
+            "heading": "Refiner Start",
+            "paragraphs": [
+                "Where in the generation process the refiner will start to be used.",
+                "0 means the refiner will be used for the entire generation process, 0.8 means the refiner will be used for the last 20% of the generation process."
+            ]
+        },
+        "refinerSteps": {
+            "heading": "Steps",
+            "paragraphs": [
+                "Number of steps that will be performed during the refiner portion of the generation process.",
+                "Similar to the Generation Steps."
+            ]
+        },
+        "refinerCfgScale": {
+            "heading": "CFG Scale",
+            "paragraphs": [
+                "Controls how much the prompt influences the generation process.",
+                "Similar to the Generation CFG Scale."
             ]
         },
         "scaleBeforeProcessing": {
             "heading": "Scale Before Processing",
             "paragraphs": [
-                "Scales the selected area to the size best suited for the model before the image generation process."
+                "“Auto” scales the selected area to the size best suited for the model before the image generation process.",
+                "“Manual” allows you to choose the width and height the selected area will be scaled to before the image generation process."
             ]
+        },
+        "seamlessTilingXAxis": {
+            "heading": "Seamless Tiling X Axis",
+            "paragraphs": ["Seamlessly tile an image along the horizontal axis."]
+        },
+        "seamlessTilingYAxis": {
+            "heading": "Seamless Tiling Y Axis",
+            "paragraphs": ["Seamlessly tile an image along the vertical axis."]
         }
     },
     "ui": {

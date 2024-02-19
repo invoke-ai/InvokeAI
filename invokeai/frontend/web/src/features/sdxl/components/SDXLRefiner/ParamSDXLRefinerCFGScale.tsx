@@ -1,5 +1,6 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setRefinerCFGScale } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,7 +22,9 @@ const ParamSDXLRefinerCFGScale = () => {
 
   return (
     <FormControl>
-      <FormLabel>{t('sdxl.cfgScale')}</FormLabel>
+      <InformationalPopover feature="refinerCfgScale">
+        <FormLabel>{t('sdxl.cfgScale')}</FormLabel>
+      </InformationalPopover>
       <CompositeSlider
         value={refinerCFGScale}
         defaultValue={initial}

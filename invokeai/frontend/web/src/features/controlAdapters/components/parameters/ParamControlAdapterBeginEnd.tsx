@@ -1,5 +1,6 @@
 import { CompositeRangeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useControlAdapterBeginEndStepPct } from 'features/controlAdapters/hooks/useControlAdapterBeginEndStepPct';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import {
@@ -61,12 +62,10 @@ export const ParamControlAdapterBeginEnd = memo(({ id }: Props) => {
   }
 
   return (
-    <FormControl
-      isDisabled={!isEnabled}
-      // feature="controlNetBeginEnd"
-      orientation="vertical"
-    >
-      <FormLabel>{t('controlnet.beginEndStepPercent')}</FormLabel>
+    <FormControl isDisabled={!isEnabled} orientation="vertical">
+      <InformationalPopover feature="controlNetBeginEnd">
+        <FormLabel>{t('controlnet.beginEndStepPercent')}</FormLabel>
+      </InformationalPopover>
       <CompositeRangeSlider
         aria-label={ariaLabel}
         value={value}
