@@ -552,7 +552,6 @@ class ColorMapImageProcessorInvocation(ImageProcessorInvocation):
     color_map_tile_size: int = InputField(default=64, ge=0, description=FieldDescriptions.tile_size)
 
     def run_processor(self, image: Image.Image):
-        image = image.convert("RGB")
         np_image = np.array(image, dtype=np.uint8)
         height, width = np_image.shape[:2]
 
