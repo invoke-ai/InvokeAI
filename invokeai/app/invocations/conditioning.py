@@ -36,12 +36,12 @@ class AddConditioningMaskInvocation(BaseInvocation):
     def convert_image_to_mask(image: Image.Image) -> torch.Tensor:
         """Convert a PIL image to a uint8 mask tensor."""
         np_image = np.array(image)
-        torch_image = torch.from_numpy(np_image[0, :, :])
+        torch_image = torch.from_numpy(np_image[:, :, 0])
         mask = torch_image >= 128
         return mask.to(dtype=torch.uint8)
 
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        image = context.services.images.get_pil_image(self.image.image_name)
+        image = context.services.images.get_pil_image(self.mask.image_name)
         mask = self.convert_image_to_mask(image)
 
         mask_name = f"{context.graph_execution_state_id}__{self.id}_conditioning_mask"
