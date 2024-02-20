@@ -6,7 +6,6 @@ import type { ModelIdentifierWithBase } from 'features/nodes/types/common';
 import { groupBy, map, reduce } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getModelId } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 
 type UseGroupedModelComboboxArg<T extends AnyModelConfig> = {
@@ -58,8 +57,7 @@ export const useGroupedModelCombobox = <T extends AnyModelConfig>(
 
   const value = useMemo(
     () =>
-      options.flatMap((o) => o.options).find((m) => (selectedModel ? m.value === getModelId(selectedModel) : false)) ??
-      null,
+      options.flatMap((o) => o.options).find((m) => (selectedModel ? m.value === selectedModel.key : false)) ?? null,
     [options, selectedModel]
   );
 
