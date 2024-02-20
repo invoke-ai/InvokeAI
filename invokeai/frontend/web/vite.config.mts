@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => {
       build: {
         cssCodeSplit: true,
         lib: {
-          entry: path.resolve(__dirname, '../src/index.ts'),
+          entry: path.resolve(__dirname, './src/index.ts'),
           name: 'InvokeAIUI',
           fileName: (format) => `invoke-ai-ui.${format}.js`,
         },
@@ -44,12 +44,12 @@ export default defineConfig(({ mode }) => {
       },
       resolve: {
         alias: {
-          app: path.resolve(__dirname, '../src/app'),
-          assets: path.resolve(__dirname, '../src/assets'),
-          common: path.resolve(__dirname, '../src/common'),
-          features: path.resolve(__dirname, '../src/features'),
-          services: path.resolve(__dirname, '../src/services'),
-          theme: path.resolve(__dirname, '../src/theme'),
+          app: path.resolve(__dirname, './src/app'),
+          assets: path.resolve(__dirname, './src/assets'),
+          common: path.resolve(__dirname, './src/common'),
+          features: path.resolve(__dirname, './src/features'),
+          services: path.resolve(__dirname, './src/services'),
+          theme: path.resolve(__dirname, './src/theme'),
         },
       },
     };

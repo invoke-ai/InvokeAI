@@ -5,5 +5,5 @@
     "moduleResolution": "Node",
     "allowSyntheticDefaultImports": true
   },
-  "include": ["vite.config.mts", "config/vite.app.config.mts", "config/vite.package.config.mts", "config/common.mts"]
+  "include": ["vite.config.mts"]
 }
