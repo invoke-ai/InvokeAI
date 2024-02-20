@@ -7,9 +7,9 @@ import { useTranslation } from 'react-i18next';
 import { ALL_BASE_MODELS } from 'services/api/constants';
 // import type { LoRAConfig, MainModelConfig } from 'services/api/endpoints/models';
 import { useGetLoRAModelsQuery, useGetMainModelsQuery } from 'services/api/endpoints/models';
+import type { LoRAConfig, MainModelConfig } from 'services/api/types';
 
 import ModelListItem from './ModelListItem';
-import { LoRAConfig, MainModelConfig } from '../../../../services/api/types';
 
 type ModelListProps = {
   selectedModelId: string | undefined;

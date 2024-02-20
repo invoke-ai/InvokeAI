@@ -3,12 +3,12 @@ import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_BASE_MODELS } from 'services/api/constants';
 import { useGetLoRAModelsQuery, useGetMainModelsQuery } from 'services/api/endpoints/models';
+import type { DiffusersModelConfig, LoRAConfig, MainModelConfig } from 'services/api/types';
 
 import CheckpointModelEdit from './ModelManagerPanel/CheckpointModelEdit';
 import DiffusersModelEdit from './ModelManagerPanel/DiffusersModelEdit';
 import LoRAModelEdit from './ModelManagerPanel/LoRAModelEdit';
 import ModelList from './ModelManagerPanel/ModelList';
-import { DiffusersModelConfig, LoRAConfig, MainModelConfig } from '../../../services/api/types';
 
 const ModelManagerPanel = () => {
   const [selectedModelId, setSelectedModelId] = useState<string>();

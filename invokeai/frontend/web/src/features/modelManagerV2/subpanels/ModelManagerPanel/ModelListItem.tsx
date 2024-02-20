@@ -8,33 +8,37 @@ import {
   Tooltip,
   useDisclosure,
 } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { setSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 import { useDeleteModelsMutation } from 'services/api/endpoints/models';
-import type { LoRAConfig, MainModelConfig } from 'services/api/types';
+import type { AnyModelConfig } from 'services/api/types';
 
 type ModelListItemProps = {
-  model: MainModelConfig | LoRAConfig;
-  isSelected: boolean;
-  setSelectedModelId: (v: string | undefined) => void;
+  model: AnyModelConfig;
 };
 
 const ModelListItem = (props: ModelListItemProps) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
   const [deleteModel] = useDeleteModelsMutation();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
-  const { model, isSelected, setSelectedModelId } = props;
+  const { model } = props;
 
   const handleSelectModel = useCallback(() => {
-    setSelectedModelId(model.key);
-  }, [model.key, setSelectedModelId]);
+    dispatch(setSelectedModelKey(model.key));
+  }, [model.key, dispatch]);
+
+  const isSelected = useMemo(() => {
+    return selectedModelKey === model.key;
+  }, [selectedModelKey, model.key]);
 
   const handleModelDelete = useCallback(() => {
     deleteModel({ key: model.key })
@@ -61,8 +65,8 @@ const ModelListItem = (props: ModelListItemProps) => {
           );
         }
       });
-    setSelectedModelId(undefined);
-  }, [deleteModel, model, setSelectedModelId, dispatch, t]);
+    dispatch(setSelectedModelKey(null));
+  }, [deleteModel, model, dispatch, t]);
 
   return (
     <Flex gap={2} alignItems="center" w="full">
