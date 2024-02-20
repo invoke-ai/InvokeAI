@@ -32,7 +32,7 @@ class BulkDownloadService(BulkDownloadBase):
         self, image_names: Optional[list[str]], board_id: Optional[str], bulk_download_item_id: Optional[str]
     ) -> None:
         bulk_download_id: str = DEFAULT_BULK_DOWNLOAD_ID
-        bulk_download_item_id = uuid_string() if bulk_download_item_id is None else bulk_download_item_id
+        bulk_download_item_id = bulk_download_item_id or uuid_string()
         bulk_download_item_name = bulk_download_item_id + ".zip"
 
         self._signal_job_started(bulk_download_id, bulk_download_item_id, bulk_download_item_name)
