@@ -94,9 +94,9 @@ class InvokeAIDiffuserComponent:
         conditioning_data: ConditioningData,
     ):
         down_block_res_samples, mid_block_res_sample = None, None
-        # HACK(ryan): Currently, we just take the first text embedding if there's more than one. We should probably
-        # concatenate all of the embeddings for the ControlNet, but not apply embedding masks.
-        text_embeddings = conditioning_data.text_embeddings[0]
+        # HACK(ryan): Currently, we just take the first text embedding if there's more than one. We should probably run
+        # the controlnet separately for each conditioning input.
+        text_embeddings = conditioning_data.text_embeddings[0].text_conditioning_info
 
         # control_data should be type List[ControlNetData]
         # this loop covers both ControlNet (one ControlNetData in list)
@@ -325,7 +325,7 @@ class InvokeAIDiffuserComponent:
         sigma_twice = torch.cat([sigma] * 2)
 
         assert len(conditioning_data.text_embeddings) == 1
-        text_embeddings = conditioning_data.text_embeddings[0]
+        text_embeddings = conditioning_data.text_embeddings[0].text_conditioning_info
 
         cross_attention_kwargs = None
         if conditioning_data.ip_adapter_conditioning is not None:
@@ -391,7 +391,7 @@ class InvokeAIDiffuserComponent:
         """
 
         assert len(conditioning_data.text_embeddings) == 1
-        text_embeddings = conditioning_data.text_embeddings[0]
+        text_embeddings = conditioning_data.text_embeddings[0].text_conditioning_info
 
         # Since we are running the conditioned and unconditioned passes sequentially, we need to split the ControlNet
         # and T2I-Adapter residuals into two chunks.

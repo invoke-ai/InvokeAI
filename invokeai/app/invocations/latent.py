@@ -41,9 +41,9 @@ from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
 from invokeai.backend.model_management.models import ModelType, SilenceWarnings
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
-    BasicConditioningInfo,
     ConditioningData,
     IPAdapterConditioningInfo,
+    TextConditioningInfoWithMask,
 )
 
 from ...backend.model_management.lora import ModelPatcher
@@ -339,10 +339,20 @@ class DenoiseLatentsInvocation(BaseInvocation):
         if not isinstance(positive_conditioning_list, list):
             positive_conditioning_list = [positive_conditioning_list]
 
-        text_embeddings: list[BasicConditioningInfo] = []
+        text_embeddings: list[TextConditioningInfoWithMask] = []
         for positive_conditioning in positive_conditioning_list:
             positive_cond_data = context.services.latents.get(positive_conditioning.conditioning_name)
-            text_embeddings.append(positive_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype))
+            mask_name = positive_conditioning.mask_name
+            mask = None
+            if mask_name is not None:
+                mask = context.services.latents.get(mask_name)
+            text_embeddings.append(
+                TextConditioningInfoWithMask(
+                    text_conditioning_info=positive_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype),
+                    mask=mask,
+                    mask_strength=positive_conditioning.mask_strength,
+                )
+            )
 
         negative_cond_data = context.services.latents.get(self.negative_conditioning.conditioning_name)
         uc = negative_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)

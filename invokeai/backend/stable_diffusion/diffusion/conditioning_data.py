@@ -39,6 +39,18 @@ class SDXLConditioningInfo(BasicConditioningInfo):
         return super().to(device=device, dtype=dtype)
 
 
+class TextConditioningInfoWithMask:
+    def __init__(
+        self,
+        text_conditioning_info: Union[BasicConditioningInfo, SDXLConditioningInfo],
+        mask: Optional[torch.Tensor],
+        mask_strength: float,
+    ):
+        self.text_conditioning_info = text_conditioning_info
+        self.mask = mask
+        self.mask_strength = mask_strength
+
+
 @dataclass(frozen=True)
 class PostprocessingSettings:
     threshold: float
@@ -62,7 +74,7 @@ class IPAdapterConditioningInfo:
 @dataclass
 class ConditioningData:
     unconditioned_embeddings: BasicConditioningInfo
-    text_embeddings: list[BasicConditioningInfo]
+    text_embeddings: list[TextConditioningInfoWithMask]
     """
     Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
     `guidance_scale` is defined as `w` of equation 2. of [Imagen Paper](https://arxiv.org/pdf/2205.11487.pdf).
