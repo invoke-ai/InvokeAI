@@ -122,7 +122,10 @@ const GalleryImage = (props: HoverableImageProps) => {
   }
 
   return (
-    <Box w="full" h="full" className="gallerygrid-image" data-testid={dataTestId}>
+    <Box w="full" h="full" className="gallerygrid-image" data-testid={dataTestId}
+      sx={{
+        containerType: "inline-size",
+      }}>
       <Flex
         ref={imageContainerRef}
         userSelect="none"
@@ -153,6 +156,11 @@ const GalleryImage = (props: HoverableImageProps) => {
             bottom={0}
             right={0}
             px={2}
+            sx={{
+              "@container (max-width: 80px)": {
+                "&": { display: "none" },
+              },
+            }}
           >{`${imageDTO.width}x${imageDTO.height}`}</Text>
           <>
             <IAIDndImageIcon onClick={toggleStarredState} icon={starIcon} tooltip={starTooltip} />
