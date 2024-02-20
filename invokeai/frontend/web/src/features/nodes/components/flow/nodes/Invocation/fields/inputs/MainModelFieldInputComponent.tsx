@@ -6,8 +6,8 @@ import { fieldMainModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type { MainModelFieldInputInstance, MainModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
 import { NON_SDXL_MAIN_MODELS } from 'services/api/constants';
-import type { MainModelConfig } from 'services/api/endpoints/models';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import type { MainModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
