@@ -10,7 +10,6 @@ from invokeai.app.services.bulk_download.bulk_download_common import (
     BulkDownloadParametersException,
     BulkDownloadTargetException,
 )
-from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
@@ -20,11 +19,6 @@ from .bulk_download_base import BulkDownloadBase
 
 
 class BulkDownloadService(BulkDownloadBase):
-    __temp_directory: TemporaryDirectory
-    __bulk_downloads_folder: Path
-    __event_bus: EventServiceBase
-    __invoker: Invoker
-
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
         self.__event_bus = invoker.services.events
