@@ -1,5 +1,6 @@
 import type { ListenerEffect, TypedAddListener, TypedStartListening, UnknownAction } from '@reduxjs/toolkit';
 import { addListener, createListenerMiddleware } from '@reduxjs/toolkit';
+import { addBulkDownloadListeners } from 'app/store/middleware/listenerMiddleware/listeners/bulkDownload';
 import { addGalleryImageClickedListener } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
 import type { AppDispatch, RootState } from 'app/store/store';
 
@@ -48,8 +49,6 @@ import { addInitialImageSelectedListener } from './listeners/initialImageSelecte
 import { addModelSelectedListener } from './listeners/modelSelected';
 import { addModelsLoadedListener } from './listeners/modelsLoaded';
 import { addDynamicPromptsListener } from './listeners/promptChanged';
-import { addBulkDownloadCompleteEventListener } from './listeners/socketio/socketBulkDownloadComplete';
-import { addBulkDownloadFailedEventListener } from './listeners/socketio/socketBulkDownloadFailed';
 import { addSocketConnectedEventListener as addSocketConnectedListener } from './listeners/socketio/socketConnected';
 import { addSocketDisconnectedEventListener as addSocketDisconnectedListener } from './listeners/socketio/socketDisconnected';
 import { addGeneratorProgressEventListener as addGeneratorProgressListener } from './listeners/socketio/socketGeneratorProgress';
@@ -139,8 +138,7 @@ addModelLoadEventListener();
 addSessionRetrievalErrorEventListener();
 addInvocationRetrievalErrorEventListener();
 addSocketQueueItemStatusChangedEventListener();
-addBulkDownloadCompleteEventListener();
-addBulkDownloadFailedEventListener();
+addBulkDownloadListeners();
 
 // ControlNet
 addControlNetImageProcessedListener();
