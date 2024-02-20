@@ -21,11 +21,9 @@ import { memo, useCallback, useEffect, useState } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import type { CheckpointModelConfig } from 'services/api/endpoints/models';
-import { useGetCheckpointConfigsQuery, useUpdateMainModelsMutation } from 'services/api/endpoints/models';
-import type { CheckpointModelConfig } from 'services/api/types';
-
+import { useGetCheckpointConfigsQuery, useUpdateModelsMutation } from 'services/api/endpoints/models';
 import ModelConvert from './ModelConvert';
+import { CheckpointModelConfig } from '../../../../services/api/types';
 
 type CheckpointModelEditProps = {
   model: CheckpointModelConfig;
@@ -34,7 +32,7 @@ type CheckpointModelEditProps = {
 const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
   const { model } = props;
 
-  const [updateMainModel, { isLoading }] = useUpdateMainModelsMutation();
+  const [updateModel, { isLoading }] = useUpdateModelsMutation();
   const { data: availableCheckpointConfigs } = useGetCheckpointConfigsQuery();
 
   const [useCustomConfig, setUseCustomConfig] = useState<boolean>(false);
@@ -56,12 +54,12 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
     reset,
   } = useForm<CheckpointModelConfig>({
     defaultValues: {
-      model_name: model.model_name ? model.model_name : '',
-      base_model: model.base_model,
-      model_type: 'main',
+      name: model.name ? model.name : '',
+      base: model.base,
+      type: 'main',
       path: model.path ? model.path : '',
       description: model.description ? model.description : '',
-      model_format: 'checkpoint',
+      format: 'checkpoint',
       vae: model.vae ? model.vae : '',
       config: model.config ? model.config : '',
       variant: model.variant,
@@ -74,11 +72,10 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
   const onSubmit = useCallback<SubmitHandler<CheckpointModelConfig>>(
     (values) => {
       const responseBody = {
-        base_model: model.base_model,
-        model_name: model.model_name,
+        key: model.key,
         body: values,
       };
-      updateMainModel(responseBody)
+      updateModel(responseBody)
         .unwrap()
         .then((payload) => {
           reset(payload as CheckpointModelConfig, { keepDefaultValues: true });
@@ -103,7 +100,7 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
           );
         });
     },
-    [dispatch, model.base_model, model.model_name, reset, t, updateMainModel]
+    [dispatch, model.key, reset, t, updateModel]
   );
 
   return (
@@ -111,13 +108,13 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
       <Flex justifyContent="space-between" alignItems="center">
         <Flex flexDirection="column">
           <Text fontSize="lg" fontWeight="bold">
-            {model.model_name}
+            {model.name}
           </Text>
           <Text fontSize="sm" color="base.400">
-            {MODEL_TYPE_MAP[model.base_model]} {t('modelManager.model')}
+            {MODEL_TYPE_MAP[model.base]} {t('modelManager.model')}
           </Text>
         </Flex>
-        {![''].includes(model.base_model) ? (
+        {![''].includes(model.base) ? (
           <ModelConvert model={model} />
         ) : (
           <Badge p={2} borderRadius={4} bg="error.400">
@@ -130,20 +127,20 @@ const CheckpointModelEdit = (props: CheckpointModelEditProps) => {
       <Flex flexDirection="column" maxHeight={window.innerHeight - 270} overflowY="scroll">
         <form onSubmit={handleSubmit(onSubmit)}>
           <Flex flexDirection="column" overflowY="scroll" gap={4}>
-            <FormControl isInvalid={Boolean(errors.model_name)}>
+            <FormControl isInvalid={Boolean(errors.name)}>
               <FormLabel>{t('modelManager.name')}</FormLabel>
               <Input
-                {...register('model_name', {
+                {...register('name', {
                   validate: (value) => value.trim().length > 3 || 'Must be at least 3 characters',
                 })}
               />
-              {errors.model_name?.message && <FormErrorMessage>{errors.model_name?.message}</FormErrorMessage>}
+              {errors.name?.message && <FormErrorMessage>{errors.name?.message}</FormErrorMessage>}
             </FormControl>
             <FormControl>
               <FormLabel>{t('modelManager.description')}</FormLabel>
               <Input {...register('description')} />
             </FormControl>
-            <BaseModelSelect<CheckpointModelConfig> control={control} name="base_model" />
+            <BaseModelSelect<CheckpointModelConfig> control={control} name="base" />
             <ModelVariantSelect<CheckpointModelConfig> control={control} name="variant" />
             <FormControl isInvalid={Boolean(errors.path)}>
               <FormLabel>{t('modelManager.modelLocation')}</FormLabel>

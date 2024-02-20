@@ -36,11 +36,10 @@ const SimpleAddModels = () => {
 
   const handleAddModelSubmit = (values: ExtendedImportModelConfig) => {
     const importModelResponseBody = {
-      location: values.location,
-      prediction_type: values.prediction_type === 'none' ? undefined : values.prediction_type,
+      config: values.prediction_type === 'none' ? undefined : values.prediction_type,
     };
 
-    importMainModel({ body: importModelResponseBody })
+    importMainModel({ source: values.location, config: importModelResponseBody })
       .unwrap()
       .then((_) => {
         dispatch(

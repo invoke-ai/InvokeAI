@@ -7,12 +7,10 @@ import type {
   AnyModelConfig,
   BaseModelType,
   ControlNetModelConfig,
-  ImportModelConfig,
   IPAdapterModelConfig,
   LoRAModelConfig,
   MainModelConfig,
   MergeModelConfig,
-  ModelType,
   T2IAdapterModelConfig,
   TextualInversionModelConfig,
   VAEModelConfig,
@@ -21,36 +19,20 @@ import type {
 import type { ApiTagDescription, tagTypes } from '..';
 import { api, buildV2Url, LIST_TAG } from '..';
 
-type UpdateMainModelArg = {
-  base_model: BaseModelType;
-  model_name: string;
-  body: MainModelConfig;
+type UpdateModelArg = {
+  key: NonNullable<operations['update_model_record']['parameters']['path']['key']>;
+  body: NonNullable<operations['update_model_record']['requestBody']['content']['application/json']>;
 };
 
-type UpdateLoRAModelArg = {
-  base_model: BaseModelType;
-  model_name: string;
-  body: LoRAModelConfig;
-};
-
-type UpdateMainModelResponse =
-  paths['/api/v2/models/i/{key}']['patch']['responses']['200']['content']['application/json'];
+type UpdateModelResponse = paths['/api/v2/models/i/{key}']['patch']['responses']['200']['content']['application/json'];
 
 type ListModelsArg = NonNullable<paths['/api/v2/models/']['get']['parameters']['query']>;
 
-type UpdateLoRAModelResponse = UpdateMainModelResponse;
-
 type DeleteMainModelArg = {
-  base_model: BaseModelType;
-  model_name: string;
-  model_type: ModelType;
+  key: string;
 };
 
 type DeleteMainModelResponse = void;
-
-type DeleteLoRAModelArg = DeleteMainModelArg;
-
-type DeleteLoRAModelResponse = void;
 
 type ConvertMainModelArg = {
   base_model: BaseModelType;
@@ -59,36 +41,40 @@ type ConvertMainModelArg = {
 };
 
 type ConvertMainModelResponse =
-  paths['/api/v1/models/convert/{base_model}/{model_type}/{model_name}']['put']['responses']['200']['content']['application/json'];
+  paths['/api/v2/models/convert/{key}']['put']['responses']['200']['content']['application/json'];
 
 type MergeMainModelArg = {
   base_model: BaseModelType;
   body: MergeModelConfig;
 };
 
-type MergeMainModelResponse =
-  paths['/api/v1/models/merge/{base_model}']['put']['responses']['200']['content']['application/json'];
+type MergeMainModelResponse = paths['/api/v2/models/merge']['put']['responses']['200']['content']['application/json'];
 
 type ImportMainModelArg = {
-  body: ImportModelConfig;
+  source: NonNullable<operations['heuristic_import_model']['parameters']['query']['source']>;
+  access_token?: operations['heuristic_import_model']['parameters']['query']['access_token'];
+  config: NonNullable<operations['heuristic_import_model']['requestBody']['content']['application/json']>;
 };
 
 type ImportMainModelResponse =
-  paths['/api/v1/models/import']['post']['responses']['201']['content']['application/json'];
+  paths['/api/v2/models/import']['post']['responses']['201']['content']['application/json'];
+
+type ListImportModelsResponse =
+  paths['/api/v2/models/import']['get']['responses']['200']['content']['application/json'];
 
 type AddMainModelArg = {
   body: MainModelConfig;
 };
 
-type AddMainModelResponse = paths['/api/v1/models/add']['post']['responses']['201']['content']['application/json'];
+type AddMainModelResponse = paths['/api/v2/models/add']['post']['responses']['201']['content']['application/json'];
 
-type SyncModelsResponse = paths['/api/v1/models/sync']['post']['responses']['201']['content']['application/json'];
+type SyncModelsResponse = paths['/api/v2/models/sync']['post']['responses']['201']['content']['application/json'];
 
 export type SearchFolderResponse =
-  paths['/api/v1/models/search']['get']['responses']['200']['content']['application/json'];
+  paths['/api/v2/models/search']['get']['responses']['200']['content']['application/json'];
 
 type CheckpointConfigsResponse =
-  paths['/api/v1/models/ckpt_confs']['get']['responses']['200']['content']['application/json'];
+  paths['/api/v2/models/ckpt_confs']['get']['responses']['200']['content']['application/json'];
 
 type SearchFolderArg = operations['search_for_models']['parameters']['query'];
 
@@ -179,10 +165,10 @@ export const modelsApi = api.injectEndpoints({
       providesTags: buildProvidesTags<MainModelConfig>('MainModel'),
       transformResponse: buildTransformResponse<MainModelConfig>(mainModelsAdapter),
     }),
-    updateMainModels: build.mutation<UpdateMainModelResponse, UpdateMainModelArg>({
-      query: ({ base_model, model_name, body }) => {
+    updateModels: build.mutation<UpdateModelResponse, UpdateModelArg>({
+      query: ({ key, body }) => {
         return {
-          url: buildModelsUrl(`${base_model}/main/${model_name}`),
+          url: buildModelsUrl(`i/${key}`),
           method: 'PATCH',
           body: body,
         };
@@ -190,11 +176,12 @@ export const modelsApi = api.injectEndpoints({
       invalidatesTags: ['Model'],
     }),
     importMainModels: build.mutation<ImportMainModelResponse, ImportMainModelArg>({
-      query: ({ body }) => {
+      query: ({ source, config, access_token }) => {
         return {
-          url: buildModelsUrl('import'),
+          url: buildModelsUrl('heuristic_import'),
+          params: { source, access_token },
           method: 'POST',
-          body: body,
+          body: config,
         };
       },
       invalidatesTags: ['Model'],
@@ -209,10 +196,10 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['Model'],
     }),
-    deleteMainModels: build.mutation<DeleteMainModelResponse, DeleteMainModelArg>({
-      query: ({ base_model, model_name, model_type }) => {
+    deleteModels: build.mutation<DeleteMainModelResponse, DeleteMainModelArg>({
+      query: ({ key }) => {
         return {
-          url: buildModelsUrl(`${base_model}/${model_type}/${model_name}`),
+          url: buildModelsUrl(`i/${key}`),
           method: 'DELETE',
         };
       },
@@ -264,25 +251,6 @@ export const modelsApi = api.injectEndpoints({
       providesTags: buildProvidesTags<LoRAModelConfig>('LoRAModel'),
       transformResponse: buildTransformResponse<LoRAModelConfig>(loraModelsAdapter),
     }),
-    updateLoRAModels: build.mutation<UpdateLoRAModelResponse, UpdateLoRAModelArg>({
-      query: ({ base_model, model_name, body }) => {
-        return {
-          url: buildModelsUrl(`${base_model}/lora/${model_name}`),
-          method: 'PATCH',
-          body: body,
-        };
-      },
-      invalidatesTags: [{ type: 'LoRAModel', id: LIST_TAG }],
-    }),
-    deleteLoRAModels: build.mutation<DeleteLoRAModelResponse, DeleteLoRAModelArg>({
-      query: ({ base_model, model_name }) => {
-        return {
-          url: buildModelsUrl(`${base_model}/lora/${model_name}`),
-          method: 'DELETE',
-        };
-      },
-      invalidatesTags: [{ type: 'LoRAModel', id: LIST_TAG }],
-    }),
     getControlNetModels: build.query<EntityState<ControlNetModelConfig, string>, void>({
       query: () => ({ url: buildModelsUrl(), params: { model_type: 'controlnet' } }),
       providesTags: buildProvidesTags<ControlNetModelConfig>('ControlNetModel'),
@@ -316,6 +284,13 @@ export const modelsApi = api.injectEndpoints({
         };
       },
     }),
+    getModelImports: build.query<ListImportModelsResponse, void>({
+      query: (arg) => {
+        return {
+          url: buildModelsUrl(`import`),
+        };
+      },
+    }),
     getCheckpointConfigs: build.query<CheckpointConfigsResponse, void>({
       query: () => {
         return {
@@ -335,15 +310,14 @@ export const {
   useGetLoRAModelsQuery,
   useGetTextualInversionModelsQuery,
   useGetVaeModelsQuery,
-  useUpdateMainModelsMutation,
-  useDeleteMainModelsMutation,
+  useDeleteModelsMutation,
+  useUpdateModelsMutation,
   useImportMainModelsMutation,
   useAddMainModelsMutation,
   useConvertMainModelsMutation,
   useMergeMainModelsMutation,
-  useDeleteLoRAModelsMutation,
-  useUpdateLoRAModelsMutation,
   useSyncModelsMutation,
   useGetModelsInFolderQuery,
   useGetCheckpointConfigsQuery,
+  useGetModelImportsQuery,
 } = modelsApi;
