@@ -22,8 +22,9 @@ import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useGetCheckpointConfigsQuery, useUpdateModelsMutation } from 'services/api/endpoints/models';
+import type { CheckpointModelConfig } from 'services/api/types';
+
 import ModelConvert from './ModelConvert';
-import { CheckpointModelConfig } from '../../../../services/api/types';
 
 type CheckpointModelEditProps = {
   model: CheckpointModelConfig;
