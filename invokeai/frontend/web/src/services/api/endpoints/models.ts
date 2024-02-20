@@ -21,9 +21,6 @@ import type {
 import type { ApiTagDescription, tagTypes } from '..';
 import { api, buildV2Url, LIST_TAG } from '..';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-export const getModelId = (input: any): any => input;
-
 type UpdateMainModelArg = {
   base_model: BaseModelType;
   model_name: string;
