@@ -1,6 +1,5 @@
-import { Text } from '@chakra-ui/react';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, useShiftModifier } from '@invoke-ai/ui-library';
+import { Box, Flex, Text, useShiftModifier } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -23,6 +22,16 @@ const imageIconStyleOverrides: SystemStyleObject = {
   bottom: 2,
   top: 'auto',
 };
+const boxSx: SystemStyleObject = {
+  containerType: 'inline-size',
+};
+
+const badgeSx: SystemStyleObject = {
+  '@container (max-width: 80px)': {
+    '&': { display: 'none' },
+  },
+};
+
 interface HoverableImageProps {
   imageName: string;
   index: number;
@@ -122,10 +131,7 @@ const GalleryImage = (props: HoverableImageProps) => {
   }
 
   return (
-    <Box w="full" h="full" className="gallerygrid-image" data-testid={dataTestId}
-      sx={{
-        containerType: "inline-size",
-      }}>
+    <Box w="full" h="full" className="gallerygrid-image" data-testid={dataTestId} sx={boxSx}>
       <Flex
         ref={imageContainerRef}
         userSelect="none"
@@ -148,21 +154,21 @@ const GalleryImage = (props: HoverableImageProps) => {
           onMouseOver={handleMouseOver}
           onMouseOut={handleMouseOut}
         >
-          <Text
-            position="absolute"
-            background="white"
-            color="black"
-            fontSize="12px"
-            bottom={0}
-            right={0}
-            px={2}
-            sx={{
-              "@container (max-width: 80px)": {
-                "&": { display: "none" },
-              },
-            }}
-          >{`${imageDTO.width}x${imageDTO.height}`}</Text>
           <>
+            {isHovered && (
+              <Text
+                position="absolute"
+                background="white"
+                color="black"
+                fontSize="base.50"
+                bottom={0}
+                right={0}
+                px={2}
+                opacity={0.7}
+                borderTopLeftRadius="base"
+                borderBottomRightRadius="base"
+                sx={badgeSx}
+              >{`${imageDTO.width}x${imageDTO.height}`}</Text>)}
             <IAIDndImageIcon onClick={toggleStarredState} icon={starIcon} tooltip={starTooltip} />
 
             {isHovered && shift && (
