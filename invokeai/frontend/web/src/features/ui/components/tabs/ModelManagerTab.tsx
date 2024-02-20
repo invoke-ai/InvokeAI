@@ -1,8 +1,7 @@
-import { Flex, Box } from '@invoke-ai/ui-library';
+import { Box,Flex } from '@invoke-ai/ui-library';
+import { ImportModels } from 'features/modelManagerV2/subpanels/ImportModels';
+import { ModelManager } from 'features/modelManagerV2/subpanels/ModelManager';
 import { memo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { ImportModels } from '../../../modelManagerV2/subpanels/ImportModels';
-import { ModelManager } from '../../../modelManagerV2/subpanels/ModelManager';
 
 const ModelManagerTab = () => {
   return (

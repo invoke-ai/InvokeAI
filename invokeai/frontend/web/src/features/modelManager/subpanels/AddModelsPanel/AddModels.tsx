@@ -1,10 +1,10 @@
 import { Button, ButtonGroup, Flex, Text } from '@invoke-ai/ui-library';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useGetModelImportsQuery } from 'services/api/endpoints/models';
 
 import AdvancedAddModels from './AdvancedAddModels';
 import SimpleAddModels from './SimpleAddModels';
-import { useGetModelImportsQuery } from '../../../../services/api/endpoints/models';
 
 const AddModels = () => {
   const { t } = useTranslation();
