@@ -3,9 +3,10 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldT2IAdapterModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type { T2IAdapterModelFieldInputInstance, T2IAdapterModelFieldInputTemplate } from 'features/nodes/types/field';
+import { pick } from 'lodash-es';
 import { memo, useCallback } from 'react';
-import type { T2IAdapterConfig } from 'services/api/endpoints/models';
 import { useGetT2IAdapterModelsQuery } from 'services/api/endpoints/models';
+import type { T2IAdapterConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
@@ -36,7 +37,7 @@ const T2IAdapterModelFieldInputComponent = (
   const { options, value, onChange } = useGroupedModelCombobox({
     modelEntities: t2iAdapterModels,
     onChange: _onChange,
-    selectedModel: field.value ? { ...field.value, model_type: 't2i_adapter' } : undefined,
+    selectedModel: field.value ? pick(field.value, ['key', 'base']) : undefined,
   });
 
   return (
