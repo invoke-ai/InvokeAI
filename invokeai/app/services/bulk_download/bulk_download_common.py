@@ -20,9 +20,6 @@ class BulkDownloadTargetException(BulkDownloadException):
 class BulkDownloadParametersException(BulkDownloadException):
     """Exception raised when a bulk download parameter is invalid."""
 
-    def __init__(
-        self,
-        message="The bulk download parameters are invalid, either an array of image names or a board id must be provided",
-    ):
+    def __init__(self, message="No image names or board ID provided"):
         super().__init__(message)
         self.message = message
