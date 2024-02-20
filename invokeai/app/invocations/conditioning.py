@@ -24,9 +24,12 @@ class AddConditioningMaskInvocation(BaseInvocation):
     """Add a mask to an existing conditioning tensor."""
 
     conditioning: ConditioningField = InputField(description="The conditioning tensor to add a mask to.")
-    image: ImageField = InputField(
+    mask: ImageField = InputField(
         description="A mask image to add to the conditioning tensor. Only the first channel of the image is used. "
         "Pixels <128 are excluded from the mask, pixels >=128 are included in the mask."
+    )
+    mask_strength: float = InputField(
+        description="The strength of the mask to apply to the conditioning tensor.", default=1.0
     )
 
     @staticmethod
@@ -45,6 +48,7 @@ class AddConditioningMaskInvocation(BaseInvocation):
         context.services.latents.save(mask_name, mask)
 
         self.conditioning.mask_name = mask_name
+        self.conditioning.mask_strength = self.mask_strength
         return ConditioningOutput(conditioning=self.conditioning)
 
 

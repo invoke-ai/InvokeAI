@@ -433,6 +433,11 @@ class ConditioningField(BaseModel):
         description="The mask associated with this conditioning tensor. Excluded regions should be set to 0, included "
         "regions should be set to 1.",
     )
+    mask_strength: float = Field(
+        default=1.0,
+        description="The strength of the mask. Only has an effect if mask_name is set. The strength is relative to "
+        "other masks. The default is 1.0. If set to 0.0, this mask will be ignored.",
+    )
 
 
 @invocation_output("conditioning_output")
