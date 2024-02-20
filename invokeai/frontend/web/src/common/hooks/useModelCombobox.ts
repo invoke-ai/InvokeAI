@@ -1,14 +1,14 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import type { EntityState } from '@reduxjs/toolkit';
+import type { ModelIdentifierWithBase } from 'features/nodes/types/common';
 import { map } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AnyModelConfig } from 'services/api/endpoints/models';
-import { getModelId } from 'services/api/endpoints/models';
+import type { AnyModelConfig } from 'services/api/types';
 
 type UseModelComboboxArg<T extends AnyModelConfig> = {
   modelEntities: EntityState<T, string> | undefined;
-  selectedModel?: Pick<T, 'base_model' | 'model_name' | 'model_type'> | null;
+  selectedModel?: ModelIdentifierWithBase | null;
   onChange: (value: T | null) => void;
   getIsDisabled?: (model: T) => boolean;
   optionsFilter?: (model: T) => boolean;
@@ -33,14 +33,14 @@ export const useModelCombobox = <T extends AnyModelConfig>(arg: UseModelCombobox
     return map(modelEntities.entities)
       .filter(optionsFilter)
       .map((model) => ({
-        label: model.model_name,
-        value: model.id,
+        label: model.name,
+        value: model.key,
         isDisabled: getIsDisabled ? getIsDisabled(model) : false,
       }));
   }, [optionsFilter, getIsDisabled, modelEntities]);
 
   const value = useMemo(
-    () => options.find((m) => (selectedModel ? m.value === getModelId(selectedModel) : false)),
+    () => options.find((m) => (selectedModel ? m.value === selectedModel.key : false)),
     [options, selectedModel]
   );
 
