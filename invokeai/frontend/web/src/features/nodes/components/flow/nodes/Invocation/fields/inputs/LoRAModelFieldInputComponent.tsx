@@ -3,9 +3,10 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldLoRAModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type { LoRAModelFieldInputInstance, LoRAModelFieldInputTemplate } from 'features/nodes/types/field';
+import { pick } from 'lodash-es';
 import { memo, useCallback } from 'react';
-import type { LoRAConfig } from 'services/api/endpoints/models';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
+import type { LoRAConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
@@ -34,7 +35,7 @@ const LoRAModelFieldInputComponent = (props: Props) => {
   const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
     modelEntities: data,
     onChange: _onChange,
-    selectedModel: field.value ? { ...field.value, model_type: 'lora' } : undefined,
+    selectedModel: field.value ? pick(field.value, ['key', 'base']) : undefined,
     isLoading,
   });
 
