@@ -9,8 +9,8 @@ import type {
 } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
 import { REFINER_BASE_MODELS } from 'services/api/constants';
-import type { MainModelConfig } from 'services/api/endpoints/models';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import type { MainModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
