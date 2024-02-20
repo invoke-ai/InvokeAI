@@ -16,6 +16,7 @@ import { galleryPersistConfig, gallerySlice } from 'features/gallery/store/galle
 import { hrfPersistConfig, hrfSlice } from 'features/hrf/store/hrfSlice';
 import { loraPersistConfig, loraSlice } from 'features/lora/store/loraSlice';
 import { modelManagerPersistConfig, modelManagerSlice } from 'features/modelManager/store/modelManagerSlice';
+import { modelManagerV2Slice } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { nodesPersistConfig, nodesSlice } from 'features/nodes/store/nodesSlice';
 import { workflowPersistConfig, workflowSlice } from 'features/nodes/store/workflowSlice';
 import { generationPersistConfig, generationSlice } from 'features/parameters/store/generationSlice';
@@ -55,6 +56,7 @@ const allReducers = {
   [changeBoardModalSlice.name]: changeBoardModalSlice.reducer,
   [loraSlice.name]: loraSlice.reducer,
   [modelManagerSlice.name]: modelManagerSlice.reducer,
+  [modelManagerV2Slice.name]: modelManagerV2Slice.reducer,
   [sdxlSlice.name]: sdxlSlice.reducer,
   [queueSlice.name]: queueSlice.reducer,
   [workflowSlice.name]: workflowSlice.reducer,
