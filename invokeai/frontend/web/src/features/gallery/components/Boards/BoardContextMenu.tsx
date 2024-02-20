@@ -5,7 +5,6 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { autoAddBoardIdChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { BoardId } from 'features/gallery/store/types';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { addToast } from 'features/system/store/systemSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDownloadBold, PiPlusBold } from 'react-icons/pi';
@@ -41,35 +40,9 @@ const BoardContextMenu = ({ board, board_id, setBoardToDelete, children }: Props
     dispatch(autoAddBoardIdChanged(board_id));
   }, [board_id, dispatch]);
 
-  const handleBulkDownload = useCallback(async () => {
-    try {
-      const response = await bulkDownload({
-        image_names: [],
-        board_id: board_id,
-      }).unwrap();
-
-      dispatch(
-        addToast({
-          title: t('gallery.preparingDownload'),
-          status: 'success',
-          ...(response.response
-            ? {
-                description: response.response,
-                duration: null,
-                isClosable: true,
-              }
-            : {}),
-        })
-      );
-    } catch {
-      dispatch(
-        addToast({
-          title: t('gallery.preparingDownloadFailed'),
-          status: 'error',
-        })
-      );
-    }
-  }, [t, board_id, bulkDownload, dispatch]);
+  const handleBulkDownload = useCallback(() => {
+    bulkDownload({ image_names: [], board_id: board_id });
+  }, [board_id, bulkDownload]);
 
   const renderMenuFunc = useCallback(
     () => (

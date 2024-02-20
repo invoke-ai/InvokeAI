@@ -5,7 +5,6 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { imagesToChangeSelected, isModalOpenChanged } from 'features/changeBoardModal/store/slice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { addToast } from 'features/system/store/systemSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDownloadSimpleBold, PiFoldersBold, PiStarBold, PiStarFill, PiTrashSimpleBold } from 'react-icons/pi';
@@ -44,34 +43,9 @@ const MultipleSelectionMenuItems = () => {
     unstarImages({ imageDTOs: selection });
   }, [unstarImages, selection]);
 
-  const handleBulkDownload = useCallback(async () => {
-    try {
-      const response = await bulkDownload({
-        image_names: selection.map((img) => img.image_name),
-      }).unwrap();
-
-      dispatch(
-        addToast({
-          title: t('gallery.preparingDownload'),
-          status: 'success',
-          ...(response.response
-            ? {
-                description: response.response,
-                duration: null,
-                isClosable: true,
-              }
-            : {}),
-        })
-      );
-    } catch {
-      dispatch(
-        addToast({
-          title: t('gallery.preparingDownloadFailed'),
-          status: 'error',
-        })
-      );
-    }
-  }, [t, selection, bulkDownload, dispatch]);
+  const handleBulkDownload = useCallback(() => {
+    bulkDownload({ image_names: selection.map((img) => img.image_name) });
+  }, [selection, bulkDownload]);
 
   const areAllStarred = useMemo(() => {
     return selection.every((img) => img.starred);
