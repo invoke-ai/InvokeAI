@@ -1,3 +1,4 @@
+import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $bulkDownloadId } from 'app/store/nanostores/bulkDownloadId';
 import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppDispatch } from 'app/store/store';
@@ -38,8 +39,10 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
     dispatch(socketConnected());
     const queue_id = $queueId.get();
     socket.emit('subscribe_queue', { queue_id });
-    const bulk_download_id = $bulkDownloadId.get();
-    socket.emit('subscribe_bulk_download', { bulk_download_id });
+    if (!$baseUrl.get()) {
+      const bulk_download_id = $bulkDownloadId.get();
+      socket.emit('subscribe_bulk_download', { bulk_download_id });
+    }
   });
 
   socket.on('connect_error', (error) => {
