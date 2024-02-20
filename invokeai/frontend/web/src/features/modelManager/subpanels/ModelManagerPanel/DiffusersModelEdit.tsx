@@ -9,8 +9,8 @@ import { memo, useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { useUpdateModelsMutation } from 'services/api/endpoints/models';
 import type { DiffusersModelConfig } from 'services/api/types';
-import { useUpdateModelsMutation } from '../../../../services/api/endpoints/models';
 
 type DiffusersModelEditProps = {
   model: DiffusersModelConfig;
