@@ -1,17 +1,8 @@
-import {
-  Box,
-  Button,
-  Flex,
-  Heading,
-  IconButton,
-  Input,
-  InputGroup,
-  InputRightElement,
-  Spacer,
-} from '@invoke-ai/ui-library';
-import { t } from 'i18next';
-import { PiXBold } from 'react-icons/pi';
-import { SyncModelsIconButton } from '../../modelManager/components/SyncModels/SyncModelsIconButton';
+import { Box, Button, Flex, Heading } from '@invoke-ai/ui-library';
+import { SyncModelsIconButton } from 'features/modelManager/components/SyncModels/SyncModelsIconButton';
+
+import ModelList from './ModelManagerPanel/ModelList';
+import { ModelListNavigation } from './ModelManagerPanel/ModelListNavigation';
 
 export const ModelManager = () => {
   return (
@@ -27,17 +18,8 @@ export const ModelManager = () => {
         </Flex>
       </Flex>
       <Box layerStyle="second" p={3} borderRadius="base" w="full" h="full">
-        <Flex gap={2} alignItems="center" justifyContent="space-between">
-          <Button>All Models</Button>
-          <Spacer />
-          <InputGroup>
-            <Input placeholder={t('boards.searchBoard')} data-testid="board-search-input" />(
-            <InputRightElement h="full" pe={2}>
-              <IconButton size="sm" variant="link" aria-label={t('boards.clearSearch')} icon={<PiXBold />} />
-            </InputRightElement>
-            )
-          </InputGroup>
-        </Flex>
+        <ModelListNavigation />
+        <ModelList />
       </Box>
     </Box>
   );
