@@ -5,10 +5,11 @@ import type { ChangeEvent, PropsWithChildren } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_BASE_MODELS } from 'services/api/constants';
-import type { LoRAConfig, MainModelConfig } from 'services/api/endpoints/models';
+// import type { LoRAConfig, MainModelConfig } from 'services/api/endpoints/models';
 import { useGetLoRAModelsQuery, useGetMainModelsQuery } from 'services/api/endpoints/models';
 
 import ModelListItem from './ModelListItem';
+import { LoRAConfig, MainModelConfig } from '../../../../services/api/types';
 
 type ModelListProps = {
   selectedModelId: string | undefined;
@@ -177,9 +178,9 @@ const ModelListWrapper = memo((props: ModelListWrapperProps) => {
         </Text>
         {modelList.map((model) => (
           <ModelListItem
-            key={model.id}
+            key={model.key}
             model={model}
-            isSelected={selected.selectedModelId === model.id}
+            isSelected={selected.selectedModelId === model.key}
             setSelectedModelId={selected.setSelectedModelId}
           />
         ))}

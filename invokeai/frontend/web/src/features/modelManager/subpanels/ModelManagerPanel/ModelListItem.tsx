@@ -15,8 +15,8 @@ import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
-import type { LoRAConfig, MainModelConfig } from 'services/api/endpoints/models';
-import { useDeleteLoRAModelsMutation, useDeleteMainModelsMutation } from 'services/api/endpoints/models';
+import { useDeleteModelsMutation } from 'services/api/endpoints/models';
+import { LoRAConfig, MainModelConfig } from '../../../../services/api/types';
 
 type ModelListItemProps = {
   model: MainModelConfig | LoRAConfig;
@@ -27,29 +27,23 @@ type ModelListItemProps = {
 const ModelListItem = (props: ModelListItemProps) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const [deleteMainModel] = useDeleteMainModelsMutation();
-  const [deleteLoRAModel] = useDeleteLoRAModelsMutation();
+  const [deleteModel] = useDeleteModelsMutation();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   const { model, isSelected, setSelectedModelId } = props;
 
   const handleSelectModel = useCallback(() => {
-    setSelectedModelId(model.id);
-  }, [model.id, setSelectedModelId]);
+    setSelectedModelId(model.key);
+  }, [model.key, setSelectedModelId]);
 
   const handleModelDelete = useCallback(() => {
-    const method = {
-      main: deleteMainModel,
-      lora: deleteLoRAModel,
-    }[model.model_type];
-
-    method(model)
+    deleteModel({ key: model.key })
       .unwrap()
       .then((_) => {
         dispatch(
           addToast(
             makeToast({
-              title: `${t('modelManager.modelDeleted')}: ${model.model_name}`,
+              title: `${t('modelManager.modelDeleted')}: ${model.name}`,
               status: 'success',
             })
           )
@@ -60,7 +54,7 @@ const ModelListItem = (props: ModelListItemProps) => {
           dispatch(
             addToast(
               makeToast({
-                title: `${t('modelManager.modelDeleteFailed')}: ${model.model_name}`,
+                title: `${t('modelManager.modelDeleteFailed')}: ${model.name}`,
                 status: 'error',
               })
             )
@@ -68,7 +62,7 @@ const ModelListItem = (props: ModelListItemProps) => {
         }
       });
     setSelectedModelId(undefined);
-  }, [deleteMainModel, deleteLoRAModel, model, setSelectedModelId, dispatch, t]);
+  }, [deleteModel, model, setSelectedModelId, dispatch, t]);
 
   return (
     <Flex gap={2} alignItems="center" w="full">
@@ -85,10 +79,10 @@ const ModelListItem = (props: ModelListItemProps) => {
       >
         <Flex gap={4} alignItems="center">
           <Badge minWidth={14} p={0.5} fontSize="sm" variant="solid">
-            {MODEL_TYPE_SHORT_MAP[model.base_model as keyof typeof MODEL_TYPE_SHORT_MAP]}
+            {MODEL_TYPE_SHORT_MAP[model.base as keyof typeof MODEL_TYPE_SHORT_MAP]}
           </Badge>
           <Tooltip label={model.description} placement="bottom">
-            <Text>{model.model_name}</Text>
+            <Text>{model.name}</Text>
           </Tooltip>
         </Flex>
       </Flex>

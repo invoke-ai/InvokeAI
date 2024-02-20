@@ -54,8 +54,8 @@ const ModelConvert = (props: ModelConvertProps) => {
 
   const modelConvertHandler = useCallback(() => {
     const queryArg = {
-      base_model: model.base_model,
-      model_name: model.model_name,
+      base_model: model.base,
+      model_name: model.name,
       convert_dest_directory: saveLocation === 'Custom' ? customSaveLocation : undefined,
     };
 
@@ -74,7 +74,7 @@ const ModelConvert = (props: ModelConvertProps) => {
     dispatch(
       addToast(
         makeToast({
-          title: `${t('modelManager.convertingModelBegin')}: ${model.model_name}`,
+          title: `${t('modelManager.convertingModelBegin')}: ${model.name}`,
           status: 'info',
         })
       )
@@ -86,7 +86,7 @@ const ModelConvert = (props: ModelConvertProps) => {
         dispatch(
           addToast(
             makeToast({
-              title: `${t('modelManager.modelConverted')}: ${model.model_name}`,
+              title: `${t('modelManager.modelConverted')}: ${model.name}`,
               status: 'success',
             })
           )
@@ -96,13 +96,13 @@ const ModelConvert = (props: ModelConvertProps) => {
         dispatch(
           addToast(
             makeToast({
-              title: `${t('modelManager.modelConversionFailed')}: ${model.model_name}`,
+              title: `${t('modelManager.modelConversionFailed')}: ${model.name}`,
               status: 'error',
             })
           )
         );
       });
-  }, [convertModel, customSaveLocation, dispatch, model.base_model, model.model_name, saveLocation, t]);
+  }, [convertModel, customSaveLocation, dispatch, model.base, model.name, saveLocation, t]);
 
   return (
     <>
@@ -116,7 +116,7 @@ const ModelConvert = (props: ModelConvertProps) => {
         🧨 {t('modelManager.convertToDiffusers')}
       </Button>
       <ConfirmationAlertDialog
-        title={`${t('modelManager.convert')} ${model.model_name}`}
+        title={`${t('modelManager.convert')} ${model.name}`}
         acceptCallback={modelConvertHandler}
         cancelCallback={modelConvertCancelHandler}
         acceptButtonText={`${t('modelManager.convert')}`}
