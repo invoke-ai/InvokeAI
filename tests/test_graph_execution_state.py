@@ -1,4 +1,3 @@
-import logging
 from typing import Optional
 from unittest.mock import Mock
 
@@ -8,17 +7,12 @@ import pytest
 from .test_nodes import (  # isort: split
     PromptCollectionTestInvocation,
     PromptTestInvocation,
-    TestEventService,
     TextToImageTestInvocation,
 )
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
 from invokeai.app.invocations.collections import RangeInvocation
 from invokeai.app.invocations.math import AddInvocation, MultiplyInvocation
-from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
-from invokeai.app.services.invocation_services import InvocationServices
-from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
 from invokeai.app.services.shared.graph import (
     CollectInvocation,
     Graph,
@@ -36,39 +30,6 @@ def simple_graph() -> Graph:
     g.add_node(TextToImageTestInvocation(id="2"))
     g.add_edge(create_edge("1", "prompt", "2", "prompt"))
     return g
-
-
-# This must be defined here to avoid issues with the dynamic creation of the union of all invocation types
-# Defining it in a separate module will cause the union to be incomplete, and pydantic will not validate
-# the test invocations.
-@pytest.fixture
-def mock_services() -> InvocationServices:
-    configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
-    # NOTE: none of these are actually called by the test invocations
-    return InvocationServices(
-        board_image_records=None,  # type: ignore
-        board_images=None,  # type: ignore
-        board_records=None,  # type: ignore
-        boards=None,  # type: ignore
-        bulk_download=None,  # type: ignore
-        configuration=configuration,
-        events=TestEventService(),
-        image_files=None,  # type: ignore
-        image_records=None,  # type: ignore
-        images=None,  # type: ignore
-        invocation_cache=MemoryInvocationCache(max_cache_size=0),
-        logger=logging,  # type: ignore
-        model_manager=None,  # type: ignore
-        download_queue=None,  # type: ignore
-        names=None,  # type: ignore
-        performance_statistics=InvocationStatsService(),
-        session_processor=None,  # type: ignore
-        session_queue=None,  # type: ignore
-        urls=None,  # type: ignore
-        workflow_records=None,  # type: ignore
-        tensors=None,  # type: ignore
-        conditioning=None,  # type: ignore
-    )
 
 
 def invoke_next(g: GraphExecutionState) -> tuple[Optional[BaseInvocation], Optional[BaseInvocationOutput]]:
