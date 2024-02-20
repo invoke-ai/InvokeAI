@@ -21,7 +21,6 @@ from .bulk_download_base import BulkDownloadBase
 class BulkDownloadService(BulkDownloadBase):
     def start(self, invoker: Invoker) -> None:
         self._invoker = invoker
-        self._event_bus = invoker.services.events
 
     def __init__(self):
         self._temp_directory = TemporaryDirectory()
@@ -104,9 +103,9 @@ class BulkDownloadService(BulkDownloadBase):
         self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
     ) -> None:
         """Signal that a bulk download job has started."""
-        if self._event_bus:
+        if self._invoker:
             assert bulk_download_id is not None
-            self._event_bus.emit_bulk_download_started(
+            self._invoker.services.events.emit_bulk_download_started(
                 bulk_download_id=bulk_download_id,
                 bulk_download_item_id=bulk_download_item_id,
                 bulk_download_item_name=bulk_download_item_name,
@@ -116,10 +115,10 @@ class BulkDownloadService(BulkDownloadBase):
         self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
     ) -> None:
         """Signal that a bulk download job has completed."""
-        if self._event_bus:
+        if self._invoker:
             assert bulk_download_id is not None
             assert bulk_download_item_name is not None
-            self._event_bus.emit_bulk_download_completed(
+            self._invoker.services.events.emit_bulk_download_completed(
                 bulk_download_id=bulk_download_id,
                 bulk_download_item_id=bulk_download_item_id,
                 bulk_download_item_name=bulk_download_item_name,
@@ -129,10 +128,10 @@ class BulkDownloadService(BulkDownloadBase):
         self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str, exception: Exception
     ) -> None:
         """Signal that a bulk download job has failed."""
-        if self._event_bus:
+        if self._invoker:
             assert bulk_download_id is not None
             assert exception is not None
-            self._event_bus.emit_bulk_download_failed(
+            self._invoker.services.events.emit_bulk_download_failed(
                 bulk_download_id=bulk_download_id,
                 bulk_download_item_id=bulk_download_item_id,
                 bulk_download_item_name=bulk_download_item_name,
