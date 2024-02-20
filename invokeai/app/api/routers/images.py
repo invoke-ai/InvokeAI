@@ -375,9 +375,11 @@ async def unstar_images_in_list(
 
 class ImagesDownloaded(BaseModel):
     response: Optional[str] = Field(
-        description="If defined, the message to display to the user when images begin downloading"
+        default=None, description="The message to display to the user when images begin downloading"
     )
-    bulk_download_item_name: str = Field(description="The bulk download item name of the bulk download item")
+    bulk_download_item_name: Optional[str] = Field(
+        default=None, description="The name of the bulk download item for which events will be emitted"
+    )
 
 
 @images_router.post(
@@ -389,7 +391,7 @@ async def download_images_from_list(
         default=None, description="The list of names of images to download", embed=True
     ),
     board_id: Optional[str] = Body(
-        default=None, description="The board from which image should be downloaded from", embed=True
+        default=None, description="The board from which image should be downloaded", embed=True
     ),
 ) -> ImagesDownloaded:
     if (image_names is None or len(image_names) == 0) and board_id is None:
@@ -402,10 +404,7 @@ async def download_images_from_list(
         board_id,
         bulk_download_item_id,
     )
-    return ImagesDownloaded(
-        response="Your images are preparing to be downloaded",
-        bulk_download_item_name=bulk_download_item_id + ".zip",
-    )
+    return ImagesDownloaded(bulk_download_item_name=bulk_download_item_id + ".zip")
 
 
 @images_router.api_route(
