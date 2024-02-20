@@ -1,64 +1,15 @@
 from pathlib import Path
 from typing import Any
 
-import pytest
 from fastapi import BackgroundTasks
 from fastapi.testclient import TestClient
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
 from invokeai.app.services.board_records.board_records_common import BoardRecord
-from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
-from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
-from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.images.images_default import ImageService
-from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invoker import Invoker
-from invokeai.backend.util.logging import InvokeAILogger
-from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 client = TestClient(app)
-
-
-@pytest.fixture
-def mock_services(tmp_path: Path) -> InvocationServices:
-    configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
-    logger = InvokeAILogger.get_logger()
-    db = create_mock_sqlite_database(configuration, logger)
-
-    return InvocationServices(
-        board_image_records=None,  # type: ignore
-        board_images=None,  # type: ignore
-        board_records=SqliteBoardRecordStorage(db=db),
-        boards=None,  # type: ignore
-        bulk_download=BulkDownloadService(),
-        configuration=None,  # type: ignore
-        events=None,  # type: ignore
-        graph_execution_manager=None,  # type: ignore
-        image_files=None,  # type: ignore
-        image_records=None,  # type: ignore
-        images=ImageService(),
-        invocation_cache=None,  # type: ignore
-        latents=None,  # type: ignore
-        logger=logger,
-        model_manager=None,  # type: ignore
-        model_records=None,  # type: ignore
-        download_queue=None,  # type: ignore
-        model_install=None,  # type: ignore
-        names=None,  # type: ignore
-        performance_statistics=None,  # type: ignore
-        processor=None,  # type: ignore
-        queue=None,  # type: ignore
-        session_processor=None,  # type: ignore
-        session_queue=None,  # type: ignore
-        urls=None,  # type: ignore
-        workflow_records=None,  # type: ignore
-    )
-
-
-@pytest.fixture()
-def mock_invoker(mock_services: InvocationServices) -> Invoker:
-    return Invoker(services=mock_services)
 
 
 class MockApiDependencies(ApiDependencies):

@@ -1,5 +1,7 @@
 from typing import Any, Callable, Union
 
+from pydantic import BaseModel
+
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -115,25 +117,22 @@ def create_edge(from_id: str, from_field: str, to_id: str, to_field: str) -> Edg
     )
 
 
-class TestEvent:
-    event_name: str
-    payload: Any
+class TestEvent(BaseModel):
     __test__ = False  # not a pytest test case
 
-    def __init__(self, event_name: str, payload: Any):
-        self.event_name = event_name
-        self.payload = payload
+    event_name: str
+    payload: Any
 
 
 class TestEventService(EventServiceBase):
-    events: list
     __test__ = False  # not a pytest test case
 
     def __init__(self):
         super().__init__()
-        self.events = []
+        self.events: list[TestEvent] = []
 
     def dispatch(self, event_name: str, payload: Any) -> None:
+        self.events.append(TestEvent(event_name=payload["event"], payload=payload["data"]))
         pass
 
 
