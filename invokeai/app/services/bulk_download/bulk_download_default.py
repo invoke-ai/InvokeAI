@@ -30,9 +30,6 @@ class BulkDownloadService(BulkDownloadBase):
         self.__event_bus = invoker.services.events
 
     def __init__(self):
-        """
-        Initialize the downloader object.
-        """
         self.__temp_directory = TemporaryDirectory()
         self.__bulk_downloads_folder = Path(self.__temp_directory.name) / "bulk_downloads"
         self.__bulk_downloads_folder.mkdir(parents=True, exist_ok=True)
@@ -40,13 +37,6 @@ class BulkDownloadService(BulkDownloadBase):
     def handler(
         self, image_names: Optional[list[str]], board_id: Optional[str], bulk_download_item_id: Optional[str]
     ) -> None:
-        """
-        Create a zip file containing the images specified by the given image names or board id.
-
-        param: image_names: A list of image names to include in the zip file.
-        param: board_id: The ID of the board. If provided, all images associated with the board will be included in the zip file.
-        """
-
         bulk_download_id: str = DEFAULT_BULK_DOWNLOAD_ID
         bulk_download_item_id = uuid_string() if bulk_download_item_id is None else bulk_download_item_id
         bulk_download_item_name = bulk_download_item_id + ".zip"
@@ -162,26 +152,13 @@ class BulkDownloadService(BulkDownloadBase):
             )
 
     def stop(self, *args, **kwargs):
-        """Stop the bulk download service and delete the files in the bulk download folder."""
-        # Get all the files in the bulk downloads folder, only .zip files
         self.__temp_directory.cleanup()
 
     def delete(self, bulk_download_item_name: str) -> None:
-        """
-        Delete the bulk download file.
-
-        :param bulk_download_item_name: The name of the bulk download item.
-        """
         path = self.get_path(bulk_download_item_name)
         Path(path).unlink()
 
     def get_path(self, bulk_download_item_name: str) -> str:
-        """
-        Get the path to the bulk download file.
-
-        :param bulk_download_item_name: The name of the bulk download item.
-        :return: The path to the bulk download file.
-        """
         path = str(self.__bulk_downloads_folder / bulk_download_item_name)
         if not self._is_valid_path(path):
             raise BulkDownloadTargetException()
