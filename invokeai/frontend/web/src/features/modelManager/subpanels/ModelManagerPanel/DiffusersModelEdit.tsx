@@ -9,9 +9,8 @@ import { memo, useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import type { DiffusersModelConfig } from 'services/api/endpoints/models';
-import { useUpdateMainModelsMutation } from 'services/api/endpoints/models';
 import type { DiffusersModelConfig } from 'services/api/types';
+import { useUpdateModelsMutation } from '../../../../services/api/endpoints/models';
 
 type DiffusersModelEditProps = {
   model: DiffusersModelConfig;
@@ -20,7 +19,7 @@ type DiffusersModelEditProps = {
 const DiffusersModelEdit = (props: DiffusersModelEditProps) => {
   const { model } = props;
 
-  const [updateMainModel, { isLoading }] = useUpdateMainModelsMutation();
+  const [updateModel, { isLoading }] = useUpdateModelsMutation();
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -33,12 +32,12 @@ const DiffusersModelEdit = (props: DiffusersModelEditProps) => {
     reset,
   } = useForm<DiffusersModelConfig>({
     defaultValues: {
-      model_name: model.model_name ? model.model_name : '',
-      base_model: model.base_model,
-      model_type: 'main',
+      name: model.name ? model.name : '',
+      base: model.base,
+      type: 'main',
       path: model.path ? model.path : '',
       description: model.description ? model.description : '',
-      model_format: 'diffusers',
+      format: 'diffusers',
       vae: model.vae ? model.vae : '',
       variant: model.variant,
     },
@@ -48,12 +47,11 @@ const DiffusersModelEdit = (props: DiffusersModelEditProps) => {
   const onSubmit = useCallback<SubmitHandler<DiffusersModelConfig>>(
     (values) => {
       const responseBody = {
-        base_model: model.base_model,
-        model_name: model.model_name,
+        key: model.key,
         body: values,
       };
 
-      updateMainModel(responseBody)
+      updateModel(responseBody)
         .unwrap()
         .then((payload) => {
           reset(payload as DiffusersModelConfig, { keepDefaultValues: true });
@@ -78,37 +76,37 @@ const DiffusersModelEdit = (props: DiffusersModelEditProps) => {
           );
         });
     },
-    [dispatch, model.base_model, model.model_name, reset, t, updateMainModel]
+    [dispatch, model.key, reset, t, updateModel]
   );
 
   return (
     <Flex flexDirection="column" rowGap={4} width="100%">
       <Flex flexDirection="column">
         <Text fontSize="lg" fontWeight="bold">
-          {model.model_name}
+          {model.name}
         </Text>
         <Text fontSize="sm" color="base.400">
-          {MODEL_TYPE_MAP[model.base_model]} {t('modelManager.model')}
+          {MODEL_TYPE_MAP[model.base]} {t('modelManager.model')}
         </Text>
       </Flex>
       <Divider />
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <Flex flexDirection="column" overflowY="scroll" gap={4}>
-          <FormControl isInvalid={Boolean(errors.model_name)}>
+          <FormControl isInvalid={Boolean(errors.name)}>
             <FormLabel>{t('modelManager.name')}</FormLabel>
             <Input
-              {...register('model_name', {
+              {...register('name', {
                 validate: (value) => value.trim().length > 3 || 'Must be at least 3 characters',
               })}
             />
-            {errors.model_name?.message && <FormErrorMessage>{errors.model_name?.message}</FormErrorMessage>}
+            {errors.name?.message && <FormErrorMessage>{errors.name?.message}</FormErrorMessage>}
           </FormControl>
           <FormControl>
             <FormLabel>{t('modelManager.description')}</FormLabel>
             <Input {...register('description')} />
           </FormControl>
-          <BaseModelSelect<DiffusersModelConfig> control={control} name="base_model" />
+          <BaseModelSelect<DiffusersModelConfig> control={control} name="base" />
           <ModelVariantSelect<DiffusersModelConfig> control={control} name="variant" />
           <FormControl isInvalid={Boolean(errors.path)}>
             <FormLabel>{t('modelManager.modelLocation')}</FormLabel>

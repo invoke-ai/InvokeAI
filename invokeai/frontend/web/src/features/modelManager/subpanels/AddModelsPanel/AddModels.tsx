@@ -1,15 +1,18 @@
-import { Button, ButtonGroup, Flex } from '@invoke-ai/ui-library';
+import { Button, ButtonGroup, Flex, Text } from '@invoke-ai/ui-library';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import AdvancedAddModels from './AdvancedAddModels';
 import SimpleAddModels from './SimpleAddModels';
+import { useGetModelImportsQuery } from '../../../../services/api/endpoints/models';
 
 const AddModels = () => {
   const { t } = useTranslation();
   const [addModelMode, setAddModelMode] = useState<'simple' | 'advanced'>('simple');
   const handleAddModelSimple = useCallback(() => setAddModelMode('simple'), []);
   const handleAddModelAdvanced = useCallback(() => setAddModelMode('advanced'), []);
+  const { data } = useGetModelImportsQuery({});
+  console.log({ data });
   return (
     <Flex flexDirection="column" width="100%" overflow="scroll" maxHeight={window.innerHeight - 250} gap={4}>
       <ButtonGroup>
@@ -24,6 +27,7 @@ const AddModels = () => {
         {addModelMode === 'simple' && <SimpleAddModels />}
         {addModelMode === 'advanced' && <AdvancedAddModels />}
       </Flex>
+      <Flex>{data?.map((model) => <Text>{model.status}</Text>)}</Flex>
     </Flex>
   );
 };

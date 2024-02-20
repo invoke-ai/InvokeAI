@@ -2,13 +2,13 @@ import { Flex, Text } from '@invoke-ai/ui-library';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ALL_BASE_MODELS } from 'services/api/constants';
-import type { DiffusersModelConfig, LoRAConfig, MainModelConfig } from 'services/api/endpoints/models';
 import { useGetLoRAModelsQuery, useGetMainModelsQuery } from 'services/api/endpoints/models';
 
 import CheckpointModelEdit from './ModelManagerPanel/CheckpointModelEdit';
 import DiffusersModelEdit from './ModelManagerPanel/DiffusersModelEdit';
 import LoRAModelEdit from './ModelManagerPanel/LoRAModelEdit';
 import ModelList from './ModelManagerPanel/ModelList';
+import { DiffusersModelConfig, LoRAConfig, MainModelConfig } from '../../../services/api/types';
 
 const ModelManagerPanel = () => {
   const [selectedModelId, setSelectedModelId] = useState<string>();
@@ -41,16 +41,16 @@ const ModelEdit = (props: ModelEditProps) => {
   const { t } = useTranslation();
   const { model } = props;
 
-  if (model?.model_format === 'checkpoint') {
-    return <CheckpointModelEdit key={model.id} model={model} />;
+  if (model?.format === 'checkpoint') {
+    return <CheckpointModelEdit key={model.key} model={model} />;
   }
 
-  if (model?.model_format === 'diffusers') {
-    return <DiffusersModelEdit key={model.id} model={model as DiffusersModelConfig} />;
+  if (model?.format === 'diffusers') {
+    return <DiffusersModelEdit key={model.key} model={model as DiffusersModelConfig} />;
   }
 
-  if (model?.model_type === 'lora') {
-    return <LoRAModelEdit key={model.id} model={model} />;
+  if (model?.type === 'lora') {
+    return <LoRAModelEdit key={model.key} model={model} />;
   }
 
   return (

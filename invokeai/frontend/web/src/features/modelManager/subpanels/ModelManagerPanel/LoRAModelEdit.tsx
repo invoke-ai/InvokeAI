@@ -8,7 +8,6 @@ import { memo, useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useUpdateLoRAModelsMutation } from 'services/api/endpoints/models';
 import type { LoRAModelConfig } from 'services/api/types';
 
 type LoRAModelEditProps = {
@@ -18,7 +17,7 @@ type LoRAModelEditProps = {
 const LoRAModelEdit = (props: LoRAModelEditProps) => {
   const { model } = props;
 
-  const [updateLoRAModel, { isLoading }] = useUpdateLoRAModelsMutation();
+  const [updateModel, { isLoading }] = useUpdateModelsMutation();
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -31,12 +30,12 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
     reset,
   } = useForm<LoRAModelConfig>({
     defaultValues: {
-      model_name: model.model_name ? model.model_name : '',
-      base_model: model.base_model,
-      model_type: 'lora',
+      name: model.name ? model.name : '',
+      base: model.base,
+      type: 'lora',
       path: model.path ? model.path : '',
       description: model.description ? model.description : '',
-      model_format: model.model_format,
+      format: model.format,
     },
     mode: 'onChange',
   });
@@ -44,12 +43,11 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
   const onSubmit = useCallback<SubmitHandler<LoRAModelConfig>>(
     (values) => {
       const responseBody = {
-        base_model: model.base_model,
-        model_name: model.model_name,
+        key: model.key,
         body: values,
       };
 
-      updateLoRAModel(responseBody)
+      updateModel(responseBody)
         .unwrap()
         .then((payload) => {
           reset(payload as LoRAModelConfig, { keepDefaultValues: true });
@@ -74,17 +72,17 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
           );
         });
     },
-    [dispatch, model.base_model, model.model_name, reset, t, updateLoRAModel]
+    [dispatch, model.key, reset, t, updateModel]
   );
 
   return (
     <Flex flexDirection="column" rowGap={4} width="100%">
       <Flex flexDirection="column">
         <Text fontSize="lg" fontWeight="bold">
-          {model.model_name}
+          {model.name}
         </Text>
         <Text fontSize="sm" color="base.400">
-          {MODEL_TYPE_MAP[model.base_model]} {t('modelManager.model')} ⋅ {LORA_MODEL_FORMAT_MAP[model.model_format]}{' '}
+          {MODEL_TYPE_MAP[model.base]} {t('modelManager.model')} ⋅ {LORA_MODEL_FORMAT_MAP[model.format]}{' '}
           {t('common.format')}
         </Text>
       </Flex>
@@ -92,20 +90,20 @@ const LoRAModelEdit = (props: LoRAModelEditProps) => {
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <Flex flexDirection="column" overflowY="scroll" gap={4}>
-          <FormControl isInvalid={Boolean(errors.model_name)}>
+          <FormControl isInvalid={Boolean(errors.name)}>
             <FormLabel>{t('modelManager.name')}</FormLabel>
             <Input
-              {...register('model_name', {
+              {...register('name', {
                 validate: (value) => value.trim().length > 3 || 'Must be at least 3 characters',
               })}
             />
-            {errors.model_name?.message && <FormErrorMessage>{errors.model_name?.message}</FormErrorMessage>}
+            {errors.name?.message && <FormErrorMessage>{errors.name?.message}</FormErrorMessage>}
           </FormControl>
           <FormControl>
             <FormLabel>{t('modelManager.description')}</FormLabel>
             <Input {...register('description')} />
           </FormControl>
-          <BaseModelSelect<LoRAModelConfig> control={control} name="base_model" />
+          <BaseModelSelect<LoRAModelConfig> control={control} name="base" />
 
           <FormControl isInvalid={Boolean(errors.path)}>
             <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
