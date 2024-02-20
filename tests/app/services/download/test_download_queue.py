@@ -9,7 +9,7 @@ from requests.sessions import Session
 from requests_testadapter import TestAdapter, TestSession
 
 from invokeai.app.services.download import DownloadJob, DownloadJobStatus, DownloadQueueService
-from tests.fixtures.event_service import DummyEventService
+from tests.test_nodes import TestEventService
 
 # Prevent pytest deprecation warnings
 TestAdapter.__test__ = False  # type: ignore
@@ -101,7 +101,7 @@ def test_errors(tmp_path: Path, session: Session) -> None:
 
 
 def test_event_bus(tmp_path: Path, session: Session) -> None:
-    event_bus = DummyEventService()
+    event_bus = TestEventService()
 
     queue = DownloadQueueService(requests_session=session, event_bus=event_bus)
     queue.start()
@@ -167,7 +167,7 @@ def test_broken_callbacks(tmp_path: Path, session: Session, capsys) -> None:
 
 
 def test_cancel(tmp_path: Path, session: Session) -> None:
-    event_bus = DummyEventService()
+    event_bus = TestEventService()
 
     queue = DownloadQueueService(requests_session=session, event_bus=event_bus)
     queue.start()
