@@ -20,13 +20,13 @@ from .bulk_download_base import BulkDownloadBase
 
 class BulkDownloadService(BulkDownloadBase):
     def start(self, invoker: Invoker) -> None:
-        self.__invoker = invoker
-        self.__event_bus = invoker.services.events
+        self._invoker = invoker
+        self._event_bus = invoker.services.events
 
     def __init__(self):
-        self.__temp_directory = TemporaryDirectory()
-        self.__bulk_downloads_folder = Path(self.__temp_directory.name) / "bulk_downloads"
-        self.__bulk_downloads_folder.mkdir(parents=True, exist_ok=True)
+        self._temp_directory = TemporaryDirectory()
+        self._bulk_downloads_folder = Path(self._temp_directory.name) / "bulk_downloads"
+        self._bulk_downloads_folder.mkdir(parents=True, exist_ok=True)
 
     def handler(
         self, image_names: Optional[list[str]], board_id: Optional[str], bulk_download_item_id: Optional[str]
@@ -58,15 +58,15 @@ class BulkDownloadService(BulkDownloadBase):
             self._signal_job_failed(bulk_download_id, bulk_download_item_id, bulk_download_item_name, e)
         except Exception as e:
             self._signal_job_failed(bulk_download_id, bulk_download_item_id, bulk_download_item_name, e)
-            self.__invoker.services.logger.error("Problem bulk downloading images.")
+            self._invoker.services.logger.error("Problem bulk downloading images.")
             raise e
 
     def _image_handler(self, image_names: list[str]) -> list[ImageDTO]:
-        return [self.__invoker.services.images.get_dto(image_name) for image_name in image_names]
+        return [self._invoker.services.images.get_dto(image_name) for image_name in image_names]
 
     def _board_handler(self, board_id: str) -> list[ImageDTO]:
         # -1 is the default value for limit, which means no limit, is_intermediate False only gives us completed images
-        image_dtos = self.__invoker.services.images.get_many(
+        image_dtos = self._invoker.services.images.get_many(
             offset=0,
             limit=-1,
             board_id=board_id,
@@ -81,7 +81,7 @@ class BulkDownloadService(BulkDownloadBase):
         if board_id == "none":
             return "Uncategorized"
 
-        return self._clean_string_to_path_safe(self.__invoker.services.board_records.get(board_id).board_name)
+        return self._clean_string_to_path_safe(self._invoker.services.board_records.get(board_id).board_name)
 
     def _create_zip_file(self, image_dtos: list[ImageDTO], bulk_download_item_id: str) -> str:
         """
@@ -91,12 +91,12 @@ class BulkDownloadService(BulkDownloadBase):
         :return: The name of the zip file.
         """
         zip_file_name = bulk_download_item_id + ".zip"
-        zip_file_path = self.__bulk_downloads_folder / (zip_file_name)
+        zip_file_path = self._bulk_downloads_folder / (zip_file_name)
 
         with ZipFile(zip_file_path, "w") as zip_file:
             for image_dto in image_dtos:
                 image_zip_path = Path(image_dto.image_category.value) / image_dto.image_name
-                image_disk_path = self.__invoker.services.images.get_path(image_dto.image_name)
+                image_disk_path = self._invoker.services.images.get_path(image_dto.image_name)
                 zip_file.write(image_disk_path, arcname=image_zip_path)
 
         return str(zip_file_name)
@@ -110,9 +110,9 @@ class BulkDownloadService(BulkDownloadBase):
         self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
     ) -> None:
         """Signal that a bulk download job has started."""
-        if self.__event_bus:
+        if self._event_bus:
             assert bulk_download_id is not None
-            self.__event_bus.emit_bulk_download_started(
+            self._event_bus.emit_bulk_download_started(
                 bulk_download_id=bulk_download_id,
                 bulk_download_item_id=bulk_download_item_id,
                 bulk_download_item_name=bulk_download_item_name,
@@ -122,10 +122,10 @@ class BulkDownloadService(BulkDownloadBase):
         self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
     ) -> None:
         """Signal that a bulk download job has completed."""
-        if self.__event_bus:
+        if self._event_bus:
             assert bulk_download_id is not None
             assert bulk_download_item_name is not None
-            self.__event_bus.emit_bulk_download_completed(
+            self._event_bus.emit_bulk_download_completed(
                 bulk_download_id=bulk_download_id,
                 bulk_download_item_id=bulk_download_item_id,
                 bulk_download_item_name=bulk_download_item_name,
@@ -135,10 +135,10 @@ class BulkDownloadService(BulkDownloadBase):
         self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str, exception: Exception
     ) -> None:
         """Signal that a bulk download job has failed."""
-        if self.__event_bus:
+        if self._event_bus:
             assert bulk_download_id is not None
             assert exception is not None
-            self.__event_bus.emit_bulk_download_failed(
+            self._event_bus.emit_bulk_download_failed(
                 bulk_download_id=bulk_download_id,
                 bulk_download_item_id=bulk_download_item_id,
                 bulk_download_item_name=bulk_download_item_name,
@@ -146,14 +146,14 @@ class BulkDownloadService(BulkDownloadBase):
             )
 
     def stop(self, *args, **kwargs):
-        self.__temp_directory.cleanup()
+        self._temp_directory.cleanup()
 
     def delete(self, bulk_download_item_name: str) -> None:
         path = self.get_path(bulk_download_item_name)
         Path(path).unlink()
 
     def get_path(self, bulk_download_item_name: str) -> str:
-        path = str(self.__bulk_downloads_folder / bulk_download_item_name)
+        path = str(self._bulk_downloads_folder / bulk_download_item_name)
         if not self._is_valid_path(path):
             raise BulkDownloadTargetException()
         return path
