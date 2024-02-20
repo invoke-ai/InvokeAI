@@ -65,14 +65,8 @@ class BulkDownloadService(BulkDownloadBase):
         return [self._invoker.services.images.get_dto(image_name) for image_name in image_names]
 
     def _board_handler(self, board_id: str) -> list[ImageDTO]:
-        # -1 is the default value for limit, which means no limit, is_intermediate False only gives us completed images
-        image_dtos = self._invoker.services.images.get_many(
-            offset=0,
-            limit=-1,
-            board_id=board_id,
-            is_intermediate=False,
-        ).items
-        return image_dtos
+        image_names = self._invoker.services.board_image_records.get_all_board_image_names_for_board(board_id)
+        return self._image_handler(image_names)
 
     def generate_item_id(self, board_id: Optional[str]) -> str:
         return uuid_string() if board_id is None else self._get_clean_board_name(board_id) + "_" + uuid_string()
