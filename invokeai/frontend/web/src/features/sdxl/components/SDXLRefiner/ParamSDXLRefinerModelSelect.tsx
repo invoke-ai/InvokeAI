@@ -3,15 +3,16 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
 import { refinerModelChanged, selectSdxlSlice } from 'features/sdxl/store/sdxlSlice';
+import { pick } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { REFINER_BASE_MODELS } from 'services/api/constants';
-import type { MainModelConfig } from 'services/api/endpoints/models';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import type { MainModelConfig } from 'services/api/types';
 
 const selectModel = createMemoizedSelector(selectSdxlSlice, (sdxl) => sdxl.refinerModel);
 
-const optionsFilter = (model: MainModelConfig) => model.base_model === 'sdxl-refiner';
+const optionsFilter = (model: MainModelConfig) => model.base === 'sdxl-refiner';
 
 const ParamSDXLRefinerModelSelect = () => {
   const dispatch = useAppDispatch();
@@ -24,13 +25,7 @@ const ParamSDXLRefinerModelSelect = () => {
         dispatch(refinerModelChanged(null));
         return;
       }
-      dispatch(
-        refinerModelChanged({
-          base_model: 'sdxl-refiner',
-          model_name: model.model_name,
-          model_type: model.model_type,
-        })
-      );
+      dispatch(refinerModelChanged(pick(model, ['key', 'base'])));
     },
     [dispatch]
   );
