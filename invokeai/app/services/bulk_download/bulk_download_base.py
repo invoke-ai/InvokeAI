@@ -27,7 +27,7 @@ class BulkDownloadBase(ABC):
         self, image_names: Optional[list[str]], board_id: Optional[str], bulk_download_item_id: Optional[str]
     ) -> None:
         """
-        Starts a a bulk download job.
+        Create a zip file containing the images specified by the given image names or board id.
 
         :param image_names: A list of image names to include in the zip file.
         :param board_id: The ID of the board. If provided, all images associated with the board will be included in the zip file.
@@ -54,15 +54,7 @@ class BulkDownloadBase(ABC):
 
     @abstractmethod
     def stop(self, *args, **kwargs) -> None:
-        """
-        Stops the BulkDownloadService and cleans up all the remnants.
-
-        This method is responsible for stopping the BulkDownloadService and performing any necessary cleanup
-        operations to remove any remnants or resources associated with the service.
-
-        :param *args: Variable length argument list.
-        :param **kwargs: Arbitrary keyword arguments.
-        """
+        """Stops the BulkDownloadService and cleans up."""
 
     @abstractmethod
     def delete(self, bulk_download_item_name: str) -> None:
