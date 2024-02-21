@@ -1,14 +1,11 @@
 """Utility (backend) functions used by model_install.py"""
-import re
 from logging import Logger
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import omegaconf
-from huggingface_hub import HfFolder
 from pydantic import BaseModel, Field
 from pydantic.dataclasses import dataclass
-from pydantic.networks import AnyHttpUrl
 from requests import HTTPError
 from tqdm import tqdm
 
@@ -18,12 +15,8 @@ from invokeai.app.services.download import DownloadQueueService
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.model_install import (
-    HFModelSource,
-    LocalModelSource,
     ModelInstallService,
     ModelInstallServiceBase,
-    ModelSource,
-    URLModelSource,
 )
 from invokeai.app.services.model_metadata import ModelMetadataStoreSQL
 from invokeai.app.services.model_records import ModelRecordServiceBase, ModelRecordServiceSQL
@@ -31,7 +24,6 @@ from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.backend.model_manager import (
     BaseModelType,
     InvalidModelConfigException,
-    ModelRepoVariant,
     ModelType,
 )
 from invokeai.backend.model_manager.metadata import UnknownMetadataException
@@ -226,37 +218,13 @@ class InstallHelper(object):
                     additional_models.append(reverse_source[requirement])
         model_list.extend(additional_models)
 
-    def _make_install_source(self, model_info: UnifiedModelInfo) -> ModelSource:
-        assert model_info.source
-        model_path_id_or_url = model_info.source.strip("\"' ")
-        model_path = Path(model_path_id_or_url)
-
-        if model_path.exists():  # local file on disk
-            return LocalModelSource(path=model_path.absolute(), inplace=True)
-
-        # parsing huggingface repo ids
-        # we're going to do a little trick that allows for extended repo_ids of form "foo/bar:fp16"
-        variants = "|".join([x.lower() for x in ModelRepoVariant.__members__])
-        if match := re.match(f"^([^/]+/[^/]+?)(?::({variants}))?$", model_path_id_or_url):
-            repo_id = match.group(1)
-            repo_variant = ModelRepoVariant(match.group(2)) if match.group(2) else None
-            subfolder = Path(model_info.subfolder) if model_info.subfolder else None
-            return HFModelSource(
-                repo_id=repo_id,
-                access_token=HfFolder.get_token(),
-                subfolder=subfolder,
-                variant=repo_variant,
-            )
-        if re.match(r"^(http|https):", model_path_id_or_url):
-            return URLModelSource(url=AnyHttpUrl(model_path_id_or_url))
-        raise ValueError(f"Unsupported model source: {model_path_id_or_url}")
-
     def add_or_delete(self, selections: InstallSelections) -> None:
         """Add or delete selected models."""
         installer = self._installer
         self._add_required_models(selections.install_models)
         for model in selections.install_models:
-            source = self._make_install_source(model)
+            assert model.source
+            model_path_id_or_url = model.source.strip("\"' ")
             config = (
                 {
                     "description": model.description,
@@ -267,12 +235,12 @@ class InstallHelper(object):
             )
 
             try:
-                installer.import_model(
-                    source=source,
+                installer.heuristic_import(
+                    source=model_path_id_or_url,
                     config=config,
                 )
             except (UnknownMetadataException, InvalidModelConfigException, HTTPError, OSError) as e:
-                self._logger.warning(f"{source}: {e}")
+                self._logger.warning(f"{model.source}: {e}")
 
         for model_to_remove in selections.remove_models:
             parts = model_to_remove.split("/")
