@@ -822,6 +822,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 parts=parts,
                 bytes=job.bytes,
                 total_bytes=job.total_bytes,
+                id=job.id
             )
 
     def _signal_job_completed(self, job: ModelInstallJob) -> None:
@@ -834,7 +835,7 @@ class ModelInstallService(ModelInstallServiceBase):
             assert job.local_path is not None
             assert job.config_out is not None
             key = job.config_out.key
-            self._event_bus.emit_model_install_completed(str(job.source), key)
+            self._event_bus.emit_model_install_completed(str(job.source), key, id=job.id)
 
     def _signal_job_errored(self, job: ModelInstallJob) -> None:
         self._logger.info(f"{job.source}: model installation encountered an exception: {job.error_type}\n{job.error}")
@@ -843,7 +844,7 @@ class ModelInstallService(ModelInstallServiceBase):
             error = job.error
             assert error_type is not None
             assert error is not None
-            self._event_bus.emit_model_install_error(str(job.source), error_type, error)
+            self._event_bus.emit_model_install_error(str(job.source), error_type, error, id=job.id)
 
     def _signal_job_cancelled(self, job: ModelInstallJob) -> None:
         self._logger.info(f"{job.source}: model installation was cancelled")

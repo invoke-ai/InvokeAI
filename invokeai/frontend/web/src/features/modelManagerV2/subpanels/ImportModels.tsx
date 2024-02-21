@@ -1,11 +1,12 @@
-import { Button, Box, Flex, FormControl, FormLabel, Heading, Input, Text, Divider } from '@invoke-ai/ui-library';
-import { t } from 'i18next';
-import { CSSProperties } from 'react';
-import { useImportMainModelsMutation } from '../../../services/api/endpoints/models';
+import { Box, Button, Divider,Flex, FormControl, FormLabel, Heading, Input } from '@invoke-ai/ui-library';
 import { useForm } from '@mantine/form';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
+import { t } from 'i18next';
+import type { CSSProperties } from 'react';
+import { useImportMainModelsMutation } from 'services/api/endpoints/models';
+
 import { ImportQueue } from './ImportQueue';
 
 const formStyles: CSSProperties = {
@@ -26,8 +27,6 @@ export const ImportModels = () => {
       location: '',
     },
   });
-
-  console.log('addModelForm', addModelForm.values.location)
 
   const handleAddModelSubmit = (values: ExtendedImportModelConfig) => {
     importMainModel({ source: values.location, config: undefined })
@@ -77,7 +76,6 @@ export const ImportModels = () => {
           </Flex>
         </form>
         <Divider mt="5" mb="3" />
-        <Text>{t('modelManager.importQueue')}</Text>
         <ImportQueue />
       </Box>
     </Box>

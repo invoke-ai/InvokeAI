@@ -357,6 +357,7 @@ class EventServiceBase:
         bytes: int,
         total_bytes: int,
         parts: List[Dict[str, Union[str, int]]],
+        id: int
     ) -> None:
         """
         Emit at intervals while the install job is in progress (remote models only).
@@ -376,6 +377,7 @@ class EventServiceBase:
                 "bytes": bytes,
                 "total_bytes": total_bytes,
                 "parts": parts,
+                "id": id
             },
         )
 
@@ -390,7 +392,7 @@ class EventServiceBase:
             payload={"source": source},
         )
 
-    def emit_model_install_completed(self, source: str, key: str, total_bytes: Optional[int] = None) -> None:
+    def emit_model_install_completed(self, source: str, key: str, id: int, total_bytes: Optional[int] = None) -> None:
         """
         Emit when an install job is completed successfully.
 
@@ -404,6 +406,7 @@ class EventServiceBase:
                 "source": source,
                 "total_bytes": total_bytes,
                 "key": key,
+                "id": id
             },
         )
 
@@ -423,6 +426,7 @@ class EventServiceBase:
         source: str,
         error_type: str,
         error: str,
+        id: int
     ) -> None:
         """
         Emit when an install job encounters an exception.
@@ -437,6 +441,7 @@ class EventServiceBase:
                 "source": source,
                 "error_type": error_type,
                 "error": error,
+                "id": id
             },
         )
 

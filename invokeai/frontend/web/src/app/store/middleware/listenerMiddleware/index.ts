@@ -57,8 +57,8 @@ import { addInvocationCompleteEventListener as addInvocationCompleteListener } f
 import { addInvocationErrorEventListener as addInvocationErrorListener } from './listeners/socketio/socketInvocationError';
 import { addInvocationRetrievalErrorEventListener } from './listeners/socketio/socketInvocationRetrievalError';
 import { addInvocationStartedEventListener as addInvocationStartedListener } from './listeners/socketio/socketInvocationStarted';
-import { addModelLoadEventListener } from './listeners/socketio/socketModelLoad';
 import { addModelInstallEventListener } from './listeners/socketio/socketModelInstall';
+import { addModelLoadEventListener } from './listeners/socketio/socketModelLoad';
 import { addSocketQueueItemStatusChangedEventListener } from './listeners/socketio/socketQueueItemStatusChanged';
 import { addSessionRetrievalErrorEventListener } from './listeners/socketio/socketSessionRetrievalError';
 import { addSocketSubscribedEventListener as addSocketSubscribedListener } from './listeners/socketio/socketSubscribed';

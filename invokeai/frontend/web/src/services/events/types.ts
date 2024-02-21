@@ -51,12 +51,14 @@ export type ModelInstallDownloadingEvent = {
   source: string;
   timestamp: number;
   total_bytes: string;
+  id: number;
 };
 
 export type ModelInstallCompletedEvent = {
   key: number;
   source: string;
   timestamp: number;
+  id: number;
 };
 
 export type ModelInstallErrorEvent = {
@@ -64,6 +66,7 @@ export type ModelInstallErrorEvent = {
   error_type: string;
   source: string;
   timestamp: number;
+  id: number;
 };
 
 /**
