@@ -1,6 +1,7 @@
+import { createSelectorCreator, lruMemoize } from '@reduxjs/toolkit';
 import type { FetchBaseQueryArgs } from '@reduxjs/toolkit/dist/query/fetchBaseQuery';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError, TagDescription } from '@reduxjs/toolkit/query/react';
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { buildCreateApi, coreModule, fetchBaseQuery, reactHooksModule } from '@reduxjs/toolkit/query/react';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $projectId } from 'app/store/nanostores/projectId';
@@ -81,7 +82,14 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
   return rawBaseQuery(args, api, extraOptions);
 };
 
-export const api = createApi({
+const createLruSelector = createSelectorCreator(lruMemoize);
+
+const customCreateApi = buildCreateApi(
+  coreModule({ createSelector: createLruSelector }),
+  reactHooksModule({ createSelector: createLruSelector })
+);
+
+export const api = customCreateApi({
   baseQuery: dynamicBaseQuery,
   reducerPath: 'api',
   tagTypes,
