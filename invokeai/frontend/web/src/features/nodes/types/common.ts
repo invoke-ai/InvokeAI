@@ -67,6 +67,8 @@ export const zModelName = z.string().min(3);
 export const zModelIdentifier = z.object({
   key: z.string().min(1),
 });
+export const isModelIdentifier = (field: unknown): field is ModelIdentifier =>
+  zModelIdentifier.safeParse(field).success;
 export const zModelFieldBase = zModelIdentifier;
 export const zModelIdentifierWithBase = zModelIdentifier.extend({ base: zBaseModel });
 export type BaseModel = z.infer<typeof zBaseModel>;
@@ -141,7 +143,7 @@ export type VAEField = z.infer<typeof zVAEField>;
 // #region Control Adapters
 export const zControlField = z.object({
   image: zImageField,
-  control_model: zControlNetModelField,
+  control_model: zModelFieldBase,
   control_weight: z.union([z.number(), z.array(z.number())]).optional(),
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),
@@ -152,7 +154,7 @@ export type ControlField = z.infer<typeof zControlField>;
 
 export const zIPAdapterField = z.object({
   image: zImageField,
-  ip_adapter_model: zIPAdapterModelField,
+  ip_adapter_model: zModelFieldBase,
   weight: z.number(),
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),
@@ -161,7 +163,7 @@ export type IPAdapterField = z.infer<typeof zIPAdapterField>;
 
 export const zT2IAdapterField = z.object({
   image: zImageField,
-  t2i_adapter_model: zT2IAdapterModelField,
+  t2i_adapter_model: zModelFieldBase,
   weight: z.union([z.number(), z.array(z.number())]).optional(),
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),

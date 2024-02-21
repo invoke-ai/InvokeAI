@@ -12,6 +12,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { EMPTY_ARRAY } from 'app/store/util';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
 import { selectLoraSlice } from 'features/lora/store/loraSlice';
@@ -20,33 +21,31 @@ import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
-import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { filter } from 'lodash-es';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
 
 const formLabelProps: FormLabelProps = {
   minW: '4rem',
 };
 
-const badgesSelector = createMemoizedSelector(selectLoraSlice, selectGenerationSlice, (lora, generation) => {
-  const enabledLoRAsCount = filter(lora.loras, (l) => !!l.isEnabled).length;
-  const loraTabBadges = enabledLoRAsCount ? [enabledLoRAsCount] : [];
-  const accordionBadges: (string | number)[] = [];
-  // TODO(MM2): fetch model name
-  if (generation.model) {
-    accordionBadges.push(generation.model.key);
-    accordionBadges.push(generation.model.base);
-  }
-
-  return { loraTabBadges, accordionBadges };
-});
-
 export const GenerationSettingsAccordion = memo(() => {
   const { t } = useTranslation();
-  const { loraTabBadges, accordionBadges } = useAppSelector(badgesSelector);
+  const modelConfig = useSelectedModelConfig();
+  const selectBadges = useMemo(
+    () =>
+      createMemoizedSelector(selectLoraSlice, (lora) => {
+        const enabledLoRAsCount = filter(lora.loras, (l) => !!l.isEnabled).length;
+        const loraTabBadges = enabledLoRAsCount ? [enabledLoRAsCount] : EMPTY_ARRAY;
+        const accordionBadges = modelConfig ? [modelConfig.name, modelConfig.base] : EMPTY_ARRAY;
+        return { loraTabBadges, accordionBadges };
+      }),
+    [modelConfig]
+  );
+  const { loraTabBadges, accordionBadges } = useAppSelector(selectBadges);
   const { isOpen: isOpenExpander, onToggle: onToggleExpander } = useExpanderToggle({
     id: 'generation-settings-advanced',
     defaultIsOpen: false,
