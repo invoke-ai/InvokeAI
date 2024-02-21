@@ -139,10 +139,10 @@ const modelsFilter = <T extends MainModelConfig | LoRAConfig>(
       return;
     }
 
-    const matchesFilter = model.model_name.toLowerCase().includes(nameFilter.toLowerCase());
+    const matchesFilter = model.name.toLowerCase().includes(nameFilter.toLowerCase());
 
-    const matchesFormat = model_format === undefined || model.model_format === model_format;
-    const matchesType = model.model_type === model_type;
+    const matchesFormat = model_format === undefined || model.format === model_format;
+    const matchesType = model.type === model_type;
 
     if (matchesFilter && matchesFormat && matchesType) {
       filteredModels.push(model);
