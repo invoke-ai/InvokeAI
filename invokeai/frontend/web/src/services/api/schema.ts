@@ -22,7 +22,7 @@ export type paths = {
   "/api/v2/models/i/{key}": {
     /**
      * Get Model Record
-     * @description Get a model record and metadata
+     * @description Get a model record
      */
     get: operations["get_model_record"];
     /**
@@ -4201,13 +4201,6 @@ export type components = {
        * @constant
        */
       type: "freeu";
-    };
-    /** GetModelResponse */
-    GetModelResponse: {
-      /** Config */
-      config: (components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"]) | (components["schemas"]["ONNXSD1Config"] | components["schemas"]["ONNXSD2Config"] | components["schemas"]["ONNXSDXLConfig"]) | (components["schemas"]["VaeDiffusersConfig"] | components["schemas"]["VaeCheckpointConfig"]) | (components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"]) | components["schemas"]["LoRAConfig"] | components["schemas"]["TextualInversionConfig"] | components["schemas"]["IPAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["T2IConfig"];
-      /** Metadata */
-      metadata: (components["schemas"]["BaseMetadata"] | components["schemas"]["HuggingFaceMetadata"] | components["schemas"]["CivitaiMetadata"]) | null;
     };
     /** Graph */
     Graph: {
@@ -11176,7 +11169,7 @@ export type operations = {
   };
   /**
    * Get Model Record
-   * @description Get a model record and metadata
+   * @description Get a model record
    */
   get_model_record: {
     parameters: {
@@ -11189,7 +11182,7 @@ export type operations = {
       /** @description The model configuration was retrieved successfully */
       200: {
         content: {
-          "application/json": components["schemas"]["GetModelResponse"];
+          "application/json": (components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"]) | (components["schemas"]["ONNXSD1Config"] | components["schemas"]["ONNXSD2Config"] | components["schemas"]["ONNXSDXLConfig"]) | (components["schemas"]["VaeDiffusersConfig"] | components["schemas"]["VaeCheckpointConfig"]) | (components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"]) | components["schemas"]["LoRAConfig"] | components["schemas"]["TextualInversionConfig"] | components["schemas"]["IPAdapterConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["T2IConfig"];
         };
       };
       /** @description Bad request */
@@ -11344,10 +11337,6 @@ export type operations = {
       };
       /** @description Bad request */
       400: {
-        content: never;
-      };
-      /** @description No metadata available */
-      404: {
         content: never;
       };
       /** @description Validation Error */
