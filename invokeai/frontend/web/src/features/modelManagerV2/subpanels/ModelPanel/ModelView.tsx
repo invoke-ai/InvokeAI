@@ -91,39 +91,41 @@ export const ModelView = () => {
           Model Settings
         </Heading>
         <Box layerStyle="second" borderRadius="base" p={3}>
-          <Flex gap={2}>
-            <ModelAttrView label="Base Model" value={modelData.base} />
-            <ModelAttrView label="Model Type" value={modelData.type} />
-          </Flex>
-          <Flex gap={2}>
-            <ModelAttrView label="Format" value={modelData.format} />
-            <ModelAttrView label="Path" value={modelData.path} />
-          </Flex>
-          {modelData.type === 'main' && (
-            <>
-              <Flex gap={2}>
-                {modelData.format === 'diffusers' && (
-                  <ModelAttrView label="Repo Variant" value={modelData.repo_variant} />
-                )}
-                {modelData.format === 'checkpoint' && <ModelAttrView label="Config Path" value={modelData.config} />}
-
-                <ModelAttrView label="Variant" value={modelData.variant} />
-              </Flex>
-              <Flex gap={2}>
-                <ModelAttrView label="Prediction Type" value={modelData.prediction_type} />
-                <ModelAttrView label="Upcast Attention" value={`${modelData.upcast_attention}`} />
-              </Flex>
-              <Flex gap={2}>
-                <ModelAttrView label="ZTSNR Training" value={`${modelData.ztsnr_training}`} />
-                <ModelAttrView label="VAE" value={modelData.vae} />
-              </Flex>
-            </>
-          )}
-          {modelData.type === 'ip_adapter' && (
+          <Flex flexDir="column" gap={3}>
             <Flex gap={2}>
-              <ModelAttrView label="Image Encoder Model ID" value={modelData.image_encoder_model_id} />
+              <ModelAttrView label="Base Model" value={modelData.base} />
+              <ModelAttrView label="Model Type" value={modelData.type} />
             </Flex>
-          )}
+            <Flex gap={2}>
+              <ModelAttrView label="Format" value={modelData.format} />
+              <ModelAttrView label="Path" value={modelData.path} />
+            </Flex>
+            {modelData.type === 'main' && (
+              <>
+                <Flex gap={2}>
+                  {modelData.format === 'diffusers' && (
+                    <ModelAttrView label="Repo Variant" value={modelData.repo_variant} />
+                  )}
+                  {modelData.format === 'checkpoint' && <ModelAttrView label="Config Path" value={modelData.config} />}
+
+                  <ModelAttrView label="Variant" value={modelData.variant} />
+                </Flex>
+                <Flex gap={2}>
+                  <ModelAttrView label="Prediction Type" value={modelData.prediction_type} />
+                  <ModelAttrView label="Upcast Attention" value={`${modelData.upcast_attention}`} />
+                </Flex>
+                <Flex gap={2}>
+                  <ModelAttrView label="ZTSNR Training" value={`${modelData.ztsnr_training}`} />
+                  <ModelAttrView label="VAE" value={modelData.vae} />
+                </Flex>
+              </>
+            )}
+            {modelData.type === 'ip_adapter' && (
+              <Flex gap={2}>
+                <ModelAttrView label="Image Encoder Model ID" value={modelData.image_encoder_model_id} />
+              </Flex>
+            )}
+          </Flex>
         </Box>
       </Flex>
 
