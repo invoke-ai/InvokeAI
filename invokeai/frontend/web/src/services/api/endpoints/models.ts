@@ -26,11 +26,9 @@ type UpdateModelArg = {
 
 type UpdateModelResponse = paths['/api/v2/models/i/{key}']['patch']['responses']['200']['content']['application/json'];
 
-
-type GetModelResponse =
-  paths['/api/v2/models/i/{key}']['get']['responses']['200']['content']['application/json'];
 type GetModelMetadataResponse =
   paths['/api/v2/models/meta/i/{key}']['get']['responses']['200']['content']['application/json'];
+type GetModelResponse = paths['/api/v2/models/i/{key}']['get']['responses']['200']['content']['application/json'];
 
 type ListModelsArg = NonNullable<paths['/api/v2/models/']['get']['parameters']['query']>;
 
@@ -68,13 +66,19 @@ type ImportMainModelResponse =
 type ListImportModelsResponse =
   paths['/api/v2/models/import']['get']['responses']['200']['content']['application/json'];
 
+type DeleteImportModelsResponse =
+  paths['/api/v2/models/import/{id}']['delete']['responses']['201']['content']['application/json'];
+
+type PruneModelImportsResponse =
+  paths['/api/v2/models/import']['patch']['responses']['200']['content']['application/json'];
+
 type AddMainModelArg = {
   body: MainModelConfig;
 };
 
 type AddMainModelResponse = paths['/api/v2/models/add']['post']['responses']['201']['content']['application/json'];
 
-type SyncModelsResponse = paths['/api/v2/models/sync']['patch']['responses']['204']['content']['application/json'];
+type SyncModelsResponse = paths['/api/v2/models/sync']['patch']['responses']['204']['content']
 
 export type SearchFolderResponse =
   paths['/api/v2/models/search']['get']['responses']['200']['content']['application/json'];
@@ -308,7 +312,25 @@ export const modelsApi = api.injectEndpoints({
           url: buildModelsUrl(`import`),
         };
       },
-      providesTags: ['ModelImports']
+      providesTags: ['ModelImports'],
+    }),
+    deleteModelImport: build.mutation<DeleteImportModelsResponse, DeleteMainModelArg>({
+      query: ({ key }) => {
+        return {
+          url: buildModelsUrl(`import/${key}`),
+          method: 'DELETE',
+        };
+      },
+      invalidatesTags: ['ModelImports'],
+    }),
+    pruneModelImports: build.mutation<PruneModelImportsResponse, void>({
+      query: () => {
+        return {
+          url: buildModelsUrl('import'),
+          method: 'PATCH',
+        };
+      },
+      invalidatesTags: ['ModelImports'],
     }),
     getCheckpointConfigs: build.query<CheckpointConfigsResponse, void>({
       query: () => {
@@ -339,6 +361,8 @@ export const {
   useGetModelsInFolderQuery,
   useGetCheckpointConfigsQuery,
   useGetModelImportsQuery,
+  useGetModelMetadataQuery,
+  useDeleteModelImportMutation,
+  usePruneModelImportsMutation,
   useGetModelQuery,
-  useGetModelMetadataQuery
 } = modelsApi;
