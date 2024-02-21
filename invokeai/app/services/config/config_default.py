@@ -30,7 +30,6 @@ InvokeAI:
     lora_dir: null
     embedding_dir: null
     controlnet_dir: null
-    conf_path: configs/models.yaml
     models_dir: models
     legacy_conf_dir: configs/stable-diffusion
     db_dir: databases
@@ -123,7 +122,6 @@ a Path object:
 
  root_path          - path to InvokeAI root
  output_path        - path to default outputs directory
- model_conf_path    - path to models.yaml
  conf               - alias for the above
  embedding_path     - path to the embeddings directory
  lora_path          - path to the LoRA directory
@@ -163,7 +161,6 @@ two configs are kept in separate sections of the config file:
   InvokeAI:
      Paths:
         root: /home/lstein/invokeai-main
-        conf_path: configs/models.yaml
         legacy_conf_dir: configs/stable-diffusion
         outdir: outputs
      ...
@@ -237,7 +234,6 @@ class InvokeAIAppConfig(InvokeAISettings):
     # PATHS
     root                : Optional[Path] = Field(default=None, description='InvokeAI runtime root directory', json_schema_extra=Categories.Paths)
     autoimport_dir      : Path = Field(default=Path('autoimport'), description='Path to a directory of models files to be imported on startup.', json_schema_extra=Categories.Paths)
-    conf_path           : Path = Field(default=Path('configs/models.yaml'), description='Path to models definition file', json_schema_extra=Categories.Paths)
     models_dir          : Path = Field(default=Path('models'), description='Path to the models directory', json_schema_extra=Categories.Paths)
     convert_cache_dir   : Path = Field(default=Path('models/.cache'), description='Path to the converted models cache directory', json_schema_extra=Categories.Paths)
     legacy_conf_dir     : Path = Field(default=Path('configs/stable-diffusion'), description='Path to directory of legacy checkpoint config files', json_schema_extra=Categories.Paths)
@@ -301,6 +297,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     lora_dir            : Optional[Path] = Field(default=None, description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', json_schema_extra=Categories.Paths)
     embedding_dir       : Optional[Path] = Field(default=None, description='Path to a directory of Textual Inversion embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
     controlnet_dir      : Optional[Path] = Field(default=None, description='Path to a directory of ControlNet embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
+    conf_path           : Path = Field(default=Path('configs/models.yaml'), description='Path to models definition file', json_schema_extra=Categories.Paths)
 
     # this is not referred to in the source code and can be removed entirely
     #free_gpu_mem        : Optional[bool] = Field(default=None, description="If true, purge model from GPU after each generation.", json_schema_extra=Categories.MemoryPerformance)
