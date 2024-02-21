@@ -73,7 +73,7 @@ class IPAdapterConditioningInfo:
 
 @dataclass
 class ConditioningData:
-    unconditioned_embeddings: BasicConditioningInfo
+    unconditioned_embeddings: Union[BasicConditioningInfo, SDXLConditioningInfo]
     text_embeddings: list[TextConditioningInfoWithMask]
     """
     Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
