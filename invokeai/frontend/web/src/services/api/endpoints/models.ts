@@ -236,6 +236,18 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['Model'],
     }),
+    getModelConfig: build.query<AnyModelConfig, string>({
+      query: (key) => buildModelsUrl(`i/${key}`),
+      providesTags: (result) => {
+        const tags: ApiTagDescription[] = ['Model'];
+
+        if (result) {
+          tags.push({ type: 'ModelConfig', id: result.key });
+        }
+
+        return tags;
+      },
+    }),
     syncModels: build.mutation<SyncModelsResponse, void>({
       query: () => {
         return {
@@ -313,6 +325,7 @@ export const modelsApi = api.injectEndpoints({
 });
 
 export const {
+  useGetModelConfigQuery,
   useGetMainModelsQuery,
   useGetControlNetModelsQuery,
   useGetIPAdapterModelsQuery,
