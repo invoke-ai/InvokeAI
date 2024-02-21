@@ -177,6 +177,12 @@ class ModelInstallJob(BaseModel):
     download_parts: Set[DownloadJob] = Field(
         default_factory=set, description="Download jobs contributing to this install"
     )
+    error: Optional[str] = Field(
+        default=None, description="On an error condition, this field will contain the text of the exception"
+    )
+    error_traceback: Optional[str] = Field(
+        default=None, description="On an error condition, this field will contain the exception traceback"
+    )
     # internal flags and transitory settings
     _install_tmpdir: Optional[Path] = PrivateAttr(default=None)
     _exception: Optional[Exception] = PrivateAttr(default=None)
@@ -184,6 +190,8 @@ class ModelInstallJob(BaseModel):
     def set_error(self, e: Exception) -> None:
         """Record the error and traceback from an exception."""
         self._exception = e
+        self.error = str(e)
+        self.error_traceback = self._format_error(e)
         self.status = InstallStatus.ERROR
 
     def cancel(self) -> None:
@@ -195,10 +203,9 @@ class ModelInstallJob(BaseModel):
         """Class name of the exception that led to status==ERROR."""
         return self._exception.__class__.__name__ if self._exception else None
 
-    @property
-    def error(self) -> Optional[str]:
+    def _format_error(self, exception: Exception) -> str:
         """Error traceback."""
-        return "".join(traceback.format_exception(self._exception)) if self._exception else None
+        return "".join(traceback.format_exception(exception))
 
     @property
     def cancelled(self) -> bool:

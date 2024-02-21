@@ -382,8 +382,8 @@ async def add_model_record(
 
 
 @model_manager_router.post(
-    "/heuristic_import",
-    operation_id="heuristic_import_model",
+    "/heuristic_install",
+    operation_id="heuristic_install_model",
     responses={
         201: {"description": "The model imported successfully"},
         415: {"description": "Unrecognized file/folder format"},
@@ -392,12 +392,12 @@ async def add_model_record(
     },
     status_code=201,
 )
-async def heuristic_import(
+async def heuristic_install(
     source: str,
     config: Optional[Dict[str, Any]] = Body(
         description="Dict of fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
         default=None,
-        example={"name": "modelT", "description": "antique cars"},
+        example={"name": "string", "description": "string"},
     ),
     access_token: Optional[str] = None,
 ) -> ModelInstallJob:
