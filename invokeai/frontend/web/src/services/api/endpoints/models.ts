@@ -202,7 +202,7 @@ export const modelsApi = api.injectEndpoints({
           body: config,
         };
       },
-      invalidatesTags: ['Model'],
+      invalidatesTags: ['Model', 'ModelImports'],
     }),
     addMainModels: build.mutation<AddMainModelResponse, AddMainModelArg>({
       query: ({ body }) => {
@@ -308,6 +308,7 @@ export const modelsApi = api.injectEndpoints({
           url: buildModelsUrl(`import`),
         };
       },
+      providesTags: ['ModelImports']
     }),
     getCheckpointConfigs: build.query<CheckpointConfigsResponse, void>({
       query: () => {
