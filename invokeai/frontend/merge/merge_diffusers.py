@@ -435,7 +435,7 @@ def main():
             run_cli(args)
     except widget.NotEnoughSpaceForWidget as e:
         if str(e).startswith("Height of 1 allocated"):
-            logger.error("You need to have at least two diffusers models defined in models.yaml in order to merge")
+            logger.error("You need to have at least two diffusers models in order to merge")
         else:
             logger.error("Not enough room for the user interface. Try making this window larger.")
         sys.exit(-1)

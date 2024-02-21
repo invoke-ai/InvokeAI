@@ -939,7 +939,7 @@ def main() -> None:
         # run this unconditionally in case new directories need to be added
         initialize_rootdir(config.root_path, opt.yes_to_all)
 
-        # this will initialize the models.yaml file if not present
+        # this will initialize and populate the models tables if not present
         install_helper = InstallHelper(config, logger)
 
         models_to_download = default_user_selections(opt, install_helper)
