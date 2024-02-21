@@ -23,7 +23,7 @@ from diffusers.models.attention_processor import (
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from diffusers.schedulers import DPMSolverSDEScheduler
 from diffusers.schedulers import SchedulerMixin as Scheduler
-from PIL import Image
+from PIL import Image, ImageFilter
 from pydantic import field_validator
 from torchvision.transforms.functional import resize as tv_resize
 
@@ -128,7 +128,7 @@ class CreateDenoiseMaskInvocation(BaseInvocation):
         ui_order=4,
     )
 
-    def prep_mask_tensor(self, mask_image: Image) -> torch.Tensor:
+    def prep_mask_tensor(self, mask_image: Image.Image) -> torch.Tensor:
         if mask_image.mode != "L":
             mask_image = mask_image.convert("L")
         mask_tensor: torch.Tensor = image_resized_to_grid_as_tensor(mask_image, normalize=False)
@@ -169,6 +169,62 @@ class CreateDenoiseMaskInvocation(BaseInvocation):
         return DenoiseMaskOutput.build(
             mask_name=mask_name,
             masked_latents_name=masked_latents_name,
+            gradient=False,
+        )
+
+
+@invocation(
+    "create_gradient_mask",
+    title="Create Gradient Mask",
+    tags=["mask", "denoise"],
+    category="latents",
+    version="1.0.0",
+)
+class CreateGradientMaskInvocation(BaseInvocation):
+    """Creates mask for denoising model run."""
+
+    mask: ImageField = InputField(default=None, description="Image which will be masked", ui_order=1)
+    edge_radius: int = InputField(
+        default=16, ge=0, description="How far to blur/expand the edges of the mask", ui_order=2
+    )
+    coherence_mode: Literal["Gaussian Blur", "Box Blur", "Staged"] = InputField(default="Gaussian Blur", ui_order=3)
+    minimum_denoise: float = InputField(
+        default=0.0, ge=0, le=1, description="Minimum denoise level for the coherence region", ui_order=4
+    )
+
+    @torch.no_grad()
+    def invoke(self, context: InvocationContext) -> DenoiseMaskOutput:
+        mask_image = context.images.get_pil(self.mask.image_name, mode="L")
+        if self.coherence_mode == "Box Blur":
+            blur_mask = mask_image.filter(ImageFilter.BoxBlur(self.edge_radius))
+        else:  # Gaussian Blur OR Staged
+            # Gaussian Blur uses standard deviation. 1/2 radius is a good approximation
+            blur_mask = mask_image.filter(ImageFilter.GaussianBlur(self.edge_radius / 2))
+
+        mask_tensor: torch.Tensor = image_resized_to_grid_as_tensor(mask_image, normalize=False)
+        blur_tensor: torch.Tensor = image_resized_to_grid_as_tensor(blur_mask, normalize=False)
+
+        # redistribute blur so that the edges are 0 and blur out to 1
+        blur_tensor = (blur_tensor - 0.5) * 2
+
+        threshold = 1 - self.minimum_denoise
+
+        if self.coherence_mode == "Staged":
+            # wherever the blur_tensor is masked to any degree, convert it to threshold
+            blur_tensor = torch.where((blur_tensor < 1), threshold, blur_tensor)
+        else:
+            # wherever the blur_tensor is above threshold but less than 1, drop it to threshold
+            blur_tensor = torch.where((blur_tensor > threshold) & (blur_tensor < 1), threshold, blur_tensor)
+
+        # multiply original mask to force actually masked regions to 0
+        blur_tensor = mask_tensor * blur_tensor
+
+        mask_name = context.tensors.save(tensor=blur_tensor.unsqueeze(1))
+
+        return DenoiseMaskOutput.build(
+            mask_name=mask_name,
+            masked_latents_name=None,
+            gradient=True,
         )
 
 
@@ -606,9 +662,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
     def prep_inpaint_mask(
         self, context: InvocationContext, latents: torch.Tensor
-    ) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor]]:
+    ) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor], bool]:
         if self.denoise_mask is None:
-            return None, None
+            return None, None, False
 
         mask = context.tensors.load(self.denoise_mask.mask_name)
         mask = tv_resize(mask, latents.shape[-2:], T.InterpolationMode.BILINEAR, antialias=False)
@@ -617,7 +673,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         else:
             masked_latents = None
 
-        return 1 - mask, masked_latents
+        return 1 - mask, masked_latents, self.denoise_mask.gradient
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
@@ -644,7 +700,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             if seed is None:
                 seed = 0
 
-            mask, masked_latents = self.prep_inpaint_mask(context, latents)
+            mask, masked_latents, gradient_mask = self.prep_inpaint_mask(context, latents)
 
             # TODO(ryand): I have hard-coded `do_classifier_free_guidance=True` to mirror the behaviour of ControlNets,
             # below. Investigate whether this is appropriate.
@@ -732,6 +788,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     seed=seed,
                     mask=mask,
                     masked_latents=masked_latents,
+                    gradient_mask=gradient_mask,
                     num_inference_steps=num_inference_steps,
                     conditioning_data=conditioning_data,
                     control_data=controlnet_data,

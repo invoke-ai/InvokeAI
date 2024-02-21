@@ -199,6 +199,7 @@ class DenoiseMaskField(BaseModel):
 
     mask_name: str = Field(description="The name of the mask image")
     masked_latents_name: Optional[str] = Field(default=None, description="The name of the masked image latents")
+    gradient: Optional[bool] = Field(default=False, description="Used for gradient inpainting")
 
 
 class LatentsField(BaseModel):
