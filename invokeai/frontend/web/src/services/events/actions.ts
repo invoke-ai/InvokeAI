@@ -11,6 +11,9 @@ import type {
   InvocationStartedEvent,
   ModelLoadCompletedEvent,
   ModelLoadStartedEvent,
+  ModelInstallDownloadingEvent,
+  ModelInstallCompletedEvent,
+  ModelInstallErrorEvent,
   QueueItemStatusChangedEvent,
   SessionRetrievalErrorEvent,
 } from 'services/events/types';
@@ -55,6 +58,18 @@ export const socketModelLoadStarted = createAction<{
 export const socketModelLoadCompleted = createAction<{
   data: ModelLoadCompletedEvent;
 }>('socket/socketModelLoadCompleted');
+
+export const socketModelInstallDownloading = createAction<{
+  data: ModelInstallDownloadingEvent;
+}>('socket/socketModelInstallDownloading');
+
+export const socketModelInstallCompleted = createAction<{
+  data: ModelInstallCompletedEvent;
+}>('socket/socketModelInstallCompleted');
+
+export const socketModelInstallError = createAction<{
+  data: ModelInstallErrorEvent;
+}>('socket/socketModelInstallError');
 
 export const socketSessionRetrievalError = createAction<{
   data: SessionRetrievalErrorEvent;
