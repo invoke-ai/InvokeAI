@@ -1,7 +1,7 @@
 """
 invokeai.backend.model_manager.merge exports:
 merge_diffusion_models() -- combine multiple models by location and return a pipeline object
-merge_diffusion_models_and_commit() -- combine multiple models by ModelManager ID and write to models.yaml
+merge_diffusion_models_and_commit() -- combine multiple models by ModelManager ID and write to the models tables
 
 Copyright (c) 2023 Lincoln Stein and the InvokeAI Development Team
 """
@@ -101,7 +101,7 @@ class ModelMerger(object):
         **kwargs: Any,
     ) -> AnyModelConfig:
         """
-        :param models: up to three models, designated by their InvokeAI models.yaml model name
+        :param models: up to three models, designated by their registered InvokeAI model name
         :param merged_model_name: name for new model
         :param alpha: The interpolation parameter. Ranges from 0 to 1.  It affects the ratio in which the checkpoints are merged. A 0.8 alpha
                    would mean that the first model checkpoints would affect the final result far less than an alpha of 0.2

@@ -811,7 +811,7 @@
         "simpleModelDesc": "Provide a path to a local Diffusers model, local checkpoint / safetensors model a HuggingFace Repo ID, or a checkpoint/diffusers model URL.",
         "statusConverting": "Converting",
         "syncModels": "Sync Models",
-        "syncModelsDesc": "If your models are out of sync with the backend, you can refresh them up using this option. This is generally handy in cases where you manually update your models.yaml file or add models to the InvokeAI root folder after the application has booted.",
+        "syncModelsDesc": "If your models are out of sync with the backend, you can refresh them up using this option. This is generally handy in cases where you add models to the InvokeAI root folder or autoimport directory after the application has booted.",
         "updateModel": "Update Model",
         "useCustomConfig": "Use Custom Config",
         "v1": "v1",

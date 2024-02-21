@@ -120,7 +120,7 @@ def parse_args() -> Namespace:
         "--model",
         type=str,
         default="sd-1/main/stable-diffusion-v1-5",
-        help="Name of the diffusers model to train against, as defined in configs/models.yaml.",
+        help="Name of the diffusers model to train against.",
     )
     model_group.add_argument(
         "--revision",

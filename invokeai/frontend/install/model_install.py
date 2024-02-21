@@ -455,7 +455,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
         selections = self.parentApp.install_selections
         all_models = self.all_models
 
-        # Defined models (in INITIAL_CONFIG.yaml or models.yaml) to add/remove
+        # Defined models (in INITIAL_CONFIG.yaml or invokeai.db) to add/remove
         ui_sections = [
             self.starter_pipelines,
             self.pipeline_models,
