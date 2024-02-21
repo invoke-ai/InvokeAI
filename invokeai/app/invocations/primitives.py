@@ -300,7 +300,7 @@ class DenoiseMaskOutput(BaseInvocationOutput):
 
     @classmethod
     def build(
-        cls, mask_name: str, masked_latents_name: Optional[str] = None, gradient: Optional[bool] = False
+        cls, mask_name: str, masked_latents_name: Optional[str] = None, gradient: bool = False
     ) -> "DenoiseMaskOutput":
         return cls(
             denoise_mask=DenoiseMaskField(
