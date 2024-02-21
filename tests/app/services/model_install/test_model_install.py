@@ -256,4 +256,4 @@ def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: In
     assert job.error_type == "HTTPError"
     assert job.error
     assert "NOT FOUND" in job.error
-    assert "Traceback" in job.error
+    assert job.error_traceback.startswith("Traceback")
