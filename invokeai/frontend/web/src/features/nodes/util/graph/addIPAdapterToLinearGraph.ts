@@ -9,7 +9,7 @@ import type {
   NonNullableGraph,
 } from 'services/api/types';
 
-import { CANVAS_COHERENCE_DENOISE_LATENTS, IP_ADAPTER_COLLECT } from './constants';
+import { IP_ADAPTER_COLLECT } from './constants';
 import { upsertMetadata } from './metadata';
 
 export const addIPAdapterToLinearGraph = (state: RootState, graph: NonNullableGraph, baseNodeId: string): void => {
@@ -33,15 +33,6 @@ export const addIPAdapterToLinearGraph = (state: RootState, graph: NonNullableGr
       },
     });
 
-    if (CANVAS_COHERENCE_DENOISE_LATENTS in graph.nodes) {
-      graph.edges.push({
-        source: { node_id: IP_ADAPTER_COLLECT, field: 'collection' },
-        destination: {
-          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-          field: 'ip_adapter',
-        },
-      });
-    }
     const ipAdapterMetdata: CoreMetadataInvocation['ipAdapters'] = [];
 
     validIPAdapters.forEach((ipAdapter) => {
