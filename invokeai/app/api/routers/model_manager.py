@@ -32,6 +32,7 @@ from invokeai.backend.model_manager.config import (
 )
 from invokeai.backend.model_manager.merge import MergeInterpolationMethod, ModelMerger
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
+from invokeai.backend.model_manager.search import ModelSearch
 
 from ..dependencies import ApiDependencies
 
@@ -232,6 +233,36 @@ async def list_tags() -> Set[str]:
     record_store = ApiDependencies.invoker.services.model_manager.store
     result: Set[str] = record_store.list_tags()
     return result
+
+@model_manager_router.get(
+    "/search",
+    operation_id="search_for_models",
+    responses={
+        200: {"description": "Directory searched successfully"},
+        404: {"description": "Invalid directory path"},
+    },
+    status_code=200,
+    response_model=List[pathlib.Path],
+)
+async def search_for_models(
+    search_path: str = Query(description="Directory path to search for models", default=None),
+) -> List[pathlib.Path]:
+    path = pathlib.Path(search_path)
+    if not search_path or not path.is_dir():
+        raise HTTPException(
+            status_code=404,
+            detail=f"The search path '{search_path}' does not exist or is not directory",
+        )
+
+    search = ModelSearch()
+    try:
+        models_found = list(search.search(path))
+    except Exception as e:
+        raise HTTPException(
+            status_code=404,
+            detail=f"An error occurred while searching the directory: {e}",
+        )
+    return models_found
 
 
 @model_manager_router.get(
