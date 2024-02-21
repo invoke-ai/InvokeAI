@@ -20,7 +20,7 @@ const ImportModelsPanel = () => {
         <Button onClick={handleClickAddTab} isChecked={addModelTab === 'add'} size="sm" width="100%">
           {t('modelManager.addModel')}
         </Button>
-        <Button onClick={handleClickScanTab} isChecked={addModelTab === 'scan'} size="sm" width="100%" isDisabled>
+        <Button onClick={handleClickScanTab} isChecked={addModelTab === 'scan'} size="sm" width="100%">
           {t('modelManager.scanForModels')}
         </Button>
       </ButtonGroup>
