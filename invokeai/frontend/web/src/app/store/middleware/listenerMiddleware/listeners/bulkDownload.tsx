@@ -1,5 +1,5 @@
 import type { UseToastOptions } from '@invoke-ai/ui-library';
-import { createStandaloneToast, theme, TOAST_OPTIONS } from '@invoke-ai/ui-library';
+import { createStandaloneToast, ExternalLink, theme, TOAST_OPTIONS } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { startAppListening } from 'app/store/middleware/listenerMiddleware';
 import { t } from 'i18next';
@@ -68,19 +68,19 @@ export const addBulkDownloadListeners = () => {
 
       // TODO(psyche): This URL may break in in some environments (e.g. Nvidia workbench) but we need to test it first
       const url = `/api/v1/images/download/${bulk_download_item_name}`;
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = bulk_download_item_name;
-      document.body.appendChild(a);
-      a.click();
 
       const toastOptions: UseToastOptions = {
         id: bulk_download_item_name,
-        title: t('gallery.bulkDownloadStarting'),
+        title: t('gallery.bulkDownloadReady', 'Download ready'),
         status: 'success',
-        description: bulk_download_item_name,
-        duration: 5000,
+        description: (
+          <ExternalLink
+            label={t('gallery.clickToDownload', 'Click here to download')}
+            href={url}
+            download={bulk_download_item_name}
+          />
+        ),
+        duration: null,
         isClosable: true,
       };
 
