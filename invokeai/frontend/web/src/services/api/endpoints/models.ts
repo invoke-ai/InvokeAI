@@ -74,7 +74,7 @@ type AddMainModelArg = {
 
 type AddMainModelResponse = paths['/api/v2/models/add']['post']['responses']['201']['content']['application/json'];
 
-type SyncModelsResponse = paths['/api/v2/models/sync']['post']['responses']['201']['content']['application/json'];
+type SyncModelsResponse = paths['/api/v2/models/sync']['patch']['responses']['204']['content']['application/json'];
 
 export type SearchFolderResponse =
   paths['/api/v2/models/search']['get']['responses']['200']['content']['application/json'];
@@ -259,7 +259,7 @@ export const modelsApi = api.injectEndpoints({
       query: () => {
         return {
           url: buildModelsUrl('sync'),
-          method: 'POST',
+          method: 'PATCH',
         };
       },
       invalidatesTags: ['Model'],
