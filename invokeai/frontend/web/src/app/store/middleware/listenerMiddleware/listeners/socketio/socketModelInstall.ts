@@ -1,63 +1,65 @@
-import { logger } from 'app/logging/logger';
+import { modelsApi } from 'services/api/endpoints/models';
 import {
   socketModelInstallCompleted,
   socketModelInstallDownloading,
   socketModelInstallError,
 } from 'services/events/actions';
-import { modelsApi } from 'services/api/endpoints/models';
-import type { components, paths } from 'services/api/schema';
-
 
 import { startAppListening } from '../..';
-import { createEntityAdapter } from '@reduxjs/toolkit';
-
-const log = logger('socketio');
 
 export const addModelInstallEventListener = () => {
   startAppListening({
     actionCreator: socketModelInstallDownloading,
     effect: async (action, { dispatch }) => {
-      const { bytes, local_path, source, timestamp, total_bytes } = action.payload.data;
-      let message = `Model install started: ${bytes}/${total_bytes}/${source}`;
-    // below doesnt work, still not sure how to update the importModels data 
-    //   dispatch(
-    //       modelsApi.util.updateQueryData('getModelImports', undefined, (draft) => {
-    //         importModelsAdapter.updateOne(draft, {
-    //             id: source,
-    //             changes: {
-    //                 bytes,
-    //                 total_bytes,
-    //             },\q
-    //             });
-    //         }
-    //         )
-    //   );
+      const { bytes, id } = action.payload.data;
 
-      log.debug(action.payload, message);
+      dispatch(
+        modelsApi.util.updateQueryData('getModelImports', undefined, (draft) => {
+          const models = JSON.parse(JSON.stringify(draft))
+
+          const modelIndex = models.findIndex((m) => m.id === id);
+
+          models[modelIndex].bytes = bytes;
+          models[modelIndex].status = 'downloading';
+          return models;
+        })
+      );
     },
   });
 
   startAppListening({
     actionCreator: socketModelInstallCompleted,
-    effect: (action) => {
-      const { key, source, timestamp } = action.payload.data;
+    effect: (action, { dispatch }) => {
+      const { id } = action.payload.data;
 
-      let message = `Model install completed: ${source}`;
+      dispatch(
+        modelsApi.util.updateQueryData('getModelImports', undefined, (draft) => {
+          const models = JSON.parse(JSON.stringify(draft))
 
-    //   dispatch something that marks the model installation as completed
+          const modelIndex = models.findIndex((m) => m.id === id);
 
-      log.debug(action.payload, message);
+          models[modelIndex].status = 'completed';
+          return models;
+        })
+      );
     },
   });
 
   startAppListening({
     actionCreator: socketModelInstallError,
-    effect: (action) => {
-      const { error, error_type, source } = action.payload.data;
+    effect: (action, { dispatch }) => {
+      const { id } = action.payload.data;
 
-    //   dispatch something that marks the model installation as errored
+      dispatch(
+        modelsApi.util.updateQueryData('getModelImports', undefined, (draft) => {
+          const models = JSON.parse(JSON.stringify(draft))
 
-      log.debug(action.payload, error);
+          const modelIndex = models.findIndex((m) => m.id === id);
+
+          models[modelIndex].status = 'error';
+          return models;
+        })
+      );
     },
   });
 };
