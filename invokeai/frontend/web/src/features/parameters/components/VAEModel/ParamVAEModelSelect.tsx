@@ -41,8 +41,6 @@ const ParamVAEModelSelect = () => {
     isLoading,
     getIsDisabled,
   });
-  
-  console.log(value)
 
   return (
     <FormControl isDisabled={!options.length} isInvalid={!options.length}>
