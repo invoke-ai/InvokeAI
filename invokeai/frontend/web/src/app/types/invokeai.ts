@@ -88,7 +88,7 @@ export type AppConfig = {
     scaledBoundingBoxHeight: NumericalParameterConfig; // initial value comes from model
     scaledBoundingBoxWidth: NumericalParameterConfig; // initial value comes from model
     canvasCoherenceStrength: NumericalParameterConfig;
-    canvasCoherenceSteps: NumericalParameterConfig;
+    canvasCoherenceEdgeSize: NumericalParameterConfig;
     infillTileSize: NumericalParameterConfig;
     infillPatchmatchDownscaleSize: NumericalParameterConfig;
     // Misc advanced

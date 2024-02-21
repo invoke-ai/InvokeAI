@@ -1130,8 +1130,8 @@
         "codeformerFidelity": "Fidelity",
         "coherenceMode": "Mode",
         "coherencePassHeader": "Coherence Pass",
-        "coherenceSteps": "Steps",
-        "coherenceStrength": "Strength",
+        "coherenceEdgeSize": "Edge Size",
+        "coherenceMinDenoise": "Min Denoise",
         "compositingSettingsHeader": "Compositing Settings",
         "controlNetControlMode": "Control Mode",
         "copyImage": "Copy Image",
@@ -1478,13 +1478,16 @@
             "heading": "Mode",
             "paragraphs": ["Method used to create a coherent image with the newly generated masked area."]
         },
-        "compositingCoherenceSteps": {
-            "heading": "Steps",
-            "paragraphs": ["Number of steps in the Coherence Pass.", "Similar to Generation Steps."]
+        "compositingCoherenceEdgeSize": {
+            "heading": "Edge Size",
+            "paragraphs": ["The edge size of the coherence pass."]
         },
-        "compositingStrength": {
-            "heading": "Strength",
-            "paragraphs": ["Amount of noise added for the Coherence Pass.", "Similar to Denoising Strength."]
+        "compositingCoherenceMinDenoise": {
+            "heading": "Minimum Denoise",
+            "paragraphs": [
+                "Minimum denoise strength for the Coherence mode",
+                "The minimum denoise strength for the coherence region when inpainting or outpainting"
+            ]
         },
         "compositingMaskAdjustments": {
             "heading": "Mask Adjustments",
@@ -1762,6 +1765,9 @@
         "clearCanvasHistoryMessage": "Clearing the canvas history leaves your current canvas intact, but irreversibly clears the undo and redo history.",
         "clearHistory": "Clear History",
         "clearMask": "Clear Mask (Shift+C)",
+        "coherenceModeGaussianBlur": "Gaussian Blur",
+        "coherenceModeBoxBlur": "Box Blur",
+        "coherenceModeStaged": "Staged",
         "colorPicker": "Color Picker",
         "copyToClipboard": "Copy to Clipboard",
         "cursorPosition": "Cursor Position",

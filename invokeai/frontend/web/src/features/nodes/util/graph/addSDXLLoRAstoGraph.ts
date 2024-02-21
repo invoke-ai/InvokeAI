@@ -5,12 +5,9 @@ import { filter, size } from 'lodash-es';
 import type { NonNullableGraph, SDXLLoraLoaderInvocation } from 'services/api/types';
 
 import {
-  CANVAS_COHERENCE_DENOISE_LATENTS,
   LORA_LOADER,
   NEGATIVE_CONDITIONING,
   POSITIVE_CONDITIONING,
-  SDXL_CANVAS_INPAINT_GRAPH,
-  SDXL_CANVAS_OUTPAINT_GRAPH,
   SDXL_MODEL_LOADER,
   SDXL_REFINER_INPAINT_CREATE_MASK,
   SEAMLESS,
@@ -162,19 +159,6 @@ export const addSDXLLoRAsToGraph = (
           field: 'unet',
         },
       });
-
-      if (graph.id && [SDXL_CANVAS_INPAINT_GRAPH, SDXL_CANVAS_OUTPAINT_GRAPH].includes(graph.id)) {
-        graph.edges.push({
-          source: {
-            node_id: currentLoraNodeId,
-            field: 'unet',
-          },
-          destination: {
-            node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-            field: 'unet',
-          },
-        });
-      }
 
       graph.edges.push({
         source: {
