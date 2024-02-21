@@ -1,7 +1,17 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from '../../../../app/store/storeHooks';
 import { useGetModelQuery, useUpdateModelsMutation } from '../../../../services/api/endpoints/models';
-import { Flex, Text, Heading, Button, Input, FormControl, FormLabel, Textarea } from '@invoke-ai/ui-library';
+import {
+  Flex,
+  Text,
+  Heading,
+  Button,
+  Input,
+  FormControl,
+  FormLabel,
+  Textarea,
+  FormErrorMessage,
+} from '@invoke-ai/ui-library';
 import { useCallback, useMemo } from 'react';
 import {
   AnyModelConfig,
@@ -75,12 +85,16 @@ export const ModelEdit = () => {
     control,
     formState: { errors },
     reset,
+    watch,
   } = useForm<AnyModelConfig>({
     defaultValues: {
       ...modelData,
     },
     mode: 'onChange',
   });
+
+  const watchedModelType = watch('type');
+  const watchedModelFormat = watch('format');
 
   const onSubmit = useCallback<SubmitHandler<AnyModelConfig>>(
     (values) => {
@@ -136,22 +150,33 @@ export const ModelEdit = () => {
   return (
     <Flex flexDir="column" h="full">
       <form onSubmit={handleSubmit(onSubmit)}>
-        <Flex w="full" justifyContent="space-between" gap={4} alignItems="center">
-          <Input
-            {...register('name', {
-              validate: (value) => value.trim().length > 3 || 'Must be at least 3 characters',
-            })}
-            size="lg"
-          />
-          <Flex gap={2}>
-            <Button size="sm" onClick={handleClickCancel}>
-              Cancel
-            </Button>
-            <Button size="sm" colorScheme="invokeYellow" onClick={handleSubmit(onSubmit)}>
-              Save
-            </Button>
+        <FormControl flexDir="column" alignItems="flex-start" gap={1} isInvalid={Boolean(errors.name)}>
+          <Flex w="full" justifyContent="space-between" gap={4} alignItems="center">
+            <FormLabel hidden={true}>Model Name</FormLabel>
+            <Input
+              {...register('name', {
+                validate: (value) => value.trim().length > 3 || 'Must be at least 3 characters',
+              })}
+              size="lg"
+            />
+
+            <Flex gap={2}>
+              <Button size="sm" onClick={handleClickCancel}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                colorScheme="invokeYellow"
+                onClick={handleSubmit(onSubmit)}
+                isLoading={isSubmitting}
+                isDisabled={Boolean(errors)}
+              >
+                Save
+              </Button>
+            </Flex>
           </Flex>
-        </Flex>
+          {errors.name?.message && <FormErrorMessage>{errors.name?.message}</FormErrorMessage>}
+        </FormControl>
 
         <Flex flexDir="column" gap={3} mt="4">
           <Flex>
@@ -178,25 +203,26 @@ export const ModelEdit = () => {
               <FormLabel>Format</FormLabel>
               <ModelFormatSelect<AnyModelConfig> control={control} name="format" />
             </FormControl>
-            <FormControl flexDir="column" alignItems="flex-start" gap={1}>
+            <FormControl flexDir="column" alignItems="flex-start" gap={1} isInvalid={Boolean(errors.path)}>
               <FormLabel>Path</FormLabel>
               <Input
                 {...register('path', {
                   validate: (value) => value.trim().length > 0 || 'Must provide a path',
                 })}
               />
+              {errors.path?.message && <FormErrorMessage>{errors.path?.message}</FormErrorMessage>}
             </FormControl>
           </Flex>
-          {modelData.type === 'main' && (
+          {watchedModelType === 'main' && (
             <>
               <Flex gap={4}>
-                {modelData.format === 'diffusers' && (
+                {watchedModelFormat === 'diffusers' && (
                   <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                     <FormLabel>Repo Variant</FormLabel>
                     <RepoVariantSelect<AnyModelConfig> control={control} name="repo_variant" />
                   </FormControl>
                 )}
-                {modelData.format === 'checkpoint' && (
+                {watchedModelFormat === 'checkpoint' && (
                   <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                     <FormLabel>Config Path</FormLabel>
                     <Input {...register('config')} />
@@ -230,7 +256,7 @@ export const ModelEdit = () => {
               </Flex>
             </>
           )}
-          {modelData.type === 'ip_adapter' && (
+          {watchedModelType === 'ip_adapter' && (
             <Flex gap={4}>
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                 <FormLabel>Image Encoder Model ID</FormLabel>
