@@ -2,9 +2,6 @@ import type { RootState } from 'app/store/store';
 import type { NonNullableGraph, SeamlessModeInvocation } from 'services/api/types';
 
 import {
-  CANVAS_COHERENCE_DENOISE_LATENTS,
-  CANVAS_INPAINT_GRAPH,
-  CANVAS_OUTPAINT_GRAPH,
   DENOISE_LATENTS,
   SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
   SDXL_CANVAS_INPAINT_GRAPH,
@@ -105,22 +102,4 @@ export const addSeamlessToLinearGraph = (
       },
     }
   );
-
-  if (
-    graph.id === CANVAS_INPAINT_GRAPH ||
-    graph.id === CANVAS_OUTPAINT_GRAPH ||
-    graph.id === SDXL_CANVAS_INPAINT_GRAPH ||
-    graph.id === SDXL_CANVAS_OUTPAINT_GRAPH
-  ) {
-    graph.edges.push({
-      source: {
-        node_id: SEAMLESS,
-        field: 'unet',
-      },
-      destination: {
-        node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-        field: 'unet',
-      },
-    });
-  }
 };

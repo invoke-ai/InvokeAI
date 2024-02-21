@@ -33,8 +33,8 @@ export interface GenerationState {
   maskBlur: number;
   maskBlurMethod: ParameterMaskBlurMethod;
   canvasCoherenceMode: ParameterCanvasCoherenceMode;
-  canvasCoherenceSteps: number;
-  canvasCoherenceStrength: ParameterStrength;
+  canvasCoherenceMinDenoise: ParameterStrength;
+  canvasCoherenceEdgeSize: number;
   seed: ParameterSeed;
   shouldFitToWidthHeight: boolean;
   shouldRandomizeSeed: boolean;
