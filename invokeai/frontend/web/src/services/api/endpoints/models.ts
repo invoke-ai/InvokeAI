@@ -29,6 +29,8 @@ type UpdateModelResponse = paths['/api/v2/models/i/{key}']['patch']['responses']
 
 type GetModelResponse =
   paths['/api/v2/models/i/{key}']['get']['responses']['200']['content']['application/json'];
+type GetModelMetadataResponse =
+  paths['/api/v2/models/meta/i/{key}']['get']['responses']['200']['content']['application/json'];
 
 type ListModelsArg = NonNullable<paths['/api/v2/models/']['get']['parameters']['query']>;
 
@@ -172,6 +174,12 @@ export const modelsApi = api.injectEndpoints({
     getModel: build.query<GetModelResponse, string>({
       query: (key) => {
         return buildModelsUrl(`i/${key}`);
+      },
+      providesTags: ['Model'],
+    }),
+    getModelMetadata: build.query<GetModelMetadataResponse, string>({
+      query: (key) => {
+        return buildModelsUrl(`meta/i/${key}`);
       },
       providesTags: ['Model'],
     }),
@@ -330,5 +338,6 @@ export const {
   useGetModelsInFolderQuery,
   useGetCheckpointConfigsQuery,
   useGetModelImportsQuery,
-  useGetModelQuery
+  useGetModelQuery,
+  useGetModelMetadataQuery
 } = modelsApi;

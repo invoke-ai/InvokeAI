@@ -2,7 +2,7 @@ import type { ComboboxOption } from '@invoke-ai/ui-library';
 import type { LoRAModelFormat } from 'services/api/types';
 
 /**
- * Mapping of model type to human readable name
+ * Mapping of base model to human readable name
  */
 export const MODEL_TYPE_MAP = {
   any: 'Any',
@@ -13,7 +13,7 @@ export const MODEL_TYPE_MAP = {
 };
 
 /**
- * Mapping of model type to (short) human readable name
+ * Mapping of base model to (short) human readable name
  */
 export const MODEL_TYPE_SHORT_MAP = {
   any: 'Any',
@@ -24,7 +24,7 @@ export const MODEL_TYPE_SHORT_MAP = {
 };
 
 /**
- * Mapping of model type to CLIP skip parameter constraints
+ * Mapping of base model to CLIP skip parameter constraints
  */
 export const CLIP_SKIP_MAP = {
   any: {
