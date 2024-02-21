@@ -156,6 +156,7 @@ class InvokeAISettings(BaseSettings):
             "lora_dir",
             "embedding_dir",
             "controlnet_dir",
+            "conf_path",
         ]
 
     @classmethod
