@@ -213,7 +213,7 @@ export const isParameterMaskBlurMethod = (val: unknown): val is ParameterMaskBlu
 // #endregion
 
 // #region Canvas Coherence Mode
-export const zParameterCanvasCoherenceMode = z.enum(['unmasked', 'mask', 'edge']);
+export const zParameterCanvasCoherenceMode = z.enum(['Gaussian Blur', 'Box Blur', 'Staged']);
 export type ParameterCanvasCoherenceMode = z.infer<typeof zParameterCanvasCoherenceMode>;
 export const isParameterCanvasCoherenceMode = (val: unknown): val is ParameterCanvasCoherenceMode =>
   zParameterCanvasCoherenceMode.safeParse(val).success;

@@ -1,45 +1,45 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { setCanvasCoherenceStrength } from 'features/parameters/store/generationSlice';
+import { setCanvasCoherenceMinDenoise } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const ParamCanvasCoherenceStrength = () => {
+const ParamCanvasCoherenceMinDenoise = () => {
   const dispatch = useAppDispatch();
-  const canvasCoherenceStrength = useAppSelector((s) => s.generation.canvasCoherenceStrength);
+  const canvasCoherenceMinDenoise = useAppSelector((s) => s.generation.canvasCoherenceMinDenoise);
   const { t } = useTranslation();
 
   const handleChange = useCallback(
     (v: number) => {
-      dispatch(setCanvasCoherenceStrength(v));
+      dispatch(setCanvasCoherenceMinDenoise(v));
     },
     [dispatch]
   );
 
   return (
     <FormControl>
-      <InformationalPopover feature="compositingStrength">
-        <FormLabel>{t('parameters.coherenceStrength')}</FormLabel>
+      <InformationalPopover feature="compositingCoherenceMinDenoise">
+        <FormLabel>{t('parameters.coherenceMinDenoise')}</FormLabel>
       </InformationalPopover>
       <CompositeSlider
         min={0}
         max={1}
         step={0.01}
-        value={canvasCoherenceStrength}
-        defaultValue={0.75}
+        value={canvasCoherenceMinDenoise}
+        defaultValue={0}
         onChange={handleChange}
       />
       <CompositeNumberInput
         min={0}
         max={1}
         step={0.01}
-        value={canvasCoherenceStrength}
-        defaultValue={0.75}
+        value={canvasCoherenceMinDenoise}
+        defaultValue={0}
         onChange={handleChange}
       />
     </FormControl>
   );
 };
 
-export default memo(ParamCanvasCoherenceStrength);
+export default memo(ParamCanvasCoherenceMinDenoise);

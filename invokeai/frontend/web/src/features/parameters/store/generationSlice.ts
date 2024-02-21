@@ -38,9 +38,9 @@ export const initialGenerationState: GenerationState = {
   scheduler: 'euler',
   maskBlur: 16,
   maskBlurMethod: 'box',
-  canvasCoherenceMode: 'unmasked',
-  canvasCoherenceSteps: 20,
-  canvasCoherenceStrength: 0.3,
+  canvasCoherenceMode: 'Gaussian Blur',
+  canvasCoherenceMinDenoise: 0,
+  canvasCoherenceEdgeSize: 16,
   seed: 0,
   shouldFitToWidthHeight: true,
   shouldRandomizeSeed: true,
@@ -124,11 +124,11 @@ export const generationSlice = createSlice({
     setCanvasCoherenceMode: (state, action: PayloadAction<ParameterCanvasCoherenceMode>) => {
       state.canvasCoherenceMode = action.payload;
     },
-    setCanvasCoherenceSteps: (state, action: PayloadAction<number>) => {
-      state.canvasCoherenceSteps = action.payload;
+    setCanvasCoherenceEdgeSize: (state, action: PayloadAction<number>) => {
+      state.canvasCoherenceEdgeSize = action.payload;
     },
-    setCanvasCoherenceStrength: (state, action: PayloadAction<number>) => {
-      state.canvasCoherenceStrength = action.payload;
+    setCanvasCoherenceMinDenoise: (state, action: PayloadAction<number>) => {
+      state.canvasCoherenceMinDenoise = action.payload;
     },
     setInfillMethod: (state, action: PayloadAction<string>) => {
       state.infillMethod = action.payload;
@@ -274,8 +274,8 @@ export const {
   setMaskBlur,
   setMaskBlurMethod,
   setCanvasCoherenceMode,
-  setCanvasCoherenceSteps,
-  setCanvasCoherenceStrength,
+  setCanvasCoherenceEdgeSize,
+  setCanvasCoherenceMinDenoise,
   setSeed,
   setShouldFitToWidthHeight,
   setShouldRandomizeSeed,
