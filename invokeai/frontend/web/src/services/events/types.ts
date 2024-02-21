@@ -45,6 +45,27 @@ export type ModelLoadCompletedEvent = {
   precision: string;
 };
 
+export type ModelInstallDownloadingEvent = {
+  bytes: string;
+  local_path: string;
+  source: string;
+  timestamp: number;
+  total_bytes: string;
+};
+
+export type ModelInstallCompletedEvent = {
+  key: number;
+  source: string;
+  timestamp: number;
+};
+
+export type ModelInstallErrorEvent = {
+  error: string;
+  error_type: string;
+  source: string;
+  timestamp: number;
+};
+
 /**
  * A `generator_progress` socket.io event.
  *
@@ -237,6 +258,9 @@ export type ServerToClientEvents = {
   graph_execution_state_complete: (payload: GraphExecutionStateCompleteEvent) => void;
   model_load_started: (payload: ModelLoadStartedEvent) => void;
   model_load_completed: (payload: ModelLoadCompletedEvent) => void;
+  model_install_downloading: (payload: ModelInstallDownloadingEvent) => void;
+  model_install_completed: (payload: ModelInstallCompletedEvent) => void;
+  model_install_error: (payload: ModelInstallErrorEvent) => void;
   session_retrieval_error: (payload: SessionRetrievalErrorEvent) => void;
   invocation_retrieval_error: (payload: InvocationRetrievalErrorEvent) => void;
   queue_item_status_changed: (payload: QueueItemStatusChangedEvent) => void;

@@ -18,6 +18,9 @@ import {
   socketInvocationStarted,
   socketModelLoadCompleted,
   socketModelLoadStarted,
+  socketModelInstallDownloading,
+  socketModelInstallCompleted,
+  socketModelInstallError,
   socketQueueItemStatusChanged,
   socketSessionRetrievalError,
 } from 'services/events/actions';
@@ -133,6 +136,39 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
       })
     );
   });
+
+  /**
+   * Model Install Downloading
+   */
+  socket.on('model_install_downloading', (data) => {
+    dispatch(
+      socketModelInstallDownloading({
+        data,
+      })
+    );
+  })
+
+    /**
+   * Model Install Completed
+   */
+    socket.on('model_install_completed', (data) => {
+      dispatch(
+        socketModelInstallCompleted({
+          data,
+        })
+      );
+    })
+
+  /**
+   * Model Install Error
+   */
+    socket.on('model_install_error', (data) => {
+      dispatch(
+        socketModelInstallError({
+          data,
+        })
+      );
+    })
 
   /**
    * Session retrieval error

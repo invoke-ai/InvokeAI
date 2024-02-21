@@ -45,7 +45,7 @@ export const ImportQueue = () => {
     <Box mt={3} layerStyle="first" p={3} borderRadius="base" w="full" h="full">
       <Flex direction="column" gap="2">
         {data?.map((model, i) => (
-          <Flex gap="3" w="full" alignItems="center" textAlign="center">
+          <Flex key={i} gap="3" w="full" alignItems="center" textAlign="center">
             <Text w="20%" whiteSpace="nowrap" overflow="hidden" text-overflow="ellipsis">
               {model.source.repo_id}
             </Text>
