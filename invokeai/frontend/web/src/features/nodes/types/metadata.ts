@@ -3,8 +3,8 @@ import { z } from 'zod';
 import {
   zControlField,
   zIPAdapterField,
-  zLoRAModelField,
   zMainModelField,
+  zModelFieldBase,
   zSDXLRefinerModelField,
   zT2IAdapterField,
   zVAEModelField,
@@ -15,7 +15,7 @@ import {
 // - https://github.com/colinhacks/zod/issues/2106
 // - https://github.com/colinhacks/zod/issues/2854
 export const zLoRAMetadataItem = z.object({
-  lora: zLoRAModelField.deepPartial(),
+  lora: zModelFieldBase.deepPartial(),
   weight: z.number(),
 });
 const zControlNetMetadataItem = zControlField.deepPartial();
