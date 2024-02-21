@@ -26,6 +26,10 @@ type UpdateModelArg = {
 
 type UpdateModelResponse = paths['/api/v2/models/i/{key}']['patch']['responses']['200']['content']['application/json'];
 
+
+type GetModelResponse =
+  paths['/api/v2/models/i/{key}']['get']['responses']['200']['content']['application/json'];
+
 type ListModelsArg = NonNullable<paths['/api/v2/models/']['get']['parameters']['query']>;
 
 type DeleteMainModelArg = {
@@ -164,6 +168,12 @@ export const modelsApi = api.injectEndpoints({
       },
       providesTags: buildProvidesTags<MainModelConfig>('MainModel'),
       transformResponse: buildTransformResponse<MainModelConfig>(mainModelsAdapter),
+    }),
+    getModel: build.query<GetModelResponse, string>({
+      query: (key) => {
+        return buildModelsUrl(`i/${key}`);
+      },
+      providesTags: ['Model'],
     }),
     updateModels: build.mutation<UpdateModelResponse, UpdateModelArg>({
       query: ({ key, body }) => {
@@ -320,4 +330,5 @@ export const {
   useGetModelsInFolderQuery,
   useGetCheckpointConfigsQuery,
   useGetModelImportsQuery,
+  useGetModelQuery
 } = modelsApi;

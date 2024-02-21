@@ -3,10 +3,12 @@ import {
   Button,
   ConfirmationAlertDialog,
   Flex,
+  Icon,
   IconButton,
   Text,
   Tooltip,
   useDisclosure,
+  Box,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
@@ -15,6 +17,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { IoWarning } from 'react-icons/io5';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 import { useDeleteModelsMutation } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
@@ -88,8 +91,16 @@ const ModelListItem = (props: ModelListItemProps) => {
           <Tooltip label={model.description} placement="bottom">
             <Text>{model.name}</Text>
           </Tooltip>
+          {model.format === 'checkpoint' && (
+            <Tooltip label="Checkpoint">
+              <Box>
+                <Icon as={IoWarning} />
+              </Box>
+            </Tooltip>
+          )}
         </Flex>
       </Flex>
+
       <IconButton
         onClick={onOpen}
         icon={<PiTrashSimpleBold />}
