@@ -86,14 +86,14 @@ export const initialConfigState: AppConfig = {
       fineStep: 0.01,
       coarseStep: 0.05,
     },
-    canvasCoherenceSteps: {
-      initial: 20,
-      sliderMin: 1,
-      sliderMax: 100,
-      numberInputMin: 1,
-      numberInputMax: 999,
-      fineStep: 1,
-      coarseStep: 1,
+    canvasCoherenceEdgeSize: {
+      initial: 16,
+      sliderMin: 16,
+      sliderMax: 512,
+      numberInputMin: 16,
+      numberInputMax: 1024,
+      fineStep: 8,
+      coarseStep: 16,
     },
     cfgRescaleMultiplier: {
       initial: 0,
