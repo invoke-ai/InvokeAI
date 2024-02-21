@@ -299,9 +299,13 @@ class DenoiseMaskOutput(BaseInvocationOutput):
     denoise_mask: DenoiseMaskField = OutputField(description="Mask for denoise model run")
 
     @classmethod
-    def build(cls, mask_name: str, masked_latents_name: Optional[str] = None) -> "DenoiseMaskOutput":
+    def build(
+        cls, mask_name: str, masked_latents_name: Optional[str] = None, gradient: Optional[bool] = False
+    ) -> "DenoiseMaskOutput":
         return cls(
-            denoise_mask=DenoiseMaskField(mask_name=mask_name, masked_latents_name=masked_latents_name),
+            denoise_mask=DenoiseMaskField(
+                mask_name=mask_name, masked_latents_name=masked_latents_name, gradient=gradient
+            ),
         )
 
 
