@@ -86,7 +86,7 @@ class CompelInvocation(BaseInvocation):
         for trigger in extract_ti_triggers_from_prompt(self.prompt):
             name = trigger[1:-1]
             try:
-                loaded_model = context.models.load(**self.clip.text_encoder.model_dump()).model
+                loaded_model = context.models.load(key=name).model
                 assert isinstance(loaded_model, TextualInversionModelRaw)
                 ti_list.append((name, loaded_model))
             except UnknownModelException:
