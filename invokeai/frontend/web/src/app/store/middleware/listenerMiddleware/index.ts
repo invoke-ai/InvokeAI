@@ -58,6 +58,7 @@ import { addInvocationErrorEventListener as addInvocationErrorListener } from '.
 import { addInvocationRetrievalErrorEventListener } from './listeners/socketio/socketInvocationRetrievalError';
 import { addInvocationStartedEventListener as addInvocationStartedListener } from './listeners/socketio/socketInvocationStarted';
 import { addModelLoadEventListener } from './listeners/socketio/socketModelLoad';
+import { addModelInstallEventListener } from './listeners/socketio/socketModelInstall';
 import { addSocketQueueItemStatusChangedEventListener } from './listeners/socketio/socketQueueItemStatusChanged';
 import { addSessionRetrievalErrorEventListener } from './listeners/socketio/socketSessionRetrievalError';
 import { addSocketSubscribedEventListener as addSocketSubscribedListener } from './listeners/socketio/socketSubscribed';
@@ -135,6 +136,7 @@ addSocketDisconnectedListener();
 addSocketSubscribedListener();
 addSocketUnsubscribedListener();
 addModelLoadEventListener();
+addModelInstallEventListener();
 addSessionRetrievalErrorEventListener();
 addInvocationRetrievalErrorEventListener();
 addSocketQueueItemStatusChangedEventListener();
