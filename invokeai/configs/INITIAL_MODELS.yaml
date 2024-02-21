@@ -34,7 +34,7 @@ sd-1/main/Analog-Diffusion:
    recommended: False
 sd-1/main/Deliberate:
    description: Versatile model that produces detailed images up to 768px (4.27 GB)
-   source: XpucT/Deliberate
+   source: stablediffusionapi/deliberate-v5
    recommended: False
 sd-1/main/Dungeons-and-Diffusion:
    description: Dungeons & Dragons characters (2.13 GB)

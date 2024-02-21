@@ -154,8 +154,12 @@ class ModelInstallService(ModelInstallServiceBase):
 
         info: AnyModelConfig = self._probe_model(Path(model_path), config)
         old_hash = info.current_hash
+
+        if preferred_name := config.get("name"):
+            preferred_name = Path(preferred_name).with_suffix(model_path.suffix)
+
         dest_path = (
-            self.app_config.models_path / info.base.value / info.type.value / (config.get("name") or model_path.name)
+            self.app_config.models_path / info.base.value / info.type.value / (preferred_name or model_path.name)
         )
         try:
             new_path = self._copy_model(model_path, dest_path)
