@@ -2,7 +2,7 @@ import json
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import Generator
 
 import psutil
 import torch
@@ -10,7 +10,6 @@ import torch
 import invokeai.backend.util.logging as logger
 from invokeai.app.invocations.baseinvocation import BaseInvocation
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.item_storage.item_storage_common import ItemNotFoundError
 from invokeai.backend.model_manager.load.model_cache import CacheStats
 
 from .invocation_stats_base import InvocationStatsServiceBase
@@ -42,7 +41,7 @@ class InvocationStatsService(InvocationStatsServiceBase):
         self._invoker = invoker
 
     @contextmanager
-    def collect_stats(self, invocation: BaseInvocation, graph_execution_state_id: str) -> Iterator[None]:
+    def collect_stats(self, invocation: BaseInvocation, graph_execution_state_id: str) -> Generator[None, None, None]:
         # This is to handle case of the model manager not being initialized, which happens
         # during some tests.
         services = self._invoker.services
@@ -50,9 +49,6 @@ class InvocationStatsService(InvocationStatsServiceBase):
             # First time we're seeing this graph_execution_state_id.
             self._stats[graph_execution_state_id] = GraphExecutionStats()
             self._cache_stats[graph_execution_state_id] = CacheStats()
-
-            # Prune stale stats. There should be none since we're starting a new graph, but just in case.
-            self._prune_stale_stats()
 
         # Record state before the invocation.
         start_time = time.time()
@@ -78,42 +74,9 @@ class InvocationStatsService(InvocationStatsServiceBase):
             )
             self._stats[graph_execution_state_id].add_node_execution_stats(node_stats)
 
-    def _prune_stale_stats(self) -> None:
-        """Check all graphs being tracked and prune any that have completed/errored.
-
-        This shouldn't be necessary, but we don't have totally robust upstream handling of graph completions/errors, so
-        for now we call this function periodically to prevent them from accumulating.
-        """
-        to_prune: list[str] = []
-        for graph_execution_state_id in self._stats:
-            try:
-                graph_execution_state = self._invoker.services.graph_execution_manager.get(graph_execution_state_id)
-            except ItemNotFoundError:
-                # TODO(ryand): What would cause this? Should this exception just be allowed to propagate?
-                logger.warning(f"Failed to get graph state for {graph_execution_state_id}.")
-                continue
-
-            if not graph_execution_state.is_complete():
-                # The graph is still running, don't prune it.
-                continue
-
-            to_prune.append(graph_execution_state_id)
-
-        for graph_execution_state_id in to_prune:
-            del self._stats[graph_execution_state_id]
-            del self._cache_stats[graph_execution_state_id]
-
-        if len(to_prune) > 0:
-            logger.info(f"Pruned stale graph stats for {to_prune}.")
-
-    def reset_stats(self, graph_execution_state_id: str):
-        try:
-            del self._stats[graph_execution_state_id]
-            del self._cache_stats[graph_execution_state_id]
-        except KeyError as e:
-            raise GESStatsNotFoundError(
-                f"Attempted to clear statistics for unknown graph {graph_execution_state_id}: {e}."
-            ) from e
+    def reset_stats(self):
+        self._stats = {}
+        self._cache_stats = {}
 
     def get_stats(self, graph_execution_state_id: str) -> InvocationStatsSummary:
         graph_stats_summary = self._get_graph_summary(graph_execution_state_id)

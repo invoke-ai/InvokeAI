@@ -424,8 +424,11 @@
         "uploads": "Uploads",
         "deleteSelection": "Delete Selection",
         "downloadSelection": "Download Selection",
-        "preparingDownload": "Preparing Download",
-        "preparingDownloadFailed": "Problem Preparing Download",
+        "bulkDownloadRequested": "Preparing Download",
+        "bulkDownloadRequestedDesc": "Your download request is being prepared. This may take a few moments.",
+        "bulkDownloadRequestFailed": "Problem Preparing Download",
+        "bulkDownloadStarting": "Download Starting",
+        "bulkDownloadFailed": "Download Failed",
         "problemDeletingImages": "Problem Deleting Images",
         "problemDeletingImagesDesc": "One or more images could not be deleted"
     },

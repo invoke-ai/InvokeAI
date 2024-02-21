@@ -7,8 +7,8 @@ import { selectGenerationSlice, vaeSelected } from 'features/parameters/store/ge
 import { pick } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { VAEConfig } from 'services/api/endpoints/models';
 import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
+import type { VAEConfig } from 'services/api/types';
 
 const selector = createMemoizedSelector(selectGenerationSlice, (generation) => {
   const { model, vae } = generation;
@@ -22,22 +22,22 @@ const ParamVAEModelSelect = () => {
   const { data, isLoading } = useGetVaeModelsQuery();
   const getIsDisabled = useCallback(
     (vae: VAEConfig): boolean => {
-      const isCompatible = model?.base_model === vae.base_model;
-      const hasMainModel = Boolean(model?.base_model);
+      const isCompatible = model?.base === vae.base;
+      const hasMainModel = Boolean(model?.base);
       return !hasMainModel || !isCompatible;
     },
-    [model?.base_model]
+    [model?.base]
   );
   const _onChange = useCallback(
     (vae: VAEConfig | null) => {
-      dispatch(vaeSelected(vae ? pick(vae, 'base_model', 'model_name') : null));
+      dispatch(vaeSelected(vae ? pick(vae, 'key', 'base') : null));
     },
     [dispatch]
   );
-  const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
+  const { options, value, onChange, noOptionsMessage } = useGroupedModelCombobox({
     modelEntities: data,
     onChange: _onChange,
-    selectedModel: vae ? { ...vae, model_type: 'vae' } : null,
+    selectedModel: vae ? pick(vae, 'key', 'base') : null,
     isLoading,
     getIsDisabled,
   });
@@ -50,7 +50,7 @@ const ParamVAEModelSelect = () => {
       <Combobox
         isClearable
         value={value}
-        placeholder={value ? placeholder : t('models.defaultVAE')}
+        placeholder={value ? value.value : t('models.defaultVAE')}
         options={options}
         onChange={onChange}
         noOptionsMessage={noOptionsMessage}

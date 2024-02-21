@@ -21,9 +21,6 @@ import type {
 import type { ApiTagDescription, tagTypes } from '..';
 import { api, buildV2Url, LIST_TAG } from '..';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-export const getModelId = (input: any): any => input;
-
 type UpdateMainModelArg = {
   base_model: BaseModelType;
   model_name: string;
@@ -39,7 +36,7 @@ type UpdateLoRAModelArg = {
 type UpdateMainModelResponse =
   paths['/api/v2/models/i/{key}']['patch']['responses']['200']['content']['application/json'];
 
-type ListModelsArg = NonNullable<paths['/api/models_v2/']['get']['parameters']['query']>;
+type ListModelsArg = NonNullable<paths['/api/v2/models/']['get']['parameters']['query']>;
 
 type UpdateLoRAModelResponse = UpdateMainModelResponse;
 
@@ -239,6 +236,18 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['Model'],
     }),
+    getModelConfig: build.query<AnyModelConfig, string>({
+      query: (key) => buildModelsUrl(`i/${key}`),
+      providesTags: (result) => {
+        const tags: ApiTagDescription[] = ['Model'];
+
+        if (result) {
+          tags.push({ type: 'ModelConfig', id: result.key });
+        }
+
+        return tags;
+      },
+    }),
     syncModels: build.mutation<SyncModelsResponse, void>({
       query: () => {
         return {
@@ -316,6 +325,7 @@ export const modelsApi = api.injectEndpoints({
 });
 
 export const {
+  useGetModelConfigQuery,
   useGetMainModelsQuery,
   useGetControlNetModelsQuery,
   useGetIPAdapterModelsQuery,

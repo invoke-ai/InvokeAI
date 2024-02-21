@@ -8,8 +8,6 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.image import ShowImageInvocation
-from invokeai.app.invocations.math import AddInvocation, SubtractInvocation
 from invokeai.app.invocations.primitives import (
     FloatCollectionInvocation,
     FloatInvocation,
@@ -17,13 +15,11 @@ from invokeai.app.invocations.primitives import (
     StringInvocation,
 )
 from invokeai.app.invocations.upscale import ESRGANInvocation
-from invokeai.app.services.shared.default_graphs import create_text_to_image
 from invokeai.app.services.shared.graph import (
     CollectInvocation,
     Edge,
     EdgeConnection,
     Graph,
-    GraphInvocation,
     InvalidEdgeError,
     IterateInvocation,
     NodeAlreadyInGraphError,
@@ -425,21 +421,6 @@ def test_graph_invalid_if_edges_reference_missing_nodes():
     assert g.is_valid() is False
 
 
-def test_graph_invalid_if_subgraph_invalid():
-    g = Graph()
-    n1 = GraphInvocation(id="1")
-    n1.graph = Graph()
-
-    n1_1 = TextToImageTestInvocation(id="2", prompt="Banana sushi")
-    n1.graph.nodes[n1_1.id] = n1_1
-    e1 = create_edge("1", "image", "2", "image")
-    n1.graph.edges.append(e1)
-
-    g.nodes[n1.id] = n1
-
-    assert g.is_valid() is False
-
-
 def test_graph_invalid_if_has_cycle():
     g = Graph()
     n1 = ESRGANInvocation(id="1")
@@ -464,110 +445,6 @@ def test_graph_invalid_with_invalid_connection():
     g.edges.append(e1)
 
     assert g.is_valid() is False
-
-
-# TODO: Subgraph operations
-def test_graph_gets_subgraph_node():
-    g = Graph()
-    n1 = GraphInvocation(id="1")
-    n1.graph = Graph()
-
-    n1_1 = TextToImageTestInvocation(id="1", prompt="Banana sushi")
-    n1.graph.add_node(n1_1)
-
-    g.add_node(n1)
-
-    result = g.get_node("1.1")
-
-    assert result is not None
-    assert result.id == "1"
-    assert result == n1_1
-
-
-def test_graph_expands_subgraph():
-    g = Graph()
-    n1 = GraphInvocation(id="1")
-    n1.graph = Graph()
-
-    n1_1 = AddInvocation(id="1", a=1, b=2)
-    n1_2 = SubtractInvocation(id="2", b=3)
-    n1.graph.add_node(n1_1)
-    n1.graph.add_node(n1_2)
-    n1.graph.add_edge(create_edge("1", "value", "2", "a"))
-
-    g.add_node(n1)
-
-    n2 = AddInvocation(id="2", b=5)
-    g.add_node(n2)
-    g.add_edge(create_edge("1.2", "value", "2", "a"))
-
-    dg = g.nx_graph_flat()
-    assert set(dg.nodes) == {"1.1", "1.2", "2"}
-    assert set(dg.edges) == {("1.1", "1.2"), ("1.2", "2")}
-
-
-def test_graph_subgraph_t2i():
-    g = Graph()
-    n1 = GraphInvocation(id="1")
-
-    # Get text to image default graph
-    lg = create_text_to_image()
-    n1.graph = lg.graph
-
-    g.add_node(n1)
-
-    n2 = IntegerInvocation(id="2", value=512)
-    n3 = IntegerInvocation(id="3", value=256)
-
-    g.add_node(n2)
-    g.add_node(n3)
-
-    g.add_edge(create_edge("2", "value", "1.width", "value"))
-    g.add_edge(create_edge("3", "value", "1.height", "value"))
-
-    n4 = ShowImageInvocation(id="4")
-    g.add_node(n4)
-    g.add_edge(create_edge("1.8", "image", "4", "image"))
-
-    # Validate
-    dg = g.nx_graph_flat()
-    assert set(dg.nodes) == {"1.width", "1.height", "1.seed", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "2", "3", "4"}
-    expected_edges = [(f"1.{e.source.node_id}", f"1.{e.destination.node_id}") for e in lg.graph.edges]
-    expected_edges.extend([("2", "1.width"), ("3", "1.height"), ("1.8", "4")])
-    print(expected_edges)
-    print(list(dg.edges))
-    assert set(dg.edges) == set(expected_edges)
-
-
-def test_graph_fails_to_get_missing_subgraph_node():
-    g = Graph()
-    n1 = GraphInvocation(id="1")
-    n1.graph = Graph()
-
-    n1_1 = TextToImageTestInvocation(id="1", prompt="Banana sushi")
-    n1.graph.add_node(n1_1)
-
-    g.add_node(n1)
-
-    with pytest.raises(NodeNotFoundError):
-        _ = g.get_node("1.2")
-
-
-def test_graph_fails_to_enumerate_non_subgraph_node():
-    g = Graph()
-    n1 = GraphInvocation(id="1")
-    n1.graph = Graph()
-
-    n1_1 = TextToImageTestInvocation(id="1", prompt="Banana sushi")
-    n1.graph.add_node(n1_1)
-
-    g.add_node(n1)
-
-    n2 = ESRGANInvocation(id="2")
-    g.add_node(n2)
-
-    with pytest.raises(NodeNotFoundError):
-        _ = g.get_node("2.1")
 
 
 def test_graph_gets_networkx_graph():

@@ -11,6 +11,8 @@ import {
 } from 'features/controlAdapters/util/buildControlAdapter';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import { loraRecalled, lorasCleared } from 'features/lora/store/loraSlice';
+import type { ModelIdentifier } from 'features/nodes/types/common';
+import { isModelIdentifier } from 'features/nodes/types/common';
 import type {
   ControlNetMetadataItem,
   CoreMetadata,
@@ -37,13 +39,9 @@ import type { ParameterModel } from 'features/parameters/types/parameterSchemas'
 import {
   isParameterCFGRescaleMultiplier,
   isParameterCFGScale,
-  isParameterControlNetModel,
   isParameterHeight,
   isParameterHRFEnabled,
   isParameterHRFMethod,
-  isParameterIPAdapterModel,
-  isParameterLoRAModel,
-  isParameterModel,
   isParameterNegativePrompt,
   isParameterNegativeStylePromptSDXL,
   isParameterPositivePrompt,
@@ -56,7 +54,6 @@ import {
   isParameterSeed,
   isParameterSteps,
   isParameterStrength,
-  isParameterVAEModel,
   isParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
 import {
@@ -73,15 +70,20 @@ import {
 import { isNil } from 'lodash-es';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ALL_BASE_MODELS } from 'services/api/constants';
 import {
   controlNetModelsAdapterSelectors,
   ipAdapterModelsAdapterSelectors,
   loraModelsAdapterSelectors,
+  mainModelsAdapterSelectors,
   t2iAdapterModelsAdapterSelectors,
   useGetControlNetModelsQuery,
   useGetIPAdapterModelsQuery,
   useGetLoRAModelsQuery,
+  useGetMainModelsQuery,
   useGetT2IAdapterModelsQuery,
+  useGetVaeModelsQuery,
+  vaeModelsAdapterSelectors,
 } from 'services/api/endpoints/models';
 import type { ImageDTO } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -279,21 +281,6 @@ export const useRecallParameters = () => {
   );
 
   /**
-   * Recall model with toast
-   */
-  const recallModel = useCallback(
-    (model: unknown) => {
-      if (!isParameterModel(model)) {
-        parameterNotSetToast();
-        return;
-      }
-      dispatch(modelSelected(model));
-      parameterSetToast();
-    },
-    [dispatch, parameterSetToast, parameterNotSetToast]
-  );
-
-  /**
    * Recall scheduler with toast
    */
   const recallScheduler = useCallback(
@@ -303,25 +290,6 @@ export const useRecallParameters = () => {
         return;
       }
       dispatch(setScheduler(scheduler));
-      parameterSetToast();
-    },
-    [dispatch, parameterSetToast, parameterNotSetToast]
-  );
-
-  /**
-   * Recall vae model
-   */
-  const recallVaeModel = useCallback(
-    (vae: unknown) => {
-      if (!isParameterVAEModel(vae) && !isNil(vae)) {
-        parameterNotSetToast();
-        return;
-      }
-      if (isNil(vae)) {
-        dispatch(vaeSelected(null));
-      } else {
-        dispatch(vaeSelected(vae));
-      }
       parameterSetToast();
     },
     [dispatch, parameterSetToast, parameterNotSetToast]
@@ -452,6 +420,95 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
+  const { data: mainModels } = useGetMainModelsQuery(ALL_BASE_MODELS);
+
+  const prepareMainModelMetadataItem = useCallback(
+    (model: ModelIdentifier) => {
+      const matchingModel = mainModels ? mainModelsAdapterSelectors.selectById(mainModels, model.key) : undefined;
+
+      if (!matchingModel) {
+        return { model: null, error: 'Model is not installed' };
+      }
+
+      return { model: matchingModel, error: null };
+    },
+    [mainModels]
+  );
+
+  /**
+   * Recall model with toast
+   */
+  const recallModel = useCallback(
+    (model: unknown) => {
+      if (!isModelIdentifier(model)) {
+        parameterNotSetToast();
+        return;
+      }
+
+      const result = prepareMainModelMetadataItem(model);
+
+      if (!result.model) {
+        parameterNotSetToast(result.error);
+        return;
+      }
+
+      dispatch(modelSelected(result.model));
+      parameterSetToast();
+    },
+    [prepareMainModelMetadataItem, dispatch, parameterSetToast, parameterNotSetToast]
+  );
+
+  const { data: vaeModels } = useGetVaeModelsQuery();
+
+  const prepareVAEMetadataItem = useCallback(
+    (vae: ModelIdentifier, newModel?: ParameterModel) => {
+      const matchingModel = vaeModels ? vaeModelsAdapterSelectors.selectById(vaeModels, vae.key) : undefined;
+      if (!matchingModel) {
+        return { vae: null, error: 'VAE model is not installed' };
+      }
+      const isCompatibleBaseModel = matchingModel?.base === (newModel ?? model)?.base;
+
+      if (!isCompatibleBaseModel) {
+        return {
+          vae: null,
+          error: 'VAE incompatible with currently-selected model',
+        };
+      }
+
+      return { vae: matchingModel, error: null };
+    },
+    [model, vaeModels]
+  );
+
+  /**
+   * Recall vae model
+   */
+  const recallVaeModel = useCallback(
+    (vae: unknown) => {
+      if (!isModelIdentifier(vae) && !isNil(vae)) {
+        parameterNotSetToast();
+        return;
+      }
+
+      if (isNil(vae)) {
+        dispatch(vaeSelected(null));
+        parameterSetToast();
+        return;
+      }
+
+      const result = prepareVAEMetadataItem(vae);
+
+      if (!result.vae) {
+        parameterNotSetToast(result.error);
+        return;
+      }
+
+      dispatch(vaeSelected(result.vae));
+      parameterSetToast();
+    },
+    [prepareVAEMetadataItem, dispatch, parameterSetToast, parameterNotSetToast]
+  );
+
   /**
    * Recall LoRA with toast
    */
@@ -460,7 +517,7 @@ export const useRecallParameters = () => {
 
   const prepareLoRAMetadataItem = useCallback(
     (loraMetadataItem: LoRAMetadataItem, newModel?: ParameterModel) => {
-      if (!isParameterLoRAModel(loraMetadataItem.lora)) {
+      if (!isModelIdentifier(loraMetadataItem.lora)) {
         return { lora: null, error: 'Invalid LoRA model' };
       }
 
@@ -510,7 +567,7 @@ export const useRecallParameters = () => {
 
   const prepareControlNetMetadataItem = useCallback(
     (controlnetMetadataItem: ControlNetMetadataItem, newModel?: ParameterModel) => {
-      if (!isParameterControlNetModel(controlnetMetadataItem.control_model)) {
+      if (!isModelIdentifier(controlnetMetadataItem.control_model)) {
         return { controlnet: null, error: 'Invalid ControlNet model' };
       }
 
@@ -584,7 +641,7 @@ export const useRecallParameters = () => {
 
   const prepareT2IAdapterMetadataItem = useCallback(
     (t2iAdapterMetadataItem: T2IAdapterMetadataItem, newModel?: ParameterModel) => {
-      if (!isParameterControlNetModel(t2iAdapterMetadataItem.t2i_adapter_model)) {
+      if (!isModelIdentifier(t2iAdapterMetadataItem.t2i_adapter_model)) {
         return { controlnet: null, error: 'Invalid ControlNet model' };
       }
 
@@ -657,7 +714,7 @@ export const useRecallParameters = () => {
 
   const prepareIPAdapterMetadataItem = useCallback(
     (ipAdapterMetadataItem: IPAdapterMetadataItem, newModel?: ParameterModel) => {
-      if (!isParameterIPAdapterModel(ipAdapterMetadataItem?.ip_adapter_model)) {
+      if (!isModelIdentifier(ipAdapterMetadataItem?.ip_adapter_model)) {
         return { ipAdapter: null, error: 'Invalid IP Adapter model' };
       }
 
@@ -762,9 +819,12 @@ export const useRecallParameters = () => {
 
       let newModel: ParameterModel | undefined = undefined;
 
-      if (isParameterModel(model)) {
-        newModel = model;
-        dispatch(modelSelected(model));
+      if (isModelIdentifier(model)) {
+        const result = prepareMainModelMetadataItem(model);
+        if (result.model) {
+          dispatch(modelSelected(result.model));
+          newModel = result.model;
+        }
       }
 
       if (isParameterCFGScale(cfg_scale)) {
@@ -786,11 +846,14 @@ export const useRecallParameters = () => {
       if (isParameterScheduler(scheduler)) {
         dispatch(setScheduler(scheduler));
       }
-      if (isParameterVAEModel(vae) || isNil(vae)) {
+      if (isModelIdentifier(vae) || isNil(vae)) {
         if (isNil(vae)) {
           dispatch(vaeSelected(null));
         } else {
-          dispatch(vaeSelected(vae));
+          const result = prepareVAEMetadataItem(vae, newModel);
+          if (result.vae) {
+            dispatch(vaeSelected(result.vae));
+          }
         }
       }
 
@@ -898,6 +961,8 @@ export const useRecallParameters = () => {
       dispatch,
       allParameterSetToast,
       allParameterNotSetToast,
+      prepareMainModelMetadataItem,
+      prepareVAEMetadataItem,
       prepareLoRAMetadataItem,
       prepareControlNetMetadataItem,
       prepareIPAdapterMetadataItem,

@@ -50,7 +50,6 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         images,
         model_manager,
         session_queue,
-        sessions,
         utilities,
         workflows,
     )
@@ -110,8 +109,6 @@ async def shutdown_event() -> None:
 
 
 # Include all routers
-app.include_router(sessions.session_router, prefix="/api")
-
 app.include_router(utilities.utilities_router, prefix="/api")
 app.include_router(model_manager.model_manager_router, prefix="/api")
 app.include_router(download_queue.download_queue_router, prefix="/api")
@@ -151,6 +148,8 @@ def custom_openapi() -> dict[str, Any]:
         # TODO: note that we assume the schema_key here is the TYPE.__name__
         # This could break in some cases, figure out a better way to do it
         output_type_titles[schema_key] = output_schema["title"]
+        openapi_schema["components"]["schemas"][schema_key] = output_schema
+        openapi_schema["components"]["schemas"][schema_key]["class"] = "output"
 
     # Add Node Editor UI helper schemas
     ui_config_schemas = models_json_schema(
@@ -173,7 +172,6 @@ def custom_openapi() -> dict[str, Any]:
         outputs_ref = {"$ref": f"#/components/schemas/{output_type_title}"}
         invoker_schema["output"] = outputs_ref
         invoker_schema["class"] = "invocation"
-        openapi_schema["components"]["schemas"][f"{output_type_title}"]["class"] = "output"
 
     # This code no longer seems to be necessary?
     # Leave it here just in case

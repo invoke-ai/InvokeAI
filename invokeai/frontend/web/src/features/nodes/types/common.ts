@@ -67,13 +67,15 @@ export const zModelName = z.string().min(3);
 export const zModelIdentifier = z.object({
   key: z.string().min(1),
 });
+export const isModelIdentifier = (field: unknown): field is ModelIdentifier =>
+  zModelIdentifier.safeParse(field).success;
 export const zModelFieldBase = zModelIdentifier;
 export const zModelIdentifierWithBase = zModelIdentifier.extend({ base: zBaseModel });
 export type BaseModel = z.infer<typeof zBaseModel>;
 export type ModelType = z.infer<typeof zModelType>;
 export type ModelIdentifier = z.infer<typeof zModelIdentifier>;
 export type ModelIdentifierWithBase = z.infer<typeof zModelIdentifierWithBase>;
-export const zMainModelField = zModelFieldBase;
+export const zMainModelField = zModelIdentifierWithBase;
 export type MainModelField = z.infer<typeof zMainModelField>;
 
 export const zSDXLRefinerModelField = zModelIdentifier;
@@ -93,23 +95,23 @@ export const zSubModelType = z.enum([
 ]);
 export type SubModelType = z.infer<typeof zSubModelType>;
 
-export const zVAEModelField = zModelFieldBase;
+export const zVAEModelField = zModelIdentifierWithBase;
 
 export const zModelInfo = zModelIdentifier.extend({
   submodel_type: zSubModelType.nullish(),
 });
 export type ModelInfo = z.infer<typeof zModelInfo>;
 
-export const zLoRAModelField = zModelFieldBase;
+export const zLoRAModelField = zModelIdentifierWithBase;
 export type LoRAModelField = z.infer<typeof zLoRAModelField>;
 
-export const zControlNetModelField = zModelFieldBase;
+export const zControlNetModelField = zModelIdentifierWithBase;
 export type ControlNetModelField = z.infer<typeof zControlNetModelField>;
 
-export const zIPAdapterModelField = zModelFieldBase;
+export const zIPAdapterModelField = zModelIdentifierWithBase;
 export type IPAdapterModelField = z.infer<typeof zIPAdapterModelField>;
 
-export const zT2IAdapterModelField = zModelFieldBase;
+export const zT2IAdapterModelField = zModelIdentifierWithBase;
 export type T2IAdapterModelField = z.infer<typeof zT2IAdapterModelField>;
 
 export const zLoraInfo = zModelInfo.extend({
@@ -141,7 +143,7 @@ export type VAEField = z.infer<typeof zVAEField>;
 // #region Control Adapters
 export const zControlField = z.object({
   image: zImageField,
-  control_model: zControlNetModelField,
+  control_model: zModelFieldBase,
   control_weight: z.union([z.number(), z.array(z.number())]).optional(),
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),
@@ -152,7 +154,7 @@ export type ControlField = z.infer<typeof zControlField>;
 
 export const zIPAdapterField = z.object({
   image: zImageField,
-  ip_adapter_model: zIPAdapterModelField,
+  ip_adapter_model: zModelFieldBase,
   weight: z.number(),
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),
@@ -161,7 +163,7 @@ export type IPAdapterField = z.infer<typeof zIPAdapterField>;
 
 export const zT2IAdapterField = z.object({
   image: zImageField,
-  t2i_adapter_model: zT2IAdapterModelField,
+  t2i_adapter_model: zModelFieldBase,
   weight: z.union([z.number(), z.array(z.number())]).optional(),
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),

@@ -1,3 +1,4 @@
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
@@ -12,7 +13,6 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
-from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.model_manager.load.load_base import LoadedModel
@@ -22,6 +22,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation
+    from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 
 """
 The InvocationContext provides access to various services and data about the current invocation.
@@ -48,26 +49,18 @@ Note: The docstrings are in weird places, but that's where they must be to get I
 
 @dataclass
 class InvocationContextData:
+    queue_item: "SessionQueueItem"
+    """The queue item that is being executed."""
     invocation: "BaseInvocation"
     """The invocation that is being executed."""
-    session_id: str
-    """The session that is being executed."""
-    queue_id: str
-    """The queue in which the session is being executed."""
-    source_node_id: str
-    """The ID of the node from which the currently executing invocation was prepared."""
-    queue_item_id: int
-    """The ID of the queue item that is being executed."""
-    batch_id: str
-    """The ID of the batch that is being executed."""
-    workflow: Optional[WorkflowWithoutID] = None
-    """The workflow associated with this queue item, if any."""
+    source_invocation_id: str
+    """The ID of the invocation from which the currently executing invocation was prepared."""
 
 
 class InvocationContextInterface:
-    def __init__(self, services: InvocationServices, context_data: InvocationContextData) -> None:
+    def __init__(self, services: InvocationServices, data: InvocationContextData) -> None:
         self._services = services
-        self._context_data = context_data
+        self._data = data
 
 
 class BoardsInterface(InvocationContextInterface):
@@ -173,26 +166,26 @@ class ImagesInterface(InvocationContextInterface):
         metadata_ = None
         if metadata:
             metadata_ = metadata
-        elif isinstance(self._context_data.invocation, WithMetadata):
-            metadata_ = self._context_data.invocation.metadata
+        elif isinstance(self._data.invocation, WithMetadata):
+            metadata_ = self._data.invocation.metadata
 
         # If `board_id` is provided directly, use that. Else, use the board provided by `WithBoard`, falling back to None.
         board_id_ = None
         if board_id:
             board_id_ = board_id
-        elif isinstance(self._context_data.invocation, WithBoard) and self._context_data.invocation.board:
-            board_id_ = self._context_data.invocation.board.board_id
+        elif isinstance(self._data.invocation, WithBoard) and self._data.invocation.board:
+            board_id_ = self._data.invocation.board.board_id
 
         return self._services.images.create(
             image=image,
-            is_intermediate=self._context_data.invocation.is_intermediate,
+            is_intermediate=self._data.invocation.is_intermediate,
             image_category=image_category,
             board_id=board_id_,
             metadata=metadata_,
             image_origin=ResourceOrigin.INTERNAL,
-            workflow=self._context_data.workflow,
-            session_id=self._context_data.session_id,
-            node_id=self._context_data.invocation.id,
+            workflow=self._data.queue_item.workflow,
+            session_id=self._data.queue_item.session_id,
+            node_id=self._data.invocation.id,
         )
 
     def get_pil(self, image_name: str, mode: IMAGE_MODES | None = None) -> Image:
@@ -254,7 +247,7 @@ class ConditioningInterface(InvocationContextInterface):
         """
         Saves a conditioning data object, returning its name.
 
-        :param conditioning_context_data: The conditioning data to save.
+        :param conditioning_data: The conditioning data to save.
         """
 
         name = self._services.conditioning.save(obj=conditioning_data)
@@ -292,7 +285,7 @@ class ModelsInterface(InvocationContextInterface):
         # the event payloads.
 
         return self._services.model_manager.load_model_by_key(
-            key=key, submodel_type=submodel_type, context_data=self._context_data
+            key=key, submodel_type=submodel_type, context_data=self._data
         )
 
     def load_by_attrs(
@@ -311,7 +304,7 @@ class ModelsInterface(InvocationContextInterface):
             base_model=base_model,
             model_type=model_type,
             submodel=submodel,
-            context_data=self._context_data,
+            context_data=self._data,
         )
 
     def get_config(self, key: str) -> AnyModelConfig:
@@ -370,6 +363,16 @@ class ConfigInterface(InvocationContextInterface):
 
 
 class UtilInterface(InvocationContextInterface):
+    def __init__(
+        self, services: InvocationServices, data: InvocationContextData, cancel_event: threading.Event
+    ) -> None:
+        super().__init__(services, data)
+        self._cancel_event = cancel_event
+
+    def is_canceled(self) -> bool:
+        """Checks if the current invocation has been canceled."""
+        return self._cancel_event.is_set()
+
     def sd_step_callback(self, intermediate_state: PipelineIntermediateState, base_model: BaseModelType) -> None:
         """
         The step callback emits a progress event with the current step, the total number of
@@ -381,17 +384,12 @@ class UtilInterface(InvocationContextInterface):
         :param base_model: The base model for the current denoising step.
         """
 
-        # The step callback needs access to the events and the invocation queue services, but this
-        # represents a dangerous level of access.
-        #
-        # We wrap the step callback so that nodes do not have direct access to these services.
-
         stable_diffusion_step_callback(
-            context_data=self._context_data,
+            context_data=self._data,
             intermediate_state=intermediate_state,
             base_model=base_model,
-            invocation_queue=self._services.queue,
             events=self._services.events,
+            is_canceled=self.is_canceled,
         )
 
 
@@ -410,50 +408,51 @@ class InvocationContext:
         config: ConfigInterface,
         util: UtilInterface,
         boards: BoardsInterface,
-        context_data: InvocationContextData,
+        data: InvocationContextData,
         services: InvocationServices,
     ) -> None:
         self.images = images
-        """Provides methods to save, get and update images and their metadata."""
+        """Methods to save, get and update images and their metadata."""
         self.tensors = tensors
-        """Provides methods to save and get tensors, including image, noise, masks, and masked images."""
+        """Methods to save and get tensors, including image, noise, masks, and masked images."""
         self.conditioning = conditioning
-        """Provides methods to save and get conditioning data."""
+        """Methods to save and get conditioning data."""
         self.models = models
-        """Provides methods to check if a model exists, get a model, and get a model's info."""
+        """Methods to check if a model exists, get a model, and get a model's info."""
         self.logger = logger
-        """Provides access to the app logger."""
+        """The app logger."""
         self.config = config
-        """Provides access to the app's config."""
+        """The app config."""
         self.util = util
-        """Provides utility methods."""
+        """Utility methods, including a method to check if an invocation was canceled and step callbacks."""
         self.boards = boards
-        """Provides methods to interact with boards."""
-        self._data = context_data
-        """Provides data about the current queue item and invocation. This is an internal API and may change without warning."""
+        """Methods to interact with boards."""
+        self._data = data
+        """An internal API providing access to data about the current queue item and invocation. You probably shouldn't use this. It may change without warning."""
         self._services = services
-        """Provides access to the full application services. This is an internal API and may change without warning."""
+        """An internal API providing access to all application services. You probably shouldn't use this. It may change without warning."""
 
 
 def build_invocation_context(
     services: InvocationServices,
-    context_data: InvocationContextData,
+    data: InvocationContextData,
+    cancel_event: threading.Event,
 ) -> InvocationContext:
     """
     Builds the invocation context for a specific invocation execution.
 
-    :param invocation_services: The invocation services to wrap.
-    :param invocation_context_data: The invocation context data.
+    :param services: The invocation services to wrap.
+    :param data: The invocation context data.
     """
 
-    logger = LoggerInterface(services=services, context_data=context_data)
-    images = ImagesInterface(services=services, context_data=context_data)
-    tensors = TensorsInterface(services=services, context_data=context_data)
-    models = ModelsInterface(services=services, context_data=context_data)
-    config = ConfigInterface(services=services, context_data=context_data)
-    util = UtilInterface(services=services, context_data=context_data)
-    conditioning = ConditioningInterface(services=services, context_data=context_data)
-    boards = BoardsInterface(services=services, context_data=context_data)
+    logger = LoggerInterface(services=services, data=data)
+    images = ImagesInterface(services=services, data=data)
+    tensors = TensorsInterface(services=services, data=data)
+    models = ModelsInterface(services=services, data=data)
+    config = ConfigInterface(services=services, data=data)
+    util = UtilInterface(services=services, data=data, cancel_event=cancel_event)
+    conditioning = ConditioningInterface(services=services, data=data)
+    boards = BoardsInterface(services=services, data=data)
 
     ctx = InvocationContext(
         images=images,
@@ -461,7 +460,7 @@ def build_invocation_context(
         config=config,
         tensors=tensors,
         models=models,
-        context_data=context_data,
+        data=data,
         util=util,
         conditioning=conditioning,
         services=services,

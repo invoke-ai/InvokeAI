@@ -2,7 +2,7 @@ import io
 import traceback
 from typing import Optional
 
-from fastapi import Body, HTTPException, Path, Query, Request, Response, UploadFile
+from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from PIL import Image
@@ -375,16 +375,67 @@ async def unstar_images_in_list(
 
 class ImagesDownloaded(BaseModel):
     response: Optional[str] = Field(
-        description="If defined, the message to display to the user when images begin downloading"
+        default=None, description="The message to display to the user when images begin downloading"
+    )
+    bulk_download_item_name: Optional[str] = Field(
+        default=None, description="The name of the bulk download item for which events will be emitted"
     )
 
 
-@images_router.post("/download", operation_id="download_images_from_list", response_model=ImagesDownloaded)
+@images_router.post(
+    "/download", operation_id="download_images_from_list", response_model=ImagesDownloaded, status_code=202
+)
 async def download_images_from_list(
-    image_names: list[str] = Body(description="The list of names of images to download", embed=True),
+    background_tasks: BackgroundTasks,
+    image_names: Optional[list[str]] = Body(
+        default=None, description="The list of names of images to download", embed=True
+    ),
     board_id: Optional[str] = Body(
-        default=None, description="The board from which image should be downloaded from", embed=True
+        default=None, description="The board from which image should be downloaded", embed=True
     ),
 ) -> ImagesDownloaded:
-    # return ImagesDownloaded(response="Your images are downloading")
-    raise HTTPException(status_code=501, detail="Endpoint is not yet implemented")
+    if (image_names is None or len(image_names) == 0) and board_id is None:
+        raise HTTPException(status_code=400, detail="No images or board id specified.")
+    bulk_download_item_id: str = ApiDependencies.invoker.services.bulk_download.generate_item_id(board_id)
+
+    background_tasks.add_task(
+        ApiDependencies.invoker.services.bulk_download.handler,
+        image_names,
+        board_id,
+        bulk_download_item_id,
+    )
+    return ImagesDownloaded(bulk_download_item_name=bulk_download_item_id + ".zip")
+
+
+@images_router.api_route(
+    "/download/{bulk_download_item_name}",
+    methods=["GET"],
+    operation_id="get_bulk_download_item",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "Return the complete bulk download item",
+            "content": {"application/zip": {}},
+        },
+        404: {"description": "Image not found"},
+    },
+)
+async def get_bulk_download_item(
+    background_tasks: BackgroundTasks,
+    bulk_download_item_name: str = Path(description="The bulk_download_item_name of the bulk download item to get"),
+) -> FileResponse:
+    """Gets a bulk download zip file"""
+    try:
+        path = ApiDependencies.invoker.services.bulk_download.get_path(bulk_download_item_name)
+
+        response = FileResponse(
+            path,
+            media_type="application/zip",
+            filename=bulk_download_item_name,
+            content_disposition_type="inline",
+        )
+        response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
+        background_tasks.add_task(ApiDependencies.invoker.services.bulk_download.delete, bulk_download_item_name)
+        return response
+    except Exception:
+        raise HTTPException(status_code=404)

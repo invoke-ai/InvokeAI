@@ -4,7 +4,7 @@ import {
   zControlNetModelField,
   zIPAdapterModelField,
   zLoRAModelField,
-  zMainModelField,
+  zModelIdentifierWithBase,
   zSchedulerField,
   zSDXLRefinerModelField,
   zT2IAdapterModelField,
@@ -105,7 +105,7 @@ export const isParameterAspectRatio = (val: unknown): val is ParameterAspectRati
 // #endregion
 
 // #region Model
-export const zParameterModel = zMainModelField.extend({ base: zBaseModel });
+export const zParameterModel = zModelIdentifierWithBase;
 export type ParameterModel = z.infer<typeof zParameterModel>;
 export const isParameterModel = (val: unknown): val is ParameterModel => zParameterModel.safeParse(val).success;
 // #endregion

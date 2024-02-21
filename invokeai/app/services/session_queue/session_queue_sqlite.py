@@ -60,7 +60,7 @@ class SqliteSessionQueue(SessionQueueBase):
         # This was a match statement, but match is not supported on python 3.9
         if event_name == "graph_execution_state_complete":
             await self._handle_complete_event(event)
-        elif event_name in ["invocation_error", "session_retrieval_error", "invocation_retrieval_error"]:
+        elif event_name == "invocation_error":
             await self._handle_error_event(event)
         elif event_name == "session_canceled":
             await self._handle_cancel_event(event)
@@ -429,7 +429,6 @@ class SqliteSessionQueue(SessionQueueBase):
         if queue_item.status not in ["canceled", "failed", "completed"]:
             status = "failed" if error is not None else "canceled"
             queue_item = self._set_queue_item_status(item_id=item_id, status=status, error=error)  # type: ignore [arg-type] # mypy seems to not narrow the Literals here
-            self.__invoker.services.queue.cancel(queue_item.session_id)
             self.__invoker.services.events.emit_session_canceled(
                 queue_item_id=queue_item.item_id,
                 queue_id=queue_item.queue_id,
@@ -471,7 +470,6 @@ class SqliteSessionQueue(SessionQueueBase):
             )
             self.__conn.commit()
             if current_queue_item is not None and current_queue_item.batch_id in batch_ids:
-                self.__invoker.services.queue.cancel(current_queue_item.session_id)
                 self.__invoker.services.events.emit_session_canceled(
                     queue_item_id=current_queue_item.item_id,
                     queue_id=current_queue_item.queue_id,
@@ -523,7 +521,6 @@ class SqliteSessionQueue(SessionQueueBase):
             )
             self.__conn.commit()
             if current_queue_item is not None and current_queue_item.queue_id == queue_id:
-                self.__invoker.services.queue.cancel(current_queue_item.session_id)
                 self.__invoker.services.events.emit_session_canceled(
                     queue_item_id=current_queue_item.item_id,
                     queue_id=current_queue_item.queue_id,

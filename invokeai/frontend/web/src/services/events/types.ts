@@ -202,6 +202,33 @@ export type ClientEmitUnsubscribeQueue = {
   queue_id: string;
 };
 
+export type BulkDownloadStartedEvent = {
+  bulk_download_id: string;
+  bulk_download_item_id: string;
+  bulk_download_item_name: string;
+};
+
+export type BulkDownloadCompletedEvent = {
+  bulk_download_id: string;
+  bulk_download_item_id: string;
+  bulk_download_item_name: string;
+};
+
+export type BulkDownloadFailedEvent = {
+  bulk_download_id: string;
+  bulk_download_item_id: string;
+  bulk_download_item_name: string;
+  error: string;
+};
+
+export type ClientEmitSubscribeBulkDownload = {
+  bulk_download_id: string;
+};
+
+export type ClientEmitUnsubscribeBulkDownload = {
+  bulk_download_id: string;
+};
+
 export type ServerToClientEvents = {
   generator_progress: (payload: GeneratorProgressEvent) => void;
   invocation_complete: (payload: InvocationCompleteEvent) => void;
@@ -213,6 +240,9 @@ export type ServerToClientEvents = {
   session_retrieval_error: (payload: SessionRetrievalErrorEvent) => void;
   invocation_retrieval_error: (payload: InvocationRetrievalErrorEvent) => void;
   queue_item_status_changed: (payload: QueueItemStatusChangedEvent) => void;
+  bulk_download_started: (payload: BulkDownloadStartedEvent) => void;
+  bulk_download_completed: (payload: BulkDownloadCompletedEvent) => void;
+  bulk_download_failed: (payload: BulkDownloadFailedEvent) => void;
 };
 
 export type ClientToServerEvents = {
@@ -220,4 +250,6 @@ export type ClientToServerEvents = {
   disconnect: () => void;
   subscribe_queue: (payload: ClientEmitSubscribeQueue) => void;
   unsubscribe_queue: (payload: ClientEmitUnsubscribeQueue) => void;
+  subscribe_bulk_download: (payload: ClientEmitSubscribeBulkDownload) => void;
+  unsubscribe_bulk_download: (payload: ClientEmitUnsubscribeBulkDownload) => void;
 };
