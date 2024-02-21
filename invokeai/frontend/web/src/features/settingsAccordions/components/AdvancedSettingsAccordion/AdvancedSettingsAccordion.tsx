@@ -1,5 +1,6 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
 import { Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-library';
+import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import ParamCFGRescaleMultiplier from 'features/parameters/components/Advanced/ParamCFGRescaleMultiplier';
@@ -10,8 +11,9 @@ import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVA
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useGetModelConfigQuery } from 'services/api/endpoints/models';
 
 const formLabelProps: FormLabelProps = {
   minW: '9.2rem',
@@ -21,31 +23,35 @@ const formLabelProps2: FormLabelProps = {
   flexGrow: 1,
 };
 
-const selectBadges = createMemoizedSelector(selectGenerationSlice, (generation) => {
-  const badges: (string | number)[] = [];
-  if (generation.vae) {
-    // TODO(MM2): Fetch the vae name
-    let vaeBadge = generation.vae.key;
-    if (generation.vaePrecision === 'fp16') {
-      vaeBadge += ` ${generation.vaePrecision}`;
-    }
-    badges.push(vaeBadge);
-  } else if (generation.vaePrecision === 'fp16') {
-    badges.push(`VAE ${generation.vaePrecision}`);
-  }
-  if (generation.clipSkip) {
-    badges.push(`Skip ${generation.clipSkip}`);
-  }
-  if (generation.cfgRescaleMultiplier) {
-    badges.push(`Rescale ${generation.cfgRescaleMultiplier}`);
-  }
-  if (generation.seamlessXAxis || generation.seamlessYAxis) {
-    badges.push('seamless');
-  }
-  return badges;
-});
-
 export const AdvancedSettingsAccordion = memo(() => {
+  const vaeKey = useAppSelector((state) => state.generation.vae?.key);
+  const { data: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
+  const selectBadges = useMemo(
+    () =>
+      createMemoizedSelector(selectGenerationSlice, (generation) => {
+        const badges: (string | number)[] = [];
+        if (vaeConfig) {
+          let vaeBadge = vaeConfig.name;
+          if (generation.vaePrecision === 'fp16') {
+            vaeBadge += ` ${generation.vaePrecision}`;
+          }
+          badges.push(vaeBadge);
+        } else if (generation.vaePrecision === 'fp16') {
+          badges.push(`VAE ${generation.vaePrecision}`);
+        }
+        if (generation.clipSkip) {
+          badges.push(`Skip ${generation.clipSkip}`);
+        }
+        if (generation.cfgRescaleMultiplier) {
+          badges.push(`Rescale ${generation.cfgRescaleMultiplier}`);
+        }
+        if (generation.seamlessXAxis || generation.seamlessYAxis) {
+          badges.push('seamless');
+        }
+        return badges;
+      }),
+    [vaeConfig]
+  );
   const badges = useAppSelector(selectBadges);
   const { t } = useTranslation();
   const { isOpen, onToggle } = useStandaloneAccordionToggle({
