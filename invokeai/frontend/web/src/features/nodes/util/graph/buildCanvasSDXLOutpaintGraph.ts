@@ -176,6 +176,7 @@ export const buildCanvasSDXLOutpaintGraph = (
         is_intermediate: getIsIntermediate(state),
         board: getBoardField(state),
         use_cache: false,
+        mask_blur: canvasCoherenceEdgeSize,
       },
     },
     edges: [
@@ -477,7 +478,7 @@ export const buildCanvasSDXLOutpaintGraph = (
       },
       {
         source: {
-          node_id: LATENTS_TO_IMAGE,
+          node_id: INPAINT_IMAGE_RESIZE_DOWN,
           field: 'image',
         },
         destination: {

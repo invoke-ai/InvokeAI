@@ -963,9 +963,7 @@ class IAICanvasPasteBackInvocation(BaseInvocation, WithMetadata, WithBoard):
         target_image = context.images.get_pil(self.target_image.image_name)
         mask = self._prepare_mask(context.images.get_pil(self.mask.image_name))
 
-        # Merge the bands back together
         source_image.paste(target_image, (0, 0), mask)
 
         image_dto = context.images.save(image=source_image)
-
         return ImageOutput.build(image_dto)
