@@ -2,7 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
-import type { LoRAConfig } from 'services/api/types';
+import type { LoRAModelConfig } from 'services/api/types';
 
 export type LoRA = ParameterLoRAModel & {
   weight: number;
@@ -28,13 +28,12 @@ export const loraSlice = createSlice({
   name: 'lora',
   initialState: initialLoraState,
   reducers: {
-    loraAdded: (state, action: PayloadAction<LoRAConfig>) => {
+    loraAdded: (state, action: PayloadAction<LoRAModelConfig>) => {
       const { key, base } = action.payload;
       state.loras[key] = { key, base, ...defaultLoRAConfig };
     },
-    loraRecalled: (state, action: PayloadAction<LoRAConfig & { weight: number }>) => {
-      const { key, base, weight } = action.payload;
-      state.loras[key] = { key, base, weight, isEnabled: true };
+    loraRecalled: (state, action: PayloadAction<LoRA>) => {
+      state.loras[action.payload.key] = action.payload;
     },
     loraRemoved: (state, action: PayloadAction<string>) => {
       const key = action.payload;

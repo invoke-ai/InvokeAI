@@ -8,7 +8,7 @@ import { pick } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
-import type { VAEConfig } from 'services/api/types';
+import type { VAEModelConfig } from 'services/api/types';
 
 const selector = createMemoizedSelector(selectGenerationSlice, (generation) => {
   const { model, vae } = generation;
@@ -21,7 +21,7 @@ const ParamVAEModelSelect = () => {
   const { model, vae } = useAppSelector(selector);
   const { data, isLoading } = useGetVaeModelsQuery();
   const getIsDisabled = useCallback(
-    (vae: VAEConfig): boolean => {
+    (vae: VAEModelConfig): boolean => {
       const isCompatible = model?.base === vae.base;
       const hasMainModel = Boolean(model?.base);
       return !hasMainModel || !isCompatible;
@@ -29,7 +29,7 @@ const ParamVAEModelSelect = () => {
     [model?.base]
   );
   const _onChange = useCallback(
-    (vae: VAEConfig | null) => {
+    (vae: VAEModelConfig | null) => {
       dispatch(vaeSelected(vae ? pick(vae, 'key', 'base') : null));
     },
     [dispatch]

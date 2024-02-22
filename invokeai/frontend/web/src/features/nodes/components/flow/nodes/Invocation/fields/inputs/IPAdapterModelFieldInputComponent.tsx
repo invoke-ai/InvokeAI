@@ -6,7 +6,7 @@ import type { IPAdapterModelFieldInputInstance, IPAdapterModelFieldInputTemplate
 import { pick } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useGetIPAdapterModelsQuery } from 'services/api/endpoints/models';
-import type { IPAdapterConfig } from 'services/api/types';
+import type { IPAdapterModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
@@ -18,7 +18,7 @@ const IPAdapterModelFieldInputComponent = (
   const { data: ipAdapterModels } = useGetIPAdapterModelsQuery();
 
   const _onChange = useCallback(
-    (value: IPAdapterConfig | null) => {
+    (value: IPAdapterModelConfig | null) => {
       if (!value) {
         return;
       }

@@ -6,7 +6,7 @@ import type { ControlNetModelFieldInputInstance, ControlNetModelFieldInputTempla
 import { pick } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
-import type { ControlNetConfig } from 'services/api/types';
+import type { ControlNetModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
@@ -18,7 +18,7 @@ const ControlNetModelFieldInputComponent = (props: Props) => {
   const { data, isLoading } = useGetControlNetModelsQuery();
 
   const _onChange = useCallback(
-    (value: ControlNetConfig | null) => {
+    (value: ControlNetModelConfig | null) => {
       if (!value) {
         return;
       }

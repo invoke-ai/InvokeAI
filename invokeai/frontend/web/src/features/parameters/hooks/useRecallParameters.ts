@@ -1,17 +1,9 @@
 import { useAppToaster } from 'app/components/Toaster';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import { controlAdapterRecalled, controlAdaptersReset } from 'features/controlAdapters/store/controlAdaptersSlice';
-import type { ControlNetConfig, IPAdapterConfig, T2IAdapterConfig } from 'features/controlAdapters/store/types';
-import {
-  initialControlNet,
-  initialIPAdapter,
-  initialT2IAdapter,
-} from 'features/controlAdapters/util/buildControlAdapter';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import { loraRecalled, lorasCleared } from 'features/lora/store/loraSlice';
-import type { ModelIdentifier } from 'features/nodes/types/common';
 import { isModelIdentifier } from 'features/nodes/types/common';
 import type {
   ControlNetMetadataItem,
@@ -57,6 +49,14 @@ import {
   isParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
 import {
+  prepareControlNetMetadataItem,
+  prepareIPAdapterMetadataItem,
+  prepareLoRAMetadataItem,
+  prepareMainModelMetadataItem,
+  prepareT2IAdapterMetadataItem,
+  prepareVAEMetadataItem,
+} from 'features/parameters/util/modelMetadataHelpers';
+import {
   refinerModelChanged,
   setNegativeStylePromptSDXL,
   setPositiveStylePromptSDXL,
@@ -70,23 +70,7 @@ import {
 import { isNil } from 'lodash-es';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ALL_BASE_MODELS } from 'services/api/constants';
-import {
-  controlNetModelsAdapterSelectors,
-  ipAdapterModelsAdapterSelectors,
-  loraModelsAdapterSelectors,
-  mainModelsAdapterSelectors,
-  t2iAdapterModelsAdapterSelectors,
-  useGetControlNetModelsQuery,
-  useGetIPAdapterModelsQuery,
-  useGetLoRAModelsQuery,
-  useGetMainModelsQuery,
-  useGetT2IAdapterModelsQuery,
-  useGetVaeModelsQuery,
-  vaeModelsAdapterSelectors,
-} from 'services/api/endpoints/models';
 import type { ImageDTO } from 'services/api/types';
-import { v4 as uuidv4 } from 'uuid';
 
 const selectModel = createMemoizedSelector(selectGenerationSlice, (generation) => generation.model);
 
@@ -140,9 +124,6 @@ export const useRecallParameters = () => {
     [t, toaster]
   );
 
-  /**
-   * Recall both prompts with toast
-   */
   const recallBothPrompts = useCallback(
     (positivePrompt: unknown, negativePrompt: unknown, positiveStylePrompt: unknown, negativeStylePrompt: unknown) => {
       if (
@@ -175,9 +156,6 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  /**
-   * Recall positive prompt with toast
-   */
   const recallPositivePrompt = useCallback(
     (positivePrompt: unknown) => {
       if (!isParameterPositivePrompt(positivePrompt)) {
@@ -190,9 +168,6 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  /**
-   * Recall negative prompt with toast
-   */
   const recallNegativePrompt = useCallback(
     (negativePrompt: unknown) => {
       if (!isParameterNegativePrompt(negativePrompt)) {
@@ -205,9 +180,6 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  /**
-   * Recall SDXL Positive Style Prompt with toast
-   */
   const recallSDXLPositiveStylePrompt = useCallback(
     (positiveStylePrompt: unknown) => {
       if (!isParameterPositiveStylePromptSDXL(positiveStylePrompt)) {
@@ -220,9 +192,6 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  /**
-   * Recall SDXL Negative Style Prompt with toast
-   */
   const recallSDXLNegativeStylePrompt = useCallback(
     (negativeStylePrompt: unknown) => {
       if (!isParameterNegativeStylePromptSDXL(negativeStylePrompt)) {
@@ -235,9 +204,6 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  /**
-   * Recall seed with toast
-   */
   const recallSeed = useCallback(
     (seed: unknown) => {
       if (!isParameterSeed(seed)) {
@@ -250,9 +216,6 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  /**
-   * Recall CFG scale with toast
-   */
   const recallCfgScale = useCallback(
     (cfgScale: unknown) => {
       if (!isParameterCFGScale(cfgScale)) {
@@ -265,9 +228,6 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  /**
-   * Recall CFG rescale multiplier with toast
-   */
   const recallCfgRescaleMultiplier = useCallback(
     (cfgRescaleMultiplier: unknown) => {
       if (!isParameterCFGRescaleMultiplier(cfgRescaleMultiplier)) {
@@ -280,9 +240,6 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  /**
-   * Recall scheduler with toast
-   */
   const recallScheduler = useCallback(
     (scheduler: unknown) => {
       if (!isParameterScheduler(scheduler)) {
@@ -295,9 +252,6 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  /**
-   * Recall steps with toast
-   */
   const recallSteps = useCallback(
     (steps: unknown) => {
       if (!isParameterSteps(steps)) {
@@ -310,9 +264,6 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  /**
-   * Recall width with toast
-   */
   const recallWidth = useCallback(
     (width: unknown) => {
       if (!isParameterWidth(width)) {
@@ -325,9 +276,6 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  /**
-   * Recall height with toast
-   */
   const recallHeight = useCallback(
     (height: unknown) => {
       if (!isParameterHeight(height)) {
@@ -340,9 +288,6 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  /**
-   * Recall width and height with toast
-   */
   const recallWidthAndHeight = useCallback(
     (width: unknown, height: unknown) => {
       if (!isParameterWidth(width)) {
@@ -360,9 +305,6 @@ export const useRecallParameters = () => {
     [dispatch, allParameterSetToast, allParameterNotSetToast]
   );
 
-  /**
-   * Recall strength with toast
-   */
   const recallStrength = useCallback(
     (strength: unknown) => {
       if (!isParameterStrength(strength)) {
@@ -375,9 +317,6 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  /**
-   * Recall high resolution enabled with toast
-   */
   const recallHrfEnabled = useCallback(
     (hrfEnabled: unknown) => {
       if (!isParameterHRFEnabled(hrfEnabled)) {
@@ -390,9 +329,6 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  /**
-   * Recall high resolution strength with toast
-   */
   const recallHrfStrength = useCallback(
     (hrfStrength: unknown) => {
       if (!isParameterStrength(hrfStrength)) {
@@ -405,9 +341,6 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  /**
-   * Recall high resolution method with toast
-   */
   const recallHrfMethod = useCallback(
     (hrfMethod: unknown) => {
       if (!isParameterHRFMethod(hrfMethod)) {
@@ -420,358 +353,95 @@ export const useRecallParameters = () => {
     [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  const { data: mainModels } = useGetMainModelsQuery(ALL_BASE_MODELS);
-
-  const prepareMainModelMetadataItem = useCallback(
-    (model: ModelIdentifier) => {
-      const matchingModel = mainModels ? mainModelsAdapterSelectors.selectById(mainModels, model.key) : undefined;
-
-      if (!matchingModel) {
-        return { model: null, error: 'Model is not installed' };
-      }
-
-      return { model: matchingModel, error: null };
-    },
-    [mainModels]
-  );
-
-  /**
-   * Recall model with toast
-   */
   const recallModel = useCallback(
-    (model: unknown) => {
-      if (!isModelIdentifier(model)) {
-        parameterNotSetToast();
+    async (modelMetadataItem: unknown) => {
+      try {
+        const model = await prepareMainModelMetadataItem(modelMetadataItem);
+        dispatch(modelSelected(model));
+        parameterSetToast();
+      } catch (e) {
+        parameterNotSetToast((e as unknown as Error).message);
         return;
       }
-
-      const result = prepareMainModelMetadataItem(model);
-
-      if (!result.model) {
-        parameterNotSetToast(result.error);
-        return;
-      }
-
-      dispatch(modelSelected(result.model));
-      parameterSetToast();
     },
-    [prepareMainModelMetadataItem, dispatch, parameterSetToast, parameterNotSetToast]
+    [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  const { data: vaeModels } = useGetVaeModelsQuery();
-
-  const prepareVAEMetadataItem = useCallback(
-    (vae: ModelIdentifier, newModel?: ParameterModel) => {
-      const matchingModel = vaeModels ? vaeModelsAdapterSelectors.selectById(vaeModels, vae.key) : undefined;
-      if (!matchingModel) {
-        return { vae: null, error: 'VAE model is not installed' };
-      }
-      const isCompatibleBaseModel = matchingModel?.base === (newModel ?? model)?.base;
-
-      if (!isCompatibleBaseModel) {
-        return {
-          vae: null,
-          error: 'VAE incompatible with currently-selected model',
-        };
-      }
-
-      return { vae: matchingModel, error: null };
-    },
-    [model, vaeModels]
-  );
-
-  /**
-   * Recall vae model
-   */
   const recallVaeModel = useCallback(
-    (vae: unknown) => {
-      if (!isModelIdentifier(vae) && !isNil(vae)) {
-        parameterNotSetToast();
-        return;
-      }
-
-      if (isNil(vae)) {
+    async (vaeMetadataItem: unknown) => {
+      if (isNil(vaeMetadataItem)) {
         dispatch(vaeSelected(null));
         parameterSetToast();
         return;
       }
-
-      const result = prepareVAEMetadataItem(vae);
-
-      if (!result.vae) {
-        parameterNotSetToast(result.error);
+      try {
+        const vae = await prepareVAEMetadataItem(vaeMetadataItem);
+        dispatch(vaeSelected(vae));
+        parameterSetToast();
+      } catch (e) {
+        parameterNotSetToast((e as unknown as Error).message);
         return;
       }
-
-      dispatch(vaeSelected(result.vae));
-      parameterSetToast();
     },
-    [prepareVAEMetadataItem, dispatch, parameterSetToast, parameterNotSetToast]
-  );
-
-  /**
-   * Recall LoRA with toast
-   */
-
-  const { data: loraModels } = useGetLoRAModelsQuery(undefined);
-
-  const prepareLoRAMetadataItem = useCallback(
-    (loraMetadataItem: LoRAMetadataItem, newModel?: ParameterModel) => {
-      if (!isModelIdentifier(loraMetadataItem.lora)) {
-        return { lora: null, error: 'Invalid LoRA model' };
-      }
-
-      const { lora } = loraMetadataItem;
-
-      const matchingLoRA = loraModels ? loraModelsAdapterSelectors.selectById(loraModels, lora.key) : undefined;
-
-      if (!matchingLoRA) {
-        return { lora: null, error: 'LoRA model is not installed' };
-      }
-
-      const isCompatibleBaseModel = matchingLoRA?.base === (newModel ?? model)?.base;
-
-      if (!isCompatibleBaseModel) {
-        return {
-          lora: null,
-          error: 'LoRA incompatible with currently-selected model',
-        };
-      }
-
-      return { lora: matchingLoRA, error: null };
-    },
-    [loraModels, model]
+    [dispatch, parameterSetToast, parameterNotSetToast]
   );
 
   const recallLoRA = useCallback(
-    (loraMetadataItem: LoRAMetadataItem) => {
-      const result = prepareLoRAMetadataItem(loraMetadataItem);
-
-      if (!result.lora) {
-        parameterNotSetToast(result.error);
+    async (loraMetadataItem: LoRAMetadataItem) => {
+      try {
+        const lora = await prepareLoRAMetadataItem(loraMetadataItem, model?.base);
+        dispatch(loraRecalled(lora));
+        parameterSetToast();
+      } catch (e) {
+        parameterNotSetToast((e as unknown as Error).message);
         return;
       }
-
-      dispatch(loraRecalled({ ...result.lora, weight: loraMetadataItem.weight }));
-
-      parameterSetToast();
     },
-    [prepareLoRAMetadataItem, dispatch, parameterSetToast, parameterNotSetToast]
-  );
-
-  /**
-   * Recall ControlNet with toast
-   */
-
-  const { data: controlNetModels } = useGetControlNetModelsQuery(undefined);
-
-  const prepareControlNetMetadataItem = useCallback(
-    (controlnetMetadataItem: ControlNetMetadataItem, newModel?: ParameterModel) => {
-      if (!isModelIdentifier(controlnetMetadataItem.control_model)) {
-        return { controlnet: null, error: 'Invalid ControlNet model' };
-      }
-
-      const { image, control_model, control_weight, begin_step_percent, end_step_percent, control_mode, resize_mode } =
-        controlnetMetadataItem;
-
-      const matchingControlNetModel = controlNetModels
-        ? controlNetModelsAdapterSelectors.selectById(controlNetModels, control_model.key)
-        : undefined;
-
-      if (!matchingControlNetModel) {
-        return { controlnet: null, error: 'ControlNet model is not installed' };
-      }
-
-      const isCompatibleBaseModel = matchingControlNetModel?.base === (newModel ?? model)?.base;
-
-      if (!isCompatibleBaseModel) {
-        return {
-          controlnet: null,
-          error: 'ControlNet incompatible with currently-selected model',
-        };
-      }
-
-      // We don't save the original image that was processed into a control image, only the processed image
-      const processorType = 'none';
-      const processorNode = CONTROLNET_PROCESSORS.none.default;
-
-      const controlnet: ControlNetConfig = {
-        type: 'controlnet',
-        isEnabled: true,
-        model: matchingControlNetModel,
-        weight: typeof control_weight === 'number' ? control_weight : initialControlNet.weight,
-        beginStepPct: begin_step_percent || initialControlNet.beginStepPct,
-        endStepPct: end_step_percent || initialControlNet.endStepPct,
-        controlMode: control_mode || initialControlNet.controlMode,
-        resizeMode: resize_mode || initialControlNet.resizeMode,
-        controlImage: image?.image_name || null,
-        processedControlImage: image?.image_name || null,
-        processorType,
-        processorNode,
-        shouldAutoConfig: true,
-        id: uuidv4(),
-      };
-
-      return { controlnet, error: null };
-    },
-    [controlNetModels, model]
+    [model?.base, dispatch, parameterSetToast, parameterNotSetToast]
   );
 
   const recallControlNet = useCallback(
-    (controlnetMetadataItem: ControlNetMetadataItem) => {
-      const result = prepareControlNetMetadataItem(controlnetMetadataItem);
-
-      if (!result.controlnet) {
-        parameterNotSetToast(result.error);
+    async (controlnetMetadataItem: ControlNetMetadataItem) => {
+      try {
+        const controlNetConfig = await prepareControlNetMetadataItem(controlnetMetadataItem, model?.base);
+        dispatch(controlAdapterRecalled(controlNetConfig));
+        parameterSetToast();
+      } catch (e) {
+        parameterNotSetToast((e as unknown as Error).message);
         return;
       }
-
-      dispatch(controlAdapterRecalled(result.controlnet));
-
-      parameterSetToast();
     },
-    [prepareControlNetMetadataItem, dispatch, parameterSetToast, parameterNotSetToast]
-  );
-
-  /**
-   * Recall T2I Adapter with toast
-   */
-
-  const { data: t2iAdapterModels } = useGetT2IAdapterModelsQuery(undefined);
-
-  const prepareT2IAdapterMetadataItem = useCallback(
-    (t2iAdapterMetadataItem: T2IAdapterMetadataItem, newModel?: ParameterModel) => {
-      if (!isModelIdentifier(t2iAdapterMetadataItem.t2i_adapter_model)) {
-        return { controlnet: null, error: 'Invalid ControlNet model' };
-      }
-
-      const { image, t2i_adapter_model, weight, begin_step_percent, end_step_percent, resize_mode } =
-        t2iAdapterMetadataItem;
-
-      const matchingT2IAdapterModel = t2iAdapterModels
-        ? t2iAdapterModelsAdapterSelectors.selectById(t2iAdapterModels, t2i_adapter_model.key)
-        : undefined;
-
-      if (!matchingT2IAdapterModel) {
-        return { controlnet: null, error: 'ControlNet model is not installed' };
-      }
-
-      const isCompatibleBaseModel = matchingT2IAdapterModel?.base === (newModel ?? model)?.base;
-
-      if (!isCompatibleBaseModel) {
-        return {
-          t2iAdapter: null,
-          error: 'ControlNet incompatible with currently-selected model',
-        };
-      }
-
-      // We don't save the original image that was processed into a control image, only the processed image
-      const processorType = 'none';
-      const processorNode = CONTROLNET_PROCESSORS.none.default;
-
-      const t2iAdapter: T2IAdapterConfig = {
-        type: 't2i_adapter',
-        isEnabled: true,
-        model: matchingT2IAdapterModel,
-        weight: typeof weight === 'number' ? weight : initialT2IAdapter.weight,
-        beginStepPct: begin_step_percent || initialT2IAdapter.beginStepPct,
-        endStepPct: end_step_percent || initialT2IAdapter.endStepPct,
-        resizeMode: resize_mode || initialT2IAdapter.resizeMode,
-        controlImage: image?.image_name || null,
-        processedControlImage: image?.image_name || null,
-        processorType,
-        processorNode,
-        shouldAutoConfig: true,
-        id: uuidv4(),
-      };
-
-      return { t2iAdapter, error: null };
-    },
-    [model, t2iAdapterModels]
+    [model?.base, dispatch, parameterSetToast, parameterNotSetToast]
   );
 
   const recallT2IAdapter = useCallback(
-    (t2iAdapterMetadataItem: T2IAdapterMetadataItem) => {
-      const result = prepareT2IAdapterMetadataItem(t2iAdapterMetadataItem);
-
-      if (!result.t2iAdapter) {
-        parameterNotSetToast(result.error);
+    async (t2iAdapterMetadataItem: T2IAdapterMetadataItem) => {
+      try {
+        const t2iAdapterConfig = await prepareT2IAdapterMetadataItem(t2iAdapterMetadataItem, model?.base);
+        dispatch(controlAdapterRecalled(t2iAdapterConfig));
+        parameterSetToast();
+      } catch (e) {
+        parameterNotSetToast((e as unknown as Error).message);
         return;
       }
-
-      dispatch(controlAdapterRecalled(result.t2iAdapter));
-
-      parameterSetToast();
     },
-    [prepareT2IAdapterMetadataItem, dispatch, parameterSetToast, parameterNotSetToast]
-  );
-
-  /**
-   * Recall IP Adapter with toast
-   */
-
-  const { data: ipAdapterModels } = useGetIPAdapterModelsQuery(undefined);
-
-  const prepareIPAdapterMetadataItem = useCallback(
-    (ipAdapterMetadataItem: IPAdapterMetadataItem, newModel?: ParameterModel) => {
-      if (!isModelIdentifier(ipAdapterMetadataItem?.ip_adapter_model)) {
-        return { ipAdapter: null, error: 'Invalid IP Adapter model' };
-      }
-
-      const { image, ip_adapter_model, weight, begin_step_percent, end_step_percent } = ipAdapterMetadataItem;
-
-      const matchingIPAdapterModel = ipAdapterModels
-        ? ipAdapterModelsAdapterSelectors.selectById(ipAdapterModels, ip_adapter_model.key)
-        : undefined;
-
-      if (!matchingIPAdapterModel) {
-        return { ipAdapter: null, error: 'IP Adapter model is not installed' };
-      }
-
-      const isCompatibleBaseModel = matchingIPAdapterModel?.base === (newModel ?? model)?.base;
-
-      if (!isCompatibleBaseModel) {
-        return {
-          ipAdapter: null,
-          error: 'IP Adapter incompatible with currently-selected model',
-        };
-      }
-
-      const ipAdapter: IPAdapterConfig = {
-        id: uuidv4(),
-        type: 'ip_adapter',
-        isEnabled: true,
-        controlImage: image?.image_name ?? null,
-        model: matchingIPAdapterModel,
-        weight: weight ?? initialIPAdapter.weight,
-        beginStepPct: begin_step_percent ?? initialIPAdapter.beginStepPct,
-        endStepPct: end_step_percent ?? initialIPAdapter.endStepPct,
-      };
-
-      return { ipAdapter, error: null };
-    },
-    [ipAdapterModels, model]
+    [model?.base, dispatch, parameterSetToast, parameterNotSetToast]
   );
 
   const recallIPAdapter = useCallback(
-    (ipAdapterMetadataItem: IPAdapterMetadataItem) => {
-      const result = prepareIPAdapterMetadataItem(ipAdapterMetadataItem);
-
-      if (!result.ipAdapter) {
-        parameterNotSetToast(result.error);
+    async (ipAdapterMetadataItem: IPAdapterMetadataItem) => {
+      try {
+        const ipAdapterConfig = await prepareIPAdapterMetadataItem(ipAdapterMetadataItem, model?.base);
+        dispatch(controlAdapterRecalled(ipAdapterConfig));
+        parameterSetToast();
+      } catch (e) {
+        parameterNotSetToast((e as unknown as Error).message);
         return;
       }
-
-      dispatch(controlAdapterRecalled(result.ipAdapter));
-
-      parameterSetToast();
     },
-    [prepareIPAdapterMetadataItem, dispatch, parameterSetToast, parameterNotSetToast]
+    [model?.base, dispatch, parameterSetToast, parameterNotSetToast]
   );
 
-  /*
-   * Sets image as initial image with toast
-   */
   const sendToImageToImage = useCallback(
     (image: ImageDTO) => {
       dispatch(initialImageSelected(image));
@@ -780,7 +450,7 @@ export const useRecallParameters = () => {
   );
 
   const recallAllParameters = useCallback(
-    (metadata: CoreMetadata | undefined) => {
+    async (metadata: CoreMetadata | undefined) => {
       if (!metadata) {
         allParameterNotSetToast();
         return;
@@ -820,10 +490,12 @@ export const useRecallParameters = () => {
       let newModel: ParameterModel | undefined = undefined;
 
       if (isModelIdentifier(model)) {
-        const result = prepareMainModelMetadataItem(model);
-        if (result.model) {
-          dispatch(modelSelected(result.model));
-          newModel = result.model;
+        try {
+          const _model = await prepareMainModelMetadataItem(model);
+          dispatch(modelSelected(_model));
+          newModel = _model;
+        } catch {
+          return;
         }
       }
 
@@ -850,9 +522,11 @@ export const useRecallParameters = () => {
         if (isNil(vae)) {
           dispatch(vaeSelected(null));
         } else {
-          const result = prepareVAEMetadataItem(vae, newModel);
-          if (result.vae) {
-            dispatch(vaeSelected(result.vae));
+          try {
+            const _vae = await prepareVAEMetadataItem(vae, newModel?.base);
+            dispatch(vaeSelected(_vae));
+          } catch {
+            return;
           }
         }
       }
@@ -926,48 +600,46 @@ export const useRecallParameters = () => {
       }
 
       dispatch(lorasCleared());
-      loras?.forEach((lora) => {
-        const result = prepareLoRAMetadataItem(lora, newModel);
-        if (result.lora) {
-          dispatch(loraRecalled({ ...result.lora, weight: lora.weight }));
+      loras?.forEach(async (loraMetadataItem) => {
+        try {
+          const lora = await prepareLoRAMetadataItem(loraMetadataItem, newModel?.base);
+          dispatch(loraRecalled(lora));
+        } catch {
+          return;
         }
       });
 
       dispatch(controlAdaptersReset());
-      controlnets?.forEach((controlnet) => {
-        const result = prepareControlNetMetadataItem(controlnet, newModel);
-        if (result.controlnet) {
-          dispatch(controlAdapterRecalled(result.controlnet));
+      controlnets?.forEach(async (controlNetMetadataItem) => {
+        try {
+          const controlNet = await prepareControlNetMetadataItem(controlNetMetadataItem, newModel?.base);
+          dispatch(controlAdapterRecalled(controlNet));
+        } catch {
+          return;
         }
       });
 
-      ipAdapters?.forEach((ipAdapter) => {
-        const result = prepareIPAdapterMetadataItem(ipAdapter, newModel);
-        if (result.ipAdapter) {
-          dispatch(controlAdapterRecalled(result.ipAdapter));
+      ipAdapters?.forEach(async (ipAdapterMetadataItem) => {
+        try {
+          const ipAdapter = await prepareIPAdapterMetadataItem(ipAdapterMetadataItem, newModel?.base);
+          dispatch(controlAdapterRecalled(ipAdapter));
+        } catch {
+          return;
         }
       });
 
-      t2iAdapters?.forEach((t2iAdapter) => {
-        const result = prepareT2IAdapterMetadataItem(t2iAdapter, newModel);
-        if (result.t2iAdapter) {
-          dispatch(controlAdapterRecalled(result.t2iAdapter));
+      t2iAdapters?.forEach(async (t2iAdapterMetadataItem) => {
+        try {
+          const t2iAdapter = await prepareT2IAdapterMetadataItem(t2iAdapterMetadataItem, newModel?.base);
+          dispatch(controlAdapterRecalled(t2iAdapter));
+        } catch {
+          return;
         }
       });
 
       allParameterSetToast();
     },
-    [
-      dispatch,
-      allParameterSetToast,
-      allParameterNotSetToast,
-      prepareMainModelMetadataItem,
-      prepareVAEMetadataItem,
-      prepareLoRAMetadataItem,
-      prepareControlNetMetadataItem,
-      prepareIPAdapterMetadataItem,
-      prepareT2IAdapterMetadataItem,
-    ]
+    [dispatch, allParameterSetToast, allParameterNotSetToast]
   );
 
   return {
