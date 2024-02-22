@@ -1,6 +1,8 @@
 # Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Team
 """Implementation of ModelManagerServiceBase."""
 
+import torch
+
 from typing import Optional
 
 from typing_extensions import Self
@@ -9,6 +11,7 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.invocation_context import InvocationContextData
 from invokeai.backend.model_manager import AnyModelConfig, BaseModelType, LoadedModel, ModelType, SubModelType
 from invokeai.backend.model_manager.load import ModelCache, ModelConvertCache, ModelLoaderRegistry
+from invokeai.backend.util.devices import choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger
 
 from ..config import InvokeAIAppConfig
@@ -119,6 +122,7 @@ class ModelManagerService(ModelManagerServiceBase):
         model_record_service: ModelRecordServiceBase,
         download_queue: DownloadQueueServiceBase,
         events: EventServiceBase,
+        execution_device: torch.device = choose_torch_device(),
     ) -> Self:
         """
         Construct the model manager service instance.
@@ -129,7 +133,10 @@ class ModelManagerService(ModelManagerServiceBase):
         logger.setLevel(app_config.log_level.upper())
 
         ram_cache = ModelCache(
-            max_cache_size=app_config.ram_cache_size, max_vram_cache_size=app_config.vram_cache_size, logger=logger
+            max_cache_size=app_config.ram_cache_size,
+            max_vram_cache_size=app_config.vram_cache_size,
+            logger=logger,
+            execution_device=execution_device,
         )
         convert_cache = ModelConvertCache(
             cache_path=app_config.models_convert_cache_path, max_size=app_config.convert_cache_size
