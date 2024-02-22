@@ -7,7 +7,7 @@ import type { VAEModelFieldInputInstance, VAEModelFieldInputTemplate } from 'fea
 import { pick } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
-import type { VAEConfig } from 'services/api/types';
+import type { VAEModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
@@ -18,7 +18,7 @@ const VAEModelFieldInputComponent = (props: Props) => {
   const dispatch = useAppDispatch();
   const { data, isLoading } = useGetVaeModelsQuery();
   const _onChange = useCallback(
-    (value: VAEConfig | null) => {
+    (value: VAEModelConfig | null) => {
       if (!value) {
         return;
       }
