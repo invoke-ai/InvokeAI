@@ -8,7 +8,7 @@ import { useControlAdapterType } from 'features/controlAdapters/hooks/useControl
 import { controlAdapterModelChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { pick } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
-import type { ControlNetConfig, IPAdapterConfig, T2IAdapterConfig } from 'services/api/types';
+import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 
 type ParamControlAdapterModelProps = {
   id: string;
@@ -24,7 +24,7 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   const { data, isLoading } = useControlAdapterModelQuery(controlAdapterType);
 
   const _onChange = useCallback(
-    (model: ControlNetConfig | IPAdapterConfig | T2IAdapterConfig | null) => {
+    (model: ControlNetModelConfig | IPAdapterModelConfig | T2IAdapterModelConfig | null) => {
       if (!model) {
         return;
       }
