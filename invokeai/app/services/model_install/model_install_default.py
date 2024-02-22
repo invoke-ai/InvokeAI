@@ -507,10 +507,13 @@ class ModelInstallService(ModelInstallServiceBase):
         if old_path == new_path:
             return old_path
         new_path.parent.mkdir(parents=True, exist_ok=True)
-        if old_path.is_dir():
-            copytree(old_path, new_path)
+        if self.app_config.model_sym_links:
+            new_path.symlink_to(old_path, target_is_directory=True)
         else:
-            copyfile(old_path, new_path)
+            if old_path.is_dir():
+                copytree(old_path, new_path)
+            else:
+                copyfile(old_path, new_path)
         return new_path
 
     def _move_model(self, old_path: Path, new_path: Path) -> Path:
