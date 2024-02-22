@@ -1,4 +1,4 @@
-import { Box, Button,Flex, Text } from '@invoke-ai/ui-library';
+import { Box, Button, Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
@@ -7,7 +7,7 @@ import { useCallback, useMemo } from 'react';
 import { RiSparklingFill } from 'react-icons/ri';
 import { useGetModelImportsQuery, usePruneModelImportsMutation } from 'services/api/endpoints/models';
 
-import { ImportQueueModel } from './ImportQueueModel';
+import { ImportQueueModel } from '../ImportQueueModel';
 
 export const ImportQueue = () => {
   const dispatch = useAppDispatch();
@@ -50,7 +50,7 @@ export const ImportQueue = () => {
   }, [data]);
 
   return (
-    <>
+    <Flex flexDir="column" p={3} h="full">
       <Flex justifyContent="space-between">
         <Text>{t('modelManager.importQueue')}</Text>
         <Button
@@ -67,6 +67,6 @@ export const ImportQueue = () => {
           {data?.map((model) => <ImportQueueModel key={model.id} model={model} />)}
         </Flex>
       </Box>
-    </>
+    </Flex>
   );
 };

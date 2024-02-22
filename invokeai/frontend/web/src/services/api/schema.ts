@@ -60,6 +60,10 @@ export type paths = {
      */
     get: operations["list_tags"];
   };
+  "/api/v2/models/scan_folder": {
+    /** Scan For Models */
+    get: operations["scan_for_models"];
+  };
   "/api/v2/models/tags/search": {
     /**
      * Search By Metadata Tags
@@ -11357,6 +11361,33 @@ export type operations = {
       200: {
         content: {
           "application/json": string[];
+        };
+      };
+    };
+  };
+  /** Scan For Models */
+  scan_for_models: {
+    parameters: {
+      query?: {
+        /** @description Directory path to search for models */
+        scan_path?: string;
+      };
+    };
+    responses: {
+      /** @description Directory scanned successfully */
+      200: {
+        content: {
+          "application/json": string[];
+        };
+      };
+      /** @description Invalid directory path */
+      400: {
+        content: never;
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
