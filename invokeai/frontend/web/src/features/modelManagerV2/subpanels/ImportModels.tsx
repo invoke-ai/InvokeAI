@@ -1,8 +1,9 @@
-import { Box, Divider, Heading, Tab, Flex, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { Box, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 
+import { AdvancedImport } from './AddModelPanel/AdvancedImport';
 import { ImportQueue } from './AddModelPanel/ImportQueue';
-import { SimpleImport } from './AddModelPanel/SimpleImport';
 import { ScanModels } from './AddModelPanel/ScanModels/ScanModels';
+import { SimpleImport } from './AddModelPanel/SimpleImport';
 
 export const ImportModels = () => {
   return (
@@ -21,7 +22,9 @@ export const ImportModels = () => {
             <TabPanel>
               <SimpleImport />
             </TabPanel>
-            <TabPanel>Advanced Import Placeholder</TabPanel>
+            <TabPanel height="100%">
+            <AdvancedImport />
+            </TabPanel>
             <TabPanel height="100%">
               <ScanModels />
             </TabPanel>

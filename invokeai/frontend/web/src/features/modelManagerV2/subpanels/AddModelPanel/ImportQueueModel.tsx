@@ -57,6 +57,10 @@ export const ImportQueueModel = (props: ModelListItemProps) => {
     return `${bytes.toFixed(2)} ${units[i]}`;
   };
 
+  const modelName = useMemo(() => {
+    return model.source.repo_id || model.source.url || model.source.path.substring(model.source.path.lastIndexOf('/') + 1);
+  }, [model.source]);
+
   const progressValue = useMemo(() => {
     return (model.bytes / model.total_bytes) * 100;
   }, [model.bytes, model.total_bytes]);
@@ -71,7 +75,7 @@ export const ImportQueueModel = (props: ModelListItemProps) => {
   return (
     <Flex gap="2" w="full" alignItems="center" textAlign="center">
       <Text w="20%" whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis">
-        {model.source.repo_id}
+        {modelName}
       </Text>
       <Progress
         value={progressValue}
@@ -83,8 +87,7 @@ export const ImportQueueModel = (props: ModelListItemProps) => {
       <Text minW="20%" fontSize="xs" w="20%">
         {progressString}
       </Text>
-      <Text w="15%">{model.status[0].toUpperCase() +
-        model.status.slice(1)}</Text>
+      <Text w="15%">{model.status[0].toUpperCase() + model.status.slice(1)}</Text>
       <Box w="10%">
         {(model.status === 'downloading' || model.status === 'waiting') && (
           <IconButton

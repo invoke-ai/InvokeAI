@@ -1,9 +1,10 @@
-import { Flex, FormControl, FormLabel, Input, Button, FormErrorMessage, Divider } from '@invoke-ai/ui-library';
-import { ChangeEventHandler, useCallback, useState } from 'react';
-import { useLazyScanModelsQuery } from '../../../../../services/api/endpoints/models';
+import { Button,Flex, FormControl, FormErrorMessage, FormLabel, Input } from '@invoke-ai/ui-library';
+import type { ChangeEventHandler} from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLazyScanModelsQuery } from 'services/api/endpoints/models';
+
 import { ScanModelsResults } from './ScanModelsResults';
-import ScrollableContent from '../../../../../common/components/OverlayScrollbars/ScrollableContent';
 
 export const ScanModelsForm = () => {
   const [scanPath, setScanPath] = useState('');
