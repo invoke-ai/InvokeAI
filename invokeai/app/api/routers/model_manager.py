@@ -234,6 +234,7 @@ async def list_tags() -> Set[str]:
     result: Set[str] = record_store.list_tags()
     return result
 
+
 @model_manager_router.get(
     "/scan_folder",
     operation_id="scan_for_models",
