@@ -1,4 +1,4 @@
-import { Box, Divider, Heading, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { Box, Divider, Heading, Tab, Flex, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 
 import { ImportQueue } from './AddModelPanel/ImportQueue';
 import { SimpleImport } from './AddModelPanel/SimpleImport';
@@ -6,31 +6,31 @@ import { ScanModels } from './AddModelPanel/ScanModels/ScanModels';
 
 export const ImportModels = () => {
   return (
-    <Box layerStyle="first" p={3} borderRadius="base" w="full" h="full">
-      <Box w="full" p={4}>
+    <Flex layerStyle="first" p={3} borderRadius="base" w="full" h="full" flexDir="column" gap={2}>
+      <Box w="full" p={2}>
         <Heading fontSize="xl">Add Model</Heading>
       </Box>
-      <Box layerStyle="second" borderRadius="base" w="full">
-        <Tabs variant="collapse">
+      <Box layerStyle="second" borderRadius="base" w="full" h="50%" overflow="hidden">
+        <Tabs variant="collapse" height="100%">
           <TabList>
             <Tab>Simple</Tab>
             <Tab>Advanced</Tab>
             <Tab>Scan</Tab>
           </TabList>
-          <TabPanels p={3}>
+          <TabPanels p={3} height="100%">
             <TabPanel>
               <SimpleImport />
             </TabPanel>
             <TabPanel>Advanced Import Placeholder</TabPanel>
-            <TabPanel>
+            <TabPanel height="100%">
               <ScanModels />
             </TabPanel>
           </TabPanels>
         </Tabs>
-
-        <Divider mt="5" mb="3" />
+      </Box>
+      <Box layerStyle="second" borderRadius="base" w="full" h="50%">
         <ImportQueue />
       </Box>
-    </Box>
+    </Flex>
   );
 };
