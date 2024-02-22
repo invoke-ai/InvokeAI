@@ -2,7 +2,7 @@ import type { UseToastOptions } from '@invoke-ai/ui-library';
 import type { EntityState } from '@reduxjs/toolkit';
 import type { components, paths } from 'services/api/schema';
 import type { O } from 'ts-toolbelt';
-import type { SetRequired } from 'type-fest';
+import type { Overwrite } from 'utility-types';
 
 export type S = components['schemas'];
 
@@ -61,28 +61,60 @@ export type IPAdapterField = S['IPAdapterField'];
 // Model Configs
 
 // TODO(MM2): Can we make key required in the pydantic model?
-type KeyRequired<T extends { key?: string }> = SetRequired<T, 'key'>;
-export type LoRAConfig = KeyRequired<S['LoRAConfig']>;
+export type LoRAModelConfig = S['LoRAConfig'];
 // TODO(MM2): Can we rename this from Vae -> VAE
-export type VAEConfig = KeyRequired<S['VaeCheckpointConfig']> | KeyRequired<S['VaeDiffusersConfig']>;
-export type ControlNetConfig =
-  | KeyRequired<S['ControlNetDiffusersConfig']>
-  | KeyRequired<S['ControlNetCheckpointConfig']>;
-export type IPAdapterConfig = KeyRequired<S['IPAdapterConfig']>;
+export type VAEModelConfig = S['VaeCheckpointConfig'] | S['VaeDiffusersConfig'];
+export type ControlNetModelConfig = S['ControlNetDiffusersConfig'] | S['ControlNetCheckpointConfig'];
+export type IPAdapterModelConfig = S['IPAdapterConfig'];
 // TODO(MM2): Can we rename this to T2IAdapterConfig
-export type T2IAdapterConfig = KeyRequired<S['T2IConfig']>;
-export type TextualInversionConfig = KeyRequired<S['TextualInversionConfig']>;
-export type DiffusersModelConfig = KeyRequired<S['MainDiffusersConfig']>;
-export type CheckpointModelConfig = KeyRequired<S['MainCheckpointConfig']>;
+export type T2IAdapterModelConfig = S['T2IConfig'];
+export type TextualInversionModelConfig = S['TextualInversionConfig'];
+export type DiffusersModelConfig = S['MainDiffusersConfig'];
+export type CheckpointModelConfig = S['MainCheckpointConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
+export type RefinerMainModelConfig = Overwrite<MainModelConfig, { base: 'sdxl-refiner' }>;
+export type NonRefinerMainModelConfig = Overwrite<MainModelConfig, { base: 'any' | 'sd-1' | 'sd-2' | 'sdxl' }>;
 export type AnyModelConfig =
-  | LoRAConfig
-  | VAEConfig
-  | ControlNetConfig
-  | IPAdapterConfig
-  | T2IAdapterConfig
-  | TextualInversionConfig
-  | MainModelConfig;
+  | LoRAModelConfig
+  | VAEModelConfig
+  | ControlNetModelConfig
+  | IPAdapterModelConfig
+  | T2IAdapterModelConfig
+  | TextualInversionModelConfig
+  | RefinerMainModelConfig
+  | NonRefinerMainModelConfig;
+
+export const isLoRAModelConfig = (config: AnyModelConfig): config is LoRAModelConfig => {
+  return config.type === 'lora';
+};
+
+export const isVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
+  return config.type === 'vae';
+};
+
+export const isControlNetModelConfig = (config: AnyModelConfig): config is ControlNetModelConfig => {
+  return config.type === 'controlnet';
+};
+
+export const isIPAdapterModelConfig = (config: AnyModelConfig): config is IPAdapterModelConfig => {
+  return config.type === 'ip_adapter';
+};
+
+export const isT2IAdapterModelConfig = (config: AnyModelConfig): config is T2IAdapterModelConfig => {
+  return config.type === 't2i_adapter';
+};
+
+export const isTextualInversionModelConfig = (config: AnyModelConfig): config is TextualInversionModelConfig => {
+  return config.type === 'embedding';
+};
+
+export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is NonRefinerMainModelConfig => {
+  return config.type === 'main' && config.base !== 'sdxl-refiner';
+};
+
+export const isRefinerMainModelModelConfig = (config: AnyModelConfig): config is RefinerMainModelConfig => {
+  return config.type === 'main' && config.base === 'sdxl-refiner';
+};
 
 export type MergeModelConfig = S['Body_merge'];
 export type ImportModelConfig = S['Body_import_model'];
