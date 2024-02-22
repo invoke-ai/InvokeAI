@@ -2,6 +2,7 @@ import { Box, Divider, Heading, Tab, TabList, TabPanel, TabPanels, Tabs } from '
 
 import { ImportQueue } from './AddModelPanel/ImportQueue';
 import { SimpleImport } from './AddModelPanel/SimpleImport';
+import { ScanModels } from './AddModelPanel/ScanModels/ScanModels';
 
 export const ImportModels = () => {
   return (
@@ -9,7 +10,7 @@ export const ImportModels = () => {
       <Box w="full" p={4}>
         <Heading fontSize="xl">Add Model</Heading>
       </Box>
-      <Box layerStyle="second" borderRadius="base" w="full" h="100vh">
+      <Box layerStyle="second" borderRadius="base" w="full">
         <Tabs variant="collapse">
           <TabList>
             <Tab>Simple</Tab>
@@ -21,7 +22,9 @@ export const ImportModels = () => {
               <SimpleImport />
             </TabPanel>
             <TabPanel>Advanced Import Placeholder</TabPanel>
-            <TabPanel>Scan Models Placeholder</TabPanel>
+            <TabPanel>
+              <ScanModels />
+            </TabPanel>
           </TabPanels>
         </Tabs>
 

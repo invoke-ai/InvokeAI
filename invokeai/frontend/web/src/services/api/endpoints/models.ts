@@ -349,6 +349,7 @@ export const {
   useMergeMainModelsMutation,
   useSyncModelsMutation,
   useScanModelsQuery,
+  useLazyScanModelsQuery,
   useGetCheckpointConfigsQuery,
   useGetModelImportsQuery,
   useGetModelMetadataQuery,
