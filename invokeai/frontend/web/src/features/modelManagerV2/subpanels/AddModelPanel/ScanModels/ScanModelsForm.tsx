@@ -3,6 +3,7 @@ import { ChangeEventHandler, useCallback, useState } from 'react';
 import { useLazyScanModelsQuery } from '../../../../../services/api/endpoints/models';
 import { useTranslation } from 'react-i18next';
 import { ScanModelsResults } from './ScanModelsResults';
+import ScrollableContent from '../../../../../common/components/OverlayScrollbars/ScrollableContent';
 
 export const ScanModelsForm = () => {
   const [scanPath, setScanPath] = useState('');
@@ -31,7 +32,7 @@ export const ScanModelsForm = () => {
   }, []);
 
   return (
-    <>
+    <Flex flexDir="column" height="100%">
       <FormControl isInvalid={!!errorMessage.length} w="full">
         <Flex flexDir="column" w="full">
           <Flex gap={2} alignItems="flex-end" justifyContent="space-between">
@@ -47,8 +48,7 @@ export const ScanModelsForm = () => {
           {!!errorMessage.length && <FormErrorMessage>{errorMessage}</FormErrorMessage>}
         </Flex>
       </FormControl>
-
       {results && <ScanModelsResults results={results} />}
-    </>
+    </Flex>
   );
 };
