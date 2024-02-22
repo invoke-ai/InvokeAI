@@ -46,7 +46,7 @@ export type paths = {
      */
     get: operations["list_model_summary"];
   };
-  "/api/v2/models/meta/i/{key}": {
+  "/api/v2/models/i/{key}/meta": {
     /**
      * Get Model Metadata
      * @description Get a model metadata object.
