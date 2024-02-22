@@ -1,5 +1,7 @@
 # Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Team
 
+import torch
+
 from abc import ABC, abstractmethod
 from typing import Optional
 
@@ -32,9 +34,10 @@ class ModelManagerServiceBase(ABC):
     def build_model_manager(
         cls,
         app_config: InvokeAIAppConfig,
-        db: SqliteDatabase,
+        model_record_service: ModelRecordServiceBase,
         download_queue: DownloadQueueServiceBase,
         events: EventServiceBase,
+        execution_device: torch.device,
     ) -> Self:
         """
         Construct the model manager service instance.
