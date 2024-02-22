@@ -176,6 +176,7 @@ export const buildCanvasOutpaintGraph = (
         is_intermediate: getIsIntermediate(state),
         board: getBoardField(state),
         use_cache: false,
+        mask_blur: canvasCoherenceEdgeSize,
       },
     },
     edges: [
@@ -468,7 +469,7 @@ export const buildCanvasOutpaintGraph = (
       },
       {
         source: {
-          node_id: LATENTS_TO_IMAGE,
+          node_id: INPAINT_IMAGE_RESIZE_DOWN,
           field: 'image',
         },
         destination: {
