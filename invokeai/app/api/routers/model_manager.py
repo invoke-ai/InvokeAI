@@ -235,23 +235,23 @@ async def list_tags() -> Set[str]:
     return result
 
 @model_manager_router.get(
-    "/search",
-    operation_id="search_for_models",
+    "/scan_folder",
+    operation_id="scan_for_models",
     responses={
-        200: {"description": "Directory searched successfully"},
-        404: {"description": "Invalid directory path"},
+        200: {"description": "Directory scanned successfully"},
+        400: {"description": "Invalid directory path"},
     },
     status_code=200,
     response_model=List[pathlib.Path],
 )
-async def search_for_models(
-    search_path: str = Query(description="Directory path to search for models", default=None),
+async def scan_for_models(
+    scan_path: str = Query(description="Directory path to search for models", default=None),
 ) -> List[pathlib.Path]:
-    path = pathlib.Path(search_path)
-    if not search_path or not path.is_dir():
+    path = pathlib.Path(scan_path)
+    if not scan_path or not path.is_dir():
         raise HTTPException(
-            status_code=404,
-            detail=f"The search path '{search_path}' does not exist or is not directory",
+            status_code=400,
+            detail=f"The search path '{scan_path}' does not exist or is not directory",
         )
 
     search = ModelSearch()
@@ -259,7 +259,7 @@ async def search_for_models(
         models_found = list(search.search(path))
     except Exception as e:
         raise HTTPException(
-            status_code=404,
+            status_code=500,
             detail=f"An error occurred while searching the directory: {e}",
         )
     return models_found
