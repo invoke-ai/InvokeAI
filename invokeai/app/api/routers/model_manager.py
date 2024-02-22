@@ -166,6 +166,27 @@ async def list_model_records(
 
 
 @model_manager_router.get(
+    "/get_by_attrs",
+    operation_id="get_model_records_by_attrs",
+    response_model=AnyModelConfig,
+)
+async def get_model_records_by_attrs(
+    name: str = Query(description="The name of the model"),
+    type: ModelType = Query(description="The type of the model"),
+    base: BaseModelType = Query(description="The base model of the model"),
+) -> AnyModelConfig:
+    """Gets a model by its attributes. The main use of this route is to provide backwards compatibility with the old
+    model manager, which identified models by a combination of name, base and type."""
+    configs = ApiDependencies.invoker.services.model_manager.store.search_by_attr(
+        base_model=base, model_type=type, model_name=name
+    )
+    if not configs:
+        raise HTTPException(status_code=404, detail="No model found with these attributes")
+
+    return configs[0]
+
+
+@model_manager_router.get(
     "/i/{key}",
     operation_id="get_model_record",
     responses={
