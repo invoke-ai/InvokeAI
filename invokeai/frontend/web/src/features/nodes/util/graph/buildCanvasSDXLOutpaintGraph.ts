@@ -59,18 +59,18 @@ export const buildCanvasSDXLOutpaintGraph = (
     cfgRescaleMultiplier: cfg_rescale_multiplier,
     scheduler,
     steps,
+    img2imgStrength: strength,
     seed,
     vaePrecision,
     shouldUseCpuNoise,
-    canvasCoherenceMode,
-    canvasCoherenceMinDenoise,
-    canvasCoherenceEdgeSize,
     infillTileSize,
     infillPatchmatchDownscaleSize,
     infillMethod,
     seamlessXAxis,
     seamlessYAxis,
-    img2imgStrength: strength,
+    canvasCoherenceMode,
+    canvasCoherenceMinDenoise,
+    canvasCoherenceEdgeSize,
   } = state.generation;
 
   const { refinerModel, refinerStart } = state.sdxl;
@@ -108,12 +108,14 @@ export const buildCanvasSDXLOutpaintGraph = (
       [POSITIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
+        is_intermediate,
         prompt: positivePrompt,
         style: positiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
+        is_intermediate,
         prompt: negativePrompt,
         style: negativeStylePrompt,
       },
@@ -161,6 +163,7 @@ export const buildCanvasSDXLOutpaintGraph = (
         denoising_start: refinerModel ? Math.min(refinerStart, 1 - strength) : 1 - strength,
         denoising_end: refinerModel ? refinerStart : 1,
       },
+
       [LATENTS_TO_IMAGE]: {
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
@@ -168,7 +171,7 @@ export const buildCanvasSDXLOutpaintGraph = (
         fp32,
       },
       [CANVAS_OUTPUT]: {
-        type: 'color_correct',
+        type: 'iai_canvas_paste_back',
         id: CANVAS_OUTPUT,
         is_intermediate: getIsIntermediate(state),
         board: getBoardField(state),
@@ -249,7 +252,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'mask1',
         },
       },
-      // Connect Everything To Inpaint
+      // Plug Everything Into Inpaint Node
       {
         source: {
           node_id: POSITIVE_CONDITIONING,
@@ -311,7 +314,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'denoise_mask',
         },
       },
-      // Decode inpainted latents to image
+
       {
         source: {
           node_id: SDXL_DENOISE_LATENTS,
@@ -419,8 +422,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
       },
-
-      // Take combined mask and resize and then blur
+      // Take combined mask and resize
       {
         source: {
           node_id: MASK_COMBINE,
@@ -431,7 +433,6 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
       },
-
       // Resize Results Down
       {
         source: {
@@ -463,7 +464,7 @@ export const buildCanvasSDXLOutpaintGraph = (
           field: 'image',
         },
       },
-      // Color Correct The Inpainted Result
+      // Paste Back
       {
         source: {
           node_id: INPAINT_INFILL_RESIZE_DOWN,
@@ -471,17 +472,17 @@ export const buildCanvasSDXLOutpaintGraph = (
         },
         destination: {
           node_id: CANVAS_OUTPUT,
-          field: 'reference',
+          field: 'source_image',
         },
       },
       {
         source: {
-          node_id: INPAINT_IMAGE_RESIZE_DOWN,
+          node_id: LATENTS_TO_IMAGE,
           field: 'image',
         },
         destination: {
           node_id: CANVAS_OUTPUT,
-          field: 'image',
+          field: 'target_image',
         },
       },
       {
@@ -511,7 +512,6 @@ export const buildCanvasSDXLOutpaintGraph = (
     };
 
     graph.edges.push(
-      // Color Correct The Inpainted Result
       {
         source: {
           node_id: INPAINT_INFILL,
@@ -519,7 +519,7 @@ export const buildCanvasSDXLOutpaintGraph = (
         },
         destination: {
           node_id: CANVAS_OUTPUT,
-          field: 'reference',
+          field: 'source_image',
         },
       },
       {
@@ -529,7 +529,7 @@ export const buildCanvasSDXLOutpaintGraph = (
         },
         destination: {
           node_id: CANVAS_OUTPUT,
-          field: 'image',
+          field: 'target_image',
         },
       },
       {
@@ -559,7 +559,7 @@ export const buildCanvasSDXLOutpaintGraph = (
     }
   }
 
-  // optionally add custom VAE
+  // Add VAE
   addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add LoRA support

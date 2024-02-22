@@ -1,7 +1,8 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import type {
-  CreateDenoiseMaskInvocation,
+  CreateGradientMaskInvocation,
+  IAICanvasPasteBackInvocation,
   ImageDTO,
   ImageToLatentsInvocation,
   NoiseInvocation,
@@ -54,15 +55,15 @@ export const buildCanvasSDXLInpaintGraph = (
     cfgRescaleMultiplier: cfg_rescale_multiplier,
     scheduler,
     steps,
+    img2imgStrength: strength,
     seed,
     vaePrecision,
     shouldUseCpuNoise,
+    seamlessXAxis,
+    seamlessYAxis,
     canvasCoherenceMode,
     canvasCoherenceMinDenoise,
     canvasCoherenceEdgeSize,
-    seamlessXAxis,
-    seamlessYAxis,
-    img2imgStrength: strength,
   } = state.generation;
 
   const { refinerModel, refinerStart } = state.sdxl;
@@ -78,8 +79,9 @@ export const buildCanvasSDXLInpaintGraph = (
   // We may need to set the inpaint width and height to scale the image
   const { scaledBoundingBoxDimensions, boundingBoxScaleMethod } = state.canvas;
 
-  const fp32 = vaePrecision === 'fp32';
   const is_intermediate = true;
+  const fp32 = vaePrecision === 'fp32';
+
   const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);
 
   let modelLoaderNodeId = SDXL_MODEL_LOADER;
@@ -95,17 +97,20 @@ export const buildCanvasSDXLInpaintGraph = (
       [modelLoaderNodeId]: {
         type: 'sdxl_model_loader',
         id: modelLoaderNodeId,
+        is_intermediate,
         model,
       },
       [POSITIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: POSITIVE_CONDITIONING,
+        is_intermediate,
         prompt: positivePrompt,
         style: positiveStylePrompt,
       },
       [NEGATIVE_CONDITIONING]: {
         type: 'sdxl_compel_prompt',
         id: NEGATIVE_CONDITIONING,
+        is_intermediate,
         prompt: negativePrompt,
         style: negativeStylePrompt,
       },
@@ -148,12 +153,12 @@ export const buildCanvasSDXLInpaintGraph = (
         fp32,
       },
       [CANVAS_OUTPUT]: {
-        type: 'color_correct',
+        type: 'iai_canvas_paste_back',
         id: CANVAS_OUTPUT,
         is_intermediate: getIsIntermediate(state),
         board: getBoardField(state),
-        reference: canvasInitImage,
-        use_cache: false,
+        mask_blur: canvasCoherenceEdgeSize,
+        source_image: canvasInitImage,
       },
     },
     edges: [
@@ -208,7 +213,7 @@ export const buildCanvasSDXLInpaintGraph = (
           field: 'clip2',
         },
       },
-      // Connect everything to Inpaint
+      // Connect Everything To Inpaint Node
       {
         source: {
           node_id: POSITIVE_CONDITIONING,
@@ -336,7 +341,7 @@ export const buildCanvasSDXLInpaintGraph = (
           field: 'mask',
         },
       },
-      // Color Correct The Inpainted Result
+      // Resize Down
       {
         source: {
           node_id: LATENTS_TO_IMAGE,
@@ -349,22 +354,23 @@ export const buildCanvasSDXLInpaintGraph = (
       },
       {
         source: {
-          node_id: INPAINT_IMAGE_RESIZE_DOWN,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_OUTPUT,
-          field: 'image',
-        },
-      },
-      {
-        source: {
           node_id: MASK_RESIZE_UP,
           field: 'image',
         },
         destination: {
           node_id: MASK_RESIZE_DOWN,
           field: 'image',
+        },
+      },
+      // Paste Back
+      {
+        source: {
+          node_id: INPAINT_IMAGE_RESIZE_DOWN,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_OUTPUT,
+          field: 'target_image',
         },
       },
       {
@@ -387,34 +393,28 @@ export const buildCanvasSDXLInpaintGraph = (
       ...(graph.nodes[INPAINT_IMAGE] as ImageToLatentsInvocation),
       image: canvasInitImage,
     };
+
     graph.nodes[INPAINT_CREATE_MASK] = {
-      ...(graph.nodes[INPAINT_CREATE_MASK] as CreateDenoiseMaskInvocation),
-      image: canvasInitImage,
+      ...(graph.nodes[INPAINT_CREATE_MASK] as CreateGradientMaskInvocation),
+      mask: canvasMaskImage,
     };
 
-    graph.edges.push(
-      // Color Correct The Inpainted Result
-      {
-        source: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_OUTPUT,
-          field: 'image',
-        },
+    // Paste Back
+    graph.nodes[CANVAS_OUTPUT] = {
+      ...(graph.nodes[CANVAS_OUTPUT] as IAICanvasPasteBackInvocation),
+      mask: canvasMaskImage,
+    };
+
+    graph.edges.push({
+      source: {
+        node_id: LATENTS_TO_IMAGE,
+        field: 'image',
       },
-      {
-        source: {
-          node_id: MASK_RESIZE_DOWN,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_OUTPUT,
-          field: 'mask',
-        },
-      }
-    );
+      destination: {
+        node_id: CANVAS_OUTPUT,
+        field: 'target_image',
+      },
+    });
   }
 
   // Add Seamless To Graph
@@ -431,7 +431,7 @@ export const buildCanvasSDXLInpaintGraph = (
     }
   }
 
-  // optionally add custom VAE
+  // Add VAE
   addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add LoRA support
