@@ -1,6 +1,5 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
-import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
 import type {
   ImageDTO,
   ImageToLatentsInvocation,
@@ -40,6 +39,7 @@ import {
   POSITIVE_CONDITIONING,
   SEAMLESS,
 } from './constants';
+import { getBoardField, getIsIntermediate } from './graphBuilderUtils';
 
 /**
  * Builds the Canvas tab's Outpaint graph.
@@ -149,8 +149,8 @@ export const buildCanvasOutpaintGraph = (
         id: INPAINT_CREATE_MASK,
         is_intermediate,
         coherence_mode: canvasCoherenceMode,
-        minimum_denoise: canvasCoherenceMinDenoise,
         edge_radius: canvasCoherenceEdgeSize,
+        minimum_denoise: canvasCoherenceMinDenoise,
       },
       [DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -171,7 +171,7 @@ export const buildCanvasOutpaintGraph = (
         fp32,
       },
       [CANVAS_OUTPUT]: {
-        type: 'color_correct',
+        type: 'iai_canvas_paste_back',
         id: CANVAS_OUTPUT,
         is_intermediate: getIsIntermediate(state),
         board: getBoardField(state),
@@ -455,7 +455,7 @@ export const buildCanvasOutpaintGraph = (
           field: 'image',
         },
       },
-      // Color Correct The Inpainted Result
+      // Paste Back
       {
         source: {
           node_id: INPAINT_INFILL_RESIZE_DOWN,
@@ -463,17 +463,17 @@ export const buildCanvasOutpaintGraph = (
         },
         destination: {
           node_id: CANVAS_OUTPUT,
-          field: 'reference',
+          field: 'source_image',
         },
       },
       {
         source: {
-          node_id: INPAINT_IMAGE_RESIZE_DOWN,
+          node_id: LATENTS_TO_IMAGE,
           field: 'image',
         },
         destination: {
           node_id: CANVAS_OUTPUT,
-          field: 'image',
+          field: 'target_image',
         },
       },
       {
@@ -503,7 +503,6 @@ export const buildCanvasOutpaintGraph = (
     };
 
     graph.edges.push(
-      // Color Correct The Inpainted Result
       {
         source: {
           node_id: INPAINT_INFILL,
@@ -511,7 +510,7 @@ export const buildCanvasOutpaintGraph = (
         },
         destination: {
           node_id: CANVAS_OUTPUT,
-          field: 'reference',
+          field: 'source_image',
         },
       },
       {
@@ -521,7 +520,7 @@ export const buildCanvasOutpaintGraph = (
         },
         destination: {
           node_id: CANVAS_OUTPUT,
-          field: 'image',
+          field: 'target_image',
         },
       },
       {
