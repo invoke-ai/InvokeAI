@@ -6,7 +6,7 @@ import type { T2IAdapterModelFieldInputInstance, T2IAdapterModelFieldInputTempla
 import { pick } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useGetT2IAdapterModelsQuery } from 'services/api/endpoints/models';
-import type { T2IAdapterConfig } from 'services/api/types';
+import type { T2IAdapterModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
@@ -19,7 +19,7 @@ const T2IAdapterModelFieldInputComponent = (
   const { data: t2iAdapterModels } = useGetT2IAdapterModelsQuery();
 
   const _onChange = useCallback(
-    (value: T2IAdapterConfig | null) => {
+    (value: T2IAdapterModelConfig | null) => {
       if (!value) {
         return;
       }
