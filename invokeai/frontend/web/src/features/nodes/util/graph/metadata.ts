@@ -1,5 +1,5 @@
+import type { JSONObject } from 'common/types';
 import type { CoreMetadataInvocation, NonNullableGraph } from 'services/api/types';
-import type { JsonObject } from 'type-fest';
 
 import { METADATA } from './constants';
 
@@ -30,7 +30,7 @@ export const addCoreMetadataNode = (
 
 export const upsertMetadata = (
   graph: NonNullableGraph,
-  metadata: Partial<CoreMetadataInvocation> | JsonObject
+  metadata: Partial<CoreMetadataInvocation> | JSONObject
 ): void => {
   const metadataNode = graph.nodes[METADATA] as CoreMetadataInvocation | undefined;
 
