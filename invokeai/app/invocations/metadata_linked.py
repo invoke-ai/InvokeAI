@@ -17,16 +17,21 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
+from invokeai.app.invocations.controlnet_image_processors import ControlField
+from invokeai.app.invocations.ip_adapter import (
+    IPAdapterField,
+    IPAdapterInvocation,
+    IPAdapterModelField,
+)
 from invokeai.app.invocations.latent import SAMPLER_NAME_VALUES, DenoiseLatentsInvocation, SchedulerOutput
 from invokeai.app.invocations.metadata import LoRAMetadataField, MetadataOutput
 from invokeai.app.invocations.model import (
     ClipField,
-    LoRAModelField,
     LoraInfo,
     LoraLoaderOutput,
+    LoRAModelField,
     MainModelField,
     ModelInfo,
-    ModelLoaderOutput,
     SDXLLoraLoaderOutput,
     UNetField,
     VaeField,
@@ -41,7 +46,7 @@ from invokeai.app.invocations.primitives import (
     LatentsOutput,
     StringOutput,
 )
-from invokeai.app.invocations.sdxl import SDXLModelLoaderOutput
+from invokeai.app.invocations.t2i_adapter import T2IAdapterField
 from invokeai.app.shared.fields import FieldDescriptions
 from invokeai.backend.model_management.models.base import ModelType, SubModelType
 from invokeai.version import __version__
@@ -111,6 +116,23 @@ CORE_LABELS_VAE = Literal[
     f"{CUSTOM_LABEL}",
     "vae",
 ]
+
+
+def append_list(new_item, items, item_cls):
+    """Add an item to an exiting item or list of items then output as a list of items."""
+
+    result = []
+    if items is None or (isinstance(items, list) and len(items) == 0):
+        pass
+    elif isinstance(items, item_cls):
+        result.append(items)
+    elif isinstance(items, list) and all(isinstance(i, item_cls) for i in items):
+        result.extend(items)
+    else:
+        raise ValueError(f"Invalid adapter list format: {items}")
+
+    result.append(new_item)
+    return result
 
 
 def validate_custom_label(
@@ -584,7 +606,7 @@ class LatentsMetaOutput(LatentsOutput, MetadataOutput):
     title="Denoise Latents + metadata",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.0.0",
+    version="1.0.1",
 )
 class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
     def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
@@ -620,11 +642,11 @@ class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
         md.update({"denoising_end": self.denoising_end})
         md.update({"scheduler": self.scheduler})
         md.update({"model": self.unet.unet})
-        if self.control is not None:
+        if self.control is not None and isinstance(self.control, list) and len(self.control) > 0:
             md.update({"controlnets": _to_json(self.control)})
-        if self.ip_adapter is not None:
+        if self.ip_adapter is not None and isinstance(self.ip_adapter, list) and len(self.ip_adapter) > 0:
             md.update({"ipAdapters": _to_json(self.ip_adapter)})
-        if self.t2i_adapter is not None:
+        if self.t2i_adapter is not None and isinstance(self.t2i_adapter, list) and len(self.t2i_adapter) > 0:
             md.update({"t2iAdapters": _to_json(self.t2i_adapter)})
         if len(self.unet.loras) > 0:
             md.update({"loras": _loras_to_json(self.unet.loras)})
@@ -652,17 +674,14 @@ class MetadataToVAEInvocation(BaseInvocation, WithMetadata):
         default="vae",
         description=FieldDescriptions.metadata_item_label,
         input=Input.Direct,
-        ui_order=0,
     )
     custom_label: Optional[str] = InputField(
         default=None,
         description=FieldDescriptions.metadata_item_label,
         input=Input.Direct,
-        ui_order=1,
     )
     default_vae: VaeField = InputField(
         description="The default VAE to use if not found in the metadata",
-        ui_order=2,
     )
 
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)
@@ -858,3 +877,149 @@ class MetadataToSDXLLorasInvocation(BaseInvocation, WithMetadata):
                 )
 
         return output
+
+
+@invocation_output("md_control_list_output")
+class MDControlListOutput(BaseInvocationOutput):
+    # Outputs
+    control_list: list[ControlField] = OutputField(
+        description=FieldDescriptions.control,
+        title="ControlNet-List",
+    )
+
+
+@invocation(
+    "metadata_to_controlnets",
+    title="Metadata To ControlNets",
+    tags=["metadata"],
+    category="metadata",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
+class MetadataToControlnetsInvocation(BaseInvocation, WithMetadata):
+    """Extracts a Controlnets value of a label from metadata"""
+
+    control_list: Optional[Union[ControlField, list[ControlField]]] = InputField(
+        default=None,
+        title="ControlNet-List",
+        input=Input.Connection,
+    )
+
+    def invoke(self, context: InvocationContext) -> MDControlListOutput:
+        data = {} if self.metadata is None else self.metadata.model_dump()
+        key = "controlnets"
+        if key in data:
+            md_controls = data.get(key, "")
+        else:
+            md_controls = []
+
+        controls = []
+
+        if self.control_list is not None:
+            controls = self.control_list
+
+        for x in md_controls:
+            c = ControlField(**x)
+            controls = append_list(c, controls, ControlField)
+
+        return MDControlListOutput(control_list=controls)
+
+
+@invocation_output("md_ip_adapter_list_output")
+class MDIPAdapterListOutput(BaseInvocationOutput):
+    # Outputs
+    ip_adapter_list: list[IPAdapterField] = OutputField(
+        description=FieldDescriptions.ip_adapter, title="IP-Adapter-List"
+    )
+
+
+@invocation(
+    "metadata_to_ip_adapters",
+    title="Metadata To IP-Adapters",
+    tags=["metadata"],
+    category="metadata",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
+class MetadataToIPAdaptersInvocation(BaseInvocation, WithMetadata):
+    """Extracts a IP-Adapters value of a label from metadata"""
+
+    ip_adapter_list: Optional[Union[IPAdapterField, list[IPAdapterField]]] = InputField(
+        description=FieldDescriptions.ip_adapter,
+        title="IP-Adapter-List",
+        default=None,
+        input=Input.Connection,
+    )
+
+    def invoke(self, context: InvocationContext) -> MDIPAdapterListOutput:
+        data = {} if self.metadata is None else self.metadata.model_dump()
+        key = "ipAdapters"
+        if key in data:
+            md_adapters = data.get(key, "")
+        else:
+            md_adapters = []
+
+        adapters = []
+
+        if self.ip_adapter_list is not None:
+            adapters = self.ip_adapter_list
+
+        for x in md_adapters:
+            ipa = IPAdapterInvocation(
+                image=x["image"],
+                ip_adapter_model=IPAdapterModelField(**x["ip_adapter_model"]),
+                weight=x["weight"],
+                begin_step_percent=x["begin_step_percent"],
+                end_step_percent=x["end_step_percent"],
+            )
+            a = ipa.invoke(context)
+
+            adapters = append_list(a.ip_adapter, adapters, IPAdapterField)
+
+        return MDIPAdapterListOutput(ip_adapter_list=adapters)
+
+
+@invocation_output("md_ip_adapters_output")
+class MDT2IAdapterListOutput(BaseInvocationOutput):
+    # Outputs
+    t2i_adapter_list: list[T2IAdapterField] = OutputField(
+        description=FieldDescriptions.t2i_adapter, title="T2I Adapter-List"
+    )
+
+
+@invocation(
+    "metadata_to_t2i_adapters",
+    title="Metadata To T2I-Adapters",
+    tags=["metadata"],
+    category="metadata",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
+class MetadataToT2IAdaptersInvocation(BaseInvocation, WithMetadata):
+    """Extracts a T2I-Adapters value of a label from metadata"""
+
+    t2i_adapter_list: Optional[Union[T2IAdapterField, list[T2IAdapterField]]] = InputField(
+        description=FieldDescriptions.ip_adapter,
+        title="T2I-Adapter",
+        default=None,
+        input=Input.Connection,
+    )
+
+    def invoke(self, context: InvocationContext) -> MDT2IAdapterListOutput:
+        data = {} if self.metadata is None else self.metadata.model_dump()
+        key = "t2iAdapters"
+        if key in data:
+            md_adapters = data.get(key, "")
+        else:
+            md_adapters = []
+
+        adapters = []
+
+        if self.t2i_adapter_list is not None:
+            adapters = self.t2i_adapter_list
+
+        for x in md_adapters:
+            a = T2IAdapterField(**x)
+            adapters = append_list(a, adapters, T2IAdapterField)
+
+        return MDT2IAdapterListOutput(t2i_adapter_list=adapters)
