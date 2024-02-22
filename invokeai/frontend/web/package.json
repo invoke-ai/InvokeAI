@@ -145,7 +145,6 @@
     "ts-toolbelt": "^9.6.0",
     "tsafe": "^1.6.6",
     "typescript": "^5.3.3",
-    "utility-types": "^3.11.0",
     "vite": "^5.1.3",
     "vite-plugin-css-injected-by-js": "^3.4.0",
     "vite-plugin-dts": "^3.7.2",
