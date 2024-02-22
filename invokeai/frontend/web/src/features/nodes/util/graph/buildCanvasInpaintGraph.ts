@@ -1,7 +1,13 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
-import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { ImageDTO, ImageToLatentsInvocation, NoiseInvocation, NonNullableGraph } from 'services/api/types';
+import type {
+  CreateGradientMaskInvocation,
+  IAICanvasPasteBackInvocation,
+  ImageDTO,
+  ImageToLatentsInvocation,
+  NoiseInvocation,
+  NonNullableGraph,
+} from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
@@ -29,6 +35,7 @@ import {
   POSITIVE_CONDITIONING,
   SEAMLESS,
 } from './constants';
+import { getBoardField, getIsIntermediate } from './graphBuilderUtils';
 
 /**
  * Builds the Canvas tab's Inpaint graph.
@@ -61,8 +68,8 @@ export const buildCanvasInpaintGraph = (
   } = state.generation;
 
   if (!model) {
-    log.error('No Image found in state');
-    throw new Error('No Image found in state');
+    log.error('No model found in state');
+    throw new Error('No model found in state');
   }
 
   // The bounding box determines width and height, not the width and height params
@@ -106,7 +113,6 @@ export const buildCanvasInpaintGraph = (
         is_intermediate,
         prompt: negativePrompt,
       },
-
       [INPAINT_IMAGE]: {
         type: 'i2l',
         id: INPAINT_IMAGE,
@@ -146,12 +152,12 @@ export const buildCanvasInpaintGraph = (
         fp32,
       },
       [CANVAS_OUTPUT]: {
-        type: 'color_correct',
+        type: 'iai_canvas_paste_back',
         id: CANVAS_OUTPUT,
         is_intermediate: getIsIntermediate(state),
         board: getBoardField(state),
-        reference: canvasInitImage,
-        use_cache: false,
+        mask_blur: canvasCoherenceEdgeSize,
+        source_image: canvasInitImage,
       },
     },
     edges: [
@@ -325,7 +331,7 @@ export const buildCanvasInpaintGraph = (
           field: 'mask',
         },
       },
-      // Color Correct The Inpainted Result
+      // Resize Down
       {
         source: {
           node_id: LATENTS_TO_IMAGE,
@@ -338,22 +344,23 @@ export const buildCanvasInpaintGraph = (
       },
       {
         source: {
-          node_id: INPAINT_IMAGE_RESIZE_DOWN,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_OUTPUT,
-          field: 'image',
-        },
-      },
-      {
-        source: {
           node_id: MASK_RESIZE_UP,
           field: 'image',
         },
         destination: {
           node_id: MASK_RESIZE_DOWN,
           field: 'image',
+        },
+      },
+      // Paste Back
+      {
+        source: {
+          node_id: INPAINT_IMAGE_RESIZE_DOWN,
+          field: 'image',
+        },
+        destination: {
+          node_id: CANVAS_OUTPUT,
+          field: 'target_image',
         },
       },
       {
@@ -377,29 +384,27 @@ export const buildCanvasInpaintGraph = (
       image: canvasInitImage,
     };
 
-    graph.edges.push(
-      // Color Correct The Inpainted Result
-      {
-        source: {
-          node_id: LATENTS_TO_IMAGE,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_OUTPUT,
-          field: 'image',
-        },
+    graph.nodes[INPAINT_CREATE_MASK] = {
+      ...(graph.nodes[INPAINT_CREATE_MASK] as CreateGradientMaskInvocation),
+      mask: canvasMaskImage,
+    };
+
+    // Paste Back
+    graph.nodes[CANVAS_OUTPUT] = {
+      ...(graph.nodes[CANVAS_OUTPUT] as IAICanvasPasteBackInvocation),
+      mask: canvasMaskImage,
+    };
+
+    graph.edges.push({
+      source: {
+        node_id: LATENTS_TO_IMAGE,
+        field: 'image',
       },
-      {
-        source: {
-          node_id: MASK_RESIZE_DOWN,
-          field: 'image',
-        },
-        destination: {
-          node_id: CANVAS_OUTPUT,
-          field: 'mask',
-        },
-      }
-    );
+      destination: {
+        node_id: CANVAS_OUTPUT,
+        field: 'target_image',
+      },
+    });
   }
 
   // Add Seamless To Graph
