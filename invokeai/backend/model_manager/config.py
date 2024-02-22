@@ -138,9 +138,16 @@ class ModelConfigBase(BaseModel):
     source: Optional[str] = Field(description="model original source (path, URL or repo_id)", default=None)
     last_modified: Optional[float] = Field(description="timestamp for modification time", default_factory=time.time)
 
+    @staticmethod
+    def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
+        schema["required"].extend(
+            ["key", "base", "type", "format", "original_hash", "current_hash", "source", "last_modified"]
+        )
+
     model_config = ConfigDict(
         use_enum_values=False,
         validate_assignment=True,
+        json_schema_extra=json_schema_extra,
     )
 
     def update(self, attributes: Dict[str, Any]) -> None:
