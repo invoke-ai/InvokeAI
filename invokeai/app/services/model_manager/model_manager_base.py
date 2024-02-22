@@ -1,10 +1,9 @@
 # Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Team
 
-import torch
-
 from abc import ABC, abstractmethod
 from typing import Optional
 
+import torch
 from typing_extensions import Self
 
 from invokeai.app.services.invoker import Invoker
@@ -18,7 +17,6 @@ from ..events.events_base import EventServiceBase
 from ..model_install import ModelInstallServiceBase
 from ..model_load import ModelLoadServiceBase
 from ..model_records import ModelRecordServiceBase
-from ..shared.sqlite.sqlite_database import SqliteDatabase
 
 
 class ModelManagerServiceBase(ABC):
