@@ -12,6 +12,7 @@ import {
 import { t } from 'i18next';
 import { ChangeEventHandler, useCallback, useMemo, useState } from 'react';
 import { PiXBold } from 'react-icons/pi';
+import ScrollableContent from '../../../../../common/components/OverlayScrollbars/ScrollableContent';
 
 export const ScanModelsResults = ({ results }: { results: string[] }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,8 +38,8 @@ export const ScanModelsResults = ({ results }: { results: string[] }) => {
   return (
     <>
       <Divider mt={4} />
-      <Flex flexDir="column" gap={2} mt={4}>
-        <Flex justifyContent="space-between" alignItems="center" mb={4}>
+      <Flex flexDir="column" gap={2} mt={4} height="100%">
+        <Flex justifyContent="space-between" alignItems="center">
           <Heading fontSize="md" as="h4">
             Scan Results
           </Heading>
@@ -64,13 +65,16 @@ export const ScanModelsResults = ({ results }: { results: string[] }) => {
             )}
           </InputGroup>
         </Flex>
-
-        {filteredResults.map((result) => (
-          <Flex key={result} fontSize="sm" flexDir="column">
-            <Text fontWeight="semibold">{result.split('\\').slice(-1)[0]}</Text>
-            <Text variant="subtext">{result}</Text>
-          </Flex>
-        ))}
+        <Flex height="100%" layerStyle="third" borderRadius="base" p={4} mt={4} mb={4}>
+          <ScrollableContent>
+            {filteredResults.map((result) => (
+              <Flex key={result} fontSize="sm" flexDir="column">
+                <Text fontWeight="semibold">{result.split('\\').slice(-1)[0]}</Text>
+                <Text variant="subtext">{result}</Text>
+              </Flex>
+            ))}
+          </ScrollableContent>
+        </Flex>
       </Flex>
     </>
   );
