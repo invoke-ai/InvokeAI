@@ -1,10 +1,9 @@
 # Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Team
 """Implementation of ModelManagerServiceBase."""
 
-import torch
-
 from typing import Optional
 
+import torch
 from typing_extensions import Self
 
 from invokeai.app.services.invoker import Invoker
