@@ -1,10 +1,12 @@
-import { Flex, FormControl, FormLabel, Input, Button } from '@invoke-ai/ui-library';
+import { Button,Flex, FormControl, FormLabel, Input } from '@invoke-ai/ui-library';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
-import { useForm } from '@mantine/form';
-import { useAppDispatch } from '../../../../app/store/storeHooks';
-import { useImportMainModelsMutation } from '../../../../services/api/endpoints/models';
-import { addToast } from '../../../system/store/systemSlice';
-import { makeToast } from '../../../system/util/makeToast';
+import { useCallback } from 'react';
+import type { SubmitHandler} from 'react-hook-form';
+import { useForm } from 'react-hook-form';
+import { useImportMainModelsMutation } from 'services/api/endpoints/models';
 
 type SimpleImportModelConfig = {
   location: string;
@@ -15,50 +17,59 @@ export const SimpleImport = () => {
 
   const [importMainModel, { isLoading }] = useImportMainModelsMutation();
 
-  const addModelForm = useForm({
-    initialValues: {
+  const { register, handleSubmit, formState, reset } = useForm<SimpleImportModelConfig>({
+    defaultValues: {
       location: '',
     },
+    mode: 'onChange',
   });
 
-  const handleAddModelSubmit = (values: SimpleImportModelConfig) => {
-    importMainModel({ source: values.location, config: undefined })
-      .unwrap()
-      .then((_) => {
-        dispatch(
-          addToast(
-            makeToast({
-              title: t('toast.modelAddedSimple'),
-              status: 'success',
-            })
-          )
-        );
-        addModelForm.reset();
-      })
-      .catch((error) => {
-        if (error) {
+  const onSubmit = useCallback<SubmitHandler<SimpleImportModelConfig>>(
+    (values) => {
+      if (!values?.location) {
+        return;
+      }
+
+      importMainModel({ source: values.location, config: undefined })
+        .unwrap()
+        .then((_) => {
           dispatch(
             addToast(
               makeToast({
-                title: `${error.data.detail} `,
-                status: 'error',
+                title: t('toast.modelAddedSimple'),
+                status: 'success',
               })
             )
           );
-        }
-      });
-  };
+          reset();
+        })
+        .catch((error) => {
+          reset();
+          if (error) {
+            dispatch(
+              addToast(
+                makeToast({
+                  title: `${error.data.detail} `,
+                  status: 'error',
+                })
+              )
+            );
+          }
+        });
+    },
+    [dispatch, reset, importMainModel]
+  );
 
   return (
-    <form onSubmit={addModelForm.onSubmit((v) => handleAddModelSubmit(v))}>
+    <form onSubmit={handleSubmit(onSubmit)}>
       <Flex gap={2} alignItems="flex-end" justifyContent="space-between">
         <FormControl>
           <Flex direction="column" w="full">
             <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
-            <Input {...addModelForm.getInputProps('location')} />
+            <Input {...register('location')} />
           </Flex>
         </FormControl>
-        <Button isDisabled={!addModelForm.values.location} isLoading={isLoading} type="submit">
+        <Button onClick={handleSubmit(onSubmit)} isDisabled={!formState.isDirty} isLoading={isLoading} type="submit">
           {t('modelManager.addModel')}
         </Button>
       </Flex>
