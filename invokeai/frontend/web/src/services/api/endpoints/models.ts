@@ -206,7 +206,7 @@ export const modelsApi = api.injectEndpoints({
           body: body,
         };
       },
-      invalidatesTags: ['Model'],
+      invalidatesTags: ['Model', 'ModelImports'],
     }),
     deleteModels: build.mutation<DeleteMainModelResponse, DeleteMainModelArg>({
       query: ({ key }) => {

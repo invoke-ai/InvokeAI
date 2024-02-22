@@ -696,6 +696,7 @@
         "addNewModel": "Add New Model",
         "addSelected": "Add Selected",
         "advanced": "Advanced",
+        "advancedImportInfo": "The advanced tab allows for manual configuration of core model settings. Only use this tab if you are confident that you know the correct model type and configuration for the selected model.",
         "allModels": "All Models",
         "alpha": "Alpha",
         "availableModels": "Available Models",

@@ -1,18 +1,18 @@
 import {
-  Text,
+  Divider,
   Flex,
   Heading,
   IconButton,
   Input,
   InputGroup,
   InputRightElement,
-  Divider,
-  Box,
+  Text,
 } from '@invoke-ai/ui-library';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { t } from 'i18next';
-import { ChangeEventHandler, useCallback, useMemo, useState } from 'react';
+import type { ChangeEventHandler} from 'react';
+import { useCallback, useState } from 'react';
 import { PiXBold } from 'react-icons/pi';
-import ScrollableContent from '../../../../../common/components/OverlayScrollbars/ScrollableContent';
 
 export const ScanModelsResults = ({ results }: { results: string[] }) => {
   const [searchTerm, setSearchTerm] = useState('');
