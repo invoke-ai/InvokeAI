@@ -1,6 +1,6 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from '../../../../app/store/storeHooks';
-import { useGetModelQuery, useUpdateModelsMutation } from '../../../../services/api/endpoints/models';
+import { useGetModelConfigQuery, useUpdateModelsMutation } from '../../../../services/api/endpoints/models';
 import {
   Flex,
   Text,
@@ -40,7 +40,7 @@ import { makeToast } from '../../../system/util/makeToast';
 export const ModelEdit = () => {
   const dispatch = useAppDispatch();
   const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
-  const { data, isLoading } = useGetModelQuery(selectedModelKey ?? skipToken);
+  const { data, isLoading } = useGetModelConfigQuery(selectedModelKey ?? skipToken);
 
   const [updateModel, { isLoading: isSubmitting }] = useUpdateModelsMutation();
 
