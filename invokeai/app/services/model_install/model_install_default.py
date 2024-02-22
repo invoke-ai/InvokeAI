@@ -508,7 +508,7 @@ class ModelInstallService(ModelInstallServiceBase):
             return old_path
         new_path.parent.mkdir(parents=True, exist_ok=True)
         if self.app_config.model_sym_links:
-            new_path.symlink_to(old_path, target_is_directory=True)
+            new_path.symlink_to(old_path, target_is_directory=old_path.is_dir())
         else:
             if old_path.is_dir():
                 copytree(old_path, new_path)
