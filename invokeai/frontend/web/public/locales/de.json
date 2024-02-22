@@ -601,7 +601,7 @@
         "setToOptimalSize": "Optimiere Größe für Modell"
     },
     "settings": {
-        "displayInProgress": "Bilder in Bearbeitung anzeigen",
+        "displayInProgress": "Zwischenbilder anzeigen",
         "saveSteps": "Speichern der Bilder alle n Schritte",
         "confirmOnDelete": "Bestätigen beim Löschen",
         "displayHelpIcons": "Hilfesymbole anzeigen",
@@ -614,9 +614,34 @@
         "useSlidersForAll": "Schieberegler für alle Optionen verwenden",
         "showAdvancedOptions": "Erweiterte Optionen anzeigen",
         "alternateCanvasLayout": "Alternatives Leinwand-Layout",
-        "clearIntermediatesDesc1": "Das Löschen der Zwischenprodukte setzt Leinwand und ControlNet zurück.",
+        "clearIntermediatesDesc1": "Das Löschen der Zwischenbilder setzt Leinwand und ControlNet zurück.",
         "favoriteSchedulers": "Lieblings-Planer",
-        "favoriteSchedulersPlaceholder": "Keine Planer favorisiert"
+        "favoriteSchedulersPlaceholder": "Keine Planer favorisiert",
+        "generation": "Erzeugung",
+        "enableInformationalPopovers": "Info-Popouts anzeigen",
+        "shouldLogToConsole": "Konsole loggen",
+        "showProgressInViewer": "Zwischenbilder im Viewer anzeigen",
+        "clearIntermediatesDesc3": "Ihre Bilder werden nicht gelöscht.",
+        "clearIntermediatesWithCount_one": "Lösche {{count}} Zwischenbilder",
+        "clearIntermediatesWithCount_other": "Lösche {{count}} Zwischenbilder",
+        "reloadingIn": "Neuladen in",
+        "enableNodesEditor": "Nodes Editor aktivieren",
+        "autoChangeDimensions": "Breite/Höhe auf Modellstandard setzen",
+        "experimental": "Experimentell",
+        "intermediatesCleared_one": "{{count}} Zwischenbilder gelöscht",
+        "intermediatesCleared_other": "{{count}} Zwischenbilder gelöscht",
+        "enableInvisibleWatermark": "Unsichtbares Wasserzeichen aktivieren",
+        "general": "Allgemein",
+        "consoleLogLevel": "Protokollierungsstufe",
+        "clearIntermediatesDisabled": "Warteschlange muss leer sein, um Zwischenbilder zu löschen",
+        "developer": "Entwickler",
+        "antialiasProgressImages": "Zwischenbilder mit Anti-Alias",
+        "beta": "Beta",
+        "ui": "Benutzeroberfläche",
+        "clearIntermediatesDesc2": "Zwischenbilder sind Nebenprodukte der Erstellung. Sie zu löschen macht Festplattenspeicher frei.",
+        "clearIntermediates": "Zwischenbilder löschen",
+        "intermediatesClearedFailed": "Problem beim Löschen der Zwischenbilder",
+        "enableNSFWChecker": "Auf unangemessene Inhalte prüfen"
     },
     "toast": {
         "tempFoldersEmptied": "Temp-Ordner geleert",
@@ -661,7 +686,9 @@
         "problemCopyingCanvas": "Problem beim Kopieren der Leinwand",
         "problemCopyingCanvasDesc": "Kann Basis-Layer nicht exportieren",
         "problemDownloadingCanvas": "Problem beim Herunterladen der Leinwand",
-        "setAsCanvasInitialImage": "Als Ausgangsbild gesetzt"
+        "setAsCanvasInitialImage": "Als Ausgangsbild gesetzt",
+        "addedToBoard": "Dem Board hinzugefügt",
+        "loadedWithWarnings": "Workflow mit Warnungen geladen"
     },
     "tooltip": {
         "feature": {
@@ -1397,7 +1424,10 @@
     },
     "sdxl": {
         "concatPromptStyle": "Verknüpfen von Prompt & Stil",
-        "scheduler": "Planer"
+        "scheduler": "Planer",
+        "steps": "Schritte",
+        "useRefiner": "Refiner verwenden",
+        "selectAModel": "Modell auswählen"
     },
     "dynamicPrompts": {
         "showDynamicPrompts": "Dynamische Prompts anzeigen"
