@@ -423,16 +423,23 @@ class ColorInvocation(BaseInvocation):
 
 # region Conditioning
 
+class DenoisingArea(BaseModel):
+    top_y: int = Field(description="TODO")
+    left_x: int = Field(description="TODO")
+    height: int = Field(description="TODO")
+    width: int = Field(description="TODO")
+
 
 class ConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
-    mask_name: Optional[str] = Field(
-        default=None,
-        description="The mask associated with this conditioning tensor. Excluded regions should be set to 0, included "
-        "regions should be set to 1.",
-    )
+    # mask_name: Optional[str] = Field(
+    #     default=None,
+    #     description="The mask associated with this conditioning tensor. Excluded regions should be set to 0, included "
+    #     "regions should be set to 1.",
+    # )
+    denoising_area: DenoisingArea = Field(description="The area to apply this conditioning to. Coordinates are in latent space.")
     mask_strength: float = Field(
         default=1.0,
         description="The strength of the mask. Only has an effect if mask_name is set. The strength is relative to "

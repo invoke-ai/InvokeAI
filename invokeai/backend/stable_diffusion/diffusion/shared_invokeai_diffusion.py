@@ -8,6 +8,7 @@ import torch
 import torchvision
 from diffusers import UNet2DConditionModel
 from typing_extensions import TypeAlias
+from invokeai.app.invocations.primitives import DenoisingArea
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
@@ -220,9 +221,21 @@ class InvokeAIDiffuserComponent:
             )
         wants_cross_attention_control = len(cross_attention_control_types_to_do) > 0
 
-        cond_next_xs = []
-        uncond_next_x = None
-        for text_conditioning in conditioning_data.text_embeddings:
+        latent_shape = sample.shape
+        cond_next_xs = torch.zeros(
+            (latent_shape[0], len(conditioning_data.text_embeddings)) + latent_shape[1:],
+            dtype=sample.dtype,
+            device=sample.device,
+        )
+        uncond_next_xs = torch.zeros(
+            (latent_shape[0], len(conditioning_data.text_embeddings)) + latent_shape[1:],
+            dtype=sample.dtype,
+            device=sample.device,
+        )
+        # Initialize counts to 1e-10 to avoid divide-by-zero.
+        cond_count = torch.ones_like(sample) * 1e-10
+
+        for i, text_conditioning in enumerate(conditioning_data.text_embeddings):
             if wants_cross_attention_control or self.sequential_guidance:
                 raise NotImplementedError(
                     "Sequential conditioning has not yet been updated to work with multiple text embeddings."
@@ -242,11 +255,26 @@ class InvokeAIDiffuserComponent:
                 #     down_intrablock_additional_residuals=down_intrablock_additional_residuals,
                 # )
             else:
+                area = text_conditioning.area
+                # TODO(ryand): Use LATENT_SCALE_FACTOR instead of hard-coding to 8.
+                latent_area = DenoisingArea(
+                    height=max(1, area.height // 8),
+                    width=max(1, area.width // 8),
+                    top_y=area.top_y // 8,
+                    left_x=area.left_x // 8,
+                )
+                area_sample = sample[
+                    :,
+                    :,
+                    latent_area.top_y : latent_area.top_y + latent_area.height,
+                    latent_area.left_x : latent_area.left_x + latent_area.width,
+                ]
+
                 (
                     unconditioned_next_x,
                     conditioned_next_x,
                 ) = self._apply_standard_conditioning(
-                    x=sample,
+                    x=area_sample,
                     sigma=timestep,
                     cond_text_embedding=text_conditioning.text_conditioning_info,
                     uncond_text_embedding=conditioning_data.unconditioned_embeddings,
@@ -255,52 +283,32 @@ class InvokeAIDiffuserComponent:
                     mid_block_additional_residual=mid_block_additional_residual,
                     down_intrablock_additional_residuals=down_intrablock_additional_residuals,
                 )
-            cond_next_xs.append(conditioned_next_x)
-            # HACK(ryand): We re-run unconditioned denoising for each text embedding, but we should only need to do it
-            # once.
-            uncond_next_x = unconditioned_next_x
 
-        # TODO(ryand): Think about how to handle the batch dimension here. Should this be torch.stack()? It probably
-        # doesn't matter, as I'm sure there are many other places where we don't properly support batching.
-        cond_out = torch.concat(cond_next_xs, dim=0)
-        # Initialize count to 1e-9 to avoid division by zero.
-        cond_count = torch.ones_like(cond_out[0, ...]) * 1e-9
+            # TODO(ryand): Apply mask here.
+            cond_next_xs[
+                :,
+                i,
+                latent_area.top_y : latent_area.top_y + latent_area.height,
+                latent_area.left_x : latent_area.left_x + latent_area.width,
+            ] = conditioned_next_x * text_conditioning.mask_strength
+            uncond_next_xs[
+                :,
+                i,
+                latent_area.top_y : latent_area.top_y + latent_area.height,
+                latent_area.left_x : latent_area.left_x + latent_area.width,
+            ] = unconditioned_next_x * text_conditioning.mask_strength
+            cond_count[
+                :,
+                latent_area.top_y : latent_area.top_y + latent_area.height,
+                latent_area.left_x : latent_area.left_x + latent_area.width,
+            ] += text_conditioning.mask_strength
 
-        _, _, height, width = cond_out.shape
-        for te_idx, te in enumerate(conditioning_data.text_embeddings):
-            mask = te.mask
-            if mask is not None:
-                # Resize if necessary.
-                tf = torchvision.transforms.Resize(
-                    (height, width), interpolation=torchvision.transforms.InterpolationMode.NEAREST
-                )
-                mask = mask.unsqueeze(0).unsqueeze(0)  # Shape: (h, w) -> (1, 1, h, w)
-                mask = tf(mask)
+            # TODO(ryand): Do other apps apply the same mask weight and count to the unconditioned output?
 
-                # TODO(ryand): We are converting from uint8 to float here. Should we just be storing a float mask to
-                # begin with?
-                mask = mask.to(cond_out.device, cond_out.dtype)
+        cond_next_x = cond_next_xs.sum(dim=1) / cond_count
+        uncond_next_x = uncond_next_xs.sum(dim=1) / cond_count
 
-                # Make sure that all mask values are either 0.0 or 1.0.
-                # HACK(ryand): This is not the right place to be doing this. Just be clear about the expected format of
-                # the mask in the passed data structures.
-                mask[mask < 0.5] = 0.0
-                mask[mask >= 0.5] = 1.0
-
-                mask *= te.mask_strength
-            else:
-                # mask is None, so treat as a mask of all 1.0s (by taking advantage of torch's treatment of scalar
-                # values).
-                mask = 1.0
-
-            # Apply the mask and update the count.
-            cond_out[te_idx, ...] *= mask[0]
-            cond_count += mask[0]
-
-        # Combine the masked conditionings.
-        cond_out = cond_out.sum(dim=0, keepdim=True) / cond_count
-
-        return uncond_next_x, cond_out
+        return uncond_next_x, cond_next_x
 
     def do_latent_postprocessing(
         self,

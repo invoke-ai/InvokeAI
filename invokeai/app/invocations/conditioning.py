@@ -9,46 +9,75 @@ from invokeai.app.invocations.baseinvocation import (
     WithMetadata,
     invocation,
 )
-from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput, ImageField, ImageOutput
+from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput, DenoisingArea, ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 
 
+# @invocation(
+#     "add_conditioning_mask",
+#     title="Add Conditioning Mask",
+#     tags=["conditioning"],
+#     category="conditioning",
+#     version="1.0.0",
+# )
+# class AddConditioningMaskInvocation(BaseInvocation):
+#     """Add a mask to an existing conditioning tensor."""
+
+#     conditioning: ConditioningField = InputField(description="The conditioning tensor to add a mask to.")
+#     mask: ImageField = InputField(
+#         description="A mask image to add to the conditioning tensor. Only the first channel of the image is used. "
+#         "Pixels <128 are excluded from the mask, pixels >=128 are included in the mask."
+#     )
+#     mask_strength: float = InputField(
+#         description="The strength of the mask to apply to the conditioning tensor.", default=1.0
+#     )
+
+#     @staticmethod
+#     def convert_image_to_mask(image: Image.Image) -> torch.Tensor:
+#         """Convert a PIL image to a uint8 mask tensor."""
+#         np_image = np.array(image)
+#         torch_image = torch.from_numpy(np_image[:, :, 0])
+#         mask = torch_image >= 128
+#         return mask.to(dtype=torch.uint8)
+
+#     def invoke(self, context: InvocationContext) -> ConditioningOutput:
+#         image = context.services.images.get_pil_image(self.mask.image_name)
+#         mask = self.convert_image_to_mask(image)
+
+#         mask_name = f"{context.graph_execution_state_id}__{self.id}_conditioning_mask"
+#         context.services.latents.save(mask_name, mask)
+
+#         self.conditioning.mask_name = mask_name
+#         self.conditioning.mask_strength = self.mask_strength
+#         return ConditioningOutput(conditioning=self.conditioning)
+
 @invocation(
-    "add_conditioning_mask",
-    title="Add Conditioning Mask",
+    "add_conditioning_area",
+    title="Add Conditioning Area",
     tags=["conditioning"],
     category="conditioning",
     version="1.0.0",
 )
-class AddConditioningMaskInvocation(BaseInvocation):
-    """Add a mask to an existing conditioning tensor."""
+class AddConditioningAreaInvocation(BaseInvocation):
+    """Add a denoising area to an existing conditioning tensor."""
 
     conditioning: ConditioningField = InputField(description="The conditioning tensor to add a mask to.")
-    mask: ImageField = InputField(
-        description="A mask image to add to the conditioning tensor. Only the first channel of the image is used. "
-        "Pixels <128 are excluded from the mask, pixels >=128 are included in the mask."
-    )
+    # mask: ImageField = InputField(
+    #     description="A mask image to add to the conditioning tensor. Only the first channel of the image is used. "
+    #     "Pixels <128 are excluded from the mask, pixels >=128 are included in the mask."
+    # )
     mask_strength: float = InputField(
         description="The strength of the mask to apply to the conditioning tensor.", default=1.0
     )
 
-    @staticmethod
-    def convert_image_to_mask(image: Image.Image) -> torch.Tensor:
-        """Convert a PIL image to a uint8 mask tensor."""
-        np_image = np.array(image)
-        torch_image = torch.from_numpy(np_image[:, :, 0])
-        mask = torch_image >= 128
-        return mask.to(dtype=torch.uint8)
+    height: int = InputField(description="The height of the area in latent space.")
+    width: int = InputField(description="The width of the area in latent space.")
+    y_top: int = InputField(description="The top of the area in latent space.")
+    x_left: int = InputField(description="The left of the area in latent space.")
 
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        image = context.services.images.get_pil_image(self.mask.image_name)
-        mask = self.convert_image_to_mask(image)
-
-        mask_name = f"{context.graph_execution_state_id}__{self.id}_conditioning_mask"
-        context.services.latents.save(mask_name, mask)
-
-        self.conditioning.mask_name = mask_name
         self.conditioning.mask_strength = self.mask_strength
+        self.conditioning.denoising_area = DenoisingArea(height=self.height, width=self.width, top_y=self.y_top, left_x=self.x_left)
         return ConditioningOutput(conditioning=self.conditioning)
 
 

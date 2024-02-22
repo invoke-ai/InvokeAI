@@ -5,6 +5,8 @@ from typing import Any, List, Optional, Union
 
 import torch
 
+from invokeai.app.invocations.primitives import DenoisingArea
+
 from .cross_attention_control import Arguments
 
 
@@ -39,15 +41,15 @@ class SDXLConditioningInfo(BasicConditioningInfo):
         return super().to(device=device, dtype=dtype)
 
 
-class TextConditioningInfoWithMask:
+class TextConditioningInfoWithArea:
     def __init__(
         self,
         text_conditioning_info: Union[BasicConditioningInfo, SDXLConditioningInfo],
-        mask: Optional[torch.Tensor],
+        area: DenoisingArea,
         mask_strength: float,
     ):
         self.text_conditioning_info = text_conditioning_info
-        self.mask = mask
+        self.area = area
         self.mask_strength = mask_strength
 
 
@@ -74,7 +76,7 @@ class IPAdapterConditioningInfo:
 @dataclass
 class ConditioningData:
     unconditioned_embeddings: Union[BasicConditioningInfo, SDXLConditioningInfo]
-    text_embeddings: list[TextConditioningInfoWithMask]
+    text_embeddings: list[TextConditioningInfoWithArea]
     """
     Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
     `guidance_scale` is defined as `w` of equation 2. of [Imagen Paper](https://arxiv.org/pdf/2205.11487.pdf).
