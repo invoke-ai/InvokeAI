@@ -7,7 +7,7 @@ import { useCallback, useMemo } from 'react';
 import { RiSparklingFill } from 'react-icons/ri';
 import { useGetModelImportsQuery, usePruneModelImportsMutation } from 'services/api/endpoints/models';
 
-import { ImportQueueModel } from '../ImportQueueModel';
+import { ImportQueueModel } from './ImportQueueModel';
 
 export const ImportQueue = () => {
   const dispatch = useAppDispatch();
