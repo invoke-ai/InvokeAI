@@ -202,7 +202,7 @@ async def list_model_summary(
 
 
 @model_manager_router.get(
-    "/meta/i/{key}",
+    "/i/{key}/meta",
     operation_id="get_model_metadata",
     responses={
         200: {
@@ -210,7 +210,6 @@ async def list_model_summary(
             "content": {"application/json": {"example": example_model_metadata}},
         },
         400: {"description": "Bad request"},
-        404: {"description": "No metadata available"},
     },
 )
 async def get_model_metadata(
@@ -219,8 +218,7 @@ async def get_model_metadata(
     """Get a model metadata object."""
     record_store = ApiDependencies.invoker.services.model_manager.store
     result: Optional[AnyModelRepoMetadata] = record_store.get_metadata(key)
-    if not result:
-        raise HTTPException(status_code=404, detail="No metadata for a model with this key")
+   
     return result
 
 
