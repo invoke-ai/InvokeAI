@@ -8,7 +8,7 @@ import { loraAdded, selectLoraSlice } from 'features/lora/store/loraSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
-import type { LoRAConfig } from 'services/api/types';
+import type { LoRAModelConfig } from 'services/api/types';
 
 const selectAddedLoRAs = createMemoizedSelector(selectLoraSlice, (lora) => lora.loras);
 
@@ -19,7 +19,7 @@ const LoRASelect = () => {
   const addedLoRAs = useAppSelector(selectAddedLoRAs);
   const currentBaseModel = useAppSelector((s) => s.generation.model?.base);
 
-  const getIsDisabled = (lora: LoRAConfig): boolean => {
+  const getIsDisabled = (lora: LoRAModelConfig): boolean => {
     const isCompatible = currentBaseModel === lora.base;
     const isAdded = Boolean(addedLoRAs[lora.key]);
     const hasMainModel = Boolean(currentBaseModel);
@@ -27,7 +27,7 @@ const LoRASelect = () => {
   };
 
   const _onChange = useCallback(
-    (lora: LoRAConfig | null) => {
+    (lora: LoRAModelConfig | null) => {
       if (!lora) {
         return;
       }

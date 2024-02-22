@@ -6,7 +6,7 @@ import type { LoRAModelFieldInputInstance, LoRAModelFieldInputTemplate } from 'f
 import { pick } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
-import type { LoRAConfig } from 'services/api/types';
+import type { LoRAModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
@@ -17,7 +17,7 @@ const LoRAModelFieldInputComponent = (props: Props) => {
   const dispatch = useAppDispatch();
   const { data, isLoading } = useGetLoRAModelsQuery();
   const _onChange = useCallback(
-    (value: LoRAConfig | null) => {
+    (value: LoRAModelConfig | null) => {
       if (!value) {
         return;
       }
