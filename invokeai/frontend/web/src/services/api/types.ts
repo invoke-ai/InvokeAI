@@ -2,7 +2,6 @@ import type { UseToastOptions } from '@invoke-ai/ui-library';
 import type { EntityState } from '@reduxjs/toolkit';
 import type { components, paths } from 'services/api/schema';
 import type { O } from 'ts-toolbelt';
-import type { Overwrite } from 'utility-types';
 
 export type S = components['schemas'];
 
@@ -72,8 +71,8 @@ export type TextualInversionModelConfig = S['TextualInversionConfig'];
 export type DiffusersModelConfig = S['MainDiffusersConfig'];
 export type CheckpointModelConfig = S['MainCheckpointConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
-export type RefinerMainModelConfig = Overwrite<MainModelConfig, { base: 'sdxl-refiner' }>;
-export type NonRefinerMainModelConfig = Overwrite<MainModelConfig, { base: 'any' | 'sd-1' | 'sd-2' | 'sdxl' }>;
+export type RefinerMainModelConfig = Omit<MainModelConfig, 'base'> & { base: 'sdxl-refiner' };
+export type NonRefinerMainModelConfig = Omit<MainModelConfig, 'base'> & { base: 'any' | 'sd-1' | 'sd-2' | 'sdxl' };
 export type AnyModelConfig =
   | LoRAModelConfig
   | VAEModelConfig
