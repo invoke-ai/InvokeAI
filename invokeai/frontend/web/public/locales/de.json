@@ -116,7 +116,8 @@
         "saveAs": "Speichern als",
         "updated": "Aktualisiert",
         "copy": "Kopieren",
-        "aboutHeading": "Nutzen Sie Ihre kreative Energie"
+        "aboutHeading": "Nutzen Sie Ihre kreative Energie",
+        "toResolve": "Lösen"
     },
     "gallery": {
         "generations": "Erzeugungen",
@@ -906,7 +907,11 @@
         "small": "Klein",
         "base": "Basis",
         "depthAnything": "Depth Anything",
-        "depthAnythingDescription": "Erstellung einer Tiefenkarte mit der Depth-Anything-Technik"
+        "depthAnythingDescription": "Erstellung einer Tiefenkarte mit der Depth-Anything-Technik",
+        "face": "Gesicht",
+        "body": "Körper",
+        "hands": "Hände",
+        "dwOpenpose": "DW Openpose"
     },
     "queue": {
         "status": "Status",
@@ -1329,7 +1334,19 @@
         "vaeFieldDescription": "VAE Submodell.",
         "unknownInput": "Unbekannte Eingabe: {{name}}",
         "unknownNodeType": "Unbekannter Knotentyp",
-        "float": "Kommazahlen"
+        "float": "Kommazahlen",
+        "latentsPolymorphic": "Latents Polymorph",
+        "integerPolymorphicDescription": "Eine Sammlung von ganzen Zahlen.",
+        "integerPolymorphic": "Ganze Zahl Polymorph",
+        "ipAdapterPolymorphic": "IP-Adapter Polymorph",
+        "floatPolymorphic": "Fließkommazahl Polymorph",
+        "enumDescription": "Aufzählungen sind Werte, die eine von mehreren Optionen sein können.",
+        "floatCollection": "Fließkommazahl Sammlung",
+        "enum": "Aufzählung",
+        "floatPolymorphicDescription": "Eine Sammlung von Fließkommazahlen",
+        "fullyContainNodes": "Vollständig ausgewählte Nodes auswählen",
+        "editMode": "Im Workflow-Editor bearbeiten",
+        "floatCollectionDescription": "Eine Sammlung von Fließkommazahlen"
     },
     "hrf": {
         "enableHrf": "Korrektur für hohe Auflösungen",
