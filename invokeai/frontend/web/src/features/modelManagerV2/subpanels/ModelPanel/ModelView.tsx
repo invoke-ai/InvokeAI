@@ -1,6 +1,6 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from '../../../../app/store/storeHooks';
-import { useGetModelMetadataQuery, useGetModelQuery } from '../../../../services/api/endpoints/models';
+import { useGetModelMetadataQuery, useGetModelConfigQuery } from '../../../../services/api/endpoints/models';
 import { Flex, Text, Heading, Button, Box } from '@invoke-ai/ui-library';
 import DataViewer from '../../../gallery/components/ImageMetadataViewer/DataViewer';
 import { useCallback, useMemo } from 'react';
@@ -21,7 +21,7 @@ import { setSelectedModelMode } from '../../store/modelManagerV2Slice';
 export const ModelView = () => {
   const dispatch = useAppDispatch();
   const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
-  const { data, isLoading } = useGetModelQuery(selectedModelKey ?? skipToken);
+  const { data, isLoading } = useGetModelConfigQuery(selectedModelKey ?? skipToken);
   const { data: metadata } = useGetModelMetadataQuery(selectedModelKey ?? skipToken);
 
   const modelData = useMemo(() => {
