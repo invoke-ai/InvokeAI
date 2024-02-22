@@ -25,10 +25,10 @@ type UpdateModelArg = {
 };
 
 type UpdateModelResponse = paths['/api/v2/models/i/{key}']['patch']['responses']['200']['content']['application/json'];
+type GetModelConfigResponse = paths['/api/v2/models/i/{key}']['get']['responses']['200']['content']['application/json'];
 
 type GetModelMetadataResponse =
-  paths['/api/v2/models/meta/i/{key}']['get']['responses']['200']['content']['application/json'];
-type GetModelResponse = paths['/api/v2/models/i/{key}']['get']['responses']['200']['content']['application/json'];
+  paths['/api/v2/models/i/{key}/meta']['get']['responses']['200']['content']['application/json'];
 
 type ListModelsArg = NonNullable<paths['/api/v2/models/']['get']['parameters']['query']>;
 
@@ -78,15 +78,12 @@ type AddMainModelArg = {
 
 type AddMainModelResponse = paths['/api/v2/models/add']['post']['responses']['201']['content']['application/json'];
 
-type SyncModelsResponse = paths['/api/v2/models/sync']['patch']['responses']['204']['content']
-
-export type SearchFolderResponse =
-  paths['/api/v2/models/search']['get']['responses']['200']['content']['application/json'];
+export type ScanFolderResponse =
+  paths['/api/v2/models/scan_folder']['get']['responses']['200']['content']['application/json'];
+type ScanFolderArg = operations['scan_for_models']['parameters']['query'];
 
 type CheckpointConfigsResponse =
   paths['/api/v2/models/ckpt_confs']['get']['responses']['200']['content']['application/json'];
-
-type SearchFolderArg = operations['search_for_models']['parameters']['query'];
 
 export const mainModelsAdapter = createEntityAdapter<MainModelConfig, string>({
   selectId: (entity) => entity.key,
@@ -131,7 +128,6 @@ const buildProvidesTags =
   <TEntity extends AnyModelConfig>(tagType: (typeof tagTypes)[number]) =>
   (result: EntityState<TEntity, string> | undefined) => {
     const tags: ApiTagDescription[] = [{ type: tagType, id: LIST_TAG }, 'Model'];
-
     if (result) {
       tags.push(
         ...result.ids.map((id) => ({
@@ -175,15 +171,9 @@ export const modelsApi = api.injectEndpoints({
       providesTags: buildProvidesTags<MainModelConfig>('MainModel'),
       transformResponse: buildTransformResponse<MainModelConfig>(mainModelsAdapter),
     }),
-    getModel: build.query<GetModelResponse, string>({
-      query: (key) => {
-        return buildModelsUrl(`i/${key}`);
-      },
-      providesTags: ['Model'],
-    }),
     getModelMetadata: build.query<GetModelMetadataResponse, string>({
       query: (key) => {
-        return buildModelsUrl(`meta/i/${key}`);
+        return buildModelsUrl(`i/${key}/meta`);
       },
       providesTags: ['Model'],
     }),
@@ -247,7 +237,7 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['Model'],
     }),
-    getModelConfig: build.query<AnyModelConfig, string>({
+    getModelConfig: build.query<GetModelConfigResponse, string>({
       query: (key) => buildModelsUrl(`i/${key}`),
       providesTags: (result) => {
         const tags: ApiTagDescription[] = ['Model'];
@@ -259,7 +249,7 @@ export const modelsApi = api.injectEndpoints({
         return tags;
       },
     }),
-    syncModels: build.mutation<SyncModelsResponse, void>({
+    syncModels: build.mutation<void, void>({
       query: () => {
         return {
           url: buildModelsUrl('sync'),
@@ -298,16 +288,16 @@ export const modelsApi = api.injectEndpoints({
       providesTags: buildProvidesTags<TextualInversionModelConfig>('TextualInversionModel'),
       transformResponse: buildTransformResponse<TextualInversionModelConfig>(textualInversionModelsAdapter),
     }),
-    getModelsInFolder: build.query<SearchFolderResponse, SearchFolderArg>({
+    scanModels: build.query<ScanFolderResponse, ScanFolderArg>({
       query: (arg) => {
-        const folderQueryStr = queryString.stringify(arg, {});
+        const folderQueryStr = arg ? queryString.stringify(arg, {}) : '';
         return {
-          url: buildModelsUrl(`search?${folderQueryStr}`),
+          url: buildModelsUrl(`scan_folder?${folderQueryStr}`),
         };
       },
     }),
     getModelImports: build.query<ListImportModelsResponse, void>({
-      query: (arg) => {
+      query: () => {
         return {
           url: buildModelsUrl(`import`),
         };
@@ -358,11 +348,10 @@ export const {
   useConvertMainModelsMutation,
   useMergeMainModelsMutation,
   useSyncModelsMutation,
-  useGetModelsInFolderQuery,
+  useScanModelsQuery,
   useGetCheckpointConfigsQuery,
   useGetModelImportsQuery,
   useGetModelMetadataQuery,
   useDeleteModelImportMutation,
   usePruneModelImportsMutation,
-  useGetModelQuery,
 } = modelsApi;
