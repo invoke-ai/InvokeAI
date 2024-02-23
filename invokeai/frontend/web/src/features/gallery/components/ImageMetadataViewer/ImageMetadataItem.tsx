@@ -1,28 +1,39 @@
 import { ExternalLink, Flex, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
+import { get } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IoArrowUndoCircleOutline } from 'react-icons/io5';
-import { PiCopyBold } from 'react-icons/pi';
+import { PiArrowBendUpLeftBold } from 'react-icons/pi';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
 
 type MetadataItemProps = {
   isLink?: boolean;
   label: string;
-  onClick?: () => void;
-  value: number | string | boolean;
+  metadata: unknown;
+  propertyName: string;
+  onRecall?: (value: unknown) => void;
   labelPosition?: string;
-  withCopy?: boolean;
 };
 
 /**
  * Component to display an individual metadata item or parameter.
  */
-const ImageMetadataItem = ({ label, value, onClick, isLink, labelPosition, withCopy = false }: MetadataItemProps) => {
+const ImageMetadataItem = ({
+  label,
+  metadata,
+  propertyName,
+  onRecall: _onRecall,
+  isLink,
+  labelPosition,
+}: MetadataItemProps) => {
   const { t } = useTranslation();
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(value?.toString());
-  }, [value]);
+  const value = useMemo(() => get(metadata, propertyName), [metadata, propertyName]);
+  const onRecall = useCallback(() => {
+    if (!_onRecall) {
+      return;
+    }
+    _onRecall(value);
+  }, [_onRecall, value]);
 
   if (!value) {
     return null;
@@ -30,27 +41,15 @@ const ImageMetadataItem = ({ label, value, onClick, isLink, labelPosition, withC
 
   return (
     <Flex gap={2}>
-      {onClick && (
-        <Tooltip label={`Recall ${label}`}>
+      {_onRecall && (
+        <Tooltip label={t('metadata.recallParameter', { parameter: label })}>
           <IconButton
-            aria-label={t('accessibility.useThisParameter')}
-            icon={<IoArrowUndoCircleOutline />}
+            aria-label={t('metadata.recallParameter', { parameter: label })}
+            icon={<PiArrowBendUpLeftBold />}
             size="xs"
             variant="ghost"
             fontSize={20}
-            onClick={onClick}
-          />
-        </Tooltip>
-      )}
-      {withCopy && (
-        <Tooltip label={`Copy ${label}`}>
-          <IconButton
-            aria-label={`Copy ${label}`}
-            icon={<PiCopyBold />}
-            size="xs"
-            variant="ghost"
-            fontSize={14}
-            onClick={handleCopy}
+            onClick={onRecall}
           />
         </Tooltip>
       )}

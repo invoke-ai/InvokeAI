@@ -1,7 +1,8 @@
 import type { UseToastOptions } from '@invoke-ai/ui-library';
-import { createStandaloneToast, ExternalLink, theme, TOAST_OPTIONS } from '@invoke-ai/ui-library';
+import { ExternalLink } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { startAppListening } from 'app/store/middleware/listenerMiddleware';
+import { toast } from 'common/util/toast';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 import {
@@ -11,11 +12,6 @@ import {
 } from 'services/events/actions';
 
 const log = logger('images');
-
-const { toast } = createStandaloneToast({
-  theme: theme,
-  defaultOptions: TOAST_OPTIONS.defaultOptions,
-});
 
 export const addBulkDownloadListeners = () => {
   startAppListening({
