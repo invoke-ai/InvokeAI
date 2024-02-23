@@ -78,9 +78,9 @@ export type paths = {
      */
     post: operations["add_model_record"];
   };
-  "/api/v2/models/heuristic_import": {
+  "/api/v2/models/heuristic_install": {
     /**
-     * Heuristic Import
+     * Heuristic Install
      * @description Install a model using a string identifier.
      *
      * `source` can be any of the following.
@@ -107,7 +107,7 @@ export type paths = {
      * See the documentation for `import_model_record` for more information on
      * interpreting the job information returned by this route.
      */
-    post: operations["heuristic_import_model"];
+    post: operations["heuristic_install_model"];
   };
   "/api/v2/models/install": {
     /**
@@ -1424,7 +1424,7 @@ export type components = {
        * @default clip_vision
        * @constant
        */
-      type?: "clip_vision";
+      type: "clip_vision";
       /**
        * Format
        * @constant
@@ -1435,17 +1435,17 @@ export type components = {
        * @description unique key for model
        * @default <NOKEY>
        */
-      key?: string;
+      key: string;
       /**
        * Original Hash
        * @description original fasthash of model contents
        */
-      original_hash?: string | null;
+      original_hash: string | null;
       /**
        * Current Hash
        * @description current fasthash of model contents
        */
-      current_hash?: string | null;
+      current_hash: string | null;
       /**
        * Description
        * @description human readable description of the model
@@ -1455,12 +1455,12 @@ export type components = {
        * Source
        * @description model original source (path, URL or repo_id)
        */
-      source?: string | null;
+      source: string | null;
       /**
        * Last Modified
        * @description timestamp for modification time
        */
-      last_modified?: number | null;
+      last_modified: number | null;
     };
     /** CLIPVisionModelField */
     CLIPVisionModelField: {
@@ -2542,29 +2542,29 @@ export type components = {
        * @default controlnet
        * @constant
        */
-      type?: "controlnet";
+      type: "controlnet";
       /**
        * Format
        * @default checkpoint
        * @constant
        */
-      format?: "checkpoint";
+      format: "checkpoint";
       /**
        * Key
        * @description unique key for model
        * @default <NOKEY>
        */
-      key?: string;
+      key: string;
       /**
        * Original Hash
        * @description original fasthash of model contents
        */
-      original_hash?: string | null;
+      original_hash: string | null;
       /**
        * Current Hash
        * @description current fasthash of model contents
        */
-      current_hash?: string | null;
+      current_hash: string | null;
       /**
        * Description
        * @description human readable description of the model
@@ -2574,12 +2574,12 @@ export type components = {
        * Source
        * @description model original source (path, URL or repo_id)
        */
-      source?: string | null;
+      source: string | null;
       /**
        * Last Modified
        * @description timestamp for modification time
        */
-      last_modified?: number | null;
+      last_modified: number | null;
       /**
        * Config
        * @description path to the checkpoint model config file
@@ -2608,29 +2608,29 @@ export type components = {
        * @default controlnet
        * @constant
        */
-      type?: "controlnet";
+      type: "controlnet";
       /**
        * Format
        * @default diffusers
        * @constant
        */
-      format?: "diffusers";
+      format: "diffusers";
       /**
        * Key
        * @description unique key for model
        * @default <NOKEY>
        */
-      key?: string;
+      key: string;
       /**
        * Original Hash
        * @description original fasthash of model contents
        */
-      original_hash?: string | null;
+      original_hash: string | null;
       /**
        * Current Hash
        * @description current fasthash of model contents
        */
-      current_hash?: string | null;
+      current_hash: string | null;
       /**
        * Description
        * @description human readable description of the model
@@ -2640,12 +2640,12 @@ export type components = {
        * Source
        * @description model original source (path, URL or repo_id)
        */
-      source?: string | null;
+      source: string | null;
       /**
        * Last Modified
        * @description timestamp for modification time
        */
-      last_modified?: number | null;
+      last_modified: number | null;
       /** @default */
       repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
     };
@@ -2978,6 +2978,55 @@ export type components = {
       type: "create_denoise_mask";
     };
     /**
+     * Create Gradient Mask
+     * @description Creates mask for denoising model run.
+     */
+    CreateGradientMaskInvocation: {
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /** @description Image which will be masked */
+      mask?: components["schemas"]["ImageField"];
+      /**
+       * Edge Radius
+       * @description How far to blur/expand the edges of the mask
+       * @default 16
+       */
+      edge_radius?: number;
+      /**
+       * Coherence Mode
+       * @default Gaussian Blur
+       * @enum {string}
+       */
+      coherence_mode?: "Gaussian Blur" | "Box Blur" | "Staged";
+      /**
+       * Minimum Denoise
+       * @description Minimum denoise level for the coherence region
+       * @default 0
+       */
+      minimum_denoise?: number;
+      /**
+       * type
+       * @default create_gradient_mask
+       * @constant
+       */
+      type: "create_gradient_mask";
+    };
+    /**
      * Crop Latents
      * @description Crops a latent-space tensor to a box specified in image-space. The box dimensions and coordinates must be
      * divisible by the latent scale factor of 8.
@@ -3272,6 +3321,12 @@ export type components = {
        * @default null
        */
       masked_latents_name?: string | null;
+      /**
+       * Gradient
+       * @description Used for gradient inpainting
+       * @default false
+       */
+      gradient?: boolean;
     };
     /**
      * DenoiseMaskOutput
@@ -4218,7 +4273,7 @@ export type components = {
        * @description The nodes in this graph
        */
       nodes: {
-        [key: string]: components["schemas"]["CompelInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["DWOpenposeImageProcessorInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["DepthAnythingImageProcessorInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["ConditioningInvocation"];
+        [key: string]: components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["DWOpenposeImageProcessorInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["DepthAnythingImageProcessorInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ImageBlurInvocation"];
       };
       /**
        * Edges
@@ -4255,7 +4310,7 @@ export type components = {
        * @description The results of node executions
        */
       results: {
-        [key: string]: components["schemas"]["ModelLoaderOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["SDXLLoraLoaderOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["ClipSkipInvocationOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["String2Output"] | components["schemas"]["NoiseOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["FaceOffOutput"];
+        [key: string]: components["schemas"]["FloatCollectionOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["ClipSkipInvocationOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["SDXLLoraLoaderOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["String2Output"] | components["schemas"]["ControlOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["ConditioningOutput"];
       };
       /**
        * Errors
@@ -4426,7 +4481,7 @@ export type components = {
        * @default ip_adapter
        * @constant
        */
-      type?: "ip_adapter";
+      type: "ip_adapter";
       /**
        * Format
        * @constant
@@ -4437,17 +4492,17 @@ export type components = {
        * @description unique key for model
        * @default <NOKEY>
        */
-      key?: string;
+      key: string;
       /**
        * Original Hash
        * @description original fasthash of model contents
        */
-      original_hash?: string | null;
+      original_hash: string | null;
       /**
        * Current Hash
        * @description current fasthash of model contents
        */
-      current_hash?: string | null;
+      current_hash: string | null;
       /**
        * Description
        * @description human readable description of the model
@@ -4457,12 +4512,12 @@ export type components = {
        * Source
        * @description model original source (path, URL or repo_id)
        */
-      source?: string | null;
+      source: string | null;
       /**
        * Last Modified
        * @description timestamp for modification time
        */
-      last_modified?: number | null;
+      last_modified: number | null;
       /** Image Encoder Model Id */
       image_encoder_model_id: string;
     };
@@ -6510,7 +6565,7 @@ export type components = {
        * @default lora
        * @constant
        */
-      type?: "lora";
+      type: "lora";
       /**
        * Format
        * @enum {string}
@@ -6521,17 +6576,17 @@ export type components = {
        * @description unique key for model
        * @default <NOKEY>
        */
-      key?: string;
+      key: string;
       /**
        * Original Hash
        * @description original fasthash of model contents
        */
-      original_hash?: string | null;
+      original_hash: string | null;
       /**
        * Current Hash
        * @description current fasthash of model contents
        */
-      current_hash?: string | null;
+      current_hash: string | null;
       /**
        * Description
        * @description human readable description of the model
@@ -6541,12 +6596,12 @@ export type components = {
        * Source
        * @description model original source (path, URL or repo_id)
        */
-      source?: string | null;
+      source: string | null;
       /**
        * Last Modified
        * @description timestamp for modification time
        */
-      last_modified?: number | null;
+      last_modified: number | null;
     };
     /**
      * LoRAMetadataField
@@ -6710,29 +6765,29 @@ export type components = {
        * @default main
        * @constant
        */
-      type?: "main";
+      type: "main";
       /**
        * Format
        * @default checkpoint
        * @constant
        */
-      format?: "checkpoint";
+      format: "checkpoint";
       /**
        * Key
        * @description unique key for model
        * @default <NOKEY>
        */
-      key?: string;
+      key: string;
       /**
        * Original Hash
        * @description original fasthash of model contents
        */
-      original_hash?: string | null;
+      original_hash: string | null;
       /**
        * Current Hash
        * @description current fasthash of model contents
        */
-      current_hash?: string | null;
+      current_hash: string | null;
       /**
        * Description
        * @description human readable description of the model
@@ -6742,12 +6797,12 @@ export type components = {
        * Source
        * @description model original source (path, URL or repo_id)
        */
-      source?: string | null;
+      source: string | null;
       /**
        * Last Modified
        * @description timestamp for modification time
        */
-      last_modified?: number | null;
+      last_modified: number | null;
       /** Vae */
       vae?: string | null;
       /** @default normal */
@@ -6792,29 +6847,29 @@ export type components = {
        * @default main
        * @constant
        */
-      type?: "main";
+      type: "main";
       /**
        * Format
        * @default diffusers
        * @constant
        */
-      format?: "diffusers";
+      format: "diffusers";
       /**
        * Key
        * @description unique key for model
        * @default <NOKEY>
        */
-      key?: string;
+      key: string;
       /**
        * Original Hash
        * @description original fasthash of model contents
        */
-      original_hash?: string | null;
+      original_hash: string | null;
       /**
        * Current Hash
        * @description current fasthash of model contents
        */
-      current_hash?: string | null;
+      current_hash: string | null;
       /**
        * Description
        * @description human readable description of the model
@@ -6824,12 +6879,12 @@ export type components = {
        * Source
        * @description model original source (path, URL or repo_id)
        */
-      source?: string | null;
+      source: string | null;
       /**
        * Last Modified
        * @description timestamp for modification time
        */
-      last_modified?: number | null;
+      last_modified: number | null;
       /** Vae */
       vae?: string | null;
       /** @default normal */
@@ -7472,6 +7527,16 @@ export type components = {
        * @description Download jobs contributing to this install
        */
       download_parts?: components["schemas"]["DownloadJob"][];
+      /**
+       * Error
+       * @description On an error condition, this field will contain the text of the exception
+       */
+      error?: string | null;
+      /**
+       * Error Traceback
+       * @description On an error condition, this field will contain the exception traceback
+       */
+      error_traceback?: string | null;
     };
     /**
      * ModelLoaderOutput
@@ -7767,13 +7832,13 @@ export type components = {
        * @default sd-1
        * @constant
        */
-      base?: "sd-1";
+      base: "sd-1";
       /**
        * Type
        * @default onnx
        * @constant
        */
-      type?: "onnx";
+      type: "onnx";
       /**
        * Format
        * @enum {string}
@@ -7784,17 +7849,17 @@ export type components = {
        * @description unique key for model
        * @default <NOKEY>
        */
-      key?: string;
+      key: string;
       /**
        * Original Hash
        * @description original fasthash of model contents
        */
-      original_hash?: string | null;
+      original_hash: string | null;
       /**
        * Current Hash
        * @description current fasthash of model contents
        */
-      current_hash?: string | null;
+      current_hash: string | null;
       /**
        * Description
        * @description human readable description of the model
@@ -7804,12 +7869,12 @@ export type components = {
        * Source
        * @description model original source (path, URL or repo_id)
        */
-      source?: string | null;
+      source: string | null;
       /**
        * Last Modified
        * @description timestamp for modification time
        */
-      last_modified?: number | null;
+      last_modified: number | null;
       /** Vae */
       vae?: string | null;
       /** @default normal */
@@ -7847,13 +7912,13 @@ export type components = {
        * @default sd-2
        * @constant
        */
-      base?: "sd-2";
+      base: "sd-2";
       /**
        * Type
        * @default onnx
        * @constant
        */
-      type?: "onnx";
+      type: "onnx";
       /**
        * Format
        * @enum {string}
@@ -7864,17 +7929,17 @@ export type components = {
        * @description unique key for model
        * @default <NOKEY>
        */
-      key?: string;
+      key: string;
       /**
        * Original Hash
        * @description original fasthash of model contents
        */
-      original_hash?: string | null;
+      original_hash: string | null;
       /**
        * Current Hash
        * @description current fasthash of model contents
        */
-      current_hash?: string | null;
+      current_hash: string | null;
       /**
        * Description
        * @description human readable description of the model
@@ -7884,12 +7949,12 @@ export type components = {
        * Source
        * @description model original source (path, URL or repo_id)
        */
-      source?: string | null;
+      source: string | null;
       /**
        * Last Modified
        * @description timestamp for modification time
        */
-      last_modified?: number | null;
+      last_modified: number | null;
       /** Vae */
       vae?: string | null;
       /** @default normal */
@@ -7927,13 +7992,13 @@ export type components = {
        * @default sdxl
        * @constant
        */
-      base?: "sdxl";
+      base: "sdxl";
       /**
        * Type
        * @default onnx
        * @constant
        */
-      type?: "onnx";
+      type: "onnx";
       /**
        * Format
        * @enum {string}
@@ -7944,17 +8009,17 @@ export type components = {
        * @description unique key for model
        * @default <NOKEY>
        */
-      key?: string;
+      key: string;
       /**
        * Original Hash
        * @description original fasthash of model contents
        */
-      original_hash?: string | null;
+      original_hash: string | null;
       /**
        * Current Hash
        * @description current fasthash of model contents
        */
-      current_hash?: string | null;
+      current_hash: string | null;
       /**
        * Description
        * @description human readable description of the model
@@ -7964,12 +8029,12 @@ export type components = {
        * Source
        * @description model original source (path, URL or repo_id)
        */
-      source?: string | null;
+      source: string | null;
       /**
        * Last Modified
        * @description timestamp for modification time
        */
-      last_modified?: number | null;
+      last_modified: number | null;
       /** Vae */
       vae?: string | null;
       /** @default normal */
@@ -10119,7 +10184,7 @@ export type components = {
        * @default t2i_adapter
        * @constant
        */
-      type?: "t2i_adapter";
+      type: "t2i_adapter";
       /**
        * Format
        * @constant
@@ -10130,17 +10195,17 @@ export type components = {
        * @description unique key for model
        * @default <NOKEY>
        */
-      key?: string;
+      key: string;
       /**
        * Original Hash
        * @description original fasthash of model contents
        */
-      original_hash?: string | null;
+      original_hash: string | null;
       /**
        * Current Hash
        * @description current fasthash of model contents
        */
-      current_hash?: string | null;
+      current_hash: string | null;
       /**
        * Description
        * @description human readable description of the model
@@ -10150,12 +10215,12 @@ export type components = {
        * Source
        * @description model original source (path, URL or repo_id)
        */
-      source?: string | null;
+      source: string | null;
       /**
        * Last Modified
        * @description timestamp for modification time
        */
-      last_modified?: number | null;
+      last_modified: number | null;
     };
     /** TBLR */
     TBLR: {
@@ -10190,7 +10255,7 @@ export type components = {
        * @default embedding
        * @constant
        */
-      type?: "embedding";
+      type: "embedding";
       /**
        * Format
        * @enum {string}
@@ -10201,17 +10266,17 @@ export type components = {
        * @description unique key for model
        * @default <NOKEY>
        */
-      key?: string;
+      key: string;
       /**
        * Original Hash
        * @description original fasthash of model contents
        */
-      original_hash?: string | null;
+      original_hash: string | null;
       /**
        * Current Hash
        * @description current fasthash of model contents
        */
-      current_hash?: string | null;
+      current_hash: string | null;
       /**
        * Description
        * @description human readable description of the model
@@ -10221,12 +10286,12 @@ export type components = {
        * Source
        * @description model original source (path, URL or repo_id)
        */
-      source?: string | null;
+      source: string | null;
       /**
        * Last Modified
        * @description timestamp for modification time
        */
-      last_modified?: number | null;
+      last_modified: number | null;
     };
     /** Tile */
     Tile: {
@@ -10539,29 +10604,29 @@ export type components = {
        * @default vae
        * @constant
        */
-      type?: "vae";
+      type: "vae";
       /**
        * Format
        * @default checkpoint
        * @constant
        */
-      format?: "checkpoint";
+      format: "checkpoint";
       /**
        * Key
        * @description unique key for model
        * @default <NOKEY>
        */
-      key?: string;
+      key: string;
       /**
        * Original Hash
        * @description original fasthash of model contents
        */
-      original_hash?: string | null;
+      original_hash: string | null;
       /**
        * Current Hash
        * @description current fasthash of model contents
        */
-      current_hash?: string | null;
+      current_hash: string | null;
       /**
        * Description
        * @description human readable description of the model
@@ -10571,12 +10636,12 @@ export type components = {
        * Source
        * @description model original source (path, URL or repo_id)
        */
-      source?: string | null;
+      source: string | null;
       /**
        * Last Modified
        * @description timestamp for modification time
        */
-      last_modified?: number | null;
+      last_modified: number | null;
     };
     /**
      * VaeDiffusersConfig
@@ -10600,29 +10665,29 @@ export type components = {
        * @default vae
        * @constant
        */
-      type?: "vae";
+      type: "vae";
       /**
        * Format
        * @default diffusers
        * @constant
        */
-      format?: "diffusers";
+      format: "diffusers";
       /**
        * Key
        * @description unique key for model
        * @default <NOKEY>
        */
-      key?: string;
+      key: string;
       /**
        * Original Hash
        * @description original fasthash of model contents
        */
-      original_hash?: string | null;
+      original_hash: string | null;
       /**
        * Current Hash
        * @description current fasthash of model contents
        */
-      current_hash?: string | null;
+      current_hash: string | null;
       /**
        * Description
        * @description human readable description of the model
@@ -10632,12 +10697,12 @@ export type components = {
        * Source
        * @description model original source (path, URL or repo_id)
        */
-      source?: string | null;
+      source: string | null;
       /**
        * Last Modified
        * @description timestamp for modification time
        */
-      last_modified?: number | null;
+      last_modified: number | null;
     };
     /** VaeField */
     VaeField: {
@@ -11469,7 +11534,7 @@ export type operations = {
     };
   };
   /**
-   * Heuristic Import
+   * Heuristic Install
    * @description Install a model using a string identifier.
    *
    * `source` can be any of the following.
@@ -11496,7 +11561,7 @@ export type operations = {
    * See the documentation for `import_model_record` for more information on
    * interpreting the job information returned by this route.
    */
-  heuristic_import_model: {
+  heuristic_install_model: {
     parameters: {
       query: {
         source: string;
@@ -11507,8 +11572,8 @@ export type operations = {
       content: {
         /**
          * @example {
-         *   "name": "modelT",
-         *   "description": "antique cars"
+         *   "name": "string",
+         *   "description": "string"
          * }
          */
         "application/json": Record<string, never> | null;

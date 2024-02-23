@@ -6,6 +6,7 @@ import {
 } from 'services/events/actions';
 
 import { startAppListening } from '../..';
+import { api } from '../../../../../../services/api';
 
 export const addModelInstallEventListener = () => {
   startAppListening({
@@ -40,6 +41,7 @@ export const addModelInstallEventListener = () => {
           return draft;
         })
       );
+      dispatch(api.util.invalidateTags([{ type: "ModelConfig" }]))
     },
   });
 
