@@ -542,8 +542,10 @@ class ModelInstallService(ModelInstallServiceBase):
     def _register(
         self, model_path: Path, config: Optional[Dict[str, Any]] = None, info: Optional[AnyModelConfig] = None
     ) -> str:
-        info = info or ModelProbe.probe(model_path, config)
         key = self._create_key()
+        if config and not config.get('key', None):
+            config['key'] = key
+        info = info or ModelProbe.probe(model_path, config)
 
         model_path = model_path.absolute()
         if model_path.is_relative_to(self.app_config.models_path):
@@ -556,8 +558,8 @@ class ModelInstallService(ModelInstallServiceBase):
             # make config relative to our root
             legacy_conf = (self.app_config.root_dir / self.app_config.legacy_conf_dir / info.config).resolve()
             info.config = legacy_conf.relative_to(self.app_config.root_dir).as_posix()
-        self.record_store.add_model(key, info)
-        return key
+        self.record_store.add_model(info.key, info)
+        return info.key
 
     def _next_id(self) -> int:
         with self._lock:
