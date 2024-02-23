@@ -171,7 +171,7 @@ export const ModelEdit = () => {
                 colorScheme="invokeYellow"
                 onClick={handleSubmit(onSubmit)}
                 isLoading={isSubmitting}
-                isDisabled={Boolean(errors)}
+                isDisabled={Boolean(Object.keys(errors).length)}
               >
                 Save
               </Button>
