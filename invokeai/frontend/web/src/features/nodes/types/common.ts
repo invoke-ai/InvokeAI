@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+import type { ModelIdentifier as ModelIdentifierV2 } from './v2/common';
+import { zModelIdentifier as zModelIdentifierV2 } from './v2/common';
+
 // #region Field data schemas
 export const zImageField = z.object({
   image_name: z.string().trim().min(1),
@@ -69,6 +72,8 @@ export const zModelIdentifier = z.object({
 });
 export const isModelIdentifier = (field: unknown): field is ModelIdentifier =>
   zModelIdentifier.safeParse(field).success;
+export const isModelIdentifierV2 = (field: unknown): field is ModelIdentifierV2 =>
+  zModelIdentifierV2.safeParse(field).success;
 export const zModelFieldBase = zModelIdentifier;
 export const zModelIdentifierWithBase = zModelIdentifier.extend({ base: zBaseModel });
 export type BaseModel = z.infer<typeof zBaseModel>;
