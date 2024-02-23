@@ -1,9 +1,10 @@
-import { Divider, Flex, Heading, IconButton, Input, InputGroup, InputRightElement, Text } from '@invoke-ai/ui-library';
+import { Divider, Flex, Heading, IconButton, Input, InputGroup, InputRightElement } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { t } from 'i18next';
 import type { ChangeEventHandler } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { PiXBold } from 'react-icons/pi';
+
 import { ScanModelResultItem } from './ScanModelResultItem';
 
 export const ScanModelsResults = ({ results }: { results: string[] }) => {
@@ -16,12 +17,9 @@ export const ScanModelsResults = ({ results }: { results: string[] }) => {
     });
   }, [results, searchTerm]);
 
-  const handleSearch: ChangeEventHandler<HTMLInputElement> = useCallback(
-    (e) => {
-      setSearchTerm(e.target.value);
-    },
-    [results]
-  );
+  const handleSearch: ChangeEventHandler<HTMLInputElement> = useCallback((e) => {
+    setSearchTerm(e.target.value);
+  }, []);
 
   const clearSearch = useCallback(() => {
     setSearchTerm('');

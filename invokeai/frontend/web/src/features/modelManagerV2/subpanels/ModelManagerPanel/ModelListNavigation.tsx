@@ -1,8 +1,8 @@
-import { Flex, IconButton,Input, InputGroup, InputRightElement, Spacer } from '@invoke-ai/ui-library';
+import { Flex, IconButton, Input, InputGroup, InputRightElement, Spacer } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setSearchTerm } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { t } from 'i18next';
-import type { ChangeEventHandler} from 'react';
+import type { ChangeEventHandler } from 'react';
 import { useCallback } from 'react';
 import { PiXBold } from 'react-icons/pi';
 
