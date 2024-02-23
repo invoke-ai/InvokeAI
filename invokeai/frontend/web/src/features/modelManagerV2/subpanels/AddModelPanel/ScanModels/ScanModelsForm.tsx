@@ -25,7 +25,7 @@ export const ScanModelsForm = () => {
           setErrorMessage(error.data.detail);
         }
       });
-  }, [scanPath]);
+  }, [_scanModels, scanPath]);
 
   const handleSetScanPath: ChangeEventHandler<HTMLInputElement> = useCallback((e) => {
     setScanPath(e.target.value);

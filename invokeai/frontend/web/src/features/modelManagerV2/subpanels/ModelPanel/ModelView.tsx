@@ -1,22 +1,23 @@
+import { Box,Button, Flex, Heading, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppDispatch, useAppSelector } from '../../../../app/store/storeHooks';
-import { useGetModelMetadataQuery, useGetModelConfigQuery } from '../../../../services/api/endpoints/models';
-import { Flex, Text, Heading, Button, Box } from '@invoke-ai/ui-library';
-import DataViewer from '../../../gallery/components/ImageMetadataViewer/DataViewer';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
+import { setSelectedModelMode } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { useCallback, useMemo } from 'react';
-import {
-  CheckpointModelConfig,
-  ControlNetConfig,
-  DiffusersModelConfig,
-  IPAdapterConfig,
-  LoRAConfig,
-  T2IAdapterConfig,
-  TextualInversionConfig,
-  VAEConfig,
-} from '../../../../services/api/types';
-import { ModelAttrView } from './ModelAttrView';
 import { IoPencil } from 'react-icons/io5';
-import { setSelectedModelMode } from '../../store/modelManagerV2Slice';
+import { useGetModelConfigQuery,useGetModelMetadataQuery } from 'services/api/endpoints/models';
+import type {
+  CheckpointModelConfig,
+  ControlNetModelConfig,
+  DiffusersModelConfig,
+  IPAdapterModelConfig,
+  LoRAModelConfig,
+  T2IAdapterModelConfig,
+  TextualInversionModelConfig,
+  VAEModelConfig,
+} from 'services/api/types';
+
+import { ModelAttrView } from './ModelAttrView';
 
 export const ModelView = () => {
   const dispatch = useAppDispatch();
@@ -41,17 +42,17 @@ export const ModelView = () => {
 
     switch (modelType) {
       case 'lora':
-        return data as LoRAConfig;
+        return data as LoRAModelConfig;
       case 'embedding':
-        return data as TextualInversionConfig;
+        return data as TextualInversionModelConfig;
       case 't2i_adapter':
-        return data as T2IAdapterConfig;
+        return data as T2IAdapterModelConfig;
       case 'ip_adapter':
-        return data as IPAdapterConfig;
+        return data as IPAdapterModelConfig;
       case 'controlnet':
-        return data as ControlNetConfig;
+        return data as ControlNetModelConfig;
       case 'vae':
-        return data as VAEConfig;
+        return data as VAEModelConfig;
       default:
         return null;
     }

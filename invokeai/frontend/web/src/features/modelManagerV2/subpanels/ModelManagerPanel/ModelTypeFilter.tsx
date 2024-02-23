@@ -40,9 +40,8 @@ export const ModelTypeFilter = () => {
         <MenuItem onClick={clearModelType}>All Models</MenuItem>
         {Object.keys(MODEL_TYPE_LABELS).map((option) => (
           <MenuItem
-            sx={{
-              backgroundColor: filteredModelType === option ? 'base.700' : 'transparent',
-            }}
+            key={option}
+            bg={filteredModelType === option ? 'base.700' : 'transparent'}
             onClick={selectModelType.bind(null, option)}
           >
             {MODEL_TYPE_LABELS[option]}
