@@ -1,11 +1,11 @@
-import { Box,Button, Flex, Heading, Text } from '@invoke-ai/ui-library';
+import { Box, Button, Flex, Heading, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import { setSelectedModelMode } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { useCallback, useMemo } from 'react';
 import { IoPencil } from 'react-icons/io5';
-import { useGetModelConfigQuery,useGetModelMetadataQuery } from 'services/api/endpoints/models';
+import { useGetModelConfigQuery, useGetModelMetadataQuery } from 'services/api/endpoints/models';
 import type {
   CheckpointModelConfig,
   ControlNetModelConfig,
@@ -18,6 +18,7 @@ import type {
 } from 'services/api/types';
 
 import { ModelAttrView } from './ModelAttrView';
+import { ModelConvert } from './ModelConvert';
 
 export const ModelView = () => {
   const dispatch = useAppDispatch();
@@ -79,9 +80,12 @@ export const ModelView = () => {
 
           {modelData.source && <Text variant="subtext">Source: {modelData.source}</Text>}
         </Flex>
-        <Button size="sm" leftIcon={<IoPencil />} colorScheme="invokeYellow" onClick={handleEditModel}>
-          Edit
-        </Button>
+        <Flex gap={2}>
+          <Button size="sm" leftIcon={<IoPencil />} colorScheme="invokeYellow" onClick={handleEditModel}>
+            Edit
+          </Button>
+          {modelData.type === 'main' && modelData.format === 'checkpoint' && <ModelConvert model={modelData} />}
+        </Flex>
       </Flex>
 
       <Flex flexDir="column" p={2} gap={3}>
