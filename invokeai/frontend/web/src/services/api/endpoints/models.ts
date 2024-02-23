@@ -55,13 +55,13 @@ type MergeMainModelArg = {
 type MergeMainModelResponse = paths['/api/v2/models/merge']['put']['responses']['200']['content']['application/json'];
 
 type ImportMainModelArg = {
-  source: NonNullable<operations['heuristic_import_model']['parameters']['query']['source']>;
-  access_token?: operations['heuristic_import_model']['parameters']['query']['access_token'];
-  config: NonNullable<operations['heuristic_import_model']['requestBody']['content']['application/json']>;
+  source: NonNullable<operations['heuristic_install_model']['parameters']['query']['source']>;
+  access_token?: operations['heuristic_install_model']['parameters']['query']['access_token'];
+  config: NonNullable<operations['heuristic_install_model']['requestBody']['content']['application/json']>;
 };
 
 type ImportMainModelResponse =
-  paths['/api/v2/models/heuristic_import']['post']['responses']['201']['content']['application/json'];
+  paths['/api/v2/models/heuristic_install']['post']['responses']['201']['content']['application/json'];
 
 type ListImportModelsResponse =
   paths['/api/v2/models/import']['get']['responses']['200']['content']['application/json'];
@@ -191,7 +191,7 @@ export const modelsApi = api.injectEndpoints({
     importMainModels: build.mutation<ImportMainModelResponse, ImportMainModelArg>({
       query: ({ source, config, access_token }) => {
         return {
-          url: buildModelsUrl('heuristic_import'),
+          url: buildModelsUrl('heuristic_install'),
           params: { source, access_token },
           method: 'POST',
           body: config,
