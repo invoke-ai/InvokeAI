@@ -10,7 +10,6 @@ import type {
   IPAdapterModelConfig,
   LoRAModelConfig,
   MainModelConfig,
-  MergeModelConfig,
   T2IAdapterModelConfig,
   TextualInversionModelConfig,
   VAEModelConfig,
@@ -38,21 +37,8 @@ type DeleteMainModelArg = {
 
 type DeleteMainModelResponse = void;
 
-type ConvertMainModelArg = {
-  base_model: BaseModelType;
-  model_name: string;
-  convert_dest_directory?: string;
-};
-
 type ConvertMainModelResponse =
   paths['/api/v2/models/convert/{key}']['put']['responses']['200']['content']['application/json'];
-
-type MergeMainModelArg = {
-  base_model: BaseModelType;
-  body: MergeModelConfig;
-};
-
-type MergeMainModelResponse = paths['/api/v2/models/merge']['put']['responses']['200']['content']['application/json'];
 
 type ImportMainModelArg = {
   source: NonNullable<operations['heuristic_install_model']['parameters']['query']['source']>;
@@ -72,19 +58,10 @@ type DeleteImportModelsResponse =
 type PruneModelImportsResponse =
   paths['/api/v2/models/import']['patch']['responses']['200']['content']['application/json'];
 
-type ImportAdvancedModelArg = {
-  source: NonNullable<operations['import_model']['requestBody']['content']['application/json']['source']>;
-  config: NonNullable<operations['import_model']['requestBody']['content']['application/json']['config']>;
-};
-
-type ImportAdvancedModelResponse = paths['/api/v2/models/import']['post']['responses']['201']['content']['application/json'];
 
 export type ScanFolderResponse =
   paths['/api/v2/models/scan_folder']['get']['responses']['200']['content']['application/json'];
 type ScanFolderArg = operations['scan_for_models']['parameters']['query'];
-
-type CheckpointConfigsResponse =
-  paths['/api/v2/models/ckpt_confs']['get']['responses']['200']['content']['application/json'];
 
 export const mainModelsAdapter = createEntityAdapter<MainModelConfig, string>({
   selectId: (entity) => entity.key,
@@ -199,16 +176,6 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['Model', 'ModelImports'],
     }),
-    importAdvancedModel: build.mutation<ImportAdvancedModelResponse, ImportAdvancedModelArg>({
-      query: ({ source, config}) => {
-        return {
-          url: buildModelsUrl('install'),
-          method: 'POST',
-          body: { source, config },
-        };
-      },
-      invalidatesTags: ['Model', 'ModelImports'],
-    }),
     deleteModels: build.mutation<DeleteMainModelResponse, DeleteMainModelArg>({
       query: ({ key }) => {
         return {
@@ -218,25 +185,14 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['Model'],
     }),
-    convertMainModels: build.mutation<ConvertMainModelResponse, ConvertMainModelArg>({
-      query: ({ base_model, model_name, convert_dest_directory }) => {
+    convertMainModels: build.mutation<ConvertMainModelResponse, string>({
+      query: (key) => {
         return {
-          url: buildModelsUrl(`convert/${base_model}/main/${model_name}`),
+          url: buildModelsUrl(`convert/${key}`),
           method: 'PUT',
-          params: { convert_dest_directory },
         };
       },
-      invalidatesTags: ['Model'],
-    }),
-    mergeMainModels: build.mutation<MergeMainModelResponse, MergeMainModelArg>({
-      query: ({ base_model, body }) => {
-        return {
-          url: buildModelsUrl(`merge/${base_model}`),
-          method: 'PUT',
-          body: body,
-        };
-      },
-      invalidatesTags: ['Model'],
+      invalidatesTags: ['ModelConfig'],
     }),
     getModelConfig: build.query<GetModelConfigResponse, string>({
       query: (key) => buildModelsUrl(`i/${key}`),
@@ -323,13 +279,6 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['ModelImports'],
     }),
-    getCheckpointConfigs: build.query<CheckpointConfigsResponse, void>({
-      query: () => {
-        return {
-          url: buildModelsUrl(`ckpt_confs`),
-        };
-      },
-    }),
   }),
 });
 
@@ -345,13 +294,10 @@ export const {
   useDeleteModelsMutation,
   useUpdateModelsMutation,
   useImportMainModelsMutation,
-  useImportAdvancedModelMutation,
   useConvertMainModelsMutation,
-  useMergeMainModelsMutation,
   useSyncModelsMutation,
   useScanModelsQuery,
   useLazyScanModelsQuery,
-  useGetCheckpointConfigsQuery,
   useGetModelImportsQuery,
   useGetModelMetadataQuery,
   useDeleteModelImportMutation,

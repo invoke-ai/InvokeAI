@@ -15,8 +15,7 @@ import { dynamicPromptsPersistConfig, dynamicPromptsSlice } from 'features/dynam
 import { galleryPersistConfig, gallerySlice } from 'features/gallery/store/gallerySlice';
 import { hrfPersistConfig, hrfSlice } from 'features/hrf/store/hrfSlice';
 import { loraPersistConfig, loraSlice } from 'features/lora/store/loraSlice';
-import { modelManagerPersistConfig, modelManagerSlice } from 'features/modelManager/store/modelManagerSlice';
-import { modelManagerV2Slice } from 'features/modelManagerV2/store/modelManagerV2Slice';
+import { modelManagerV2PersistConfig, modelManagerV2Slice } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { nodesPersistConfig, nodesSlice } from 'features/nodes/store/nodesSlice';
 import { workflowPersistConfig, workflowSlice } from 'features/nodes/store/workflowSlice';
 import { generationPersistConfig, generationSlice } from 'features/parameters/store/generationSlice';
@@ -55,7 +54,6 @@ const allReducers = {
   [deleteImageModalSlice.name]: deleteImageModalSlice.reducer,
   [changeBoardModalSlice.name]: changeBoardModalSlice.reducer,
   [loraSlice.name]: loraSlice.reducer,
-  [modelManagerSlice.name]: modelManagerSlice.reducer,
   [modelManagerV2Slice.name]: modelManagerV2Slice.reducer,
   [sdxlSlice.name]: sdxlSlice.reducer,
   [queueSlice.name]: queueSlice.reducer,
@@ -103,7 +101,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [dynamicPromptsPersistConfig.name]: dynamicPromptsPersistConfig,
   [sdxlPersistConfig.name]: sdxlPersistConfig,
   [loraPersistConfig.name]: loraPersistConfig,
-  [modelManagerPersistConfig.name]: modelManagerPersistConfig,
+  [modelManagerV2PersistConfig.name]: modelManagerV2PersistConfig,
   [hrfPersistConfig.name]: hrfPersistConfig,
 };
 
