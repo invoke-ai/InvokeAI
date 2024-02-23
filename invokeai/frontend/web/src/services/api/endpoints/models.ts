@@ -61,7 +61,7 @@ type ImportMainModelArg = {
 };
 
 type ImportMainModelResponse =
-  paths['/api/v2/models/import']['post']['responses']['201']['content']['application/json'];
+  paths['/api/v2/models/heuristic_import']['post']['responses']['201']['content']['application/json'];
 
 type ListImportModelsResponse =
   paths['/api/v2/models/import']['get']['responses']['200']['content']['application/json'];
