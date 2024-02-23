@@ -1,9 +1,10 @@
 import { Box, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 
 import { AdvancedImport } from './AddModelPanel/AdvancedImport';
-import { ImportQueue } from './AddModelPanel/ImportQueue';
+import { ImportQueue } from './AddModelPanel/ImportQueue/ImportQueue';
 import { ScanModels } from './AddModelPanel/ScanModels/ScanModels';
 import { SimpleImport } from './AddModelPanel/SimpleImport';
+import { ScanModelsForm } from './AddModelPanel/ScanModels/ScanModelsForm';
 
 export const ImportModels = () => {
   return (
@@ -23,10 +24,10 @@ export const ImportModels = () => {
               <SimpleImport />
             </TabPanel>
             <TabPanel height="100%">
-            <AdvancedImport />
+              <AdvancedImport />
             </TabPanel>
             <TabPanel height="100%">
-              <ScanModels />
+              <ScanModelsForm />
             </TabPanel>
           </TabPanels>
         </Tabs>
