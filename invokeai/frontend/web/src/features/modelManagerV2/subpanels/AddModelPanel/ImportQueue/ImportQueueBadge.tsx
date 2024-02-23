@@ -12,7 +12,7 @@ const STATUSES = {
   cancelled: { colorScheme: 'orange', translationKey: 'queue.canceled' },
 };
 
-const ImportQueueBadge = ({ status, detail }: { status?: ModelInstallStatus; detail?: string }) => {
+const ImportQueueBadge = ({ status, errorReason }: { status?: ModelInstallStatus; errorReason?: string | null }) => {
   const { t } = useTranslation();
 
   if (!status) {
@@ -20,7 +20,7 @@ const ImportQueueBadge = ({ status, detail }: { status?: ModelInstallStatus; det
   }
 
   return (
-    <Tooltip label={detail}>
+    <Tooltip label={errorReason}>
       <Badge colorScheme={STATUSES[status].colorScheme}>{t(STATUSES[status].translationKey)}</Badge>
     </Tooltip>
   );
