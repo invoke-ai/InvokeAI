@@ -52,7 +52,7 @@ export const migrateModelManagerState = (state: any): any => {
     return state;
 };
 
-export const modelManagerPersistConfig: PersistConfig<ModelManagerState> = {
+export const modelManagerV2PersistConfig: PersistConfig<ModelManagerState> = {
     name: modelManagerV2Slice.name,
     initialState: initialModelManagerState,
     migrate: migrateModelManagerState,
