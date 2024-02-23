@@ -156,6 +156,7 @@ class ModelInstallJob(BaseModel):
 
     id: int = Field(description="Unique ID for this job")
     status: InstallStatus = Field(default=InstallStatus.WAITING, description="Current status of install process")
+    error_reason: Optional[str] = Field(default=None, description="Information about why the job failed")
     config_in: Dict[str, Any] = Field(
         default_factory=dict, description="Configuration information (e.g. 'description') to apply to model."
     )
@@ -193,6 +194,7 @@ class ModelInstallJob(BaseModel):
         self.error = str(e)
         self.error_traceback = self._format_error(e)
         self.status = InstallStatus.ERROR
+        self.error_reason = self._exception.__class__.__name__ if self._exception else None
 
     def cancel(self) -> None:
         """Call to cancel the job."""
