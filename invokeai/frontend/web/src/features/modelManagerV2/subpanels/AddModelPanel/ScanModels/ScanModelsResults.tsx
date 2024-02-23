@@ -1,18 +1,10 @@
-import {
-  Divider,
-  Flex,
-  Heading,
-  IconButton,
-  Input,
-  InputGroup,
-  InputRightElement,
-  Text,
-} from '@invoke-ai/ui-library';
+import { Divider, Flex, Heading, IconButton, Input, InputGroup, InputRightElement, Text } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { t } from 'i18next';
-import type { ChangeEventHandler} from 'react';
+import type { ChangeEventHandler } from 'react';
 import { useCallback, useState } from 'react';
 import { PiXBold } from 'react-icons/pi';
+import { ScanModelResultItem } from './ScanModelResultItem';
 
 export const ScanModelsResults = ({ results }: { results: string[] }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -67,12 +59,11 @@ export const ScanModelsResults = ({ results }: { results: string[] }) => {
         </Flex>
         <Flex height="100%" layerStyle="third" borderRadius="base" p={4} mt={4} mb={4}>
           <ScrollableContent>
-            {filteredResults.map((result) => (
-              <Flex key={result} fontSize="sm" flexDir="column">
-                <Text fontWeight="semibold">{result.split('\\').slice(-1)[0]}</Text>
-                <Text variant="subtext">{result}</Text>
-              </Flex>
-            ))}
+            <Flex flexDir="column" gap={3}>
+              {filteredResults.map((result) => (
+                <ScanModelResultItem key={result} result={result} />
+              ))}
+            </Flex>
           </ScrollableContent>
         </Flex>
       </Flex>
