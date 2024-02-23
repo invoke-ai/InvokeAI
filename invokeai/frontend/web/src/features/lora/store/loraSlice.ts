@@ -2,9 +2,11 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
+import { getModelKeyAndBase } from 'features/parameters/util/modelFetchingHelpers';
 import type { LoRAModelConfig } from 'services/api/types';
 
-export type LoRA = ParameterLoRAModel & {
+export type LoRA = {
+  model: ParameterLoRAModel;
   weight: number;
   isEnabled?: boolean;
 };
@@ -29,11 +31,11 @@ export const loraSlice = createSlice({
   initialState: initialLoraState,
   reducers: {
     loraAdded: (state, action: PayloadAction<LoRAModelConfig>) => {
-      const { key, base } = action.payload;
-      state.loras[key] = { key, base, ...defaultLoRAConfig };
+      const model = getModelKeyAndBase(action.payload);
+      state.loras[model.key] = { ...defaultLoRAConfig, model };
     },
     loraRecalled: (state, action: PayloadAction<LoRA>) => {
-      state.loras[action.payload.key] = action.payload;
+      state.loras[action.payload.model.key] = action.payload;
     },
     loraRemoved: (state, action: PayloadAction<string>) => {
       const key = action.payload;
@@ -58,7 +60,7 @@ export const loraSlice = createSlice({
       }
       lora.weight = defaultLoRAConfig.weight;
     },
-    loraIsEnabledChanged: (state, action: PayloadAction<Pick<LoRA, 'key' | 'isEnabled'>>) => {
+    loraIsEnabledChanged: (state, action: PayloadAction<{ key: string; isEnabled: boolean }>) => {
       const { key, isEnabled } = action.payload;
       const lora = state.loras[key];
       if (!lora) {
