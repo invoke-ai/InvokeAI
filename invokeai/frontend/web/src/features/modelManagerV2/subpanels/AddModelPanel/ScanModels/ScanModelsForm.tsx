@@ -14,13 +14,11 @@ export const ScanModelsForm = () => {
   const [_scanModels, { isLoading, data }] = useLazyScanModelsQuery();
 
   const handleSubmitScan = useCallback(async () => {
-    try {
-      await _scanModels({ scan_path: scanPath }).unwrap();
-    } catch (error: any) {
+    _scanModels({ scan_path: scanPath }).catch((error) => {
       if (error) {
         setErrorMessage(error.data.detail);
       }
-    }
+    });
   }, [_scanModels, scanPath]);
 
   const handleSetScanPath: ChangeEventHandler<HTMLInputElement> = useCallback((e) => {

@@ -1,10 +1,10 @@
-import { Button,Flex, FormControl, FormLabel, Input } from '@invoke-ai/ui-library';
+import { Button, Flex, FormControl, FormLabel, Input } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
 import { useCallback } from 'react';
-import type { SubmitHandler} from 'react-hook-form';
+import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useImportMainModelsMutation } from 'services/api/endpoints/models';
 
