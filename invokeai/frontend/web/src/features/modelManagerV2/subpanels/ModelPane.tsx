@@ -1,5 +1,6 @@
 import { Box } from '@invoke-ai/ui-library';
-import { useAppSelector } from '../../../app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
+
 import { ImportModels } from './ImportModels';
 import { Model } from './ModelPanel/Model';
 

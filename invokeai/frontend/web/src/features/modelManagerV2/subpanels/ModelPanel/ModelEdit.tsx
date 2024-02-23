@@ -1,41 +1,43 @@
-import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppDispatch, useAppSelector } from '../../../../app/store/storeHooks';
-import { useGetModelConfigQuery, useUpdateModelsMutation } from '../../../../services/api/endpoints/models';
 import {
-  Flex,
-  Text,
-  Heading,
   Button,
-  Input,
+  Flex,
   FormControl,
-  FormLabel,
-  Textarea,
   FormErrorMessage,
+  FormLabel,
+  Heading,
+  Input,
+  Text,
+  Textarea,
 } from '@invoke-ai/ui-library';
+import { skipToken } from '@reduxjs/toolkit/query';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { setSelectedModelMode } from 'features/modelManagerV2/store/modelManagerV2Slice';
+import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 import { useCallback, useMemo } from 'react';
-import {
+import type { SubmitHandler } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
+import { useGetModelConfigQuery, useUpdateModelsMutation } from 'services/api/endpoints/models';
+import type {
   AnyModelConfig,
   CheckpointModelConfig,
-  ControlNetConfig,
+  ControlNetModelConfig,
   DiffusersModelConfig,
-  IPAdapterConfig,
-  LoRAConfig,
-  T2IAdapterConfig,
-  TextualInversionConfig,
-  VAEConfig,
-} from '../../../../services/api/types';
-import { setSelectedModelMode } from '../../store/modelManagerV2Slice';
+  IPAdapterModelConfig,
+  LoRAModelConfig,
+  T2IAdapterModelConfig,
+  TextualInversionModelConfig,
+  VAEModelConfig,
+} from 'services/api/types';
+
 import BaseModelSelect from './Fields/BaseModelSelect';
-import { SubmitHandler, useForm } from 'react-hook-form';
-import ModelTypeSelect from './Fields/ModelTypeSelect';
-import ModelVariantSelect from './Fields/ModelVariantSelect';
-import RepoVariantSelect from './Fields/RepoVariantSelect';
-import PredictionTypeSelect from './Fields/PredictionTypeSelect';
 import BooleanSelect from './Fields/BooleanSelect';
 import ModelFormatSelect from './Fields/ModelFormatSelect';
-import { useTranslation } from 'react-i18next';
-import { addToast } from '../../../system/store/systemSlice';
-import { makeToast } from '../../../system/util/makeToast';
+import ModelTypeSelect from './Fields/ModelTypeSelect';
+import ModelVariantSelect from './Fields/ModelVariantSelect';
+import PredictionTypeSelect from './Fields/PredictionTypeSelect';
+import RepoVariantSelect from './Fields/RepoVariantSelect';
 
 export const ModelEdit = () => {
   const dispatch = useAppDispatch();
@@ -63,19 +65,19 @@ export const ModelEdit = () => {
 
     switch (modelType) {
       case 'lora':
-        return data as LoRAConfig;
+        return data as LoRAModelConfig;
       case 'embedding':
-        return data as TextualInversionConfig;
+        return data as TextualInversionModelConfig;
       case 't2i_adapter':
-        return data as T2IAdapterConfig;
+        return data as T2IAdapterModelConfig;
       case 'ip_adapter':
-        return data as IPAdapterConfig;
+        return data as IPAdapterModelConfig;
       case 'controlnet':
-        return data as ControlNetConfig;
+        return data as ControlNetModelConfig;
       case 'vae':
-        return data as VAEConfig;
+        return data as VAEModelConfig;
       default:
-        return data as DiffusersModelConfig;
+        return null;
     }
   }, [data]);
 

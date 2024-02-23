@@ -1,11 +1,11 @@
 import { Box, Button, Flex, Heading } from '@invoke-ai/ui-library';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { SyncModelsIconButton } from 'features/modelManager/components/SyncModels/SyncModelsIconButton';
+import { setSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
+import { useCallback } from 'react';
 
 import ModelList from './ModelManagerPanel/ModelList';
 import { ModelListNavigation } from './ModelManagerPanel/ModelListNavigation';
-import { useCallback } from 'react';
-import { useAppDispatch } from '../../../app/store/storeHooks';
-import { setSelectedModelKey } from '../store/modelManagerV2Slice';
 
 export const ModelManager = () => {
   const dispatch = useAppDispatch();

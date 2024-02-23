@@ -1,12 +1,11 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { Combobox } from '@invoke-ai/ui-library';
 import { typedMemo } from 'common/util/typedMemo';
-import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
+import { MODEL_TYPE_LABELS } from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelTypeFilter';
 import { useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 import type { AnyModelConfig } from 'services/api/types';
-import { MODEL_TYPE_LABELS } from '../../ModelManagerPanel/ModelTypeFilter';
 
 const options: ComboboxOption[] = [
   { value: 'main', label: MODEL_TYPE_LABELS['main'] as string },
