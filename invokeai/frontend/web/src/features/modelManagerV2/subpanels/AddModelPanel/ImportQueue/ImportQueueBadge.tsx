@@ -1,7 +1,7 @@
 import { Badge, Tooltip } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ModelInstallStatus } from '../../../../../services/api/types';
+import type { ModelInstallStatus } from 'services/api/types';
 
 const STATUSES = {
   waiting: { colorScheme: 'cyan', translationKey: 'queue.pending' },

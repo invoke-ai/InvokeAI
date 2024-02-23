@@ -1,4 +1,4 @@
-import { Box, Flex, IconButton, Progress, Tag, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Box, Flex, IconButton, Progress, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
@@ -6,7 +6,8 @@ import { t } from 'i18next';
 import { useCallback, useMemo } from 'react';
 import { PiXBold } from 'react-icons/pi';
 import { useDeleteModelImportMutation } from 'services/api/endpoints/models';
-import type { ModelInstallJob, HFModelSource, LocalModelSource, URLModelSource } from 'services/api/types';
+import type { HFModelSource, LocalModelSource, ModelInstallJob, URLModelSource } from 'services/api/types';
+
 import ImportQueueBadge from './ImportQueueBadge';
 
 type ModelListItemProps = {

@@ -1,3 +1,4 @@
+import { api } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import {
   socketModelInstallCompleted,
@@ -6,7 +7,6 @@ import {
 } from 'services/events/actions';
 
 import { startAppListening } from '../..';
-import { api } from '../../../../../../services/api';
 
 export const addModelInstallEventListener = () => {
   startAppListening({
@@ -41,7 +41,7 @@ export const addModelInstallEventListener = () => {
           return draft;
         })
       );
-      dispatch(api.util.invalidateTags([{ type: "ModelConfig" }]))
+      dispatch(api.util.invalidateTags([{ type: 'ModelConfig' }]));
     },
   });
 
@@ -55,7 +55,7 @@ export const addModelInstallEventListener = () => {
           const modelImport = draft.find((m) => m.id === id);
           if (modelImport) {
             modelImport.status = 'error';
-            modelImport.error_reason = error_type
+            modelImport.error_reason = error_type;
           }
           return draft;
         })

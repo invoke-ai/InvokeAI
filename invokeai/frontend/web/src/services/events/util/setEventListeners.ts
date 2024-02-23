@@ -146,29 +146,29 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
         data,
       })
     );
-  })
+  });
 
-    /**
+  /**
    * Model Install Completed
    */
-    socket.on('model_install_completed', (data) => {
-      dispatch(
-        socketModelInstallCompleted({
-          data,
-        })
-      );
-    })
+  socket.on('model_install_completed', (data) => {
+    dispatch(
+      socketModelInstallCompleted({
+        data,
+      })
+    );
+  });
 
   /**
    * Model Install Error
    */
-    socket.on('model_install_error', (data) => {
-      dispatch(
-        socketModelInstallError({
-          data,
-        })
-      );
-    })
+  socket.on('model_install_error', (data) => {
+    dispatch(
+      socketModelInstallError({
+        data,
+      })
+    );
+  });
 
   /**
    * Session retrieval error

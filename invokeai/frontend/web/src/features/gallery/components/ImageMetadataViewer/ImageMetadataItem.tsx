@@ -91,7 +91,7 @@ VAEMetadataItem.displayName = 'VAEMetadataItem';
 type ModelMetadataItemProps = {
   label: string;
   modelKey?: string;
-  
+
   extra?: string;
   onClick: () => void;
 };
