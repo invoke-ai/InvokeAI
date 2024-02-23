@@ -117,6 +117,13 @@ export const isRefinerMainModelModelConfig = (config: AnyModelConfig): config is
 
 export type MergeModelConfig = S['Body_merge'];
 export type ImportModelConfig = S['Body_import_model'];
+export type ModelInstallJob = S['ModelInstallJob']
+export type ModelInstallStatus = S["InstallStatus"]
+
+export type HFModelSource = S['HFModelSource'];
+export type CivitaiModelSource = S['CivitaiModelSource'];
+export type LocalModelSource = S['LocalModelSource'];
+export type URLModelSource = S['URLModelSource'];
 
 // Graphs
 export type Graph = S['Graph'];
