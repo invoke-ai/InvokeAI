@@ -25,7 +25,7 @@ const formLabelProps2: FormLabelProps = {
 
 export const AdvancedSettingsAccordion = memo(() => {
   const vaeKey = useAppSelector((state) => state.generation.vae?.key);
-  const { data: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
+  const { currentData: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
   const selectBadges = useMemo(
     () =>
       createMemoizedSelector(selectGenerationSlice, (generation) => {
