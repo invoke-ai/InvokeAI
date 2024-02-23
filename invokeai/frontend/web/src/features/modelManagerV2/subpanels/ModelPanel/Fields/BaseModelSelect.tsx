@@ -1,5 +1,5 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { Combobox } from '@invoke-ai/ui-library';
 import { typedMemo } from 'common/util/typedMemo';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { useCallback, useMemo } from 'react';
