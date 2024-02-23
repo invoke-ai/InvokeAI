@@ -4,10 +4,9 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
 import { useCallback, useMemo } from 'react';
-import { RiSparklingFill } from 'react-icons/ri';
 import { useGetModelImportsQuery, usePruneModelImportsMutation } from 'services/api/endpoints/models';
 
-import { ImportQueueModel } from './ImportQueueModel';
+import { ImportQueueItem } from './ImportQueueItem';
 
 export const ImportQueue = () => {
   const dispatch = useAppDispatch();
@@ -51,20 +50,15 @@ export const ImportQueue = () => {
 
   return (
     <Flex flexDir="column" p={3} h="full">
-      <Flex justifyContent="space-between">
+      <Flex justifyContent="space-between" alignItems="center">
         <Text>{t('modelManager.importQueue')}</Text>
-        <Button
-          isDisabled={!pruneAvailable}
-          onClick={pruneQueue}
-          tooltip={t('modelManager.pruneTooltip')}
-          rightIcon={<RiSparklingFill />}
-        >
+        <Button size="sm" isDisabled={!pruneAvailable} onClick={pruneQueue} tooltip={t('modelManager.pruneTooltip')}>
           {t('modelManager.prune')}
         </Button>
       </Flex>
       <Box mt={3} layerStyle="first" p={3} borderRadius="base" w="full" h="full">
-        <Flex direction="column" gap="2">
-          {data?.map((model) => <ImportQueueModel key={model.id} model={model} />)}
+        <Flex flexDir="column-reverse" gap="2">
+          {data?.map((model) => <ImportQueueItem key={model.id} model={model} />)}
         </Flex>
       </Box>
     </Flex>
