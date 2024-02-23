@@ -27,9 +27,9 @@ const BaseModelSelect = <T extends AnyModelConfig>(props: UseControllerProps<T>)
   );
   return (
     <FormControl>
-        <Flex direction="column" width="full">
-      <FormLabel>{t('modelManager.baseModel')}</FormLabel>
-      <Combobox value={value} options={options} onChange={onChange} />
+      <Flex direction="column" width="full">
+        <FormLabel>{t('modelManager.baseModel')}</FormLabel>
+        <Combobox value={value} options={options} onChange={onChange} />
       </Flex>
     </FormControl>
   );

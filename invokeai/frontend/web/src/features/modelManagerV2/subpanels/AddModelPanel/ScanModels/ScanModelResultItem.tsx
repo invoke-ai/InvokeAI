@@ -1,12 +1,12 @@
-import { Flex, Text, Box, Button, IconButton, Tooltip, Badge } from '@invoke-ai/ui-library';
+import { Badge, Box, Flex, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { useIsImported } from 'features/modelManagerV2/hooks/useIsImported';
+import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IoAdd } from 'react-icons/io5';
-import { useAppDispatch } from '../../../../../app/store/storeHooks';
-import { useImportMainModelsMutation } from '../../../../../services/api/endpoints/models';
-import { addToast } from '../../../../system/store/systemSlice';
-import { makeToast } from '../../../../system/util/makeToast';
-import { useIsImported } from '../../../hooks/useIsImported';
-import { useMemo } from 'react';
+import { useImportMainModelsMutation } from 'services/api/endpoints/models';
 
 export const ScanModelResultItem = ({ result }: { result: string }) => {
   const { t } = useTranslation();
@@ -14,11 +14,11 @@ export const ScanModelResultItem = ({ result }: { result: string }) => {
 
   const { isImported } = useIsImported();
 
-  const [importMainModel, { isLoading }] = useImportMainModelsMutation();
+  const [importMainModel] = useImportMainModelsMutation();
 
   const isAlreadyImported = useMemo(() => {
     const prettyName = result.split('\\').slice(-1)[0];
-    console.log({ prettyName });
+
     if (prettyName) {
       return isImported({ name: prettyName });
     } else {
@@ -26,7 +26,7 @@ export const ScanModelResultItem = ({ result }: { result: string }) => {
     }
   }, [result, isImported]);
 
-  const handleQuickAdd = () => {
+  const handleQuickAdd = useCallback(() => {
     importMainModel({ source: result, config: undefined })
       .unwrap()
       .then((_) => {
@@ -51,10 +51,10 @@ export const ScanModelResultItem = ({ result }: { result: string }) => {
           );
         }
       });
-  };
+  }, [importMainModel, result, dispatch, t]);
 
   return (
-    <Flex justifyContent={'space-between'}>
+    <Flex justifyContent="space-between">
       <Flex fontSize="sm" flexDir="column">
         <Text fontWeight="semibold">{result.split('\\').slice(-1)[0]}</Text>
         <Text variant="subtext">{result}</Text>

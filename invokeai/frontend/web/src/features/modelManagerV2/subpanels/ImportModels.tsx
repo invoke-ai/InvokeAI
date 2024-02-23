@@ -2,9 +2,8 @@ import { Box, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs } from '@in
 
 import { AdvancedImport } from './AddModelPanel/AdvancedImport';
 import { ImportQueue } from './AddModelPanel/ImportQueue/ImportQueue';
-import { ScanModels } from './AddModelPanel/ScanModels/ScanModels';
-import { SimpleImport } from './AddModelPanel/SimpleImport';
 import { ScanModelsForm } from './AddModelPanel/ScanModels/ScanModelsForm';
+import { SimpleImport } from './AddModelPanel/SimpleImport';
 
 export const ImportModels = () => {
   return (
