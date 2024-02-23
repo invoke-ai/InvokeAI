@@ -1,18 +1,11 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { Combobox } from '@invoke-ai/ui-library';
 import { typedMemo } from 'common/util/typedMemo';
-import { LORA_MODEL_FORMAT_MAP, MODEL_TYPE_MAP } from 'features/parameters/types/constants';
+import { LORA_MODEL_FORMAT_MAP } from 'features/parameters/types/constants';
 import { useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 import type { AnyModelConfig } from 'services/api/types';
-
-const options: ComboboxOption[] = [
-  { value: 'sd-1', label: MODEL_TYPE_MAP['sd-1'] },
-  { value: 'sd-2', label: MODEL_TYPE_MAP['sd-2'] },
-  { value: 'sdxl', label: MODEL_TYPE_MAP['sdxl'] },
-  { value: 'sdxl-refiner', label: MODEL_TYPE_MAP['sdxl-refiner'] },
-];
 
 const ModelFormatSelect = <T extends AnyModelConfig>(props: UseControllerProps<T>) => {
   const { field, formState } = useController(props);

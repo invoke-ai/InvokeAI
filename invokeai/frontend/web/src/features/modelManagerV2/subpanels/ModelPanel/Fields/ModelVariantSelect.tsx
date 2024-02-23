@@ -1,10 +1,10 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { Combobox } from '@invoke-ai/ui-library';
 import { typedMemo } from 'common/util/typedMemo';
 import { useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
-import type { AnyModelConfig, CheckpointModelConfig, DiffusersModelConfig } from 'services/api/types';
+import type { AnyModelConfig } from 'services/api/types';
 
 const options: ComboboxOption[] = [
   { value: 'normal', label: 'Normal' },
