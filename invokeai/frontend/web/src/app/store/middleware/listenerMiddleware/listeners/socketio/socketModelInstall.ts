@@ -46,13 +46,14 @@ export const addModelInstallEventListener = () => {
   startAppListening({
     actionCreator: socketModelInstallError,
     effect: (action, { dispatch }) => {
-      const { id } = action.payload.data;
+      const { id, error_type } = action.payload.data;
 
       dispatch(
         modelsApi.util.updateQueryData('getModelImports', undefined, (draft) => {
           const modelImport = draft.find((m) => m.id === id);
           if (modelImport) {
             modelImport.status = 'error';
+            modelImport.error_reason = error_type
           }
           return draft;
         })
