@@ -46,11 +46,11 @@ export type ModelLoadCompletedEvent = {
 };
 
 export type ModelInstallDownloadingEvent = {
-  bytes: string;
+  bytes: number;
   local_path: string;
   source: string;
   timestamp: number;
-  total_bytes: string;
+  total_bytes: number;
   id: number;
 };
 
