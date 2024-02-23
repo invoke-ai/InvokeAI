@@ -25,10 +25,10 @@ from abc import ABC, abstractmethod
 from logging import Logger
 from pathlib import Path
 from typing import Callable, Optional, Set, Union
-from invokeai.app.services.config import InvokeAIAppConfig
 
 from pydantic import BaseModel, Field
 
+from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util.logging import InvokeAILogger
 
 default_logger: Logger = InvokeAILogger.get_logger()
@@ -167,15 +167,15 @@ class ModelSearch(ModelSearchBase):
         ):
             try:
                 self.model_found(absolute_path)
+                return
             except KeyboardInterrupt:
                 raise
             except Exception as e:
                 self.logger.warning(str(e))
-            finally:
                 return
 
         for n in file_names:
-            if any([n.endswith(suffix) for suffix in {".ckpt", ".bin", ".pth", ".safetensors", ".pt"}]):
+            if n.endswith((".ckpt", ".bin", ".pth", ".safetensors", ".pt")):
                 try:
                     self.model_found(absolute_path / n)
                 except KeyboardInterrupt:
