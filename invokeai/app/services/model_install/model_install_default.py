@@ -543,7 +543,7 @@ class ModelInstallService(ModelInstallServiceBase):
         self, model_path: Path, config: Optional[Dict[str, Any]] = None, info: Optional[AnyModelConfig] = None
     ) -> str:
         info = info or ModelProbe.probe(model_path, config)
-        key = info.key or self._create_key()
+        key = self._create_key()
 
         model_path = model_path.absolute()
         if model_path.is_relative_to(self.app_config.models_path):
