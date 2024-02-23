@@ -14,7 +14,7 @@ export const ModelManager = () => {
   }, [dispatch]);
 
   return (
-    <Box layerStyle="first" p={3} borderRadius="base" w="full" h="full">
+    <Box layerStyle="first" p={3} borderRadius="base" w="50%" h="full">
       <Flex w="full" p={3} justifyContent="space-between" alignItems="center">
         <Flex gap={2}>
           <Heading fontSize="xl">Model Manager</Heading>
