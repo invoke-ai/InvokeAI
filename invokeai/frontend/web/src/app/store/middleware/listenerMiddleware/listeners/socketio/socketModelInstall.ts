@@ -15,13 +15,12 @@ export const addModelInstallEventListener = () => {
 
       dispatch(
         modelsApi.util.updateQueryData('getModelImports', undefined, (draft) => {
-          const models = JSON.parse(JSON.stringify(draft))
-
-          const modelIndex = models.findIndex((m) => m.id === id);
-
-          models[modelIndex].bytes = bytes;
-          models[modelIndex].status = 'downloading';
-          return models;
+          const modelImport = draft.find((m) => m.id === id);
+          if (modelImport) {
+            modelImport.bytes = bytes;
+            modelImport.status = 'downloading';
+          }
+          return draft;
         })
       );
     },
@@ -34,12 +33,11 @@ export const addModelInstallEventListener = () => {
 
       dispatch(
         modelsApi.util.updateQueryData('getModelImports', undefined, (draft) => {
-          const models = JSON.parse(JSON.stringify(draft))
-
-          const modelIndex = models.findIndex((m) => m.id === id);
-
-          models[modelIndex].status = 'completed';
-          return models;
+          const modelImport = draft.find((m) => m.id === id);
+          if (modelImport) {
+            modelImport.status = 'completed';
+          }
+          return draft;
         })
       );
     },
@@ -52,12 +50,11 @@ export const addModelInstallEventListener = () => {
 
       dispatch(
         modelsApi.util.updateQueryData('getModelImports', undefined, (draft) => {
-          const models = JSON.parse(JSON.stringify(draft))
-
-          const modelIndex = models.findIndex((m) => m.id === id);
-
-          models[modelIndex].status = 'error';
-          return models;
+          const modelImport = draft.find((m) => m.id === id);
+          if (modelImport) {
+            modelImport.status = 'error';
+          }
+          return draft;
         })
       );
     },
