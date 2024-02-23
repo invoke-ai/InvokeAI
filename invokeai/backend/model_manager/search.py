@@ -141,7 +141,7 @@ class ModelSearch(ModelSearchBase):
             self._directory = self.config.models_path / self._directory
         self.stats = SearchStats()  # zero out
         self.search_started()  # This will initialize _models_found to empty
-        self._walk_directory(directory)
+        self._walk_directory(self._directory)
         self.search_completed()
         return self.models_found
 
