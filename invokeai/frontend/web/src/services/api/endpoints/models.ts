@@ -72,11 +72,12 @@ type DeleteImportModelsResponse =
 type PruneModelImportsResponse =
   paths['/api/v2/models/import']['patch']['responses']['200']['content']['application/json'];
 
-type AddMainModelArg = {
-  body: MainModelConfig;
+type ImportAdvancedModelArg = {
+  source: NonNullable<operations['import_model']['requestBody']['content']['application/json']['source']>;
+  config: NonNullable<operations['import_model']['requestBody']['content']['application/json']['config']>;
 };
 
-type AddMainModelResponse = paths['/api/v2/models/add']['post']['responses']['201']['content']['application/json'];
+type ImportAdvancedModelResponse = paths['/api/v2/models/import']['post']['responses']['201']['content']['application/json'];
 
 export type ScanFolderResponse =
   paths['/api/v2/models/scan_folder']['get']['responses']['200']['content']['application/json'];
@@ -198,12 +199,12 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['Model', 'ModelImports'],
     }),
-    addMainModels: build.mutation<AddMainModelResponse, AddMainModelArg>({
-      query: ({ body }) => {
+    importAdvancedModel: build.mutation<ImportAdvancedModelResponse, ImportAdvancedModelArg>({
+      query: ({ source, config}) => {
         return {
-          url: buildModelsUrl('add'),
+          url: buildModelsUrl('install'),
           method: 'POST',
-          body: body,
+          body: { source, config },
         };
       },
       invalidatesTags: ['Model', 'ModelImports'],
@@ -344,7 +345,7 @@ export const {
   useDeleteModelsMutation,
   useUpdateModelsMutation,
   useImportMainModelsMutation,
-  useAddMainModelsMutation,
+  useImportAdvancedModelMutation,
   useConvertMainModelsMutation,
   useMergeMainModelsMutation,
   useSyncModelsMutation,
