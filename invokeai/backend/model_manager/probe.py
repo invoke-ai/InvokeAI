@@ -188,7 +188,7 @@ class ModelProbe(object):
                 and fields["prediction_type"] == SchedulerPredictionType.VPrediction
             )
 
-        model_info = ModelConfigFactory.make_config(fields)
+        model_info = ModelConfigFactory.make_config(fields, key=fields.get("key", None))
         return model_info
 
     @classmethod
