@@ -16,7 +16,7 @@ import { EMPTY_ARRAY } from 'app/store/util';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
 import { selectLoraSlice } from 'features/lora/store/loraSlice';
-import { SyncModelsIconButton } from 'features/modelManager/components/SyncModels/SyncModelsIconButton';
+import { SyncModelsIconButton } from 'features/modelManagerV2/components/SyncModels/SyncModelsIconButton';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
