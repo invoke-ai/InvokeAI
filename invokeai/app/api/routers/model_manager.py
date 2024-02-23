@@ -273,7 +273,7 @@ async def scan_for_models(
     scan_path: str = Query(description="Directory path to search for models", default=None),
 ) -> List[FoundModel]:
     path = pathlib.Path(scan_path)
-    if not scan_path or not path.is_dir():
+    if not path.is_dir():
         raise HTTPException(
             status_code=400,
             detail=f"The search path '{scan_path}' does not exist or is not directory",
