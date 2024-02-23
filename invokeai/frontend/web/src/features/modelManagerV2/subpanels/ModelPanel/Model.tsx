@@ -1,4 +1,5 @@
-import { useAppSelector } from '../../../../app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
+
 import { ModelEdit } from './ModelEdit';
 import { ModelView } from './ModelView';
 

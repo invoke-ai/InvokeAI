@@ -11,7 +11,7 @@ const AddModels = () => {
   const [addModelMode, setAddModelMode] = useState<'simple' | 'advanced'>('simple');
   const handleAddModelSimple = useCallback(() => setAddModelMode('simple'), []);
   const handleAddModelAdvanced = useCallback(() => setAddModelMode('advanced'), []);
-  const { data } = useGetModelImportsQuery({});
+  const { data } = useGetModelImportsQuery();
   console.log({ data });
   return (
     <Flex flexDirection="column" width="100%" overflow="scroll" maxHeight={window.innerHeight - 250} gap={4}>
@@ -27,7 +27,7 @@ const AddModels = () => {
         {addModelMode === 'simple' && <SimpleAddModels />}
         {addModelMode === 'advanced' && <AdvancedAddModels />}
       </Flex>
-      <Flex>{data?.map((model) => <Text>{model.status}</Text>)}</Flex>
+      <Flex>{data?.map((model) => <Text key={model.id}>{model.status}</Text>)}</Flex>
     </Flex>
   );
 };

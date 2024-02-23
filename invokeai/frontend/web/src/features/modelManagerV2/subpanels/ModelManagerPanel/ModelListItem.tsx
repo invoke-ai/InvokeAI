@@ -1,5 +1,6 @@
 import {
   Badge,
+  Box,
   Button,
   ConfirmationAlertDialog,
   Flex,
@@ -8,7 +9,6 @@ import {
   Text,
   Tooltip,
   useDisclosure,
-  Box,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
