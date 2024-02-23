@@ -127,25 +127,25 @@ export const vaeModelsAdapterSelectors = vaeModelsAdapter.getSelectors(undefined
 
 const buildProvidesTags =
   <TEntity extends AnyModelConfig>(tagType: (typeof tagTypes)[number]) =>
-  (result: EntityState<TEntity, string> | undefined) => {
-    const tags: ApiTagDescription[] = [{ type: tagType, id: LIST_TAG }, 'Model'];
-    if (result) {
-      tags.push(
-        ...result.ids.map((id) => ({
-          type: tagType,
-          id,
-        }))
-      );
-    }
+    (result: EntityState<TEntity, string> | undefined) => {
+      const tags: ApiTagDescription[] = [{ type: tagType, id: LIST_TAG }, 'Model'];
+      if (result) {
+        tags.push(
+          ...result.ids.map((id) => ({
+            type: tagType,
+            id,
+          }))
+        );
+      }
 
-    return tags;
-  };
+      return tags;
+    };
 
 const buildTransformResponse =
   <T extends AnyModelConfig>(adapter: EntityAdapter<T, string>) =>
-  (response: { models: T[] }) => {
-    return adapter.setAll(adapter.getInitialState(), response.models);
-  };
+    (response: { models: T[] }) => {
+      return adapter.setAll(adapter.getInitialState(), response.models);
+    };
 
 /**
  * Builds an endpoint URL for the models router
@@ -305,10 +305,10 @@ export const modelsApi = api.injectEndpoints({
       },
       providesTags: ['ModelImports'],
     }),
-    deleteModelImport: build.mutation<DeleteImportModelsResponse, DeleteMainModelArg>({
-      query: ({ key }) => {
+    deleteModelImport: build.mutation<DeleteImportModelsResponse, number>({
+      query: (id) => {
         return {
-          url: buildModelsUrl(`import/${key}`),
+          url: buildModelsUrl(`import/${id}`),
           method: 'DELETE',
         };
       },
