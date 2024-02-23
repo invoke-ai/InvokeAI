@@ -8,8 +8,8 @@ import type { AnyModelConfig } from 'services/api/types';
 
 const options: ComboboxOption[] = [
   { value: 'none', label: '-' },
-  { value: true as any, label: 'True' },
-  { value: false as any, label: 'False' },
+  { value: 'true', label: 'True' },
+  { value: 'false', label: 'False' },
 ];
 
 const BooleanSelect = <T extends AnyModelConfig>(props: UseControllerProps<T>) => {
@@ -17,7 +17,7 @@ const BooleanSelect = <T extends AnyModelConfig>(props: UseControllerProps<T>) =
   const value = useMemo(() => options.find((o) => o.value === field.value), [field.value]);
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {
-      v?.value === 'none' ? field.onChange(undefined) : field.onChange(v?.value);
+      v?.value === 'none' ? field.onChange(undefined) : field.onChange(v?.value === 'true');
     },
     [field]
   );
