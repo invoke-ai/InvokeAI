@@ -59,7 +59,7 @@ export const ModelConvert = (props: ModelConvertProps) => {
           )
         );
       });
-  }, [convertModel, dispatch, model.base, model.name, t]);
+  }, [convertModel, dispatch, model.key, model.name, t]);
 
   return (
     <>

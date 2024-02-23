@@ -58,7 +58,6 @@ type DeleteImportModelsResponse =
 type PruneModelImportsResponse =
   paths['/api/v2/models/import']['patch']['responses']['200']['content']['application/json'];
 
-
 export type ScanFolderResponse =
   paths['/api/v2/models/scan_folder']['get']['responses']['200']['content']['application/json'];
 type ScanFolderArg = operations['scan_for_models']['parameters']['query'];
@@ -104,25 +103,25 @@ export const vaeModelsAdapterSelectors = vaeModelsAdapter.getSelectors(undefined
 
 const buildProvidesTags =
   <TEntity extends AnyModelConfig>(tagType: (typeof tagTypes)[number]) =>
-    (result: EntityState<TEntity, string> | undefined) => {
-      const tags: ApiTagDescription[] = [{ type: tagType, id: LIST_TAG }, 'Model'];
-      if (result) {
-        tags.push(
-          ...result.ids.map((id) => ({
-            type: tagType,
-            id,
-          }))
-        );
-      }
+  (result: EntityState<TEntity, string> | undefined) => {
+    const tags: ApiTagDescription[] = [{ type: tagType, id: LIST_TAG }, 'Model'];
+    if (result) {
+      tags.push(
+        ...result.ids.map((id) => ({
+          type: tagType,
+          id,
+        }))
+      );
+    }
 
-      return tags;
-    };
+    return tags;
+  };
 
 const buildTransformResponse =
   <T extends AnyModelConfig>(adapter: EntityAdapter<T, string>) =>
-    (response: { models: T[] }) => {
-      return adapter.setAll(adapter.getInitialState(), response.models);
-    };
+  (response: { models: T[] }) => {
+    return adapter.setAll(adapter.getInitialState(), response.models);
+  };
 
 /**
  * Builds an endpoint URL for the models router
