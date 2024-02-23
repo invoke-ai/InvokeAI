@@ -1,10 +1,8 @@
 import type { EntityState, Update } from '@reduxjs/toolkit';
 import type { PatchCollection } from '@reduxjs/toolkit/dist/query/core/buildThunks';
-import { logger } from 'app/logging/logger';
+import type { JSONObject } from 'common/types';
 import type { BoardId } from 'features/gallery/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES, IMAGE_LIMIT } from 'features/gallery/store/types';
-import type { CoreMetadata } from 'features/nodes/types/metadata';
-import { zCoreMetadata } from 'features/nodes/types/metadata';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { keyBy } from 'lodash-es';
@@ -118,22 +116,9 @@ export const imagesApi = api.injectEndpoints({
       providesTags: (result, error, image_name) => [{ type: 'Image', id: image_name }],
       keepUnusedDataFor: 86400, // 24 hours
     }),
-    getImageMetadata: build.query<CoreMetadata | undefined, string>({
+    getImageMetadata: build.query<JSONObject | undefined, string>({
       query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}/metadata`) }),
       providesTags: (result, error, image_name) => [{ type: 'ImageMetadata', id: image_name }],
-      transformResponse: (
-        response: paths['/api/v1/images/i/{image_name}/metadata']['get']['responses']['200']['content']['application/json']
-      ) => {
-        if (response) {
-          const result = zCoreMetadata.safeParse(response);
-          if (result.success) {
-            return result.data;
-          } else {
-            logger('images').warn('Problem parsing metadata');
-          }
-        }
-        return;
-      },
       keepUnusedDataFor: 86400, // 24 hours
     }),
     getImageWorkflow: build.query<
