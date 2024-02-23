@@ -116,7 +116,7 @@ export const ImportQueueItem = (props: ModelListItemProps) => {
         </Tooltip>
       </Flex>
       <Box w="15%">
-        <ImportQueueBadge status={model.status} />
+        <ImportQueueBadge status={model.status} errorReason={model.error_reason} />
       </Box>
 
       <Box w="10%">
