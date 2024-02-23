@@ -1,29 +1,22 @@
 import { z } from 'zod';
 
-import {
-  zControlField,
-  zIPAdapterField,
-  zMainModelField,
-  zModelFieldBase,
-  zSDXLRefinerModelField,
-  zT2IAdapterField,
-  zVAEModelField,
-} from './common';
+import { zControlField, zIPAdapterField, zT2IAdapterField } from './common';
 
+export const zLoRAWeight = z.number().nullish();
 // #region Metadata-optimized versions of schemas
 // TODO: It's possible that `deepPartial` will be deprecated:
 // - https://github.com/colinhacks/zod/issues/2106
 // - https://github.com/colinhacks/zod/issues/2854
 export const zLoRAMetadataItem = z.object({
-  lora: zModelFieldBase.deepPartial(),
-  weight: z.number(),
+  lora: z.unknown(),
+  weight: zLoRAWeight,
 });
-const zControlNetMetadataItem = zControlField.deepPartial();
-const zIPAdapterMetadataItem = zIPAdapterField.deepPartial();
-const zT2IAdapterMetadataItem = zT2IAdapterField.deepPartial();
-const zSDXLRefinerModelMetadataItem = zSDXLRefinerModelField.deepPartial();
-const zModelMetadataItem = zMainModelField.deepPartial();
-const zVAEModelMetadataItem = zVAEModelField.deepPartial();
+const zControlNetMetadataItem = zControlField.merge(z.object({ control_model: z.unknown() })).deepPartial();
+const zIPAdapterMetadataItem = zIPAdapterField.merge(z.object({ ip_adapter_model: z.unknown() })).deepPartial();
+const zT2IAdapterMetadataItem = zT2IAdapterField.merge(z.object({ t2i_adapter_model: z.unknown() })).deepPartial();
+const zSDXLRefinerModelMetadataItem = z.unknown();
+const zModelMetadataItem = z.unknown();
+const zVAEModelMetadataItem = z.unknown();
 export type LoRAMetadataItem = z.infer<typeof zLoRAMetadataItem>;
 export type ControlNetMetadataItem = z.infer<typeof zControlNetMetadataItem>;
 export type IPAdapterMetadataItem = z.infer<typeof zIPAdapterMetadataItem>;

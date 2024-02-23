@@ -70,6 +70,8 @@ export type ScanFolderResponse =
   paths['/api/v2/models/scan_folder']['get']['responses']['200']['content']['application/json'];
 type ScanFolderArg = operations['scan_for_models']['parameters']['query'];
 
+export type GetByAttrsArg = operations['get_model_records_by_attrs']['parameters']['query'];
+
 export const mainModelsAdapter = createEntityAdapter<MainModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
@@ -223,6 +225,18 @@ export const modelsApi = api.injectEndpoints({
         return tags;
       },
     }),
+    getModelConfigByAttrs: build.query<AnyModelConfig, GetByAttrsArg>({
+      query: (arg) => buildModelsUrl(`get_by_attrs?${queryString.stringify(arg)}`),
+      providesTags: (result) => {
+        const tags: ApiTagDescription[] = ['Model'];
+
+        if (result) {
+          tags.push({ type: 'ModelConfig', id: result.key });
+        }
+
+        return tags;
+      },
+    }),
     syncModels: build.mutation<void, void>({
       query: () => {
         return {
@@ -300,6 +314,7 @@ export const modelsApi = api.injectEndpoints({
 });
 
 export const {
+  useGetModelConfigByAttrsQuery,
   useGetModelConfigQuery,
   useGetMainModelsQuery,
   useGetControlNetModelsQuery,
