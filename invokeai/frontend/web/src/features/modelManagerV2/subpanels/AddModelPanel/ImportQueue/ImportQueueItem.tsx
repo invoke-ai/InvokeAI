@@ -77,7 +77,7 @@ export const ImportQueueItem = (props: ModelListItemProps) => {
       case 'url':
         return source.url;
       case 'local':
-        return source.path.substring(source.path.lastIndexOf('/') + 1);
+        return source.path.split('\\').slice(-1)[0];
       default:
         return '';
     }
@@ -99,13 +99,13 @@ export const ImportQueueItem = (props: ModelListItemProps) => {
   }, [model.bytes, model.total_bytes, model.status]);
 
   return (
-    <Flex gap="2" w="full" alignItems="center" textAlign="center">
+    <Flex gap="2" w="full" alignItems="center">
       <Tooltip label={modelName}>
-        <Text w="30%" whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis">
+        <Text width="30%" whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis">
           {modelName}
         </Text>
       </Tooltip>
-      <Flex flexDir="column" w="50%">
+      <Flex flexDir="column" flex={1}>
         <Tooltip label={progressString}>
           <Progress
             value={progressValue}
@@ -115,11 +115,11 @@ export const ImportQueueItem = (props: ModelListItemProps) => {
           />
         </Tooltip>
       </Flex>
-      <Box w="15%">
+      <Box minW="100px" textAlign="center">
         <ImportQueueBadge status={model.status} errorReason={model.error_reason} />
       </Box>
 
-      <Box w="10%">
+      <Box minW="20px">
         {(model.status === 'downloading' || model.status === 'waiting') && (
           <IconButton
             isRound={true}
