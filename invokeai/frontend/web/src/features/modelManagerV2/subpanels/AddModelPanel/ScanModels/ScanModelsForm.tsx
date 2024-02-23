@@ -1,5 +1,5 @@
-import { Button,Flex, FormControl, FormErrorMessage, FormLabel, Input } from '@invoke-ai/ui-library';
-import type { ChangeEventHandler} from 'react';
+import { Button, Flex, FormControl, FormErrorMessage, FormLabel, Input } from '@invoke-ai/ui-library';
+import type { ChangeEventHandler } from 'react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLazyScanModelsQuery } from 'services/api/endpoints/models';
@@ -9,22 +9,18 @@ import { ScanModelsResults } from './ScanModelsResults';
 export const ScanModelsForm = () => {
   const [scanPath, setScanPath] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [results, setResults] = useState<string[] | undefined>();
   const { t } = useTranslation();
 
-  const [_scanModels, { isLoading }] = useLazyScanModelsQuery();
+  const [_scanModels, { isLoading, data }] = useLazyScanModelsQuery();
 
   const handleSubmitScan = useCallback(async () => {
-    _scanModels({ scan_path: scanPath })
-      .unwrap()
-      .then((result) => {
-        setResults(result);
-      })
-      .catch((error) => {
-        if (error) {
-          setErrorMessage(error.data.detail);
-        }
-      });
+    try {
+      await _scanModels({ scan_path: scanPath }).unwrap();
+    } catch (error: any) {
+      if (error) {
+        setErrorMessage(error.data.detail);
+      }
+    }
   }, [_scanModels, scanPath]);
 
   const handleSetScanPath: ChangeEventHandler<HTMLInputElement> = useCallback((e) => {
@@ -49,7 +45,7 @@ export const ScanModelsForm = () => {
           {!!errorMessage.length && <FormErrorMessage>{errorMessage}</FormErrorMessage>}
         </Flex>
       </FormControl>
-      {results && <ScanModelsResults results={results} />}
+      {data && <ScanModelsResults results={data} />}
     </Flex>
   );
 };

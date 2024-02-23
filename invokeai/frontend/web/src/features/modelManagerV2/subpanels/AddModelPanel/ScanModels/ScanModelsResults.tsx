@@ -2,23 +2,23 @@ import { Divider, Flex, Heading, IconButton, Input, InputGroup, InputRightElemen
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { t } from 'i18next';
 import type { ChangeEventHandler } from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { PiXBold } from 'react-icons/pi';
 import { ScanModelResultItem } from './ScanModelResultItem';
 
 export const ScanModelsResults = ({ results }: { results: string[] }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredResults, setFilteredResults] = useState(results);
+
+  const filteredResults = useMemo(() => {
+    return results.filter((result) => {
+      const modelName = result.split('\\').slice(-1)[0];
+      return modelName?.includes(searchTerm);
+    });
+  }, [results, searchTerm]);
 
   const handleSearch: ChangeEventHandler<HTMLInputElement> = useCallback(
     (e) => {
       setSearchTerm(e.target.value);
-      setFilteredResults(
-        results.filter((result) => {
-          const modelName = result.split('\\').slice(-1)[0];
-          return modelName?.includes(e.target.value);
-        })
-      );
     },
     [results]
   );
