@@ -806,6 +806,7 @@
         "repoIDValidationMsg": "Online repository of your model",
         "safetensorModels": "SafeTensors",
         "sameFolder": "Same folder",
+        "scanFolder": "Scan folder",
         "scanAgain": "Scan Again",
         "scanForModels": "Scan For Models",
         "search": "Search",
