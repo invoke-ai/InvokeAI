@@ -202,7 +202,7 @@ async def list_model_summary(
 
 
 @model_manager_router.get(
-    "/i/{key}/meta",
+    "/i/{key}/metadata",
     operation_id="get_model_metadata",
     responses={
         200: {
@@ -218,7 +218,7 @@ async def get_model_metadata(
     """Get a model metadata object."""
     record_store = ApiDependencies.invoker.services.model_manager.store
     result: Optional[AnyModelRepoMetadata] = record_store.get_metadata(key)
-   
+
     return result
 
 
