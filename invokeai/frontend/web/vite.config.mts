@@ -57,7 +57,12 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: './',
-    plugins: [react(), mode !== 'test' && eslint(), tsconfigPaths(), visualizer() as unknown as PluginOption],
+    plugins: [
+      react(),
+      mode !== 'test' && eslint({ failOnError: mode === 'production', failOnWarning: mode === 'production' }),
+      tsconfigPaths(),
+      visualizer() as unknown as PluginOption,
+    ],
     build: {
       chunkSizeWarningLimit: 1500,
     },
