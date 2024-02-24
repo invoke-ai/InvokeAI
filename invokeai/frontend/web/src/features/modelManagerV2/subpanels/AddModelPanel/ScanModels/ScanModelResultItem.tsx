@@ -1,33 +1,24 @@
 import { Badge, Box, Flex, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { useIsImported } from 'features/modelManagerV2/hooks/useIsImported';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IoAdd } from 'react-icons/io5';
+import type { ScanFolderResponse } from 'services/api/endpoints/models';
 import { useImportMainModelsMutation } from 'services/api/endpoints/models';
 
-export const ScanModelResultItem = ({ result }: { result: string }) => {
+type Props = {
+  result: ScanFolderResponse[number];
+};
+export const ScanModelResultItem = ({ result }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
-  const { isImported } = useIsImported();
-
   const [importMainModel] = useImportMainModelsMutation();
 
-  const isAlreadyImported = useMemo(() => {
-    const prettyName = result.split('\\').slice(-1)[0];
-
-    if (prettyName) {
-      return isImported({ name: prettyName });
-    } else {
-      return false;
-    }
-  }, [result, isImported]);
-
   const handleQuickAdd = useCallback(() => {
-    importMainModel({ source: result, config: undefined })
+    importMainModel({ source: result.path, config: undefined })
       .unwrap()
       .then((_) => {
         dispatch(
@@ -56,11 +47,11 @@ export const ScanModelResultItem = ({ result }: { result: string }) => {
   return (
     <Flex justifyContent="space-between">
       <Flex fontSize="sm" flexDir="column">
-        <Text fontWeight="semibold">{result.split('\\').slice(-1)[0]}</Text>
-        <Text variant="subtext">{result}</Text>
+        <Text fontWeight="semibold">{result.path.split('\\').slice(-1)[0]}</Text>
+        <Text variant="subtext">{result.path}</Text>
       </Flex>
       <Box>
-        {isAlreadyImported ? (
+        {result.is_installed ? (
           <Badge>{t('common.installed')}</Badge>
         ) : (
           <Tooltip label={t('modelManager.quickAdd')}>
