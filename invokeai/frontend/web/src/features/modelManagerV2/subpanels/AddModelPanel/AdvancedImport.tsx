@@ -11,8 +11,8 @@ import RepoVariantSelect from 'features/modelManagerV2/subpanels/ModelPanel/Fiel
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { useCallback, useEffect } from 'react';
-import type { SubmitHandler} from 'react-hook-form';
-import {useForm  } from 'react-hook-form';
+import type { SubmitHandler } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useImportAdvancedModelMutation } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
