@@ -58,6 +58,14 @@ type DeleteImportModelsResponse =
 type PruneModelImportsResponse =
   paths['/api/v2/models/import']['patch']['responses']['200']['content']['application/json'];
 
+type ImportAdvancedModelArg = {
+  source: NonNullable<operations['import_model']['requestBody']['content']['application/json']['source']>;
+  config: NonNullable<operations['import_model']['requestBody']['content']['application/json']['config']>;
+};
+
+type ImportAdvancedModelResponse =
+  paths['/api/v2/models/import']['post']['responses']['201']['content']['application/json'];
+
 export type ScanFolderResponse =
   paths['/api/v2/models/scan_folder']['get']['responses']['200']['content']['application/json'];
 type ScanFolderArg = operations['scan_for_models']['parameters']['query'];
@@ -171,6 +179,16 @@ export const modelsApi = api.injectEndpoints({
           params: { source, access_token },
           method: 'POST',
           body: config,
+        };
+      },
+      invalidatesTags: ['Model', 'ModelImports'],
+    }),
+    importAdvancedModel: build.mutation<ImportAdvancedModelResponse, ImportAdvancedModelArg>({
+      query: ({ source, config }) => {
+        return {
+          url: buildModelsUrl('install'),
+          method: 'POST',
+          body: { source, config },
         };
       },
       invalidatesTags: ['Model', 'ModelImports'],
