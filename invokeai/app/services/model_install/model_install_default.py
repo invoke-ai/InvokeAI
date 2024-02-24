@@ -822,7 +822,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 parts=parts,
                 bytes=job.bytes,
                 total_bytes=job.total_bytes,
-                id=job.id
+                id=job.id,
             )
 
     def _signal_job_completed(self, job: ModelInstallJob) -> None:
