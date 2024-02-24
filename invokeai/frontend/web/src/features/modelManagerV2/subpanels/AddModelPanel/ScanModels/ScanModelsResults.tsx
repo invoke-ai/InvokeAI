@@ -4,21 +4,26 @@ import { t } from 'i18next';
 import type { ChangeEventHandler } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { PiXBold } from 'react-icons/pi';
+import type { ScanFolderResponse } from 'services/api/endpoints/models';
 
 import { ScanModelResultItem } from './ScanModelResultItem';
 
-export const ScanModelsResults = ({ results }: { results: string[] }) => {
+type ScanModelResultsProps = {
+  results: ScanFolderResponse;
+};
+
+export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredResults = useMemo(() => {
     return results.filter((result) => {
-      const modelName = result.split('\\').slice(-1)[0];
-      return modelName?.includes(searchTerm);
+      const modelName = result.path.split('\\').slice(-1)[0];
+      return modelName?.toLowerCase().includes(searchTerm.toLowerCase());
     });
   }, [results, searchTerm]);
 
   const handleSearch: ChangeEventHandler<HTMLInputElement> = useCallback((e) => {
-    setSearchTerm(e.target.value);
+    setSearchTerm(e.target.value.trim());
   }, []);
 
   const clearSearch = useCallback(() => {
@@ -36,13 +41,13 @@ export const ScanModelsResults = ({ results }: { results: string[] }) => {
           <InputGroup maxW="300px" size="xs">
             <Input
               placeholder={t('modelManager.search')}
-              value={searchTerm || ''}
+              value={searchTerm}
               data-testid="board-search-input"
               onChange={handleSearch}
               size="xs"
             />
 
-            {!!searchTerm?.length && (
+            {searchTerm && (
               <InputRightElement h="full" pe={2}>
                 <IconButton
                   size="sm"
@@ -59,7 +64,7 @@ export const ScanModelsResults = ({ results }: { results: string[] }) => {
           <ScrollableContent>
             <Flex flexDir="column" gap={3}>
               {filteredResults.map((result) => (
-                <ScanModelResultItem key={result} result={result} />
+                <ScanModelResultItem key={result.path} result={result} />
               ))}
             </Flex>
           </ScrollableContent>
