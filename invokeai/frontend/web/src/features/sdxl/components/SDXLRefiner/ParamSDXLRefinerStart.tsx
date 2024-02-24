@@ -1,5 +1,6 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setRefinerStart } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,7 +13,9 @@ const ParamSDXLRefinerStart = () => {
 
   return (
     <FormControl>
-      <FormLabel>{t('sdxl.refinerStart')}</FormLabel>
+      <InformationalPopover feature="refinerStart">
+        <FormLabel>{t('sdxl.refinerStart')}</FormLabel>
+      </InformationalPopover>
       <CompositeSlider
         step={0.01}
         min={0}

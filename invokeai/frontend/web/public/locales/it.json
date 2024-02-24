@@ -1138,7 +1138,11 @@
         "unsupportedAnyOfLength": "unione di troppi elementi ({{count}})",
         "clearWorkflowDesc": "Cancellare questo flusso di lavoro e avviarne uno nuovo?",
         "clearWorkflow": "Cancella il flusso di lavoro",
-        "clearWorkflowDesc2": "Il tuo flusso di lavoro attuale presenta modifiche non salvate."
+        "clearWorkflowDesc2": "Il tuo flusso di lavoro attuale presenta modifiche non salvate.",
+        "viewMode": "Utilizzare nella vista lineare",
+        "reorderLinearView": "Riordina la vista lineare",
+        "editMode": "Modifica nell'editor del flusso di lavoro",
+        "resetToDefaultValue": "Ripristina il valore predefinito"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1241,7 +1245,11 @@
         "large": "Grande",
         "small": "Piccolo",
         "depthAnythingDescription": "Generazione di mappe di profondità utilizzando la tecnica Depth Anything",
-        "modelSize": "Dimensioni del modello"
+        "modelSize": "Dimensioni del modello",
+        "dwOpenposeDescription": "Stima della posa umana utilizzando DW Openpose",
+        "face": "Viso",
+        "body": "Corpo",
+        "hands": "Mani"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -1371,7 +1379,8 @@
     "popovers": {
         "paramScheduler": {
             "paragraphs": [
-                "Il campionatore definisce come aggiungere in modo iterativo il rumore a un'immagine o come aggiornare un campione in base all'output di un modello."
+                "Il campionatore utilizzato durante il processo di generazione.",
+                "Ciascun campionatore definisce come aggiungere in modo iterativo il rumore a un'immagine o come aggiornare un campione in base all'output di un modello."
             ],
             "heading": "Campionatore"
         },
@@ -1384,8 +1393,8 @@
         "compositingCoherenceSteps": {
             "heading": "Passi",
             "paragraphs": [
-                "Numero di passi di riduzione del rumore utilizzati nel Passaggio di Coerenza.",
-                "Uguale al parametro principale Passi."
+                "Numero di passi utilizzati nel Passaggio di Coerenza.",
+                "Simile ai passi di generazione."
             ]
         },
         "compositingBlur": {
@@ -1397,14 +1406,13 @@
         "compositingCoherenceMode": {
             "heading": "Modalità",
             "paragraphs": [
-                "La modalità del Passaggio di Coerenza."
+                "Metodo utilizzato per creare un'immagine coerente con l'area mascherata appena generata."
             ]
         },
         "clipSkip": {
             "paragraphs": [
                 "Scegli quanti livelli del modello CLIP saltare.",
-                "Alcuni modelli funzionano meglio con determinate impostazioni di CLIP Skip.",
-                "Un valore più alto in genere produce un'immagine meno dettagliata."
+                "Alcuni modelli funzionano meglio con determinate impostazioni di CLIP Skip."
             ]
         },
         "compositingCoherencePass": {
@@ -1416,8 +1424,8 @@
         "compositingStrength": {
             "heading": "Forza",
             "paragraphs": [
-                "Intensità di riduzione del rumore per il passaggio di coerenza.",
-                "Uguale al parametro intensità di riduzione del rumore da immagine a immagine."
+                "Quantità di rumore aggiunta per il Passaggio di Coerenza.",
+                "Simile alla forza di riduzione del rumore."
             ]
         },
         "paramNegativeConditioning": {
@@ -1443,8 +1451,8 @@
         "controlNetBeginEnd": {
             "heading": "Percentuale passi Inizio / Fine",
             "paragraphs": [
-                "A quali passi del processo di rimozione del rumore verrà applicato ControlNet.",
-                "I ControlNet applicati all'inizio del processo guidano la composizione, mentre i ControlNet applicati alla fine guidano i dettagli."
+                "La parte del processo di rimozione del rumore in cui verrà applicato l'adattatore di controllo.",
+                "In genere, gli adattatori di controllo applicati all'inizio del processo guidano la composizione, mentre quelli applicati alla fine guidano i dettagli."
             ]
         },
         "noiseUseCPU": {
@@ -1457,7 +1465,7 @@
         },
         "scaleBeforeProcessing": {
             "paragraphs": [
-                "Ridimensiona l'area selezionata alla dimensione più adatta al modello prima del processo di generazione dell'immagine."
+                "\"Auto\" ridimensiona l'area selezionata alla dimensione più adatta al modello prima del processo di generazione dell'immagine."
             ],
             "heading": "Scala prima dell'elaborazione"
         },
@@ -1492,20 +1500,21 @@
         "paramVAEPrecision": {
             "heading": "Precisione VAE",
             "paragraphs": [
-                "La precisione utilizzata durante la codifica e decodifica VAE. FP16/mezza precisione è più efficiente, a scapito di minori variazioni dell'immagine."
+                "La precisione utilizzata durante la codifica e decodifica VAE.",
+                "Fp16/Mezza precisione è più efficiente, a scapito di minori variazioni dell'immagine."
             ]
         },
         "paramSeed": {
             "paragraphs": [
                 "Controlla il rumore iniziale utilizzato per la generazione.",
-                "Disabilita seme \"Casuale\" per produrre risultati identici con le stesse impostazioni di generazione."
+                "Disabilita l'opzione \"Casuale\" per produrre risultati identici con le stesse impostazioni di generazione."
             ],
             "heading": "Seme"
         },
         "controlNetResizeMode": {
             "heading": "Modalità ridimensionamento",
             "paragraphs": [
-                "Come l'immagine ControlNet verrà adattata alle dimensioni di output dell'immagine."
+                "Metodo per adattare le dimensioni dell'immagine in ingresso dell'adattatore di controllo alle dimensioni della generazione di output."
             ]
         },
         "dynamicPromptsSeedBehaviour": {
@@ -1520,8 +1529,7 @@
         "paramModel": {
             "heading": "Modello",
             "paragraphs": [
-                "Modello utilizzato per i passaggi di riduzione del rumore.",
-                "Diversi modelli sono generalmente addestrati per specializzarsi nella produzione di particolari risultati e contenuti estetici."
+                "Modello utilizzato per la generazione. Diversi modelli vengono addestrati per specializzarsi nella produzione di risultati e contenuti estetici diversi."
             ]
         },
         "paramDenoisingStrength": {
@@ -1539,25 +1547,26 @@
         },
         "infillMethod": {
             "paragraphs": [
-                "Metodo per riempire l'area selezionata."
+                "Metodo di riempimento durante il processo di Outpainting o Inpainting."
             ],
             "heading": "Metodo di riempimento"
         },
         "controlNetWeight": {
             "heading": "Peso",
             "paragraphs": [
-                "Quanto forte sarà l'impatto di ControlNet sull'immagine generata."
+                "Peso dell'adattatore di controllo. Un peso maggiore porterà a impatti maggiori sull'immagine finale."
             ]
         },
         "paramCFGScale": {
             "heading": "Scala CFG",
             "paragraphs": [
-                "Controlla quanto il tuo prompt influenza il processo di generazione."
+                "Controlla quanto il prompt influenza il processo di generazione.",
+                "Valori elevati della scala CFG possono provocare una saturazione eccessiva e distorsioni nei risultati della generazione. "
             ]
         },
         "controlNetControlMode": {
             "paragraphs": [
-                "Attribuisce più peso al prompt o a ControlNet."
+                "Attribuisce più peso al prompt oppure a ControlNet."
             ],
             "heading": "Modalità di controllo"
         },
@@ -1569,9 +1578,9 @@
             ]
         },
         "lora": {
-            "heading": "Peso LoRA",
+            "heading": "LoRA",
             "paragraphs": [
-                "Un peso LoRA più elevato porterà a impatti maggiori sull'immagine finale."
+                "Modelli leggeri utilizzati insieme ai modelli base."
             ]
         },
         "controlNet": {
@@ -1583,8 +1592,65 @@
         "paramCFGRescaleMultiplier": {
             "heading": "Moltiplicatore di riscala CFG",
             "paragraphs": [
-                "Moltiplicatore di riscala per la guida CFG, utilizzato per modelli addestrati utilizzando SNR a terminale zero (ztsnr). Valore suggerito 0.7."
+                "Moltiplicatore di riscala per la guida CFG, utilizzato per modelli addestrati utilizzando SNR a terminale zero (ztsnr).",
+                "Valore suggerito di 0.7 per questi modelli."
             ]
+        },
+        "controlNetProcessor": {
+            "heading": "Processore",
+            "paragraphs": [
+                "Metodo di elaborazione dell'immagine di input per guidare il processo di generazione. Processori diversi forniranno effetti o stili diversi nelle immagini generate."
+            ]
+        },
+        "imageFit": {
+            "heading": "Adatta l'immagine iniziale alle dimensioni di output",
+            "paragraphs": [
+                "Ridimensiona l'immagine iniziale in base alla larghezza e all'altezza dell'immagine di output. Si consiglia di abilitarlo."
+            ]
+        },
+        "loraWeight": {
+            "heading": "Peso",
+            "paragraphs": [
+                "Peso del LoRA. Un peso maggiore comporterà un impatto maggiore sull'immagine finale."
+            ]
+        },
+        "paramAspect": {
+            "heading": "Aspetto",
+            "paragraphs": [
+                "Proporzioni dell'immagine generata. La modifica del rapporto aggiornerà di conseguenza la larghezza e l'altezza.",
+                "\"Ottimizza\" imposterà la larghezza e l'altezza alle dimensioni ottimali per il modello scelto."
+            ]
+        },
+        "paramHeight": {
+            "heading": "Altezza",
+            "paragraphs": [
+                "Altezza dell'immagine generata. Deve essere un multiplo di 8."
+            ]
+        },
+        "paramHrf": {
+            "heading": "Abilita correzione alta risoluzione",
+            "paragraphs": [
+                "Genera immagini di alta qualità con una risoluzione maggiore di quella ottimale per il modello. Generalmente utilizzato per impedire la duplicazione nell'immagine generata."
+            ]
+        },
+        "paramUpscaleMethod": {
+            "heading": "Metodo di ampliamento",
+            "paragraphs": [
+                "Metodo utilizzato per eseguire l'ampliamento dell'immagine per la correzione ad alta risoluzione."
+            ]
+        },
+        "patchmatchDownScaleSize": {
+            "heading": "Ridimensiona",
+            "paragraphs": [
+                "Quanto ridimensionamento avviene prima del riempimento.",
+                "Un ridimensionamento più elevato migliorerà le prestazioni e ridurrà la qualità."
+            ]
+        },
+        "paramWidth": {
+            "paragraphs": [
+                "Larghezza dell'immagine generata. Deve essere un multiplo di 8."
+            ],
+            "heading": "Larghezza"
         }
     },
     "sdxl": {
