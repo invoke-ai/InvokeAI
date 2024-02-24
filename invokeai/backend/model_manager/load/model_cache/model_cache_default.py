@@ -294,6 +294,12 @@ class ModelCache(ModelCacheBase[AnyModel]):
                     f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
                 )
 
+    def _clear_vram(self) -> None:
+        """Called on out of memory errors. Moves all our models out of VRAM."""
+        self.logger.warning('Resetting VRAM cache.')
+        for model in self._cached_models.values():
+            self.move_model_to_device(model, torch.device('cpu'))
+
     def print_cuda_stats(self) -> None:
         """Log CUDA diagnostics."""
         vram = "%4.2fG" % (torch.cuda.memory_allocated() / GIG)
