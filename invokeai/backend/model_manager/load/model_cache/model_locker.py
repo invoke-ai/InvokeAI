@@ -43,7 +43,8 @@ class ModelLocker(ModelLockerBase):
             self._cache.logger.debug(f"Locking {self._cache_entry.key} in {self._cache.execution_device}")
             self._cache.print_cuda_stats()
         except torch.cuda.OutOfMemoryError:
-            self._cache._clear_vram()
+            self._cache.logger.warning("Insufficient GPU memory to load model. Aborting")
+            self._cache_entry.unlock()
             raise
         except Exception:
             self._cache_entry.unlock()
