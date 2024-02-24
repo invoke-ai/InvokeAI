@@ -543,8 +543,8 @@ class ModelInstallService(ModelInstallServiceBase):
         self, model_path: Path, config: Optional[Dict[str, Any]] = None, info: Optional[AnyModelConfig] = None
     ) -> str:
         key = self._create_key()
-        if config and not config.get('key', None):
-            config['key'] = key
+        if config and not config.get("key", None):
+            config["key"] = key
         info = info or ModelProbe.probe(model_path, config)
 
         model_path = model_path.absolute()
