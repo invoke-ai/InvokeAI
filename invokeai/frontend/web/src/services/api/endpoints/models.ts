@@ -311,6 +311,7 @@ export const {
   useDeleteModelsMutation,
   useUpdateModelsMutation,
   useImportMainModelsMutation,
+  useImportAdvancedModelMutation,
   useConvertMainModelsMutation,
   useSyncModelsMutation,
   useScanModelsQuery,
