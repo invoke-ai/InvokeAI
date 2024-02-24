@@ -45,7 +45,7 @@ class TextConditioningInfoWithArea:
     def __init__(
         self,
         text_conditioning_info: Union[BasicConditioningInfo, SDXLConditioningInfo],
-        area: DenoisingArea,
+        area: Optional[DenoisingArea],
         mask_strength: float,
     ):
         self.text_conditioning_info = text_conditioning_info
