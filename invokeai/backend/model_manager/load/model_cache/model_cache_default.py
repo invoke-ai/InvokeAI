@@ -245,7 +245,13 @@ class ModelCache(ModelCacheBase[AnyModel]):
             mps.empty_cache()
 
     def move_model_to_device(self, cache_entry: CacheRecord[AnyModel], target_device: torch.device) -> None:
-        """Move model into the indicated device."""
+        """Move model into the indicated device.
+
+        :param cache_entry: The CacheRecord for the model
+        :param target_device: The torch.device to move the model into
+
+        May raise a torch.cuda.OutOfMemoryError
+        """
         # These attributes are not in the base ModelMixin class but in various derived classes.
         # Some models don't have these attributes, in which case they run in RAM/CPU.
         self.logger.debug(f"Called to move {cache_entry.key} to {target_device}")
@@ -258,6 +264,9 @@ class ModelCache(ModelCacheBase[AnyModel]):
         # This would need to be revised to support multi-GPU.
         if torch.device(source_device).type == torch.device(target_device).type:
             return
+
+        # may raise an exception here if insufficient GPU VRAM
+        self._check_free_vram(target_device, cache_entry.size)
 
         start_model_to_time = time.time()
         snapshot_before = self._capture_memory_snapshot()
@@ -293,12 +302,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
                     f" {(cache_entry.size/GIG):.3f} GB.\n"
                     f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
                 )
-
-    def _clear_vram(self) -> None:
-        """Called on out of memory errors. Moves all our models out of VRAM."""
-        self.logger.warning('Resetting VRAM cache.')
-        for model in self._cached_models.values():
-            self.move_model_to_device(model, torch.device('cpu'))
 
     def print_cuda_stats(self) -> None:
         """Log CUDA diagnostics."""
@@ -411,3 +414,13 @@ class ModelCache(ModelCacheBase[AnyModel]):
             mps.empty_cache()
 
         self.logger.debug(f"After making room: cached_models={len(self._cached_models)}")
+
+    def _check_free_vram(self, target_device: torch.device, needed_size: int) -> None:
+        if target_device.type != "cuda":
+            return
+        vram_device = ( # mem_get_info() needs an indexed device
+            target_device if target_device.index is not None else torch.device(str(target_device), index=0)
+        )
+        free_mem, _ = torch.cuda.mem_get_info(torch.device(vram_device))
+        if needed_size > free_mem:
+            raise torch.cuda.OutOfMemoryError
