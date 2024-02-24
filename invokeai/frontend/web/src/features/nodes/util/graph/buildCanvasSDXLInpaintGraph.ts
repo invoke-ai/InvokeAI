@@ -153,7 +153,7 @@ export const buildCanvasSDXLInpaintGraph = (
         fp32,
       },
       [CANVAS_OUTPUT]: {
-        type: 'iai_canvas_paste_back',
+        type: 'canvas_paste_back',
         id: CANVAS_OUTPUT,
         is_intermediate: getIsIntermediate(state),
         board: getBoardField(state),
