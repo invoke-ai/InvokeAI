@@ -28,14 +28,28 @@ class FastModelHash(object):
         """
         model_location = Path(model_location)
         if model_location.is_file():
-            return cls._hash_file(model_location)
+            return cls._hash_file_sha1(model_location)
         elif model_location.is_dir():
             return cls._hash_dir(model_location)
         else:
             raise OSError(f"Not a valid file or directory: {model_location}")
 
     @classmethod
-    def _hash_file(cls, model_location: Union[str, Path]) -> str:
+    def _hash_file_sha1(cls, model_location: Union[str, Path]) -> str:
+        """
+        Compute full sha1 hash over a single file and return its hexdigest.
+
+        :param model_location: Path to the model file
+        """
+        BLOCK_SIZE = 65536
+        file_hash = hashlib.sha1()
+        with open(model_location, "rb") as f:
+            data = f.read(BLOCK_SIZE)
+            file_hash.update(data)
+        return file_hash.hexdigest()
+
+    @classmethod
+    def _hash_file_fast(cls, model_location: Union[str, Path]) -> str:
         """
         Fasthash a single file and return its hexdigest.
 
@@ -56,7 +70,7 @@ class FastModelHash(object):
                 if not file.endswith((".ckpt", ".safetensors", ".bin", ".pt", ".pth")):
                     continue
                 path = (Path(root) / file).as_posix()
-                fast_hash = cls._hash_file(path)
+                fast_hash = cls._hash_file_fast(path)
                 components.update({path: fast_hash})
 
         # hash all the model hashes together, using alphabetic file order

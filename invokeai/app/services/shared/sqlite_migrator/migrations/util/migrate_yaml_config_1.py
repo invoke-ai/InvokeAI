@@ -3,7 +3,6 @@
 
 import json
 import sqlite3
-from hashlib import sha1
 from logging import Logger
 from pathlib import Path
 from typing import Optional
@@ -78,14 +77,22 @@ class MigrateModelYamlToDb1:
                 self.logger.warning(f"The model at {stanza.path} is not a valid file or directory. Skipping migration.")
                 continue
 
-            assert isinstance(model_key, str)
-            new_key = sha1(model_key.encode("utf-8")).hexdigest()
-
             stanza["base"] = BaseModelType(base_type)
             stanza["type"] = ModelType(model_type)
             stanza["name"] = model_name
             stanza["original_hash"] = hash
             stanza["current_hash"] = hash
+            new_key = hash  # deterministic key assignment
+
+            # special case for ip adapters, which need the new `image_encoder_model_id` field
+            if stanza["type"] == ModelType.IPAdapter:
+                try:
+                    stanza["image_encoder_model_id"] = self._get_image_encoder_model_id(
+                        self.config.models_path / stanza.path
+                    )
+                except OSError:
+                    self.logger.warning(f"Could not determine image encoder for {stanza.path}. Skipping.")
+                    continue
 
             new_config: AnyModelConfig = ModelsValidator.validate_python(stanza)  # type: ignore # see https://github.com/pydantic/pydantic/discussions/7094
 
@@ -95,7 +102,7 @@ class MigrateModelYamlToDb1:
                     self.logger.info(f"Updating model {model_name} with information from models.yaml using key {key}")
                     self._update_model(key, new_config)
                 else:
-                    self.logger.info(f"Adding model {model_name} with key {model_key}")
+                    self.logger.info(f"Adding model {model_name} with key {new_key}")
                     self._add_model(new_key, new_config)
             except DuplicateModelException:
                 self.logger.warning(f"Model {model_name} is already in the database")
@@ -149,3 +156,8 @@ class MigrateModelYamlToDb1:
             )
         except sqlite3.IntegrityError as exc:
             raise DuplicateModelException(f"{record.name}: model is already in database") from exc
+
+    def _get_image_encoder_model_id(self, model_path: Path) -> str:
+        with open(model_path / "image_encoder.txt") as f:
+            encoder = f.read()
+        return encoder.strip()
