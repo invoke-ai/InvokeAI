@@ -933,14 +933,14 @@ class SaveImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
 
 @invocation(
-    "iai_canvas_paste_back",
-    title="InvokeAI Canvas Paste Back",
+    "canvas_paste_back",
+    title="Canvas Paste Back",
     tags=["image", "combine"],
     category="image",
     version="1.0.0",
 )
-class IAICanvasPasteBackInvocation(BaseInvocation, WithMetadata, WithBoard):
-    """Combines two images by using the mask provided"""
+class CanvasPasteBackInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Combines two images by using the mask provided. Intended for use on the Unified Canvas."""
 
     source_image: ImageField = InputField(description="The source image")
     target_image: ImageField = InputField(default=None, description="The target image")
@@ -949,7 +949,7 @@ class IAICanvasPasteBackInvocation(BaseInvocation, WithMetadata, WithBoard):
     )
     mask_blur: int = InputField(default=0, ge=0, description="The amount to blur the mask by")
 
-    def _prepare_mask(self, mask: Image.Image):
+    def _prepare_mask(self, mask: Image.Image) -> Image.Image:
         mask_array = numpy.array(mask)
         kernel = numpy.ones((self.mask_blur, self.mask_blur), numpy.uint8)
         dilated_mask_array = cv2.erode(mask_array, kernel, iterations=3)
