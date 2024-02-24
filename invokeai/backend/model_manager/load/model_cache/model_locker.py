@@ -2,8 +2,8 @@
 Base class and implementation of a class that moves models in and out of VRAM.
 """
 
+import torch
 from invokeai.backend.model_manager import AnyModel
-
 from .model_cache_base import CacheRecord, ModelCacheBase, ModelLockerBase
 
 
@@ -42,7 +42,9 @@ class ModelLocker(ModelLockerBase):
 
             self._cache.logger.debug(f"Locking {self._cache_entry.key} in {self._cache.execution_device}")
             self._cache.print_cuda_stats()
-
+        except torch.cuda.OutOfMemoryError:
+            self._cache._clear_vram()
+            raise
         except Exception:
             self._cache_entry.unlock()
             raise
