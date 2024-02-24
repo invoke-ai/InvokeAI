@@ -7,7 +7,6 @@ import time
 from hashlib import sha256
 from pathlib import Path
 from queue import Empty, Queue
-from random import randbytes
 from shutil import copyfile, copytree, move, rmtree
 from tempfile import mkdtemp
 from typing import Any, Dict, List, Optional, Set, Union
@@ -536,16 +535,16 @@ class ModelInstallService(ModelInstallServiceBase):
                 setattr(info, key, value)
         return info
 
-    def _create_key(self) -> str:
-        return sha256(randbytes(100)).hexdigest()[0:32]
-
     def _register(
         self, model_path: Path, config: Optional[Dict[str, Any]] = None, info: Optional[AnyModelConfig] = None
     ) -> str:
-        key = self._create_key()
-        if config and not config.get("key", None):
-            config["key"] = key
+        # the model key is either the forced key specified in config,
+        # or it is the file/directory hash computed by probe
         info = info or ModelProbe.probe(model_path, config)
+        override_key: Optional[str] = config.get("key") if config else None
+
+        assert info.original_hash  # always assigned by probe()
+        info.key = override_key or info.original_hash
 
         model_path = model_path.absolute()
         if model_path.is_relative_to(self.app_config.models_path):

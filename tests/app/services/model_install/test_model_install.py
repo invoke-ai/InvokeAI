@@ -31,7 +31,7 @@ def test_registration(mm2_installer: ModelInstallServiceBase, embedding_file: Pa
     assert len(matches) == 0
     key = mm2_installer.register_path(embedding_file)
     assert key is not None
-    assert len(key) == 32
+    assert len(key) == 40  # length of the sha1 hash
 
 
 def test_registration_meta(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
