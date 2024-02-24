@@ -20,16 +20,16 @@
     "jsx": "react-jsx",
     "baseUrl": "./",
     "paths": {
-      "*": ["./src/*"],
-    },
+      "*": ["./src/*"]
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "*.d.ts", ".storybook/**/*"],
   "exclude": ["src/services/fixtures/*", "node_modules", "dist"],
   "references": [{ "path": "./tsconfig.node.json" }],
   "ts-node": {
     "compilerOptions": {
-      "jsx": "preserve",
+      "jsx": "preserve"
     },
-    "esm": true,
-  },
+    "esm": true
+  }
 }
