@@ -29,12 +29,7 @@ export const MetadataIPAdapters = ({ metadata }: Props) => {
   return (
     <>
       {ipAdapters.map((ipAdapter) => (
-        <MetadataViewIPAdapter
-          key={ipAdapter.model.key}
-          label={label}
-          ipAdapter={ipAdapter}
-          handlers={handlers.ipAdapters}
-        />
+        <MetadataViewIPAdapter key={ipAdapter.id} label={label} ipAdapter={ipAdapter} handlers={handlers.ipAdapters} />
       ))}
     </>
   );
