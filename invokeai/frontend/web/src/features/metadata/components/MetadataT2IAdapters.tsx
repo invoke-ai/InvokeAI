@@ -30,7 +30,7 @@ export const MetadataT2IAdapters = ({ metadata }: Props) => {
     <>
       {t2iAdapters.map((t2iAdapter) => (
         <MetadataViewT2IAdapter
-          key={t2iAdapter.model.key}
+          key={t2iAdapter.id}
           label={label}
           t2iAdapter={t2iAdapter}
           handlers={handlers.t2iAdapters}
