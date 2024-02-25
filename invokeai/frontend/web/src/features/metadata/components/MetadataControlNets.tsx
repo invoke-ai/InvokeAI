@@ -1,3 +1,4 @@
+import { Text } from '@invoke-ai/ui-library';
 import type { ControlNetConfig } from 'features/controlAdapters/store/types';
 import { MetadataItemView } from 'features/metadata/components/MetadataItemView';
 import type { MetadataHandlers } from 'features/metadata/types';
@@ -59,7 +60,7 @@ const MetadataViewControlNet = ({
     if (!handlers.renderItemValue) {
       return null;
     }
-    return handlers.renderItemValue(controlNet);
+    return <Text>{handlers.renderItemValue(controlNet)}</Text>;
   }, [handlers, controlNet]);
 
   return <MetadataItemView label={label} isDisabled={false} onRecall={onRecall} renderedValue={renderedValue} />;
