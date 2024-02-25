@@ -1,3 +1,4 @@
+import { Text } from '@invoke-ai/ui-library';
 import type { IPAdapterConfig } from 'features/controlAdapters/store/types';
 import { MetadataItemView } from 'features/metadata/components/MetadataItemView';
 import type { MetadataHandlers } from 'features/metadata/types';
@@ -59,7 +60,7 @@ const MetadataViewIPAdapter = ({
     if (!handlers.renderItemValue) {
       return null;
     }
-    return handlers.renderItemValue(ipAdapter);
+    return <Text>{handlers.renderItemValue(ipAdapter)}</Text>;
   }, [handlers, ipAdapter]);
 
   return <MetadataItemView label={label} isDisabled={false} onRecall={onRecall} renderedValue={renderedValue} />;

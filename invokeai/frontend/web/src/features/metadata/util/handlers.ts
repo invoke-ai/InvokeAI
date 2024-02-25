@@ -1,6 +1,5 @@
-import { Text } from '@invoke-ai/ui-library';
 import { toast } from 'common/util/toast';
-import type { ControlNetConfig, IPAdapterConfig, T2IAdapterConfig } from 'features/controlAdapters/store/types';
+import type { ControlAdapterConfig } from 'features/controlAdapters/store/types';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import type {
   BuildMetadataHandlers,
@@ -20,10 +19,9 @@ import { recallers } from './recallers';
 
 const renderModelConfigValue: MetadataRenderValueFunc<AnyModelConfig> = (value) =>
   `${value.name} (${value.base.toUpperCase()}, ${value.key})`;
-const renderLoRAValue: MetadataRenderValueFunc<LoRA> = (value) => <Text>{`${value.model.key} (${value.weight})`}</Text>;
-const renderControlAdapterValue: MetadataRenderValueFunc<ControlNetConfig | T2IAdapterConfig | IPAdapterConfig> = (
-  value
-) => <Text>{`${value.model?.key} (${value.weight})`}</Text>;
+const renderLoRAValue: MetadataRenderValueFunc<LoRA> = (value) => `${value.model.key} (${value.weight})`;
+const renderControlAdapterValue: MetadataRenderValueFunc<ControlAdapterConfig> = (value) =>
+  `${value.model?.key} (${value.weight})`;
 
 const parameterSetToast = (parameter: string, description?: string) => {
   toast({
