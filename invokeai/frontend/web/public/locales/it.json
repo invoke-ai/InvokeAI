@@ -934,7 +934,7 @@
         "executionStateCompleted": "Completato",
         "boardFieldDescription": "Una bacheca della galleria",
         "addNodeToolTip": "Aggiungi nodo (Shift+A, Space)",
-        "sDXLRefinerModelField": "Modello Refiner",
+        "sDXLRefinerModelField": "Modello Affinatore",
         "problemReadingMetadata": "Problema durante la lettura dei metadati dall'immagine",
         "colorCodeEdgesHelp": "Bordi con codice colore in base ai campi collegati",
         "animatedEdges": "Bordi animati",
@@ -1329,7 +1329,7 @@
         "noModelsAvailable": "Nessun modello disponibile",
         "selectModel": "Seleziona un modello",
         "selectLoRA": "Seleziona un LoRA",
-        "noRefinerModelsInstalled": "Nessun modello SDXL Refiner installato",
+        "noRefinerModelsInstalled": "Nessun modello affinatore SDXL installato",
         "noLoRAsInstalled": "Nessun LoRA installato",
         "esrganModel": "Modello ESRGAN",
         "addLora": "Aggiungi LoRA",
@@ -1465,7 +1465,8 @@
         },
         "scaleBeforeProcessing": {
             "paragraphs": [
-                "\"Auto\" ridimensiona l'area selezionata alla dimensione più adatta al modello prima del processo di generazione dell'immagine."
+                "\"Auto\" ridimensiona l'area selezionata alla dimensione più adatta al modello prima del processo di generazione dell'immagine.",
+                "\"Manuale\" consente di scegliere la larghezza e l'altezza a cui verrà ridimensionata l'area selezionata prima del processo di generazione dell'immagine."
             ],
             "heading": "Scala prima dell'elaborazione"
         },
@@ -1651,6 +1652,65 @@
                 "Larghezza dell'immagine generata. Deve essere un multiplo di 8."
             ],
             "heading": "Larghezza"
+        },
+        "refinerModel": {
+            "heading": "Modello Affinatore",
+            "paragraphs": [
+                "Modello utilizzato durante la parte di affinamento del processo di generazione.",
+                "Simile al modello di generazione."
+            ]
+        },
+        "refinerNegativeAestheticScore": {
+            "paragraphs": [
+                "Valuta le generazioni in modo che siano più simili alle immagini con un punteggio estetico basso, in base ai dati di addestramento."
+            ],
+            "heading": "Punteggio estetico negativo"
+        },
+        "refinerScheduler": {
+            "paragraphs": [
+                "Campionatore utilizzato durante la parte di affinamento del processo di generazione.",
+                "Simile al campionatore di generazione."
+            ],
+            "heading": "Campionatore"
+        },
+        "refinerStart": {
+            "heading": "Inizio affinamento",
+            "paragraphs": [
+                "A che punto nel processo di generazione inizierà ad essere utilizzato l'affinatore.",
+                "0 significa che l'affinatore verrà utilizzato per l'intero processo di generazione, 0.8 significa che l'affinatore verrà utilizzato per l'ultimo 20% del processo di generazione."
+            ]
+        },
+        "refinerSteps": {
+            "heading": "Passi",
+            "paragraphs": [
+                "Numero di passi che verranno eseguiti durante la parte di affinamento del processo di generazione.",
+                "Simile ai passi di generazione."
+            ]
+        },
+        "refinerCfgScale": {
+            "heading": "Scala CFG",
+            "paragraphs": [
+                "Controlla quanto il prompt influenza il processo di generazione.",
+                "Simile alla scala CFG di generazione."
+            ]
+        },
+        "seamlessTilingXAxis": {
+            "heading": "Asse X di piastrellatura senza cuciture",
+            "paragraphs": [
+                "Affianca senza soluzione di continuità un'immagine lungo l'asse orizzontale."
+            ]
+        },
+        "seamlessTilingYAxis": {
+            "heading": "Asse Y di piastrellatura senza cuciture",
+            "paragraphs": [
+                "Affianca senza soluzione di continuità un'immagine lungo l'asse verticale."
+            ]
+        },
+        "refinerPositiveAestheticScore": {
+            "heading": "Punteggio estetico positivo",
+            "paragraphs": [
+                "Valuta le generazioni in modo che siano più simili alle immagini con un punteggio estetico elevato, in base ai dati di addestramento."
+            ]
         }
     },
     "sdxl": {
