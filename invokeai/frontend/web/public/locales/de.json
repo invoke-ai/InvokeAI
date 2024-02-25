@@ -599,7 +599,10 @@
         "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (kann zu groß sein)",
         "lockAspectRatio": "Seitenverhältnis sperren",
         "swapDimensions": "Seitenverhältnis umkehren",
-        "setToOptimalSize": "Optimiere Größe für Modell"
+        "setToOptimalSize": "Optimiere Größe für Modell",
+        "useSize": "Maße übernehmen",
+        "remixImage": "Remix des Bilds erstellen",
+        "imageActions": "Weitere Bildaktionen"
     },
     "settings": {
         "displayInProgress": "Zwischenbilder anzeigen",
@@ -858,7 +861,7 @@
         "colorMap": "Farbe",
         "lowThreshold": "Niedrige Schwelle",
         "highThreshold": "Hohe Schwelle",
-        "toggleControlNet": "Schalten ControlNet um",
+        "toggleControlNet": "Dieses ControlNet ein- oder ausschalten",
         "delete": "Löschen",
         "controlAdapter_one": "Control Adapter",
         "controlAdapter_other": "Control Adapter",
@@ -911,14 +914,15 @@
         "face": "Gesicht",
         "body": "Körper",
         "hands": "Hände",
-        "dwOpenpose": "DW Openpose"
+        "dwOpenpose": "DW Openpose",
+        "dwOpenposeDescription": "Posenschätzung mit DW Openpose"
     },
     "queue": {
         "status": "Status",
         "cancelTooltip": "Aktuellen Aufgabe abbrechen",
         "queueEmpty": "Warteschlange leer",
         "in_progress": "In Arbeit",
-        "queueFront": "An den Anfang der Warteschlange tun",
+        "queueFront": "Am Anfang der Warteschlange einreihen",
         "completed": "Fertig",
         "queueBack": "In die Warteschlange",
         "clearFailed": "Probleme beim leeren der Warteschlange",
@@ -1131,6 +1135,11 @@
                 "\"Planer\" definiert, wie iterativ Rauschen zu einem Bild hinzugefügt wird, oder wie ein Sample bei der Ausgabe eines Modells aktualisiert wird."
             ],
             "heading": "Planer"
+        },
+        "imageFit": {
+            "paragraphs": [
+                "Reduziert das Ausgangsbild auf die Breite und Höhe des Ausgangsbildes. Empfohlen zu aktivieren."
+            ]
         }
     },
     "ui": {
