@@ -12,7 +12,6 @@ import type { MetadataParseFunc } from 'features/metadata/types';
 import {
   fetchModelConfigWithTypeGuard,
   getModelKey,
-  getModelKeyAndBase,
 } from 'features/metadata/util/modelFetchingHelpers';
 import {
   zControlField,
@@ -26,17 +25,20 @@ import type {
   ParameterHeight,
   ParameterHRFEnabled,
   ParameterHRFMethod,
+  ParameterModel,
   ParameterNegativePrompt,
   ParameterNegativeStylePromptSDXL,
   ParameterPositivePrompt,
   ParameterPositiveStylePromptSDXL,
   ParameterScheduler,
+  ParameterSDXLRefinerModel,
   ParameterSDXLRefinerNegativeAestheticScore,
   ParameterSDXLRefinerPositiveAestheticScore,
   ParameterSDXLRefinerStart,
   ParameterSeed,
   ParameterSteps,
   ParameterStrength,
+  ParameterVAEModel,
   ParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
 import {
@@ -60,7 +62,6 @@ import {
   isParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
 import { get, isArray, isString } from 'lodash-es';
-import type { NonRefinerMainModelConfig, RefinerMainModelConfig, VAEModelConfig } from 'services/api/types';
 import {
   isControlNetModelConfig,
   isIPAdapterModelConfig,
@@ -163,25 +164,28 @@ const parseRefinerNegativeAestheticScore: MetadataParseFunc<ParameterSDXLRefiner
 const parseRefinerStart: MetadataParseFunc<ParameterSDXLRefinerStart> = (metadata) =>
   getProperty(metadata, 'refiner_start', isParameterSDXLRefinerStart);
 
-const parseMainModel: MetadataParseFunc<NonRefinerMainModelConfig> = async (metadata) => {
+const parseMainModel: MetadataParseFunc<ParameterModel> = async (metadata) => {
   const model = await getProperty(metadata, 'model', undefined);
   const key = await getModelKey(model, 'main');
   const mainModelConfig = await fetchModelConfigWithTypeGuard(key, isNonRefinerMainModelConfig);
-  return mainModelConfig;
+  const modelIdentifier = zModelIdentifierWithBase.parse(mainModelConfig);
+  return modelIdentifier;
 };
 
-const parseRefinerModel: MetadataParseFunc<RefinerMainModelConfig> = async (metadata) => {
+const parseRefinerModel: MetadataParseFunc<ParameterSDXLRefinerModel> = async (metadata) => {
   const refiner_model = await getProperty(metadata, 'refiner_model', undefined);
   const key = await getModelKey(refiner_model, 'main');
   const refinerModelConfig = await fetchModelConfigWithTypeGuard(key, isRefinerMainModelModelConfig);
-  return refinerModelConfig;
+  const modelIdentifier = zModelIdentifierWithBase.parse(refinerModelConfig);
+  return modelIdentifier;
 };
 
-const parseVAEModel: MetadataParseFunc<VAEModelConfig> = async (metadata) => {
+const parseVAEModel: MetadataParseFunc<ParameterVAEModel> = async (metadata) => {
   const vae = await getProperty(metadata, 'vae', undefined);
   const key = await getModelKey(vae, 'vae');
   const vaeModelConfig = await fetchModelConfigWithTypeGuard(key, isVAEModelConfig);
-  return vaeModelConfig;
+  const modelIdentifier = zModelIdentifierWithBase.parse(vaeModelConfig);
+  return modelIdentifier;
 };
 
 const parseLoRA: MetadataParseFunc<LoRA> = async (metadataItem) => {
@@ -194,7 +198,7 @@ const parseLoRA: MetadataParseFunc<LoRA> = async (metadataItem) => {
   const loraModelConfig = await fetchModelConfigWithTypeGuard(key, isLoRAModelConfig);
 
   return {
-    model: getModelKeyAndBase(loraModelConfig),
+    model: zModelIdentifierWithBase.parse(loraModelConfig),
     weight: isParameterLoRAWeight(weight) ? weight : defaultLoRAConfig.weight,
     isEnabled: true,
   };

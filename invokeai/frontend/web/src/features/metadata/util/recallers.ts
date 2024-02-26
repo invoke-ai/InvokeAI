@@ -5,7 +5,6 @@ import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { loraRecalled } from 'features/lora/store/loraSlice';
 import type { MetadataRecallFunc } from 'features/metadata/types';
-import { zModelIdentifierWithBase } from 'features/nodes/types/common';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
   heightRecalled,
@@ -26,17 +25,20 @@ import type {
   ParameterHeight,
   ParameterHRFEnabled,
   ParameterHRFMethod,
+  ParameterModel,
   ParameterNegativePrompt,
   ParameterNegativeStylePromptSDXL,
   ParameterPositivePrompt,
   ParameterPositiveStylePromptSDXL,
   ParameterScheduler,
+  ParameterSDXLRefinerModel,
   ParameterSDXLRefinerNegativeAestheticScore,
   ParameterSDXLRefinerPositiveAestheticScore,
   ParameterSDXLRefinerStart,
   ParameterSeed,
   ParameterSteps,
   ParameterStrength,
+  ParameterVAEModel,
   ParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
 import {
@@ -50,7 +52,6 @@ import {
   setRefinerStart,
   setRefinerSteps,
 } from 'features/sdxl/store/sdxlSlice';
-import type { NonRefinerMainModelConfig, RefinerMainModelConfig, VAEModelConfig } from 'services/api/types';
 
 const recallPositivePrompt: MetadataRecallFunc<ParameterPositivePrompt> = (positivePrompt) => {
   getStore().dispatch(setPositivePrompt(positivePrompt));
@@ -140,23 +141,20 @@ const recallRefinerStart: MetadataRecallFunc<ParameterSDXLRefinerStart> = (refin
   getStore().dispatch(setRefinerStart(refinerStart));
 };
 
-const recallModel: MetadataRecallFunc<NonRefinerMainModelConfig> = (model) => {
-  const modelIdentifier = zModelIdentifierWithBase.parse(model);
-  getStore().dispatch(modelSelected(modelIdentifier));
+const recallModel: MetadataRecallFunc<ParameterModel> = (model) => {
+  getStore().dispatch(modelSelected(model));
 };
 
-const recallRefinerModel: MetadataRecallFunc<RefinerMainModelConfig> = (refinerModel) => {
-  const modelIdentifier = zModelIdentifierWithBase.parse(refinerModel);
-  getStore().dispatch(refinerModelChanged(modelIdentifier));
+const recallRefinerModel: MetadataRecallFunc<ParameterSDXLRefinerModel> = (refinerModel) => {
+  getStore().dispatch(refinerModelChanged(refinerModel));
 };
 
-const recallVAE: MetadataRecallFunc<VAEModelConfig | null | undefined> = (vaeModel) => {
+const recallVAE: MetadataRecallFunc<ParameterVAEModel | null | undefined> = (vaeModel) => {
   if (!vaeModel) {
     getStore().dispatch(vaeSelected(null));
     return;
   }
-  const modelIdentifier = zModelIdentifierWithBase.parse(vaeModel);
-  getStore().dispatch(vaeSelected(modelIdentifier));
+  getStore().dispatch(vaeSelected(vaeModel));
 };
 
 const recallLoRA: MetadataRecallFunc<LoRA> = (lora) => {

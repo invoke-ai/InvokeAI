@@ -1,7 +1,7 @@
 /**
  * Renders a value of type T as a React node.
  */
-export type MetadataRenderValueFunc<T> = (value: T) => React.ReactNode;
+export type MetadataRenderValueFunc<T> = (value: T) => Promise<React.ReactNode>;
 
 /**
  * Gets the label of the current metadata item as a string.

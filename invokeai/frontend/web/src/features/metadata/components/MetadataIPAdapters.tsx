@@ -1,4 +1,3 @@
-import { Text } from '@invoke-ai/ui-library';
 import type { IPAdapterConfig } from 'features/controlAdapters/store/types';
 import { MetadataItemView } from 'features/metadata/components/MetadataItemView';
 import type { MetadataHandlers } from 'features/metadata/types';
@@ -51,11 +50,18 @@ const MetadataViewIPAdapter = ({
     handlers.recallItem(ipAdapter, true);
   }, [handlers, ipAdapter]);
 
-  const renderedValue = useMemo(() => {
-    if (!handlers.renderItemValue) {
-      return null;
-    }
-    return <Text>{handlers.renderItemValue(ipAdapter)}</Text>;
+  const [renderedValue, setRenderedValue] = useState<React.ReactNode>(null);
+  useEffect(() => {
+    const _renderValue = async () => {
+      if (!handlers.renderItemValue) {
+        setRenderedValue(null);
+        return;
+      }
+      const rendered = await handlers.renderItemValue(ipAdapter);
+      setRenderedValue(rendered);
+    };
+
+    _renderValue();
   }, [handlers, ipAdapter]);
 
   return <MetadataItemView label={label} isDisabled={false} onRecall={onRecall} renderedValue={renderedValue} />;
