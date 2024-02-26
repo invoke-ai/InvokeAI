@@ -18,7 +18,7 @@ export const LoRAList = memo(() => {
   return (
     <Flex flexWrap="wrap" gap={2}>
       {lorasArray.map((lora) => (
-        <LoRACard key={lora.key} lora={lora} />
+        <LoRACard key={lora.model.key} lora={lora} />
       ))}
     </Flex>
   );

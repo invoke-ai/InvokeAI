@@ -58,7 +58,8 @@ export const addSDXLLoRAsToGraph = (
   let currentLoraIndex = 0;
 
   enabledLoRAs.forEach((lora) => {
-    const { key, weight } = lora;
+    const { weight } = lora;
+    const { key } = lora.model;
     const currentLoraNodeId = `${LORA_LOADER}_${key}`;
 
     const loraLoaderNode: SDXLLoraLoaderInvocation = {

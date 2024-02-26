@@ -39,7 +39,7 @@ export const addModelSelectedListener = () => {
 
         // handle incompatible loras
         forEach(state.lora.loras, (lora, id) => {
-          if (lora.base !== newBaseModel) {
+          if (lora.model.base !== newBaseModel) {
             dispatch(loraRemoved(id));
             modelsCleared += 1;
           }
