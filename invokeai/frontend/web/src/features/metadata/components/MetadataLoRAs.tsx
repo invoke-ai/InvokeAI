@@ -1,3 +1,4 @@
+import { Text } from '@invoke-ai/ui-library';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { MetadataItemView } from 'features/metadata/components/MetadataItemView';
 import type { MetadataHandlers } from 'features/metadata/types';
@@ -54,7 +55,7 @@ const MetadataViewLoRA = ({
     if (!handlers.renderItemValue) {
       return null;
     }
-    return handlers.renderItemValue(lora);
+    return <Text>{handlers.renderItemValue(lora)}</Text>;
   }, [handlers, lora]);
 
   return <MetadataItemView label={label} isDisabled={false} onRecall={onRecall} renderedValue={renderedValue} />;
