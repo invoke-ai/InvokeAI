@@ -345,10 +345,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
             positive_cond_data = context.services.latents.get(positive_conditioning.conditioning_name)
             text_embeddings.append(positive_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype))
 
-            mask_name = positive_conditioning.mask_name
-            mask = None
-            if mask_name is not None:
-                mask = context.services.latents.get(mask_name)
+            mask = positive_conditioning.mask
+            if mask is not None:
+                mask = context.services.latents.get(mask.mask_name)
             text_embeddings_masks.append(mask)
 
         negative_cond_data = context.services.latents.get(self.negative_conditioning.conditioning_name)

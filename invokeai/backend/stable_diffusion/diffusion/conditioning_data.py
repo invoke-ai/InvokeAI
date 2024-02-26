@@ -20,6 +20,8 @@ class ExtraConditioningInfo:
 
 @dataclass
 class BasicConditioningInfo:
+    """SD 1/2 text conditioning information produced by Compel."""
+
     embeds: torch.Tensor
     extra_conditioning: Optional[ExtraConditioningInfo]
 
@@ -30,6 +32,8 @@ class BasicConditioningInfo:
 
 @dataclass
 class SDXLConditioningInfo(BasicConditioningInfo):
+    """SDXL text conditioning information produced by Compel."""
+
     pooled_embeds: torch.Tensor
     add_time_ids: torch.Tensor
 

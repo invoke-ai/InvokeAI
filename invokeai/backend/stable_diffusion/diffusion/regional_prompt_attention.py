@@ -52,6 +52,9 @@ class RegionalPromptAttnProcessor2_0(AttnProcessor2_0):
             w //= 2
         assert h * w == query_seq_len
 
+        # Convert the bool masks to float masks.
+        per_prompt_query_masks = per_prompt_query_masks.to(dtype=torch.float32)
+
         # Apply max-pooling to resize the masks to the target spatial dimensions.
         # TODO(ryand): We should be able to pre-compute all of the mask sizes. There's a lot of redundant computation
         # here.

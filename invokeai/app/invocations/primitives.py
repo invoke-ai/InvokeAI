@@ -233,6 +233,24 @@ class BoardField(BaseModel):
     board_id: str = Field(description="The id of the board")
 
 
+class MaskField(BaseModel):
+    """A mask primitive field."""
+
+    mask_name: str = Field(description="The name of the mask.")
+
+
+@invocation_output("mask_output")
+class MaskOutput(BaseInvocationOutput):
+    """A torch mask tensor.
+    dtype: torch.bool
+    shape: (1, height, width).
+    """
+
+    mask: MaskField = OutputField(description="The mask.")
+    width: int = OutputField(description="The width of the mask in pixels.")
+    height: int = OutputField(description="The height of the mask in pixels.")
+
+
 @invocation_output("image_output")
 class ImageOutput(BaseInvocationOutput):
     """Base class for nodes that output a single image"""
@@ -428,10 +446,10 @@ class ConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
-    mask_name: Optional[str] = Field(
+    mask: Optional[MaskField] = Field(
         default=None,
-        description="The mask associated with this conditioning tensor. Excluded regions should be set to 0, included "
-        "regions should be set to 1.",
+        description="The mask associated with this conditioning tensor. Excluded regions should be set to False, "
+        "included regions should be set to 1.",
     )
 
 

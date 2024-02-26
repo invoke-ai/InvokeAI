@@ -1,6 +1,4 @@
-import numpy as np
 import torch
-from PIL import Image
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -9,8 +7,7 @@ from invokeai.app.invocations.baseinvocation import (
     WithMetadata,
     invocation,
 )
-from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput, ImageField, ImageOutput
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput, MaskField, MaskOutput
 
 
 @invocation(
@@ -24,27 +21,10 @@ class AddConditioningMaskInvocation(BaseInvocation):
     """Add a mask to an existing conditioning tensor."""
 
     conditioning: ConditioningField = InputField(description="The conditioning tensor to add a mask to.")
-    image: ImageField = InputField(
-        description="A mask image to add to the conditioning tensor. Only the first channel of the image is used. "
-        "Pixels <128 are excluded from the mask, pixels >=128 are included in the mask."
-    )
-
-    @staticmethod
-    def convert_image_to_mask(image: Image.Image) -> torch.Tensor:
-        """Convert a PIL image to a uint8 mask tensor."""
-        np_image = np.array(image)
-        torch_image = torch.from_numpy(np_image[:, :, 0])
-        mask = torch_image >= 128
-        return mask.to(dtype=torch.uint8)
+    mask: MaskField = InputField(description="A mask to add to the conditioning tensor.")
 
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        image = context.services.images.get_pil_image(self.image.image_name)
-        mask = self.convert_image_to_mask(image)
-
-        mask_name = f"{context.graph_execution_state_id}__{self.id}_conditioning_mask"
-        context.services.latents.save(mask_name, mask)
-
-        self.conditioning.mask_name = mask_name
+        self.conditioning.mask = self.mask
         return ConditioningOutput(conditioning=self.conditioning)
 
 
@@ -56,33 +36,26 @@ class AddConditioningMaskInvocation(BaseInvocation):
     version="1.0.0",
 )
 class RectangleMaskInvocation(BaseInvocation, WithMetadata):
-    """Create a mask image containing a rectangular mask region."""
+    """Create a rectangular mask."""
 
-    height: int = InputField(description="The height of the image.")
-    width: int = InputField(description="The width of the image.")
-    y_top: int = InputField(description="The top y-coordinate of the rectangle (inclusive).")
-    y_bottom: int = InputField(description="The bottom y-coordinate of the rectangle (exclusive).")
-    x_left: int = InputField(description="The left x-coordinate of the rectangle (inclusive).")
-    x_right: int = InputField(description="The right x-coordinate of the rectangle (exclusive).")
+    height: int = InputField(description="The height of the entire mask.")
+    width: int = InputField(description="The width of the entire mask.")
+    y_top: int = InputField(description="The top y-coordinate of the rectangular masked region (inclusive).")
+    x_left: int = InputField(description="The left x-coordinate of the rectangular masked region (inclusive).")
+    rectangle_height: int = InputField(description="The height of the rectangular masked region.")
+    rectangle_width: int = InputField(description="The width of the rectangular masked region.")
 
-    def invoke(self, context: InvocationContext) -> ImageOutput:
-        mask = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-        mask[self.y_top : self.y_bottom, self.x_left : self.x_right, :] = 255
-        mask_image = Image.fromarray(mask)
+    def invoke(self, context: InvocationContext) -> MaskOutput:
+        mask = torch.zeros((1, self.height, self.width), dtype=torch.bool)
+        mask[
+            :, self.y_top : self.y_top + self.rectangle_height, self.x_left : self.x_left + self.rectangle_width
+        ] = True
 
-        image_dto = context.services.images.create(
-            image=mask_image,
-            image_origin=ResourceOrigin.INTERNAL,
-            image_category=ImageCategory.GENERAL,
-            node_id=self.id,
-            session_id=context.graph_execution_state_id,
-            is_intermediate=self.is_intermediate,
-            metadata=self.metadata,
-            workflow=context.workflow,
-        )
+        mask_name = f"{context.graph_execution_state_id}__{self.id}_mask"
+        context.services.latents.save(mask_name, mask)
 
-        return ImageOutput(
-            image=ImageField(image_name=image_dto.image_name),
-            width=image_dto.width,
-            height=image_dto.height,
+        return MaskOutput(
+            mask=MaskField(mask_name=mask_name),
+            width=self.width,
+            height=self.height,
         )
