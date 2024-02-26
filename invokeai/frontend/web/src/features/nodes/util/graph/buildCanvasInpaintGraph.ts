@@ -1,8 +1,8 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import type {
+  CanvasPasteBackInvocation,
   CreateGradientMaskInvocation,
-  IAICanvasPasteBackInvocation,
   ImageDTO,
   ImageToLatentsInvocation,
   NoiseInvocation,
@@ -391,7 +391,7 @@ export const buildCanvasInpaintGraph = (
 
     // Paste Back
     graph.nodes[CANVAS_OUTPUT] = {
-      ...(graph.nodes[CANVAS_OUTPUT] as IAICanvasPasteBackInvocation),
+      ...(graph.nodes[CANVAS_OUTPUT] as CanvasPasteBackInvocation),
       mask: canvasMaskImage,
     };
 
