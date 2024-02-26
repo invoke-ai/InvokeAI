@@ -3,7 +3,8 @@ import type { ControlNetConfig, IPAdapterConfig, T2IAdapterConfig } from 'featur
 import type { LoRA } from 'features/lora/store/loraSlice';
 import type { MetadataValidateFunc } from 'features/metadata/types';
 import { InvalidModelConfigError } from 'features/metadata/util/modelFetchingHelpers';
-import type { BaseModelType, RefinerMainModelConfig, VAEModelConfig } from 'services/api/types';
+import type { ParameterSDXLRefinerModel, ParameterVAEModel } from 'features/parameters/types/parameterSchemas';
+import type { BaseModelType } from 'services/api/types';
 
 /**
  * Checks the given base model type against the currently-selected model's base type and throws an error if they are
@@ -21,12 +22,12 @@ const validateBaseCompatibility = (base?: BaseModelType, message?: string) => {
   }
 };
 
-const validateRefinerModel: MetadataValidateFunc<RefinerMainModelConfig> = (refinerModel) => {
+const validateRefinerModel: MetadataValidateFunc<ParameterSDXLRefinerModel> = (refinerModel) => {
   validateBaseCompatibility('sdxl', 'Refiner incompatible with currently-selected model');
   return new Promise((resolve) => resolve(refinerModel));
 };
 
-const validateVAEModel: MetadataValidateFunc<VAEModelConfig> = (vaeModel) => {
+const validateVAEModel: MetadataValidateFunc<ParameterVAEModel> = (vaeModel) => {
   validateBaseCompatibility(vaeModel.base, 'VAE incompatible with currently-selected model');
   return new Promise((resolve) => resolve(vaeModel));
 };
