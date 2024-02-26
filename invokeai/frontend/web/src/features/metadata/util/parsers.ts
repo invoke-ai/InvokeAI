@@ -10,6 +10,11 @@ import { defaultLoRAConfig } from 'features/lora/store/loraSlice';
 import { MetadataParseError } from 'features/metadata/exceptions';
 import type { MetadataParseFunc } from 'features/metadata/types';
 import {
+  fetchModelConfigWithTypeGuard,
+  getModelKey,
+  getModelKeyAndBase,
+} from 'features/metadata/util/modelFetchingHelpers';
+import {
   zControlField,
   zIPAdapterField,
   zModelIdentifierWithBase,
@@ -54,11 +59,6 @@ import {
   isParameterStrength,
   isParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
-import {
-  fetchModelConfigWithTypeGuard,
-  getModelKey,
-  getModelKeyAndBase,
-} from 'features/parameters/util/modelFetchingHelpers';
 import { get, isArray, isString } from 'lodash-es';
 import type { NonRefinerMainModelConfig, RefinerMainModelConfig, VAEModelConfig } from 'services/api/types';
 import {
