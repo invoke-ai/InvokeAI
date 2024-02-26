@@ -2,6 +2,7 @@ import { Button, Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-libr
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setFilteredModelType } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { IoFilter } from 'react-icons/io5';
 
 export const MODEL_TYPE_LABELS: { [key: string]: string } = {
@@ -17,6 +18,7 @@ export const MODEL_TYPE_LABELS: { [key: string]: string } = {
 };
 
 export const ModelTypeFilter = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const filteredModelType = useAppSelector((s) => s.modelmanagerV2.filteredModelType);
 
@@ -34,10 +36,10 @@ export const ModelTypeFilter = () => {
   return (
     <Menu>
       <MenuButton as={Button} leftIcon={<IoFilter />}>
-        {filteredModelType ? MODEL_TYPE_LABELS[filteredModelType] : 'All Models'}
+        {filteredModelType ? MODEL_TYPE_LABELS[filteredModelType] : t('modelManager.allModels')}
       </MenuButton>
       <MenuList>
-        <MenuItem onClick={clearModelType}>All Models</MenuItem>
+        <MenuItem onClick={clearModelType}>{t('modelManager.allModels')}</MenuItem>
         {Object.keys(MODEL_TYPE_LABELS).map((option) => (
           <MenuItem
             key={option}
