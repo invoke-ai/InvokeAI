@@ -1,4 +1,4 @@
-import type { EntityAdapter, EntityState } from '@reduxjs/toolkit';
+import type { EntityAdapter, EntityState, ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { createEntityAdapter } from '@reduxjs/toolkit';
 import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
 import queryString from 'query-string';
@@ -111,6 +111,12 @@ export const vaeModelsAdapter = createEntityAdapter<VAEModelConfig, string>({
 });
 export const vaeModelsAdapterSelectors = vaeModelsAdapter.getSelectors(undefined, getSelectorsOptions);
 
+export const anyModelConfigAdapter = createEntityAdapter<AnyModelConfig, string>({
+  selectId: (entity) => entity.key,
+  sortComparer: (a, b) => a.name.localeCompare(b.name),
+});
+export const anyModelConfigAdapterSelectors = anyModelConfigAdapter.getSelectors(undefined, getSelectorsOptions);
+
 const buildProvidesTags =
   <TEntity extends AnyModelConfig>(tagType: (typeof tagTypes)[number]) =>
   (result: EntityState<TEntity, string> | undefined) => {
@@ -141,8 +147,6 @@ const buildTransformResponse =
  */
 const buildModelsUrl = (path: string = '') => buildV2Url(`models/${path}`);
 
-// TODO(psyche): Ideally we can share the cache between the `getXYZModels` queries and `getModelConfig` query
-
 export const modelsApi = api.injectEndpoints({
   endpoints: (build) => ({
     getMainModels: build.query<EntityState<MainModelConfig, string>, BaseModelType[]>({
@@ -157,6 +161,11 @@ export const modelsApi = api.injectEndpoints({
       },
       providesTags: buildProvidesTags<MainModelConfig>('MainModel'),
       transformResponse: buildTransformResponse<MainModelConfig>(mainModelsAdapter),
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        queryFulfilled.then(({ data }) => {
+          upsertModelConfigs(data, dispatch);
+        });
+      },
     }),
     getModelMetadata: build.query<GetModelMetadataResponse, string>({
       query: (key) => {
@@ -236,6 +245,7 @@ export const modelsApi = api.injectEndpoints({
 
         return tags;
       },
+      serializeQueryArgs: ({ queryArgs }) => `${queryArgs.name}.${queryArgs.base}.${queryArgs.type}`,
     }),
     syncModels: build.mutation<void, void>({
       query: () => {
@@ -250,31 +260,61 @@ export const modelsApi = api.injectEndpoints({
       query: () => ({ url: buildModelsUrl(), params: { model_type: 'lora' } }),
       providesTags: buildProvidesTags<LoRAModelConfig>('LoRAModel'),
       transformResponse: buildTransformResponse<LoRAModelConfig>(loraModelsAdapter),
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        queryFulfilled.then(({ data }) => {
+          upsertModelConfigs(data, dispatch);
+        });
+      },
     }),
     getControlNetModels: build.query<EntityState<ControlNetModelConfig, string>, void>({
       query: () => ({ url: buildModelsUrl(), params: { model_type: 'controlnet' } }),
       providesTags: buildProvidesTags<ControlNetModelConfig>('ControlNetModel'),
       transformResponse: buildTransformResponse<ControlNetModelConfig>(controlNetModelsAdapter),
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        queryFulfilled.then(({ data }) => {
+          upsertModelConfigs(data, dispatch);
+        });
+      },
     }),
     getIPAdapterModels: build.query<EntityState<IPAdapterModelConfig, string>, void>({
       query: () => ({ url: buildModelsUrl(), params: { model_type: 'ip_adapter' } }),
       providesTags: buildProvidesTags<IPAdapterModelConfig>('IPAdapterModel'),
       transformResponse: buildTransformResponse<IPAdapterModelConfig>(ipAdapterModelsAdapter),
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        queryFulfilled.then(({ data }) => {
+          upsertModelConfigs(data, dispatch);
+        });
+      },
     }),
     getT2IAdapterModels: build.query<EntityState<T2IAdapterModelConfig, string>, void>({
       query: () => ({ url: buildModelsUrl(), params: { model_type: 't2i_adapter' } }),
       providesTags: buildProvidesTags<T2IAdapterModelConfig>('T2IAdapterModel'),
       transformResponse: buildTransformResponse<T2IAdapterModelConfig>(t2iAdapterModelsAdapter),
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        queryFulfilled.then(({ data }) => {
+          upsertModelConfigs(data, dispatch);
+        });
+      },
     }),
     getVaeModels: build.query<EntityState<VAEModelConfig, string>, void>({
       query: () => ({ url: buildModelsUrl(), params: { model_type: 'vae' } }),
       providesTags: buildProvidesTags<VAEModelConfig>('VaeModel'),
       transformResponse: buildTransformResponse<VAEModelConfig>(vaeModelsAdapter),
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        queryFulfilled.then(({ data }) => {
+          upsertModelConfigs(data, dispatch);
+        });
+      },
     }),
     getTextualInversionModels: build.query<EntityState<TextualInversionModelConfig, string>, void>({
       query: () => ({ url: buildModelsUrl(), params: { model_type: 'embedding' } }),
       providesTags: buildProvidesTags<TextualInversionModelConfig>('TextualInversionModel'),
       transformResponse: buildTransformResponse<TextualInversionModelConfig>(textualInversionModelsAdapter),
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        queryFulfilled.then(({ data }) => {
+          upsertModelConfigs(data, dispatch);
+        });
+      },
     }),
     scanModels: build.query<ScanFolderResponse, ScanFolderArg>({
       query: (arg) => {
@@ -336,3 +376,15 @@ export const {
   useDeleteModelImportMutation,
   usePruneModelImportsMutation,
 } = modelsApi;
+
+const upsertModelConfigs = (
+  modelConfigs: EntityState<AnyModelConfig, string>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  dispatch: ThunkDispatch<any, any, UnknownAction>
+) => {
+  anyModelConfigAdapterSelectors.selectAll(modelConfigs).forEach((modelConfig) => {
+    dispatch(modelsApi.util.upsertQueryData('getModelConfig', modelConfig.key, modelConfig));
+    const { base, name, type } = modelConfig;
+    dispatch(modelsApi.util.upsertQueryData('getModelConfigByAttrs', { base, name, type }, modelConfig));
+  });
+};
