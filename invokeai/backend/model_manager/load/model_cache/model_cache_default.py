@@ -418,7 +418,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
     def _check_free_vram(self, target_device: torch.device, needed_size: int) -> None:
         if target_device.type != "cuda":
             return
-        vram_device = ( # mem_get_info() needs an indexed device
+        vram_device = (  # mem_get_info() needs an indexed device
             target_device if target_device.index is not None else torch.device(str(target_device), index=0)
         )
         free_mem, _ = torch.cuda.mem_get_info(torch.device(vram_device))
