@@ -1,8 +1,8 @@
 import { objectKeys } from 'common/util/objectKeys';
 import { toast } from 'common/util/toast';
-import type { ControlAdapterConfig } from 'features/controlAdapters/store/types';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import type {
+  AnyControlAdapterConfigMetadata,
   BuildMetadataHandlers,
   MetadataGetLabelFunc,
   MetadataHandlers,
@@ -35,12 +35,12 @@ const renderLoRAValue: MetadataRenderValueFunc<LoRA> = async (value) => {
     return `${value.model.key} (${value.model.base.toUpperCase()}) - ${value.weight}`;
   }
 };
-const renderControlAdapterValue: MetadataRenderValueFunc<ControlAdapterConfig> = async (value) => {
+const renderControlAdapterValue: MetadataRenderValueFunc<AnyControlAdapterConfigMetadata> = async (value) => {
   try {
-    const modelConfig = await fetchModelConfig(value.model?.key ?? 'none');
+    const modelConfig = await fetchModelConfig(value.model.key ?? 'none');
     return `${modelConfig.name} (${modelConfig.base.toUpperCase()}) - ${value.weight}`;
   } catch {
-    return `${value.model?.key} (${value.model?.base.toUpperCase()}) - ${value.weight}`;
+    return `${value.model.key} (${value.model.base.toUpperCase()}) - ${value.weight}`;
   }
 };
 
