@@ -53,7 +53,7 @@ export const addLoRAsToGraph = (
     };
 
     loraMetadata.push({
-      lora: { key },
+      model: { key },
       weight,
     });
 

@@ -33,7 +33,7 @@ class MetadataItemField(BaseModel):
 class LoRAMetadataField(BaseModel):
     """LoRA Metadata Field"""
 
-    lora: LoRAModelField = Field(description=FieldDescriptions.lora_model)
+    model: LoRAModelField = Field(description=FieldDescriptions.lora_model)
     weight: float = Field(description=FieldDescriptions.lora_weight)
 
 
@@ -114,7 +114,7 @@ GENERATION_MODES = Literal[
 ]
 
 
-@invocation("core_metadata", title="Core Metadata", tags=["metadata"], category="metadata", version="1.0.1")
+@invocation("core_metadata", title="Core Metadata", tags=["metadata"], category="metadata", version="1.1.1")
 class CoreMetadataInvocation(BaseInvocation):
     """Collects core generation metadata into a MetadataField"""
 
