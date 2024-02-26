@@ -40,7 +40,8 @@ export const addLoRAsToGraph = (
   const loraMetadata: CoreMetadataInvocation['loras'] = [];
 
   enabledLoRAs.forEach((lora) => {
-    const { key, weight } = lora;
+    const { weight } = lora;
+    const { key } = lora.model;
     const currentLoraNodeId = `${LORA_LOADER}_${key}`;
 
     const loraLoaderNode: LoraLoaderInvocation = {
