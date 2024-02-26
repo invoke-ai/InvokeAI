@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import { setSelectedModelMode } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { IoPencil } from 'react-icons/io5';
 import { useGetModelConfigQuery, useGetModelMetadataQuery } from 'services/api/endpoints/models';
 import type {
@@ -21,6 +22,7 @@ import { ModelAttrView } from './ModelAttrView';
 import { ModelConvert } from './ModelConvert';
 
 export const ModelView = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
   const { data, isLoading } = useGetModelConfigQuery(selectedModelKey ?? skipToken);
@@ -64,11 +66,11 @@ export const ModelView = () => {
   }, [dispatch]);
 
   if (isLoading) {
-    return <Text>Loading</Text>;
+    return <Text>{t('common.loading')}</Text>;
   }
 
   if (!modelData) {
-    return <Text>Something went wrong</Text>;
+    return <Text>{t('common.somethingWentWrong')}</Text>;
   }
   return (
     <Flex flexDir="column" h="full">
@@ -78,11 +80,15 @@ export const ModelView = () => {
             {modelData.name}
           </Heading>
 
-          {modelData.source && <Text variant="subtext">Source: {modelData.source}</Text>}
+          {modelData.source && (
+            <Text variant="subtext">
+              {t('modelManager.source')}: {modelData.source}
+            </Text>
+          )}
         </Flex>
         <Flex gap={2}>
           <Button size="sm" leftIcon={<IoPencil />} colorScheme="invokeYellow" onClick={handleEditModel}>
-            Edit
+            {t('modelManager.edit')}
           </Button>
           {modelData.type === 'main' && modelData.format === 'checkpoint' && <ModelConvert model={modelData} />}
         </Flex>
@@ -93,41 +99,43 @@ export const ModelView = () => {
           <ModelAttrView label="Description" value={modelData.description} />
         </Flex>
         <Heading as="h3" fontSize="md" mt="4">
-          Model Settings
+          {t('modelManager.modelSettings')}
         </Heading>
         <Box layerStyle="second" borderRadius="base" p={3}>
           <Flex flexDir="column" gap={3}>
             <Flex gap={2}>
-              <ModelAttrView label="Base Model" value={modelData.base} />
-              <ModelAttrView label="Model Type" value={modelData.type} />
+              <ModelAttrView label={t('modelManager.baseModel')} value={modelData.base} />
+              <ModelAttrView label={t('modelManager.modelType')} value={modelData.type} />
             </Flex>
             <Flex gap={2}>
-              <ModelAttrView label="Format" value={modelData.format} />
-              <ModelAttrView label="Path" value={modelData.path} />
+              <ModelAttrView label={t('common.format')} value={modelData.format} />
+              <ModelAttrView label={t('modelManager.path')} value={modelData.path} />
             </Flex>
             {modelData.type === 'main' && (
               <>
                 <Flex gap={2}>
                   {modelData.format === 'diffusers' && (
-                    <ModelAttrView label="Repo Variant" value={modelData.repo_variant} />
+                    <ModelAttrView label={t('modelManager.repoVariant')} value={modelData.repo_variant} />
                   )}
-                  {modelData.format === 'checkpoint' && <ModelAttrView label="Config Path" value={modelData.config} />}
+                  {modelData.format === 'checkpoint' && (
+                    <ModelAttrView label={t('modelManager.pathToConfig')} value={modelData.config} />
+                  )}
 
-                  <ModelAttrView label="Variant" value={modelData.variant} />
+                  <ModelAttrView label={t('modelManager.variant')} value={modelData.variant} />
                 </Flex>
                 <Flex gap={2}>
-                  <ModelAttrView label="Prediction Type" value={modelData.prediction_type} />
-                  <ModelAttrView label="Upcast Attention" value={`${modelData.upcast_attention}`} />
+                  <ModelAttrView label={t('modelManager.predictionType')} value={modelData.prediction_type} />
+                  <ModelAttrView label={t('modelManager.upcastAttention')} value={`${modelData.upcast_attention}`} />
                 </Flex>
                 <Flex gap={2}>
-                  <ModelAttrView label="ZTSNR Training" value={`${modelData.ztsnr_training}`} />
-                  <ModelAttrView label="VAE" value={modelData.vae} />
+                  <ModelAttrView label={t('modelManager.ztsnrTraining')} value={`${modelData.ztsnr_training}`} />
+                  <ModelAttrView label={t('modelManager.vae')} value={modelData.vae} />
                 </Flex>
               </>
             )}
             {modelData.type === 'ip_adapter' && (
               <Flex gap={2}>
-                <ModelAttrView label="Image Encoder Model ID" value={modelData.image_encoder_model_id} />
+                <ModelAttrView label={t('modelManager.imageEncoderModelId')} value={modelData.image_encoder_model_id} />
               </Flex>
             )}
           </Flex>
@@ -137,7 +145,7 @@ export const ModelView = () => {
       {metadata && (
         <>
           <Heading as="h3" fontSize="md" mt="4">
-            Model Metadata
+            {t('modelManager.modelMetadata')}
           </Heading>
           <Flex h="full" w="full" p={2}>
             <DataViewer label="metadata" data={metadata} />

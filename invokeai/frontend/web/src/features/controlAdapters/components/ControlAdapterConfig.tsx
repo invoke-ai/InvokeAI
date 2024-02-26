@@ -20,7 +20,6 @@ import ControlAdapterShouldAutoConfig from './ControlAdapterShouldAutoConfig';
 import ControlNetCanvasImageImports from './imports/ControlNetCanvasImageImports';
 import { ParamControlAdapterBeginEnd } from './parameters/ParamControlAdapterBeginEnd';
 import ParamControlAdapterControlMode from './parameters/ParamControlAdapterControlMode';
-import ParamControlAdapterModel from './parameters/ParamControlAdapterModel';
 import ParamControlAdapterProcessorSelect from './parameters/ParamControlAdapterProcessorSelect';
 import ParamControlAdapterResizeMode from './parameters/ParamControlAdapterResizeMode';
 import ParamControlAdapterWeight from './parameters/ParamControlAdapterWeight';
@@ -73,7 +72,7 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
       </Flex>
       <Flex gap={4} alignItems="center">
         <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
-          <ParamControlAdapterModel id={id} />
+          {/* <ParamControlAdapterModel id={id} /> */}
         </Box>
         {activeTabName === 'unifiedCanvas' && <ControlNetCanvasImageImports id={id} />}
         <IconButton
