@@ -31,7 +31,7 @@ export const EmbeddingSelect = memo(({ onSelect, onClose }: EmbeddingSelectProps
       if (!embedding) {
         return;
       }
-      onSelect(embedding.key);
+      onSelect(embedding.name);
     },
     [onSelect]
   );
