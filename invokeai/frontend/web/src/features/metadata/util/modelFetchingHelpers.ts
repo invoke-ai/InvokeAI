@@ -3,16 +3,8 @@ import type { ModelIdentifierWithBase } from 'features/nodes/types/common';
 import { isModelIdentifier, isModelIdentifierV2 } from 'features/nodes/types/common';
 import { modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig, BaseModelType, ModelType } from 'services/api/types';
-import {
-  isControlNetModelConfig,
-  isIPAdapterModelConfig,
-  isLoRAModelConfig,
-  isNonRefinerMainModelConfig,
-  isRefinerMainModelModelConfig,
-  isT2IAdapterModelConfig,
-  isTextualInversionModelConfig,
-  isVAEModelConfig,
-} from 'services/api/types';
+
+
 
 /**
  * Raised when a model config is unable to be fetched.
@@ -99,40 +91,6 @@ export const fetchModelConfigWithTypeGuard = async <T extends AnyModelConfig>(
     throw new InvalidModelConfigError(`Invalid model type for key ${key}: ${modelConfig.type}`);
   }
   return modelConfig;
-};
-
-// TODO(psyche): Remove these helpers once `useRecallParameters` is removed
-
-export const fetchMainModelConfig = async (key: string) => {
-  return fetchModelConfigWithTypeGuard(key, isNonRefinerMainModelConfig);
-};
-
-export const fetchRefinerModelConfig = async (key: string) => {
-  return fetchModelConfigWithTypeGuard(key, isRefinerMainModelModelConfig);
-};
-
-export const fetchVAEModelConfig = async (key: string) => {
-  return fetchModelConfigWithTypeGuard(key, isVAEModelConfig);
-};
-
-export const fetchLoRAModel = async (key: string) => {
-  return fetchModelConfigWithTypeGuard(key, isLoRAModelConfig);
-};
-
-export const fetchControlNetModel = async (key: string) => {
-  return fetchModelConfigWithTypeGuard(key, isControlNetModelConfig);
-};
-
-export const fetchIPAdapterModel = async (key: string) => {
-  return fetchModelConfigWithTypeGuard(key, isIPAdapterModelConfig);
-};
-
-export const fetchT2IAdapterModel = async (key: string) => {
-  return fetchModelConfigWithTypeGuard(key, isT2IAdapterModelConfig);
-};
-
-export const fetchTextualInversionModel = async (key: string) => {
-  return fetchModelConfigWithTypeGuard(key, isTextualInversionModelConfig);
 };
 
 /**

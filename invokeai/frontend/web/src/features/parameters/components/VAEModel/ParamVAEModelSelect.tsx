@@ -3,8 +3,8 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
+import { getModelKeyAndBase } from 'features/metadata/util/modelFetchingHelpers';
 import { selectGenerationSlice, vaeSelected } from 'features/parameters/store/generationSlice';
-import { pick } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
@@ -30,14 +30,14 @@ const ParamVAEModelSelect = () => {
   );
   const _onChange = useCallback(
     (vae: VAEModelConfig | null) => {
-      dispatch(vaeSelected(vae ? pick(vae, 'key', 'base') : null));
+      dispatch(vaeSelected(vae ? getModelKeyAndBase(vae) : null));
     },
     [dispatch]
   );
   const { options, value, onChange, noOptionsMessage } = useGroupedModelCombobox({
     modelEntities: data,
     onChange: _onChange,
-    selectedModel: vae ? pick(vae, 'key', 'base') : null,
+    selectedModel: vae,
     isLoading,
     getIsDisabled,
   });
