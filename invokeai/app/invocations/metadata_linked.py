@@ -406,7 +406,7 @@ class MetadataToSDXLModelOutput(BaseInvocationOutput):
     title="Metadata To Model",
     tags=["metadata"],
     category="metadata",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Beta,
 )
 class MetadataToModelInvocation(BaseInvocation, WithMetadata):
@@ -430,9 +430,11 @@ class MetadataToModelInvocation(BaseInvocation, WithMetadata):
 
     def invoke(self, context: InvocationContext) -> MetadataToModelOutput:
         data = {} if self.metadata is None else self.metadata.model_dump()
-        model = MainModelField(
-            **data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
-        )
+        key = self.custom_label if self.label == CUSTOM_LABEL else self.label
+        if key in data:
+            model = MainModelField(**data.get(key, ""))
+        else:
+            model = self.default_value
 
         base_model = model.base_model
         model_name = model.model_name
@@ -496,7 +498,7 @@ class MetadataToModelInvocation(BaseInvocation, WithMetadata):
     title="Metadata To SDXL Model",
     tags=["metadata"],
     category="metadata",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Beta,
 )
 class MetadataToSDXLModelInvocation(BaseInvocation, WithMetadata):
@@ -520,9 +522,11 @@ class MetadataToSDXLModelInvocation(BaseInvocation, WithMetadata):
 
     def invoke(self, context: InvocationContext) -> MetadataToSDXLModelOutput:
         data = {} if self.metadata is None else self.metadata.model_dump()
-        model = MainModelField(
-            **data.get(self.custom_label if self.label == CUSTOM_LABEL else self.label, self.default_value)
-        )
+        key = self.custom_label if self.label == CUSTOM_LABEL else self.label
+        if key in data:
+            model = MainModelField(**data.get(key, ""))
+        else:
+            model = self.default_value
 
         base_model = model.base_model
         model_name = model.model_name
@@ -664,7 +668,7 @@ class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
     title="Metadata To VAE",
     tags=["metadata"],
     category="metadata",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Beta,
 )
 class MetadataToVAEInvocation(BaseInvocation, WithMetadata):
@@ -680,7 +684,7 @@ class MetadataToVAEInvocation(BaseInvocation, WithMetadata):
         description=FieldDescriptions.metadata_item_label,
         input=Input.Direct,
     )
-    default_vae: VaeField = InputField(
+    default_value: VaeField = InputField(
         description="The default VAE to use if not found in the metadata",
     )
 
@@ -699,7 +703,7 @@ class MetadataToVAEInvocation(BaseInvocation, WithMetadata):
                 ),
             )
         else:
-            vae = self.default_vae
+            vae = self.default_value
 
         if not context.services.model_manager.model_exists(
             base_model=vae.vae.base_model,
