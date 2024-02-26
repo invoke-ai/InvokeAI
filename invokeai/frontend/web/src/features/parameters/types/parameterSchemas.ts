@@ -1,8 +1,6 @@
 import { NUMPY_RAND_MAX } from 'app/constants';
-import {
-  zModelIdentifierWithBase,
-  zSchedulerField,
-} from 'features/nodes/types/common';
+import { roundToMultiple } from 'common/util/roundDownToMultiple';
+import { zModelIdentifierWithBase, zSchedulerField } from 'features/nodes/types/common';
 import { z } from 'zod';
 
 /**
@@ -79,7 +77,10 @@ export const isParameterSeed = (val: unknown): val is ParameterSeed => zParamete
 // #endregion
 
 // #region Width
-export const zParameterWidth = z.number().multipleOf(8).min(64);
+export const zParameterWidth = z
+  .number()
+  .min(64)
+  .transform((val) => roundToMultiple(val, 8));
 export type ParameterWidth = z.infer<typeof zParameterWidth>;
 export const isParameterWidth = (val: unknown): val is ParameterWidth => zParameterWidth.safeParse(val).success;
 // #endregion
