@@ -71,6 +71,7 @@ export const buildCanvasSDXLOutpaintGraph = (
     canvasCoherenceMode,
     canvasCoherenceMinDenoise,
     canvasCoherenceEdgeSize,
+    maskBlur,
   } = state.generation;
 
   const { refinerModel, refinerStart } = state.sdxl;
@@ -176,7 +177,7 @@ export const buildCanvasSDXLOutpaintGraph = (
         is_intermediate: getIsIntermediate(state),
         board: getBoardField(state),
         use_cache: false,
-        mask_blur: canvasCoherenceEdgeSize,
+        mask_blur: maskBlur,
       },
     },
     edges: [

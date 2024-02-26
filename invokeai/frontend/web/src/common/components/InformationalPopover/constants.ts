@@ -6,7 +6,7 @@ export type Feature =
   | 'paramNegativeConditioning'
   | 'paramPositiveConditioning'
   | 'paramScheduler'
-  | 'compositingBlur'
+  | 'compositingMaskBlur'
   | 'compositingBlurMethod'
   | 'compositingCoherencePass'
   | 'compositingCoherenceMode'
