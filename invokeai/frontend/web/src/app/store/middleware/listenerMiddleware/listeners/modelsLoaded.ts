@@ -123,7 +123,7 @@ export const addModelsLoadedListener = () => {
       const loras = getState().lora.loras;
 
       forEach(loras, (lora, id) => {
-        const isLoRAAvailable = some(action.payload.entities, (m) => m?.key === lora?.key);
+        const isLoRAAvailable = some(action.payload.entities, (m) => m?.key === lora?.model.key);
 
         if (isLoRAAvailable) {
           return;
