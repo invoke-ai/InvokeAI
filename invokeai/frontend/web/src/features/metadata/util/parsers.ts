@@ -1,5 +1,4 @@
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
-import type { ControlNetConfig, IPAdapterConfig, T2IAdapterConfig } from 'features/controlAdapters/store/types';
 import {
   initialControlNet,
   initialIPAdapter,
@@ -8,7 +7,7 @@ import {
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { defaultLoRAConfig } from 'features/lora/store/loraSlice';
 import { MetadataParseError } from 'features/metadata/exceptions';
-import type { MetadataParseFunc } from 'features/metadata/types';
+import type { ControlNetConfigMetadata, IPAdapterConfigMetadata, MetadataParseFunc, T2IAdapterConfigMetadata } from 'features/metadata/types';
 import {
   fetchModelConfigWithTypeGuard,
   getModelKey,
@@ -213,7 +212,7 @@ const parseAllLoRAs: MetadataParseFunc<LoRA[]> = async (metadata) => {
   return loras;
 };
 
-const parseControlNet: MetadataParseFunc<ControlNetConfig> = async (metadataItem) => {
+const parseControlNet: MetadataParseFunc<ControlNetConfigMetadata> = async (metadataItem) => {
   const control_model = await getProperty(metadataItem, 'control_model');
   const key = await getModelKey(control_model, 'controlnet');
   const controlNetModel = await fetchModelConfigWithTypeGuard(key, isControlNetModelConfig);
@@ -243,7 +242,7 @@ const parseControlNet: MetadataParseFunc<ControlNetConfig> = async (metadataItem
   const processorType = 'none';
   const processorNode = CONTROLNET_PROCESSORS.none.default;
 
-  const controlNet: ControlNetConfig = {
+  const controlNet: ControlNetConfigMetadata = {
     type: 'controlnet',
     isEnabled: true,
     model: zModelIdentifierWithBase.parse(controlNetModel),
@@ -263,16 +262,16 @@ const parseControlNet: MetadataParseFunc<ControlNetConfig> = async (metadataItem
   return controlNet;
 };
 
-const parseAllControlNets: MetadataParseFunc<ControlNetConfig[]> = async (metadata) => {
+const parseAllControlNets: MetadataParseFunc<ControlNetConfigMetadata[]> = async (metadata) => {
   const controlNetsRaw = await getProperty(metadata, 'controlnets', isArray);
   const parseResults = await Promise.allSettled(controlNetsRaw.map((cn) => parseControlNet(cn)));
   const controlNets = parseResults
-    .filter((result): result is PromiseFulfilledResult<ControlNetConfig> => result.status === 'fulfilled')
+    .filter((result): result is PromiseFulfilledResult<ControlNetConfigMetadata> => result.status === 'fulfilled')
     .map((result) => result.value);
   return controlNets;
 };
 
-const parseT2IAdapter: MetadataParseFunc<T2IAdapterConfig> = async (metadataItem) => {
+const parseT2IAdapter: MetadataParseFunc<T2IAdapterConfigMetadata> = async (metadataItem) => {
   const t2i_adapter_model = await getProperty(metadataItem, 't2i_adapter_model');
   const key = await getModelKey(t2i_adapter_model, 't2i_adapter');
   const t2iAdapterModel = await fetchModelConfigWithTypeGuard(key, isT2IAdapterModelConfig);
@@ -295,7 +294,7 @@ const parseT2IAdapter: MetadataParseFunc<T2IAdapterConfig> = async (metadataItem
   const processorType = 'none';
   const processorNode = CONTROLNET_PROCESSORS.none.default;
 
-  const t2iAdapter: T2IAdapterConfig = {
+  const t2iAdapter: T2IAdapterConfigMetadata = {
     type: 't2i_adapter',
     isEnabled: true,
     model: zModelIdentifierWithBase.parse(t2iAdapterModel),
@@ -314,16 +313,16 @@ const parseT2IAdapter: MetadataParseFunc<T2IAdapterConfig> = async (metadataItem
   return t2iAdapter;
 };
 
-const parseAllT2IAdapters: MetadataParseFunc<T2IAdapterConfig[]> = async (metadata) => {
+const parseAllT2IAdapters: MetadataParseFunc<T2IAdapterConfigMetadata[]> = async (metadata) => {
   const t2iAdaptersRaw = await getProperty(metadata, 't2iAdapters', isArray);
   const parseResults = await Promise.allSettled(t2iAdaptersRaw.map((t2iAdapter) => parseT2IAdapter(t2iAdapter)));
   const t2iAdapters = parseResults
-    .filter((result): result is PromiseFulfilledResult<T2IAdapterConfig> => result.status === 'fulfilled')
+    .filter((result): result is PromiseFulfilledResult<T2IAdapterConfigMetadata> => result.status === 'fulfilled')
     .map((result) => result.value);
   return t2iAdapters;
 };
 
-const parseIPAdapter: MetadataParseFunc<IPAdapterConfig> = async (metadataItem) => {
+const parseIPAdapter: MetadataParseFunc<IPAdapterConfigMetadata> = async (metadataItem) => {
   const ip_adapter_model = await getProperty(metadataItem, 'ip_adapter_model');
   const key = await getModelKey(ip_adapter_model, 'ip_adapter');
   const ipAdapterModel = await fetchModelConfigWithTypeGuard(key, isIPAdapterModelConfig);
@@ -339,7 +338,7 @@ const parseIPAdapter: MetadataParseFunc<IPAdapterConfig> = async (metadataItem) 
     .catch(null)
     .parse(getProperty(metadataItem, 'end_step_percent'));
 
-  const ipAdapter: IPAdapterConfig = {
+  const ipAdapter: IPAdapterConfigMetadata = {
     id: uuidv4(),
     type: 'ip_adapter',
     isEnabled: true,
@@ -353,11 +352,11 @@ const parseIPAdapter: MetadataParseFunc<IPAdapterConfig> = async (metadataItem) 
   return ipAdapter;
 };
 
-const parseAllIPAdapters: MetadataParseFunc<IPAdapterConfig[]> = async (metadata) => {
+const parseAllIPAdapters: MetadataParseFunc<IPAdapterConfigMetadata[]> = async (metadata) => {
   const ipAdaptersRaw = await getProperty(metadata, 'ipAdapters', isArray);
   const parseResults = await Promise.allSettled(ipAdaptersRaw.map((ipAdapter) => parseIPAdapter(ipAdapter)));
   const ipAdapters = parseResults
-    .filter((result): result is PromiseFulfilledResult<IPAdapterConfig> => result.status === 'fulfilled')
+    .filter((result): result is PromiseFulfilledResult<IPAdapterConfigMetadata> => result.status === 'fulfilled')
     .map((result) => result.value);
   return ipAdapters;
 };

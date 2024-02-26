@@ -1,7 +1,11 @@
 import { getStore } from 'app/store/nanostores/store';
-import type { ControlNetConfig, IPAdapterConfig, T2IAdapterConfig } from 'features/controlAdapters/store/types';
 import type { LoRA } from 'features/lora/store/loraSlice';
-import type { MetadataValidateFunc } from 'features/metadata/types';
+import type {
+  ControlNetConfigMetadata,
+  IPAdapterConfigMetadata,
+  MetadataValidateFunc,
+  T2IAdapterConfigMetadata,
+} from 'features/metadata/types';
 import { InvalidModelConfigError } from 'features/metadata/util/modelFetchingHelpers';
 import type { ParameterSDXLRefinerModel, ParameterVAEModel } from 'features/parameters/types/parameterSchemas';
 import type { BaseModelType } from 'services/api/types';
@@ -50,13 +54,13 @@ const validateLoRAs: MetadataValidateFunc<LoRA[]> = (loras) => {
   return new Promise((resolve) => resolve(validatedLoRAs));
 };
 
-const validateControlNet: MetadataValidateFunc<ControlNetConfig> = (controlNet) => {
+const validateControlNet: MetadataValidateFunc<ControlNetConfigMetadata> = (controlNet) => {
   validateBaseCompatibility(controlNet.model?.base, 'ControlNet incompatible with currently-selected model');
   return new Promise((resolve) => resolve(controlNet));
 };
 
-const validateControlNets: MetadataValidateFunc<ControlNetConfig[]> = (controlNets) => {
-  const validatedControlNets: ControlNetConfig[] = [];
+const validateControlNets: MetadataValidateFunc<ControlNetConfigMetadata[]> = (controlNets) => {
+  const validatedControlNets: ControlNetConfigMetadata[] = [];
   controlNets.forEach((controlNet) => {
     try {
       validateBaseCompatibility(controlNet.model?.base, 'ControlNet incompatible with currently-selected model');
@@ -68,13 +72,13 @@ const validateControlNets: MetadataValidateFunc<ControlNetConfig[]> = (controlNe
   return new Promise((resolve) => resolve(validatedControlNets));
 };
 
-const validateT2IAdapter: MetadataValidateFunc<T2IAdapterConfig> = (t2iAdapter) => {
+const validateT2IAdapter: MetadataValidateFunc<T2IAdapterConfigMetadata> = (t2iAdapter) => {
   validateBaseCompatibility(t2iAdapter.model?.base, 'T2I Adapter incompatible with currently-selected model');
   return new Promise((resolve) => resolve(t2iAdapter));
 };
 
-const validateT2IAdapters: MetadataValidateFunc<T2IAdapterConfig[]> = (t2iAdapters) => {
-  const validatedT2IAdapters: T2IAdapterConfig[] = [];
+const validateT2IAdapters: MetadataValidateFunc<T2IAdapterConfigMetadata[]> = (t2iAdapters) => {
+  const validatedT2IAdapters: T2IAdapterConfigMetadata[] = [];
   t2iAdapters.forEach((t2iAdapter) => {
     try {
       validateBaseCompatibility(t2iAdapter.model?.base, 'T2I Adapter incompatible with currently-selected model');
@@ -86,13 +90,13 @@ const validateT2IAdapters: MetadataValidateFunc<T2IAdapterConfig[]> = (t2iAdapte
   return new Promise((resolve) => resolve(validatedT2IAdapters));
 };
 
-const validateIPAdapter: MetadataValidateFunc<IPAdapterConfig> = (ipAdapter) => {
+const validateIPAdapter: MetadataValidateFunc<IPAdapterConfigMetadata> = (ipAdapter) => {
   validateBaseCompatibility(ipAdapter.model?.base, 'IP Adapter incompatible with currently-selected model');
   return new Promise((resolve) => resolve(ipAdapter));
 };
 
-const validateIPAdapters: MetadataValidateFunc<IPAdapterConfig[]> = (ipAdapters) => {
-  const validatedIPAdapters: IPAdapterConfig[] = [];
+const validateIPAdapters: MetadataValidateFunc<IPAdapterConfigMetadata[]> = (ipAdapters) => {
+  const validatedIPAdapters: IPAdapterConfigMetadata[] = [];
   ipAdapters.forEach((ipAdapter) => {
     try {
       validateBaseCompatibility(ipAdapter.model?.base, 'IP Adapter incompatible with currently-selected model');
