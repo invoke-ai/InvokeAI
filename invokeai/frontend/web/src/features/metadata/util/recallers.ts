@@ -203,62 +203,6 @@ const recallIPAdapters: MetadataRecallFunc<IPAdapterConfig[]> = (ipAdapters) => 
   });
 };
 
-export const recallPrompts = (_metadata: unknown) => {
-  // recallPositivePrompt(metadata);
-  // recallNegativePrompt(metadata);
-  // recallSDXLPositiveStylePrompt(metadata);
-  // recallSDXLNegativeStylePrompt(metadata);
-  // parameterNotSetToast(t('metadata.allPrompts'));
-  // parameterSetToast(t('metadata.allPrompts'));
-};
-
-export const recallWidthAndHeight = (_metadata: unknown) => {
-  // recallWidth(metadata);
-  // recallHeight(metadata);
-};
-
-export const recallAll = async (_metadata: unknown) => {
-  // if (!metadata) {
-  //   allParameterNotSetToast();
-  //   return;
-  // }
-  // // Update the main model first, as other parameters may depend on it.
-  // await recallModel(metadata);
-  // await Promise.allSettled([
-  //   // Core parameters
-  //   recallCFGScale(metadata),
-  //   recallCFGRescaleMultiplier(metadata),
-  //   recallPositivePrompt(metadata),
-  //   recallNegativePrompt(metadata),
-  //   recallScheduler(metadata),
-  //   recallSeed(metadata),
-  //   recallSteps(metadata),
-  //   recallWidth(metadata),
-  //   recallHeight(metadata),
-  //   recallStrength(metadata),
-  //   recallHRFEnabled(metadata),
-  //   recallHRFMethod(metadata),
-  //   recallHRFStrength(metadata),
-  //   // SDXL parameters
-  //   recallSDXLPositiveStylePrompt(metadata),
-  //   recallSDXLNegativeStylePrompt(metadata),
-  //   recallRefinerSteps(metadata),
-  //   recallRefinerCFGScale(metadata),
-  //   recallRefinerScheduler(metadata),
-  //   recallRefinerPositiveAestheticScore(metadata),
-  //   recallRefinerNegativeAestheticScore(metadata),
-  //   recallRefinerStart(metadata),
-  //   // Models
-  //   recallVAE(metadata),
-  //   recallRefinerModel(metadata),
-  //   recallAllLoRAs(metadata),
-  //   recallControlNets(metadata),
-  //   recallT2IAdapters(metadata),
-  //   recallIPAdapters(metadata),
-  // ]);
-  // allParameterSetToast();
-};
-
 export const recallers = {
   positivePrompt: recallPositivePrompt,
   negativePrompt: recallNegativePrompt,
