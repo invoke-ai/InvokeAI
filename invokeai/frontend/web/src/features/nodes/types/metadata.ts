@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { zControlField, zIPAdapterField, zT2IAdapterField } from './common';
+import { zControlField, zIPAdapterField, zModelFieldBase, zT2IAdapterField } from './common';
 
 export const zLoRAWeight = z.number().nullish();
 // #region Metadata-optimized versions of schemas
@@ -8,7 +8,7 @@ export const zLoRAWeight = z.number().nullish();
 // - https://github.com/colinhacks/zod/issues/2106
 // - https://github.com/colinhacks/zod/issues/2854
 export const zLoRAMetadataItem = z.object({
-  lora: z.unknown(),
+  lora: zModelFieldBase.deepPartial(),
   weight: zLoRAWeight,
 });
 const zControlNetMetadataItem = zControlField.merge(z.object({ control_model: z.unknown() })).deepPartial();
