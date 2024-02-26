@@ -1,4 +1,3 @@
-import { Text } from '@invoke-ai/ui-library';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { MetadataItemView } from 'features/metadata/components/MetadataItemView';
 import type { MetadataHandlers } from 'features/metadata/types';
@@ -51,11 +50,18 @@ const MetadataViewLoRA = ({
     handlers.recallItem(lora, true);
   }, [handlers, lora]);
 
-  const renderedValue = useMemo(() => {
-    if (!handlers.renderItemValue) {
-      return null;
-    }
-    return <Text>{handlers.renderItemValue(lora)}</Text>;
+  const [renderedValue, setRenderedValue] = useState<React.ReactNode>(null);
+  useEffect(() => {
+    const _renderValue = async () => {
+      if (!handlers.renderItemValue) {
+        setRenderedValue(null);
+        return;
+      }
+      const rendered = await handlers.renderItemValue(lora);
+      setRenderedValue(rendered);
+    };
+
+    _renderValue();
   }, [handlers, lora]);
 
   return <MetadataItemView label={label} isDisabled={false} onRecall={onRecall} renderedValue={renderedValue} />;

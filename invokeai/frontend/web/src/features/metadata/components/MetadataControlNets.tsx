@@ -1,4 +1,3 @@
-import { Text } from '@invoke-ai/ui-library';
 import type { ControlNetConfig } from 'features/controlAdapters/store/types';
 import { MetadataItemView } from 'features/metadata/components/MetadataItemView';
 import type { MetadataHandlers } from 'features/metadata/types';
@@ -56,11 +55,18 @@ const MetadataViewControlNet = ({
     handlers.recallItem(controlNet, true);
   }, [handlers, controlNet]);
 
-  const renderedValue = useMemo(() => {
-    if (!handlers.renderItemValue) {
-      return null;
-    }
-    return <Text>{handlers.renderItemValue(controlNet)}</Text>;
+  const [renderedValue, setRenderedValue] = useState<React.ReactNode>(null);
+  useEffect(() => {
+    const _renderValue = async () => {
+      if (!handlers.renderItemValue) {
+        setRenderedValue(null);
+        return;
+      }
+      const rendered = await handlers.renderItemValue(controlNet);
+      setRenderedValue(rendered);
+    };
+
+    _renderValue();
   }, [handlers, controlNet]);
 
   return <MetadataItemView label={label} isDisabled={false} onRecall={onRecall} renderedValue={renderedValue} />;

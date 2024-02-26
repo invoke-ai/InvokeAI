@@ -3,10 +3,14 @@ import type { MetadataHandlers } from 'features/metadata/types';
 import { MetadataParseFailedToken, MetadataParsePendingToken } from 'features/metadata/util/parsers';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+const pendingRenderedValue = <Text>Loading</Text>;
+const failedRenderedValue = <Text>Parsing Failed</Text>;
+
 export const useMetadataItem = <T,>(metadata: unknown, handlers: MetadataHandlers<T>) => {
   const [value, setValue] = useState<T | typeof MetadataParsePendingToken | typeof MetadataParseFailedToken>(
     MetadataParsePendingToken
   );
+  const [renderedValue, setRenderedValue] = useState<React.ReactNode>(pendingRenderedValue);
 
   useEffect(() => {
     const _parse = async () => {
@@ -24,20 +28,27 @@ export const useMetadataItem = <T,>(metadata: unknown, handlers: MetadataHandler
 
   const label = useMemo(() => handlers.getLabel(), [handlers]);
 
-  const renderedValue = useMemo(() => {
-    if (value === MetadataParsePendingToken) {
-      return <Text>Loading</Text>;
-    }
-    if (value === MetadataParseFailedToken) {
-      return <Text>Parsing Failed</Text>;
-    }
+  useEffect(() => {
+    const _renderValue = async () => {
+      if (value === MetadataParsePendingToken) {
+        setRenderedValue(pendingRenderedValue);
+        return;
+      }
+      if (value === MetadataParseFailedToken) {
+        setRenderedValue(failedRenderedValue);
+        return;
+      }
 
-    const rendered = handlers.renderValue(value);
+      const rendered = await handlers.renderValue(value);
 
-    if (typeof rendered === 'string') {
-      return <Text>{rendered}</Text>;
-    }
-    return rendered;
+      if (typeof rendered === 'string') {
+        setRenderedValue(<Text>{rendered}</Text>);
+        return;
+      }
+      setRenderedValue(rendered);
+    };
+
+    _renderValue();
   }, [handlers, value]);
 
   const onRecall = useCallback(() => {
