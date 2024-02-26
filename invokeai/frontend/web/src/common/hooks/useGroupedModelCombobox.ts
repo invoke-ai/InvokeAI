@@ -35,7 +35,7 @@ export const useGroupedModelCombobox = <T extends AnyModelConfig>(
       return [];
     }
     const modelEntitiesArray = map(modelEntities.entities);
-    const groupedModels = groupBy(modelEntitiesArray, 'base_model');
+    const groupedModels = groupBy(modelEntitiesArray, 'base');
     const _options = reduce(
       groupedModels,
       (acc, val, label) => {
