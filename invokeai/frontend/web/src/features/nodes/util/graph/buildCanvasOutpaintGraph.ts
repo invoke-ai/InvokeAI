@@ -71,6 +71,7 @@ export const buildCanvasOutpaintGraph = (
     canvasCoherenceMode,
     canvasCoherenceMinDenoise,
     canvasCoherenceEdgeSize,
+    maskBlur,
   } = state.generation;
 
   if (!model) {
@@ -176,7 +177,7 @@ export const buildCanvasOutpaintGraph = (
         is_intermediate: getIsIntermediate(state),
         board: getBoardField(state),
         use_cache: false,
-        mask_blur: canvasCoherenceEdgeSize,
+        mask_blur: maskBlur,
       },
     },
     edges: [
