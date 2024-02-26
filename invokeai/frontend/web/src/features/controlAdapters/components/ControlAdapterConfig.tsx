@@ -72,7 +72,7 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
       </Flex>
       <Flex gap={4} alignItems="center">
         <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
-          {/* <ParamControlAdapterModel id={id} /> */}
+          <ParamControlAdapterModel id={id} />
         </Box>
         {activeTabName === 'unifiedCanvas' && <ControlNetCanvasImageImports id={id} />}
         <IconButton
