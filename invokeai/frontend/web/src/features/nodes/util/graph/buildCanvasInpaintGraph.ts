@@ -58,13 +58,13 @@ export const buildCanvasInpaintGraph = (
     seed,
     vaePrecision,
     shouldUseCpuNoise,
-
     clipSkip,
     seamlessXAxis,
     seamlessYAxis,
     canvasCoherenceMode,
     canvasCoherenceMinDenoise,
     canvasCoherenceEdgeSize,
+    maskBlur,
   } = state.generation;
 
   if (!model) {
@@ -156,7 +156,7 @@ export const buildCanvasInpaintGraph = (
         id: CANVAS_OUTPUT,
         is_intermediate: getIsIntermediate(state),
         board: getBoardField(state),
-        mask_blur: canvasCoherenceEdgeSize,
+        mask_blur: maskBlur,
         source_image: canvasInitImage,
       },
     },
