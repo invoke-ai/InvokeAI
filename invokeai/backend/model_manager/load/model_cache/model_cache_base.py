@@ -111,7 +111,7 @@ class ModelCacheBase(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    def move_model_to_device(self, cache_entry: CacheRecord[AnyModel], device: torch.device) -> None:
+    def move_model_to_device(self, cache_entry: CacheRecord[AnyModel], target_device: torch.device) -> None:
         """Move model into the indicated device."""
         pass
 
