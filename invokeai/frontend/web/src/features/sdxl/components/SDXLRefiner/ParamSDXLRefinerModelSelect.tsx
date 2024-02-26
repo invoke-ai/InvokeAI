@@ -2,8 +2,8 @@ import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
+import { getModelKeyAndBase } from 'features/metadata/util/modelFetchingHelpers';
 import { refinerModelChanged, selectSdxlSlice } from 'features/sdxl/store/sdxlSlice';
-import { pick } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { REFINER_BASE_MODELS } from 'services/api/constants';
@@ -25,7 +25,7 @@ const ParamSDXLRefinerModelSelect = () => {
         dispatch(refinerModelChanged(null));
         return;
       }
-      dispatch(refinerModelChanged(pick(model, ['key', 'base'])));
+      dispatch(refinerModelChanged(getModelKeyAndBase(model)));
     },
     [dispatch]
   );
