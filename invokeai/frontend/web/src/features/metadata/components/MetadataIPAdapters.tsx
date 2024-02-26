@@ -1,6 +1,5 @@
-import type { IPAdapterConfig } from 'features/controlAdapters/store/types';
 import { MetadataItemView } from 'features/metadata/components/MetadataItemView';
-import type { MetadataHandlers } from 'features/metadata/types';
+import type { IPAdapterConfigMetadata, MetadataHandlers } from 'features/metadata/types';
 import { handlers } from 'features/metadata/util/handlers';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -9,7 +8,7 @@ type Props = {
 };
 
 export const MetadataIPAdapters = ({ metadata }: Props) => {
-  const [ipAdapters, setIPAdapters] = useState<IPAdapterConfig[]>([]);
+  const [ipAdapters, setIPAdapters] = useState<IPAdapterConfigMetadata[]>([]);
 
   useEffect(() => {
     const parse = async () => {
@@ -40,8 +39,8 @@ const MetadataViewIPAdapter = ({
   handlers,
 }: {
   label: string;
-  ipAdapter: IPAdapterConfig;
-  handlers: MetadataHandlers<IPAdapterConfig[], IPAdapterConfig>;
+  ipAdapter: IPAdapterConfigMetadata;
+  handlers: MetadataHandlers<IPAdapterConfigMetadata[], IPAdapterConfigMetadata>;
 }) => {
   const onRecall = useCallback(() => {
     if (!handlers.recallItem) {
