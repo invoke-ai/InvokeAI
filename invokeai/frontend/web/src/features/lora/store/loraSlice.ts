@@ -1,8 +1,8 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { getModelKeyAndBase } from 'features/metadata/util/modelFetchingHelpers';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
-import { getModelKeyAndBase } from 'features/parameters/util/modelFetchingHelpers';
 import type { LoRAModelConfig } from 'services/api/types';
 
 export type LoRA = {
