@@ -2,7 +2,7 @@ import { Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
-import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
+import { parseAndRecallImageDimensions } from 'features/metadata/util/handlers';
 import { clearInitialImage, selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -19,7 +19,6 @@ const postUploadAction: PostUploadAction = {
 };
 
 const InitialImageDisplay = () => {
-  const { recallWidthAndHeight } = useRecallParameters();
   const { t } = useTranslation();
   const initialImage = useAppSelector(selectInitialImage);
   const dispatch = useAppDispatch();
@@ -34,9 +33,9 @@ const InitialImageDisplay = () => {
 
   const handleUseSizeInitialImage = useCallback(() => {
     if (initialImage) {
-      recallWidthAndHeight(initialImage.width, initialImage.height);
+      parseAndRecallImageDimensions(initialImage);
     }
-  }, [initialImage, recallWidthAndHeight]);
+  }, [initialImage]);
 
   useHotkeys('shift+d', handleUseSizeInitialImage, [initialImage]);
 

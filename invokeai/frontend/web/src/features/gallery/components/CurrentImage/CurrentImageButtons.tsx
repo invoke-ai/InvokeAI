@@ -7,11 +7,12 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
+import { useImageActions } from 'features/gallery/hooks/useImageActions';
 import { sentImageToImg2Img } from 'features/gallery/store/actions';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
+import { parseAndRecallImageDimensions } from 'features/metadata/util/handlers';
 import ParamUpscalePopover from 'features/parameters/components/Upscale/ParamUpscaleSettings';
-import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -33,7 +34,6 @@ import {
   PiRulerBold,
 } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 
 const selectShouldDisableToolbarButtons = createSelector(
   selectSystemSlice,
@@ -58,11 +58,10 @@ const CurrentImageButtons = () => {
   const toaster = useAppToaster();
   const { t } = useTranslation();
 
-  const { recallBothPrompts, recallSeed, recallWidthAndHeight, recallAllParameters } = useRecallParameters();
-
   const { currentData: imageDTO } = useGetImageDTOQuery(lastSelectedImage?.image_name ?? skipToken);
 
-  const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(lastSelectedImage?.image_name);
+  const { recallAll, remix, recallSeed, recallPrompts, hasMetadata, hasSeed, hasPrompts, isLoadingMetadata } =
+    useImageActions(lastSelectedImage?.image_name);
 
   const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } = useGetAndLoadEmbeddedWorkflow({});
 
@@ -74,51 +73,16 @@ const CurrentImageButtons = () => {
   }, [getAndLoadEmbeddedWorkflow, lastSelectedImage]);
 
   useHotkeys('w', handleLoadWorkflow, [lastSelectedImage]);
-
-  const handleClickUseAllParameters = useCallback(() => {
-    recallAllParameters(metadata);
-  }, [metadata, recallAllParameters]);
-
-  useHotkeys('a', handleClickUseAllParameters, [metadata]);
-
-  const handleUseSeed = useCallback(() => {
-    recallSeed(metadata?.seed);
-  }, [metadata?.seed, recallSeed]);
-
-  useHotkeys('s', handleUseSeed, [metadata]);
-
-  const handleUsePrompt = useCallback(() => {
-    recallBothPrompts(
-      metadata?.positive_prompt,
-      metadata?.negative_prompt,
-      metadata?.positive_style_prompt,
-      metadata?.negative_style_prompt
-    );
-  }, [
-    metadata?.negative_prompt,
-    metadata?.positive_prompt,
-    metadata?.positive_style_prompt,
-    metadata?.negative_style_prompt,
-    recallBothPrompts,
-  ]);
-
-  useHotkeys('p', handleUsePrompt, [metadata]);
-
-  const handleRemixImage = useCallback(() => {
-    // Recalls all metadata parameters except seed
-    recallAllParameters({
-      ...metadata,
-      seed: undefined,
-    });
-  }, [metadata, recallAllParameters]);
-
-  useHotkeys('r', handleRemixImage, [metadata]);
+  useHotkeys('a', recallAll, [recallAll]);
+  useHotkeys('s', recallSeed, [recallSeed]);
+  useHotkeys('p', recallPrompts, [recallPrompts]);
+  useHotkeys('r', remix, [remix]);
 
   const handleUseSize = useCallback(() => {
-    recallWidthAndHeight(metadata?.width, metadata?.height);
-  }, [metadata?.width, metadata?.height, recallWidthAndHeight]);
+    parseAndRecallImageDimensions(lastSelectedImage);
+  }, [lastSelectedImage]);
 
-  useHotkeys('d', handleUseSize, [metadata]);
+  useHotkeys('d', handleUseSize, [handleUseSize]);
 
   const handleSendToImageToImage = useCallback(() => {
     dispatch(sentImageToImg2Img());
@@ -216,36 +180,30 @@ const CurrentImageButtons = () => {
             icon={<PiArrowsCounterClockwiseBold />}
             tooltip={`${t('parameters.remixImage')} (R)`}
             aria-label={`${t('parameters.remixImage')} (R)`}
-            isDisabled={!metadata?.positive_prompt}
-            onClick={handleRemixImage}
+            isDisabled={!hasMetadata}
+            onClick={remix}
           />
           <IconButton
             isLoading={isLoadingMetadata}
             icon={<PiQuotesBold />}
             tooltip={`${t('parameters.usePrompt')} (P)`}
             aria-label={`${t('parameters.usePrompt')} (P)`}
-            isDisabled={!metadata?.positive_prompt}
-            onClick={handleUsePrompt}
+            isDisabled={!hasPrompts}
+            onClick={recallPrompts}
           />
           <IconButton
             isLoading={isLoadingMetadata}
             icon={<PiPlantBold />}
             tooltip={`${t('parameters.useSeed')} (S)`}
             aria-label={`${t('parameters.useSeed')} (S)`}
-            isDisabled={metadata?.seed === null || metadata?.seed === undefined}
-            onClick={handleUseSeed}
+            isDisabled={!hasSeed}
+            onClick={recallSeed}
           />
           <IconButton
             isLoading={isLoadingMetadata}
             icon={<PiRulerBold />}
             tooltip={`${t('parameters.useSize')} (D)`}
             aria-label={`${t('parameters.useSize')} (D)`}
-            isDisabled={
-              metadata?.height === null ||
-              metadata?.height === undefined ||
-              metadata?.width === null ||
-              metadata?.width === undefined
-            }
             onClick={handleUseSize}
           />
           <IconButton
@@ -253,8 +211,8 @@ const CurrentImageButtons = () => {
             icon={<PiAsteriskBold />}
             tooltip={`${t('parameters.useAll')} (A)`}
             aria-label={`${t('parameters.useAll')} (A)`}
-            isDisabled={!metadata}
-            onClick={handleClickUseAllParameters}
+            isDisabled={!hasMetadata}
+            onClick={recallAll}
           />
         </ButtonGroup>
 
