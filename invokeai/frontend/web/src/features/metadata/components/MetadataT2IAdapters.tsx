@@ -1,6 +1,5 @@
-import type { T2IAdapterConfig } from 'features/controlAdapters/store/types';
 import { MetadataItemView } from 'features/metadata/components/MetadataItemView';
-import type { MetadataHandlers } from 'features/metadata/types';
+import type { MetadataHandlers, T2IAdapterConfigMetadata } from 'features/metadata/types';
 import { handlers } from 'features/metadata/util/handlers';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -9,7 +8,7 @@ type Props = {
 };
 
 export const MetadataT2IAdapters = ({ metadata }: Props) => {
-  const [t2iAdapters, setT2IAdapters] = useState<T2IAdapterConfig[]>([]);
+  const [t2iAdapters, setT2IAdapters] = useState<T2IAdapterConfigMetadata[]>([]);
 
   useEffect(() => {
     const parse = async () => {
@@ -45,8 +44,8 @@ const MetadataViewT2IAdapter = ({
   handlers,
 }: {
   label: string;
-  t2iAdapter: T2IAdapterConfig;
-  handlers: MetadataHandlers<T2IAdapterConfig[], T2IAdapterConfig>;
+  t2iAdapter: T2IAdapterConfigMetadata;
+  handlers: MetadataHandlers<T2IAdapterConfigMetadata[], T2IAdapterConfigMetadata>;
 }) => {
   const onRecall = useCallback(() => {
     if (!handlers.recallItem) {
