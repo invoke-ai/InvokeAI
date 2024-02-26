@@ -2,7 +2,7 @@ import { getStore } from 'app/store/nanostores/store';
 import type { ControlNetConfig, IPAdapterConfig, T2IAdapterConfig } from 'features/controlAdapters/store/types';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import type { MetadataValidateFunc } from 'features/metadata/types';
-import { InvalidModelConfigError } from 'features/parameters/util/modelFetchingHelpers';
+import { InvalidModelConfigError } from 'features/metadata/util/modelFetchingHelpers';
 import type { BaseModelType, RefinerMainModelConfig, VAEModelConfig } from 'services/api/types';
 
 /**
