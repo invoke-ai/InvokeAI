@@ -158,15 +158,14 @@ const GalleryImage = (props: HoverableImageProps) => {
             {isHovered && (
               <Text
                 position="absolute"
-                background="white"
-                color="black"
-                fontSize="base.50"
-                bottom={0}
-                right={0}
+                background="black"
+                color="white"
+                fontSize="12px"
+                bottom={1.5}
+                right={8}
                 px={2}
                 opacity={0.7}
-                borderTopLeftRadius="base"
-                borderBottomRightRadius="base"
+                borderRadius="base"
                 sx={badgeSx}
               >{`${imageDTO.width}x${imageDTO.height}`}</Text>)}
             <IAIDndImageIcon onClick={toggleStarredState} icon={starIcon} tooltip={starTooltip} />
