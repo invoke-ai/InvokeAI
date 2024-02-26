@@ -1,8 +1,8 @@
 import { Divider, Flex, Heading, IconButton, Input, InputGroup, InputRightElement } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { t } from 'i18next';
 import type { ChangeEventHandler } from 'react';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 import type { ScanFolderResponse } from 'services/api/endpoints/models';
 
@@ -13,6 +13,7 @@ type ScanModelResultsProps = {
 };
 
 export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredResults = useMemo(() => {
@@ -36,7 +37,7 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
       <Flex flexDir="column" gap={2} mt={4} height="100%">
         <Flex justifyContent="space-between" alignItems="center">
           <Heading fontSize="md" as="h4">
-            Scan Results
+            {t('modelManager.scanResults')}
           </Heading>
           <InputGroup maxW="300px" size="xs">
             <Input

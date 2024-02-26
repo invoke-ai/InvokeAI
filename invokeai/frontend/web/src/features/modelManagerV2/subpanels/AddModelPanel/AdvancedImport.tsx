@@ -126,7 +126,7 @@ export const AdvancedImport = () => {
         <Flex flexDirection="column" gap={4} width="100%" pb={10}>
           <Flex alignItems="flex-end" gap="4">
             <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-              <FormLabel>Model Type</FormLabel>
+              <FormLabel>{t('modelManager.modelType')}</FormLabel>
               <ModelTypeSelect<AnyModelConfig> control={control} name="type" />
             </FormControl>
             <Text px="2" fontSize="xs" textAlign="center">
@@ -157,17 +157,17 @@ export const AdvancedImport = () => {
             </Flex>
             <Flex gap={4}>
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                <FormLabel>Base Model</FormLabel>
+                <FormLabel>{t('modelManager.baseModel')}</FormLabel>
                 <BaseModelSelect<AnyModelConfig> control={control} name="base" />
               </FormControl>
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                <FormLabel>Format</FormLabel>
+                <FormLabel>{t('common.format')}</FormLabel>
                 <ModelFormatSelect<AnyModelConfig> control={control} name="format" />
               </FormControl>
             </Flex>
             <Flex gap={4}>
               <FormControl flexDir="column" alignItems="flex-start" gap={1} isInvalid={Boolean(errors.path)}>
-                <FormLabel>Path</FormLabel>
+                <FormLabel>{t('modelManager.path')}</FormLabel>
                 <Input
                   {...register('path', {
                     validate: (value) => value.trim().length > 0 || 'Must provide a path',
@@ -181,39 +181,39 @@ export const AdvancedImport = () => {
                 <Flex gap={4}>
                   {watchedModelFormat === 'diffusers' && (
                     <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                      <FormLabel>Repo Variant</FormLabel>
+                      <FormLabel>{t('modelManager.repoVariant')}</FormLabel>
                       <RepoVariantSelect<AnyModelConfig> control={control} name="repo_variant" />
                     </FormControl>
                   )}
                   {watchedModelFormat === 'checkpoint' && (
                     <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                      <FormLabel>Config Path</FormLabel>
+                      <FormLabel>{t('modelManager.pathToConfig')}</FormLabel>
                       <Input {...register('config')} />
                     </FormControl>
                   )}
 
                   <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                    <FormLabel>Variant</FormLabel>
+                    <FormLabel>{t('modelManager.variant')}</FormLabel>
                     <ModelVariantSelect<AnyModelConfig> control={control} name="variant" />
                   </FormControl>
                 </Flex>
                 <Flex gap={4}>
                   <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                    <FormLabel>Prediction Type</FormLabel>
+                    <FormLabel>{t('modelManager.predictionType')}</FormLabel>
                     <PredictionTypeSelect<AnyModelConfig> control={control} name="prediction_type" />
                   </FormControl>
                   <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                    <FormLabel>Upcast Attention</FormLabel>
+                    <FormLabel>{t('modelManager.upcastAttention')}</FormLabel>
                     <BooleanSelect<AnyModelConfig> control={control} name="upcast_attention" />
                   </FormControl>
                 </Flex>
                 <Flex gap={4}>
                   <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                    <FormLabel>ZTSNR Training</FormLabel>
+                    <FormLabel>{t('modelManager.ztsnrTraining')}</FormLabel>
                     <BooleanSelect<AnyModelConfig> control={control} name="ztsnr_training" />
                   </FormControl>
                   <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                    <FormLabel>VAE Path</FormLabel>
+                    <FormLabel>{t('modelManager.vaeLocation')}</FormLabel>
                     <Input {...register('vae')} />
                   </FormControl>
                 </Flex>
@@ -222,7 +222,7 @@ export const AdvancedImport = () => {
             {watchedModelType === 'ip_adapter' && (
               <Flex gap={4}>
                 <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                  <FormLabel>Image Encoder Model ID</FormLabel>
+                  <FormLabel>{t('modelManager.imageEncoderModelId')}</FormLabel>
                   <Input {...register('image_encoder_model_id')} />
                 </FormControl>
               </Flex>
