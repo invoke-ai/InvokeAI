@@ -88,9 +88,9 @@ export const initialConfigState: AppConfig = {
     },
     canvasCoherenceEdgeSize: {
       initial: 16,
-      sliderMin: 16,
-      sliderMax: 512,
-      numberInputMin: 16,
+      sliderMin: 0,
+      sliderMax: 128,
+      numberInputMin: 0,
       numberInputMax: 1024,
       fineStep: 8,
       coarseStep: 16,
@@ -134,7 +134,7 @@ export const initialConfigState: AppConfig = {
     maskBlur: {
       initial: 16,
       sliderMin: 0,
-      sliderMax: 64,
+      sliderMax: 128,
       numberInputMin: 0,
       numberInputMax: 512,
       fineStep: 1,
