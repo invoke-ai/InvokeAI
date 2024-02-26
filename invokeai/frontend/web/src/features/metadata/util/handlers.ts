@@ -1,3 +1,4 @@
+import { objectKeys } from 'common/util/objectKeys';
 import { toast } from 'common/util/toast';
 import type { ControlAdapterConfig } from 'features/controlAdapters/store/types';
 import type { LoRA } from 'features/lora/store/loraSlice';
@@ -312,3 +313,75 @@ export const handlers = {
     renderItemValue: renderControlAdapterValue,
   }),
 } as const;
+
+export const parseAndRecallPrompts = async (metadata: unknown) => {
+  const results = await Promise.allSettled([
+    handlers.positivePrompt.parse(metadata).then((positivePrompt) => {
+      if (!handlers.positivePrompt.recall) {
+        return;
+      }
+      handlers.positivePrompt?.recall(positivePrompt);
+    }),
+    handlers.negativePrompt.parse(metadata).then((negativePrompt) => {
+      if (!handlers.negativePrompt.recall) {
+        return;
+      }
+      handlers.negativePrompt?.recall(negativePrompt);
+    }),
+    handlers.sdxlPositiveStylePrompt.parse(metadata).then((sdxlPositiveStylePrompt) => {
+      if (!handlers.sdxlPositiveStylePrompt.recall) {
+        return;
+      }
+      handlers.sdxlPositiveStylePrompt?.recall(sdxlPositiveStylePrompt);
+    }),
+    handlers.sdxlNegativeStylePrompt.parse(metadata).then((sdxlNegativeStylePrompt) => {
+      if (!handlers.sdxlNegativeStylePrompt.recall) {
+        return;
+      }
+      handlers.sdxlNegativeStylePrompt?.recall(sdxlNegativeStylePrompt);
+    }),
+  ]);
+  if (results.some((result) => result.status === 'fulfilled')) {
+    parameterSetToast(t('metadata.allPrompts'));
+  }
+};
+
+export const parseAndRecallImageDimensions = async (metadata: unknown) => {
+  const results = await Promise.allSettled([
+    handlers.width.parse(metadata).then((width) => {
+      if (!handlers.width.recall) {
+        return;
+      }
+      handlers.width?.recall(width);
+    }),
+    handlers.height.parse(metadata).then((height) => {
+      if (!handlers.height.recall) {
+        return;
+      }
+      handlers.height?.recall(height);
+    }),
+  ]);
+  if (results.some((result) => result.status === 'fulfilled')) {
+    parameterSetToast(t('metadata.imageDimensions'));
+  }
+};
+
+export const parseAndRecallAllMetadata = async (metadata: unknown, skip: (keyof typeof handlers)[] = []) => {
+  const results = await Promise.allSettled(
+    objectKeys(handlers)
+      .filter((key) => !skip.includes(key))
+      .map((key) => {
+        const { parse, recall } = handlers[key];
+        return parse(metadata).then((value) => {
+          if (!recall) {
+            return;
+          }
+          /* @ts-expect-error The return type of parse and the input type of recall are guaranteed to be compatible. */
+          recall(value);
+        });
+      })
+  );
+  if (results.some((result) => result.status === 'fulfilled')) {
+    parameterSetToast(t('toast.parametersSet'));
+  }
+};

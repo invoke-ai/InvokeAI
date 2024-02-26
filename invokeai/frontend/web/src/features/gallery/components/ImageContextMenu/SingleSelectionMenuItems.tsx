@@ -8,8 +8,8 @@ import { useDownloadImage } from 'common/hooks/useDownloadImage';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { imagesToChangeSelected, isModalOpenChanged } from 'features/changeBoardModal/store/slice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import { useImageActions } from 'features/gallery/hooks/useImageActions';
 import { sentImageToCanvas, sentImageToImg2Img } from 'features/gallery/store/actions';
-import { useRecallParameters } from 'features/parameters/hooks/useRecallParameters';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -33,7 +33,6 @@ import {
   PiTrashSimpleBold,
 } from 'react-icons/pi';
 import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
-import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 import type { ImageDTO } from 'services/api/types';
 
 type SingleSelectionMenuItemsProps = {
@@ -49,7 +48,9 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
   const customStarUi = useStore($customStarUI);
   const { downloadImage } = useDownloadImage();
-  const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(imageDTO?.image_name);
+
+  const { recallAll, remix, recallSeed, recallPrompts, hasMetadata, hasSeed, hasPrompts, isLoadingMetadata } =
+    useImageActions(imageDTO?.image_name);
 
   const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } = useGetAndLoadEmbeddedWorkflow({});
 
@@ -68,28 +69,6 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     }
     dispatch(imagesToDeleteSelected([imageDTO]));
   }, [dispatch, imageDTO]);
-
-  const { recallBothPrompts, recallSeed, recallAllParameters } = useRecallParameters();
-
-  // Recall parameters handlers
-  const handleRecallPrompt = useCallback(() => {
-    recallBothPrompts(
-      metadata?.positive_prompt,
-      metadata?.negative_prompt,
-      metadata?.positive_style_prompt,
-      metadata?.negative_style_prompt
-    );
-  }, [
-    metadata?.negative_prompt,
-    metadata?.positive_prompt,
-    metadata?.positive_style_prompt,
-    metadata?.negative_style_prompt,
-    recallBothPrompts,
-  ]);
-
-  const handleRecallSeed = useCallback(() => {
-    recallSeed(metadata?.seed);
-  }, [metadata?.seed, recallSeed]);
 
   const handleSendToImageToImage = useCallback(() => {
     dispatch(sentImageToImg2Img());
@@ -110,18 +89,6 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       isClosable: true,
     });
   }, [dispatch, imageDTO, t, toaster, optimalDimension]);
-
-  const handleUseAllParameters = useCallback(() => {
-    recallAllParameters(metadata);
-  }, [metadata, recallAllParameters]);
-
-  const handleRemixImage = useCallback(() => {
-    // Recalls all metadata parameters except seed
-    recallAllParameters({
-      ...metadata,
-      seed: undefined,
-    });
-  }, [metadata, recallAllParameters]);
 
   const handleChangeBoard = useCallback(() => {
     dispatch(imagesToChangeSelected([imageDTO]));
@@ -171,33 +138,29 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       </MenuItem>
       <MenuItem
         icon={isLoadingMetadata ? <SpinnerIcon /> : <PiArrowsCounterClockwiseBold />}
-        onClickCapture={handleRemixImage}
-        isDisabled={
-          isLoadingMetadata || (metadata?.positive_prompt === undefined && metadata?.negative_prompt === undefined)
-        }
+        onClickCapture={remix}
+        isDisabled={isLoadingMetadata || !hasMetadata}
       >
         {t('parameters.remixImage')}
       </MenuItem>
       <MenuItem
         icon={isLoadingMetadata ? <SpinnerIcon /> : <PiQuotesBold />}
-        onClickCapture={handleRecallPrompt}
-        isDisabled={
-          isLoadingMetadata || (metadata?.positive_prompt === undefined && metadata?.negative_prompt === undefined)
-        }
+        onClickCapture={recallPrompts}
+        isDisabled={isLoadingMetadata || !hasPrompts}
       >
         {t('parameters.usePrompt')}
       </MenuItem>
       <MenuItem
         icon={isLoadingMetadata ? <SpinnerIcon /> : <PiPlantBold />}
-        onClickCapture={handleRecallSeed}
-        isDisabled={isLoadingMetadata || metadata?.seed === undefined}
+        onClickCapture={recallSeed}
+        isDisabled={isLoadingMetadata || !hasSeed}
       >
         {t('parameters.useSeed')}
       </MenuItem>
       <MenuItem
         icon={isLoadingMetadata ? <SpinnerIcon /> : <PiAsteriskBold />}
-        onClickCapture={handleUseAllParameters}
-        isDisabled={isLoadingMetadata || !metadata}
+        onClickCapture={recallAll}
+        isDisabled={isLoadingMetadata || !hasMetadata}
       >
         {t('parameters.useAll')}
       </MenuItem>
