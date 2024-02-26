@@ -1,4 +1,3 @@
-import { Text } from '@invoke-ai/ui-library';
 import type { T2IAdapterConfig } from 'features/controlAdapters/store/types';
 import { MetadataItemView } from 'features/metadata/components/MetadataItemView';
 import type { MetadataHandlers } from 'features/metadata/types';
@@ -55,12 +54,19 @@ const MetadataViewT2IAdapter = ({
     }
     handlers.recallItem(t2iAdapter, true);
   }, [handlers, t2iAdapter]);
+  
+  const [renderedValue, setRenderedValue] = useState<React.ReactNode>(null);
+  useEffect(() => {
+    const _renderValue = async () => {
+      if (!handlers.renderItemValue) {
+        setRenderedValue(null);
+        return;
+      }
+      const rendered = await handlers.renderItemValue(t2iAdapter);
+      setRenderedValue(rendered);
+    };
 
-  const renderedValue = useMemo(() => {
-    if (!handlers.renderItemValue) {
-      return null;
-    }
-    return <Text>{handlers.renderItemValue(t2iAdapter)}</Text>;
+    _renderValue();
   }, [handlers, t2iAdapter]);
 
   return <MetadataItemView label={label} isDisabled={false} onRecall={onRecall} renderedValue={renderedValue} />;

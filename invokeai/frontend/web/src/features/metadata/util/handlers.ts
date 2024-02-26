@@ -11,18 +11,38 @@ import type {
   MetadataRenderValueFunc,
   MetadataValidateFunc,
 } from 'features/metadata/types';
+import { fetchModelConfig } from 'features/metadata/util/modelFetchingHelpers';
 import { validators } from 'features/metadata/util/validators';
+import type { ModelIdentifierWithBase } from 'features/nodes/types/common';
 import { t } from 'i18next';
-import type { AnyModelConfig } from 'services/api/types';
 
 import { parsers } from './parsers';
 import { recallers } from './recallers';
 
-const renderModelConfigValue: MetadataRenderValueFunc<AnyModelConfig> = (value) =>
-  `${value.name} (${value.base.toUpperCase()}, ${value.key})`;
-const renderLoRAValue: MetadataRenderValueFunc<LoRA> = (value) => `${value.model.key} (${value.weight})`;
-const renderControlAdapterValue: MetadataRenderValueFunc<ControlAdapterConfig> = (value) =>
-  `${value.model?.key} (${value.weight})`;
+const renderModelConfigValue: MetadataRenderValueFunc<ModelIdentifierWithBase> = async (value) => {
+  try {
+    const modelConfig = await fetchModelConfig(value.key);
+    return `${modelConfig.name} (${modelConfig.base.toUpperCase()})`;
+  } catch {
+    return `${value.key} (${value.base.toUpperCase()})`;
+  }
+};
+const renderLoRAValue: MetadataRenderValueFunc<LoRA> = async (value) => {
+  try {
+    const modelConfig = await fetchModelConfig(value.model.key);
+    return `${modelConfig.name} (${modelConfig.base.toUpperCase()}) - ${value.weight}`;
+  } catch {
+    return `${value.model.key} (${value.model.base.toUpperCase()}) - ${value.weight}`;
+  }
+};
+const renderControlAdapterValue: MetadataRenderValueFunc<ControlAdapterConfig> = async (value) => {
+  try {
+    const modelConfig = await fetchModelConfig(value.model?.key ?? 'none');
+    return `${modelConfig.name} (${modelConfig.base.toUpperCase()}) - ${value.weight}`;
+  } catch {
+    return `${value.model?.key} (${value.model?.base.toUpperCase()}) - ${value.weight}`;
+  }
+};
 
 const parameterSetToast = (parameter: string, description?: string) => {
   toast({
@@ -130,6 +150,8 @@ const buildRecallItem =
     }
   };
 
+const resolveToString = (value: unknown) => new Promise<React.ReactNode>((resolve) => resolve(String(value)));
+
 const buildHandlers: BuildMetadataHandlers = ({
   getLabel,
   parser,
@@ -146,8 +168,8 @@ const buildHandlers: BuildMetadataHandlers = ({
   recall: recaller ? buildRecall({ recaller, validator, getLabel }) : undefined,
   recallItem: itemRecaller ? buildRecallItem({ itemRecaller, itemValidator, getLabel }) : undefined,
   getLabel,
-  renderValue: renderValue ?? String,
-  renderItemValue: renderItemValue ?? String,
+  renderValue: renderValue ?? resolveToString,
+  renderItemValue: renderItemValue ?? resolveToString,
 });
 
 export const handlers = {
