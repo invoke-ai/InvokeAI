@@ -1,8 +1,6 @@
 import type { RootState } from 'app/store/store';
-import type { LoRAMetadataItem } from 'features/nodes/types/metadata';
-import { zLoRAMetadataItem } from 'features/nodes/types/metadata';
 import { filter, size } from 'lodash-es';
-import type { NonNullableGraph, SDXLLoraLoaderInvocation } from 'services/api/types';
+import type { CoreMetadataInvocation, NonNullableGraph, SDXLLoraLoaderInvocation } from 'services/api/types';
 
 import {
   LORA_LOADER,
@@ -36,7 +34,7 @@ export const addSDXLLoRAsToGraph = (
     return;
   }
 
-  const loraMetadata: LoRAMetadataItem[] = [];
+  const loraMetadata: CoreMetadataInvocation['loras'] = [];
 
   // Handle Seamless Plugs
   const unetLoaderId = modelLoaderNodeId;
@@ -70,12 +68,7 @@ export const addSDXLLoRAsToGraph = (
       weight,
     };
 
-    loraMetadata.push(
-      zLoRAMetadataItem.parse({
-        lora: { key },
-        weight,
-      })
-    );
+    loraMetadata.push({ model: { key }, weight });
 
     // add to graph
     graph.nodes[currentLoraNodeId] = loraLoaderNode;
