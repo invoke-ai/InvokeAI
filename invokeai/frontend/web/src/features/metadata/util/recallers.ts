@@ -1,10 +1,14 @@
 import { getStore } from 'app/store/nanostores/store';
 import { controlAdapterRecalled } from 'features/controlAdapters/store/controlAdaptersSlice';
-import type { ControlNetConfig, IPAdapterConfig, T2IAdapterConfig } from 'features/controlAdapters/store/types';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { loraRecalled } from 'features/lora/store/loraSlice';
-import type { MetadataRecallFunc } from 'features/metadata/types';
+import type {
+  ControlNetConfigMetadata,
+  IPAdapterConfigMetadata,
+  MetadataRecallFunc,
+  T2IAdapterConfigMetadata,
+} from 'features/metadata/types';
 import { modelSelected } from 'features/parameters/store/actions';
 import {
   heightRecalled,
@@ -168,33 +172,33 @@ const recallAllLoRAs: MetadataRecallFunc<LoRA[]> = (loras) => {
   });
 };
 
-const recallControlNet: MetadataRecallFunc<ControlNetConfig> = (controlNet) => {
+const recallControlNet: MetadataRecallFunc<ControlNetConfigMetadata> = (controlNet) => {
   getStore().dispatch(controlAdapterRecalled(controlNet));
 };
 
-const recallControlNets: MetadataRecallFunc<ControlNetConfig[]> = (controlNets) => {
+const recallControlNets: MetadataRecallFunc<ControlNetConfigMetadata[]> = (controlNets) => {
   const { dispatch } = getStore();
   controlNets.forEach((controlNet) => {
     dispatch(controlAdapterRecalled(controlNet));
   });
 };
 
-const recallT2IAdapter: MetadataRecallFunc<T2IAdapterConfig> = (t2iAdapter) => {
+const recallT2IAdapter: MetadataRecallFunc<T2IAdapterConfigMetadata> = (t2iAdapter) => {
   getStore().dispatch(controlAdapterRecalled(t2iAdapter));
 };
 
-const recallT2IAdapters: MetadataRecallFunc<T2IAdapterConfig[]> = (t2iAdapters) => {
+const recallT2IAdapters: MetadataRecallFunc<T2IAdapterConfigMetadata[]> = (t2iAdapters) => {
   const { dispatch } = getStore();
   t2iAdapters.forEach((t2iAdapter) => {
     dispatch(controlAdapterRecalled(t2iAdapter));
   });
 };
 
-const recallIPAdapter: MetadataRecallFunc<IPAdapterConfig> = (ipAdapter) => {
+const recallIPAdapter: MetadataRecallFunc<IPAdapterConfigMetadata> = (ipAdapter) => {
   getStore().dispatch(controlAdapterRecalled(ipAdapter));
 };
 
-const recallIPAdapters: MetadataRecallFunc<IPAdapterConfig[]> = (ipAdapters) => {
+const recallIPAdapters: MetadataRecallFunc<IPAdapterConfigMetadata[]> = (ipAdapters) => {
   const { dispatch } = getStore();
   ipAdapters.forEach((ipAdapter) => {
     dispatch(controlAdapterRecalled(ipAdapter));

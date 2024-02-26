@@ -1,6 +1,5 @@
-import type { ControlNetConfig } from 'features/controlAdapters/store/types';
 import { MetadataItemView } from 'features/metadata/components/MetadataItemView';
-import type { MetadataHandlers } from 'features/metadata/types';
+import type { ControlNetConfigMetadata, MetadataHandlers } from 'features/metadata/types';
 import { handlers } from 'features/metadata/util/handlers';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -9,7 +8,7 @@ type Props = {
 };
 
 export const MetadataControlNets = ({ metadata }: Props) => {
-  const [controlNets, setControlNets] = useState<ControlNetConfig[]>([]);
+  const [controlNets, setControlNets] = useState<ControlNetConfigMetadata[]>([]);
 
   useEffect(() => {
     const parse = async () => {
@@ -45,8 +44,8 @@ const MetadataViewControlNet = ({
   handlers,
 }: {
   label: string;
-  controlNet: ControlNetConfig;
-  handlers: MetadataHandlers<ControlNetConfig[], ControlNetConfig>;
+  controlNet: ControlNetConfigMetadata;
+  handlers: MetadataHandlers<ControlNetConfigMetadata[], ControlNetConfigMetadata>;
 }) => {
   const onRecall = useCallback(() => {
     if (!handlers.recallItem) {
