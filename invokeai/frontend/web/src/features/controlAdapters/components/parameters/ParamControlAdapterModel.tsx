@@ -6,7 +6,7 @@ import { useControlAdapterModel } from 'features/controlAdapters/hooks/useContro
 import { useControlAdapterModelQuery } from 'features/controlAdapters/hooks/useControlAdapterModelQuery';
 import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
 import { controlAdapterModelChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { pick } from 'lodash-es';
+import { getModelKeyAndBase } from 'features/metadata/util/modelFetchingHelpers';
 import { memo, useCallback, useMemo } from 'react';
 import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 
@@ -31,7 +31,7 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
       dispatch(
         controlAdapterModelChanged({
           id,
-          model: pick(model, 'base', 'key'),
+          model: getModelKeyAndBase(model),
         })
       );
     },

@@ -4,7 +4,6 @@ import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { SyncModelsIconButton } from 'features/modelManagerV2/components/SyncModels/SyncModelsIconButton';
 import { fieldVaeModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type { VAEModelFieldInputInstance, VAEModelFieldInputTemplate } from 'features/nodes/types/field';
-import { pick } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
 import type { VAEModelConfig } from 'services/api/types';
@@ -35,7 +34,7 @@ const VAEModelFieldInputComponent = (props: Props) => {
   const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
     modelEntities: data,
     onChange: _onChange,
-    selectedModel: field.value ? pick(field.value, ['key', 'base']) : null,
+    selectedModel: field.value,
     isLoading,
   });
 

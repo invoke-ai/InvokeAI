@@ -3,7 +3,6 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldControlNetModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type { ControlNetModelFieldInputInstance, ControlNetModelFieldInputTemplate } from 'features/nodes/types/field';
-import { pick } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
 import type { ControlNetModelConfig } from 'services/api/types';
@@ -36,7 +35,7 @@ const ControlNetModelFieldInputComponent = (props: Props) => {
   const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
     modelEntities: data,
     onChange: _onChange,
-    selectedModel: field.value ? pick(field.value, ['key', 'base']) : undefined,
+    selectedModel: field.value,
     isLoading,
   });
 
