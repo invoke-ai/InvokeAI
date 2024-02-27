@@ -297,7 +297,6 @@ _MainModelConfig = Annotated[Union[MainDiffusersConfig, MainCheckpointConfig], F
 
 AnyModelConfig = Union[
     _MainModelConfig,
-    _ONNXConfig,
     _VaeConfig,
     _ControlNetConfig,
     # ModelConfigBase,
