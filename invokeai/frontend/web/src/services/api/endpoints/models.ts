@@ -19,7 +19,7 @@ import type {
 import type { ApiTagDescription, tagTypes } from '..';
 import { api, buildV2Url, LIST_TAG } from '..';
 
-type UpdateModelArg = {
+export type UpdateModelArg = {
   key: paths['/api/v2/models/i/{key}']['patch']['parameters']['path']['key'];
   body: paths['/api/v2/models/i/{key}']['patch']['requestBody']['content']['application/json'];
 };

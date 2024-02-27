@@ -14,22 +14,13 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setSelectedModelMode } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import type { UpdateModelArg } from 'services/api/endpoints/models';
 import { useGetModelConfigQuery, useUpdateModelsMutation } from 'services/api/endpoints/models';
-import type {
-  AnyModelConfig,
-  CheckpointModelConfig,
-  ControlNetModelConfig,
-  DiffusersModelConfig,
-  IPAdapterModelConfig,
-  LoRAModelConfig,
-  T2IAdapterModelConfig,
-  TextualInversionModelConfig,
-  VAEModelConfig,
-} from 'services/api/types';
+import type { AnyModelConfig } from 'services/api/types';
 
 import BaseModelSelect from './Fields/BaseModelSelect';
 import BooleanSelect from './Fields/BooleanSelect';
@@ -48,38 +39,38 @@ export const ModelEdit = () => {
 
   const { t } = useTranslation();
 
-  const modelData = useMemo(() => {
-    if (!data) {
-      return null;
-    }
-    const modelFormat = data.format;
-    const modelType = data.type;
+  // const modelData = useMemo(() => {
+  //   if (!data) {
+  //     return null;
+  //   }
+  //   const modelFormat = data.format;
+  //   const modelType = data.type;
 
-    if (modelType === 'main') {
-      if (modelFormat === 'diffusers') {
-        return data as DiffusersModelConfig;
-      } else if (modelFormat === 'checkpoint') {
-        return data as CheckpointModelConfig;
-      }
-    }
+  //   if (modelType === 'main') {
+  //     if (modelFormat === 'diffusers') {
+  //       return data as DiffusersModelConfig;
+  //     } else if (modelFormat === 'checkpoint') {
+  //       return data as CheckpointModelConfig;
+  //     }
+  //   }
 
-    switch (modelType) {
-      case 'lora':
-        return data as LoRAModelConfig;
-      case 'embedding':
-        return data as TextualInversionModelConfig;
-      case 't2i_adapter':
-        return data as T2IAdapterModelConfig;
-      case 'ip_adapter':
-        return data as IPAdapterModelConfig;
-      case 'controlnet':
-        return data as ControlNetModelConfig;
-      case 'vae':
-        return data as VAEModelConfig;
-      default:
-        return null;
-    }
-  }, [data]);
+  //   switch (modelType) {
+  //     case 'lora':
+  //       return data as LoRAModelConfig;
+  //     case 'embedding':
+  //       return data as TextualInversionModelConfig;
+  //     case 't2i_adapter':
+  //       return data as T2IAdapterModelConfig;
+  //     case 'ip_adapter':
+  //       return data as IPAdapterModelConfig;
+  //     case 'controlnet':
+  //       return data as ControlNetModelConfig;
+  //     case 'vae':
+  //       return data as VAEModelConfig;
+  //     default:
+  //       return null;
+  //   }
+  // }, [data]);
 
   const {
     register,
@@ -88,9 +79,9 @@ export const ModelEdit = () => {
     formState: { errors },
     reset,
     watch,
-  } = useForm<AnyModelConfig>({
+  } = useForm<UpdateModelArg['body']>({
     defaultValues: {
-      ...modelData,
+      ...data,
     },
     mode: 'onChange',
   });
@@ -100,19 +91,19 @@ export const ModelEdit = () => {
 
   const onSubmit = useCallback<SubmitHandler<AnyModelConfig>>(
     (values) => {
-      if (!modelData?.key) {
+      if (!data?.key) {
         return;
       }
 
-      const responseBody = {
-        key: modelData.key,
+      const responseBody: UpdateModelArg = {
+        key: data.key,
         body: values,
       };
 
       updateModel(responseBody)
         .unwrap()
         .then((payload) => {
-          reset(payload as AnyModelConfig, { keepDefaultValues: true });
+          reset(payload, { keepDefaultValues: true });
           dispatch(setSelectedModelMode('view'));
           dispatch(
             addToast(
@@ -135,7 +126,7 @@ export const ModelEdit = () => {
           );
         });
     },
-    [dispatch, modelData?.key, reset, t, updateModel]
+    [dispatch, data?.key, reset, t, updateModel]
   );
 
   const handleClickCancel = useCallback(() => {
@@ -146,7 +137,7 @@ export const ModelEdit = () => {
     return <Text>{t('common.loading')}</Text>;
   }
 
-  if (!modelData) {
+  if (!data) {
     return <Text>{t('common.somethingWentWrong')}</Text>;
   }
   return (
@@ -193,7 +184,7 @@ export const ModelEdit = () => {
           <Flex gap={4}>
             <FormControl flexDir="column" alignItems="flex-start" gap={1}>
               <FormLabel>{t('modelManager.baseModel')}</FormLabel>
-              <BaseModelSelect<AnyModelConfig> control={control} name="base" />
+              <BaseModelSelect control={control} name="base" />
             </FormControl>
             <FormControl flexDir="column" alignItems="flex-start" gap={1}>
               <FormLabel>{t('modelManager.modelType')}</FormLabel>
@@ -203,7 +194,7 @@ export const ModelEdit = () => {
           <Flex gap={4}>
             <FormControl flexDir="column" alignItems="flex-start" gap={1}>
               <FormLabel>{t('common.format')}</FormLabel>
-              <ModelFormatSelect<AnyModelConfig> control={control} name="format" />
+              <ModelFormatSelect control={control} name="format" />
             </FormControl>
             <FormControl flexDir="column" alignItems="flex-start" gap={1} isInvalid={Boolean(errors.path)}>
               <FormLabel>{t('modelManager.path')}</FormLabel>
