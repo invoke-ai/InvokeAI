@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export type HotkeyListItem = {
+type HotkeyListItem = {
   title: string;
   desc: string;
   hotkeys: string[][];

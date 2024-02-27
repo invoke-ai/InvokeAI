@@ -38,9 +38,7 @@ const caAdapterSelectors = caAdapter.getSelectors(undefined, getSelectorsOptions
 export const {
   selectById: selectControlAdapterById,
   selectAll: selectControlAdapterAll,
-  selectEntities: selectControlAdapterEntities,
   selectIds: selectControlAdapterIds,
-  selectTotal: selectControlAdapterTotal,
 } = caAdapterSelectors;
 
 const initialControlAdaptersState: ControlAdaptersState = caAdapter.getInitialState<{

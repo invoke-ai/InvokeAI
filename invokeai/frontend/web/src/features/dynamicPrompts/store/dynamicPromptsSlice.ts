@@ -4,7 +4,7 @@ import type { PersistConfig, RootState } from 'app/store/store';
 import { z } from 'zod';
 
 const zSeedBehaviour = z.enum(['PER_ITERATION', 'PER_PROMPT']);
-export type SeedBehaviour = z.infer<typeof zSeedBehaviour>;
+type SeedBehaviour = z.infer<typeof zSeedBehaviour>;
 export const isSeedBehaviour = (v: unknown): v is SeedBehaviour => zSeedBehaviour.safeParse(v).success;
 
 interface DynamicPromptsState {

@@ -9,11 +9,11 @@ const zParamESRGANModelName = z.enum([
   'ESRGAN_SRx4_DF2KOST_official-ff704c30.pth',
   'RealESRGAN_x2plus.pth',
 ]);
-export type ParamESRGANModelName = z.infer<typeof zParamESRGANModelName>;
+type ParamESRGANModelName = z.infer<typeof zParamESRGANModelName>;
 export const isParamESRGANModelName = (v: unknown): v is ParamESRGANModelName =>
   zParamESRGANModelName.safeParse(v).success;
 
-export interface PostprocessingState {
+interface PostprocessingState {
   _version: 1;
   esrganModelName: ParamESRGANModelName;
 }

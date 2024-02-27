@@ -12,9 +12,6 @@ const zXYPosition = z
   .default({ x: 0, y: 0 });
 export type XYPosition = z.infer<typeof zXYPosition>;
 
-const zDimension = z.number().gt(0).nullish();
-export type Dimension = z.infer<typeof zDimension>;
-
 const zWorkflowCategory = z.enum(['user', 'default', 'project']);
 export type WorkflowCategory = z.infer<typeof zWorkflowCategory>;
 // #endregion
@@ -34,9 +31,7 @@ const zWorkflowNotesNode = z.object({
 });
 const zWorkflowNode = z.union([zWorkflowInvocationNode, zWorkflowNotesNode]);
 
-export type WorkflowInvocationNode = z.infer<typeof zWorkflowInvocationNode>;
-export type WorkflowNotesNode = z.infer<typeof zWorkflowNotesNode>;
-export type WorkflowNode = z.infer<typeof zWorkflowNode>;
+type WorkflowInvocationNode = z.infer<typeof zWorkflowInvocationNode>;
 
 export const isWorkflowInvocationNode = (val: unknown): val is WorkflowInvocationNode =>
   zWorkflowInvocationNode.safeParse(val).success;
@@ -57,10 +52,6 @@ const zWorkflowEdgeCollapsed = zWorkflowEdgeBase.extend({
   type: z.literal('collapsed'),
 });
 const zWorkflowEdge = z.union([zWorkflowEdgeDefault, zWorkflowEdgeCollapsed]);
-
-export type WorkflowEdgeDefault = z.infer<typeof zWorkflowEdgeDefault>;
-export type WorkflowEdgeCollapsed = z.infer<typeof zWorkflowEdgeCollapsed>;
-export type WorkflowEdge = z.infer<typeof zWorkflowEdge>;
 // #endregion
 
 // #region Workflow
