@@ -105,6 +105,9 @@ export const generationSlice = createSlice({
     clearInitialImage: (state) => {
       state.initialImage = undefined;
     },
+    setMaskBlur: (state, action: PayloadAction<number>) => {
+      state.maskBlur = action.payload;
+    },
     setCanvasCoherenceMode: (state, action: PayloadAction<ParameterCanvasCoherenceMode>) => {
       state.canvasCoherenceMode = action.payload;
     },
@@ -253,6 +256,7 @@ export const {
   setPositivePrompt,
   setNegativePrompt,
   setScheduler,
+  setMaskBlur,
   setCanvasCoherenceMode,
   setCanvasCoherenceEdgeSize,
   setCanvasCoherenceMinDenoise,
