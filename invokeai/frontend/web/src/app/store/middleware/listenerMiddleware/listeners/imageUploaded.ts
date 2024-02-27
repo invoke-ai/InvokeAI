@@ -1,5 +1,6 @@
 import type { UseToastOptions } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
   controlAdapterImageChanged,
@@ -13,9 +14,7 @@ import { omit } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 
-import { startAppListening } from '..';
-
-export const addImageUploadedFulfilledListener = () => {
+export const addImageUploadedFulfilledListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher: imagesApi.endpoints.uploadImage.matchFulfilled,
     effect: (action, { dispatch, getState }) => {
@@ -133,9 +132,7 @@ export const addImageUploadedFulfilledListener = () => {
       }
     },
   });
-};
 
-export const addImageUploadedRejectedListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.uploadImage.matchRejected,
     effect: (action, { dispatch }) => {

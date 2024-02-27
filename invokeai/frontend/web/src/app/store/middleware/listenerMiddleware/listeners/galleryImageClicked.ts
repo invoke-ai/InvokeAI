@@ -1,11 +1,10 @@
 import { createAction } from '@reduxjs/toolkit';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { imagesSelectors } from 'services/api/util';
-
-import { startAppListening } from '..';
 
 export const galleryImageClicked = createAction<{
   imageDTO: ImageDTO;
@@ -25,7 +24,7 @@ export const galleryImageClicked = createAction<{
  * is much more responsive.
  */
 
-export const addGalleryImageClickedListener = () => {
+export const addGalleryImageClickedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: galleryImageClicked,
     effect: async (action, { dispatch, getState }) => {

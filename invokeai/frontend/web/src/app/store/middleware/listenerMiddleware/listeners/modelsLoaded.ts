@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import {
   controlAdapterModelCleared,
   selectAllControlNets,
@@ -13,9 +14,7 @@ import { forEach, some } from 'lodash-es';
 import { mainModelsAdapterSelectors, modelsApi, vaeModelsAdapterSelectors } from 'services/api/endpoints/models';
 import type { TypeGuardFor } from 'services/api/types';
 
-import { startAppListening } from '..';
-
-export const addModelsLoadedListener = () => {
+export const addModelsLoadedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate: (action): action is TypeGuardFor<typeof modelsApi.endpoints.getMainModels.matchFulfilled> =>
       modelsApi.endpoints.getMainModels.matchFulfilled(action) &&

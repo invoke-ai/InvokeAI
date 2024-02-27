@@ -1,11 +1,10 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { socketSessionRetrievalError } from 'services/events/actions';
-
-import { startAppListening } from '../..';
 
 const log = logger('socketio');
 
-export const addSessionRetrievalErrorEventListener = () => {
+export const addSessionRetrievalErrorEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketSessionRetrievalError,
     effect: (action) => {

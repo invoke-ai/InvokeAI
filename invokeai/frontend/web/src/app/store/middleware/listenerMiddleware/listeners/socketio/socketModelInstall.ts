@@ -1,3 +1,4 @@
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { api } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import {
@@ -6,9 +7,7 @@ import {
   socketModelInstallError,
 } from 'services/events/actions';
 
-import { startAppListening } from '../..';
-
-export const addModelInstallEventListener = () => {
+export const addModelInstallEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketModelInstallDownloading,
     effect: async (action, { dispatch }) => {
