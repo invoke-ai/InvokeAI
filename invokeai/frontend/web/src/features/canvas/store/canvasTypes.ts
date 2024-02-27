@@ -10,8 +10,6 @@ export const LAYER_NAMES_DICT: { label: string; value: CanvasLayer }[] = [
   { label: 'Mask', value: 'mask' },
 ];
 
-const LAYER_NAMES = ['base', 'mask'] as const;
-
 const zBoundingBoxScaleMethod = z.enum(['none', 'auto', 'manual']);
 export type BoundingBoxScaleMethod = z.infer<typeof zBoundingBoxScaleMethod>;
 export const isBoundingBoxScaleMethod = (v: unknown): v is BoundingBoxScaleMethod =>
