@@ -743,6 +743,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 self._signal_job_downloading(install_job)
 
     def _download_complete_callback(self, download_job: DownloadJob) -> None:
+        self._logger.info(f"{download_job.source}: model download complete")
         with self._lock:
             install_job = self._download_cache[download_job.source]
             self._download_cache.pop(download_job.source, None)
@@ -775,7 +776,7 @@ class ModelInstallService(ModelInstallServiceBase):
             if not install_job:
                 return
             self._downloads_changed_event.set()
-            self._logger.warning(f"Download {download_job.source} cancelled.")
+            self._logger.warning(f"{download_job.source}: model download cancelled")
             # if install job has already registered an error, then do not replace its status with cancelled
             if not install_job.errored:
                 install_job.cancel()
