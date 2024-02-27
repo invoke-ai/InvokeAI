@@ -10,17 +10,18 @@ import PredictionTypeSelect from 'features/modelManagerV2/subpanels/ModelPanel/F
 import RepoVariantSelect from 'features/modelManagerV2/subpanels/ModelPanel/Fields/RepoVariantSelect';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
+import { isNil, omitBy } from 'lodash-es';
 import { useCallback, useEffect } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useImportAdvancedModelMutation } from 'services/api/endpoints/models';
+import { useInstallModelMutation } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 
 export const AdvancedImport = () => {
   const dispatch = useAppDispatch();
 
-  const [importAdvancedModel] = useImportAdvancedModelMutation();
+  const [installModel] = useInstallModelMutation();
 
   const { t } = useTranslation();
 
@@ -49,15 +50,9 @@ export const AdvancedImport = () => {
 
   const onSubmit = useCallback<SubmitHandler<AnyModelConfig>>(
     (values) => {
-      const cleanValues = Object.fromEntries(
-        Object.entries(values).filter(([value]) => value !== null && value !== undefined)
-      );
-      importAdvancedModel({
-        source: {
-          path: cleanValues.path as string,
-          type: 'local',
-        },
-        config: cleanValues,
+      installModel({
+        source: values.path,
+        config: omitBy(values, isNil),
       })
         .unwrap()
         .then((_) => {
@@ -86,7 +81,7 @@ export const AdvancedImport = () => {
           }
         });
     },
-    [dispatch, reset, t, importAdvancedModel]
+    [installModel, dispatch, t, reset]
   );
 
   const watchedModelType = watch('type');

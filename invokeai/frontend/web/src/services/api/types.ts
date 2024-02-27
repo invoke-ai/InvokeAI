@@ -70,6 +70,7 @@ export type T2IAdapterModelConfig = S['T2IConfig'];
 export type TextualInversionModelConfig = S['TextualInversionConfig'];
 export type DiffusersModelConfig = S['MainDiffusersConfig'];
 export type CheckpointModelConfig = S['MainCheckpointConfig'];
+type CLIPVisionDiffusersConfig = S['CLIPVisionDiffusersConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type RefinerMainModelConfig = Omit<MainModelConfig, 'base'> & { base: 'sdxl-refiner' };
 export type NonRefinerMainModelConfig = Omit<MainModelConfig, 'base'> & { base: 'any' | 'sd-1' | 'sd-2' | 'sdxl' };
@@ -81,7 +82,18 @@ export type AnyModelConfig =
   | T2IAdapterModelConfig
   | TextualInversionModelConfig
   | RefinerMainModelConfig
-  | NonRefinerMainModelConfig;
+  | NonRefinerMainModelConfig
+  | CLIPVisionDiffusersConfig;
+
+type AnyModelConfig2 =
+  | (S['MainDiffusersConfig'] | S['MainCheckpointConfig'])
+  | (S['VaeDiffusersConfig'] | S['VaeCheckpointConfig'])
+  | (S['ControlNetDiffusersConfig'] | S['ControlNetCheckpointConfig'])
+  | S['LoRAConfig']
+  | S['TextualInversionConfig']
+  | S['IPAdapterConfig']
+  | S['CLIPVisionDiffusersConfig']
+  | S['T2IConfig'];
 
 export const isLoRAModelConfig = (config: AnyModelConfig): config is LoRAModelConfig => {
   return config.type === 'lora';
