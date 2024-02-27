@@ -1,11 +1,11 @@
 import re
 from typing import List, Tuple
 
+import invokeai.backend.util.logging as logger
+from invokeai.app.services.model_records import UnknownModelException
+from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.config import BaseModelType, ModelType
 from invokeai.backend.textual_inversion import TextualInversionModelRaw
-from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.app.services.model_records import UnknownModelException
-import invokeai.backend.util.logging as logger
 
 
 def extract_ti_triggers_from_prompt(prompt: str) -> List[str]:
