@@ -53,8 +53,8 @@ const zAnyNodeData = z.union([zInvocationNodeData, zNotesNodeData, zCurrentImage
 
 export type NotesNodeData = z.infer<typeof zNotesNodeData>;
 export type InvocationNodeData = z.infer<typeof zInvocationNodeData>;
-export type CurrentImageNodeData = z.infer<typeof zCurrentImageNodeData>;
-export type AnyNodeData = z.infer<typeof zAnyNodeData>;
+type CurrentImageNodeData = z.infer<typeof zCurrentImageNodeData>;
+type AnyNodeData = z.infer<typeof zAnyNodeData>;
 
 export type InvocationNode = Node<InvocationNodeData, 'invocation'>;
 export type NotesNode = Node<NotesNodeData, 'notes'>;
@@ -79,13 +79,12 @@ const zNodeExecutionState = z.object({
   outputs: z.array(z.any()),
 });
 export type NodeExecutionState = z.infer<typeof zNodeExecutionState>;
-export type NodeStatus = z.infer<typeof zNodeStatus>;
 // #endregion
 
 // #region Edges
 const zInvocationNodeEdgeExtra = z.object({
   type: z.union([z.literal('default'), z.literal('collapsed')]),
 });
-export type InvocationNodeEdgeExtra = z.infer<typeof zInvocationNodeEdgeExtra>;
+type InvocationNodeEdgeExtra = z.infer<typeof zInvocationNodeEdgeExtra>;
 export type InvocationNodeEdge = Edge<InvocationNodeEdgeExtra>;
 // #endregion

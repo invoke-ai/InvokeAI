@@ -6,7 +6,7 @@ import { atom } from 'nanostores';
 import type { Driver } from 'redux-remember';
 
 // Create a custom idb-keyval store (just needed to customize the name)
-export const $idbKeyValStore = atom<UseStore>(createIDBKeyValStore('invoke', 'invoke-store'));
+const $idbKeyValStore = atom<UseStore>(createIDBKeyValStore('invoke', 'invoke-store'));
 
 export const clearIdbKeyValStore = () => {
   clear($idbKeyValStore.get());

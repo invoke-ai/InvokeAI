@@ -45,7 +45,3 @@ export type WorkflowsState = Omit<WorkflowV3, 'nodes' | 'edges'> & {
   mode: WorkflowMode;
   originalExposedFieldValues: FieldIdentifierWithValue[];
 };
-
-export type NodeTemplatesState = {
-  templates: Record<string, InvocationTemplate>;
-};

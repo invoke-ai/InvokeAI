@@ -11,7 +11,7 @@ declare global {
 /**
  * Raised when the redux store is unable to be retrieved.
  */
-export class ReduxStoreNotInitialized extends Error {
+class ReduxStoreNotInitialized extends Error {
   /**
    * Create ReduxStoreNotInitialized
    * @param {String} message

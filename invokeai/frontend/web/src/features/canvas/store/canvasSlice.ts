@@ -674,7 +674,6 @@ export const {
   setShouldAutoSave,
   setShouldCropToBoundingBoxOnSave,
   setShouldDarkenOutsideBoundingBox,
-  setShouldLockBoundingBox,
   setShouldPreserveMaskedArea,
   setShouldShowBoundingBox,
   setShouldShowCanvasDebugInfo,

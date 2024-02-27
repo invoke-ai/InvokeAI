@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { useClearIntermediatesMutation, useGetIntermediatesCountQuery } from 'services/api/endpoints/images';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
-export type UseClearIntermediatesReturn = {
+type UseClearIntermediatesReturn = {
   intermediatesCount: number | undefined;
   clearIntermediates: () => void;
   isLoading: boolean;
