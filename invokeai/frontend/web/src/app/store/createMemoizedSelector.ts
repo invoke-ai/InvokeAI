@@ -13,19 +13,9 @@ export const createMemoizedSelector = createSelectorCreator({
   argsMemoize: lruMemoize,
 });
 
-/**
- * A memoized selector creator that uses LRU cache default shallow equality check.
- */
-export const createLruSelector = createSelectorCreator({
-  memoize: lruMemoize,
-  argsMemoize: lruMemoize,
-});
-
-export const createLruDraftSafeSelector = createDraftSafeSelectorCreator({
-  memoize: lruMemoize,
-  argsMemoize: lruMemoize,
-});
-
 export const getSelectorsOptions: GetSelectorsOptions = {
-  createSelector: createLruDraftSafeSelector,
+  createSelector: createDraftSafeSelectorCreator({
+    memoize: lruMemoize,
+    argsMemoize: lruMemoize,
+  }),
 };

@@ -1,8 +1,7 @@
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { queueApi, selectQueueStatus } from 'services/api/endpoints/queue';
 
-import { startAppListening } from '..';
-
-export const addAnyEnqueuedListener = () => {
+export const addAnyEnqueuedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher: queueApi.endpoints.enqueueBatch.matchFulfilled,
     effect: async (_, { dispatch, getState }) => {

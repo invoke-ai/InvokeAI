@@ -1,6 +1,7 @@
 import type { EntityAdapter, EntityState, ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { createEntityAdapter } from '@reduxjs/toolkit';
 import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
+import type { JSONObject } from 'common/types';
 import queryString from 'query-string';
 import type { operations, paths } from 'services/api/schema';
 import type {
@@ -18,9 +19,9 @@ import type {
 import type { ApiTagDescription, tagTypes } from '..';
 import { api, buildV2Url, LIST_TAG } from '..';
 
-type UpdateModelArg = {
-  key: NonNullable<operations['update_model_record']['parameters']['path']['key']>;
-  body: NonNullable<operations['update_model_record']['requestBody']['content']['application/json']>;
+export type UpdateModelArg = {
+  key: paths['/api/v2/models/i/{key}']['patch']['parameters']['path']['key'];
+  body: paths['/api/v2/models/i/{key}']['patch']['requestBody']['content']['application/json'];
 };
 
 type UpdateModelResponse = paths['/api/v2/models/i/{key}']['patch']['responses']['200']['content']['application/json'];
@@ -40,14 +41,15 @@ type DeleteMainModelResponse = void;
 type ConvertMainModelResponse =
   paths['/api/v2/models/convert/{key}']['put']['responses']['200']['content']['application/json'];
 
-type ImportMainModelArg = {
-  source: NonNullable<operations['heuristic_install_model']['parameters']['query']['source']>;
-  access_token?: operations['heuristic_install_model']['parameters']['query']['access_token'];
-  config: NonNullable<operations['heuristic_install_model']['requestBody']['content']['application/json']>;
+type InstallModelArg = {
+  source: paths['/api/v2/models/install']['post']['parameters']['query']['source'];
+  access_token?: paths['/api/v2/models/install']['post']['parameters']['query']['access_token'];
+  // TODO(MM2): This is typed as `Optional[Dict[str, Any]]` in backend...
+  config?: JSONObject;
+  // config: NonNullable<paths['/api/v2/models/install']['post']['requestBody']>['content']['application/json'];
 };
 
-type ImportMainModelResponse =
-  paths['/api/v2/models/heuristic_install']['post']['responses']['201']['content']['application/json'];
+type InstallModelResponse = paths['/api/v2/models/install']['post']['responses']['201']['content']['application/json'];
 
 type ListImportModelsResponse =
   paths['/api/v2/models/import']['get']['responses']['200']['content']['application/json'];
@@ -58,64 +60,51 @@ type DeleteImportModelsResponse =
 type PruneModelImportsResponse =
   paths['/api/v2/models/import']['patch']['responses']['200']['content']['application/json'];
 
-type ImportAdvancedModelArg = {
-  source: NonNullable<operations['import_model']['requestBody']['content']['application/json']['source']>;
-  config: NonNullable<operations['import_model']['requestBody']['content']['application/json']['config']>;
-};
-
-type ImportAdvancedModelResponse =
-  paths['/api/v2/models/import']['post']['responses']['201']['content']['application/json'];
-
 export type ScanFolderResponse =
   paths['/api/v2/models/scan_folder']['get']['responses']['200']['content']['application/json'];
 type ScanFolderArg = operations['scan_for_models']['parameters']['query'];
 
-export type GetByAttrsArg = operations['get_model_records_by_attrs']['parameters']['query'];
+type GetByAttrsArg = operations['get_model_records_by_attrs']['parameters']['query'];
 
-export const mainModelsAdapter = createEntityAdapter<MainModelConfig, string>({
+const mainModelsAdapter = createEntityAdapter<MainModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 export const mainModelsAdapterSelectors = mainModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-export const loraModelsAdapter = createEntityAdapter<LoRAModelConfig, string>({
+const loraModelsAdapter = createEntityAdapter<LoRAModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
-export const loraModelsAdapterSelectors = loraModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-export const controlNetModelsAdapter = createEntityAdapter<ControlNetModelConfig, string>({
+const controlNetModelsAdapter = createEntityAdapter<ControlNetModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 export const controlNetModelsAdapterSelectors = controlNetModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-export const ipAdapterModelsAdapter = createEntityAdapter<IPAdapterModelConfig, string>({
+const ipAdapterModelsAdapter = createEntityAdapter<IPAdapterModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 export const ipAdapterModelsAdapterSelectors = ipAdapterModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-export const t2iAdapterModelsAdapter = createEntityAdapter<T2IAdapterModelConfig, string>({
+const t2iAdapterModelsAdapter = createEntityAdapter<T2IAdapterModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 export const t2iAdapterModelsAdapterSelectors = t2iAdapterModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-export const textualInversionModelsAdapter = createEntityAdapter<TextualInversionModelConfig, string>({
+const textualInversionModelsAdapter = createEntityAdapter<TextualInversionModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
-export const textualInversionModelsAdapterSelectors = textualInversionModelsAdapter.getSelectors(
-  undefined,
-  getSelectorsOptions
-);
-export const vaeModelsAdapter = createEntityAdapter<VAEModelConfig, string>({
+const vaeModelsAdapter = createEntityAdapter<VAEModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 export const vaeModelsAdapterSelectors = vaeModelsAdapter.getSelectors(undefined, getSelectorsOptions);
 
-export const anyModelConfigAdapter = createEntityAdapter<AnyModelConfig, string>({
+const anyModelConfigAdapter = createEntityAdapter<AnyModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
-export const anyModelConfigAdapterSelectors = anyModelConfigAdapter.getSelectors(undefined, getSelectorsOptions);
+const anyModelConfigAdapterSelectors = anyModelConfigAdapter.getSelectors(undefined, getSelectorsOptions);
 
 const buildProvidesTags =
   <TEntity extends AnyModelConfig>(tagType: (typeof tagTypes)[number]) =>
@@ -183,23 +172,13 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['Model'],
     }),
-    importMainModels: build.mutation<ImportMainModelResponse, ImportMainModelArg>({
+    installModel: build.mutation<InstallModelResponse, InstallModelArg>({
       query: ({ source, config, access_token }) => {
         return {
-          url: buildModelsUrl('heuristic_install'),
+          url: buildModelsUrl('install'),
           params: { source, access_token },
           method: 'POST',
           body: config,
-        };
-      },
-      invalidatesTags: ['Model', 'ModelImports'],
-    }),
-    importAdvancedModel: build.mutation<ImportAdvancedModelResponse, ImportAdvancedModelArg>({
-      query: ({ source, config }) => {
-        return {
-          url: buildModelsUrl('install'),
-          method: 'POST',
-          body: { source, config },
         };
       },
       invalidatesTags: ['Model', 'ModelImports'],
@@ -354,7 +333,6 @@ export const modelsApi = api.injectEndpoints({
 });
 
 export const {
-  useGetModelConfigByAttrsQuery,
   useGetModelConfigQuery,
   useGetMainModelsQuery,
   useGetControlNetModelsQuery,
@@ -365,11 +343,9 @@ export const {
   useGetVaeModelsQuery,
   useDeleteModelsMutation,
   useUpdateModelsMutation,
-  useImportMainModelsMutation,
-  useImportAdvancedModelMutation,
+  useInstallModelMutation,
   useConvertMainModelsMutation,
   useSyncModelsMutation,
-  useScanModelsQuery,
   useLazyScanModelsQuery,
   useGetModelImportsQuery,
   useGetModelMetadataQuery,

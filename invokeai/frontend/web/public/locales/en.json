@@ -674,6 +674,7 @@
         "noMetaData": "No metadata found",
         "noRecallParameters": "No parameters to recall found",
         "parameterSet": "Parameter {{parameter}} set",
+        "parsingFailed": "Parsing Failed",
         "perlin": "Perlin Noise",
         "positivePrompt": "Positive Prompt",
         "recallParameters": "Recall Parameters",
@@ -1193,8 +1194,8 @@
             "unableToInvoke": "Unable to Invoke"
         },
         "maskAdjustmentsHeader": "Mask Adjustments",
-        "maskBlur": "Blur",
-        "maskBlurMethod": "Blur Method",
+        "maskBlur": "Mask Blur",
+        "maskBlurMethod": "Mask Blur Method",
         "maskEdge": "Mask Edge",
         "negativePromptPlaceholder": "Negative Prompt",
         "noiseSettings": "Noise",
@@ -1480,8 +1481,8 @@
                 "Scheduler defines how to iteratively add noise to an image or how to update a sample based on a model's output."
             ]
         },
-        "compositingBlur": {
-            "heading": "Blur",
+        "compositingMaskBlur": {
+            "heading": "Mask Blur",
             "paragraphs": ["The blur radius of the mask."]
         },
         "compositingBlurMethod": {

@@ -1,3 +1,4 @@
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { api } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import {
@@ -6,19 +7,18 @@ import {
   socketModelInstallError,
 } from 'services/events/actions';
 
-import { startAppListening } from '../..';
-
-export const addModelInstallEventListener = () => {
+export const addModelInstallEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketModelInstallDownloading,
     effect: async (action, { dispatch }) => {
-      const { bytes, id } = action.payload.data;
+      const { bytes, total_bytes, id } = action.payload.data;
 
       dispatch(
         modelsApi.util.updateQueryData('getModelImports', undefined, (draft) => {
           const modelImport = draft.find((m) => m.id === id);
           if (modelImport) {
             modelImport.bytes = bytes;
+            modelImport.total_bytes = total_bytes;
             modelImport.status = 'downloading';
           }
           return draft;
@@ -48,7 +48,7 @@ export const addModelInstallEventListener = () => {
   startAppListening({
     actionCreator: socketModelInstallError,
     effect: (action, { dispatch }) => {
-      const { id, error_type } = action.payload.data;
+      const { id, error, error_type } = action.payload.data;
 
       dispatch(
         modelsApi.util.updateQueryData('getModelImports', undefined, (draft) => {
@@ -56,6 +56,7 @@ export const addModelInstallEventListener = () => {
           if (modelImport) {
             modelImport.status = 'error';
             modelImport.error_reason = error_type;
+            modelImport.error = error;
           }
           return draft;
         })

@@ -35,7 +35,7 @@ import ResizeHandle from './tabs/ResizeHandle';
 import TextToImageTab from './tabs/TextToImageTab';
 import UnifiedCanvasTab from './tabs/UnifiedCanvasTab';
 
-export interface InvokeTabInfo {
+interface InvokeTabInfo {
   id: InvokeTabName;
   translationKey: string;
   icon: ReactElement;
@@ -85,8 +85,8 @@ const enabledTabsSelector = createMemoizedSelector(selectConfigSlice, (config) =
   tabs.filter((tab) => !config.disabledTabs.includes(tab.id))
 );
 
-export const NO_GALLERY_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
-export const NO_OPTIONS_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
+const NO_GALLERY_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
+const NO_OPTIONS_PANEL_TABS: InvokeTabName[] = ['modelManager', 'queue'];
 const panelStyles: CSSProperties = { height: '100%', width: '100%' };
 const GALLERY_MIN_SIZE_PX = 310;
 const GALLERY_MIN_SIZE_PCT = 20;

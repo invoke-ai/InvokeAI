@@ -16,12 +16,12 @@ export const defaultLoRAConfig: Pick<LoRA, 'weight' | 'isEnabled'> = {
   isEnabled: true,
 };
 
-export type LoraState = {
+type LoraState = {
   _version: 1;
   loras: Record<string, LoRA>;
 };
 
-export const initialLoraState: LoraState = {
+const initialLoraState: LoraState = {
   _version: 1,
   loras: {},
 };
@@ -41,9 +41,6 @@ export const loraSlice = createSlice({
       const key = action.payload;
       delete state.loras[key];
     },
-    lorasCleared: (state) => {
-      state.loras = {};
-    },
     loraWeightChanged: (state, action: PayloadAction<{ key: string; weight: number }>) => {
       const { key, weight } = action.payload;
       const lora = state.loras[key];
@@ -51,14 +48,6 @@ export const loraSlice = createSlice({
         return;
       }
       lora.weight = weight;
-    },
-    loraWeightReset: (state, action: PayloadAction<string>) => {
-      const key = action.payload;
-      const lora = state.loras[key];
-      if (!lora) {
-        return;
-      }
-      lora.weight = defaultLoRAConfig.weight;
     },
     loraIsEnabledChanged: (state, action: PayloadAction<{ key: string; isEnabled: boolean }>) => {
       const { key, isEnabled } = action.payload;
@@ -71,20 +60,12 @@ export const loraSlice = createSlice({
   },
 });
 
-export const {
-  loraAdded,
-  loraRemoved,
-  loraWeightChanged,
-  loraWeightReset,
-  loraIsEnabledChanged,
-  lorasCleared,
-  loraRecalled,
-} = loraSlice.actions;
+export const { loraAdded, loraRemoved, loraWeightChanged, loraIsEnabledChanged, loraRecalled } = loraSlice.actions;
 
 export const selectLoraSlice = (state: RootState) => state.lora;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-export const migrateLoRAState = (state: any): any => {
+const migrateLoRAState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
   }

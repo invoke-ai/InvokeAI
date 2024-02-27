@@ -36,8 +36,10 @@ jobs:
       - name: Typescript
         run: 'pnpm run lint:tsc'
       - name: Madge
-        run: 'pnpm run lint:madge'
+        run: 'pnpm run lint:dpdm'
       - name: ESLint
         run: 'pnpm run lint:eslint'
       - name: Prettier
         run: 'pnpm run lint:prettier'
+      - name: Knip
+        run: 'pnpm run lint:knip'

@@ -38,7 +38,7 @@ import { CANVAS_GRID_SIZE_FINE } from './constants';
  */
 const MAX_HISTORY = 128;
 
-export const initialLayerState: CanvasLayerState = {
+const initialLayerState: CanvasLayerState = {
   objects: [],
   stagingArea: {
     images: [],
@@ -46,11 +46,10 @@ export const initialLayerState: CanvasLayerState = {
   },
 };
 
-export const initialCanvasState: CanvasState = {
+const initialCanvasState: CanvasState = {
   _version: 1,
   boundingBoxCoordinates: { x: 0, y: 0 },
   boundingBoxDimensions: { width: 512, height: 512 },
-  boundingBoxPreviewFill: { r: 0, g: 0, b: 0, a: 0.5 },
   boundingBoxScaleMethod: 'auto',
   brushColor: { r: 90, g: 90, b: 255, a: 1 },
   brushSize: 50,
@@ -215,9 +214,6 @@ export const canvasSlice = createSlice({
     setStageCoordinates: (state, action: PayloadAction<Vector2d>) => {
       state.stageCoordinates = action.payload;
     },
-    setBoundingBoxPreviewFill: (state, action: PayloadAction<RgbaColor>) => {
-      state.boundingBoxPreviewFill = action.payload;
-    },
     setStageScale: (state, action: PayloadAction<number>) => {
       state.stageScale = action.payload;
     },
@@ -230,9 +226,6 @@ export const canvasSlice = createSlice({
     },
     setShouldLockBoundingBox: (state, action: PayloadAction<boolean>) => {
       state.shouldLockBoundingBox = action.payload;
-    },
-    toggleShouldLockBoundingBox: (state) => {
-      state.shouldLockBoundingBox = !state.shouldLockBoundingBox;
     },
     setShouldShowBoundingBox: (state, action: PayloadAction<boolean>) => {
       state.shouldShowBoundingBox = action.payload;
@@ -573,19 +566,6 @@ export const canvasSlice = createSlice({
         },
       }),
     },
-    scaledBoundingBoxDimensionsReset: {
-      reducer: (state, action: PayloadActionWithOptimalDimension) => {
-        const scaledDimensions = getScaledBoundingBoxDimensions(
-          state.boundingBoxDimensions,
-          action.meta.optimalDimension
-        );
-        state.scaledBoundingBoxDimensions = scaledDimensions;
-      },
-      prepare: (payload: void, optimalDimension: number) => ({
-        payload: undefined,
-        meta: { optimalDimension },
-      }),
-    },
     setShouldShowStagingImage: (state, action: PayloadAction<boolean>) => {
       state.shouldShowStagingImage = action.payload;
     },
@@ -682,7 +662,6 @@ export const {
   resetCanvasView,
   setBoundingBoxCoordinates,
   setBoundingBoxDimensions,
-  setBoundingBoxPreviewFill,
   setBoundingBoxScaleMethod,
   setBrushColor,
   setBrushSize,
@@ -695,7 +674,6 @@ export const {
   setShouldAutoSave,
   setShouldCropToBoundingBoxOnSave,
   setShouldDarkenOutsideBoundingBox,
-  setShouldLockBoundingBox,
   setShouldPreserveMaskedArea,
   setShouldShowBoundingBox,
   setShouldShowCanvasDebugInfo,
@@ -706,7 +684,6 @@ export const {
   setShouldSnapToGrid,
   setStageCoordinates,
   setStageScale,
-  toggleShouldLockBoundingBox,
   undo,
   setScaledBoundingBoxDimensions,
   setShouldRestrictStrokesToBox,
@@ -716,13 +693,12 @@ export const {
   canvasBatchIdAdded,
   canvasBatchIdsReset,
   aspectRatioChanged,
-  scaledBoundingBoxDimensionsReset,
 } = canvasSlice.actions;
 
 export const selectCanvasSlice = (state: RootState) => state.canvas;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-export const migrateCanvasState = (state: any): any => {
+const migrateCanvasState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
     state.aspectRatio = initialAspectRatioState;

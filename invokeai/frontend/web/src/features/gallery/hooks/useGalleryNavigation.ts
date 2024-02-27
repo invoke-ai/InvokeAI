@@ -105,7 +105,7 @@ const getImageFuncs = {
   down: getDownImage,
 };
 
-export type UseGalleryNavigationReturn = {
+type UseGalleryNavigationReturn = {
   handleLeftImage: () => void;
   handleRightImage: () => void;
   handleUpImage: () => void;

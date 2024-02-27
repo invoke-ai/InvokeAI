@@ -15,7 +15,7 @@ const options: ComboboxOption[] = [
   { value: 'controlnet', label: MODEL_TYPE_LABELS['controlnet'] as string },
   { value: 'ip_adapter', label: MODEL_TYPE_LABELS['ip_adapter'] as string },
   { value: 't2i_adapater', label: MODEL_TYPE_LABELS['t2i_adapter'] as string },
-];
+] as const;
 
 const ModelTypeSelect = <T extends AnyModelConfig>(props: UseControllerProps<T>) => {
   const { field } = useController(props);

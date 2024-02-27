@@ -53,7 +53,7 @@ const MetadataViewT2IAdapter = ({
     }
     handlers.recallItem(t2iAdapter, true);
   }, [handlers, t2iAdapter]);
-  
+
   const [renderedValue, setRenderedValue] = useState<React.ReactNode>(null);
   useEffect(() => {
     const _renderValue = async () => {

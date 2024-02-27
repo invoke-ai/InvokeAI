@@ -11,18 +11,10 @@ export type MetadataRenderValueFunc<T> = (value: T) => Promise<React.ReactNode>;
  */
 export type MetadataGetLabelFunc = () => string;
 
-export type MetadataParseOptions = {
-  toastOnFailure?: boolean;
-  toastOnSuccess?: boolean;
-};
-
-export type MetadataRecallOptions = MetadataParseOptions;
-
 /**
  * A function that recalls a parsed and validated metadata value.
  *
  * @param value The value to recall.
- * @throws MetadataRecallError if the value cannot be recalled.
  */
 export type MetadataRecallFunc<T> = (value: T) => void;
 
@@ -49,7 +41,7 @@ export type MetadataParseFunc<T = unknown> = (metadata: unknown) => Promise<T>;
  *
  * @param value The value to validate.
  * @returns A promise that resolves to the validated value.
- * @throws MetadataRecallError if the value is invalid.
+ * @throws MetadataParseError if the value is invalid.
  */
 export type MetadataValidateFunc<T> = (value: T) => Promise<T>;
 
@@ -88,7 +80,6 @@ export type MetadataHandlers<TValue = unknown, TItem = unknown> = {
    * @param value The value to recall.
    * @param withToast Whether to show a toast on success or failure.
    * @returns A promise that resolves when the recall operation is complete.
-   * @throws MetadataRecallError if the value cannot be recalled.
    */
   recall?: (value: TValue, withToast?: boolean) => Promise<void>;
   /**
@@ -99,7 +90,6 @@ export type MetadataHandlers<TValue = unknown, TItem = unknown> = {
    * @param item The item to recall. It should be an item from the array.
    * @param withToast Whether to show a toast on success or failure.
    * @returns A promise that resolves when the recall operation is complete.
-   * @throws MetadataRecallError if the value cannot be recalled.
    */
   recallItem?: (item: TItem, withToast?: boolean) => Promise<void>;
   /**
@@ -122,7 +112,7 @@ export type MetadataHandlers<TValue = unknown, TItem = unknown> = {
 // type MetadataHandlersInferItem<TValue> = TValue extends Array<infer TItem> ? MetadataParseFunc<TItem> : never
 // While this works for the types as expected, I couldn't satisfy TS in the implementations of the handlers.
 
-export type BuildMetadataHandlersArg<TValue, TItem> = {
+type BuildMetadataHandlersArg<TValue, TItem> = {
   parser: MetadataParseFunc<TValue>;
   itemParser?: MetadataParseFunc<TItem>;
   recaller?: MetadataRecallFunc<TValue>;

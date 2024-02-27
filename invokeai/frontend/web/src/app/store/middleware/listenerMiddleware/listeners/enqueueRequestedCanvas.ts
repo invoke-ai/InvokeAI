@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { enqueueRequested } from 'app/store/actions';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { parseify } from 'common/util/serialize';
 import { canvasBatchIdAdded, stagingAreaInitialized } from 'features/canvas/store/canvasSlice';
@@ -12,8 +13,6 @@ import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatch
 import { imagesApi } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { ImageDTO } from 'services/api/types';
-
-import { startAppListening } from '..';
 
 /**
  * This listener is responsible invoking the canvas. This involves a number of steps:
@@ -28,7 +27,7 @@ import { startAppListening } from '..';
  * 8. Initialize the staging area if not yet initialized
  * 9. Dispatch the sessionReadyToInvoke action to invoke the session
  */
-export const addEnqueueRequestedCanvasListener = () => {
+export const addEnqueueRequestedCanvasListener = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate: (action): action is ReturnType<typeof enqueueRequested> =>
       enqueueRequested.match(action) && action.payload.tabName === 'unifiedCanvas',

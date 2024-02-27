@@ -1,13 +1,12 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { canvasSavedToGallery } from 'features/canvas/store/actions';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 
-import { startAppListening } from '..';
-
-export const addCanvasSavedToGalleryListener = () => {
+export const addCanvasSavedToGalleryListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: canvasSavedToGallery,
     effect: async (action, { dispatch, getState }) => {

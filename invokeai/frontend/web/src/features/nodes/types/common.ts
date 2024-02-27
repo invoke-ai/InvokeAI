@@ -54,95 +54,19 @@ export type SchedulerField = z.infer<typeof zSchedulerField>;
 // #endregion
 
 // #region Model-related schemas
-export const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
-export const zModelType = z.enum([
-  'main',
-  'vae',
-  'lora',
-  'controlnet',
-  'embedding',
-  'ip_adapter',
-  'clip_vision',
-  't2i_adapter',
-  'onnx', // TODO(psyche): Remove this when removed from backend
-]);
-export const zModelName = z.string().min(3);
-export const zModelIdentifier = z.object({
+const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
+const zModelIdentifier = z.object({
   key: z.string().min(1),
 });
 export const isModelIdentifier = (field: unknown): field is ModelIdentifier =>
   zModelIdentifier.safeParse(field).success;
 export const isModelIdentifierV2 = (field: unknown): field is ModelIdentifierV2 =>
   zModelIdentifierV2.safeParse(field).success;
-export const zModelFieldBase = zModelIdentifier;
+const zModelFieldBase = zModelIdentifier;
 export const zModelIdentifierWithBase = zModelIdentifier.extend({ base: zBaseModel });
 export type BaseModel = z.infer<typeof zBaseModel>;
-export type ModelType = z.infer<typeof zModelType>;
-export type ModelIdentifier = z.infer<typeof zModelIdentifier>;
+type ModelIdentifier = z.infer<typeof zModelIdentifier>;
 export type ModelIdentifierWithBase = z.infer<typeof zModelIdentifierWithBase>;
-export const zMainModelField = zModelIdentifierWithBase;
-export type MainModelField = z.infer<typeof zMainModelField>;
-
-export const zSDXLRefinerModelField = zModelIdentifier;
-export type SDXLRefinerModelField = z.infer<typeof zSDXLRefinerModelField>;
-
-export const zSubModelType = z.enum([
-  'unet',
-  'text_encoder',
-  'text_encoder_2',
-  'tokenizer',
-  'tokenizer_2',
-  'vae',
-  'vae_decoder',
-  'vae_encoder',
-  'scheduler',
-  'safety_checker',
-]);
-export type SubModelType = z.infer<typeof zSubModelType>;
-
-export const zVAEModelField = zModelIdentifierWithBase;
-
-export const zModelInfo = zModelIdentifier.extend({
-  submodel_type: zSubModelType.nullish(),
-});
-export type ModelInfo = z.infer<typeof zModelInfo>;
-
-export const zLoRAModelField = zModelIdentifierWithBase;
-export type LoRAModelField = z.infer<typeof zLoRAModelField>;
-
-export const zControlNetModelField = zModelIdentifierWithBase;
-export type ControlNetModelField = z.infer<typeof zControlNetModelField>;
-
-export const zIPAdapterModelField = zModelIdentifierWithBase;
-export type IPAdapterModelField = z.infer<typeof zIPAdapterModelField>;
-
-export const zT2IAdapterModelField = zModelIdentifierWithBase;
-export type T2IAdapterModelField = z.infer<typeof zT2IAdapterModelField>;
-
-export const zLoraInfo = zModelInfo.extend({
-  weight: z.number().optional(),
-});
-export type LoraInfo = z.infer<typeof zLoraInfo>;
-
-export const zUNetField = z.object({
-  unet: zModelInfo,
-  scheduler: zModelInfo,
-  loras: z.array(zLoraInfo),
-});
-export type UNetField = z.infer<typeof zUNetField>;
-
-export const zCLIPField = z.object({
-  tokenizer: zModelInfo,
-  text_encoder: zModelInfo,
-  skipped_layers: z.number(),
-  loras: z.array(zLoraInfo),
-});
-export type CLIPField = z.infer<typeof zCLIPField>;
-
-export const zVAEField = z.object({
-  vae: zModelInfo,
-});
-export type VAEField = z.infer<typeof zVAEField>;
 // #endregion
 
 // #region Control Adapters
@@ -187,7 +111,7 @@ export type ProgressImage = z.infer<typeof zProgressImage>;
 // #endregion
 
 // #region ImageOutput
-export const zImageOutput = z.object({
+const zImageOutput = z.object({
   image: zImageField,
   width: z.number().int().gt(0),
   height: z.number().int().gt(0),

@@ -10,22 +10,18 @@ import PredictionTypeSelect from 'features/modelManagerV2/subpanels/ModelPanel/F
 import RepoVariantSelect from 'features/modelManagerV2/subpanels/ModelPanel/Fields/RepoVariantSelect';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
+import { isNil, omitBy } from 'lodash-es';
 import { useCallback, useEffect } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useImportAdvancedModelMutation } from 'services/api/endpoints/models';
+import { useInstallModelMutation } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
-import { z } from 'zod';
-
-export const zManualAddMode = z.enum(['diffusers', 'checkpoint']);
-export type ManualAddMode = z.infer<typeof zManualAddMode>;
-export const isManualAddMode = (v: unknown): v is ManualAddMode => zManualAddMode.safeParse(v).success;
 
 export const AdvancedImport = () => {
   const dispatch = useAppDispatch();
 
-  const [importAdvancedModel] = useImportAdvancedModelMutation();
+  const [installModel] = useInstallModelMutation();
 
   const { t } = useTranslation();
 
@@ -54,15 +50,9 @@ export const AdvancedImport = () => {
 
   const onSubmit = useCallback<SubmitHandler<AnyModelConfig>>(
     (values) => {
-      const cleanValues = Object.fromEntries(
-        Object.entries(values).filter(([value]) => value !== null && value !== undefined)
-      );
-      importAdvancedModel({
-        source: {
-          path: cleanValues.path as string,
-          type: 'local',
-        },
-        config: cleanValues,
+      installModel({
+        source: values.path,
+        config: omitBy(values, isNil),
       })
         .unwrap()
         .then((_) => {
@@ -91,7 +81,7 @@ export const AdvancedImport = () => {
           }
         });
     },
-    [dispatch, reset, t, importAdvancedModel]
+    [installModel, dispatch, t, reset]
   );
 
   const watchedModelType = watch('type');
@@ -158,11 +148,11 @@ export const AdvancedImport = () => {
             <Flex gap={4}>
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                 <FormLabel>{t('modelManager.baseModel')}</FormLabel>
-                <BaseModelSelect<AnyModelConfig> control={control} name="base" />
+                <BaseModelSelect control={control} name="base" />
               </FormControl>
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                 <FormLabel>{t('common.format')}</FormLabel>
-                <ModelFormatSelect<AnyModelConfig> control={control} name="format" />
+                <ModelFormatSelect control={control} name="format" />
               </FormControl>
             </Flex>
             <Flex gap={4}>

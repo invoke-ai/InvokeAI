@@ -15,11 +15,6 @@ import {
   MOTION_ICON_INITIAL,
 } from './constants';
 
-export type AspectRatioPreviewProps = {
-  width: number;
-  height: number;
-};
-
 export const AspectRatioPreview = () => {
   const ctx = useImageSizeContext();
   const containerRef = useRef<HTMLDivElement>(null);

@@ -234,37 +234,6 @@ class MainDiffusersConfig(_DiffusersConfig, _MainConfig):
     type: Literal[ModelType.Main] = ModelType.Main
 
 
-class ONNXSD1Config(_MainConfig):
-    """Model config for ONNX format models based on sd-1."""
-
-    type: Literal[ModelType.ONNX] = ModelType.ONNX
-    format: Literal[ModelFormat.Onnx, ModelFormat.Olive]
-    base: Literal[BaseModelType.StableDiffusion1] = BaseModelType.StableDiffusion1
-    prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon
-    upcast_attention: bool = False
-
-
-class ONNXSD2Config(_MainConfig):
-    """Model config for ONNX format models based on sd-2."""
-
-    type: Literal[ModelType.ONNX] = ModelType.ONNX
-    format: Literal[ModelFormat.Onnx, ModelFormat.Olive]
-    # No yaml config file for ONNX, so these are part of config
-    base: Literal[BaseModelType.StableDiffusion2] = BaseModelType.StableDiffusion2
-    prediction_type: SchedulerPredictionType = SchedulerPredictionType.VPrediction
-    upcast_attention: bool = True
-
-
-class ONNXSDXLConfig(_MainConfig):
-    """Model config for ONNX format models based on sdxl."""
-
-    type: Literal[ModelType.ONNX] = ModelType.ONNX
-    format: Literal[ModelFormat.Onnx, ModelFormat.Olive]
-    # No yaml config file for ONNX, so these are part of config
-    base: Literal[BaseModelType.StableDiffusionXL] = BaseModelType.StableDiffusionXL
-    prediction_type: SchedulerPredictionType = SchedulerPredictionType.VPrediction
-
-
 class IPAdapterConfig(ModelConfigBase):
     """Model config for IP Adaptor format models."""
 
@@ -287,7 +256,6 @@ class T2IConfig(ModelConfigBase):
     format: Literal[ModelFormat.Diffusers]
 
 
-_ONNXConfig = Annotated[Union[ONNXSD1Config, ONNXSD2Config, ONNXSDXLConfig], Field(discriminator="base")]
 _ControlNetConfig = Annotated[
     Union[ControlNetDiffusersConfig, ControlNetCheckpointConfig],
     Field(discriminator="format"),
@@ -297,7 +265,6 @@ _MainModelConfig = Annotated[Union[MainDiffusersConfig, MainCheckpointConfig], F
 
 AnyModelConfig = Union[
     _MainModelConfig,
-    _ONNXConfig,
     _VaeConfig,
     _ControlNetConfig,
     # ModelConfigBase,

@@ -4,12 +4,10 @@ import { isModelIdentifier, isModelIdentifierV2 } from 'features/nodes/types/com
 import { modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig, BaseModelType, ModelType } from 'services/api/types';
 
-
-
 /**
  * Raised when a model config is unable to be fetched.
  */
-export class ModelConfigNotFoundError extends Error {
+class ModelConfigNotFoundError extends Error {
   /**
    * Create ModelConfigNotFoundError
    * @param {String} message
@@ -60,11 +58,7 @@ export const fetchModelConfig = async (key: string): Promise<AnyModelConfig> => 
  * @returns A promise that resolves to the model config.
  * @throws {ModelConfigNotFoundError} If the model config is unable to be fetched.
  */
-export const fetchModelConfigByAttrs = async (
-  name: string,
-  base: BaseModelType,
-  type: ModelType
-): Promise<AnyModelConfig> => {
+const fetchModelConfigByAttrs = async (name: string, base: BaseModelType, type: ModelType): Promise<AnyModelConfig> => {
   const { dispatch } = getStore();
   try {
     const req = dispatch(modelsApi.endpoints.getModelConfigByAttrs.initiate({ name, base, type }));
@@ -91,19 +85,6 @@ export const fetchModelConfigWithTypeGuard = async <T extends AnyModelConfig>(
     throw new InvalidModelConfigError(`Invalid model type for key ${key}: ${modelConfig.type}`);
   }
   return modelConfig;
-};
-
-/**
- * Raises an error if the source base model is incompatible with the target base model.
- * @param sourceBase The source base model.
- * @param targetBase The target base model.
- * @param message An optional custom message to include in the error.
- * @throws {InvalidModelConfigError} If the source base model is incompatible with the target base model.
- */
-export const raiseIfBaseIncompatible = (sourceBase: BaseModelType, targetBase?: BaseModelType, message?: string) => {
-  if (targetBase && sourceBase !== targetBase) {
-    throw new InvalidModelConfigError(message || `Incompatible base models: ${sourceBase} and ${targetBase}`);
-  }
 };
 
 /**

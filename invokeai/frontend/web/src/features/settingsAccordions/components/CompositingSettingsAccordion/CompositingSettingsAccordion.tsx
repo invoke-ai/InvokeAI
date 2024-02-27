@@ -12,6 +12,7 @@ import {
 import ParamCanvasCoherenceEdgeSize from 'features/parameters/components/Canvas/Compositing/CoherencePass/ParamCanvasCoherenceEdgeSize';
 import ParamCanvasCoherenceMinDenoise from 'features/parameters/components/Canvas/Compositing/CoherencePass/ParamCanvasCoherenceMinDenoise';
 import ParamCanvasCoherenceMode from 'features/parameters/components/Canvas/Compositing/CoherencePass/ParamCanvasCoherenceMode';
+import ParamMaskBlur from 'features/parameters/components/Canvas/Compositing/MaskAdjustment/ParamMaskBlur';
 import ParamInfillMethod from 'features/parameters/components/Canvas/InfillAndScaling/ParamInfillMethod';
 import ParamInfillOptions from 'features/parameters/components/Canvas/InfillAndScaling/ParamInfillOptions';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
@@ -43,8 +44,9 @@ export const CompositingSettingsAccordion = memo(() => {
                 <ParamCanvasCoherenceMode />
                 <ParamCanvasCoherenceEdgeSize />
                 <ParamCanvasCoherenceMinDenoise />
+                <ParamMaskBlur />
                 {/* <ParamMaskBlurMethod />
-                <ParamMaskBlur /> */}
+                 */}
               </FormControlGroup>
             </Flex>
           </TabPanel>

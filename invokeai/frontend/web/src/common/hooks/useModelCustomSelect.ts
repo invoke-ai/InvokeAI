@@ -1,6 +1,6 @@
 import type { Item } from '@invoke-ai/ui-library';
 import type { EntityState } from '@reduxjs/toolkit';
-import { EMPTY_ARRAY } from 'app/store/util';
+import { EMPTY_ARRAY } from 'app/store/constants';
 import type { ModelIdentifierWithBase } from 'features/nodes/types/common';
 import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
 import { filter } from 'lodash-es';
