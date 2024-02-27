@@ -55,16 +55,6 @@ export type SchedulerField = z.infer<typeof zSchedulerField>;
 
 // #region Model-related schemas
 const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
-const zModelType = z.enum([
-  'main',
-  'vae',
-  'lora',
-  'controlnet',
-  'embedding',
-  'ip_adapter',
-  'clip_vision',
-  't2i_adapter',
-]);
 const zModelIdentifier = z.object({
   key: z.string().min(1),
 });
@@ -75,8 +65,7 @@ export const isModelIdentifierV2 = (field: unknown): field is ModelIdentifierV2 
 const zModelFieldBase = zModelIdentifier;
 export const zModelIdentifierWithBase = zModelIdentifier.extend({ base: zBaseModel });
 export type BaseModel = z.infer<typeof zBaseModel>;
-export type ModelType = z.infer<typeof zModelType>;
-export type ModelIdentifier = z.infer<typeof zModelIdentifier>;
+type ModelIdentifier = z.infer<typeof zModelIdentifier>;
 export type ModelIdentifierWithBase = z.infer<typeof zModelIdentifierWithBase>;
 // #endregion
 

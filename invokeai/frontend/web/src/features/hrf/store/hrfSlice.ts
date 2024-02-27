@@ -3,7 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import type { ParameterHRFMethod, ParameterStrength } from 'features/parameters/types/parameterSchemas';
 
-export interface HRFState {
+interface HRFState {
   _version: 1;
   hrfEnabled: boolean;
   hrfStrength: ParameterStrength;
