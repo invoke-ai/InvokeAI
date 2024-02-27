@@ -15,77 +15,101 @@ class Range:
     end: int
 
 
-@dataclass
 class RegionalPromptData:
-    # The region masks for each prompt.
-    # shape: (batch_size, num_prompts, height, width)
-    # dtype: float*
-    # The mask is set to 1.0 in regions where the prompt should be applied, and 0.0 elsewhere.
-    masks: torch.Tensor
+    def __init__(self, attn_masks_by_seq_len: dict[int, torch.Tensor]):
+        self._attn_masks_by_seq_len = attn_masks_by_seq_len
 
-    # The embedding ranges for each prompt.
-    # The i'th mask is applied to the embeddings in:
-    # encoder_hidden_states[:, embedding_ranges[i].start:embedding_ranges[i].end, :]
-    embedding_ranges: list[Range]
+    @classmethod
+    def from_masks_and_ranges(
+        cls,
+        masks: list[torch.Tensor],
+        embedding_ranges: list[list[Range]],
+        key_seq_len: int,
+        # TODO(ryand): Pass in a list of downscale factors?
+        max_downscale_factor: int = 8,
+    ):
+        """Construct a `RegionalPromptData` object.
+
+        Args:
+            masks (list[torch.Tensor]): masks[i] contains the regions masks for the i'th sample in the batch.
+                The shape of masks[i] is (num_prompts, height, width), and dtype=bool. The mask is set to True in
+                regions where the prompt should be applied, and 0.0 elsewhere.
+
+            embedding_ranges (list[list[Range]]): embedding_ranges[i][j] contains the embedding range for the j'th
+                prompt in the i'th batch sample. masks[i][j, ...] is applied to the embeddings in:
+                encoder_hidden_states[i, embedding_ranges[j].start:embedding_ranges[j].end, :].
+
+            key_seq_len (int): The sequence length of the expected prompt embeddings (which act as the key in the
+                cross-attention layers).
+        """
+        attn_masks_by_seq_len = {}
+
+        # batch_attn_mask_by_seq_len[b][s] contains the attention mask for the b'th batch sample with a query sequence
+        # length of s.
+        batch_attn_masks_by_seq_len: list[dict[int, torch.Tensor]] = []
+        for batch_masks, batch_ranges in zip(masks, embedding_ranges, strict=True):
+            batch_attn_masks_by_seq_len.append({})
+
+            # Convert the bool masks to float masks so that max pooling can be applied.
+            batch_masks = batch_masks.to(dtype=torch.float32)
+
+            # Downsample the spatial dimensions by factors of 2 until max_downscale_factor is reached.
+            downscale_factor = 1
+            while downscale_factor <= max_downscale_factor:
+                _, num_prompts, h, w = batch_masks.shape
+                query_seq_len = h * w
+
+                # Flatten the spatial dimensions of the mask by reshaping to (1, num_prompts, query_seq_len, 1).
+                batch_query_masks = batch_masks.reshape((1, num_prompts, -1, 1))
+
+                # Create a cross-attention mask for each prompt that selects the corresponding embeddings from
+                # `encoder_hidden_states`.
+                # attn_mask shape: (batch_size, query_seq_len, key_seq_len)
+                # TODO(ryand): What device / dtype should this be?
+                attn_mask = torch.zeros((1, query_seq_len, key_seq_len))
+
+                for prompt_idx, embedding_range in enumerate(batch_ranges):
+                    attn_mask[0, :, embedding_range.start : embedding_range.end] = batch_query_masks[
+                        :, prompt_idx, :, :
+                    ]
+
+                batch_attn_masks_by_seq_len[-1][query_seq_len] = attn_mask
+
+                downscale_factor *= 2
+                if downscale_factor <= max_downscale_factor:
+                    # We use max pooling because we downscale to a pretty low resolution, so we don't want small prompt
+                    # regions to be lost entirely.
+                    # TODO(ryand): In the future, we may want to experiment with other downsampling methods, and could
+                    # potentially use a weighted mask rather than a binary mask.
+                    batch_masks = F.max_pool2d(batch_masks, kernel_size=2, stride=2)
+
+        # Merge the batch_attn_masks_by_seq_len into a single attn_masks_by_seq_len.
+        for query_seq_len in batch_attn_masks_by_seq_len[0].keys():
+            attn_masks_by_seq_len[query_seq_len] = torch.cat(
+                [batch_attn_masks_by_seq_len[i][query_seq_len] for i in range(len(batch_attn_masks_by_seq_len))]
+            )
+
+        return cls(attn_masks_by_seq_len)
+
+    def get_attn_mask(self, query_seq_len: int) -> torch.Tensor:
+        """Get the attention mask for the given query sequence length (i.e. downscaling level).
+
+        This is called during cross-attention, where query_seq_len is the length of the flattened spatial features, so
+        it changes at each downscaling level in the model.
+
+        key_seq_len is the length of the expected prompt embeddings.
+
+        Returns:
+            torch.Tensor: The masks.
+                shape: (batch_size, query_seq_len, key_seq_len).
+                dtype: float
+                The mask is a binary mask with values of 0.0 and 1.0.
+        """
+        return self._attn_masks_by_seq_len[query_seq_len]
 
 
 class RegionalPromptAttnProcessor2_0(AttnProcessor2_0):
     """An attention processor that supports regional prompt attention for PyTorch 2.0."""
-
-    def _prepare_regional_prompt_attention_mask(
-        self,
-        regional_prompt_data: RegionalPromptData,
-        hidden_states: torch.Tensor,
-        encoder_hidden_states: torch.Tensor,
-        orig_attn_mask: torch.Tensor,
-    ) -> torch.Tensor:
-        # Infer the current spatial dimensions from the shape of `hidden_states`.
-        _, query_seq_len, _ = hidden_states.shape
-        per_prompt_query_masks = regional_prompt_data.masks
-        _, _, h, w = per_prompt_query_masks.shape
-
-        # Downsample by factors of 2 until the spatial dimensions match the current query sequence length.
-        scale_factor = 1
-        while h * w > query_seq_len:
-            scale_factor *= 2
-            h //= 2
-            w //= 2
-        assert h * w == query_seq_len
-
-        # Convert the bool masks to float masks.
-        per_prompt_query_masks = per_prompt_query_masks.to(dtype=torch.float32)
-
-        # Apply max-pooling to resize the masks to the target spatial dimensions.
-        # TODO(ryand): We should be able to pre-compute all of the mask sizes. There's a lot of redundant computation
-        # here.
-        per_prompt_query_masks = F.max_pool2d(per_prompt_query_masks, kernel_size=scale_factor, stride=scale_factor)
-        batch_size, num_prompts, resized_h, resized_w = per_prompt_query_masks.shape
-        assert resized_h == h and resized_w == w
-
-        # Flatten the spatial dimensions of the masks.
-        # Shape after reshape: (batch_size, num_prompts, query_seq_len)
-        per_prompt_query_masks = per_prompt_query_masks.reshape((batch_size, num_prompts, -1, 1))
-
-        # Create a cross-attention mask for each prompt that selects the corresponding embeddings from
-        # `encoder_hidden_states`.
-
-        # attn_mask shape: (batch_size, query_seq_len, key_seq_len)
-        _, key_seq_len, _ = encoder_hidden_states.shape
-        # HACK(ryand): We are assuming the batch size.
-        attn_mask = torch.zeros((2, query_seq_len, key_seq_len), device=hidden_states.device)
-
-        for i, embedding_range in enumerate(regional_prompt_data.embedding_ranges):
-            # HACK(ryand): We are assuming that batch 0 is unconditioned and batch 1 is conditioned. This is too fragile
-            # to merge.
-            attn_mask[1, :, embedding_range.start : embedding_range.end] = per_prompt_query_masks[:, i, :, :]
-
-        # HACK(ryand): We are assuming that batch 0 is unconditioned and batch 1 is conditioned. We are also assuming
-        # the intent of attn_mask. And we shouldn't have to do this awkward mask type conversion.
-        orig_mask = torch.zeros_like(orig_attn_mask[0, ...])
-        orig_mask[orig_attn_mask[0, ...] > -0.5] = 1.0
-        attn_mask[0, ...] = orig_mask
-
-        return attn_mask > 0.5
 
     def __call__(
         self,
@@ -114,9 +138,16 @@ class RegionalPromptAttnProcessor2_0(AttnProcessor2_0):
         if encoder_hidden_states is not None:
             assert regional_prompt_data is not None
             assert attention_mask is not None
-            attention_mask = self._prepare_regional_prompt_attention_mask(
-                regional_prompt_data, hidden_states, encoder_hidden_states, attention_mask
+            _, query_seq_len, _ = hidden_states.shape
+            prompt_region_attention_mask = regional_prompt_data.get_attn_mask(query_seq_len)
+            # TODO(ryand): Avoid redundant type/device conversion here.
+            prompt_region_attention_mask = prompt_region_attention_mask.to(
+                dtype=attention_mask.dtype, device=attention_mask.device
             )
+            prompt_region_attention_mask[prompt_region_attention_mask < 0.5] = -10000.0
+            prompt_region_attention_mask[prompt_region_attention_mask >= 0.5] = 0.0
+
+            attention_mask = prompt_region_attention_mask + attention_mask
 
         if attention_mask is not None:
             attention_mask = attn.prepare_attention_mask(attention_mask, sequence_length, batch_size)

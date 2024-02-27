@@ -65,6 +65,7 @@ class IPAdapterConditioningInfo:
 
 @dataclass
 class ConditioningData:
+    # TODO(ryand): Support masks for unconditioned_embeddings.
     unconditioned_embeddings: BasicConditioningInfo
     text_embeddings: list[BasicConditioningInfo]
     text_embedding_masks: list[Optional[torch.Tensor]]
