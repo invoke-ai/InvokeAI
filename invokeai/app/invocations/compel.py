@@ -193,11 +193,9 @@ class SDXLPromptInvocationBase:
         for trigger in extract_ti_triggers_from_prompt(prompt):
             name = trigger[1:-1]
             try:
-                ti_model = context.models.load_by_attrs(
-                    model_name=name, base_model=text_encoder_info.config.base, model_type=ModelType.TextualInversion
-                ).model
-                assert isinstance(ti_model, TextualInversionModelRaw)
-                ti_list.append((name, ti_model))
+                loaded_model = context.models.load(key=name).model
+                assert isinstance(loaded_model, TextualInversionModelRaw)
+                ti_list.append((name, loaded_model))
             except UnknownModelException:
                 # print(e)
                 # import traceback
