@@ -33,7 +33,7 @@
     "preinstall": "npx only-allow pnpm",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "unimported": "npx unimported",
+    "knip": "knip",
     "test": "vitest",
     "test:no-watch": "vitest --no-watch"
   },
@@ -136,6 +136,7 @@
     "eslint": "^8.56.0",
     "eslint-plugin-i18next": "^6.0.3",
     "eslint-plugin-path": "^1.2.4",
+    "knip": "^5.0.2",
     "madge": "^6.1.0",
     "openapi-types": "^12.1.3",
     "openapi-typescript": "^6.7.4",
