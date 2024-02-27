@@ -9,7 +9,7 @@ import { isNumber } from 'lodash-es';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Rect } from 'react-konva';
 
-export const canvasMaskCompositerSelector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
+const canvasMaskCompositerSelector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
   return {
     stageCoordinates: canvas.stageCoordinates,
     stageDimensions: canvas.stageDimensions,

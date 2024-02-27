@@ -29,9 +29,6 @@ dependencies:
   '@invoke-ai/ui-library':
     specifier: ^0.0.21
     version: 0.0.21(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@fontsource-variable/inter@5.0.16)(@internationalized/date@3.5.2)(@types/react@18.2.57)(i18next@23.9.0)(react-dom@18.2.0)(react@18.2.0)
-  '@mantine/form':
-    specifier: 6.0.21
-    version: 6.0.21(react@18.2.0)
   '@nanostores/react':
     specifier: ^0.7.2
     version: 0.7.2(nanostores@0.10.0)(react@18.2.0)
@@ -125,9 +122,6 @@ dependencies:
   react-select:
     specifier: 5.8.0
     version: 5.8.0(@types/react@18.2.57)(react-dom@18.2.0)(react@18.2.0)
-  react-textarea-autosize:
-    specifier: ^8.5.3
-    version: 8.5.3(@types/react@18.2.57)(react@18.2.0)
   react-use:
     specifier: ^17.5.0
     version: 17.5.0(react-dom@18.2.0)(react@18.2.0)
@@ -3960,16 +3954,6 @@ packages:
   /@juggle/resize-observer@3.4.0:
     resolution: {integrity: sha512-dfLbk+PwWvFzSxwk3n5ySL0hfBog779o8h68wK/7/APo/7cgyWp5jcXockbxdk5kFRkbeXWm4Fbi9FrdN381sA==}
     dev: true
-
-  /@mantine/form@6.0.21(react@18.2.0):
-    resolution: {integrity: sha512-d4tlxyZic7MSDnaPx/WliCX1sRFDkUd2nxx4MxxO2T4OSek0YDqTlSBCxeoveu60P+vrQQN5rbbsVsaOJBe4SQ==}
-    peerDependencies:
-      react: '>=16.8.0'
-    dependencies:
-      fast-deep-equal: 3.1.3
-      klona: 2.0.6
-      react: 18.2.0
-    dev: false
 
   /@mdx-js/react@2.3.0(react@18.2.0):
     resolution: {integrity: sha512-zQH//gdOmuu7nt2oJR29vFhDv88oGPmVw6BggmrHeMI+xgEkp1B2dX9/bMBSYtK0dyLX/aOmesKS09g222K1/g==}
@@ -8360,6 +8344,7 @@ packages:
   /clone@1.0.4:
     resolution: {integrity: sha512-JQHZ2QMW6l3aH/j6xCqQThY/9OH4D/9ls34cgkUBiEeocRTU04tHfKPBsUK1PqZCUQM7GiA0IIXJSuXHI64Kbg==}
     engines: {node: '>=0.8'}
+    requiresBuild: true
     dev: true
 
   /color-convert@1.9.3:
@@ -8782,6 +8767,7 @@ packages:
 
   /defaults@1.0.4:
     resolution: {integrity: sha512-eFuaLoy/Rxalv2kr+lqMlUnrDWV+3j4pljOIJgLIhI058IQfWJ7vXhyEIHu+HtC738klGALYxOKDO0bQP3tg8A==}
+    requiresBuild: true
     dependencies:
       clone: 1.0.4
     dev: true
@@ -13151,20 +13137,6 @@ packages:
       react: 18.2.0
       tslib: 2.6.2
 
-  /react-textarea-autosize@8.5.3(@types/react@18.2.57)(react@18.2.0):
-    resolution: {integrity: sha512-XT1024o2pqCuZSuBt9FwHlaDeNtVrtCXu0Rnz88t1jUGheCLa3PhjE1GH8Ctm2axEtvdCl5SUHYschyQ0L5QHQ==}
-    engines: {node: '>=10'}
-    peerDependencies:
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0
-    dependencies:
-      '@babel/runtime': 7.23.9
-      react: 18.2.0
-      use-composed-ref: 1.3.0(react@18.2.0)
-      use-latest: 1.2.1(@types/react@18.2.57)(react@18.2.0)
-    transitivePeerDependencies:
-      - '@types/react'
-    dev: false
-
   /react-transition-group@4.4.5(react-dom@18.2.0)(react@18.2.0):
     resolution: {integrity: sha512-pZcd1MCJoiKiBR2NRxeCRg13uCXbydPnmB4EOeRrY7480qNWO8IIgQG6zlDkm6uRMsURXPuKq0GWtiM59a5Q6g==}
     peerDependencies:
@@ -14777,14 +14749,6 @@ packages:
       react: 18.2.0
       tslib: 2.6.2
 
-  /use-composed-ref@1.3.0(react@18.2.0):
-    resolution: {integrity: sha512-GLMG0Jc/jiKov/3Ulid1wbv3r54K9HlMW29IWcDFPEqFkSO2nS0MuefWgMJpeHQ9YJeXDL3ZUF+P3jdXlZX/cQ==}
-    peerDependencies:
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0
-    dependencies:
-      react: 18.2.0
-    dev: false
-
   /use-debounce@10.0.0(react@18.2.0):
     resolution: {integrity: sha512-XRjvlvCB46bah9IBXVnq/ACP2lxqXyZj0D9hj4K5OzNroMDpTEBg8Anuh1/UfRTRs7pLhQ+RiNxxwZu9+MVl1A==}
     engines: {node: '>= 16.0.0'}
@@ -14815,20 +14779,6 @@ packages:
     dependencies:
       '@types/react': 18.2.57
       react: 18.2.0
-    dev: false
-
-  /use-latest@1.2.1(@types/react@18.2.57)(react@18.2.0):
-    resolution: {integrity: sha512-xA+AVm/Wlg3e2P/JiItTziwS7FK92LWrDB0p+hgXloIMuVCeJJ8v6f0eeHyPZaJrM+usM1FkFfbNCrJGs8A/zw==}
-    peerDependencies:
-      '@types/react': '*'
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0
-    peerDependenciesMeta:
-      '@types/react':
-        optional: true
-    dependencies:
-      '@types/react': 18.2.57
-      react: 18.2.0
-      use-isomorphic-layout-effect: 1.1.2(@types/react@18.2.57)(react@18.2.0)
     dev: false
 
   /use-resize-observer@9.1.0(react-dom@18.2.0)(react@18.2.0):

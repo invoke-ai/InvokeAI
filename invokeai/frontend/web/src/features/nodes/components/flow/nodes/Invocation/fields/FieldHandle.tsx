@@ -9,23 +9,6 @@ import { memo, useMemo } from 'react';
 import type { HandleType } from 'reactflow';
 import { Handle, Position } from 'reactflow';
 
-export const handleBaseStyles: CSSProperties = {
-  position: 'absolute',
-  width: '1rem',
-  height: '1rem',
-  borderWidth: 0,
-  zIndex: 1,
-};
-``;
-
-export const inputHandleStyles: CSSProperties = {
-  left: '-1rem',
-};
-
-export const outputHandleStyles: CSSProperties = {
-  right: '-0.5rem',
-};
-
 type FieldHandleProps = {
   fieldTemplate: FieldInputTemplate | FieldOutputTemplate;
   handleType: HandleType;

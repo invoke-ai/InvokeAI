@@ -2,10 +2,10 @@ import { createAction, isAnyOf } from '@reduxjs/toolkit';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import type { Graph } from 'services/api/types';
 
-export const textToImageGraphBuilt = createAction<Graph>('nodes/textToImageGraphBuilt');
-export const imageToImageGraphBuilt = createAction<Graph>('nodes/imageToImageGraphBuilt');
+const textToImageGraphBuilt = createAction<Graph>('nodes/textToImageGraphBuilt');
+const imageToImageGraphBuilt = createAction<Graph>('nodes/imageToImageGraphBuilt');
 export const canvasGraphBuilt = createAction<Graph>('nodes/canvasGraphBuilt');
-export const nodesGraphBuilt = createAction<Graph>('nodes/nodesGraphBuilt');
+const nodesGraphBuilt = createAction<Graph>('nodes/nodesGraphBuilt');
 
 export const isAnyGraphBuilt = isAnyOf(
   textToImageGraphBuilt,

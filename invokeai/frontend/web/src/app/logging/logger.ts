@@ -12,7 +12,6 @@ ROARR.serializeMessage = serializeMessage;
 ROARR.write = createLogWriter();
 
 export const BASE_CONTEXT = {};
-export const log = Roarr.child(BASE_CONTEXT);
 
 export const $logger = atom<Logger>(Roarr.child(BASE_CONTEXT));
 
