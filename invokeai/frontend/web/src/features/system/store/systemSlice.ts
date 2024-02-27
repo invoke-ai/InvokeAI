@@ -24,7 +24,7 @@ import {
 
 import type { Language, SystemState } from './types';
 
-export const initialSystemState: SystemState = {
+const initialSystemState: SystemState = {
   _version: 1,
   isConnected: false,
   shouldConfirmOnDelete: true,
@@ -199,7 +199,7 @@ const isAnyServerError = isAnyOf(socketInvocationError, socketSessionRetrievalEr
 export const selectSystemSlice = (state: RootState) => state.system;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-export const migrateSystemState = (state: any): any => {
+const migrateSystemState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
   }

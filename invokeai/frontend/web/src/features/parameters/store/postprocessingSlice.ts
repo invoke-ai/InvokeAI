@@ -3,7 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { z } from 'zod';
 
-export const zParamESRGANModelName = z.enum([
+const zParamESRGANModelName = z.enum([
   'RealESRGAN_x4plus.pth',
   'RealESRGAN_x4plus_anime_6B.pth',
   'ESRGAN_SRx4_DF2KOST_official-ff704c30.pth',
@@ -18,7 +18,7 @@ export interface PostprocessingState {
   esrganModelName: ParamESRGANModelName;
 }
 
-export const initialPostprocessingState: PostprocessingState = {
+const initialPostprocessingState: PostprocessingState = {
   _version: 1,
   esrganModelName: 'RealESRGAN_x4plus.pth',
 };
@@ -38,7 +38,7 @@ export const { esrganModelNameChanged } = postprocessingSlice.actions;
 export const selectPostprocessingSlice = (state: RootState) => state.postprocessing;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-export const migratePostprocessingState = (state: any): any => {
+const migratePostprocessingState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
   }

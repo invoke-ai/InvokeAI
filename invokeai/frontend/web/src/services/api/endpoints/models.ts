@@ -66,50 +66,45 @@ type ScanFolderArg = operations['scan_for_models']['parameters']['query'];
 
 export type GetByAttrsArg = operations['get_model_records_by_attrs']['parameters']['query'];
 
-export const mainModelsAdapter = createEntityAdapter<MainModelConfig, string>({
+const mainModelsAdapter = createEntityAdapter<MainModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 export const mainModelsAdapterSelectors = mainModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-export const loraModelsAdapter = createEntityAdapter<LoRAModelConfig, string>({
+const loraModelsAdapter = createEntityAdapter<LoRAModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
-export const loraModelsAdapterSelectors = loraModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-export const controlNetModelsAdapter = createEntityAdapter<ControlNetModelConfig, string>({
+const controlNetModelsAdapter = createEntityAdapter<ControlNetModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 export const controlNetModelsAdapterSelectors = controlNetModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-export const ipAdapterModelsAdapter = createEntityAdapter<IPAdapterModelConfig, string>({
+const ipAdapterModelsAdapter = createEntityAdapter<IPAdapterModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 export const ipAdapterModelsAdapterSelectors = ipAdapterModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-export const t2iAdapterModelsAdapter = createEntityAdapter<T2IAdapterModelConfig, string>({
+const t2iAdapterModelsAdapter = createEntityAdapter<T2IAdapterModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 export const t2iAdapterModelsAdapterSelectors = t2iAdapterModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-export const textualInversionModelsAdapter = createEntityAdapter<TextualInversionModelConfig, string>({
+const textualInversionModelsAdapter = createEntityAdapter<TextualInversionModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
-export const textualInversionModelsAdapterSelectors = textualInversionModelsAdapter.getSelectors(
-  undefined,
-  getSelectorsOptions
-);
-export const vaeModelsAdapter = createEntityAdapter<VAEModelConfig, string>({
+const vaeModelsAdapter = createEntityAdapter<VAEModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 export const vaeModelsAdapterSelectors = vaeModelsAdapter.getSelectors(undefined, getSelectorsOptions);
 
-export const anyModelConfigAdapter = createEntityAdapter<AnyModelConfig, string>({
+const anyModelConfigAdapter = createEntityAdapter<AnyModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
-export const anyModelConfigAdapterSelectors = anyModelConfigAdapter.getSelectors(undefined, getSelectorsOptions);
+const anyModelConfigAdapterSelectors = anyModelConfigAdapter.getSelectors(undefined, getSelectorsOptions);
 
 const buildProvidesTags =
   <TEntity extends AnyModelConfig>(tagType: (typeof tagTypes)[number]) =>
@@ -338,7 +333,6 @@ export const modelsApi = api.injectEndpoints({
 });
 
 export const {
-  useGetModelConfigByAttrsQuery,
   useGetModelConfigQuery,
   useGetMainModelsQuery,
   useGetControlNetModelsQuery,
@@ -352,7 +346,6 @@ export const {
   useInstallModelMutation,
   useConvertMainModelsMutation,
   useSyncModelsMutation,
-  useScanModelsQuery,
   useLazyScanModelsQuery,
   useGetModelImportsQuery,
   useGetModelMetadataQuery,
