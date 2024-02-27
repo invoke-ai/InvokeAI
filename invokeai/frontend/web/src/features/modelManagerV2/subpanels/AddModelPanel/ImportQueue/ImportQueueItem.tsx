@@ -121,7 +121,7 @@ export const ImportQueueItem = (props: ModelListItemProps) => {
       </Box>
 
       <Box minW="20px">
-        {(model.status === 'downloading' || model.status === 'waiting') && (
+        {(model.status === 'downloading' || model.status === 'waiting' || model.status === 'running') && (
           <IconButton
             isRound={true}
             size="xs"
