@@ -67,5 +67,3 @@ export const ClearQueueIconButton = (props: ClearQueueButtonProps) => {
     </>
   );
 };
-
-export default ClearQueueIconButton;

@@ -8,7 +8,3 @@ export const roundDownToMultipleMin = (num: number, multiple: number): number =>
 export const roundToMultiple = (num: number, multiple: number): number => {
   return Math.round(num / multiple) * multiple;
 };
-
-export const roundToMultipleMin = (num: number, multiple: number): number => {
-  return Math.max(multiple, roundToMultiple(num, multiple));
-};

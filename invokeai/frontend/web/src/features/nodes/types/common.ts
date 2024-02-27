@@ -102,7 +102,7 @@ export type SubModelType = z.infer<typeof zSubModelType>;
 
 export const zVAEModelField = zModelIdentifierWithBase;
 
-export const zModelInfo = zModelIdentifier.extend({
+const zModelInfo = zModelIdentifier.extend({
   submodel_type: zSubModelType.nullish(),
 });
 export type ModelInfo = z.infer<typeof zModelInfo>;
@@ -118,26 +118,6 @@ export type IPAdapterModelField = z.infer<typeof zIPAdapterModelField>;
 
 export const zT2IAdapterModelField = zModelIdentifierWithBase;
 export type T2IAdapterModelField = z.infer<typeof zT2IAdapterModelField>;
-
-export const zLoraInfo = zModelInfo.extend({
-  weight: z.number().optional(),
-});
-export type LoraInfo = z.infer<typeof zLoraInfo>;
-
-export const zUNetField = z.object({
-  unet: zModelInfo,
-  scheduler: zModelInfo,
-  loras: z.array(zLoraInfo),
-});
-export type UNetField = z.infer<typeof zUNetField>;
-
-export const zCLIPField = z.object({
-  tokenizer: zModelInfo,
-  text_encoder: zModelInfo,
-  skipped_layers: z.number(),
-  loras: z.array(zLoraInfo),
-});
-export type CLIPField = z.infer<typeof zCLIPField>;
 
 export const zVAEField = z.object({
   vae: zModelInfo,

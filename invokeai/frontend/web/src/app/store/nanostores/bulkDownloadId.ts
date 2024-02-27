@@ -1,6 +1,6 @@
 import { atom } from 'nanostores';
 
-export const DEFAULT_BULK_DOWNLOAD_ID = 'default';
+const DEFAULT_BULK_DOWNLOAD_ID = 'default';
 
 /**
  * The download id for a bulk download. Used for socket subscriptions.
