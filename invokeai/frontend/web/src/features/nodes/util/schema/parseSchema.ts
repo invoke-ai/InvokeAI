@@ -22,14 +22,7 @@ const RESERVED_INPUT_FIELD_NAMES = ['id', 'type', 'use_cache'];
 const RESERVED_OUTPUT_FIELD_NAMES = ['type'];
 const RESERVED_FIELD_TYPES = ['IsIntermediate'];
 
-const invocationDenylist: string[] = [
-  'graph',
-  'linear_ui_output',
-  'l2i_onnx',
-  'prompt_onnx',
-  't2l_onnx',
-  'onnx_model_loader',
-];
+const invocationDenylist: string[] = ['graph', 'linear_ui_output'];
 
 const isReservedInputField = (nodeType: string, fieldName: string) => {
   if (RESERVED_INPUT_FIELD_NAMES.includes(fieldName)) {
