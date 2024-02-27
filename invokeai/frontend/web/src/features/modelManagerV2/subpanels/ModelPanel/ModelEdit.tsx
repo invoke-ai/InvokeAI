@@ -29,6 +29,7 @@ import ModelTypeSelect from './Fields/ModelTypeSelect';
 import ModelVariantSelect from './Fields/ModelVariantSelect';
 import PredictionTypeSelect from './Fields/PredictionTypeSelect';
 import RepoVariantSelect from './Fields/RepoVariantSelect';
+import VaeSelect from './Fields/VaeSelect';
 
 export const ModelEdit = () => {
   const dispatch = useAppDispatch();
@@ -38,39 +39,6 @@ export const ModelEdit = () => {
   const [updateModel, { isLoading: isSubmitting }] = useUpdateModelsMutation();
 
   const { t } = useTranslation();
-
-  // const modelData = useMemo(() => {
-  //   if (!data) {
-  //     return null;
-  //   }
-  //   const modelFormat = data.format;
-  //   const modelType = data.type;
-
-  //   if (modelType === 'main') {
-  //     if (modelFormat === 'diffusers') {
-  //       return data as DiffusersModelConfig;
-  //     } else if (modelFormat === 'checkpoint') {
-  //       return data as CheckpointModelConfig;
-  //     }
-  //   }
-
-  //   switch (modelType) {
-  //     case 'lora':
-  //       return data as LoRAModelConfig;
-  //     case 'embedding':
-  //       return data as TextualInversionModelConfig;
-  //     case 't2i_adapter':
-  //       return data as T2IAdapterModelConfig;
-  //     case 'ip_adapter':
-  //       return data as IPAdapterModelConfig;
-  //     case 'controlnet':
-  //       return data as ControlNetModelConfig;
-  //     case 'vae':
-  //       return data as VAEModelConfig;
-  //     default:
-  //       return null;
-  //   }
-  // }, [data]);
 
   const {
     register,
@@ -91,6 +59,7 @@ export const ModelEdit = () => {
 
   const onSubmit = useCallback<SubmitHandler<AnyModelConfig>>(
     (values) => {
+      console.log({ values });
       if (!data?.key) {
         return;
       }
@@ -243,8 +212,8 @@ export const ModelEdit = () => {
                   <BooleanSelect<AnyModelConfig> control={control} name="ztsnr_training" />
                 </FormControl>
                 <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                  <FormLabel>{t('modelManager.vaeLocation')}</FormLabel>
-                  <Input {...register('vae')} />
+                  <FormLabel>{t('modelManager.vae')}</FormLabel>
+                  <VaeSelect control={control} name="vae" />
                 </FormControl>
               </Flex>
             </>
