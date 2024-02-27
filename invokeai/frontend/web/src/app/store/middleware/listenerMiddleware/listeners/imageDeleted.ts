@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { resetCanvas } from 'features/canvas/store/canvasSlice';
 import {
   controlAdapterImageChanged,
@@ -19,9 +20,7 @@ import { api } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
 import { imagesSelectors } from 'services/api/util';
 
-import { startAppListening } from '..';
-
-export const addRequestedSingleImageDeletionListener = () => {
+export const addRequestedSingleImageDeletionListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: imageDeletionConfirmed,
     effect: async (action, { dispatch, getState, condition }) => {
@@ -134,12 +133,7 @@ export const addRequestedSingleImageDeletionListener = () => {
       }
     },
   });
-};
 
-/**
- * Called when the user requests an image deletion
- */
-export const addRequestedMultipleImageDeletionListener = () => {
   startAppListening({
     actionCreator: imageDeletionConfirmed,
     effect: async (action, { dispatch, getState }) => {
@@ -224,24 +218,14 @@ export const addRequestedMultipleImageDeletionListener = () => {
       }
     },
   });
-};
 
-/**
- * Called when the actual delete request is sent to the server
- */
-export const addImageDeletedPendingListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.deleteImage.matchPending,
     effect: () => {
       //
     },
   });
-};
 
-/**
- * Called on successful delete
- */
-export const addImageDeletedFulfilledListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.deleteImage.matchFulfilled,
     effect: (action) => {
@@ -249,12 +233,7 @@ export const addImageDeletedFulfilledListener = () => {
       log.debug({ imageDTO: action.meta.arg.originalArgs }, 'Image deleted');
     },
   });
-};
 
-/**
- * Called on failed delete
- */
-export const addImageDeletedRejectedListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.deleteImage.matchRejected,
     effect: (action) => {

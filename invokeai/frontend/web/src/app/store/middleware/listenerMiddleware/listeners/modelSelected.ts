@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import {
   controlAdapterIsEnabledChanged,
   selectControlAdapterAll,
@@ -12,9 +13,7 @@ import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
 import { forEach } from 'lodash-es';
 
-import { startAppListening } from '..';
-
-export const addModelSelectedListener = () => {
+export const addModelSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: modelSelected,
     effect: (action, { getState, dispatch }) => {

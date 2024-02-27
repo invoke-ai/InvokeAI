@@ -1,5 +1,6 @@
 import type { AnyListenerPredicate } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import type { RootState } from 'app/store/store';
 import { controlAdapterImageProcessed } from 'features/controlAdapters/store/actions';
 import {
@@ -11,8 +12,6 @@ import {
   selectControlAdapterById,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
-
-import { startAppListening } from '..';
 
 type AnyControlAdapterParamChangeAction =
   | ReturnType<typeof controlAdapterProcessorParamsChanged>
@@ -67,7 +66,7 @@ const DEBOUNCE_MS = 300;
  *
  * The network request is debounced.
  */
-export const addControlNetAutoProcessListener = () => {
+export const addControlNetAutoProcessListener = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate,
     effect: async (action, { dispatch, cancelActiveListeners, delay }) => {

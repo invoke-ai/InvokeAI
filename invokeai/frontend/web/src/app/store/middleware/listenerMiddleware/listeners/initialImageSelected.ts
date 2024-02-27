@@ -1,12 +1,11 @@
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { initialImageChanged } from 'features/parameters/store/generationSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
 
-import { startAppListening } from '..';
-
-export const addInitialImageSelectedListener = () => {
+export const addInitialImageSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: initialImageSelected,
     effect: (action, { dispatch }) => {

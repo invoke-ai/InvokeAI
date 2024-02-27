@@ -1,10 +1,9 @@
 import { createAction } from '@reduxjs/toolkit';
-
-import { startAppListening } from '..';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 
 export const appStarted = createAction('app/appStarted');
 
-export const addAppStartedListener = () => {
+export const addAppStartedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: appStarted,
     effect: async (action, { unsubscribe, cancelActiveListeners }) => {
