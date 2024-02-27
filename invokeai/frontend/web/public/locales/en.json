@@ -691,6 +691,7 @@
     },
     "modelManager": {
         "active": "active",
+        "addAll": "Add All",
         "addCheckpointModel": "Add Checkpoint / Safetensor Model",
         "addDifference": "Add Difference",
         "addDiffuserModel": "Add Diffusers",
