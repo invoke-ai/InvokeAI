@@ -16,7 +16,7 @@ import type { ChangeEventHandler } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
-import { type ScanFolderResponse, useImportMainModelsMutation } from 'services/api/endpoints/models';
+import { type ScanFolderResponse, useInstallModelMutation } from 'services/api/endpoints/models';
 
 import { ScanModelResultItem } from './ScanModelResultItem';
 
@@ -29,7 +29,7 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const dispatch = useAppDispatch();
 
-  const [importMainModel] = useImportMainModelsMutation();
+  const [installModel] = useInstallModelMutation();
 
   const filteredResults = useMemo(() => {
     return results.filter((result) => {
@@ -51,7 +51,7 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
       if (result.is_installed) {
         continue;
       }
-      importMainModel({ source: result.path, config: undefined })
+      installModel({ source: result.path })
         .unwrap()
         .then((_) => {
           dispatch(
@@ -76,7 +76,7 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
           }
         });
     }
-  }, [importMainModel, filteredResults, dispatch, t]);
+  }, [installModel, filteredResults, dispatch, t]);
 
   return (
     <>
