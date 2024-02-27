@@ -1,5 +1,6 @@
 import { Box, Flex, FormControl, FormLabel, Icon, IconButton, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import ParamControlAdapterModel from 'features/controlAdapters/components/parameters/ParamControlAdapterModel';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
 import {
