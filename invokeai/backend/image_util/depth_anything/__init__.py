@@ -84,7 +84,7 @@ class DepthAnythingDetector:
         self.model.to(device)
         return self
 
-    def __call__(self, image, resolution=512, offload=False):
+    def __call__(self, image, resolution=512):
         image = np.array(image, dtype=np.uint8)
         image = image[:, :, ::-1] / 255.0
 
@@ -102,8 +102,5 @@ class DepthAnythingDetector:
 
         new_height = int(image_height * (resolution / image_width))
         depth_map = depth_map.resize((resolution, new_height))
-
-        if offload:
-            del self.model
 
         return depth_map

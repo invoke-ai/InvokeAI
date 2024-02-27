@@ -576,7 +576,7 @@ DEPTH_ANYTHING_MODEL_SIZES = Literal["large", "base", "small"]
     title="Depth Anything Processor",
     tags=["controlnet", "depth", "depth anything"],
     category="controlnet",
-    version="1.0.0",
+    version="1.0.1",
 )
 class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
     """Generates a depth map based on the Depth Anything algorithm"""
@@ -585,13 +585,12 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
         default="small", description="The size of the depth model to use"
     )
     resolution: int = InputField(default=512, ge=64, multiple_of=64, description=FieldDescriptions.image_res)
-    offload: bool = InputField(default=False)
 
     def run_processor(self, image: Image.Image):
         depth_anything_detector = DepthAnythingDetector()
         depth_anything_detector.load_model(model_size=self.model_size)
 
-        processed_image = depth_anything_detector(image=image, resolution=self.resolution, offload=self.offload)
+        processed_image = depth_anything_detector(image=image, resolution=self.resolution)
         return processed_image
 
 
