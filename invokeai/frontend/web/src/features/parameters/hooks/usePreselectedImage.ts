@@ -10,7 +10,6 @@ import { t } from 'i18next';
 import { useCallback, useEffect } from 'react';
 import { useGetImageDTOQuery, useGetImageMetadataQuery } from 'services/api/endpoints/images';
 
-
 export const usePreselectedImage = (selectedImage?: {
   imageName: string;
   action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';

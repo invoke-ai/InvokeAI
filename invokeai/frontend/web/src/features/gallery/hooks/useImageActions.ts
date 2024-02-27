@@ -58,5 +58,5 @@ export const useImageActions = (image_name?: string) => {
     parseAndRecallPrompts(metadata);
   }, [metadata]);
 
-  return { recallAll, remix, recallSeed, recallPrompts , hasMetadata, hasSeed,  hasPrompts, isLoadingMetadata };
+  return { recallAll, remix, recallSeed, recallPrompts, hasMetadata, hasSeed, hasPrompts, isLoadingMetadata };
 };

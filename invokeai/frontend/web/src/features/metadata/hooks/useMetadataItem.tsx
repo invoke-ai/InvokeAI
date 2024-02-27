@@ -2,15 +2,23 @@ import { Text } from '@invoke-ai/ui-library';
 import type { MetadataHandlers } from 'features/metadata/types';
 import { MetadataParseFailedToken, MetadataParsePendingToken } from 'features/metadata/util/parsers';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-const pendingRenderedValue = <Text>Loading</Text>;
-const failedRenderedValue = <Text>Parsing Failed</Text>;
+const Pending = () => {
+  const { t } = useTranslation();
+  return <Text>{t('common.loading')}</Text>;
+};
+
+const Failed = () => {
+  const { t } = useTranslation();
+  return <Text>{t('metadata.parsingFailed')}</Text>;
+};
 
 export const useMetadataItem = <T,>(metadata: unknown, handlers: MetadataHandlers<T>) => {
   const [value, setValue] = useState<T | typeof MetadataParsePendingToken | typeof MetadataParseFailedToken>(
     MetadataParsePendingToken
   );
-  const [renderedValue, setRenderedValue] = useState<React.ReactNode>(pendingRenderedValue);
+  const [renderedValue, setRenderedValue] = useState<React.ReactNode>(Pending);
 
   useEffect(() => {
     const _parse = async () => {
@@ -31,11 +39,11 @@ export const useMetadataItem = <T,>(metadata: unknown, handlers: MetadataHandler
   useEffect(() => {
     const _renderValue = async () => {
       if (value === MetadataParsePendingToken) {
-        setRenderedValue(pendingRenderedValue);
+        setRenderedValue(Pending);
         return;
       }
       if (value === MetadataParseFailedToken) {
-        setRenderedValue(failedRenderedValue);
+        setRenderedValue(Failed);
         return;
       }
 
