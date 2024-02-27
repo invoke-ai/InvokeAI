@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
-from invokeai.app.services.model_install import ModelInstallJob, ModelSource
+from invokeai.app.services.model_install import ModelInstallJob
 from invokeai.app.services.model_records import (
     DuplicateModelException,
     InvalidModelException,
@@ -439,8 +439,8 @@ async def add_model_record(
 
 
 @model_manager_router.post(
-    "/heuristic_install",
-    operation_id="heuristic_install_model",
+    "/install",
+    operation_id="install_model",
     responses={
         201: {"description": "The model imported successfully"},
         415: {"description": "Unrecognized file/folder format"},
@@ -449,8 +449,9 @@ async def add_model_record(
     },
     status_code=201,
 )
-async def heuristic_install(
-    source: str,
+async def install_model(
+    source: str = Query(description="Model source to install, can be a local path, repo_id, or remote URL"),
+    # TODO(MM2): Can we type this?
     config: Optional[Dict[str, Any]] = Body(
         description="Dict of fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
         default=None,
@@ -491,106 +492,7 @@ async def heuristic_install(
         result: ModelInstallJob = installer.heuristic_import(
             source=source,
             config=config,
-        )
-        logger.info(f"Started installation of {source}")
-    except UnknownModelException as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=424, detail=str(e))
-    except InvalidModelException as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=415)
-    except ValueError as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=409, detail=str(e))
-    return result
-
-
-@model_manager_router.post(
-    "/install",
-    operation_id="import_model",
-    responses={
-        201: {"description": "The model imported successfully"},
-        415: {"description": "Unrecognized file/folder format"},
-        424: {"description": "The model appeared to import successfully, but could not be found in the model manager"},
-        409: {"description": "There is already a model corresponding to this path or repo_id"},
-    },
-    status_code=201,
-)
-async def import_model(
-    source: ModelSource,
-    config: Optional[Dict[str, Any]] = Body(
-        description="Dict of fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
-        default=None,
-    ),
-) -> ModelInstallJob:
-    """Install a model using its local path, repo_id, or remote URL.
-
-    Models will be downloaded, probed, configured and installed in a
-    series of background threads. The return object has `status` attribute
-    that can be used to monitor progress.
-
-    The source object is a discriminated Union of LocalModelSource,
-    HFModelSource and URLModelSource. Set the "type" field to the
-    appropriate value:
-
-    * To install a local path using LocalModelSource, pass a source of form:
-      ```
-      {
-        "type": "local",
-        "path": "/path/to/model",
-        "inplace": false
-      }
-      ```
-      The "inplace" flag, if true, will register the model in place in its
-      current filesystem location. Otherwise, the model will be copied
-      into the InvokeAI models directory.
-
-    * To install a HuggingFace repo_id using HFModelSource, pass a source of form:
-      ```
-      {
-        "type": "hf",
-        "repo_id": "stabilityai/stable-diffusion-2.0",
-        "variant": "fp16",
-        "subfolder": "vae",
-        "access_token": "f5820a918aaf01"
-      }
-      ```
-      The `variant`, `subfolder` and `access_token` fields are optional.
-
-    * To install a remote model using an arbitrary URL, pass:
-      ```
-      {
-        "type": "url",
-        "url": "http://www.civitai.com/models/123456",
-        "access_token": "f5820a918aaf01"
-      }
-      ```
-      The `access_token` field is optonal
-
-    The model's configuration record will be probed and filled in
-    automatically.  To override the default guesses, pass "metadata"
-    with a Dict containing the attributes you wish to override.
-
-    Installation occurs in the background. Either use list_model_install_jobs()
-    to poll for completion, or listen on the event bus for the following events:
-
-      * "model_install_running"
-      * "model_install_completed"
-      * "model_install_error"
-
-    On successful completion, the event's payload will contain the field "key"
-    containing the installed ID of the model. On an error, the event's payload
-    will contain the fields "error_type" and "error" describing the nature of the
-    error and its traceback, respectively.
-
-    """
-    logger = ApiDependencies.invoker.services.logger
-
-    try:
-        installer = ApiDependencies.invoker.services.model_manager.install
-        result: ModelInstallJob = installer.import_model(
-            source=source,
-            config=config,
+            access_token=access_token,
         )
         logger.info(f"Started installation of {source}")
     except UnknownModelException as e:
