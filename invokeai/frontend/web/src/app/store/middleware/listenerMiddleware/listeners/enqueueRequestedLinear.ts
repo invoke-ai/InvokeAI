@@ -1,4 +1,5 @@
 import { enqueueRequested } from 'app/store/actions';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildLinearImageToImageGraph } from 'features/nodes/util/graph/buildLinearImageToImageGraph';
 import { buildLinearSDXLImageToImageGraph } from 'features/nodes/util/graph/buildLinearSDXLImageToImageGraph';
@@ -6,9 +7,7 @@ import { buildLinearSDXLTextToImageGraph } from 'features/nodes/util/graph/build
 import { buildLinearTextToImageGraph } from 'features/nodes/util/graph/buildLinearTextToImageGraph';
 import { queueApi } from 'services/api/endpoints/queue';
 
-import { startAppListening } from '..';
-
-export const addEnqueueRequestedLinear = () => {
+export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate: (action): action is ReturnType<typeof enqueueRequested> =>
       enqueueRequested.match(action) && (action.payload.tabName === 'txt2img' || action.payload.tabName === 'img2img'),

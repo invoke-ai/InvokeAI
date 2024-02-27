@@ -1,10 +1,9 @@
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { selectImageUsage } from 'features/deleteImageModal/store/selectors';
 import { imagesToDeleteSelected, isModalOpenChanged } from 'features/deleteImageModal/store/slice';
 
-import { startAppListening } from '..';
-
-export const addImageToDeleteSelectedListener = () => {
+export const addImageToDeleteSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: imagesToDeleteSelected,
     effect: async (action, { dispatch, getState }) => {

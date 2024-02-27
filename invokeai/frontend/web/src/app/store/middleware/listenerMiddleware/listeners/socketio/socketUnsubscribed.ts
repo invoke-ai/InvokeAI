@@ -1,10 +1,9 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { socketUnsubscribedSession } from 'services/events/actions';
-
-import { startAppListening } from '../..';
 const log = logger('socketio');
 
-export const addSocketUnsubscribedEventListener = () => {
+export const addSocketUnsubscribedEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketUnsubscribedSession,
     effect: (action) => {

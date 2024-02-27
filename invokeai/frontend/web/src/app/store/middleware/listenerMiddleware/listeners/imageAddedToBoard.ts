@@ -1,9 +1,8 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { imagesApi } from 'services/api/endpoints/images';
 
-import { startAppListening } from '..';
-
-export const addImageAddedToBoardFulfilledListener = () => {
+export const addImageAddedToBoardFulfilledListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher: imagesApi.endpoints.addImageToBoard.matchFulfilled,
     effect: (action) => {
@@ -15,9 +14,7 @@ export const addImageAddedToBoardFulfilledListener = () => {
       log.debug({ board_id, imageDTO }, 'Image added to board');
     },
   });
-};
 
-export const addImageAddedToBoardRejectedListener = () => {
   startAppListening({
     matcher: imagesApi.endpoints.addImageToBoard.matchRejected,
     effect: (action) => {
