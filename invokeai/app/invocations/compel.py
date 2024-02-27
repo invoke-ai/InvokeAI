@@ -3,9 +3,8 @@ from typing import Iterator, List, Optional, Tuple, Union
 import torch
 from compel import Compel, ReturnedEmbeddingsType
 from compel.prompt_parser import Blend, Conjunction, CrossAttentionControlSubstitute, FlattenedPrompt, Fragment
-from transformers import CLIPTokenizer, CLIPTextModel
+from transformers import CLIPTextModel, CLIPTokenizer
 
-import invokeai.backend.util.logging as logger
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     Input,
@@ -14,11 +13,9 @@ from invokeai.app.invocations.fields import (
     UIComponent,
 )
 from invokeai.app.invocations.primitives import ConditioningOutput
-from invokeai.app.services.model_records import UnknownModelException
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.ti_utils import generate_ti_list
 from invokeai.backend.lora import LoRAModelRaw
-from invokeai.backend.model_manager.config import ModelType
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
@@ -26,7 +23,6 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ExtraConditioningInfo,
     SDXLConditioningInfo,
 )
-from invokeai.backend.textual_inversion import TextualInversionModelRaw
 from invokeai.backend.util.devices import torch_dtype
 
 from .baseinvocation import (
