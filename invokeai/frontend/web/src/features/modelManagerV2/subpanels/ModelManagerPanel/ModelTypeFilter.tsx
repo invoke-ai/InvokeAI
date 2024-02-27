@@ -14,7 +14,6 @@ export const MODEL_TYPE_LABELS: { [key: string]: string } = {
   t2i_adapter: 'T2I Adapter',
   ip_adapter: 'IP Adapter',
   clip_vision: 'Clip Vision',
-  onnx: 'Onnx',
 };
 
 export const ModelTypeFilter = () => {
