@@ -8,7 +8,7 @@ import { selectOptimalDimension } from 'features/parameters/store/generationSlic
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const OPTIONS: ComboboxOption[] = [
+const OPTIONS: ComboboxOption[] = [
   { label: 'None', value: 'none' },
   { label: 'Auto', value: 'auto' },
   { label: 'Manual', value: 'manual' },
