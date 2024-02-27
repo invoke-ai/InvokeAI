@@ -1,13 +1,12 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox } from '@invoke-ai/ui-library';
 import { typedMemo } from 'common/util/typedMemo';
-import { LORA_MODEL_FORMAT_MAP } from 'features/parameters/types/constants';
 import { useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController, useWatch } from 'react-hook-form';
 import type { AnyModelConfig } from 'services/api/types';
 
-const ModelFormatSelect = <T extends AnyModelConfig>(props: UseControllerProps<T>) => {
+const ModelFormatSelect = (props: UseControllerProps<AnyModelConfig>) => {
   const { field, formState } = useController(props);
   const type = useWatch({ control: props.control, name: 'type' });
 
@@ -21,10 +20,10 @@ const ModelFormatSelect = <T extends AnyModelConfig>(props: UseControllerProps<T
   const options: ComboboxOption[] = useMemo(() => {
     const modelType = type || formState.defaultValues?.type;
     if (modelType === 'lora') {
-      return Object.keys(LORA_MODEL_FORMAT_MAP).map((format) => ({
-        value: format,
-        label: LORA_MODEL_FORMAT_MAP[format],
-      })) as ComboboxOption[];
+      return [
+        { value: 'lycoris', label: 'LyCORIS' },
+        { value: 'diffusers', label: 'Diffusers' },
+      ];
     } else if (modelType === 'embedding') {
       return [
         { value: 'embedding_file', label: 'Embedding File' },
