@@ -14,7 +14,10 @@ def extract_ti_triggers_from_prompt(prompt: str) -> List[str]:
         ti_triggers.append(str(trigger))
     return ti_triggers
 
-def generate_ti_list(prompt: str, base: BaseModelType, context: InvocationContext) -> List[Tuple[str, TextualInversionModelRaw]]:
+
+def generate_ti_list(
+    prompt: str, base: BaseModelType, context: InvocationContext
+) -> List[Tuple[str, TextualInversionModelRaw]]:
     ti_list: List[Tuple[str, TextualInversionModelRaw]] = []
     for trigger in extract_ti_triggers_from_prompt(prompt):
         name_or_key = trigger[1:-1]
