@@ -1,4 +1,5 @@
 import { $logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { canvasMerged } from 'features/canvas/store/actions';
 import { $canvasBaseLayer } from 'features/canvas/store/canvasNanostore';
 import { setMergedCanvas } from 'features/canvas/store/canvasSlice';
@@ -7,9 +8,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 
-import { startAppListening } from '..';
-
-export const addCanvasMergedListener = () => {
+export const addCanvasMergedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: canvasMerged,
     effect: async (action, { dispatch }) => {

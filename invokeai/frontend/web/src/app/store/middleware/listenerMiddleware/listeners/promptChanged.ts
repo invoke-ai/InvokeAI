@@ -1,4 +1,5 @@
 import { isAnyOf } from '@reduxjs/toolkit';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import {
   combinatorialToggled,
   isErrorChanged,
@@ -13,11 +14,9 @@ import { setPositivePrompt } from 'features/parameters/store/generationSlice';
 import { utilitiesApi } from 'services/api/endpoints/utilities';
 import { socketConnected } from 'services/events/actions';
 
-import { startAppListening } from '..';
-
 const matcher = isAnyOf(setPositivePrompt, combinatorialToggled, maxPromptsChanged, maxPromptsReset, socketConnected);
 
-export const addDynamicPromptsListener = () => {
+export const addDynamicPromptsListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher,
     effect: async (action, { dispatch, getState, cancelActiveListeners, delay }) => {

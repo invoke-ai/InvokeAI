@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { canvasMaskToControlAdapter } from 'features/canvas/store/actions';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
 import { controlAdapterImageChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
@@ -6,9 +7,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 
-import { startAppListening } from '..';
-
-export const addCanvasMaskToControlNetListener = () => {
+export const addCanvasMaskToControlNetListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: canvasMaskToControlAdapter,
     effect: async (action, { dispatch, getState }) => {

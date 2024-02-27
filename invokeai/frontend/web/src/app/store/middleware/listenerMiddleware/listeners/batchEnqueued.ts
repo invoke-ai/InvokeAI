@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
 import { toast } from 'common/util/toast';
 import { zPydanticValidationError } from 'features/system/store/zodSchemas';
@@ -6,9 +7,7 @@ import { t } from 'i18next';
 import { truncate, upperFirst } from 'lodash-es';
 import { queueApi } from 'services/api/endpoints/queue';
 
-import { startAppListening } from '..';
-
-export const addBatchEnqueuedListener = () => {
+export const addBatchEnqueuedListener = (startAppListening: AppStartListening) => {
   // success
   startAppListening({
     matcher: queueApi.endpoints.enqueueBatch.matchFulfilled,
