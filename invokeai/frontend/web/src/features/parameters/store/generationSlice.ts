@@ -11,7 +11,6 @@ import type {
   ParameterCanvasCoherenceMode,
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
-  ParameterMaskBlurMethod,
   ParameterModel,
   ParameterPrecision,
   ParameterScheduler,
@@ -25,7 +24,7 @@ import type { ImageDTO } from 'services/api/types';
 
 import type { GenerationState } from './types';
 
-export const initialGenerationState: GenerationState = {
+const initialGenerationState: GenerationState = {
   _version: 1,
   cfgScale: 7.5,
   cfgRescaleMultiplier: 0,
@@ -100,26 +99,11 @@ export const generationSlice = createSlice({
     setShouldFitToWidthHeight: (state, action: PayloadAction<boolean>) => {
       state.shouldFitToWidthHeight = action.payload;
     },
-    resetSeed: (state) => {
-      state.seed = -1;
-    },
-    resetParametersState: (state) => {
-      return {
-        ...state,
-        ...initialGenerationState,
-      };
-    },
     setShouldRandomizeSeed: (state, action: PayloadAction<boolean>) => {
       state.shouldRandomizeSeed = action.payload;
     },
     clearInitialImage: (state) => {
       state.initialImage = undefined;
-    },
-    setMaskBlur: (state, action: PayloadAction<number>) => {
-      state.maskBlur = action.payload;
-    },
-    setMaskBlurMethod: (state, action: PayloadAction<ParameterMaskBlurMethod>) => {
-      state.maskBlurMethod = action.payload;
     },
     setCanvasCoherenceMode: (state, action: PayloadAction<ParameterCanvasCoherenceMode>) => {
       state.canvasCoherenceMode = action.payload;
@@ -261,8 +245,6 @@ export const generationSlice = createSlice({
 
 export const {
   clearInitialImage,
-  resetParametersState,
-  resetSeed,
   setCfgScale,
   setCfgRescaleMultiplier,
   setImg2imgStrength,
@@ -271,8 +253,6 @@ export const {
   setPositivePrompt,
   setNegativePrompt,
   setScheduler,
-  setMaskBlur,
-  setMaskBlurMethod,
   setCanvasCoherenceMode,
   setCanvasCoherenceEdgeSize,
   setCanvasCoherenceMinDenoise,
@@ -302,7 +282,7 @@ export const { selectOptimalDimension } = generationSlice.selectors;
 export const selectGenerationSlice = (state: RootState) => state.generation;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-export const migrateGenerationState = (state: any): GenerationState => {
+const migrateGenerationState = (state: any): GenerationState => {
   if (!('_version' in state)) {
     state._version = 1;
     state.aspectRatio = initialAspectRatioState;

@@ -54,8 +54,8 @@ export type SchedulerField = z.infer<typeof zSchedulerField>;
 // #endregion
 
 // #region Model-related schemas
-export const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
-export const zModelType = z.enum([
+const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
+const zModelType = z.enum([
   'main',
   'vae',
   'lora',
@@ -65,15 +65,14 @@ export const zModelType = z.enum([
   'clip_vision',
   't2i_adapter',
 ]);
-export const zModelName = z.string().min(3);
-export const zModelIdentifier = z.object({
+const zModelIdentifier = z.object({
   key: z.string().min(1),
 });
 export const isModelIdentifier = (field: unknown): field is ModelIdentifier =>
   zModelIdentifier.safeParse(field).success;
 export const isModelIdentifierV2 = (field: unknown): field is ModelIdentifierV2 =>
   zModelIdentifierV2.safeParse(field).success;
-export const zModelFieldBase = zModelIdentifier;
+const zModelFieldBase = zModelIdentifier;
 export const zModelIdentifierWithBase = zModelIdentifier.extend({ base: zBaseModel });
 export type BaseModel = z.infer<typeof zBaseModel>;
 export type ModelType = z.infer<typeof zModelType>;
@@ -123,7 +122,7 @@ export type ProgressImage = z.infer<typeof zProgressImage>;
 // #endregion
 
 // #region ImageOutput
-export const zImageOutput = z.object({
+const zImageOutput = z.object({
   image: zImageField,
   width: z.number().int().gt(0),
   height: z.number().int().gt(0),

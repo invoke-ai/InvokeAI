@@ -6,7 +6,7 @@ import { zFieldInputInstance, zFieldInputTemplate, zFieldOutputTemplate } from '
 import { zSemVer } from './semver';
 
 // #region InvocationTemplate
-export const zInvocationTemplate = z.object({
+const zInvocationTemplate = z.object({
   type: z.string(),
   title: z.string(),
   description: z.string(),
@@ -43,13 +43,13 @@ export const zNotesNodeData = z.object({
   isOpen: z.boolean(),
   notes: z.string(),
 });
-export const zCurrentImageNodeData = z.object({
+const zCurrentImageNodeData = z.object({
   id: z.string().trim().min(1),
   type: z.literal('current_image'),
   label: z.string(),
   isOpen: z.boolean(),
 });
-export const zAnyNodeData = z.union([zInvocationNodeData, zNotesNodeData, zCurrentImageNodeData]);
+const zAnyNodeData = z.union([zInvocationNodeData, zNotesNodeData, zCurrentImageNodeData]);
 
 export type NotesNodeData = z.infer<typeof zNotesNodeData>;
 export type InvocationNodeData = z.infer<typeof zInvocationNodeData>;
@@ -64,15 +64,13 @@ export type AnyNode = Node<AnyNodeData>;
 export const isInvocationNode = (node?: AnyNode | null): node is InvocationNode =>
   Boolean(node && node.type === 'invocation');
 export const isNotesNode = (node?: AnyNode | null): node is NotesNode => Boolean(node && node.type === 'notes');
-export const isCurrentImageNode = (node?: AnyNode | null): node is CurrentImageNode =>
-  Boolean(node && node.type === 'current_image');
 export const isInvocationNodeData = (node?: AnyNodeData | null): node is InvocationNodeData =>
   Boolean(node && !['notes', 'current_image'].includes(node.type)); // node.type may be 'notes', 'current_image', or any invocation type
 // #endregion
 
 // #region NodeExecutionState
 export const zNodeStatus = z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED']);
-export const zNodeExecutionState = z.object({
+const zNodeExecutionState = z.object({
   nodeId: z.string().trim().min(1),
   status: zNodeStatus,
   progress: z.number().nullable(),
@@ -85,7 +83,7 @@ export type NodeStatus = z.infer<typeof zNodeStatus>;
 // #endregion
 
 // #region Edges
-export const zInvocationNodeEdgeExtra = z.object({
+const zInvocationNodeEdgeExtra = z.object({
   type: z.union([z.literal('default'), z.literal('collapsed')]),
 });
 export type InvocationNodeEdgeExtra = z.infer<typeof zInvocationNodeEdgeExtra>;
