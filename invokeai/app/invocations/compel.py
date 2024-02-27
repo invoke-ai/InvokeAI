@@ -116,7 +116,7 @@ class CompelInvocation(BaseInvocation):
             # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
             ModelPatcher.apply_lora_text_encoder(text_encoder, _lora_loader()),
             # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
-            ModelPatcher.apply_clip_skip(text_encoder_info.model, self.clip.skipped_layers),
+            ModelPatcher.apply_clip_skip(text_encoder_model, self.clip.skipped_layers),
         ):
             assert isinstance(text_encoder, CLIPTextModel)
             compel = Compel(
