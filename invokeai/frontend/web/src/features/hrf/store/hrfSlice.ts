@@ -10,18 +10,16 @@ export interface HRFState {
   hrfMethod: ParameterHRFMethod;
 }
 
-export const initialHRFState: HRFState = {
+const initialHRFState: HRFState = {
   _version: 1,
   hrfStrength: 0.45,
   hrfEnabled: false,
   hrfMethod: 'ESRGAN',
 };
 
-const initialState: HRFState = initialHRFState;
-
 export const hrfSlice = createSlice({
   name: 'hrf',
-  initialState,
+  initialState: initialHRFState,
   reducers: {
     setHrfStrength: (state, action: PayloadAction<number>) => {
       state.hrfStrength = action.payload;
@@ -40,7 +38,7 @@ export const { setHrfEnabled, setHrfStrength, setHrfMethod } = hrfSlice.actions;
 export const selectHrfSlice = (state: RootState) => state.hrf;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-export const migrateHRFState = (state: any): any => {
+const migrateHRFState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
   }

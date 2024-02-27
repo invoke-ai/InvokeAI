@@ -64,7 +64,6 @@ import {
   getIncomers,
   getOutgoers,
   SelectionMode,
-  updateEdge,
 } from 'reactflow';
 import {
   socketGeneratorProgress,
@@ -88,7 +87,7 @@ const initialNodeExecutionState: Omit<NodeExecutionState, 'nodeId'> = {
   outputs: [],
 };
 
-export const initialNodesState: NodesState = {
+const initialNodesState: NodesState = {
   _version: 1,
   nodes: [],
   edges: [],
@@ -214,10 +213,6 @@ export const nodesSlice = createSlice({
     },
     edgeAdded: (state, action: PayloadAction<Edge>) => {
       state.edges = addEdge(action.payload, state.edges);
-    },
-    edgeUpdated: (state, action: PayloadAction<{ oldEdge: Edge; newConnection: Connection }>) => {
-      const { oldEdge, newConnection } = action.payload;
-      state.edges = updateEdge(oldEdge, newConnection, state.edges);
     },
     connectionStarted: (state, action: PayloadAction<OnConnectStartParams>) => {
       state.connectionStartParams = action.payload;
@@ -674,9 +669,6 @@ export const nodesSlice = createSlice({
       state.connectionStartParams = null;
       state.connectionStartFieldType = null;
     },
-    addNodePopoverToggled: (state) => {
-      state.isAddNodePopoverOpen = !state.isAddNodePopoverOpen;
-    },
     selectionModeChanged: (state, action: PayloadAction<boolean>) => {
       state.selectionMode = action.payload ? SelectionMode.Full : SelectionMode.Partial;
     },
@@ -762,7 +754,6 @@ export const nodesSlice = createSlice({
 export const {
   addNodePopoverClosed,
   addNodePopoverOpened,
-  addNodePopoverToggled,
   connectionEnded,
   connectionMade,
   connectionStarted,
@@ -770,7 +761,6 @@ export const {
   edgeChangeStarted,
   edgesChanged,
   edgesDeleted,
-  edgeUpdated,
   fieldValueReset,
   fieldBoardValueChanged,
   fieldBooleanValueChanged,
@@ -824,7 +814,6 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   edgeDeleted,
   edgesChanged,
   edgesDeleted,
-  edgeUpdated,
   fieldBoardValueChanged,
   fieldBooleanValueChanged,
   fieldColorValueChanged,
@@ -857,7 +846,7 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
 export const selectNodesSlice = (state: RootState) => state.nodes;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-export const migrateNodesState = (state: any): any => {
+const migrateNodesState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
   }

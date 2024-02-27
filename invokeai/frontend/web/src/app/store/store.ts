@@ -136,7 +136,7 @@ const unserialize: UnserializeFunction = (data, key) => {
   }
 };
 
-export const serialize: SerializeFunction = (data, key) => {
+const serialize: SerializeFunction = (data, key) => {
   const persistConfig = persistConfigs[key as keyof typeof persistConfigs];
   if (!persistConfig) {
     throw new Error(`No persist config for slice "${key}"`);
