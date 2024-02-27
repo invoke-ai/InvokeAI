@@ -6,12 +6,13 @@ import {
 } from 'features/controlAdapters/util/buildControlAdapter';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { defaultLoRAConfig } from 'features/lora/store/loraSlice';
-import { MetadataParseError } from 'features/metadata/exceptions';
-import type { ControlNetConfigMetadata, IPAdapterConfigMetadata, MetadataParseFunc, T2IAdapterConfigMetadata } from 'features/metadata/types';
-import {
-  fetchModelConfigWithTypeGuard,
-  getModelKey,
-} from 'features/metadata/util/modelFetchingHelpers';
+import type {
+  ControlNetConfigMetadata,
+  IPAdapterConfigMetadata,
+  MetadataParseFunc,
+  T2IAdapterConfigMetadata,
+} from 'features/metadata/types';
+import { fetchModelConfigWithTypeGuard, getModelKey } from 'features/metadata/util/modelFetchingHelpers';
 import {
   zControlField,
   zIPAdapterField,
@@ -74,6 +75,19 @@ import { v4 as uuidv4 } from 'uuid';
 
 export const MetadataParsePendingToken = Symbol('pending');
 export const MetadataParseFailedToken = Symbol('failed');
+/**
+ * Raised when metadata parsing fails.
+ */
+export class MetadataParseError extends Error {
+  /**
+   * Create MetadataParseError
+   * @param {String} message
+   */
+  constructor(message: string) {
+    super(message);
+    this.name = this.constructor.name;
+  }
+}
 
 /**
  * An async function that a property from an object and validates its type using a type guard. If the property is missing

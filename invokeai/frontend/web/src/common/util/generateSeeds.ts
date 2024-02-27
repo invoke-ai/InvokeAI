@@ -16,5 +16,3 @@ export const generateSeeds = ({ count, start, min = NUMPY_RAND_MIN, max = NUMPY_
   }
   return seeds;
 };
-
-export const generateOneSeed = (min: number = NUMPY_RAND_MIN, max: number = NUMPY_RAND_MAX) => random(min, max);

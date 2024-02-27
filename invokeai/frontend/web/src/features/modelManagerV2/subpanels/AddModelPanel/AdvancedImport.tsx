@@ -16,11 +16,6 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useImportAdvancedModelMutation } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
-import { z } from 'zod';
-
-export const zManualAddMode = z.enum(['diffusers', 'checkpoint']);
-export type ManualAddMode = z.infer<typeof zManualAddMode>;
-export const isManualAddMode = (v: unknown): v is ManualAddMode => zManualAddMode.safeParse(v).success;
 
 export const AdvancedImport = () => {
   const dispatch = useAppDispatch();

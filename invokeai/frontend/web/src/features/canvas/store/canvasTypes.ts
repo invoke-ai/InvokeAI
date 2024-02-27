@@ -10,9 +10,9 @@ export const LAYER_NAMES_DICT: { label: string; value: CanvasLayer }[] = [
   { label: 'Mask', value: 'mask' },
 ];
 
-export const LAYER_NAMES = ['base', 'mask'] as const;
+const LAYER_NAMES = ['base', 'mask'] as const;
 
-export const zBoundingBoxScaleMethod = z.enum(['none', 'auto', 'manual']);
+const zBoundingBoxScaleMethod = z.enum(['none', 'auto', 'manual']);
 export type BoundingBoxScaleMethod = z.infer<typeof zBoundingBoxScaleMethod>;
 export const isBoundingBoxScaleMethod = (v: unknown): v is BoundingBoxScaleMethod =>
   zBoundingBoxScaleMethod.safeParse(v).success;
@@ -112,7 +112,6 @@ export interface CanvasState {
   _version: 1;
   boundingBoxCoordinates: Vector2d;
   boundingBoxDimensions: Dimensions;
-  boundingBoxPreviewFill: RgbaColor;
   boundingBoxScaleMethod: BoundingBoxScaleMethod;
   brushColor: RgbaColor;
   brushSize: number;
