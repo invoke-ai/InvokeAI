@@ -1,4 +1,4 @@
-import type { ListenerEffect, TypedStartListening, UnknownAction } from '@reduxjs/toolkit';
+import type { TypedStartListening } from '@reduxjs/toolkit';
 import { createListenerMiddleware } from '@reduxjs/toolkit';
 import { addBulkDownloadListeners } from 'app/store/middleware/listenerMiddleware/listeners/bulkDownload';
 import { addGalleryImageClickedListener } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
@@ -70,11 +70,9 @@ import { addWorkflowLoadRequestedListener } from './listeners/workflowLoadReques
 
 export const listenerMiddleware = createListenerMiddleware();
 
-export type AppStartListening = TypedStartListening<RootState, AppDispatch>;
+type AppStartListening = TypedStartListening<RootState, AppDispatch>;
 
 export const startAppListening = listenerMiddleware.startListening as AppStartListening;
-
-export type AppListenerEffect = ListenerEffect<UnknownAction, RootState, AppDispatch>;
 
 /**
  * The RTK listener middleware is a lightweight alternative sagas/observables.
