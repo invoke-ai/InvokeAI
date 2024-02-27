@@ -1,0 +1,4 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "ignore": ["src/features/nodes/types/v2/**/*", "src/features/nodes/types/v1/**/*"]
+}
