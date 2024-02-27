@@ -1,11 +1,5 @@
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
-import type {
-  BoardDTO,
-  ListBoardsArg,
-  OffsetPaginatedResults_BoardDTO_,
-  OffsetPaginatedResults_ImageDTO_,
-  UpdateBoardArg,
-} from 'services/api/types';
+import type { BoardDTO, OffsetPaginatedResults_ImageDTO_, UpdateBoardArg } from 'services/api/types';
 import { getListImagesUrl } from 'services/api/util';
 
 import type { ApiTagDescription } from '..';
@@ -24,26 +18,6 @@ export const boardsApi = api.injectEndpoints({
     /**
      * Boards Queries
      */
-    listBoards: build.query<OffsetPaginatedResults_BoardDTO_, ListBoardsArg>({
-      query: (arg) => ({ url: buildBoardsUrl(), params: arg }),
-      providesTags: (result) => {
-        // any list of boards
-        const tags: ApiTagDescription[] = [{ type: 'Board', id: LIST_TAG }, 'FetchOnReconnect'];
-
-        if (result) {
-          // and individual tags for each board
-          tags.push(
-            ...result.items.map(({ board_id }) => ({
-              type: 'Board' as const,
-              id: board_id,
-            }))
-          );
-        }
-
-        return tags;
-      },
-    }),
-
     listAllBoards: build.query<Array<BoardDTO>, void>({
       query: () => ({
         url: buildBoardsUrl(),
@@ -134,7 +108,6 @@ export const boardsApi = api.injectEndpoints({
 });
 
 export const {
-  useListBoardsQuery,
   useListAllBoardsQuery,
   useGetBoardImagesTotalQuery,
   useGetBoardAssetsTotalQuery,

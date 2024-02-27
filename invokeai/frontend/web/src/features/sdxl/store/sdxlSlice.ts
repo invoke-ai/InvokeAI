@@ -22,7 +22,7 @@ type SDXLState = {
   refinerStart: number;
 };
 
-export const initialSDXLState: SDXLState = {
+const initialSDXLState: SDXLState = {
   _version: 1,
   positiveStylePrompt: '',
   negativeStylePrompt: '',
@@ -89,7 +89,7 @@ export const {
 export const selectSdxlSlice = (state: RootState) => state.sdxl;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-export const migrateSDXLState = (state: any): any => {
+const migrateSDXLState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
   }

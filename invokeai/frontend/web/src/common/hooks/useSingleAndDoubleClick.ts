@@ -1,7 +1,7 @@
 // https://stackoverflow.com/a/73731908
 import { useCallback, useEffect, useState } from 'react';
 
-export type UseSingleAndDoubleClickOptions = {
+type UseSingleAndDoubleClickOptions = {
   onSingleClick: () => void;
   onDoubleClick: () => void;
   latency?: number;

@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { PersistConfig } from 'app/store/store';
 
 type ModelManagerState = {
   _version: 1;
@@ -41,8 +41,6 @@ export const modelManagerV2Slice = createSlice({
 
 export const { setSelectedModelKey, setSearchTerm, setFilteredModelType, setSelectedModelMode } =
   modelManagerV2Slice.actions;
-
-export const selectModelManagerSlice = (state: RootState) => state.modelmanagerV2;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateModelManagerState = (state: any): any => {

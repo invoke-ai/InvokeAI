@@ -14,7 +14,7 @@ const baseDimensionConfig: NumericalParameterConfig = {
   coarseStep: 64,
 };
 
-export const initialConfigState: AppConfig = {
+const initialConfigState: AppConfig = {
   shouldUpdateImagesOnConnect: false,
   shouldFetchMetadataFromApi: false,
   disabledTabs: [],

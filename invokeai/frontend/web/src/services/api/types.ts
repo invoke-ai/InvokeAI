@@ -101,10 +101,6 @@ export const isT2IAdapterModelConfig = (config: AnyModelConfig): config is T2IAd
   return config.type === 't2i_adapter';
 };
 
-export const isTextualInversionModelConfig = (config: AnyModelConfig): config is TextualInversionModelConfig => {
-  return config.type === 'embedding';
-};
-
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base !== 'sdxl-refiner';
 };
