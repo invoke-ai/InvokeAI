@@ -1,9 +1,0 @@
-{
-  "entry": ["src/main.tsx"],
-  "extensions": [".ts", ".tsx"],
-  "ignorePatterns": ["**/node_modules/**", "dist/**", "public/**", "**/*.stories.tsx", "config/**"],
-  "ignoreUnresolved": [],
-  "ignoreUnimported": ["src/i18.d.ts", "vite.config.ts", "src/vite-env.d.ts"],
-  "respectGitignore": true,
-  "ignoreUnused": []
-}
