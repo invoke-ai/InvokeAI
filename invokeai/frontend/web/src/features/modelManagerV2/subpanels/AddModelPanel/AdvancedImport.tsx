@@ -148,11 +148,11 @@ export const AdvancedImport = () => {
             <Flex gap={4}>
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                 <FormLabel>{t('modelManager.baseModel')}</FormLabel>
-                <BaseModelSelect<AnyModelConfig> control={control} name="base" />
+                <BaseModelSelect control={control} name="base" />
               </FormControl>
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                 <FormLabel>{t('common.format')}</FormLabel>
-                <ModelFormatSelect<AnyModelConfig> control={control} name="format" />
+                <ModelFormatSelect control={control} name="format" />
               </FormControl>
             </Flex>
             <Flex gap={4}>

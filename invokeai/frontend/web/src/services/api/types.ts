@@ -50,7 +50,6 @@ export type BaseModelType = S['BaseModelType'];
 export type MainModelField = S['MainModelField'];
 export type VAEModelField = S['VAEModelField'];
 export type LoRAModelField = S['LoRAModelField'];
-export type LoRAModelFormat = S['LoRAModelFormat'];
 export type ControlNetModelField = S['ControlNetModelField'];
 export type IPAdapterModelField = S['IPAdapterModelField'];
 export type T2IAdapterModelField = S['T2IAdapterModelField'];
@@ -72,8 +71,6 @@ export type DiffusersModelConfig = S['MainDiffusersConfig'];
 export type CheckpointModelConfig = S['MainCheckpointConfig'];
 type CLIPVisionDiffusersConfig = S['CLIPVisionDiffusersConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
-export type RefinerMainModelConfig = Omit<MainModelConfig, 'base'> & { base: 'sdxl-refiner' };
-export type NonRefinerMainModelConfig = Omit<MainModelConfig, 'base'> & { base: 'any' | 'sd-1' | 'sd-2' | 'sdxl' };
 export type AnyModelConfig =
   | LoRAModelConfig
   | VAEModelConfig
@@ -81,19 +78,8 @@ export type AnyModelConfig =
   | IPAdapterModelConfig
   | T2IAdapterModelConfig
   | TextualInversionModelConfig
-  | RefinerMainModelConfig
-  | NonRefinerMainModelConfig
+  | MainModelConfig
   | CLIPVisionDiffusersConfig;
-
-type AnyModelConfig2 =
-  | (S['MainDiffusersConfig'] | S['MainCheckpointConfig'])
-  | (S['VaeDiffusersConfig'] | S['VaeCheckpointConfig'])
-  | (S['ControlNetDiffusersConfig'] | S['ControlNetCheckpointConfig'])
-  | S['LoRAConfig']
-  | S['TextualInversionConfig']
-  | S['IPAdapterConfig']
-  | S['CLIPVisionDiffusersConfig']
-  | S['T2IConfig'];
 
 export const isLoRAModelConfig = (config: AnyModelConfig): config is LoRAModelConfig => {
   return config.type === 'lora';
@@ -119,16 +105,14 @@ export const isTextualInversionModelConfig = (config: AnyModelConfig): config is
   return config.type === 'embedding';
 };
 
-export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is NonRefinerMainModelConfig => {
+export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base !== 'sdxl-refiner';
 };
 
-export const isRefinerMainModelModelConfig = (config: AnyModelConfig): config is RefinerMainModelConfig => {
+export const isRefinerMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'sdxl-refiner';
 };
 
-export type MergeModelConfig = S['Body_merge'];
-export type ImportModelConfig = S['Body_import_model'];
 export type ModelInstallJob = S['ModelInstallJob'];
 export type ModelInstallStatus = S['InstallStatus'];
 
