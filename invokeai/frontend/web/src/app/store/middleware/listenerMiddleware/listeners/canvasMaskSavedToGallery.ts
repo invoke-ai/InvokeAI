@@ -1,13 +1,12 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { canvasMaskSavedToGallery } from 'features/canvas/store/actions';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 
-import { startAppListening } from '..';
-
-export const addCanvasMaskSavedToGalleryListener = () => {
+export const addCanvasMaskSavedToGalleryListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: canvasMaskSavedToGallery,
     effect: async (action, { dispatch, getState }) => {

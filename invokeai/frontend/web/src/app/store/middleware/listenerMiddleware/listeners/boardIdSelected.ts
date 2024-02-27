@@ -1,12 +1,11 @@
 import { isAnyOf } from '@reduxjs/toolkit';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { imagesApi } from 'services/api/endpoints/images';
 import { imagesSelectors } from 'services/api/util';
 
-import { startAppListening } from '..';
-
-export const addBoardIdSelectedListener = () => {
+export const addBoardIdSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher: isAnyOf(boardIdSelected, galleryViewChanged),
     effect: async (action, { getState, dispatch, condition, cancelActiveListeners }) => {

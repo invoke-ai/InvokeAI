@@ -1,11 +1,10 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { socketModelLoadCompleted, socketModelLoadStarted } from 'services/events/actions';
-
-import { startAppListening } from '../..';
 
 const log = logger('socketio');
 
-export const addModelLoadEventListener = () => {
+export const addModelLoadEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketModelLoadStarted,
     effect: (action) => {

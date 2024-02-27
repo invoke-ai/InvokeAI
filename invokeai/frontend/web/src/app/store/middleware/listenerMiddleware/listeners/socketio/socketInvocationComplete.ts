@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
 import { addImageToStagingArea } from 'features/canvas/store/canvasSlice';
 import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
@@ -10,14 +11,12 @@ import { imagesApi } from 'services/api/endpoints/images';
 import { imagesAdapter } from 'services/api/util';
 import { socketInvocationComplete } from 'services/events/actions';
 
-import { startAppListening } from '../..';
-
 // These nodes output an image, but do not actually *save* an image, so we don't want to handle the gallery logic on them
 const nodeTypeDenylist = ['load_image', 'image'];
 
 const log = logger('socketio');
 
-export const addInvocationCompleteEventListener = () => {
+export const addInvocationCompleteEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketInvocationComplete,
     effect: async (action, { dispatch, getState }) => {
