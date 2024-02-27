@@ -13,7 +13,7 @@ import { isInvocationNode } from 'features/nodes/types/invocation';
 import type { WorkflowCategory, WorkflowV3 } from 'features/nodes/types/workflow';
 import { cloneDeep, isEqual, omit, uniqBy } from 'lodash-es';
 
-export const blankWorkflow: Omit<WorkflowV3, 'nodes' | 'edges'> = {
+const blankWorkflow: Omit<WorkflowV3, 'nodes' | 'edges'> = {
   name: '',
   author: '',
   description: '',
@@ -26,7 +26,7 @@ export const blankWorkflow: Omit<WorkflowV3, 'nodes' | 'edges'> = {
   id: undefined,
 };
 
-export const initialWorkflowState: WorkflowState = {
+const initialWorkflowState: WorkflowState = {
   _version: 1,
   isTouched: false,
   mode: 'view',
@@ -195,7 +195,7 @@ export const {
 export const selectWorkflowSlice = (state: RootState) => state.workflow;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-export const migrateWorkflowState = (state: any): any => {
+const migrateWorkflowState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
   }

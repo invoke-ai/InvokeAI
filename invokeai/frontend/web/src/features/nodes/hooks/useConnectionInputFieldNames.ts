@@ -1,6 +1,6 @@
+import { EMPTY_ARRAY } from "app/store/constants";
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { EMPTY_ARRAY } from 'app/store/util';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { selectNodeTemplate } from 'features/nodes/store/selectors';
 import { getSortedFilteredFieldNames } from 'features/nodes/util/node/getSortedFilteredFieldNames';
