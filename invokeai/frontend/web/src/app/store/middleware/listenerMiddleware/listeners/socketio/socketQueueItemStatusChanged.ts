@@ -1,12 +1,11 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
 import { socketQueueItemStatusChanged } from 'services/events/actions';
 
-import { startAppListening } from '../..';
-
 const log = logger('socketio');
 
-export const addSocketQueueItemStatusChangedEventListener = () => {
+export const addSocketQueueItemStatusChangedEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketQueueItemStatusChanged,
     effect: async (action, { dispatch }) => {

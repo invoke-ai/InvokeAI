@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
 import { workflowLoaded, workflowLoadRequested } from 'features/nodes/store/actions';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
@@ -10,9 +11,7 @@ import { t } from 'i18next';
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 
-import { startAppListening } from '..';
-
-export const addWorkflowLoadRequestedListener = () => {
+export const addWorkflowLoadRequestedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: workflowLoadRequested,
     effect: (action, { dispatch, getState }) => {

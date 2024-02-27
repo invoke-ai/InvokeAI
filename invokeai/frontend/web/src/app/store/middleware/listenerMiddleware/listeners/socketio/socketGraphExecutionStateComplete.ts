@@ -1,11 +1,10 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { socketGraphExecutionStateComplete } from 'services/events/actions';
-
-import { startAppListening } from '../..';
 
 const log = logger('socketio');
 
-export const addGraphExecutionStateCompleteEventListener = () => {
+export const addGraphExecutionStateCompleteEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketGraphExecutionStateComplete,
     effect: (action) => {

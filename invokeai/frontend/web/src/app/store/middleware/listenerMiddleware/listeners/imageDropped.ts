@@ -1,5 +1,6 @@
 import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
@@ -12,14 +13,12 @@ import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { initialImageChanged, selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 
-import { startAppListening } from '../';
-
 export const dndDropped = createAction<{
   overData: TypesafeDroppableData;
   activeData: TypesafeDraggableData;
 }>('dnd/dndDropped');
 
-export const addImageDroppedListener = () => {
+export const addImageDroppedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: dndDropped,
     effect: async (action, { dispatch, getState }) => {
