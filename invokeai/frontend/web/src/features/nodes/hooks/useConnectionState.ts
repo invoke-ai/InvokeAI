@@ -11,7 +11,7 @@ const selectIsConnectionInProgress = createSelector(
   (nodes) => nodes.connectionStartFieldType !== null && nodes.connectionStartParams !== null
 );
 
-export type UseConnectionStateProps = {
+type UseConnectionStateProps = {
   nodeId: string;
   fieldName: string;
   kind: 'inputs' | 'outputs';

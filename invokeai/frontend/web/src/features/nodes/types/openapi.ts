@@ -7,7 +7,7 @@ import type {
 
 // Janky customization of OpenAPI Schema :/
 
-export type InvocationSchemaExtra = InvocationJSONSchemaExtra & {
+type InvocationSchemaExtra = InvocationJSONSchemaExtra & {
   output: OpenAPIV3_1.ReferenceObject; // the output of the invocation
   title: string;
   category?: string;
@@ -26,14 +26,10 @@ export type InvocationSchemaExtra = InvocationJSONSchemaExtra & {
   };
 };
 
-export type InvocationSchemaType = {
-  default: string; // the type of the invocation
-};
-
-export type InvocationBaseSchemaObject = Omit<OpenAPIV3_1.BaseSchemaObject, 'title' | 'type' | 'properties'> &
+type InvocationBaseSchemaObject = Omit<OpenAPIV3_1.BaseSchemaObject, 'title' | 'type' | 'properties'> &
   InvocationSchemaExtra;
 
-export type InvocationOutputSchemaObject = Omit<OpenAPIV3_1.SchemaObject, 'properties'> & {
+type InvocationOutputSchemaObject = Omit<OpenAPIV3_1.SchemaObject, 'properties'> & {
   properties: OpenAPIV3_1.SchemaObject['properties'] & {
     type: Omit<OpenAPIV3_1.SchemaObject, 'default'> & {
       default: string;
@@ -47,11 +43,11 @@ export type InvocationFieldSchema = OpenAPIV3_1.SchemaObject & InputFieldJSONSch
 
 export type OpenAPIV3_1SchemaOrRef = OpenAPIV3_1.ReferenceObject | OpenAPIV3_1.SchemaObject;
 
-export interface ArraySchemaObject extends InvocationBaseSchemaObject {
+interface ArraySchemaObject extends InvocationBaseSchemaObject {
   type: OpenAPIV3_1.ArraySchemaObjectType;
   items: OpenAPIV3_1.ReferenceObject | OpenAPIV3_1.SchemaObject;
 }
-export interface NonArraySchemaObject extends InvocationBaseSchemaObject {
+interface NonArraySchemaObject extends InvocationBaseSchemaObject {
   type?: OpenAPIV3_1.NonArraySchemaObjectType;
 }
 

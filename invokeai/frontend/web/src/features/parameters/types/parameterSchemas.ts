@@ -91,11 +91,6 @@ export type ParameterHeight = z.infer<typeof zParameterHeight>;
 export const isParameterHeight = (val: unknown): val is ParameterHeight => zParameterHeight.safeParse(val).success;
 // #endregion
 
-// #region Aspect Ratio
-const zParameterAspectRatio = z.number().int().min(0).max(6);
-export type ParameterAspectRatio = z.infer<typeof zParameterAspectRatio>;
-// #endregion
-
 // #region Model
 export const zParameterModel = zModelIdentifierWithBase;
 export type ParameterModel = z.infer<typeof zParameterModel>;
@@ -198,6 +193,6 @@ export const isParameterCanvasCoherenceMode = (val: unknown): val is ParameterCa
 
 // #region LoRA weight
 const zLoRAWeight = z.number();
-export type ParameterLoRAWeight = z.infer<typeof zLoRAWeight>;
+type ParameterLoRAWeight = z.infer<typeof zLoRAWeight>;
 export const isParameterLoRAWeight = (val: unknown): val is ParameterLoRAWeight => zLoRAWeight.safeParse(val).success;
 // #endregion
