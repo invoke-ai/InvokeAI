@@ -185,7 +185,6 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
     },
   });
 
-export type AppGetState = ReturnType<ReturnType<typeof createStore>['getState']>;
 export type RootState = ReturnType<ReturnType<typeof createStore>['getState']>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AppThunkDispatch = ThunkDispatch<RootState, any, UnknownAction>;

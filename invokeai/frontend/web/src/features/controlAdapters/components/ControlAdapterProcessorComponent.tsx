@@ -17,7 +17,7 @@ import NormalBaeProcessor from './processors/NormalBaeProcessor';
 import PidiProcessor from './processors/PidiProcessor';
 import ZoeDepthProcessor from './processors/ZoeDepthProcessor';
 
-export type Props = {
+type Props = {
   id: string;
 };
 

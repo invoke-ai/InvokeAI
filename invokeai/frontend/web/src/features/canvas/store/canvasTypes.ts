@@ -15,7 +15,7 @@ export type BoundingBoxScaleMethod = z.infer<typeof zBoundingBoxScaleMethod>;
 export const isBoundingBoxScaleMethod = (v: unknown): v is BoundingBoxScaleMethod =>
   zBoundingBoxScaleMethod.safeParse(v).success;
 
-export type CanvasDrawingTool = 'brush' | 'eraser';
+type CanvasDrawingTool = 'brush' | 'eraser';
 
 export type CanvasTool = CanvasDrawingTool | 'move' | 'colorPicker';
 
@@ -53,7 +53,7 @@ export type CanvasBaseLine = {
   clip?: IRect;
 };
 
-export type CanvasFillRect = {
+type CanvasFillRect = {
   kind: 'fillRect';
   layer: 'base';
   x: number;
@@ -63,7 +63,7 @@ export type CanvasFillRect = {
   color: RgbaColor;
 };
 
-export type CanvasEraseRect = {
+type CanvasEraseRect = {
   kind: 'eraseRect';
   layer: 'base';
   x: number;
@@ -72,7 +72,7 @@ export type CanvasEraseRect = {
   height: number;
 };
 
-export type CanvasObject = CanvasImage | CanvasBaseLine | CanvasMaskLine | CanvasFillRect | CanvasEraseRect;
+type CanvasObject = CanvasImage | CanvasBaseLine | CanvasMaskLine | CanvasFillRect | CanvasEraseRect;
 
 export type CanvasLayerState = {
   objects: CanvasObject[];
@@ -81,11 +81,6 @@ export type CanvasLayerState = {
     selectedImageIndex: number;
     boundingBox?: IRect;
   };
-};
-
-export type CanvasSession = {
-  sessionId: string;
-  boundingBox: IRect;
 };
 
 // type guards

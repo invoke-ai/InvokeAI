@@ -377,40 +377,6 @@ export const imagesApi = api.injectEndpoints({
       },
     }),
     /**
-     * Change an image's `session_id` association.
-     */
-    changeImageSessionId: build.mutation<ImageDTO, { imageDTO: ImageDTO; session_id: string }>({
-      query: ({ imageDTO, session_id }) => ({
-        url: buildImagesUrl(`i/${imageDTO.image_name}`),
-        method: 'PATCH',
-        body: { session_id },
-      }),
-      async onQueryStarted({ imageDTO, session_id }, { dispatch, queryFulfilled }) {
-        /**
-         * Cache changes for `changeImageSessionId`:
-         * - *update* getImageDTO
-         */
-
-        // Store patches so we can undo if the query fails
-        const patches: PatchCollection[] = [];
-
-        // *update* getImageDTO
-        patches.push(
-          dispatch(
-            imagesApi.util.updateQueryData('getImageDTO', imageDTO.image_name, (draft) => {
-              Object.assign(draft, { session_id });
-            })
-          )
-        );
-
-        try {
-          await queryFulfilled;
-        } catch {
-          patches.forEach((patchResult) => patchResult.undo());
-        }
-      },
-    }),
-    /**
      * Star a list of images.
      */
     starImages: build.mutation<
@@ -1336,13 +1302,10 @@ export const imagesApi = api.injectEndpoints({
 export const {
   useGetIntermediatesCountQuery,
   useListImagesQuery,
-  useLazyListImagesQuery,
   useGetImageDTOQuery,
   useGetImageMetadataQuery,
   useGetImageWorkflowQuery,
   useLazyGetImageWorkflowQuery,
-  useDeleteImageMutation,
-  useDeleteImagesMutation,
   useUploadImageMutation,
   useClearIntermediatesMutation,
   useAddImagesToBoardMutation,
@@ -1350,7 +1313,6 @@ export const {
   useAddImageToBoardMutation,
   useRemoveImageFromBoardMutation,
   useChangeImageIsIntermediateMutation,
-  useChangeImageSessionIdMutation,
   useDeleteBoardAndImagesMutation,
   useDeleteBoardMutation,
   useStarImagesMutation,
