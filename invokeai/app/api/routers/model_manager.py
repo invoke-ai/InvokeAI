@@ -261,13 +261,11 @@ async def update_model_metadata(
     changes: ModelMetadataChanges = Body(description="The changes")
 ) -> Optional[AnyModelRepoMetadata]:
     """Updates or creates a model metadata object."""
-    logger = ApiDependencies.invoker.services.logger
     record_store = ApiDependencies.invoker.services.model_manager.store
     metadata_store = ApiDependencies.invoker.services.model_manager.store.metadata_store
     
     try:
         original_metadata = record_store.get_metadata(key)
-        print(original_metadata)
         if original_metadata:
             original_metadata.trigger_phrases = changes.trigger_phrases
 
@@ -275,7 +273,6 @@ async def update_model_metadata(
         else:
             metadata_store.add_metadata(key, BaseMetadata(name="", author="",trigger_phrases=changes.trigger_phrases))
     except Exception as e:
-        ApiDependencies.invoker.services.logger.error(traceback.format_exception(e))
         raise HTTPException(
             status_code=500,
             detail=f"An error occurred while updating the model metadata: {e}",
@@ -284,7 +281,6 @@ async def update_model_metadata(
     result: Optional[AnyModelRepoMetadata] = record_store.get_metadata(key)
 
     return result
-
 
 
 @model_manager_router.get(
