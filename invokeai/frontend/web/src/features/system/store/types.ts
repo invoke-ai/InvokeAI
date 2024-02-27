@@ -15,7 +15,7 @@ export type DenoiseProgress = {
   percentage: number;
 };
 
-export const zLanguage = z.enum([
+const zLanguage = z.enum([
   'ar',
   'az',
   'de',
@@ -58,11 +58,3 @@ export interface SystemState {
   status: SystemStatus;
   shouldEnableInformationalPopovers: boolean;
 }
-
-export const STATUS_TRANSLATION_KEYS: Record<SystemStatus, string> = {
-  CONNECTED: 'common.statusConnected',
-  DISCONNECTED: 'common.statusDisconnected',
-  PROCESSING: 'common.statusProcessing',
-  ERROR: 'common.statusError',
-  LOADING_MODEL: 'common.statusLoadingModel',
-};
