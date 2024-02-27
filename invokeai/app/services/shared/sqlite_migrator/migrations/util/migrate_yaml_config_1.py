@@ -21,7 +21,7 @@ from invokeai.backend.model_manager.config import (
     ModelConfigFactory,
     ModelType,
 )
-from invokeai.backend.model_manager.hash import FastModelHash
+from invokeai.backend.model_manager.hash import ModelHash
 
 ModelsValidator = TypeAdapter(AnyModelConfig)
 
@@ -72,7 +72,7 @@ class MigrateModelYamlToDb1:
 
             base_type, model_type, model_name = str(model_key).split("/")
             try:
-                hash = FastModelHash.hash(self.config.models_path / stanza.path)
+                hash = ModelHash.hash(self.config.models_path / stanza.path)
             except OSError:
                 self.logger.warning(f"The model at {stanza.path} is not a valid file or directory. Skipping migration.")
                 continue
