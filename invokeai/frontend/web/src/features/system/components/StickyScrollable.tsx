@@ -28,7 +28,7 @@ const StickyScrollableContent = memo((props: StickyScrollableContentProps) => {
 
 StickyScrollableContent.displayName = 'StickyScrollableContent';
 
-export type StickyScrollableProps = PropsWithChildren<{
+type StickyScrollableProps = PropsWithChildren<{
   title: string;
 }>;
 

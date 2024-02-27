@@ -78,7 +78,7 @@ export const MetadataParseFailedToken = Symbol('failed');
 /**
  * Raised when metadata parsing fails.
  */
-export class MetadataParseError extends Error {
+class MetadataParseError extends Error {
   /**
    * Create MetadataParseError
    * @param {String} message

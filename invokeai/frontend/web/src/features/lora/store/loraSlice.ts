@@ -16,7 +16,7 @@ export const defaultLoRAConfig: Pick<LoRA, 'weight' | 'isEnabled'> = {
   isEnabled: true,
 };
 
-export type LoraState = {
+type LoraState = {
   _version: 1;
   loras: Record<string, LoRA>;
 };

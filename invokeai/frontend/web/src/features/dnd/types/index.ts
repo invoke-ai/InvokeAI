@@ -18,30 +18,26 @@ type BaseDropData = {
   id: string;
 };
 
-export type CurrentImageDropData = BaseDropData & {
+type CurrentImageDropData = BaseDropData & {
   actionType: 'SET_CURRENT_IMAGE';
 };
 
-export type InitialImageDropData = BaseDropData & {
+type InitialImageDropData = BaseDropData & {
   actionType: 'SET_INITIAL_IMAGE';
 };
 
-export type ControlAdapterDropData = BaseDropData & {
+type ControlAdapterDropData = BaseDropData & {
   actionType: 'SET_CONTROL_ADAPTER_IMAGE';
   context: {
     id: string;
   };
 };
 
-export type IPAdapterImageDropData = BaseDropData & {
-  actionType: 'SET_IP_ADAPTER_IMAGE';
-};
-
 export type CanvasInitialImageDropData = BaseDropData & {
   actionType: 'SET_CANVAS_INITIAL_IMAGE';
 };
 
-export type NodesImageDropData = BaseDropData & {
+type NodesImageDropData = BaseDropData & {
   actionType: 'SET_NODES_IMAGE';
   context: {
     nodeId: string;
@@ -71,7 +67,7 @@ type BaseDragData = {
   id: string;
 };
 
-export type NodeFieldDraggableData = BaseDragData & {
+type NodeFieldDraggableData = BaseDragData & {
   payloadType: 'NODE_FIELD';
   payload: {
     nodeId: string;
@@ -114,7 +110,7 @@ export interface TypesafeActive extends Omit<Active, 'data'> {
   data: React.MutableRefObject<TypesafeDraggableData | undefined>;
 }
 
-export interface TypesafeOver extends Omit<Over, 'data'> {
+interface TypesafeOver extends Omit<Over, 'data'> {
   data: React.MutableRefObject<TypesafeDroppableData | undefined>;
 }
 
@@ -127,10 +123,10 @@ interface DragEvent {
 }
 
 export interface DragStartEvent extends Pick<DragEvent, 'active'> {}
-export interface DragMoveEvent extends DragEvent {}
-export interface DragOverEvent extends DragMoveEvent {}
+interface DragMoveEvent extends DragEvent {}
+interface DragOverEvent extends DragMoveEvent {}
 export interface DragEndEvent extends DragEvent {}
-export interface DragCancelEvent extends DragEndEvent {}
+interface DragCancelEvent extends DragEndEvent {}
 
 export interface DndContextTypesafeProps
   extends Omit<DndContextProps, 'onDragStart' | 'onDragMove' | 'onDragOver' | 'onDragEnd' | 'onDragCancel'> {
