@@ -1,6 +1,7 @@
 import type { EntityAdapter, EntityState, ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { createEntityAdapter } from '@reduxjs/toolkit';
 import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
+import type { JSONObject } from 'common/types';
 import queryString from 'query-string';
 import type { operations, paths } from 'services/api/schema';
 import type {
@@ -19,8 +20,8 @@ import type { ApiTagDescription, tagTypes } from '..';
 import { api, buildV2Url, LIST_TAG } from '..';
 
 type UpdateModelArg = {
-  key: NonNullable<operations['update_model_record']['parameters']['path']['key']>;
-  body: NonNullable<operations['update_model_record']['requestBody']['content']['application/json']>;
+  key: paths['/api/v2/models/i/{key}']['patch']['parameters']['path']['key'];
+  body: paths['/api/v2/models/i/{key}']['patch']['requestBody']['content']['application/json'];
 };
 
 type UpdateModelResponse = paths['/api/v2/models/i/{key}']['patch']['responses']['200']['content']['application/json'];
@@ -40,14 +41,15 @@ type DeleteMainModelResponse = void;
 type ConvertMainModelResponse =
   paths['/api/v2/models/convert/{key}']['put']['responses']['200']['content']['application/json'];
 
-type ImportMainModelArg = {
-  source: NonNullable<operations['heuristic_install_model']['parameters']['query']['source']>;
-  access_token?: operations['heuristic_install_model']['parameters']['query']['access_token'];
-  config: NonNullable<operations['heuristic_install_model']['requestBody']['content']['application/json']>;
+type InstallModelArg = {
+  source: paths['/api/v2/models/install']['post']['parameters']['query']['source'];
+  access_token?: paths['/api/v2/models/install']['post']['parameters']['query']['access_token'];
+  // TODO(MM2): This is typed as `Optional[Dict[str, Any]]` in backend...
+  config?: JSONObject;
+  // config: NonNullable<paths['/api/v2/models/heuristic_install']['post']['requestBody']>['content']['application/json'];
 };
 
-type ImportMainModelResponse =
-  paths['/api/v2/models/heuristic_install']['post']['responses']['201']['content']['application/json'];
+type InstallModelResponse = paths['/api/v2/models/install']['post']['responses']['201']['content']['application/json'];
 
 type ListImportModelsResponse =
   paths['/api/v2/models/import']['get']['responses']['200']['content']['application/json'];
@@ -57,14 +59,6 @@ type DeleteImportModelsResponse =
 
 type PruneModelImportsResponse =
   paths['/api/v2/models/import']['patch']['responses']['200']['content']['application/json'];
-
-type ImportAdvancedModelArg = {
-  source: NonNullable<operations['import_model']['requestBody']['content']['application/json']['source']>;
-  config: NonNullable<operations['import_model']['requestBody']['content']['application/json']['config']>;
-};
-
-type ImportAdvancedModelResponse =
-  paths['/api/v2/models/import']['post']['responses']['201']['content']['application/json'];
 
 export type ScanFolderResponse =
   paths['/api/v2/models/scan_folder']['get']['responses']['200']['content']['application/json'];
@@ -183,23 +177,13 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['Model'],
     }),
-    importMainModels: build.mutation<ImportMainModelResponse, ImportMainModelArg>({
+    installModel: build.mutation<InstallModelResponse, InstallModelArg>({
       query: ({ source, config, access_token }) => {
         return {
           url: buildModelsUrl('heuristic_install'),
           params: { source, access_token },
           method: 'POST',
           body: config,
-        };
-      },
-      invalidatesTags: ['Model', 'ModelImports'],
-    }),
-    importAdvancedModel: build.mutation<ImportAdvancedModelResponse, ImportAdvancedModelArg>({
-      query: ({ source, config }) => {
-        return {
-          url: buildModelsUrl('install'),
-          method: 'POST',
-          body: { source, config },
         };
       },
       invalidatesTags: ['Model', 'ModelImports'],
@@ -365,8 +349,7 @@ export const {
   useGetVaeModelsQuery,
   useDeleteModelsMutation,
   useUpdateModelsMutation,
-  useImportMainModelsMutation,
-  useImportAdvancedModelMutation,
+  useInstallModelMutation,
   useConvertMainModelsMutation,
   useSyncModelsMutation,
   useScanModelsQuery,
