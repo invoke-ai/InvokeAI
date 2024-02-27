@@ -3,36 +3,35 @@
  * Do not make direct changes to the file.
  */
 
-
 export type paths = {
-  "/api/v1/utilities/dynamicprompts": {
+  '/api/v1/utilities/dynamicprompts': {
     /**
      * Parse Dynamicprompts
      * @description Creates a batch process
      */
-    post: operations["parse_dynamicprompts"];
+    post: operations['parse_dynamicprompts'];
   };
-  "/api/v2/models/": {
+  '/api/v2/models/': {
     /**
      * List Model Records
      * @description Get a list of models.
      */
-    get: operations["list_model_records"];
+    get: operations['list_model_records'];
   };
-  "/api/v2/models/get_by_attrs": {
+  '/api/v2/models/get_by_attrs': {
     /**
      * Get Model Records By Attrs
      * @description Gets a model by its attributes. The main use of this route is to provide backwards compatibility with the old
      * model manager, which identified models by a combination of name, base and type.
      */
-    get: operations["get_model_records_by_attrs"];
+    get: operations['get_model_records_by_attrs'];
   };
-  "/api/v2/models/i/{key}": {
+  '/api/v2/models/i/{key}': {
     /**
      * Get Model Record
      * @description Get a model record
      */
-    get: operations["get_model_record"];
+    get: operations['get_model_record'];
     /**
      * Delete Model
      * @description Delete model record from database.
@@ -45,11 +44,11 @@ export type paths = {
      * Update Model Record
      * @description Update a model's config.
      */
-    patch: operations["update_model_record"];
+    patch: operations['update_model_record'];
   };
   "/api/v2/models/scan_folder": {
     /** Scan For Models */
-    get: operations["scan_for_models"];
+    get: operations['scan_for_models'];
   };
   "/api/v2/models/install": {
     /**
@@ -114,14 +113,14 @@ export type paths = {
      * @description Return model install job corresponding to the given source. See the documentation for 'List Model Install Jobs'
      * for information on the format of the return value.
      */
-    get: operations["get_model_install_job"];
+    get: operations['get_model_install_job'];
     /**
      * Cancel Model Install Job
      * @description Cancel the model install job(s) corresponding to the given job ID.
      */
-    delete: operations["cancel_model_install_job"];
+    delete: operations['cancel_model_install_job'];
   };
-  "/api/v2/models/sync": {
+  '/api/v2/models/sync': {
     /**
      * Sync Models To Config
      * @description Traverse the models and autoimport directories.
@@ -129,391 +128,391 @@ export type paths = {
      * Model files without a corresponding
      * record in the database are added. Orphan records without a models file are deleted.
      */
-    patch: operations["sync_models_to_config"];
+    patch: operations['sync_models_to_config'];
   };
-  "/api/v2/models/convert/{key}": {
+  '/api/v2/models/convert/{key}': {
     /**
      * Convert Model
      * @description Permanently convert a model into diffusers format, replacing the safetensors version.
      * Note that during the conversion process the key and model hash will change.
      * The return value is the model configuration for the converted model.
      */
-    put: operations["convert_model"];
+    put: operations['convert_model'];
   };
   "/api/v1/download_queue/": {
     /**
      * List Downloads
      * @description Get a list of active and inactive jobs.
      */
-    get: operations["list_downloads"];
+    get: operations['list_downloads'];
     /**
      * Prune Downloads
      * @description Prune completed and errored jobs.
      */
-    patch: operations["prune_downloads"];
+    patch: operations['prune_downloads'];
   };
-  "/api/v1/download_queue/i/": {
+  '/api/v1/download_queue/i/': {
     /**
      * Download
      * @description Download the source URL to the file or directory indicted in dest.
      */
-    post: operations["download"];
+    post: operations['download'];
   };
-  "/api/v1/download_queue/i/{id}": {
+  '/api/v1/download_queue/i/{id}': {
     /**
      * Get Download Job
      * @description Get a download job using its ID.
      */
-    get: operations["get_download_job"];
+    get: operations['get_download_job'];
     /**
      * Cancel Download Job
      * @description Cancel a download job using its ID.
      */
-    delete: operations["cancel_download_job"];
+    delete: operations['cancel_download_job'];
   };
-  "/api/v1/download_queue/i": {
+  '/api/v1/download_queue/i': {
     /**
      * Cancel All Download Jobs
      * @description Cancel all download jobs.
      */
-    delete: operations["cancel_all_download_jobs"];
+    delete: operations['cancel_all_download_jobs'];
   };
-  "/api/v1/images/upload": {
+  '/api/v1/images/upload': {
     /**
      * Upload Image
      * @description Uploads an image
      */
-    post: operations["upload_image"];
+    post: operations['upload_image'];
   };
-  "/api/v1/images/i/{image_name}": {
+  '/api/v1/images/i/{image_name}': {
     /**
      * Get Image Dto
      * @description Gets an image's DTO
      */
-    get: operations["get_image_dto"];
+    get: operations['get_image_dto'];
     /**
      * Delete Image
      * @description Deletes an image
      */
-    delete: operations["delete_image"];
+    delete: operations['delete_image'];
     /**
      * Update Image
      * @description Updates an image
      */
-    patch: operations["update_image"];
+    patch: operations['update_image'];
   };
-  "/api/v1/images/intermediates": {
+  '/api/v1/images/intermediates': {
     /**
      * Get Intermediates Count
      * @description Gets the count of intermediate images
      */
-    get: operations["get_intermediates_count"];
+    get: operations['get_intermediates_count'];
     /**
      * Clear Intermediates
      * @description Clears all intermediates
      */
-    delete: operations["clear_intermediates"];
+    delete: operations['clear_intermediates'];
   };
-  "/api/v1/images/i/{image_name}/metadata": {
+  '/api/v1/images/i/{image_name}/metadata': {
     /**
      * Get Image Metadata
      * @description Gets an image's metadata
      */
-    get: operations["get_image_metadata"];
+    get: operations['get_image_metadata'];
   };
-  "/api/v1/images/i/{image_name}/workflow": {
+  '/api/v1/images/i/{image_name}/workflow': {
     /** Get Image Workflow */
-    get: operations["get_image_workflow"];
+    get: operations['get_image_workflow'];
   };
-  "/api/v1/images/i/{image_name}/full": {
+  '/api/v1/images/i/{image_name}/full': {
     /**
      * Get Image Full
      * @description Gets a full-resolution image file
      */
-    get: operations["get_image_full"];
+    get: operations['get_image_full'];
     /**
      * Get Image Full
      * @description Gets a full-resolution image file
      */
-    head: operations["get_image_full"];
+    head: operations['get_image_full'];
   };
-  "/api/v1/images/i/{image_name}/thumbnail": {
+  '/api/v1/images/i/{image_name}/thumbnail': {
     /**
      * Get Image Thumbnail
      * @description Gets a thumbnail image file
      */
-    get: operations["get_image_thumbnail"];
+    get: operations['get_image_thumbnail'];
   };
-  "/api/v1/images/i/{image_name}/urls": {
+  '/api/v1/images/i/{image_name}/urls': {
     /**
      * Get Image Urls
      * @description Gets an image and thumbnail URL
      */
-    get: operations["get_image_urls"];
+    get: operations['get_image_urls'];
   };
-  "/api/v1/images/": {
+  '/api/v1/images/': {
     /**
      * List Image Dtos
      * @description Gets a list of image DTOs
      */
-    get: operations["list_image_dtos"];
+    get: operations['list_image_dtos'];
   };
-  "/api/v1/images/delete": {
+  '/api/v1/images/delete': {
     /** Delete Images From List */
-    post: operations["delete_images_from_list"];
+    post: operations['delete_images_from_list'];
   };
-  "/api/v1/images/star": {
+  '/api/v1/images/star': {
     /** Star Images In List */
-    post: operations["star_images_in_list"];
+    post: operations['star_images_in_list'];
   };
-  "/api/v1/images/unstar": {
+  '/api/v1/images/unstar': {
     /** Unstar Images In List */
-    post: operations["unstar_images_in_list"];
+    post: operations['unstar_images_in_list'];
   };
-  "/api/v1/images/download": {
+  '/api/v1/images/download': {
     /** Download Images From List */
-    post: operations["download_images_from_list"];
+    post: operations['download_images_from_list'];
   };
-  "/api/v1/images/download/{bulk_download_item_name}": {
+  '/api/v1/images/download/{bulk_download_item_name}': {
     /**
      * Get Bulk Download Item
      * @description Gets a bulk download zip file
      */
-    get: operations["get_bulk_download_item"];
+    get: operations['get_bulk_download_item'];
   };
-  "/api/v1/boards/": {
+  '/api/v1/boards/': {
     /**
      * List Boards
      * @description Gets a list of boards
      */
-    get: operations["list_boards"];
+    get: operations['list_boards'];
     /**
      * Create Board
      * @description Creates a board
      */
-    post: operations["create_board"];
+    post: operations['create_board'];
   };
-  "/api/v1/boards/{board_id}": {
+  '/api/v1/boards/{board_id}': {
     /**
      * Get Board
      * @description Gets a board
      */
-    get: operations["get_board"];
+    get: operations['get_board'];
     /**
      * Delete Board
      * @description Deletes a board
      */
-    delete: operations["delete_board"];
+    delete: operations['delete_board'];
     /**
      * Update Board
      * @description Updates a board
      */
-    patch: operations["update_board"];
+    patch: operations['update_board'];
   };
-  "/api/v1/boards/{board_id}/image_names": {
+  '/api/v1/boards/{board_id}/image_names': {
     /**
      * List All Board Image Names
      * @description Gets a list of images for a board
      */
-    get: operations["list_all_board_image_names"];
+    get: operations['list_all_board_image_names'];
   };
-  "/api/v1/board_images/": {
+  '/api/v1/board_images/': {
     /**
      * Add Image To Board
      * @description Creates a board_image
      */
-    post: operations["add_image_to_board"];
+    post: operations['add_image_to_board'];
     /**
      * Remove Image From Board
      * @description Removes an image from its board, if it had one
      */
-    delete: operations["remove_image_from_board"];
+    delete: operations['remove_image_from_board'];
   };
-  "/api/v1/board_images/batch": {
+  '/api/v1/board_images/batch': {
     /**
      * Add Images To Board
      * @description Adds a list of images to a board
      */
-    post: operations["add_images_to_board"];
+    post: operations['add_images_to_board'];
   };
-  "/api/v1/board_images/batch/delete": {
+  '/api/v1/board_images/batch/delete': {
     /**
      * Remove Images From Board
      * @description Removes a list of images from their board, if they had one
      */
-    post: operations["remove_images_from_board"];
+    post: operations['remove_images_from_board'];
   };
-  "/api/v1/app/version": {
+  '/api/v1/app/version': {
     /** Get Version */
-    get: operations["app_version"];
+    get: operations['app_version'];
   };
-  "/api/v1/app/app_deps": {
+  '/api/v1/app/app_deps': {
     /** Get App Deps */
-    get: operations["get_app_deps"];
+    get: operations['get_app_deps'];
   };
-  "/api/v1/app/config": {
+  '/api/v1/app/config': {
     /** Get Config */
-    get: operations["get_config"];
+    get: operations['get_config'];
   };
-  "/api/v1/app/logging": {
+  '/api/v1/app/logging': {
     /**
      * Get Log Level
      * @description Returns the log level
      */
-    get: operations["get_log_level"];
+    get: operations['get_log_level'];
     /**
      * Set Log Level
      * @description Sets the log verbosity level
      */
-    post: operations["set_log_level"];
+    post: operations['set_log_level'];
   };
-  "/api/v1/app/invocation_cache": {
+  '/api/v1/app/invocation_cache': {
     /**
      * Clear Invocation Cache
      * @description Clears the invocation cache
      */
-    delete: operations["clear_invocation_cache"];
+    delete: operations['clear_invocation_cache'];
   };
-  "/api/v1/app/invocation_cache/enable": {
+  '/api/v1/app/invocation_cache/enable': {
     /**
      * Enable Invocation Cache
      * @description Clears the invocation cache
      */
-    put: operations["enable_invocation_cache"];
+    put: operations['enable_invocation_cache'];
   };
-  "/api/v1/app/invocation_cache/disable": {
+  '/api/v1/app/invocation_cache/disable': {
     /**
      * Disable Invocation Cache
      * @description Clears the invocation cache
      */
-    put: operations["disable_invocation_cache"];
+    put: operations['disable_invocation_cache'];
   };
-  "/api/v1/app/invocation_cache/status": {
+  '/api/v1/app/invocation_cache/status': {
     /**
      * Get Invocation Cache Status
      * @description Clears the invocation cache
      */
-    get: operations["get_invocation_cache_status"];
+    get: operations['get_invocation_cache_status'];
   };
-  "/api/v1/queue/{queue_id}/enqueue_batch": {
+  '/api/v1/queue/{queue_id}/enqueue_batch': {
     /**
      * Enqueue Batch
      * @description Processes a batch and enqueues the output graphs for execution.
      */
-    post: operations["enqueue_batch"];
+    post: operations['enqueue_batch'];
   };
-  "/api/v1/queue/{queue_id}/list": {
+  '/api/v1/queue/{queue_id}/list': {
     /**
      * List Queue Items
      * @description Gets all queue items (without graphs)
      */
-    get: operations["list_queue_items"];
+    get: operations['list_queue_items'];
   };
-  "/api/v1/queue/{queue_id}/processor/resume": {
+  '/api/v1/queue/{queue_id}/processor/resume': {
     /**
      * Resume
      * @description Resumes session processor
      */
-    put: operations["resume"];
+    put: operations['resume'];
   };
-  "/api/v1/queue/{queue_id}/processor/pause": {
+  '/api/v1/queue/{queue_id}/processor/pause': {
     /**
      * Pause
      * @description Pauses session processor
      */
-    put: operations["pause"];
+    put: operations['pause'];
   };
-  "/api/v1/queue/{queue_id}/cancel_by_batch_ids": {
+  '/api/v1/queue/{queue_id}/cancel_by_batch_ids': {
     /**
      * Cancel By Batch Ids
      * @description Immediately cancels all queue items from the given batch ids
      */
-    put: operations["cancel_by_batch_ids"];
+    put: operations['cancel_by_batch_ids'];
   };
-  "/api/v1/queue/{queue_id}/clear": {
+  '/api/v1/queue/{queue_id}/clear': {
     /**
      * Clear
      * @description Clears the queue entirely, immediately canceling the currently-executing session
      */
-    put: operations["clear"];
+    put: operations['clear'];
   };
-  "/api/v1/queue/{queue_id}/prune": {
+  '/api/v1/queue/{queue_id}/prune': {
     /**
      * Prune
      * @description Prunes all completed or errored queue items
      */
-    put: operations["prune"];
+    put: operations['prune'];
   };
-  "/api/v1/queue/{queue_id}/current": {
+  '/api/v1/queue/{queue_id}/current': {
     /**
      * Get Current Queue Item
      * @description Gets the currently execution queue item
      */
-    get: operations["get_current_queue_item"];
+    get: operations['get_current_queue_item'];
   };
-  "/api/v1/queue/{queue_id}/next": {
+  '/api/v1/queue/{queue_id}/next': {
     /**
      * Get Next Queue Item
      * @description Gets the next queue item, without executing it
      */
-    get: operations["get_next_queue_item"];
+    get: operations['get_next_queue_item'];
   };
-  "/api/v1/queue/{queue_id}/status": {
+  '/api/v1/queue/{queue_id}/status': {
     /**
      * Get Queue Status
      * @description Gets the status of the session queue
      */
-    get: operations["get_queue_status"];
+    get: operations['get_queue_status'];
   };
-  "/api/v1/queue/{queue_id}/b/{batch_id}/status": {
+  '/api/v1/queue/{queue_id}/b/{batch_id}/status': {
     /**
      * Get Batch Status
      * @description Gets the status of the session queue
      */
-    get: operations["get_batch_status"];
+    get: operations['get_batch_status'];
   };
-  "/api/v1/queue/{queue_id}/i/{item_id}": {
+  '/api/v1/queue/{queue_id}/i/{item_id}': {
     /**
      * Get Queue Item
      * @description Gets a queue item
      */
-    get: operations["get_queue_item"];
+    get: operations['get_queue_item'];
   };
-  "/api/v1/queue/{queue_id}/i/{item_id}/cancel": {
+  '/api/v1/queue/{queue_id}/i/{item_id}/cancel': {
     /**
      * Cancel Queue Item
      * @description Deletes a queue item
      */
-    put: operations["cancel_queue_item"];
+    put: operations['cancel_queue_item'];
   };
-  "/api/v1/workflows/i/{workflow_id}": {
+  '/api/v1/workflows/i/{workflow_id}': {
     /**
      * Get Workflow
      * @description Gets a workflow
      */
-    get: operations["get_workflow"];
+    get: operations['get_workflow'];
     /**
      * Delete Workflow
      * @description Deletes a workflow
      */
-    delete: operations["delete_workflow"];
+    delete: operations['delete_workflow'];
     /**
      * Update Workflow
      * @description Updates a workflow
      */
-    patch: operations["update_workflow"];
+    patch: operations['update_workflow'];
   };
-  "/api/v1/workflows/": {
+  '/api/v1/workflows/': {
     /**
      * List Workflows
      * @description Gets a page of workflows
      */
-    get: operations["list_workflows"];
+    get: operations['list_workflows'];
     /**
      * Create Workflow
      * @description Creates a workflow
      */
-    post: operations["create_workflow"];
+    post: operations['create_workflow'];
   };
 };
 
@@ -573,7 +572,7 @@ export type components = {
        * @default add
        * @constant
        */
-      type: "add";
+      type: 'add';
     };
     /**
      * AppConfig
@@ -589,7 +588,7 @@ export type components = {
        * Upscaling Methods
        * @description List of upscaling methods
        */
-      upscaling_methods: components["schemas"]["Upscaler"][];
+      upscaling_methods: components['schemas']['Upscaler'][];
       /**
        * Nsfw Methods
        * @description List of NSFW checking methods
@@ -698,14 +697,14 @@ export type components = {
        * @default basemetadata
        * @constant
        */
-      type?: "basemetadata";
+      type?: 'basemetadata';
     };
     /**
      * BaseModelType
      * @description Base model type.
      * @enum {string}
      */
-    BaseModelType: "any" | "sd-1" | "sd-2" | "sdxl" | "sdxl-refiner";
+    BaseModelType: 'any' | 'sd-1' | 'sd-2' | 'sdxl' | 'sdxl-refiner';
     /** Batch */
     Batch: {
       /**
@@ -717,11 +716,11 @@ export type components = {
        * Data
        * @description The batch data collection.
        */
-      data?: components["schemas"]["BatchDatum"][][] | null;
+      data?: components['schemas']['BatchDatum'][][] | null;
       /** @description The graph to initialize the session with */
-      graph: components["schemas"]["Graph"];
+      graph: components['schemas']['Graph'];
       /** @description The workflow to initialize the session with */
-      workflow?: components["schemas"]["WorkflowWithoutID"] | null;
+      workflow?: components['schemas']['WorkflowWithoutID'] | null;
       /**
        * Runs
        * @description Int stating how many times to iterate through all possible batch indices
@@ -796,9 +795,9 @@ export type components = {
      */
     BlankImageInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -834,7 +833,7 @@ export type components = {
        * @default RGB
        * @enum {string}
        */
-      mode?: "RGB" | "RGBA";
+      mode?: 'RGB' | 'RGBA';
       /**
        * @description The color of the image
        * @default {
@@ -844,13 +843,13 @@ export type components = {
        *   "a": 255
        * }
        */
-      color?: components["schemas"]["ColorField"];
+      color?: components['schemas']['ColorField'];
       /**
        * type
        * @default blank_image
        * @constant
        */
-      type: "blank_image";
+      type: 'blank_image';
     };
     /**
      * Blend Latents
@@ -875,9 +874,9 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description Latents tensor */
-      latents_a?: components["schemas"]["LatentsField"];
+      latents_a?: components['schemas']['LatentsField'];
       /** @description Latents tensor */
-      latents_b?: components["schemas"]["LatentsField"];
+      latents_b?: components['schemas']['LatentsField'];
       /**
        * Alpha
        * @description Blending factor. 0.0 = use input A only, 1.0 = use input B only, 0.5 = 50% mix of input A and input B.
@@ -889,7 +888,7 @@ export type components = {
        * @default lblend
        * @constant
        */
-      type: "lblend";
+      type: 'lblend';
     };
     /** BoardChanges */
     BoardChanges: {
@@ -993,7 +992,7 @@ export type components = {
     /** Body_create_workflow */
     Body_create_workflow: {
       /** @description The workflow to create */
-      workflow: components["schemas"]["WorkflowWithoutID"];
+      workflow: components['schemas']['WorkflowWithoutID'];
     };
     /** Body_delete_images_from_list */
     Body_delete_images_from_list: {
@@ -1044,7 +1043,7 @@ export type components = {
     /** Body_enqueue_batch */
     Body_enqueue_batch: {
       /** @description Batch to process */
-      batch: components["schemas"]["Batch"];
+      batch: components['schemas']['Batch'];
       /**
        * Prepend
        * @description Whether or not to prepend this batch in the queue
@@ -1107,7 +1106,7 @@ export type components = {
     /** Body_update_workflow */
     Body_update_workflow: {
       /** @description The updated workflow */
-      workflow: components["schemas"]["Workflow"];
+      workflow: components['schemas']['Workflow'];
     };
     /** Body_upload_image */
     Body_upload_image: {
@@ -1150,7 +1149,7 @@ export type components = {
        * @default boolean_collection
        * @constant
        */
-      type: "boolean_collection";
+      type: 'boolean_collection';
     };
     /**
      * BooleanCollectionOutput
@@ -1167,7 +1166,7 @@ export type components = {
        * @default boolean_collection_output
        * @constant
        */
-      type: "boolean_collection_output";
+      type: 'boolean_collection_output';
     };
     /**
      * Boolean Primitive
@@ -1202,7 +1201,7 @@ export type components = {
        * @default boolean
        * @constant
        */
-      type: "boolean";
+      type: 'boolean';
     };
     /**
      * BooleanOutput
@@ -1219,7 +1218,7 @@ export type components = {
        * @default boolean_output
        * @constant
        */
-      type: "boolean_output";
+      type: 'boolean_output';
     };
     /**
      * CLIPOutput
@@ -1230,13 +1229,13 @@ export type components = {
        * CLIP
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip: components["schemas"]["ClipField"];
+      clip: components['schemas']['ClipField'];
       /**
        * type
        * @default clip_output
        * @constant
        */
-      type: "clip_output";
+      type: 'clip_output';
     };
     /**
      * CLIPVisionDiffusersConfig
@@ -1294,7 +1293,7 @@ export type components = {
        * @default clip_vision
        * @constant
        */
-      type: "clip_vision";
+      type: 'clip_vision';
       /**
        * Format
        * @constant
@@ -1315,9 +1314,9 @@ export type components = {
      */
     CV2InfillInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -1336,13 +1335,13 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to infill */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * type
        * @default infill_cv2
        * @constant
        */
-      type: "infill_cv2";
+      type: 'infill_cv2';
     };
     /**
      * Calculate Image Tiles Even Split
@@ -1401,7 +1400,7 @@ export type components = {
        * @default calculate_image_tiles_even_split
        * @constant
        */
-      type: "calculate_image_tiles_even_split";
+      type: 'calculate_image_tiles_even_split';
     };
     /**
      * Calculate Image Tiles
@@ -1460,7 +1459,7 @@ export type components = {
        * @default calculate_image_tiles
        * @constant
        */
-      type: "calculate_image_tiles";
+      type: 'calculate_image_tiles';
     };
     /**
      * Calculate Image Tiles Minimum Overlap
@@ -1519,7 +1518,7 @@ export type components = {
        * @default calculate_image_tiles_min_overlap
        * @constant
        */
-      type: "calculate_image_tiles_min_overlap";
+      type: 'calculate_image_tiles_min_overlap';
     };
     /** CalculateImageTilesOutput */
     CalculateImageTilesOutput: {
@@ -1527,13 +1526,13 @@ export type components = {
        * Tiles
        * @description The tiles coordinates that cover a particular image shape.
        */
-      tiles: components["schemas"]["Tile"][];
+      tiles: components['schemas']['Tile'][];
       /**
        * type
        * @default calculate_image_tiles_output
        * @constant
        */
-      type: "calculate_image_tiles_output";
+      type: 'calculate_image_tiles_output';
     };
     /**
      * CancelByBatchIDsResult
@@ -1552,9 +1551,9 @@ export type components = {
      */
     CannyImageProcessorInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -1573,7 +1572,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Low Threshold
        * @description The low threshold of the Canny pixel gradient (0-255)
@@ -1591,7 +1590,7 @@ export type components = {
        * @default canny_image_processor
        * @constant
        */
-      type: "canny_image_processor";
+      type: 'canny_image_processor';
     };
     /**
      * Canvas Paste Back
@@ -1599,9 +1598,9 @@ export type components = {
      */
     CanvasPasteBackInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -1620,11 +1619,11 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The source image */
-      source_image?: components["schemas"]["ImageField"];
+      source_image?: components['schemas']['ImageField'];
       /** @description The target image */
-      target_image?: components["schemas"]["ImageField"];
+      target_image?: components['schemas']['ImageField'];
       /** @description The mask to use when pasting */
-      mask?: components["schemas"]["ImageField"];
+      mask?: components['schemas']['ImageField'];
       /**
        * Mask Blur
        * @description The amount to blur the mask by
@@ -1636,7 +1635,7 @@ export type components = {
        * @default canvas_paste_back
        * @constant
        */
-      type: "canvas_paste_back";
+      type: 'canvas_paste_back';
     };
     /**
      * Center Pad or Crop Image
@@ -1661,7 +1660,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to crop */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Left
        * @description Number of pixels to pad/crop from the left (negative values crop inwards, positive values pad outwards)
@@ -1691,7 +1690,7 @@ export type components = {
        * @default img_pad_crop
        * @constant
        */
-      type: "img_pad_crop";
+      type: 'img_pad_crop';
     };
     /**
      * CivitaiMetadata
@@ -1707,13 +1706,13 @@ export type components = {
        * Files
        * @description model files and their sizes
        */
-      files?: components["schemas"]["RemoteModelFile"][];
+      files?: components['schemas']['RemoteModelFile'][];
       /**
        * Type
        * @default civitai
        * @constant
        */
-      type?: "civitai";
+      type?: 'civitai';
       /**
        * Trigger Phrases
        * @description Trigger phrases extracted from the API response
@@ -1732,7 +1731,7 @@ export type components = {
     CivitaiModelSource: {
       /** Version Id */
       version_id: number;
-      variant?: components["schemas"]["ModelRepoVariant"] | null;
+      variant?: components['schemas']['ModelRepoVariant'] | null;
       /** Access Token */
       access_token?: string | null;
       /**
@@ -1740,7 +1739,7 @@ export type components = {
        * @default civitai
        * @constant
        */
-      type?: "civitai";
+      type?: 'civitai';
     };
     /**
      * ClearResult
@@ -1756,9 +1755,9 @@ export type components = {
     /** ClipField */
     ClipField: {
       /** @description Info to load tokenizer submodel */
-      tokenizer: components["schemas"]["ModelInfo"];
+      tokenizer: components['schemas']['ModelInfo'];
       /** @description Info to load text_encoder submodel */
-      text_encoder: components["schemas"]["ModelInfo"];
+      text_encoder: components['schemas']['ModelInfo'];
       /**
        * Skipped Layers
        * @description Number of skipped layers in text_encoder
@@ -1768,7 +1767,7 @@ export type components = {
        * Loras
        * @description Loras to apply on model loading
        */
-      loras: components["schemas"]["LoraInfo"][];
+      loras: components['schemas']['LoraInfo'][];
     };
     /**
      * CLIP Skip
@@ -1796,7 +1795,7 @@ export type components = {
        * CLIP
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip?: components["schemas"]["ClipField"];
+      clip?: components['schemas']['ClipField'];
       /**
        * Skipped Layers
        * @description Number of layers to skip in text encoder
@@ -1808,7 +1807,7 @@ export type components = {
        * @default clip_skip
        * @constant
        */
-      type: "clip_skip";
+      type: 'clip_skip';
     };
     /**
      * ClipSkipInvocationOutput
@@ -1820,13 +1819,13 @@ export type components = {
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        * @default null
        */
-      clip: components["schemas"]["ClipField"] | null;
+      clip: components['schemas']['ClipField'] | null;
       /**
        * type
        * @default clip_skip_output
        * @constant
        */
-      type: "clip_skip_output";
+      type: 'clip_skip_output';
     };
     /**
      * CollectInvocation
@@ -1866,7 +1865,7 @@ export type components = {
        * @default collect
        * @constant
        */
-      type: "collect";
+      type: 'collect';
     };
     /** CollectInvocationOutput */
     CollectInvocationOutput: {
@@ -1880,7 +1879,7 @@ export type components = {
        * @default collect_output
        * @constant
        */
-      type: "collect_output";
+      type: 'collect_output';
     };
     /**
      * ColorCollectionOutput
@@ -1891,13 +1890,13 @@ export type components = {
        * Collection
        * @description The output colors
        */
-      collection: components["schemas"]["ColorField"][];
+      collection: components['schemas']['ColorField'][];
       /**
        * type
        * @default color_collection_output
        * @constant
        */
-      type: "color_collection_output";
+      type: 'color_collection_output';
     };
     /**
      * Color Correct
@@ -1906,9 +1905,9 @@ export type components = {
      */
     ColorCorrectInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -1927,11 +1926,11 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to color-correct */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /** @description Reference image for color-correction */
-      reference?: components["schemas"]["ImageField"];
+      reference?: components['schemas']['ImageField'];
       /** @description Mask to use when applying color-correction */
-      mask?: components["schemas"]["ImageField"] | null;
+      mask?: components['schemas']['ImageField'] | null;
       /**
        * Mask Blur Radius
        * @description Mask blur radius
@@ -1943,7 +1942,7 @@ export type components = {
        * @default color_correct
        * @constant
        */
-      type: "color_correct";
+      type: 'color_correct';
     };
     /**
      * ColorField
@@ -2002,13 +2001,13 @@ export type components = {
        *   "a": 255
        * }
        */
-      color?: components["schemas"]["ColorField"];
+      color?: components['schemas']['ColorField'];
       /**
        * type
        * @default color
        * @constant
        */
-      type: "color";
+      type: 'color';
     };
     /**
      * Color Map Processor
@@ -2016,9 +2015,9 @@ export type components = {
      */
     ColorMapImageProcessorInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -2037,7 +2036,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Color Map Tile Size
        * @description Tile size
@@ -2049,7 +2048,7 @@ export type components = {
        * @default color_map_image_processor
        * @constant
        */
-      type: "color_map_image_processor";
+      type: 'color_map_image_processor';
     };
     /**
      * ColorOutput
@@ -2057,13 +2056,13 @@ export type components = {
      */
     ColorOutput: {
       /** @description The output color */
-      color: components["schemas"]["ColorField"];
+      color: components['schemas']['ColorField'];
       /**
        * type
        * @default color_output
        * @constant
        */
-      type: "color_output";
+      type: 'color_output';
     };
     /**
      * Prompt
@@ -2097,13 +2096,13 @@ export type components = {
        * CLIP
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip?: components["schemas"]["ClipField"];
+      clip?: components['schemas']['ClipField'];
       /**
        * type
        * @default compel
        * @constant
        */
-      type: "compel";
+      type: 'compel';
     };
     /**
      * Conditioning Collection Primitive
@@ -2132,13 +2131,13 @@ export type components = {
        * @description The collection of conditioning tensors
        * @default []
        */
-      collection?: components["schemas"]["ConditioningField"][];
+      collection?: components['schemas']['ConditioningField'][];
       /**
        * type
        * @default conditioning_collection
        * @constant
        */
-      type: "conditioning_collection";
+      type: 'conditioning_collection';
     };
     /**
      * ConditioningCollectionOutput
@@ -2149,13 +2148,13 @@ export type components = {
        * Collection
        * @description The output conditioning tensors
        */
-      collection: components["schemas"]["ConditioningField"][];
+      collection: components['schemas']['ConditioningField'][];
       /**
        * type
        * @default conditioning_collection_output
        * @constant
        */
-      type: "conditioning_collection_output";
+      type: 'conditioning_collection_output';
     };
     /**
      * ConditioningField
@@ -2191,13 +2190,13 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description Conditioning tensor */
-      conditioning?: components["schemas"]["ConditioningField"];
+      conditioning?: components['schemas']['ConditioningField'];
       /**
        * type
        * @default conditioning
        * @constant
        */
-      type: "conditioning";
+      type: 'conditioning';
     };
     /**
      * ConditioningOutput
@@ -2205,13 +2204,13 @@ export type components = {
      */
     ConditioningOutput: {
       /** @description Conditioning tensor */
-      conditioning: components["schemas"]["ConditioningField"];
+      conditioning: components['schemas']['ConditioningField'];
       /**
        * type
        * @default conditioning_output
        * @constant
        */
-      type: "conditioning_output";
+      type: 'conditioning_output';
     };
     /**
      * Content Shuffle Processor
@@ -2219,9 +2218,9 @@ export type components = {
      */
     ContentShuffleImageProcessorInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -2240,7 +2239,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Detect Resolution
        * @description Pixel resolution for detection
@@ -2276,14 +2275,14 @@ export type components = {
        * @default content_shuffle_image_processor
        * @constant
        */
-      type: "content_shuffle_image_processor";
+      type: 'content_shuffle_image_processor';
     };
     /** ControlField */
     ControlField: {
       /** @description The control image */
-      image: components["schemas"]["ImageField"];
+      image: components['schemas']['ImageField'];
       /** @description The ControlNet model to use */
-      control_model: components["schemas"]["ControlNetModelField"];
+      control_model: components['schemas']['ControlNetModelField'];
       /**
        * Control Weight
        * @description The weight given to the ControlNet
@@ -2308,14 +2307,14 @@ export type components = {
        * @default balanced
        * @enum {string}
        */
-      control_mode?: "balanced" | "more_prompt" | "more_control" | "unbalanced";
+      control_mode?: 'balanced' | 'more_prompt' | 'more_control' | 'unbalanced';
       /**
        * Resize Mode
        * @description The resize mode to use
        * @default just_resize
        * @enum {string}
        */
-      resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
+      resize_mode?: 'just_resize' | 'crop_resize' | 'fill_resize' | 'just_resize_simple';
     };
     /**
      * ControlNetCheckpointConfig
@@ -2373,7 +2372,7 @@ export type components = {
        * @default checkpoint
        * @constant
        */
-      format: "checkpoint";
+      format: 'checkpoint';
       /**
        * Config Path
        * @description path to the checkpoint model config file
@@ -2480,9 +2479,9 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The control image */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /** @description ControlNet model to load */
-      control_model: components["schemas"]["ControlNetModelField"];
+      control_model: components['schemas']['ControlNetModelField'];
       /**
        * Control Weight
        * @description The weight given to the ControlNet
@@ -2507,20 +2506,20 @@ export type components = {
        * @default balanced
        * @enum {string}
        */
-      control_mode?: "balanced" | "more_prompt" | "more_control" | "unbalanced";
+      control_mode?: 'balanced' | 'more_prompt' | 'more_control' | 'unbalanced';
       /**
        * Resize Mode
        * @description The resize mode used
        * @default just_resize
        * @enum {string}
        */
-      resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
+      resize_mode?: 'just_resize' | 'crop_resize' | 'fill_resize' | 'just_resize_simple';
       /**
        * type
        * @default controlnet
        * @constant
        */
-      type: "controlnet";
+      type: 'controlnet';
     };
     /**
      * ControlNetModelField
@@ -2539,13 +2538,13 @@ export type components = {
      */
     ControlOutput: {
       /** @description ControlNet(s) to apply */
-      control: components["schemas"]["ControlField"];
+      control: components['schemas']['ControlField'];
       /**
        * type
        * @default control_output
        * @constant
        */
-      type: "control_output";
+      type: 'control_output';
     };
     /**
      * Core Metadata
@@ -2573,7 +2572,18 @@ export type components = {
        * Generation Mode
        * @description The generation mode that output this image
        */
-      generation_mode?: ("txt2img" | "img2img" | "inpaint" | "outpaint" | "sdxl_txt2img" | "sdxl_img2img" | "sdxl_inpaint" | "sdxl_outpaint") | null;
+      generation_mode?:
+        | (
+            | 'txt2img'
+            | 'img2img'
+            | 'inpaint'
+            | 'outpaint'
+            | 'sdxl_txt2img'
+            | 'sdxl_img2img'
+            | 'sdxl_inpaint'
+            | 'sdxl_outpaint'
+          )
+        | null;
       /**
        * Positive Prompt
        * @description The positive prompt parameter
@@ -2640,27 +2650,27 @@ export type components = {
        */
       clip_skip?: number | null;
       /** @description The main model used for inference */
-      model?: components["schemas"]["MainModelField"] | null;
+      model?: components['schemas']['MainModelField'] | null;
       /**
        * Controlnets
        * @description The ControlNets used for inference
        */
-      controlnets?: components["schemas"]["ControlField"][] | null;
+      controlnets?: components['schemas']['ControlField'][] | null;
       /**
        * Ipadapters
        * @description The IP Adapters used for inference
        */
-      ipAdapters?: components["schemas"]["IPAdapterMetadataField"][] | null;
+      ipAdapters?: components['schemas']['IPAdapterMetadataField'][] | null;
       /**
        * T2Iadapters
        * @description The IP Adapters used for inference
        */
-      t2iAdapters?: components["schemas"]["T2IAdapterField"][] | null;
+      t2iAdapters?: components['schemas']['T2IAdapterField'][] | null;
       /**
        * Loras
        * @description The LoRAs used for inference
        */
-      loras?: components["schemas"]["LoRAMetadataField"][] | null;
+      loras?: components['schemas']['LoRAMetadataField'][] | null;
       /**
        * Strength
        * @description The strength used for latents-to-latents
@@ -2672,7 +2682,7 @@ export type components = {
        */
       init_image?: string | null;
       /** @description The VAE used for decoding, if the main model's default was not used */
-      vae?: components["schemas"]["VAEModelField"] | null;
+      vae?: components['schemas']['VAEModelField'] | null;
       /**
        * Hrf Enabled
        * @description Whether or not high resolution fix was enabled.
@@ -2699,7 +2709,7 @@ export type components = {
        */
       negative_style_prompt?: string | null;
       /** @description The SDXL Refiner model used */
-      refiner_model?: components["schemas"]["MainModelField"] | null;
+      refiner_model?: components['schemas']['MainModelField'] | null;
       /**
        * Refiner Cfg Scale
        * @description The classifier-free guidance scale parameter used for the refiner
@@ -2735,7 +2745,7 @@ export type components = {
        * @default core_metadata
        * @constant
        */
-      type: "core_metadata";
+      type: 'core_metadata';
       [key: string]: unknown;
     };
     /**
@@ -2761,11 +2771,11 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description VAE */
-      vae?: components["schemas"]["VaeField"];
+      vae?: components['schemas']['VaeField'];
       /** @description Image which will be masked */
-      image?: components["schemas"]["ImageField"] | null;
+      image?: components['schemas']['ImageField'] | null;
       /** @description The mask to use when pasting */
-      mask?: components["schemas"]["ImageField"];
+      mask?: components['schemas']['ImageField'];
       /**
        * Tiled
        * @description Processing using overlapping tiles (reduce memory consumption)
@@ -2783,7 +2793,7 @@ export type components = {
        * @default create_denoise_mask
        * @constant
        */
-      type: "create_denoise_mask";
+      type: 'create_denoise_mask';
     };
     /**
      * Create Gradient Mask
@@ -2808,7 +2818,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description Image which will be masked */
-      mask?: components["schemas"]["ImageField"];
+      mask?: components['schemas']['ImageField'];
       /**
        * Edge Radius
        * @description How far to blur/expand the edges of the mask
@@ -2820,7 +2830,7 @@ export type components = {
        * @default Gaussian Blur
        * @enum {string}
        */
-      coherence_mode?: "Gaussian Blur" | "Box Blur" | "Staged";
+      coherence_mode?: 'Gaussian Blur' | 'Box Blur' | 'Staged';
       /**
        * Minimum Denoise
        * @description Minimum denoise level for the coherence region
@@ -2832,7 +2842,7 @@ export type components = {
        * @default create_gradient_mask
        * @constant
        */
-      type: "create_gradient_mask";
+      type: 'create_gradient_mask';
     };
     /**
      * Crop Latents
@@ -2858,7 +2868,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description Latents tensor */
-      latents?: components["schemas"]["LatentsField"];
+      latents?: components['schemas']['LatentsField'];
       /**
        * X
        * @description The left x coordinate (in px) of the crop rectangle in image space. This value will be converted to a dimension in latent space.
@@ -2884,7 +2894,7 @@ export type components = {
        * @default crop_latents
        * @constant
        */
-      type: "crop_latents";
+      type: 'crop_latents';
     };
     /** CursorPaginatedResults[SessionQueueItemDTO] */
     CursorPaginatedResults_SessionQueueItemDTO_: {
@@ -2902,7 +2912,7 @@ export type components = {
        * Items
        * @description Items
        */
-      items: components["schemas"]["SessionQueueItemDTO"][];
+      items: components['schemas']['SessionQueueItemDTO'][];
     };
     /**
      * OpenCV Inpaint
@@ -2910,9 +2920,9 @@ export type components = {
      */
     CvInpaintInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -2931,15 +2941,15 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to inpaint */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /** @description The mask to use when inpainting */
-      mask?: components["schemas"]["ImageField"];
+      mask?: components['schemas']['ImageField'];
       /**
        * type
        * @default cv_inpaint
        * @constant
        */
-      type: "cv_inpaint";
+      type: 'cv_inpaint';
     };
     /**
      * DW Openpose Image Processor
@@ -2947,9 +2957,9 @@ export type components = {
      */
     DWOpenposeImageProcessorInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -2968,7 +2978,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Draw Body
        * @default true
@@ -2995,7 +3005,7 @@ export type components = {
        * @default dw_openpose_image_processor
        * @constant
        */
-      type: "dw_openpose_image_processor";
+      type: 'dw_openpose_image_processor';
     };
     /** DeleteBoardResult */
     DeleteBoardResult: {
@@ -3043,11 +3053,11 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description Positive conditioning tensor */
-      positive_conditioning?: components["schemas"]["ConditioningField"];
+      positive_conditioning?: components['schemas']['ConditioningField'];
       /** @description Negative conditioning tensor */
-      negative_conditioning?: components["schemas"]["ConditioningField"];
+      negative_conditioning?: components['schemas']['ConditioningField'];
       /** @description Noise tensor */
-      noise?: components["schemas"]["LatentsField"] | null;
+      noise?: components['schemas']['LatentsField'] | null;
       /**
        * Steps
        * @description Number of steps to run
@@ -3078,24 +3088,47 @@ export type components = {
        * @default euler
        * @enum {string}
        */
-      scheduler?: "ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "lcm";
+      scheduler?:
+        | 'ddim'
+        | 'ddpm'
+        | 'deis'
+        | 'lms'
+        | 'lms_k'
+        | 'pndm'
+        | 'heun'
+        | 'heun_k'
+        | 'euler'
+        | 'euler_k'
+        | 'euler_a'
+        | 'kdpm_2'
+        | 'kdpm_2_a'
+        | 'dpmpp_2s'
+        | 'dpmpp_2s_k'
+        | 'dpmpp_2m'
+        | 'dpmpp_2m_k'
+        | 'dpmpp_2m_sde'
+        | 'dpmpp_2m_sde_k'
+        | 'dpmpp_sde'
+        | 'dpmpp_sde_k'
+        | 'unipc'
+        | 'lcm';
       /**
        * UNet
        * @description UNet (scheduler, LoRAs)
        */
-      unet?: components["schemas"]["UNetField"];
+      unet?: components['schemas']['UNetField'];
       /** Control */
-      control?: components["schemas"]["ControlField"] | components["schemas"]["ControlField"][] | null;
+      control?: components['schemas']['ControlField'] | components['schemas']['ControlField'][] | null;
       /**
        * IP-Adapter
        * @description IP-Adapter to apply
        */
-      ip_adapter?: components["schemas"]["IPAdapterField"] | components["schemas"]["IPAdapterField"][] | null;
+      ip_adapter?: components['schemas']['IPAdapterField'] | components['schemas']['IPAdapterField'][] | null;
       /**
        * T2I-Adapter
        * @description T2I-Adapter(s) to apply
        */
-      t2i_adapter?: components["schemas"]["T2IAdapterField"] | components["schemas"]["T2IAdapterField"][] | null;
+      t2i_adapter?: components['schemas']['T2IAdapterField'] | components['schemas']['T2IAdapterField'][] | null;
       /**
        * CFG Rescale Multiplier
        * @description Rescale multiplier for CFG guidance, used for models trained with zero-terminal SNR
@@ -3103,15 +3136,15 @@ export type components = {
        */
       cfg_rescale_multiplier?: number;
       /** @description Latents tensor */
-      latents?: components["schemas"]["LatentsField"] | null;
+      latents?: components['schemas']['LatentsField'] | null;
       /** @description The mask to use for the operation */
-      denoise_mask?: components["schemas"]["DenoiseMaskField"] | null;
+      denoise_mask?: components['schemas']['DenoiseMaskField'] | null;
       /**
        * type
        * @default denoise_latents
        * @constant
        */
-      type: "denoise_latents";
+      type: 'denoise_latents';
     };
     /**
      * DenoiseMaskField
@@ -3142,13 +3175,13 @@ export type components = {
      */
     DenoiseMaskOutput: {
       /** @description Mask for denoise model run */
-      denoise_mask: components["schemas"]["DenoiseMaskField"];
+      denoise_mask: components['schemas']['DenoiseMaskField'];
       /**
        * type
        * @default denoise_mask_output
        * @constant
        */
-      type: "denoise_mask_output";
+      type: 'denoise_mask_output';
     };
     /**
      * Depth Anything Processor
@@ -3156,9 +3189,9 @@ export type components = {
      */
     DepthAnythingImageProcessorInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -3177,14 +3210,14 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Model Size
        * @description The size of the depth model to use
        * @default small
        * @enum {string}
        */
-      model_size?: "large" | "base" | "small";
+      model_size?: 'large' | 'base' | 'small';
       /**
        * Resolution
        * @description Pixel resolution for output image
@@ -3201,7 +3234,7 @@ export type components = {
        * @default depth_anything_image_processor
        * @constant
        */
-      type: "depth_anything_image_processor";
+      type: 'depth_anything_image_processor';
     };
     /**
      * Divide Integers
@@ -3242,7 +3275,7 @@ export type components = {
        * @default div
        * @constant
        */
-      type: "div";
+      type: 'div';
     };
     /**
      * DownloadJob
@@ -3282,7 +3315,7 @@ export type components = {
        * @description Status of the download
        * @default waiting
        */
-      status?: components["schemas"]["DownloadJobStatus"];
+      status?: components['schemas']['DownloadJobStatus'];
       /**
        * Download Path
        * @description Final location of downloaded file
@@ -3331,7 +3364,7 @@ export type components = {
      * @description State of a download job.
      * @enum {string}
      */
-    DownloadJobStatus: "waiting" | "running" | "completed" | "cancelled" | "error";
+    DownloadJobStatus: 'waiting' | 'running' | 'completed' | 'cancelled' | 'error';
     /**
      * Dynamic Prompt
      * @description Parses a prompt using adieyal/dynamicprompts' random or combinatorial generator
@@ -3376,7 +3409,7 @@ export type components = {
        * @default dynamic_prompt
        * @constant
        */
-      type: "dynamic_prompt";
+      type: 'dynamic_prompt';
     };
     /** DynamicPromptsResponse */
     DynamicPromptsResponse: {
@@ -3391,9 +3424,9 @@ export type components = {
      */
     ESRGANInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -3412,14 +3445,18 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The input image */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Model Name
        * @description The Real-ESRGAN model to use
        * @default RealESRGAN_x4plus.pth
        * @enum {string}
        */
-      model_name?: "RealESRGAN_x4plus.pth" | "RealESRGAN_x4plus_anime_6B.pth" | "ESRGAN_SRx4_DF2KOST_official-ff704c30.pth" | "RealESRGAN_x2plus.pth";
+      model_name?:
+        | 'RealESRGAN_x4plus.pth'
+        | 'RealESRGAN_x4plus_anime_6B.pth'
+        | 'ESRGAN_SRx4_DF2KOST_official-ff704c30.pth'
+        | 'RealESRGAN_x2plus.pth';
       /**
        * Tile Size
        * @description Tile size for tiled ESRGAN upscaling (0=tiling disabled)
@@ -3431,14 +3468,14 @@ export type components = {
        * @default esrgan
        * @constant
        */
-      type: "esrgan";
+      type: 'esrgan';
     };
     /** Edge */
     Edge: {
       /** @description The connection for the edge's from node and field */
-      source: components["schemas"]["EdgeConnection"];
+      source: components['schemas']['EdgeConnection'];
       /** @description The connection for the edge's to node and field */
-      destination: components["schemas"]["EdgeConnection"];
+      destination: components['schemas']['EdgeConnection'];
     };
     /** EdgeConnection */
     EdgeConnection: {
@@ -3471,7 +3508,7 @@ export type components = {
        */
       requested: number;
       /** @description The batch that was enqueued */
-      batch: components["schemas"]["Batch"];
+      batch: components['schemas']['Batch'];
       /**
        * Priority
        * @description The priority of the enqueued batch
@@ -3491,9 +3528,9 @@ export type components = {
      */
     FaceIdentifierInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -3512,7 +3549,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description Image to face detect */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Minimum Confidence
        * @description Minimum confidence for face detection (lower if detection is failing)
@@ -3530,7 +3567,7 @@ export type components = {
        * @default face_identifier
        * @constant
        */
-      type: "face_identifier";
+      type: 'face_identifier';
     };
     /**
      * FaceMask
@@ -3538,7 +3575,7 @@ export type components = {
      */
     FaceMaskInvocation: {
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -3557,7 +3594,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description Image to face detect */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Face Ids
        * @description Comma-separated list of face ids to mask eg '0,2,7'. Numbered from 0. Leave empty to mask all. Find face IDs with FaceIdentifier node.
@@ -3599,7 +3636,7 @@ export type components = {
        * @default face_mask_detection
        * @constant
        */
-      type: "face_mask_detection";
+      type: 'face_mask_detection';
     };
     /**
      * FaceMaskOutput
@@ -3607,7 +3644,7 @@ export type components = {
      */
     FaceMaskOutput: {
       /** @description The output image */
-      image: components["schemas"]["ImageField"];
+      image: components['schemas']['ImageField'];
       /**
        * Width
        * @description The width of the image in pixels
@@ -3623,9 +3660,9 @@ export type components = {
        * @default face_mask_output
        * @constant
        */
-      type: "face_mask_output";
+      type: 'face_mask_output';
       /** @description The output mask */
-      mask: components["schemas"]["ImageField"];
+      mask: components['schemas']['ImageField'];
     };
     /**
      * FaceOff
@@ -3633,7 +3670,7 @@ export type components = {
      */
     FaceOffInvocation: {
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -3652,7 +3689,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description Image for face detection */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Face Id
        * @description The face ID to process, numbered from 0. Multiple faces not supported. Find a face's ID with FaceIdentifier node.
@@ -3694,7 +3731,7 @@ export type components = {
        * @default face_off
        * @constant
        */
-      type: "face_off";
+      type: 'face_off';
     };
     /**
      * FaceOffOutput
@@ -3702,7 +3739,7 @@ export type components = {
      */
     FaceOffOutput: {
       /** @description The output image */
-      image: components["schemas"]["ImageField"];
+      image: components['schemas']['ImageField'];
       /**
        * Width
        * @description The width of the image in pixels
@@ -3718,9 +3755,9 @@ export type components = {
        * @default face_off_output
        * @constant
        */
-      type: "face_off_output";
+      type: 'face_off_output';
       /** @description The output mask */
-      mask: components["schemas"]["ImageField"];
+      mask: components['schemas']['ImageField'];
       /**
        * X
        * @description The x coordinate of the bounding box's left side
@@ -3765,7 +3802,7 @@ export type components = {
        * @default float_collection
        * @constant
        */
-      type: "float_collection";
+      type: 'float_collection';
     };
     /**
      * FloatCollectionOutput
@@ -3782,7 +3819,7 @@ export type components = {
        * @default float_collection_output
        * @constant
        */
-      type: "float_collection_output";
+      type: 'float_collection_output';
     };
     /**
      * Float Primitive
@@ -3817,7 +3854,7 @@ export type components = {
        * @default float
        * @constant
        */
-      type: "float";
+      type: 'float';
     };
     /**
      * Float Range
@@ -3864,7 +3901,7 @@ export type components = {
        * @default float_range
        * @constant
        */
-      type: "float_range";
+      type: 'float_range';
     };
     /**
      * Float Math
@@ -3894,7 +3931,7 @@ export type components = {
        * @default ADD
        * @enum {string}
        */
-      operation?: "ADD" | "SUB" | "MUL" | "DIV" | "EXP" | "ABS" | "SQRT" | "MIN" | "MAX";
+      operation?: 'ADD' | 'SUB' | 'MUL' | 'DIV' | 'EXP' | 'ABS' | 'SQRT' | 'MIN' | 'MAX';
       /**
        * A
        * @description The first number
@@ -3912,7 +3949,7 @@ export type components = {
        * @default float_math
        * @constant
        */
-      type: "float_math";
+      type: 'float_math';
     };
     /**
      * FloatOutput
@@ -3929,7 +3966,7 @@ export type components = {
        * @default float_output
        * @constant
        */
-      type: "float_output";
+      type: 'float_output';
     };
     /**
      * Float To Integer
@@ -3971,13 +4008,13 @@ export type components = {
        * @default Nearest
        * @enum {string}
        */
-      method?: "Nearest" | "Floor" | "Ceiling" | "Truncate";
+      method?: 'Nearest' | 'Floor' | 'Ceiling' | 'Truncate';
       /**
        * type
        * @default float_to_int
        * @constant
        */
-      type: "float_to_int";
+      type: 'float_to_int';
     };
     /** FoundModel */
     FoundModel: {
@@ -4050,7 +4087,7 @@ export type components = {
        * UNet
        * @description UNet (scheduler, LoRAs)
        */
-      unet?: components["schemas"]["UNetField"];
+      unet?: components['schemas']['UNetField'];
       /**
        * B1
        * @description Scaling factor for stage 1 to amplify the contributions of backbone features.
@@ -4080,7 +4117,7 @@ export type components = {
        * @default freeu
        * @constant
        */
-      type: "freeu";
+      type: 'freeu';
     };
     /**
      * GradientMaskOutput
@@ -4116,7 +4153,7 @@ export type components = {
        * Edges
        * @description The connections between nodes and their fields in this graph
        */
-      edges: components["schemas"]["Edge"][];
+      edges: components['schemas']['Edge'][];
     };
     /**
      * GraphExecutionState
@@ -4129,9 +4166,9 @@ export type components = {
        */
       id: string;
       /** @description The graph being executed */
-      graph: components["schemas"]["Graph"];
+      graph: components['schemas']['Graph'];
       /** @description The expanded graph of activated and executed nodes */
-      execution_graph: components["schemas"]["Graph"];
+      execution_graph: components['schemas']['Graph'];
       /**
        * Executed
        * @description The set of node ids that have been executed
@@ -4181,7 +4218,7 @@ export type components = {
       /** Repo Id */
       repo_id: string;
       /** @default fp16 */
-      variant?: components["schemas"]["ModelRepoVariant"] | null;
+      variant?: components['schemas']['ModelRepoVariant'] | null;
       /** Subfolder */
       subfolder?: string | null;
       /** Access Token */
@@ -4191,12 +4228,12 @@ export type components = {
        * @default hf
        * @constant
        */
-      type?: "hf";
+      type?: 'hf';
     };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
-      detail?: components["schemas"]["ValidationError"][];
+      detail?: components['schemas']['ValidationError'][];
     };
     /**
      * HED (softedge) Processor
@@ -4204,9 +4241,9 @@ export type components = {
      */
     HedImageProcessorInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4225,7 +4262,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Detect Resolution
        * @description Pixel resolution for detection
@@ -4249,7 +4286,7 @@ export type components = {
        * @default hed_image_processor
        * @constant
        */
-      type: "hed_image_processor";
+      type: 'hed_image_processor';
     };
     /**
      * HuggingFaceMetadata
@@ -4265,13 +4302,13 @@ export type components = {
        * Files
        * @description model files and their sizes
        */
-      files?: components["schemas"]["RemoteModelFile"][];
+      files?: components['schemas']['RemoteModelFile'][];
       /**
        * Type
        * @default huggingface
        * @constant
        */
-      type?: "huggingface";
+      type?: 'huggingface';
       /**
        * Id
        * @description The HF model id
@@ -4354,11 +4391,11 @@ export type components = {
        * Image
        * @description The IP-Adapter image prompt(s).
        */
-      image: components["schemas"]["ImageField"] | components["schemas"]["ImageField"][];
+      image: components['schemas']['ImageField'] | components['schemas']['ImageField'][];
       /** @description The IP-Adapter model to use. */
-      ip_adapter_model: components["schemas"]["IPAdapterModelField"];
+      ip_adapter_model: components['schemas']['IPAdapterModelField'];
       /** @description The name of the CLIP image encoder model. */
-      image_encoder_model: components["schemas"]["CLIPVisionModelField"];
+      image_encoder_model: components['schemas']['CLIPVisionModelField'];
       /**
        * Weight
        * @description The weight given to the ControlNet
@@ -4404,12 +4441,12 @@ export type components = {
        * Image
        * @description The IP-Adapter image prompt(s).
        */
-      image?: components["schemas"]["ImageField"] | components["schemas"]["ImageField"][];
+      image?: components['schemas']['ImageField'] | components['schemas']['ImageField'][];
       /**
        * IP-Adapter Model
        * @description The IP-Adapter model.
        */
-      ip_adapter_model: components["schemas"]["IPAdapterModelField"];
+      ip_adapter_model: components['schemas']['IPAdapterModelField'];
       /**
        * Weight
        * @description The weight given to the IP-Adapter
@@ -4433,7 +4470,7 @@ export type components = {
        * @default ip_adapter
        * @constant
        */
-      type: "ip_adapter";
+      type: 'ip_adapter';
     };
     /**
      * IPAdapterMetadataField
@@ -4441,9 +4478,9 @@ export type components = {
      */
     IPAdapterMetadataField: {
       /** @description The IP-Adapter image prompt. */
-      image: components["schemas"]["ImageField"];
+      image: components['schemas']['ImageField'];
       /** @description The IP-Adapter model. */
-      ip_adapter_model: components["schemas"]["IPAdapterModelField"];
+      ip_adapter_model: components['schemas']['IPAdapterModelField'];
       /**
        * Weight
        * @description The weight given to the IP-Adapter
@@ -4474,13 +4511,13 @@ export type components = {
        * IP-Adapter
        * @description IP-Adapter to apply
        */
-      ip_adapter: components["schemas"]["IPAdapterField"];
+      ip_adapter: components['schemas']['IPAdapterField'];
       /**
        * type
        * @default ip_adapter_output
        * @constant
        */
-      type: "ip_adapter_output";
+      type: 'ip_adapter_output';
     };
     /**
      * Ideal Size
@@ -4517,7 +4554,7 @@ export type components = {
        */
       height?: number;
       /** @description UNet (scheduler, LoRAs) */
-      unet?: components["schemas"]["UNetField"];
+      unet?: components['schemas']['UNetField'];
       /**
        * Multiplier
        * @description Amount to multiply the model's dimensions by when calculating the ideal size (may result in initial generation artifacts if too large)
@@ -4529,7 +4566,7 @@ export type components = {
        * @default ideal_size
        * @constant
        */
-      type: "ideal_size";
+      type: 'ideal_size';
     };
     /**
      * IdealSizeOutput
@@ -4551,7 +4588,7 @@ export type components = {
        * @default ideal_size_output
        * @constant
        */
-      type: "ideal_size_output";
+      type: 'ideal_size_output';
     };
     /**
      * Blur Image
@@ -4559,9 +4596,9 @@ export type components = {
      */
     ImageBlurInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4580,7 +4617,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to blur */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Radius
        * @description The blur radius
@@ -4593,13 +4630,13 @@ export type components = {
        * @default gaussian
        * @enum {string}
        */
-      blur_type?: "gaussian" | "box";
+      blur_type?: 'gaussian' | 'box';
       /**
        * type
        * @default img_blur
        * @constant
        */
-      type: "img_blur";
+      type: 'img_blur';
     };
     /**
      * ImageCategory
@@ -4612,16 +4649,16 @@ export type components = {
      * - OTHER: The image is some other type of image with a specialized purpose. To be used by external nodes.
      * @enum {string}
      */
-    ImageCategory: "general" | "mask" | "control" | "user" | "other";
+    ImageCategory: 'general' | 'mask' | 'control' | 'user' | 'other';
     /**
      * Extract Image Channel
      * @description Gets a channel from an image.
      */
     ImageChannelInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4640,20 +4677,20 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to get the channel from */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Channel
        * @description The channel to get
        * @default A
        * @enum {string}
        */
-      channel?: "A" | "R" | "G" | "B";
+      channel?: 'A' | 'R' | 'G' | 'B';
       /**
        * type
        * @default img_chan
        * @constant
        */
-      type: "img_chan";
+      type: 'img_chan';
     };
     /**
      * Multiply Image Channel
@@ -4661,9 +4698,9 @@ export type components = {
      */
     ImageChannelMultiplyInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4682,13 +4719,30 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to adjust */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Channel
        * @description Which channel to adjust
        * @enum {string}
        */
-      channel?: "Red (RGBA)" | "Green (RGBA)" | "Blue (RGBA)" | "Alpha (RGBA)" | "Cyan (CMYK)" | "Magenta (CMYK)" | "Yellow (CMYK)" | "Black (CMYK)" | "Hue (HSV)" | "Saturation (HSV)" | "Value (HSV)" | "Luminosity (LAB)" | "A (LAB)" | "B (LAB)" | "Y (YCbCr)" | "Cb (YCbCr)" | "Cr (YCbCr)";
+      channel?:
+        | 'Red (RGBA)'
+        | 'Green (RGBA)'
+        | 'Blue (RGBA)'
+        | 'Alpha (RGBA)'
+        | 'Cyan (CMYK)'
+        | 'Magenta (CMYK)'
+        | 'Yellow (CMYK)'
+        | 'Black (CMYK)'
+        | 'Hue (HSV)'
+        | 'Saturation (HSV)'
+        | 'Value (HSV)'
+        | 'Luminosity (LAB)'
+        | 'A (LAB)'
+        | 'B (LAB)'
+        | 'Y (YCbCr)'
+        | 'Cb (YCbCr)'
+        | 'Cr (YCbCr)';
       /**
        * Scale
        * @description The amount to scale the channel by.
@@ -4706,7 +4760,7 @@ export type components = {
        * @default img_channel_multiply
        * @constant
        */
-      type: "img_channel_multiply";
+      type: 'img_channel_multiply';
     };
     /**
      * Offset Image Channel
@@ -4714,9 +4768,9 @@ export type components = {
      */
     ImageChannelOffsetInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4735,13 +4789,30 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to adjust */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Channel
        * @description Which channel to adjust
        * @enum {string}
        */
-      channel?: "Red (RGBA)" | "Green (RGBA)" | "Blue (RGBA)" | "Alpha (RGBA)" | "Cyan (CMYK)" | "Magenta (CMYK)" | "Yellow (CMYK)" | "Black (CMYK)" | "Hue (HSV)" | "Saturation (HSV)" | "Value (HSV)" | "Luminosity (LAB)" | "A (LAB)" | "B (LAB)" | "Y (YCbCr)" | "Cb (YCbCr)" | "Cr (YCbCr)";
+      channel?:
+        | 'Red (RGBA)'
+        | 'Green (RGBA)'
+        | 'Blue (RGBA)'
+        | 'Alpha (RGBA)'
+        | 'Cyan (CMYK)'
+        | 'Magenta (CMYK)'
+        | 'Yellow (CMYK)'
+        | 'Black (CMYK)'
+        | 'Hue (HSV)'
+        | 'Saturation (HSV)'
+        | 'Value (HSV)'
+        | 'Luminosity (LAB)'
+        | 'A (LAB)'
+        | 'B (LAB)'
+        | 'Y (YCbCr)'
+        | 'Cb (YCbCr)'
+        | 'Cr (YCbCr)';
       /**
        * Offset
        * @description The amount to adjust the channel by
@@ -4753,7 +4824,7 @@ export type components = {
        * @default img_channel_offset
        * @constant
        */
-      type: "img_channel_offset";
+      type: 'img_channel_offset';
     };
     /**
      * Image Collection Primitive
@@ -4781,13 +4852,13 @@ export type components = {
        * Collection
        * @description The collection of image values
        */
-      collection?: components["schemas"]["ImageField"][];
+      collection?: components['schemas']['ImageField'][];
       /**
        * type
        * @default image_collection
        * @constant
        */
-      type: "image_collection";
+      type: 'image_collection';
     };
     /**
      * ImageCollectionOutput
@@ -4798,13 +4869,13 @@ export type components = {
        * Collection
        * @description The output images
        */
-      collection: components["schemas"]["ImageField"][];
+      collection: components['schemas']['ImageField'][];
       /**
        * type
        * @default image_collection_output
        * @constant
        */
-      type: "image_collection_output";
+      type: 'image_collection_output';
     };
     /**
      * Convert Image Mode
@@ -4812,9 +4883,9 @@ export type components = {
      */
     ImageConvertInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4833,20 +4904,20 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to convert */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Mode
        * @description The mode to convert to
        * @default L
        * @enum {string}
        */
-      mode?: "L" | "RGB" | "RGBA" | "CMYK" | "YCbCr" | "LAB" | "HSV" | "I" | "F";
+      mode?: 'L' | 'RGB' | 'RGBA' | 'CMYK' | 'YCbCr' | 'LAB' | 'HSV' | 'I' | 'F';
       /**
        * type
        * @default img_conv
        * @constant
        */
-      type: "img_conv";
+      type: 'img_conv';
     };
     /**
      * Crop Image
@@ -4854,9 +4925,9 @@ export type components = {
      */
     ImageCropInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -4875,7 +4946,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to crop */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * X
        * @description The left x coordinate of the crop rectangle
@@ -4905,7 +4976,7 @@ export type components = {
        * @default img_crop
        * @constant
        */
-      type: "img_crop";
+      type: 'img_crop';
     };
     /**
      * ImageDTO
@@ -4928,9 +4999,9 @@ export type components = {
        */
       thumbnail_url: string;
       /** @description The type of the image. */
-      image_origin: components["schemas"]["ResourceOrigin"];
+      image_origin: components['schemas']['ResourceOrigin'];
       /** @description The category of the image. */
-      image_category: components["schemas"]["ImageCategory"];
+      image_category: components['schemas']['ImageCategory'];
       /**
        * Width
        * @description The width of the image in px.
@@ -5004,9 +5075,9 @@ export type components = {
      */
     ImageHueAdjustmentInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5025,7 +5096,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to adjust */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Hue
        * @description The degrees by which to rotate the hue, 0-360
@@ -5037,7 +5108,7 @@ export type components = {
        * @default img_hue_adjust
        * @constant
        */
-      type: "img_hue_adjust";
+      type: 'img_hue_adjust';
     };
     /**
      * Inverse Lerp Image
@@ -5045,9 +5116,9 @@ export type components = {
      */
     ImageInverseLerpInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5066,7 +5137,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to lerp */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Min
        * @description The minimum input value
@@ -5084,7 +5155,7 @@ export type components = {
        * @default img_ilerp
        * @constant
        */
-      type: "img_ilerp";
+      type: 'img_ilerp';
     };
     /**
      * Image Primitive
@@ -5109,13 +5180,13 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to load */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * type
        * @default image
        * @constant
        */
-      type: "image";
+      type: 'image';
     };
     /**
      * Lerp Image
@@ -5123,9 +5194,9 @@ export type components = {
      */
     ImageLerpInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5144,7 +5215,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to lerp */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Min
        * @description The minimum output value
@@ -5162,7 +5233,7 @@ export type components = {
        * @default img_lerp
        * @constant
        */
-      type: "img_lerp";
+      type: 'img_lerp';
     };
     /**
      * Multiply Images
@@ -5170,9 +5241,9 @@ export type components = {
      */
     ImageMultiplyInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5191,15 +5262,15 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The first image to multiply */
-      image1?: components["schemas"]["ImageField"];
+      image1?: components['schemas']['ImageField'];
       /** @description The second image to multiply */
-      image2?: components["schemas"]["ImageField"];
+      image2?: components['schemas']['ImageField'];
       /**
        * type
        * @default img_mul
        * @constant
        */
-      type: "img_mul";
+      type: 'img_mul';
     };
     /**
      * Blur NSFW Image
@@ -5207,9 +5278,9 @@ export type components = {
      */
     ImageNSFWBlurInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5228,13 +5299,13 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to check */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * type
        * @default img_nsfw
        * @constant
        */
-      type: "img_nsfw";
+      type: 'img_nsfw';
     };
     /**
      * ImageOutput
@@ -5242,7 +5313,7 @@ export type components = {
      */
     ImageOutput: {
       /** @description The output image */
-      image: components["schemas"]["ImageField"];
+      image: components['schemas']['ImageField'];
       /**
        * Width
        * @description The width of the image in pixels
@@ -5258,7 +5329,7 @@ export type components = {
        * @default image_output
        * @constant
        */
-      type: "image_output";
+      type: 'image_output';
     };
     /**
      * Paste Image
@@ -5266,9 +5337,9 @@ export type components = {
      */
     ImagePasteInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5287,11 +5358,11 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The base image */
-      base_image?: components["schemas"]["ImageField"];
+      base_image?: components['schemas']['ImageField'];
       /** @description The image to paste */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /** @description The mask to use when pasting */
-      mask?: components["schemas"]["ImageField"] | null;
+      mask?: components['schemas']['ImageField'] | null;
       /**
        * X
        * @description The left x coordinate at which to paste the image
@@ -5315,7 +5386,7 @@ export type components = {
        * @default img_paste
        * @constant
        */
-      type: "img_paste";
+      type: 'img_paste';
     };
     /**
      * ImageRecordChanges
@@ -5329,7 +5400,7 @@ export type components = {
      */
     ImageRecordChanges: {
       /** @description The image's new category. */
-      image_category?: components["schemas"]["ImageCategory"] | null;
+      image_category?: components['schemas']['ImageCategory'] | null;
       /**
        * Session Id
        * @description The image's new session ID.
@@ -5353,9 +5424,9 @@ export type components = {
      */
     ImageResizeInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5374,7 +5445,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to resize */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Width
        * @description The width to resize to (px)
@@ -5393,13 +5464,13 @@ export type components = {
        * @default bicubic
        * @enum {string}
        */
-      resample_mode?: "nearest" | "box" | "bilinear" | "hamming" | "bicubic" | "lanczos";
+      resample_mode?: 'nearest' | 'box' | 'bilinear' | 'hamming' | 'bicubic' | 'lanczos';
       /**
        * type
        * @default img_resize
        * @constant
        */
-      type: "img_resize";
+      type: 'img_resize';
     };
     /**
      * Scale Image
@@ -5407,9 +5478,9 @@ export type components = {
      */
     ImageScaleInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5428,7 +5499,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to scale */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Scale Factor
        * @description The factor by which to scale the image
@@ -5441,13 +5512,13 @@ export type components = {
        * @default bicubic
        * @enum {string}
        */
-      resample_mode?: "nearest" | "box" | "bilinear" | "hamming" | "bicubic" | "lanczos";
+      resample_mode?: 'nearest' | 'box' | 'bilinear' | 'hamming' | 'bicubic' | 'lanczos';
       /**
        * type
        * @default img_scale
        * @constant
        */
-      type: "img_scale";
+      type: 'img_scale';
     };
     /**
      * Image to Latents
@@ -5472,9 +5543,9 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to encode */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /** @description VAE */
-      vae?: components["schemas"]["VaeField"];
+      vae?: components['schemas']['VaeField'];
       /**
        * Tiled
        * @description Processing using overlapping tiles (reduce memory consumption)
@@ -5492,7 +5563,7 @@ export type components = {
        * @default i2l
        * @constant
        */
-      type: "i2l";
+      type: 'i2l';
     };
     /**
      * ImageUrlsDTO
@@ -5521,9 +5592,9 @@ export type components = {
      */
     ImageWatermarkInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5542,7 +5613,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to check */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Text
        * @description Watermark text
@@ -5554,7 +5625,7 @@ export type components = {
        * @default img_watermark
        * @constant
        */
-      type: "img_watermark";
+      type: 'img_watermark';
     };
     /** ImagesDownloaded */
     ImagesDownloaded: {
@@ -5583,9 +5654,9 @@ export type components = {
      */
     InfillColorInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5604,7 +5675,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to infill */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * @description The color to use to infill
        * @default {
@@ -5614,13 +5685,13 @@ export type components = {
        *   "a": 255
        * }
        */
-      color?: components["schemas"]["ColorField"];
+      color?: components['schemas']['ColorField'];
       /**
        * type
        * @default infill_rgba
        * @constant
        */
-      type: "infill_rgba";
+      type: 'infill_rgba';
     };
     /**
      * PatchMatch Infill
@@ -5628,9 +5699,9 @@ export type components = {
      */
     InfillPatchMatchInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5649,7 +5720,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to infill */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Downscale
        * @description Run patchmatch on downscaled image to speedup infill
@@ -5662,13 +5733,13 @@ export type components = {
        * @default bicubic
        * @enum {string}
        */
-      resample_mode?: "nearest" | "box" | "bilinear" | "hamming" | "bicubic" | "lanczos";
+      resample_mode?: 'nearest' | 'box' | 'bilinear' | 'hamming' | 'bicubic' | 'lanczos';
       /**
        * type
        * @default infill_patchmatch
        * @constant
        */
-      type: "infill_patchmatch";
+      type: 'infill_patchmatch';
     };
     /**
      * Tile Infill
@@ -5676,9 +5747,9 @@ export type components = {
      */
     InfillTileInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5697,7 +5768,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to infill */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Tile Size
        * @description The tile size (px)
@@ -5715,7 +5786,7 @@ export type components = {
        * @default infill_tile
        * @constant
        */
-      type: "infill_tile";
+      type: 'infill_tile';
     };
     /**
      * InstallStatus
@@ -5756,7 +5827,7 @@ export type components = {
        * @default integer_collection
        * @constant
        */
-      type: "integer_collection";
+      type: 'integer_collection';
     };
     /**
      * IntegerCollectionOutput
@@ -5773,7 +5844,7 @@ export type components = {
        * @default integer_collection_output
        * @constant
        */
-      type: "integer_collection_output";
+      type: 'integer_collection_output';
     };
     /**
      * Integer Primitive
@@ -5808,7 +5879,7 @@ export type components = {
        * @default integer
        * @constant
        */
-      type: "integer";
+      type: 'integer';
     };
     /**
      * Integer Math
@@ -5838,7 +5909,7 @@ export type components = {
        * @default ADD
        * @enum {string}
        */
-      operation?: "ADD" | "SUB" | "MUL" | "DIV" | "EXP" | "MOD" | "ABS" | "MIN" | "MAX";
+      operation?: 'ADD' | 'SUB' | 'MUL' | 'DIV' | 'EXP' | 'MOD' | 'ABS' | 'MIN' | 'MAX';
       /**
        * A
        * @description The first number
@@ -5856,7 +5927,7 @@ export type components = {
        * @default integer_math
        * @constant
        */
-      type: "integer_math";
+      type: 'integer_math';
     };
     /**
      * IntegerOutput
@@ -5873,7 +5944,7 @@ export type components = {
        * @default integer_output
        * @constant
        */
-      type: "integer_output";
+      type: 'integer_output';
     };
     /** InvocationCacheStatus */
     InvocationCacheStatus: {
@@ -5942,7 +6013,7 @@ export type components = {
        * @default iterate
        * @constant
        */
-      type: "iterate";
+      type: 'iterate';
     };
     /**
      * IterateInvocationOutput
@@ -5969,7 +6040,7 @@ export type components = {
        * @default iterate_output
        * @constant
        */
-      type: "iterate_output";
+      type: 'iterate_output';
     };
     JsonValue: unknown;
     /**
@@ -5978,9 +6049,9 @@ export type components = {
      */
     LaMaInfillInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -5999,13 +6070,13 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to infill */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * type
        * @default infill_lama
        * @constant
        */
-      type: "infill_lama";
+      type: 'infill_lama';
     };
     /**
      * Latents Collection Primitive
@@ -6033,13 +6104,13 @@ export type components = {
        * Collection
        * @description The collection of latents tensors
        */
-      collection?: components["schemas"]["LatentsField"][];
+      collection?: components['schemas']['LatentsField'][];
       /**
        * type
        * @default latents_collection
        * @constant
        */
-      type: "latents_collection";
+      type: 'latents_collection';
     };
     /**
      * LatentsCollectionOutput
@@ -6050,13 +6121,13 @@ export type components = {
        * Collection
        * @description Latents tensor
        */
-      collection: components["schemas"]["LatentsField"][];
+      collection: components['schemas']['LatentsField'][];
       /**
        * type
        * @default latents_collection_output
        * @constant
        */
-      type: "latents_collection_output";
+      type: 'latents_collection_output';
     };
     /**
      * LatentsField
@@ -6098,13 +6169,13 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The latents tensor */
-      latents?: components["schemas"]["LatentsField"];
+      latents?: components['schemas']['LatentsField'];
       /**
        * type
        * @default latents
        * @constant
        */
-      type: "latents";
+      type: 'latents';
     };
     /**
      * LatentsOutput
@@ -6112,7 +6183,7 @@ export type components = {
      */
     LatentsOutput: {
       /** @description Latents tensor */
-      latents: components["schemas"]["LatentsField"];
+      latents: components['schemas']['LatentsField'];
       /**
        * Width
        * @description Width of output (px)
@@ -6128,7 +6199,7 @@ export type components = {
        * @default latents_output
        * @constant
        */
-      type: "latents_output";
+      type: 'latents_output';
     };
     /**
      * Latents to Image
@@ -6136,9 +6207,9 @@ export type components = {
      */
     LatentsToImageInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -6157,9 +6228,9 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description Latents tensor */
-      latents?: components["schemas"]["LatentsField"];
+      latents?: components['schemas']['LatentsField'];
       /** @description VAE */
-      vae?: components["schemas"]["VaeField"];
+      vae?: components['schemas']['VaeField'];
       /**
        * Tiled
        * @description Processing using overlapping tiles (reduce memory consumption)
@@ -6177,7 +6248,7 @@ export type components = {
        * @default l2i
        * @constant
        */
-      type: "l2i";
+      type: 'l2i';
     };
     /**
      * Leres (Depth) Processor
@@ -6185,9 +6256,9 @@ export type components = {
      */
     LeresImageProcessorInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -6206,7 +6277,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Thr A
        * @description Leres parameter `thr_a`
@@ -6242,7 +6313,7 @@ export type components = {
        * @default leres_image_processor
        * @constant
        */
-      type: "leres_image_processor";
+      type: 'leres_image_processor';
     };
     /**
      * Lineart Anime Processor
@@ -6250,9 +6321,9 @@ export type components = {
      */
     LineartAnimeImageProcessorInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -6271,7 +6342,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Detect Resolution
        * @description Pixel resolution for detection
@@ -6289,7 +6360,7 @@ export type components = {
        * @default lineart_anime_image_processor
        * @constant
        */
-      type: "lineart_anime_image_processor";
+      type: 'lineart_anime_image_processor';
     };
     /**
      * Lineart Processor
@@ -6297,9 +6368,9 @@ export type components = {
      */
     LineartImageProcessorInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -6318,7 +6389,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Detect Resolution
        * @description Pixel resolution for detection
@@ -6342,7 +6413,7 @@ export type components = {
        * @default lineart_image_processor
        * @constant
        */
-      type: "lineart_image_processor";
+      type: 'lineart_image_processor';
     };
     /**
      * LoRADiffusersConfig
@@ -6400,7 +6471,7 @@ export type components = {
        * @default lora
        * @constant
        */
-      type: "lora";
+      type: 'lora';
       /**
        * Format
        * @default diffusers
@@ -6478,7 +6549,7 @@ export type components = {
      */
     LoRAMetadataField: {
       /** @description LoRA model to load */
-      model: components["schemas"]["LoRAModelField"];
+      model: components['schemas']['LoRAModelField'];
       /**
        * Weight
        * @description The weight at which the LoRA is applied to each model
@@ -6513,7 +6584,7 @@ export type components = {
        * @default local
        * @constant
        */
-      type?: "local";
+      type?: 'local';
     };
     /**
      * LogLevel
@@ -6531,7 +6602,7 @@ export type components = {
        * @description Info to load submodel
        * @default null
        */
-      submodel_type?: components["schemas"]["SubModelType"] | null;
+      submodel_type?: components['schemas']['SubModelType'] | null;
       /**
        * Weight
        * @description Lora's weight which to use when apply to model
@@ -6564,7 +6635,7 @@ export type components = {
        * LoRA
        * @description LoRA model to load
        */
-      lora: components["schemas"]["LoRAModelField"];
+      lora: components['schemas']['LoRAModelField'];
       /**
        * Weight
        * @description The weight at which the LoRA is applied to each model
@@ -6575,18 +6646,18 @@ export type components = {
        * UNet
        * @description UNet (scheduler, LoRAs)
        */
-      unet?: components["schemas"]["UNetField"] | null;
+      unet?: components['schemas']['UNetField'] | null;
       /**
        * CLIP
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip?: components["schemas"]["ClipField"] | null;
+      clip?: components['schemas']['ClipField'] | null;
       /**
        * type
        * @default lora_loader
        * @constant
        */
-      type: "lora_loader";
+      type: 'lora_loader';
     };
     /**
      * LoraLoaderOutput
@@ -6598,19 +6669,19 @@ export type components = {
        * @description UNet (scheduler, LoRAs)
        * @default null
        */
-      unet: components["schemas"]["UNetField"] | null;
+      unet: components['schemas']['UNetField'] | null;
       /**
        * CLIP
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        * @default null
        */
-      clip: components["schemas"]["ClipField"] | null;
+      clip: components['schemas']['ClipField'] | null;
       /**
        * type
        * @default lora_loader_output
        * @constant
        */
-      type: "lora_loader_output";
+      type: 'lora_loader_output';
     };
     /**
      * MainCheckpointConfig
@@ -6668,7 +6739,7 @@ export type components = {
        * @default checkpoint
        * @constant
        */
-      format: "checkpoint";
+      format: 'checkpoint';
       /**
        * Config Path
        * @description path to the checkpoint model config file
@@ -6686,9 +6757,9 @@ export type components = {
        */
       type: "main";
       /** @default normal */
-      variant?: components["schemas"]["ModelVariantType"];
+      variant?: components['schemas']['ModelVariantType'];
       /** @default epsilon */
-      prediction_type?: components["schemas"]["SchedulerPredictionType"];
+      prediction_type?: components['schemas']['SchedulerPredictionType'];
       /**
        * Upcast Attention
        * @default false
@@ -6795,13 +6866,13 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description Main model (UNet, VAE, CLIP) to load */
-      model: components["schemas"]["MainModelField"];
+      model: components['schemas']['MainModelField'];
       /**
        * type
        * @default main_model_loader
        * @constant
        */
-      type: "main_model_loader";
+      type: 'main_model_loader';
     };
     /**
      * Combine Masks
@@ -6809,9 +6880,9 @@ export type components = {
      */
     MaskCombineInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -6830,15 +6901,15 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The first mask to combine */
-      mask1?: components["schemas"]["ImageField"];
+      mask1?: components['schemas']['ImageField'];
       /** @description The second image to combine */
-      mask2?: components["schemas"]["ImageField"];
+      mask2?: components['schemas']['ImageField'];
       /**
        * type
        * @default mask_combine
        * @constant
        */
-      type: "mask_combine";
+      type: 'mask_combine';
     };
     /**
      * Mask Edge
@@ -6846,9 +6917,9 @@ export type components = {
      */
     MaskEdgeInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -6867,7 +6938,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to apply the mask to */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Edge Size
        * @description The size of the edge
@@ -6893,7 +6964,7 @@ export type components = {
        * @default mask_edge
        * @constant
        */
-      type: "mask_edge";
+      type: 'mask_edge';
     };
     /**
      * Mask from Alpha
@@ -6901,9 +6972,9 @@ export type components = {
      */
     MaskFromAlphaInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -6922,7 +6993,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to create the mask from */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Invert
        * @description Whether or not to invert the mask
@@ -6934,7 +7005,7 @@ export type components = {
        * @default tomask
        * @constant
        */
-      type: "tomask";
+      type: 'tomask';
     };
     /**
      * Mediapipe Face Processor
@@ -6942,9 +7013,9 @@ export type components = {
      */
     MediapipeFaceProcessorInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -6963,7 +7034,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Max Faces
        * @description Maximum number of faces to detect
@@ -6981,7 +7052,7 @@ export type components = {
        * @default mediapipe_face_processor
        * @constant
        */
-      type: "mediapipe_face_processor";
+      type: 'mediapipe_face_processor';
     };
     /**
      * Metadata Merge
@@ -7009,13 +7080,13 @@ export type components = {
        * Collection
        * @description Collection of Metadata
        */
-      collection?: components["schemas"]["MetadataField"][];
+      collection?: components['schemas']['MetadataField'][];
       /**
        * type
        * @default merge_metadata
        * @constant
        */
-      type: "merge_metadata";
+      type: 'merge_metadata';
     };
     /**
      * Merge Tiles to Image
@@ -7023,9 +7094,9 @@ export type components = {
      */
     MergeTilesToImageInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -7047,14 +7118,14 @@ export type components = {
        * Tiles With Images
        * @description A list of tile images with tile properties.
        */
-      tiles_with_images?: components["schemas"]["TileWithImage"][];
+      tiles_with_images?: components['schemas']['TileWithImage'][];
       /**
        * Blend Mode
        * @description blending type Linear or Seam
        * @default Seam
        * @enum {string}
        */
-      blend_mode?: "Linear" | "Seam";
+      blend_mode?: 'Linear' | 'Seam';
       /**
        * Blend Amount
        * @description The amount to blend adjacent tiles in pixels. Must be <= the amount of overlap between adjacent tiles.
@@ -7066,7 +7137,7 @@ export type components = {
        * @default merge_tiles_to_image
        * @constant
        */
-      type: "merge_tiles_to_image";
+      type: 'merge_tiles_to_image';
     };
     /**
      * MetadataField
@@ -7100,13 +7171,13 @@ export type components = {
        * Items
        * @description A single metadata item or collection of metadata items
        */
-      items?: components["schemas"]["MetadataItemField"][] | components["schemas"]["MetadataItemField"];
+      items?: components['schemas']['MetadataItemField'][] | components['schemas']['MetadataItemField'];
       /**
        * type
        * @default metadata
        * @constant
        */
-      type: "metadata";
+      type: 'metadata';
     };
     /** MetadataItemField */
     MetadataItemField: {
@@ -7158,7 +7229,7 @@ export type components = {
        * @default metadata_item
        * @constant
        */
-      type: "metadata_item";
+      type: 'metadata_item';
     };
     /**
      * MetadataItemOutput
@@ -7166,24 +7237,24 @@ export type components = {
      */
     MetadataItemOutput: {
       /** @description Metadata Item */
-      item: components["schemas"]["MetadataItemField"];
+      item: components['schemas']['MetadataItemField'];
       /**
        * type
        * @default metadata_item_output
        * @constant
        */
-      type: "metadata_item_output";
+      type: 'metadata_item_output';
     };
     /** MetadataOutput */
     MetadataOutput: {
       /** @description Metadata Dict */
-      metadata: components["schemas"]["MetadataField"];
+      metadata: components['schemas']['MetadataField'];
       /**
        * type
        * @default metadata_output
        * @constant
        */
-      type: "metadata_output";
+      type: 'metadata_output';
     };
     /**
      * Midas Depth Processor
@@ -7191,9 +7262,9 @@ export type components = {
      */
     MidasDepthImageProcessorInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -7212,7 +7283,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * A Mult
        * @description Midas parameter `a_mult` (a = a_mult * PI)
@@ -7230,7 +7301,7 @@ export type components = {
        * @default midas_depth_image_processor
        * @constant
        */
-      type: "midas_depth_image_processor";
+      type: 'midas_depth_image_processor';
     };
     /**
      * MLSD Processor
@@ -7238,9 +7309,9 @@ export type components = {
      */
     MlsdImageProcessorInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -7259,7 +7330,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Detect Resolution
        * @description Pixel resolution for detection
@@ -7289,7 +7360,7 @@ export type components = {
        * @default mlsd_image_processor
        * @constant
        */
-      type: "mlsd_image_processor";
+      type: 'mlsd_image_processor';
     };
     /** ModelDefaultSettings */
     ModelDefaultSettings: {
@@ -7311,7 +7382,15 @@ export type components = {
      * @description Storage format of model.
      * @enum {string}
      */
-    ModelFormat: "diffusers" | "checkpoint" | "lycoris" | "onnx" | "olive" | "embedding_file" | "embedding_folder" | "invokeai";
+    ModelFormat:
+      | 'diffusers'
+      | 'checkpoint'
+      | 'lycoris'
+      | 'onnx'
+      | 'olive'
+      | 'embedding_file'
+      | 'embedding_folder'
+      | 'invokeai';
     /** ModelInfo */
     ModelInfo: {
       /**
@@ -7323,7 +7402,7 @@ export type components = {
        * @description Info to load submodel
        * @default null
        */
-      submodel_type?: components["schemas"]["SubModelType"] | null;
+      submodel_type?: components['schemas']['SubModelType'] | null;
     };
     /**
      * ModelInstallJob
@@ -7339,7 +7418,7 @@ export type components = {
        * @description Current status of install process
        * @default waiting
        */
-      status?: components["schemas"]["InstallStatus"];
+      status?: components['schemas']['InstallStatus'];
       /**
        * Error Reason
        * @description Information about why the job failed
@@ -7365,7 +7444,11 @@ export type components = {
        * Source
        * @description Source (URL, repo_id, or local path) of model
        */
-      source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["CivitaiModelSource"] | components["schemas"]["URLModelSource"];
+      source:
+        | components['schemas']['LocalModelSource']
+        | components['schemas']['HFModelSource']
+        | components['schemas']['CivitaiModelSource']
+        | components['schemas']['URLModelSource'];
       /**
        * Local Path
        * Format: path
@@ -7388,12 +7471,18 @@ export type components = {
        * Source Metadata
        * @description Metadata provided by the model source
        */
-      source_metadata?: (components["schemas"]["BaseMetadata"] | components["schemas"]["HuggingFaceMetadata"] | components["schemas"]["CivitaiMetadata"]) | null;
+      source_metadata?:
+        | (
+            | components['schemas']['BaseMetadata']
+            | components['schemas']['HuggingFaceMetadata']
+            | components['schemas']['CivitaiMetadata']
+          )
+        | null;
       /**
        * Download Parts
        * @description Download jobs contributing to this install
        */
-      download_parts?: components["schemas"]["DownloadJob"][];
+      download_parts?: components['schemas']['DownloadJob'][];
       /**
        * Error
        * @description On an error condition, this field will contain the text of the exception
@@ -7414,23 +7503,38 @@ export type components = {
        * VAE
        * @description VAE
        */
-      vae: components["schemas"]["VaeField"];
+      vae: components['schemas']['VaeField'];
       /**
        * type
        * @default model_loader_output
        * @constant
        */
-      type: "model_loader_output";
+      type: 'model_loader_output';
       /**
        * CLIP
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip: components["schemas"]["ClipField"];
+      clip: components['schemas']['ClipField'];
       /**
        * UNet
        * @description UNet (scheduler, LoRAs)
        */
-      unet: components["schemas"]["UNetField"];
+      unet: components['schemas']['UNetField'];
+    };
+    /**
+     * ModelMetadataChanges
+     * @description A set of changes to apply to model metadata.
+     *
+     * Only limited changes are valid:
+     *   - `trigger_phrases`: the list of trigger phrases for this model
+     */
+    ModelMetadataChanges: {
+      /**
+       * Trigger Phrases
+       * @description The model's list of trigger phrases
+       */
+      trigger_phrases?: string[] | null;
+      [key: string]: unknown;
     };
     /**
      * ModelRecordChanges
@@ -7471,7 +7575,7 @@ export type components = {
      * @description Various hugging face variants on the diffusers format.
      * @enum {string}
      */
-    ModelRepoVariant: "" | "fp16" | "fp32" | "onnx" | "openvino" | "flax";
+    ModelRepoVariant: '' | 'fp16' | 'fp32' | 'onnx' | 'openvino' | 'flax';
     /**
      * ModelSourceType
      * @description Model source type.
@@ -7483,13 +7587,22 @@ export type components = {
      * @description Model type.
      * @enum {string}
      */
-    ModelType: "onnx" | "main" | "vae" | "lora" | "controlnet" | "embedding" | "ip_adapter" | "clip_vision" | "t2i_adapter";
+    ModelType:
+      | 'onnx'
+      | 'main'
+      | 'vae'
+      | 'lora'
+      | 'controlnet'
+      | 'embedding'
+      | 'ip_adapter'
+      | 'clip_vision'
+      | 't2i_adapter';
     /**
      * ModelVariantType
      * @description Variant type.
      * @enum {string}
      */
-    ModelVariantType: "normal" | "inpaint" | "depth";
+    ModelVariantType: 'normal' | 'inpaint' | 'depth';
     /**
      * ModelsList
      * @description Return list of configs.
@@ -7537,7 +7650,7 @@ export type components = {
        * @default mul
        * @constant
        */
-      type: "mul";
+      type: 'mul';
     };
     /** NodeFieldValue */
     NodeFieldValue: {
@@ -7608,7 +7721,7 @@ export type components = {
        * @default noise
        * @constant
        */
-      type: "noise";
+      type: 'noise';
     };
     /**
      * NoiseOutput
@@ -7616,7 +7729,7 @@ export type components = {
      */
     NoiseOutput: {
       /** @description Noise tensor */
-      noise: components["schemas"]["LatentsField"];
+      noise: components['schemas']['LatentsField'];
       /**
        * Width
        * @description Width of output (px)
@@ -7632,7 +7745,7 @@ export type components = {
        * @default noise_output
        * @constant
        */
-      type: "noise_output";
+      type: 'noise_output';
     };
     /**
      * Normal BAE Processor
@@ -7640,9 +7753,9 @@ export type components = {
      */
     NormalbaeImageProcessorInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -7661,7 +7774,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Detect Resolution
        * @description Pixel resolution for detection
@@ -7679,7 +7792,7 @@ export type components = {
        * @default normalbae_image_processor
        * @constant
        */
-      type: "normalbae_image_processor";
+      type: 'normalbae_image_processor';
     };
     /** OffsetPaginatedResults[BoardDTO] */
     OffsetPaginatedResults_BoardDTO_: {
@@ -7702,7 +7815,7 @@ export type components = {
        * Items
        * @description Items
        */
-      items: components["schemas"]["BoardDTO"][];
+      items: components['schemas']['BoardDTO'][];
     };
     /** OffsetPaginatedResults[ImageDTO] */
     OffsetPaginatedResults_ImageDTO_: {
@@ -7725,7 +7838,7 @@ export type components = {
        * Items
        * @description Items
        */
-      items: components["schemas"]["ImageDTO"][];
+      items: components['schemas']['ImageDTO'][];
     };
     /** PaginatedResults[WorkflowRecordListItemDTO] */
     PaginatedResults_WorkflowRecordListItemDTO_: {
@@ -7753,7 +7866,7 @@ export type components = {
        * Items
        * @description Items
        */
-      items: components["schemas"]["WorkflowRecordListItemDTO"][];
+      items: components['schemas']['WorkflowRecordListItemDTO'][];
     };
     /**
      * Pair Tile with Image
@@ -7778,26 +7891,26 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The tile image. */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /** @description The tile properties. */
-      tile?: components["schemas"]["Tile"];
+      tile?: components['schemas']['Tile'];
       /**
        * type
        * @default pair_tile_image
        * @constant
        */
-      type: "pair_tile_image";
+      type: 'pair_tile_image';
     };
     /** PairTileImageOutput */
     PairTileImageOutput: {
       /** @description A tile description with its corresponding image. */
-      tile_with_image: components["schemas"]["TileWithImage"];
+      tile_with_image: components['schemas']['TileWithImage'];
       /**
        * type
        * @default pair_tile_image_output
        * @constant
        */
-      type: "pair_tile_image_output";
+      type: 'pair_tile_image_output';
     };
     /**
      * PIDI Processor
@@ -7805,9 +7918,9 @@ export type components = {
      */
     PidiImageProcessorInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -7826,7 +7939,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Detect Resolution
        * @description Pixel resolution for detection
@@ -7856,7 +7969,7 @@ export type components = {
        * @default pidi_image_processor
        * @constant
        */
-      type: "pidi_image_processor";
+      type: 'pidi_image_processor';
     };
     /**
      * Prompts from File
@@ -7912,7 +8025,7 @@ export type components = {
        * @default prompt_from_file
        * @constant
        */
-      type: "prompt_from_file";
+      type: 'prompt_from_file';
     };
     /**
      * PruneResult
@@ -7970,7 +8083,7 @@ export type components = {
        * @default rand_float
        * @constant
        */
-      type: "rand_float";
+      type: 'rand_float';
     };
     /**
      * Random Integer
@@ -8011,7 +8124,7 @@ export type components = {
        * @default rand_int
        * @constant
        */
-      type: "rand_int";
+      type: 'rand_int';
     };
     /**
      * Random Range
@@ -8064,7 +8177,7 @@ export type components = {
        * @default random_range
        * @constant
        */
-      type: "random_range";
+      type: 'random_range';
     };
     /**
      * Integer Range
@@ -8111,7 +8224,7 @@ export type components = {
        * @default range
        * @constant
        */
-      type: "range";
+      type: 'range';
     };
     /**
      * Integer Range of Size
@@ -8158,7 +8271,7 @@ export type components = {
        * @default range_of_size
        * @constant
        */
-      type: "range_of_size";
+      type: 'range_of_size';
     };
     /**
      * RemoteModelFile
@@ -8219,7 +8332,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description Latents tensor */
-      latents?: components["schemas"]["LatentsField"];
+      latents?: components['schemas']['LatentsField'];
       /**
        * Width
        * @description Width of output (px)
@@ -8236,7 +8349,7 @@ export type components = {
        * @default bilinear
        * @enum {string}
        */
-      mode?: "nearest" | "linear" | "bilinear" | "bicubic" | "trilinear" | "area" | "nearest-exact";
+      mode?: 'nearest' | 'linear' | 'bilinear' | 'bicubic' | 'trilinear' | 'area' | 'nearest-exact';
       /**
        * Antialias
        * @description Whether or not to apply antialiasing (bilinear or bicubic only)
@@ -8248,7 +8361,7 @@ export type components = {
        * @default lresize
        * @constant
        */
-      type: "lresize";
+      type: 'lresize';
     };
     /**
      * ResourceOrigin
@@ -8259,7 +8372,7 @@ export type components = {
      * This may be a user-initiated upload, or an internal application upload (eg Canvas init image).
      * @enum {string}
      */
-    ResourceOrigin: "internal" | "external";
+    ResourceOrigin: 'internal' | 'external';
     /**
      * Round Float
      * @description Rounds a float to a specified number of decimal places.
@@ -8299,7 +8412,7 @@ export type components = {
        * @default round_float
        * @constant
        */
-      type: "round_float";
+      type: 'round_float';
     };
     /**
      * SDXL Prompt
@@ -8369,18 +8482,18 @@ export type components = {
        * CLIP 1
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip?: components["schemas"]["ClipField"];
+      clip?: components['schemas']['ClipField'];
       /**
        * CLIP 2
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip2?: components["schemas"]["ClipField"];
+      clip2?: components['schemas']['ClipField'];
       /**
        * type
        * @default sdxl_compel_prompt
        * @constant
        */
-      type: "sdxl_compel_prompt";
+      type: 'sdxl_compel_prompt';
     };
     /**
      * SDXL LoRA
@@ -8408,7 +8521,7 @@ export type components = {
        * LoRA
        * @description LoRA model to load
        */
-      lora: components["schemas"]["LoRAModelField"];
+      lora: components['schemas']['LoRAModelField'];
       /**
        * Weight
        * @description The weight at which the LoRA is applied to each model
@@ -8419,23 +8532,23 @@ export type components = {
        * UNet
        * @description UNet (scheduler, LoRAs)
        */
-      unet?: components["schemas"]["UNetField"] | null;
+      unet?: components['schemas']['UNetField'] | null;
       /**
        * CLIP 1
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip?: components["schemas"]["ClipField"] | null;
+      clip?: components['schemas']['ClipField'] | null;
       /**
        * CLIP 2
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip2?: components["schemas"]["ClipField"] | null;
+      clip2?: components['schemas']['ClipField'] | null;
       /**
        * type
        * @default sdxl_lora_loader
        * @constant
        */
-      type: "sdxl_lora_loader";
+      type: 'sdxl_lora_loader';
     };
     /**
      * SDXLLoraLoaderOutput
@@ -8447,25 +8560,25 @@ export type components = {
        * @description UNet (scheduler, LoRAs)
        * @default null
        */
-      unet: components["schemas"]["UNetField"] | null;
+      unet: components['schemas']['UNetField'] | null;
       /**
        * CLIP 1
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        * @default null
        */
-      clip: components["schemas"]["ClipField"] | null;
+      clip: components['schemas']['ClipField'] | null;
       /**
        * CLIP 2
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        * @default null
        */
-      clip2: components["schemas"]["ClipField"] | null;
+      clip2: components['schemas']['ClipField'] | null;
       /**
        * type
        * @default sdxl_lora_loader_output
        * @constant
        */
-      type: "sdxl_lora_loader_output";
+      type: 'sdxl_lora_loader_output';
     };
     /**
      * SDXL Main Model
@@ -8490,13 +8603,13 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load */
-      model: components["schemas"]["MainModelField"];
+      model: components['schemas']['MainModelField'];
       /**
        * type
        * @default sdxl_model_loader
        * @constant
        */
-      type: "sdxl_model_loader";
+      type: 'sdxl_model_loader';
     };
     /**
      * SDXLModelLoaderOutput
@@ -8507,28 +8620,28 @@ export type components = {
        * UNet
        * @description UNet (scheduler, LoRAs)
        */
-      unet: components["schemas"]["UNetField"];
+      unet: components['schemas']['UNetField'];
       /**
        * CLIP 1
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip: components["schemas"]["ClipField"];
+      clip: components['schemas']['ClipField'];
       /**
        * CLIP 2
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip2: components["schemas"]["ClipField"];
+      clip2: components['schemas']['ClipField'];
       /**
        * VAE
        * @description VAE
        */
-      vae: components["schemas"]["VaeField"];
+      vae: components['schemas']['VaeField'];
       /**
        * type
        * @default sdxl_model_loader_output
        * @constant
        */
-      type: "sdxl_model_loader_output";
+      type: 'sdxl_model_loader_output';
     };
     /**
      * SDXL Refiner Prompt
@@ -8585,13 +8698,13 @@ export type components = {
        */
       aesthetic_score?: number;
       /** @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count */
-      clip2?: components["schemas"]["ClipField"];
+      clip2?: components['schemas']['ClipField'];
       /**
        * type
        * @default sdxl_refiner_compel_prompt
        * @constant
        */
-      type: "sdxl_refiner_compel_prompt";
+      type: 'sdxl_refiner_compel_prompt';
     };
     /**
      * SDXL Refiner Model
@@ -8616,13 +8729,13 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load */
-      model: components["schemas"]["MainModelField"];
+      model: components['schemas']['MainModelField'];
       /**
        * type
        * @default sdxl_refiner_model_loader
        * @constant
        */
-      type: "sdxl_refiner_model_loader";
+      type: 'sdxl_refiner_model_loader';
     };
     /**
      * SDXLRefinerModelLoaderOutput
@@ -8633,38 +8746,38 @@ export type components = {
        * UNet
        * @description UNet (scheduler, LoRAs)
        */
-      unet: components["schemas"]["UNetField"];
+      unet: components['schemas']['UNetField'];
       /**
        * CLIP 2
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip2: components["schemas"]["ClipField"];
+      clip2: components['schemas']['ClipField'];
       /**
        * VAE
        * @description VAE
        */
-      vae: components["schemas"]["VaeField"];
+      vae: components['schemas']['VaeField'];
       /**
        * type
        * @default sdxl_refiner_model_loader_output
        * @constant
        */
-      type: "sdxl_refiner_model_loader_output";
+      type: 'sdxl_refiner_model_loader_output';
     };
     /**
      * SQLiteDirection
      * @enum {string}
      */
-    SQLiteDirection: "ASC" | "DESC";
+    SQLiteDirection: 'ASC' | 'DESC';
     /**
      * Save Image
      * @description Saves an image. Unlike an image primitive, this invocation stores a copy of the image.
      */
     SaveImageInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -8683,13 +8796,13 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * type
        * @default save_image
        * @constant
        */
-      type: "save_image";
+      type: 'save_image';
     };
     /**
      * Scale Latents
@@ -8714,7 +8827,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description Latents tensor */
-      latents?: components["schemas"]["LatentsField"];
+      latents?: components['schemas']['LatentsField'];
       /**
        * Scale Factor
        * @description The factor by which to scale
@@ -8726,7 +8839,7 @@ export type components = {
        * @default bilinear
        * @enum {string}
        */
-      mode?: "nearest" | "linear" | "bilinear" | "bicubic" | "trilinear" | "area" | "nearest-exact";
+      mode?: 'nearest' | 'linear' | 'bilinear' | 'bicubic' | 'trilinear' | 'area' | 'nearest-exact';
       /**
        * Antialias
        * @description Whether or not to apply antialiasing (bilinear or bicubic only)
@@ -8738,7 +8851,7 @@ export type components = {
        * @default lscale
        * @constant
        */
-      type: "lscale";
+      type: 'lscale';
     };
     /**
      * Scheduler
@@ -8768,13 +8881,36 @@ export type components = {
        * @default euler
        * @enum {string}
        */
-      scheduler?: "ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "lcm";
+      scheduler?:
+        | 'ddim'
+        | 'ddpm'
+        | 'deis'
+        | 'lms'
+        | 'lms_k'
+        | 'pndm'
+        | 'heun'
+        | 'heun_k'
+        | 'euler'
+        | 'euler_k'
+        | 'euler_a'
+        | 'kdpm_2'
+        | 'kdpm_2_a'
+        | 'dpmpp_2s'
+        | 'dpmpp_2s_k'
+        | 'dpmpp_2m'
+        | 'dpmpp_2m_k'
+        | 'dpmpp_2m_sde'
+        | 'dpmpp_2m_sde_k'
+        | 'dpmpp_sde'
+        | 'dpmpp_sde_k'
+        | 'unipc'
+        | 'lcm';
       /**
        * type
        * @default scheduler
        * @constant
        */
-      type: "scheduler";
+      type: 'scheduler';
     };
     /** SchedulerOutput */
     SchedulerOutput: {
@@ -8783,20 +8919,43 @@ export type components = {
        * @description Scheduler to use during inference
        * @enum {string}
        */
-      scheduler: "ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "lcm";
+      scheduler:
+        | 'ddim'
+        | 'ddpm'
+        | 'deis'
+        | 'lms'
+        | 'lms_k'
+        | 'pndm'
+        | 'heun'
+        | 'heun_k'
+        | 'euler'
+        | 'euler_k'
+        | 'euler_a'
+        | 'kdpm_2'
+        | 'kdpm_2_a'
+        | 'dpmpp_2s'
+        | 'dpmpp_2s_k'
+        | 'dpmpp_2m'
+        | 'dpmpp_2m_k'
+        | 'dpmpp_2m_sde'
+        | 'dpmpp_2m_sde_k'
+        | 'dpmpp_sde'
+        | 'dpmpp_sde_k'
+        | 'unipc'
+        | 'lcm';
       /**
        * type
        * @default scheduler_output
        * @constant
        */
-      type: "scheduler_output";
+      type: 'scheduler_output';
     };
     /**
      * SchedulerPredictionType
      * @description Scheduler prediction type.
      * @enum {string}
      */
-    SchedulerPredictionType: "epsilon" | "v_prediction" | "sample";
+    SchedulerPredictionType: 'epsilon' | 'v_prediction' | 'sample';
     /**
      * Seamless
      * @description Applies the seamless transformation to the Model UNet and VAE.
@@ -8823,12 +8982,12 @@ export type components = {
        * UNet
        * @description UNet (scheduler, LoRAs)
        */
-      unet?: components["schemas"]["UNetField"] | null;
+      unet?: components['schemas']['UNetField'] | null;
       /**
        * VAE
        * @description VAE model to load
        */
-      vae?: components["schemas"]["VaeField"] | null;
+      vae?: components['schemas']['VaeField'] | null;
       /**
        * Seamless Y
        * @description Specify whether Y axis is seamless
@@ -8846,7 +9005,7 @@ export type components = {
        * @default seamless
        * @constant
        */
-      type: "seamless";
+      type: 'seamless';
     };
     /**
      * SeamlessModeOutput
@@ -8858,19 +9017,19 @@ export type components = {
        * @description UNet (scheduler, LoRAs)
        * @default null
        */
-      unet: components["schemas"]["UNetField"] | null;
+      unet: components['schemas']['UNetField'] | null;
       /**
        * VAE
        * @description VAE
        * @default null
        */
-      vae: components["schemas"]["VaeField"] | null;
+      vae: components['schemas']['VaeField'] | null;
       /**
        * type
        * @default seamless_output
        * @constant
        */
-      type: "seamless_output";
+      type: 'seamless_output';
     };
     /**
      * Segment Anything Processor
@@ -8878,9 +9037,9 @@ export type components = {
      */
     SegmentAnythingProcessorInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -8899,13 +9058,13 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * type
        * @default segment_anything_processor
        * @constant
        */
-      type: "segment_anything_processor";
+      type: 'segment_anything_processor';
     };
     /** SessionProcessorStatus */
     SessionProcessorStatus: {
@@ -8925,8 +9084,8 @@ export type components = {
      * @description The overall status of session queue and processor
      */
     SessionQueueAndProcessorStatus: {
-      queue: components["schemas"]["SessionQueueStatus"];
-      processor: components["schemas"]["SessionProcessorStatus"];
+      queue: components['schemas']['SessionQueueStatus'];
+      processor: components['schemas']['SessionProcessorStatus'];
     };
     /** SessionQueueItem */
     SessionQueueItem: {
@@ -8941,7 +9100,7 @@ export type components = {
        * @default pending
        * @enum {string}
        */
-      status: "pending" | "in_progress" | "completed" | "failed" | "canceled";
+      status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'canceled';
       /**
        * Priority
        * @description The priority of this queue item
@@ -8992,11 +9151,11 @@ export type components = {
        * Field Values
        * @description The field values that were used for this queue item
        */
-      field_values?: components["schemas"]["NodeFieldValue"][] | null;
+      field_values?: components['schemas']['NodeFieldValue'][] | null;
       /** @description The fully-populated session to be executed */
-      session: components["schemas"]["GraphExecutionState"];
+      session: components['schemas']['GraphExecutionState'];
       /** @description The workflow associated with this queue item */
-      workflow?: components["schemas"]["WorkflowWithoutID"] | null;
+      workflow?: components['schemas']['WorkflowWithoutID'] | null;
     };
     /** SessionQueueItemDTO */
     SessionQueueItemDTO: {
@@ -9011,7 +9170,7 @@ export type components = {
        * @default pending
        * @enum {string}
        */
-      status: "pending" | "in_progress" | "completed" | "failed" | "canceled";
+      status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'canceled';
       /**
        * Priority
        * @description The priority of this queue item
@@ -9062,7 +9221,7 @@ export type components = {
        * Field Values
        * @description The field values that were used for this queue item
        */
-      field_values?: components["schemas"]["NodeFieldValue"][] | null;
+      field_values?: components['schemas']['NodeFieldValue'][] | null;
     };
     /** SessionQueueStatus */
     SessionQueueStatus: {
@@ -9140,13 +9299,13 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to show */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * type
        * @default show_image
        * @constant
        */
-      type: "show_image";
+      type: 'show_image';
     };
     /**
      * Step Param Easing
@@ -9176,7 +9335,38 @@ export type components = {
        * @default Linear
        * @enum {string}
        */
-      easing?: "Linear" | "QuadIn" | "QuadOut" | "QuadInOut" | "CubicIn" | "CubicOut" | "CubicInOut" | "QuarticIn" | "QuarticOut" | "QuarticInOut" | "QuinticIn" | "QuinticOut" | "QuinticInOut" | "SineIn" | "SineOut" | "SineInOut" | "CircularIn" | "CircularOut" | "CircularInOut" | "ExponentialIn" | "ExponentialOut" | "ExponentialInOut" | "ElasticIn" | "ElasticOut" | "ElasticInOut" | "BackIn" | "BackOut" | "BackInOut" | "BounceIn" | "BounceOut" | "BounceInOut";
+      easing?:
+        | 'Linear'
+        | 'QuadIn'
+        | 'QuadOut'
+        | 'QuadInOut'
+        | 'CubicIn'
+        | 'CubicOut'
+        | 'CubicInOut'
+        | 'QuarticIn'
+        | 'QuarticOut'
+        | 'QuarticInOut'
+        | 'QuinticIn'
+        | 'QuinticOut'
+        | 'QuinticInOut'
+        | 'SineIn'
+        | 'SineOut'
+        | 'SineInOut'
+        | 'CircularIn'
+        | 'CircularOut'
+        | 'CircularInOut'
+        | 'ExponentialIn'
+        | 'ExponentialOut'
+        | 'ExponentialInOut'
+        | 'ElasticIn'
+        | 'ElasticOut'
+        | 'ElasticInOut'
+        | 'BackIn'
+        | 'BackOut'
+        | 'BackInOut'
+        | 'BounceIn'
+        | 'BounceOut'
+        | 'BounceInOut';
       /**
        * Num Steps
        * @description number of denoising steps
@@ -9234,7 +9424,7 @@ export type components = {
        * @default step_param_easing
        * @constant
        */
-      type: "step_param_easing";
+      type: 'step_param_easing';
     };
     /**
      * String2Output
@@ -9256,7 +9446,7 @@ export type components = {
        * @default string_2_output
        * @constant
        */
-      type: "string_2_output";
+      type: 'string_2_output';
     };
     /**
      * String Collection Primitive
@@ -9291,7 +9481,7 @@ export type components = {
        * @default string_collection
        * @constant
        */
-      type: "string_collection";
+      type: 'string_collection';
     };
     /**
      * StringCollectionOutput
@@ -9308,7 +9498,7 @@ export type components = {
        * @default string_collection_output
        * @constant
        */
-      type: "string_collection_output";
+      type: 'string_collection_output';
     };
     /**
      * String Primitive
@@ -9343,7 +9533,7 @@ export type components = {
        * @default string
        * @constant
        */
-      type: "string";
+      type: 'string';
     };
     /**
      * String Join
@@ -9384,7 +9574,7 @@ export type components = {
        * @default string_join
        * @constant
        */
-      type: "string_join";
+      type: 'string_join';
     };
     /**
      * String Join Three
@@ -9431,7 +9621,7 @@ export type components = {
        * @default string_join_three
        * @constant
        */
-      type: "string_join_three";
+      type: 'string_join_three';
     };
     /**
      * StringOutput
@@ -9448,7 +9638,7 @@ export type components = {
        * @default string_output
        * @constant
        */
-      type: "string_output";
+      type: 'string_output';
     };
     /**
      * StringPosNegOutput
@@ -9470,7 +9660,7 @@ export type components = {
        * @default string_pos_neg_output
        * @constant
        */
-      type: "string_pos_neg_output";
+      type: 'string_pos_neg_output';
     };
     /**
      * String Replace
@@ -9523,7 +9713,7 @@ export type components = {
        * @default string_replace
        * @constant
        */
-      type: "string_replace";
+      type: 'string_replace';
     };
     /**
      * String Split
@@ -9564,7 +9754,7 @@ export type components = {
        * @default string_split
        * @constant
        */
-      type: "string_split";
+      type: 'string_split';
     };
     /**
      * String Split Negative
@@ -9599,14 +9789,24 @@ export type components = {
        * @default string_split_neg
        * @constant
        */
-      type: "string_split_neg";
+      type: 'string_split_neg';
     };
     /**
      * SubModelType
      * @description Submodel type.
      * @enum {string}
      */
-    SubModelType: "unet" | "text_encoder" | "text_encoder_2" | "tokenizer" | "tokenizer_2" | "vae" | "vae_decoder" | "vae_encoder" | "scheduler" | "safety_checker";
+    SubModelType:
+      | 'unet'
+      | 'text_encoder'
+      | 'text_encoder_2'
+      | 'tokenizer'
+      | 'tokenizer_2'
+      | 'vae'
+      | 'vae_decoder'
+      | 'vae_encoder'
+      | 'scheduler'
+      | 'safety_checker';
     /**
      * Subtract Integers
      * @description Subtracts two numbers
@@ -9646,7 +9846,7 @@ export type components = {
        * @default sub
        * @constant
        */
-      type: "sub";
+      type: 'sub';
     };
     /**
      * T2IAdapterConfig
@@ -9714,9 +9914,9 @@ export type components = {
     /** T2IAdapterField */
     T2IAdapterField: {
       /** @description The T2I-Adapter image prompt. */
-      image: components["schemas"]["ImageField"];
+      image: components['schemas']['ImageField'];
       /** @description The T2I-Adapter model to use. */
-      t2i_adapter_model: components["schemas"]["T2IAdapterModelField"];
+      t2i_adapter_model: components['schemas']['T2IAdapterModelField'];
       /**
        * Weight
        * @description The weight given to the T2I-Adapter
@@ -9741,7 +9941,7 @@ export type components = {
        * @default just_resize
        * @enum {string}
        */
-      resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
+      resize_mode?: 'just_resize' | 'crop_resize' | 'fill_resize' | 'just_resize_simple';
     };
     /**
      * T2I-Adapter
@@ -9766,12 +9966,12 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The IP-Adapter image prompt. */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * T2I-Adapter Model
        * @description The T2I-Adapter model.
        */
-      t2i_adapter_model: components["schemas"]["T2IAdapterModelField"];
+      t2i_adapter_model: components['schemas']['T2IAdapterModelField'];
       /**
        * Weight
        * @description The weight given to the T2I-Adapter
@@ -9796,13 +9996,13 @@ export type components = {
        * @default just_resize
        * @enum {string}
        */
-      resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
+      resize_mode?: 'just_resize' | 'crop_resize' | 'fill_resize' | 'just_resize_simple';
       /**
        * type
        * @default t2i_adapter
        * @constant
        */
-      type: "t2i_adapter";
+      type: 't2i_adapter';
     };
     /** T2IAdapterModelField */
     T2IAdapterModelField: {
@@ -9818,13 +10018,13 @@ export type components = {
        * T2I Adapter
        * @description T2I-Adapter(s) to apply
        */
-      t2i_adapter: components["schemas"]["T2IAdapterField"];
+      t2i_adapter: components['schemas']['T2IAdapterField'];
       /**
        * type
        * @default t2i_adapter_output
        * @constant
        */
-      type: "t2i_adapter_output";
+      type: 't2i_adapter_output';
     };
     /** TBLR */
     TBLR: {
@@ -9893,7 +10093,7 @@ export type components = {
        * @default embedding
        * @constant
        */
-      type: "embedding";
+      type: 'embedding';
       /**
        * Format
        * @default embedding_file
@@ -9968,9 +10168,9 @@ export type components = {
     /** Tile */
     Tile: {
       /** @description The coordinates of this tile relative to its parent image. */
-      coords: components["schemas"]["TBLR"];
+      coords: components['schemas']['TBLR'];
       /** @description The amount of overlap with adjacent tiles on each side of this tile. */
-      overlap: components["schemas"]["TBLR"];
+      overlap: components['schemas']['TBLR'];
     };
     /**
      * Tile Resample Processor
@@ -9978,9 +10178,9 @@ export type components = {
      */
     TileResamplerProcessorInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -9999,7 +10199,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Down Sampling Rate
        * @description Down sampling rate
@@ -10011,7 +10211,7 @@ export type components = {
        * @default tile_image_processor
        * @constant
        */
-      type: "tile_image_processor";
+      type: 'tile_image_processor';
     };
     /**
      * Tile to Properties
@@ -10036,13 +10236,13 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The tile to split into properties. */
-      tile?: components["schemas"]["Tile"];
+      tile?: components['schemas']['Tile'];
       /**
        * type
        * @default tile_to_properties
        * @constant
        */
-      type: "tile_to_properties";
+      type: 'tile_to_properties';
     };
     /** TileToPropertiesOutput */
     TileToPropertiesOutput: {
@@ -10101,24 +10301,24 @@ export type components = {
        * @default tile_to_properties_output
        * @constant
        */
-      type: "tile_to_properties_output";
+      type: 'tile_to_properties_output';
     };
     /** TileWithImage */
     TileWithImage: {
-      tile: components["schemas"]["Tile"];
-      image: components["schemas"]["ImageField"];
+      tile: components['schemas']['Tile'];
+      image: components['schemas']['ImageField'];
     };
     /** UNetField */
     UNetField: {
       /** @description Info to load unet submodel */
-      unet: components["schemas"]["ModelInfo"];
+      unet: components['schemas']['ModelInfo'];
       /** @description Info to load scheduler submodel */
-      scheduler: components["schemas"]["ModelInfo"];
+      scheduler: components['schemas']['ModelInfo'];
       /**
        * Loras
        * @description Loras to apply on model loading
        */
-      loras: components["schemas"]["LoraInfo"][];
+      loras: components['schemas']['LoraInfo'][];
       /**
        * Seamless Axes
        * @description Axes("x" and "y") to which apply seamless
@@ -10128,7 +10328,7 @@ export type components = {
        * @description FreeU configuration
        * @default null
        */
-      freeu_config?: components["schemas"]["FreeUConfig"] | null;
+      freeu_config?: components['schemas']['FreeUConfig'] | null;
     };
     /**
      * UNetOutput
@@ -10139,13 +10339,13 @@ export type components = {
        * UNet
        * @description UNet (scheduler, LoRAs)
        */
-      unet: components["schemas"]["UNetField"];
+      unet: components['schemas']['UNetField'];
       /**
        * type
        * @default unet_output
        * @constant
        */
-      type: "unet_output";
+      type: 'unet_output';
     };
     /**
      * URLModelSource
@@ -10164,7 +10364,7 @@ export type components = {
        * @default url
        * @constant
        */
-      type?: "url";
+      type?: 'url';
     };
     /**
      * Unsharp Mask
@@ -10172,9 +10372,9 @@ export type components = {
      */
     UnsharpMaskInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -10193,7 +10393,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to use */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * Radius
        * @description Unsharp mask radius
@@ -10211,7 +10411,7 @@ export type components = {
        * @default unsharp_mask
        * @constant
        */
-      type: "unsharp_mask";
+      type: 'unsharp_mask';
     };
     /** Upscaler */
     Upscaler: {
@@ -10384,18 +10584,18 @@ export type components = {
        * VAE
        * @description VAE
        */
-      vae: components["schemas"]["VaeField"];
+      vae: components['schemas']['VaeField'];
       /**
        * type
        * @default vae_output
        * @constant
        */
-      type: "vae_output";
+      type: 'vae_output';
     };
     /** VaeField */
     VaeField: {
       /** @description Info to load vae submodel */
-      vae: components["schemas"]["ModelInfo"];
+      vae: components['schemas']['ModelInfo'];
       /**
        * Seamless Axes
        * @description Axes("x" and "y") to which apply seamless
@@ -10428,13 +10628,13 @@ export type components = {
        * VAE
        * @description VAE model to load
        */
-      vae_model: components["schemas"]["VAEModelField"];
+      vae_model: components['schemas']['VAEModelField'];
       /**
        * type
        * @default vae_loader
        * @constant
        */
-      type: "vae_loader";
+      type: 'vae_loader';
     };
     /** ValidationError */
     ValidationError: {
@@ -10486,23 +10686,23 @@ export type components = {
        * Exposedfields
        * @description The exposed fields of the workflow.
        */
-      exposedFields: components["schemas"]["ExposedField"][];
+      exposedFields: components['schemas']['ExposedField'][];
       /** @description The meta of the workflow. */
-      meta: components["schemas"]["WorkflowMeta"];
+      meta: components['schemas']['WorkflowMeta'];
       /**
        * Nodes
        * @description The nodes of the workflow.
        */
       nodes: {
-          [key: string]: components["schemas"]["JsonValue"];
-        }[];
+        [key: string]: components['schemas']['JsonValue'];
+      }[];
       /**
        * Edges
        * @description The edges of the workflow.
        */
       edges: {
-          [key: string]: components["schemas"]["JsonValue"];
-        }[];
+        [key: string]: components['schemas']['JsonValue'];
+      }[];
       /**
        * Id
        * @description The id of the workflow.
@@ -10513,7 +10713,7 @@ export type components = {
      * WorkflowCategory
      * @enum {string}
      */
-    WorkflowCategory: "user" | "default" | "project";
+    WorkflowCategory: 'user' | 'default' | 'project';
     /** WorkflowMeta */
     WorkflowMeta: {
       /**
@@ -10525,7 +10725,7 @@ export type components = {
        * @description The category of the workflow (user or default).
        * @default user
        */
-      category?: components["schemas"]["WorkflowCategory"];
+      category?: components['schemas']['WorkflowCategory'];
     };
     /** WorkflowRecordDTO */
     WorkflowRecordDTO: {
@@ -10555,7 +10755,7 @@ export type components = {
        */
       opened_at: string;
       /** @description The workflow. */
-      workflow: components["schemas"]["Workflow"];
+      workflow: components['schemas']['Workflow'];
     };
     /** WorkflowRecordListItemDTO */
     WorkflowRecordListItemDTO: {
@@ -10590,14 +10790,14 @@ export type components = {
        */
       description: string;
       /** @description The description of the workflow. */
-      category: components["schemas"]["WorkflowCategory"];
+      category: components['schemas']['WorkflowCategory'];
     };
     /**
      * WorkflowRecordOrderBy
      * @description The order by options for workflow records
      * @enum {string}
      */
-    WorkflowRecordOrderBy: "created_at" | "updated_at" | "opened_at" | "name";
+    WorkflowRecordOrderBy: 'created_at' | 'updated_at' | 'opened_at' | 'name';
     /** WorkflowWithoutID */
     WorkflowWithoutID: {
       /**
@@ -10639,23 +10839,23 @@ export type components = {
        * Exposedfields
        * @description The exposed fields of the workflow.
        */
-      exposedFields: components["schemas"]["ExposedField"][];
+      exposedFields: components['schemas']['ExposedField'][];
       /** @description The meta of the workflow. */
-      meta: components["schemas"]["WorkflowMeta"];
+      meta: components['schemas']['WorkflowMeta'];
       /**
        * Nodes
        * @description The nodes of the workflow.
        */
       nodes: {
-          [key: string]: components["schemas"]["JsonValue"];
-        }[];
+        [key: string]: components['schemas']['JsonValue'];
+      }[];
       /**
        * Edges
        * @description The edges of the workflow.
        */
       edges: {
-          [key: string]: components["schemas"]["JsonValue"];
-        }[];
+        [key: string]: components['schemas']['JsonValue'];
+      }[];
     };
     /**
      * Zoe (Depth) Processor
@@ -10663,9 +10863,9 @@ export type components = {
      */
     ZoeDepthImageProcessorInvocation: {
       /** @description The board to save the image to */
-      board?: components["schemas"]["BoardField"] | null;
+      board?: components['schemas']['BoardField'] | null;
       /** @description Optional metadata to be saved with the image */
-      metadata?: components["schemas"]["MetadataField"] | null;
+      metadata?: components['schemas']['MetadataField'] | null;
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -10684,13 +10884,13 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description The image to process */
-      image?: components["schemas"]["ImageField"];
+      image?: components['schemas']['ImageField'];
       /**
        * type
        * @default zoe_depth_image_processor
        * @constant
        */
-      type: "zoe_depth_image_processor";
+      type: 'zoe_depth_image_processor';
     };
     /**
      * Classification
@@ -10700,7 +10900,7 @@ export type components = {
      * - `Prototype`: The invocation is not yet stable and may be removed from the application at any time. Workflows built around this invocation may break, and we are *not* committed to supporting this invocation.
      * @enum {string}
      */
-    Classification: "stable" | "beta" | "prototype";
+    Classification: 'stable' | 'beta' | 'prototype';
     /**
      * FieldKind
      * @description The kind of field.
@@ -10718,7 +10918,7 @@ export type components = {
      * startup, and when generating the OpenAPI schema for the workflow editor.
      * @enum {string}
      */
-    FieldKind: "input" | "output" | "internal" | "node_attribute";
+    FieldKind: 'input' | 'output' | 'internal' | 'node_attribute';
     /**
      * Input
      * @description The type of input a field accepts.
@@ -10727,17 +10927,17 @@ export type components = {
      * - `Input.Any`: The field may have its value provided either directly or by a connection.
      * @enum {string}
      */
-    Input: "connection" | "direct" | "any";
+    Input: 'connection' | 'direct' | 'any';
     /**
      * InputFieldJSONSchemaExtra
      * @description Extra attributes to be added to input fields and their OpenAPI schema. Used during graph execution,
      * and by the workflow editor during schema parsing and UI rendering.
      */
     InputFieldJSONSchemaExtra: {
-      input: components["schemas"]["Input"];
+      input: components['schemas']['Input'];
       /** Orig Required */
       orig_required: boolean;
-      field_kind: components["schemas"]["FieldKind"];
+      field_kind: components['schemas']['FieldKind'];
       /**
        * Default
        * @default null
@@ -10754,9 +10954,9 @@ export type components = {
        */
       ui_hidden: boolean;
       /** @default null */
-      ui_type: components["schemas"]["UIType"] | null;
+      ui_type: components['schemas']['UIType'] | null;
       /** @default null */
-      ui_component: components["schemas"]["UIComponent"] | null;
+      ui_component: components['schemas']['UIComponent'] | null;
       /**
        * Ui Order
        * @default null
@@ -10776,10 +10976,10 @@ export type components = {
      * during schema parsing and UI rendering.
      */
     OutputFieldJSONSchemaExtra: {
-      field_kind: components["schemas"]["FieldKind"];
+      field_kind: components['schemas']['FieldKind'];
       /** Ui Hidden */
       ui_hidden: boolean;
-      ui_type: components["schemas"]["UIType"] | null;
+      ui_type: components['schemas']['UIType'] | null;
       /** Ui Order */
       ui_order: number | null;
     };
@@ -10789,7 +10989,7 @@ export type components = {
      * inferred from the field type.
      * @enum {string}
      */
-    UIComponent: "none" | "textarea" | "slider";
+    UIComponent: 'none' | 'textarea' | 'slider';
     /**
      * UIConfigBase
      * @description Provides additional node configuration to the UI.
@@ -10828,7 +11028,7 @@ export type components = {
        * @description The node's classification
        * @default stable
        */
-      classification: components["schemas"]["Classification"];
+      classification: components['schemas']['Classification'];
     };
     /**
      * UIType
@@ -10857,7 +11057,59 @@ export type components = {
      * used, and the type will be ignored. They are included here for backwards compatibility.
      * @enum {string}
      */
-    UIType: "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VAEModelField" | "LoRAModelField" | "ControlNetModelField" | "IPAdapterModelField" | "SchedulerField" | "AnyField" | "CollectionField" | "CollectionItemField" | "DEPRECATED_Boolean" | "DEPRECATED_Color" | "DEPRECATED_Conditioning" | "DEPRECATED_Control" | "DEPRECATED_Float" | "DEPRECATED_Image" | "DEPRECATED_Integer" | "DEPRECATED_Latents" | "DEPRECATED_String" | "DEPRECATED_BooleanCollection" | "DEPRECATED_ColorCollection" | "DEPRECATED_ConditioningCollection" | "DEPRECATED_ControlCollection" | "DEPRECATED_FloatCollection" | "DEPRECATED_ImageCollection" | "DEPRECATED_IntegerCollection" | "DEPRECATED_LatentsCollection" | "DEPRECATED_StringCollection" | "DEPRECATED_BooleanPolymorphic" | "DEPRECATED_ColorPolymorphic" | "DEPRECATED_ConditioningPolymorphic" | "DEPRECATED_ControlPolymorphic" | "DEPRECATED_FloatPolymorphic" | "DEPRECATED_ImagePolymorphic" | "DEPRECATED_IntegerPolymorphic" | "DEPRECATED_LatentsPolymorphic" | "DEPRECATED_StringPolymorphic" | "DEPRECATED_MainModel" | "DEPRECATED_UNet" | "DEPRECATED_Vae" | "DEPRECATED_CLIP" | "DEPRECATED_Collection" | "DEPRECATED_CollectionItem" | "DEPRECATED_Enum" | "DEPRECATED_WorkflowField" | "DEPRECATED_IsIntermediate" | "DEPRECATED_BoardField" | "DEPRECATED_MetadataItem" | "DEPRECATED_MetadataItemCollection" | "DEPRECATED_MetadataItemPolymorphic" | "DEPRECATED_MetadataDict";
+    UIType:
+      | 'SDXLMainModelField'
+      | 'SDXLRefinerModelField'
+      | 'ONNXModelField'
+      | 'VAEModelField'
+      | 'LoRAModelField'
+      | 'ControlNetModelField'
+      | 'IPAdapterModelField'
+      | 'SchedulerField'
+      | 'AnyField'
+      | 'CollectionField'
+      | 'CollectionItemField'
+      | 'DEPRECATED_Boolean'
+      | 'DEPRECATED_Color'
+      | 'DEPRECATED_Conditioning'
+      | 'DEPRECATED_Control'
+      | 'DEPRECATED_Float'
+      | 'DEPRECATED_Image'
+      | 'DEPRECATED_Integer'
+      | 'DEPRECATED_Latents'
+      | 'DEPRECATED_String'
+      | 'DEPRECATED_BooleanCollection'
+      | 'DEPRECATED_ColorCollection'
+      | 'DEPRECATED_ConditioningCollection'
+      | 'DEPRECATED_ControlCollection'
+      | 'DEPRECATED_FloatCollection'
+      | 'DEPRECATED_ImageCollection'
+      | 'DEPRECATED_IntegerCollection'
+      | 'DEPRECATED_LatentsCollection'
+      | 'DEPRECATED_StringCollection'
+      | 'DEPRECATED_BooleanPolymorphic'
+      | 'DEPRECATED_ColorPolymorphic'
+      | 'DEPRECATED_ConditioningPolymorphic'
+      | 'DEPRECATED_ControlPolymorphic'
+      | 'DEPRECATED_FloatPolymorphic'
+      | 'DEPRECATED_ImagePolymorphic'
+      | 'DEPRECATED_IntegerPolymorphic'
+      | 'DEPRECATED_LatentsPolymorphic'
+      | 'DEPRECATED_StringPolymorphic'
+      | 'DEPRECATED_MainModel'
+      | 'DEPRECATED_UNet'
+      | 'DEPRECATED_Vae'
+      | 'DEPRECATED_CLIP'
+      | 'DEPRECATED_Collection'
+      | 'DEPRECATED_CollectionItem'
+      | 'DEPRECATED_Enum'
+      | 'DEPRECATED_WorkflowField'
+      | 'DEPRECATED_IsIntermediate'
+      | 'DEPRECATED_BoardField'
+      | 'DEPRECATED_MetadataItem'
+      | 'DEPRECATED_MetadataItemCollection'
+      | 'DEPRECATED_MetadataItemPolymorphic'
+      | 'DEPRECATED_MetadataDict';
   };
   responses: never;
   parameters: never;
@@ -10871,7 +11123,6 @@ export type $defs = Record<string, never>;
 export type external = Record<string, never>;
 
 export type operations = {
-
   /**
    * Parse Dynamicprompts
    * @description Creates a batch process
@@ -10879,20 +11130,20 @@ export type operations = {
   parse_dynamicprompts: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_parse_dynamicprompts"];
+        'application/json': components['schemas']['Body_parse_dynamicprompts'];
       };
     };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["DynamicPromptsResponse"];
+          'application/json': components['schemas']['DynamicPromptsResponse'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -10905,26 +11156,26 @@ export type operations = {
     parameters: {
       query?: {
         /** @description Base models to include */
-        base_models?: components["schemas"]["BaseModelType"][] | null;
+        base_models?: components['schemas']['BaseModelType'][] | null;
         /** @description The type of model to get */
-        model_type?: components["schemas"]["ModelType"] | null;
+        model_type?: components['schemas']['ModelType'] | null;
         /** @description Exact match on the name of the model */
         model_name?: string | null;
         /** @description Exact match on the format of the model (e.g. 'diffusers') */
-        model_format?: components["schemas"]["ModelFormat"] | null;
+        model_format?: components['schemas']['ModelFormat'] | null;
       };
     };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["ModelsList"];
+          'application/json': components['schemas']['ModelsList'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -10940,9 +11191,9 @@ export type operations = {
         /** @description The name of the model */
         name: string;
         /** @description The type of the model */
-        type: components["schemas"]["ModelType"];
+        type: components['schemas']['ModelType'];
         /** @description The base model of the model */
-        base: components["schemas"]["BaseModelType"];
+        base: components['schemas']['BaseModelType'];
       };
     };
     responses: {
@@ -10955,7 +11206,7 @@ export type operations = {
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -10989,7 +11240,7 @@ export type operations = {
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11020,7 +11271,7 @@ export type operations = {
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11075,7 +11326,7 @@ export type operations = {
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11092,7 +11343,7 @@ export type operations = {
       /** @description Directory scanned successfully */
       200: {
         content: {
-          "application/json": components["schemas"]["FoundModel"][];
+          'application/json': components['schemas']['FoundModel'][];
         };
       };
       /** @description Invalid directory path */
@@ -11102,7 +11353,7 @@ export type operations = {
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11183,14 +11434,14 @@ export type operations = {
          *   "description": "string"
          * }
          */
-        "application/json": Record<string, never> | null;
+        'application/json': Record<string, never> | null;
       };
     };
     responses: {
       /** @description The model imported successfully */
       201: {
         content: {
-          "application/json": components["schemas"]["ModelInstallJob"];
+          'application/json': components['schemas']['ModelInstallJob'];
         };
       };
       /** @description There is already a model corresponding to this path or repo_id */
@@ -11204,7 +11455,7 @@ export type operations = {
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
       /** @description The model appeared to import successfully, but could not be found in the model manager */
@@ -11222,7 +11473,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": unknown;
+          'application/json': unknown;
         };
       };
       /** @description All completed and errored jobs have been pruned */
@@ -11251,7 +11502,7 @@ export type operations = {
       /** @description Success */
       200: {
         content: {
-          "application/json": components["schemas"]["ModelInstallJob"];
+          'application/json': components['schemas']['ModelInstallJob'];
         };
       };
       /** @description No such job */
@@ -11261,7 +11512,7 @@ export type operations = {
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11281,7 +11532,7 @@ export type operations = {
       /** @description The job was cancelled successfully */
       201: {
         content: {
-          "application/json": unknown;
+          'application/json': unknown;
         };
       };
       /** @description No such job */
@@ -11291,7 +11542,7 @@ export type operations = {
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11308,7 +11559,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": unknown;
+          'application/json': unknown;
         };
       };
       /** @description Model config record database resynced with files on disk */
@@ -11356,7 +11607,7 @@ export type operations = {
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11370,7 +11621,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["DownloadJob"][];
+          'application/json': components['schemas']['DownloadJob'][];
         };
       };
     };
@@ -11384,7 +11635,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": unknown;
+          'application/json': unknown;
         };
       };
       /** @description All completed jobs have been pruned */
@@ -11404,20 +11655,20 @@ export type operations = {
   download: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_download"];
+        'application/json': components['schemas']['Body_download'];
       };
     };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["DownloadJob"];
+          'application/json': components['schemas']['DownloadJob'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11437,7 +11688,7 @@ export type operations = {
       /** @description Success */
       200: {
         content: {
-          "application/json": components["schemas"]["DownloadJob"];
+          'application/json': components['schemas']['DownloadJob'];
         };
       };
       /** @description The requested download JobID could not be found */
@@ -11447,7 +11698,7 @@ export type operations = {
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11467,7 +11718,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": unknown;
+          'application/json': unknown;
         };
       };
       /** @description Job has been cancelled */
@@ -11481,7 +11732,7 @@ export type operations = {
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11495,7 +11746,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": unknown;
+          'application/json': unknown;
         };
       };
       /** @description Download jobs have been cancelled */
@@ -11512,7 +11763,7 @@ export type operations = {
     parameters: {
       query: {
         /** @description The category of the image */
-        image_category: components["schemas"]["ImageCategory"];
+        image_category: components['schemas']['ImageCategory'];
         /** @description Whether this is an intermediate image */
         is_intermediate: boolean;
         /** @description The board to add this image to, if any */
@@ -11525,14 +11776,14 @@ export type operations = {
     };
     requestBody: {
       content: {
-        "multipart/form-data": components["schemas"]["Body_upload_image"];
+        'multipart/form-data': components['schemas']['Body_upload_image'];
       };
     };
     responses: {
       /** @description The image was uploaded successfully */
       201: {
         content: {
-          "application/json": components["schemas"]["ImageDTO"];
+          'application/json': components['schemas']['ImageDTO'];
         };
       };
       /** @description Image upload failed */
@@ -11542,7 +11793,7 @@ export type operations = {
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11562,13 +11813,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["ImageDTO"];
+          'application/json': components['schemas']['ImageDTO'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11588,13 +11839,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": unknown;
+          'application/json': unknown;
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11612,20 +11863,20 @@ export type operations = {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["ImageRecordChanges"];
+        'application/json': components['schemas']['ImageRecordChanges'];
       };
     };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["ImageDTO"];
+          'application/json': components['schemas']['ImageDTO'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11639,7 +11890,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": number;
+          'application/json': number;
         };
       };
     };
@@ -11653,7 +11904,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": number;
+          'application/json': number;
         };
       };
     };
@@ -11673,13 +11924,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["MetadataField"] | null;
+          'application/json': components['schemas']['MetadataField'] | null;
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11696,13 +11947,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["WorkflowWithoutID"] | null;
+          'application/json': components['schemas']['WorkflowWithoutID'] | null;
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11722,7 +11973,7 @@ export type operations = {
       /** @description Return the full-resolution image */
       200: {
         content: {
-          "image/png": unknown;
+          'image/png': unknown;
         };
       };
       /** @description Image not found */
@@ -11732,7 +11983,7 @@ export type operations = {
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11752,7 +12003,7 @@ export type operations = {
       /** @description Return the image thumbnail */
       200: {
         content: {
-          "image/webp": unknown;
+          'image/webp': unknown;
         };
       };
       /** @description Image not found */
@@ -11762,7 +12013,7 @@ export type operations = {
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11782,13 +12033,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["ImageUrlsDTO"];
+          'application/json': components['schemas']['ImageUrlsDTO'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11801,9 +12052,9 @@ export type operations = {
     parameters: {
       query?: {
         /** @description The origin of images to list. */
-        image_origin?: components["schemas"]["ResourceOrigin"] | null;
+        image_origin?: components['schemas']['ResourceOrigin'] | null;
         /** @description The categories of image to include. */
-        categories?: components["schemas"]["ImageCategory"][] | null;
+        categories?: components['schemas']['ImageCategory'][] | null;
         /** @description Whether to list intermediate images. */
         is_intermediate?: boolean | null;
         /** @description The board id to filter by. Use 'none' to find images without a board. */
@@ -11818,13 +12069,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["OffsetPaginatedResults_ImageDTO_"];
+          'application/json': components['schemas']['OffsetPaginatedResults_ImageDTO_'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11833,20 +12084,20 @@ export type operations = {
   delete_images_from_list: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_delete_images_from_list"];
+        'application/json': components['schemas']['Body_delete_images_from_list'];
       };
     };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["DeleteImagesFromListResult"];
+          'application/json': components['schemas']['DeleteImagesFromListResult'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11855,20 +12106,20 @@ export type operations = {
   star_images_in_list: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_star_images_in_list"];
+        'application/json': components['schemas']['Body_star_images_in_list'];
       };
     };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["ImagesUpdatedFromListResult"];
+          'application/json': components['schemas']['ImagesUpdatedFromListResult'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11877,20 +12128,20 @@ export type operations = {
   unstar_images_in_list: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_unstar_images_in_list"];
+        'application/json': components['schemas']['Body_unstar_images_in_list'];
       };
     };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["ImagesUpdatedFromListResult"];
+          'application/json': components['schemas']['ImagesUpdatedFromListResult'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11899,20 +12150,20 @@ export type operations = {
   download_images_from_list: {
     requestBody?: {
       content: {
-        "application/json": components["schemas"]["Body_download_images_from_list"];
+        'application/json': components['schemas']['Body_download_images_from_list'];
       };
     };
     responses: {
       /** @description Successful Response */
       202: {
         content: {
-          "application/json": components["schemas"]["ImagesDownloaded"];
+          'application/json': components['schemas']['ImagesDownloaded'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11932,7 +12183,7 @@ export type operations = {
       /** @description Return the complete bulk download item */
       200: {
         content: {
-          "application/zip": unknown;
+          'application/zip': unknown;
         };
       };
       /** @description Image not found */
@@ -11942,7 +12193,7 @@ export type operations = {
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11966,13 +12217,15 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["OffsetPaginatedResults_BoardDTO_"] | components["schemas"]["BoardDTO"][];
+          'application/json':
+            | components['schemas']['OffsetPaginatedResults_BoardDTO_']
+            | components['schemas']['BoardDTO'][];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -11992,13 +12245,13 @@ export type operations = {
       /** @description The board was created successfully */
       201: {
         content: {
-          "application/json": components["schemas"]["BoardDTO"];
+          'application/json': components['schemas']['BoardDTO'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12018,13 +12271,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["BoardDTO"];
+          'application/json': components['schemas']['BoardDTO'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12048,13 +12301,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["DeleteBoardResult"];
+          'application/json': components['schemas']['DeleteBoardResult'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12072,20 +12325,20 @@ export type operations = {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["BoardChanges"];
+        'application/json': components['schemas']['BoardChanges'];
       };
     };
     responses: {
       /** @description The board was updated successfully */
       201: {
         content: {
-          "application/json": components["schemas"]["BoardDTO"];
+          'application/json': components['schemas']['BoardDTO'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12105,13 +12358,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": string[];
+          'application/json': string[];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12123,20 +12376,20 @@ export type operations = {
   add_image_to_board: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_add_image_to_board"];
+        'application/json': components['schemas']['Body_add_image_to_board'];
       };
     };
     responses: {
       /** @description The image was added to a board successfully */
       201: {
         content: {
-          "application/json": unknown;
+          'application/json': unknown;
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12148,20 +12401,20 @@ export type operations = {
   remove_image_from_board: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_remove_image_from_board"];
+        'application/json': components['schemas']['Body_remove_image_from_board'];
       };
     };
     responses: {
       /** @description The image was removed from the board successfully */
       201: {
         content: {
-          "application/json": unknown;
+          'application/json': unknown;
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12173,20 +12426,20 @@ export type operations = {
   add_images_to_board: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_add_images_to_board"];
+        'application/json': components['schemas']['Body_add_images_to_board'];
       };
     };
     responses: {
       /** @description Images were added to board successfully */
       201: {
         content: {
-          "application/json": components["schemas"]["AddImagesToBoardResult"];
+          'application/json': components['schemas']['AddImagesToBoardResult'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12198,20 +12451,20 @@ export type operations = {
   remove_images_from_board: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_remove_images_from_board"];
+        'application/json': components['schemas']['Body_remove_images_from_board'];
       };
     };
     responses: {
       /** @description Images were removed from board successfully */
       201: {
         content: {
-          "application/json": components["schemas"]["RemoveImagesFromBoardResult"];
+          'application/json': components['schemas']['RemoveImagesFromBoardResult'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12222,7 +12475,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["AppVersion"];
+          'application/json': components['schemas']['AppVersion'];
         };
       };
     };
@@ -12233,7 +12486,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["AppDependencyVersions"];
+          'application/json': components['schemas']['AppDependencyVersions'];
         };
       };
     };
@@ -12244,7 +12497,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["AppConfig"];
+          'application/json': components['schemas']['AppConfig'];
         };
       };
     };
@@ -12258,7 +12511,7 @@ export type operations = {
       /** @description The operation was successful */
       200: {
         content: {
-          "application/json": components["schemas"]["LogLevel"];
+          'application/json': components['schemas']['LogLevel'];
         };
       };
     };
@@ -12270,20 +12523,20 @@ export type operations = {
   set_log_level: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["LogLevel"];
+        'application/json': components['schemas']['LogLevel'];
       };
     };
     responses: {
       /** @description The operation was successful */
       200: {
         content: {
-          "application/json": components["schemas"]["LogLevel"];
+          'application/json': components['schemas']['LogLevel'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12297,7 +12550,7 @@ export type operations = {
       /** @description The operation was successful */
       200: {
         content: {
-          "application/json": unknown;
+          'application/json': unknown;
         };
       };
     };
@@ -12311,7 +12564,7 @@ export type operations = {
       /** @description The operation was successful */
       200: {
         content: {
-          "application/json": unknown;
+          'application/json': unknown;
         };
       };
     };
@@ -12325,7 +12578,7 @@ export type operations = {
       /** @description The operation was successful */
       200: {
         content: {
-          "application/json": unknown;
+          'application/json': unknown;
         };
       };
     };
@@ -12339,7 +12592,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["InvocationCacheStatus"];
+          'application/json': components['schemas']['InvocationCacheStatus'];
         };
       };
     };
@@ -12357,26 +12610,26 @@ export type operations = {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_enqueue_batch"];
+        'application/json': components['schemas']['Body_enqueue_batch'];
       };
     };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["EnqueueBatchResult"];
+          'application/json': components['schemas']['EnqueueBatchResult'];
         };
       };
       /** @description Created */
       201: {
         content: {
-          "application/json": components["schemas"]["EnqueueBatchResult"];
+          'application/json': components['schemas']['EnqueueBatchResult'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12391,7 +12644,7 @@ export type operations = {
         /** @description The number of items to fetch */
         limit?: number;
         /** @description The status of items to fetch */
-        status?: ("pending" | "in_progress" | "completed" | "failed" | "canceled") | null;
+        status?: ('pending' | 'in_progress' | 'completed' | 'failed' | 'canceled') | null;
         /** @description The pagination cursor */
         cursor?: number | null;
         /** @description The pagination cursor priority */
@@ -12406,13 +12659,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["CursorPaginatedResults_SessionQueueItemDTO_"];
+          'application/json': components['schemas']['CursorPaginatedResults_SessionQueueItemDTO_'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12432,13 +12685,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["SessionProcessorStatus"];
+          'application/json': components['schemas']['SessionProcessorStatus'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12458,13 +12711,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["SessionProcessorStatus"];
+          'application/json': components['schemas']['SessionProcessorStatus'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12482,20 +12735,20 @@ export type operations = {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_cancel_by_batch_ids"];
+        'application/json': components['schemas']['Body_cancel_by_batch_ids'];
       };
     };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["CancelByBatchIDsResult"];
+          'application/json': components['schemas']['CancelByBatchIDsResult'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12515,13 +12768,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["ClearResult"];
+          'application/json': components['schemas']['ClearResult'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12541,13 +12794,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["PruneResult"];
+          'application/json': components['schemas']['PruneResult'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12567,13 +12820,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["SessionQueueItem"] | null;
+          'application/json': components['schemas']['SessionQueueItem'] | null;
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12593,13 +12846,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["SessionQueueItem"] | null;
+          'application/json': components['schemas']['SessionQueueItem'] | null;
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12619,13 +12872,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["SessionQueueAndProcessorStatus"];
+          'application/json': components['schemas']['SessionQueueAndProcessorStatus'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12647,13 +12900,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["BatchStatus"];
+          'application/json': components['schemas']['BatchStatus'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12675,13 +12928,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["SessionQueueItem"];
+          'application/json': components['schemas']['SessionQueueItem'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12703,13 +12956,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["SessionQueueItem"];
+          'application/json': components['schemas']['SessionQueueItem'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12729,13 +12982,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["WorkflowRecordDTO"];
+          'application/json': components['schemas']['WorkflowRecordDTO'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12755,13 +13008,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": unknown;
+          'application/json': unknown;
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12773,20 +13026,20 @@ export type operations = {
   update_workflow: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_update_workflow"];
+        'application/json': components['schemas']['Body_update_workflow'];
       };
     };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["WorkflowRecordDTO"];
+          'application/json': components['schemas']['WorkflowRecordDTO'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12803,11 +13056,11 @@ export type operations = {
         /** @description The number of workflows per page */
         per_page?: number;
         /** @description The attribute to order by */
-        order_by?: components["schemas"]["WorkflowRecordOrderBy"];
+        order_by?: components['schemas']['WorkflowRecordOrderBy'];
         /** @description The direction to order by */
-        direction?: components["schemas"]["SQLiteDirection"];
+        direction?: components['schemas']['SQLiteDirection'];
         /** @description The category of workflow to get */
-        category?: components["schemas"]["WorkflowCategory"];
+        category?: components['schemas']['WorkflowCategory'];
         /** @description The text to query by (matches name and description) */
         query?: string | null;
       };
@@ -12816,13 +13069,13 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["PaginatedResults_WorkflowRecordListItemDTO_"];
+          'application/json': components['schemas']['PaginatedResults_WorkflowRecordListItemDTO_'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -12834,20 +13087,20 @@ export type operations = {
   create_workflow: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_create_workflow"];
+        'application/json': components['schemas']['Body_create_workflow'];
       };
     };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["WorkflowRecordDTO"];
+          'application/json': components['schemas']['WorkflowRecordDTO'];
         };
       };
       /** @description Validation Error */
       422: {
         content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
