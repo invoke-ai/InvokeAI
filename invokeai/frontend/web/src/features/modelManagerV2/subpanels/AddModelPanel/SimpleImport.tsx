@@ -6,7 +6,7 @@ import { t } from 'i18next';
 import { useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
-import { useImportMainModelsMutation } from 'services/api/endpoints/models';
+import { useInstallModelMutation } from 'services/api/endpoints/models';
 
 type SimpleImportModelConfig = {
   location: string;
@@ -15,7 +15,7 @@ type SimpleImportModelConfig = {
 export const SimpleImport = () => {
   const dispatch = useAppDispatch();
 
-  const [importMainModel, { isLoading }] = useImportMainModelsMutation();
+  const [installModel, { isLoading }] = useInstallModelMutation();
 
   const { register, handleSubmit, formState, reset } = useForm<SimpleImportModelConfig>({
     defaultValues: {
@@ -30,7 +30,7 @@ export const SimpleImport = () => {
         return;
       }
 
-      importMainModel({ source: values.location, config: undefined })
+      installModel({ source: values.location })
         .unwrap()
         .then((_) => {
           dispatch(
@@ -57,7 +57,7 @@ export const SimpleImport = () => {
           }
         });
     },
-    [dispatch, reset, importMainModel]
+    [dispatch, reset, installModel]
   );
 
   return (
