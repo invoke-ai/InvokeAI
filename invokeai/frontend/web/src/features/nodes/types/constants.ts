@@ -24,14 +24,6 @@ export const SHARED_NODE_PROPERTIES: Partial<Node> = {
 };
 
 /**
- * Helper for getting the kind of a field.
- */
-export const KIND_MAP = {
-  input: 'inputs' as const,
-  output: 'outputs' as const,
-};
-
-/**
  * Model types' handles are rendered as squares in the UI.
  */
 export const MODEL_TYPES = [
