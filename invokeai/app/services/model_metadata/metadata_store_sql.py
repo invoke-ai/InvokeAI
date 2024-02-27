@@ -38,8 +38,6 @@ class ModelMetadataStoreSQL(ModelMetadataStoreBase):
         :param metadata: ModelRepoMetadata object to store
         """
         json_serialized = metadata.model_dump_json()
-        print("json_serialized")
-        print(json_serialized)
         with self._db.lock:
             try:
                 self._cursor.execute(
@@ -55,7 +53,7 @@ class ModelMetadataStoreSQL(ModelMetadataStoreBase):
                         json_serialized,
                     ),
                 )
-                # self._update_tags(model_key, metadata.tags)
+                self._update_tags(model_key, metadata.tags)
                 self._db.conn.commit()
             except sqlite3.IntegrityError as excp:  # FOREIGN KEY error: the key was not in model_config table
                 self._db.conn.rollback()
@@ -63,8 +61,6 @@ class ModelMetadataStoreSQL(ModelMetadataStoreBase):
             except sqlite3.Error as excp:
                 self._db.conn.rollback()
                 raise excp
-            except Exception as e:
-                raise e
 
     def get_metadata(self, model_key: str) -> AnyModelRepoMetadata:
         """Retrieve the ModelRepoMetadata corresponding to model key."""
