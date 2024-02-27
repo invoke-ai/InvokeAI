@@ -3,7 +3,7 @@ import { parseify } from 'common/util/serialize';
 import { PersistError, RehydrateError } from 'redux-remember';
 import { serializeError } from 'serialize-error';
 
-export type StorageErrorArgs = {
+type StorageErrorArgs = {
   key: string;
   /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ // any is correct
   value?: any;

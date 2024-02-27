@@ -1,7 +1,7 @@
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
 import { random } from 'lodash-es';
 
-export type GenerateSeedsArg = {
+type GenerateSeedsArg = {
   count: number;
   start?: number;
   min?: number;
