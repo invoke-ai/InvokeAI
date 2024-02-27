@@ -24,7 +24,15 @@ export type UpdateModelArg = {
   body: paths['/api/v2/models/i/{key}']['patch']['requestBody']['content']['application/json'];
 };
 
+export type UpdateModelMetadataArg = {
+  key: paths['/api/v2/models/i/{key}/metadata']['patch']['parameters']['path']['key'];
+  body: paths['/api/v2/models/i/{key}/metadata']['patch']['requestBody']['content']['application/json'];
+};
+
 type UpdateModelResponse = paths['/api/v2/models/i/{key}']['patch']['responses']['200']['content']['application/json'];
+type UpdateModelMetadataResponse =
+  paths['/api/v2/models/i/{key}/metadata']['patch']['responses']['200']['content']['application/json'];
+
 type GetModelConfigResponse = paths['/api/v2/models/i/{key}']['get']['responses']['200']['content']['application/json'];
 
 type GetModelMetadataResponse =
@@ -166,6 +174,16 @@ export const modelsApi = api.injectEndpoints({
       query: ({ key, body }) => {
         return {
           url: buildModelsUrl(`i/${key}`),
+          method: 'PATCH',
+          body: body,
+        };
+      },
+      invalidatesTags: ['Model'],
+    }),
+    updateModelMetadata: build.mutation<UpdateModelMetadataResponse, UpdateModelMetadataArg>({
+      query: ({ key, body }) => {
+        return {
+          url: buildModelsUrl(`i/${key}/metadata`),
           method: 'PATCH',
           body: body,
         };
@@ -351,6 +369,7 @@ export const {
   useGetModelMetadataQuery,
   useDeleteModelImportMutation,
   usePruneModelImportsMutation,
+  useUpdateModelMetadataMutation,
 } = modelsApi;
 
 const upsertModelConfigs = (
