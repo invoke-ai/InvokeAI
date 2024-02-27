@@ -1,5 +1,4 @@
 import type { ComboboxOption } from '@invoke-ai/ui-library';
-import type { LoRAModelFormat } from 'services/api/types';
 
 /**
  * Mapping of base model to human readable name
@@ -47,16 +46,6 @@ export const CLIP_SKIP_MAP = {
     maxClip: 24,
     markers: [0, 1, 2, 3, 5, 10, 15, 20, 24],
   },
-};
-
-/**
- * Mapping of LoRA format to human readable name
- */
-export const LORA_MODEL_FORMAT_MAP: {
-  [key in LoRAModelFormat]: string;
-} = {
-  lycoris: 'LyCORIS',
-  diffusers: 'Diffusers',
 };
 
 /**
