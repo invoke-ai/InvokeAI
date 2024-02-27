@@ -164,6 +164,7 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
                 AllowDerivatives=model_json["allowDerivatives"],
                 AllowDifferentLicense=model_json["allowDifferentLicense"],
             ),
+            trigger_phrases=version_json["trainedWords"],
         )
 
     def from_civitai_versionid(self, version_id: int, model_id: Optional[int] = None) -> CivitaiMetadata:

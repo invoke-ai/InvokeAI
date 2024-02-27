@@ -172,6 +172,8 @@ class ModelPatcher:
         text_encoder: Union[CLIPTextModel, CLIPTextModelWithProjection],
         ti_list: List[Tuple[str, TextualInversionModelRaw]],
     ) -> Iterator[Tuple[CLIPTokenizer, TextualInversionManager]]:
+        print("TI LIST")
+        print(ti_list)
         init_tokens_count = None
         new_tokens_added = None
 

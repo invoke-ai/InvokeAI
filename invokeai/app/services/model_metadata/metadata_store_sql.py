@@ -38,6 +38,8 @@ class ModelMetadataStoreSQL(ModelMetadataStoreBase):
         :param metadata: ModelRepoMetadata object to store
         """
         json_serialized = metadata.model_dump_json()
+        print("json_serialized")
+        print(json_serialized)
         with self._db.lock:
             try:
                 self._cursor.execute(
@@ -53,7 +55,7 @@ class ModelMetadataStoreSQL(ModelMetadataStoreBase):
                         json_serialized,
                     ),
                 )
-                self._update_tags(model_key, metadata.tags)
+                # self._update_tags(model_key, metadata.tags)
                 self._db.conn.commit()
             except sqlite3.IntegrityError as excp:  # FOREIGN KEY error: the key was not in model_config table
                 self._db.conn.rollback()
@@ -61,6 +63,8 @@ class ModelMetadataStoreSQL(ModelMetadataStoreBase):
             except sqlite3.Error as excp:
                 self._db.conn.rollback()
                 raise excp
+            except Exception as e:
+                raise e
 
     def get_metadata(self, model_key: str) -> AnyModelRepoMetadata:
         """Retrieve the ModelRepoMetadata corresponding to model key."""
@@ -114,6 +118,8 @@ class ModelMetadataStoreSQL(ModelMetadataStoreBase):
                 self._db.conn.commit()
             except sqlite3.Error as e:
                 self._db.conn.rollback()
+                raise e
+            except Exception as e:
                 raise e
 
         return self.get_metadata(model_key)
@@ -179,44 +185,45 @@ class ModelMetadataStoreSQL(ModelMetadataStoreBase):
         )
         return {x[0] for x in self._cursor.fetchall()}
 
-    def _update_tags(self, model_key: str, tags: Set[str]) -> None:
+    def _update_tags(self, model_key: str, tags: Optional[Set[str]]) -> None:
         """Update tags for the model referenced by model_key."""
+        if tags:
         # remove previous tags from this model
-        self._cursor.execute(
-            """--sql
-            DELETE FROM model_tags
-            WHERE model_id=?;
-            """,
-            (model_key,),
-        )
+            self._cursor.execute(
+                """--sql
+                DELETE FROM model_tags
+                WHERE model_id=?;
+                """,
+                (model_key,),
+            )
 
-        for tag in tags:
-            self._cursor.execute(
-                """--sql
-                INSERT OR IGNORE INTO tags (
-                  tag_text
-                  )
-                VALUES (?);
-                """,
-                (tag,),
-            )
-            self._cursor.execute(
-                """--sql
-                SELECT tag_id
-                FROM tags
-                WHERE tag_text = ?
-                LIMIT 1;
-                """,
-                (tag,),
-            )
-            tag_id = self._cursor.fetchone()[0]
-            self._cursor.execute(
-                """--sql
-                INSERT OR IGNORE INTO model_tags (
-                   model_id,
-                   tag_id
-                  )
-                VALUES (?,?);
-                """,
-                (model_key, tag_id),
-            )
+            for tag in tags:
+                self._cursor.execute(
+                    """--sql
+                    INSERT OR IGNORE INTO tags (
+                    tag_text
+                    )
+                    VALUES (?);
+                    """,
+                    (tag,),
+                )
+                self._cursor.execute(
+                    """--sql
+                    SELECT tag_id
+                    FROM tags
+                    WHERE tag_text = ?
+                    LIMIT 1;
+                    """,
+                    (tag,),
+                )
+                tag_id = self._cursor.fetchone()[0]
+                self._cursor.execute(
+                    """--sql
+                    INSERT OR IGNORE INTO model_tags (
+                    model_id,
+                    tag_id
+                    )
+                    VALUES (?,?);
+                    """,
+                    (model_key, tag_id),
+                )
