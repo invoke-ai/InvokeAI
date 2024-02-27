@@ -6,7 +6,7 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IoAdd } from 'react-icons/io5';
 import type { ScanFolderResponse } from 'services/api/endpoints/models';
-import { useImportMainModelsMutation } from 'services/api/endpoints/models';
+import { useInstallModelMutation } from 'services/api/endpoints/models';
 
 type Props = {
   result: ScanFolderResponse[number];
@@ -15,10 +15,10 @@ export const ScanModelResultItem = ({ result }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
-  const [importMainModel] = useImportMainModelsMutation();
+  const [installModel] = useInstallModelMutation();
 
   const handleQuickAdd = useCallback(() => {
-    importMainModel({ source: result.path, config: undefined })
+    installModel({ source: result.path })
       .unwrap()
       .then((_) => {
         dispatch(
@@ -42,7 +42,7 @@ export const ScanModelResultItem = ({ result }: Props) => {
           );
         }
       });
-  }, [importMainModel, result, dispatch, t]);
+  }, [installModel, result, dispatch, t]);
 
   return (
     <Flex justifyContent="space-between">
