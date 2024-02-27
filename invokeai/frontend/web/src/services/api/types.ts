@@ -12,16 +12,12 @@ export type ListImagesArgs = NonNullable<paths['/api/v1/images/']['get']['parame
 export type DeleteBoardResult =
   paths['/api/v1/boards/{board_id}']['delete']['responses']['200']['content']['application/json'];
 
-export type ListBoardsArg = NonNullable<paths['/api/v1/boards/']['get']['parameters']['query']>;
-
 export type UpdateBoardArg = paths['/api/v1/boards/{board_id}']['patch']['parameters']['path'] & {
   changes: paths['/api/v1/boards/{board_id}']['patch']['requestBody']['content']['application/json'];
 };
 
 export type BatchConfig =
   paths['/api/v1/queue/{queue_id}/enqueue_batch']['post']['requestBody']['content']['application/json'];
-
-export type EnqueueBatchResult = components['schemas']['EnqueueBatchResult'];
 
 export type InputFieldJSONSchemaExtra = S['InputFieldJSONSchemaExtra'];
 export type OutputFieldJSONSchemaExtra = S['OutputFieldJSONSchemaExtra'];
@@ -35,26 +31,14 @@ export type AppDependencyVersions = S['AppDependencyVersions'];
 // Images
 export type ImageDTO = S['ImageDTO'];
 export type BoardDTO = S['BoardDTO'];
-export type BoardChanges = S['BoardChanges'];
-export type ImageChanges = S['ImageRecordChanges'];
 export type ImageCategory = S['ImageCategory'];
-export type ResourceOrigin = S['ResourceOrigin'];
-export type ImageField = S['ImageField'];
-export type OffsetPaginatedResults_BoardDTO_ = S['OffsetPaginatedResults_BoardDTO_'];
 export type OffsetPaginatedResults_ImageDTO_ = S['OffsetPaginatedResults_ImageDTO_'];
 
 // Models
 export type ModelType = S['ModelType'];
 export type SubModelType = S['SubModelType'];
 export type BaseModelType = S['BaseModelType'];
-export type MainModelField = S['MainModelField'];
-export type VAEModelField = S['VAEModelField'];
-export type LoRAModelField = S['LoRAModelField'];
-export type ControlNetModelField = S['ControlNetModelField'];
-export type IPAdapterModelField = S['IPAdapterModelField'];
-export type T2IAdapterModelField = S['T2IAdapterModelField'];
 export type ControlField = S['ControlField'];
-export type IPAdapterField = S['IPAdapterField'];
 
 // Model Configs
 
@@ -113,7 +97,6 @@ export type ModelInstallJob = S['ModelInstallJob'];
 export type ModelInstallStatus = S['InstallStatus'];
 
 export type HFModelSource = S['HFModelSource'];
-export type CivitaiModelSource = S['CivitaiModelSource'];
 export type LocalModelSource = S['LocalModelSource'];
 export type URLModelSource = S['URLModelSource'];
 
@@ -124,50 +107,31 @@ export type Edge = S['Edge'];
 export type GraphExecutionState = S['GraphExecutionState'];
 export type Batch = S['Batch'];
 export type SessionQueueItemDTO = S['SessionQueueItemDTO'];
-export type SessionQueueItem = S['SessionQueueItem'];
 export type WorkflowRecordOrderBy = S['WorkflowRecordOrderBy'];
 export type SQLiteDirection = S['SQLiteDirection'];
-export type WorkflowDTO = S['WorkflowRecordDTO'];
 export type WorkflowRecordListItemDTO = S['WorkflowRecordListItemDTO'];
 
 // General nodes
 export type CollectInvocation = S['CollectInvocation'];
-export type IterateInvocation = S['IterateInvocation'];
-export type RangeInvocation = S['RangeInvocation'];
-export type RandomRangeInvocation = S['RandomRangeInvocation'];
-export type RangeOfSizeInvocation = S['RangeOfSizeInvocation'];
 export type ImageResizeInvocation = S['ImageResizeInvocation'];
-export type ImageBlurInvocation = S['ImageBlurInvocation'];
-export type ImageScaleInvocation = S['ImageScaleInvocation'];
 export type InfillPatchMatchInvocation = S['InfillPatchMatchInvocation'];
 export type InfillTileInvocation = S['InfillTileInvocation'];
 export type CreateDenoiseMaskInvocation = S['CreateDenoiseMaskInvocation'];
 export type CreateGradientMaskInvocation = S['CreateGradientMaskInvocation'];
 export type CanvasPasteBackInvocation = S['CanvasPasteBackInvocation'];
-export type MaskEdgeInvocation = S['MaskEdgeInvocation'];
-export type RandomIntInvocation = S['RandomIntInvocation'];
-export type CompelInvocation = S['CompelInvocation'];
-export type DynamicPromptInvocation = S['DynamicPromptInvocation'];
 export type NoiseInvocation = S['NoiseInvocation'];
 export type DenoiseLatentsInvocation = S['DenoiseLatentsInvocation'];
 export type SDXLLoraLoaderInvocation = S['SDXLLoraLoaderInvocation'];
 export type ImageToLatentsInvocation = S['ImageToLatentsInvocation'];
 export type LatentsToImageInvocation = S['LatentsToImageInvocation'];
-export type ImageCollectionInvocation = S['ImageCollectionInvocation'];
-export type MainModelLoaderInvocation = S['MainModelLoaderInvocation'];
 export type LoraLoaderInvocation = S['LoraLoaderInvocation'];
 export type ESRGANInvocation = S['ESRGANInvocation'];
-export type DivideInvocation = S['DivideInvocation'];
 export type ImageNSFWBlurInvocation = S['ImageNSFWBlurInvocation'];
 export type ImageWatermarkInvocation = S['ImageWatermarkInvocation'];
 export type SeamlessModeInvocation = S['SeamlessModeInvocation'];
-export type MetadataInvocation = S['MetadataInvocation'];
 export type CoreMetadataInvocation = S['CoreMetadataInvocation'];
-export type MetadataItemInvocation = S['MetadataItemInvocation'];
-export type MergeMetadataInvocation = S['MergeMetadataInvocation'];
 export type IPAdapterMetadataField = S['IPAdapterMetadataField'];
 export type T2IAdapterField = S['T2IAdapterField'];
-export type LoRAMetadataField = S['LoRAMetadataField'];
 
 // ControlNet Nodes
 export type ControlNetInvocation = S['ControlNetInvocation'];
@@ -190,40 +154,34 @@ export type ZoeDepthImageProcessorInvocation = S['ZoeDepthImageProcessorInvocati
 
 // Node Outputs
 export type ImageOutput = S['ImageOutput'];
-export type StringOutput = S['StringOutput'];
-export type FloatOutput = S['FloatOutput'];
-export type IntegerOutput = S['IntegerOutput'];
-export type IterateInvocationOutput = S['IterateInvocationOutput'];
-export type CollectInvocationOutput = S['CollectInvocationOutput'];
-export type LatentsOutput = S['LatentsOutput'];
 
 // Post-image upload actions, controls workflows when images are uploaded
 
-export type ControlAdapterAction = {
+type ControlAdapterAction = {
   type: 'SET_CONTROL_ADAPTER_IMAGE';
   id: string;
 };
 
-export type InitialImageAction = {
+type InitialImageAction = {
   type: 'SET_INITIAL_IMAGE';
 };
 
-export type NodesAction = {
+type NodesAction = {
   type: 'SET_NODES_IMAGE';
   nodeId: string;
   fieldName: string;
 };
 
-export type CanvasInitialImageAction = {
+type CanvasInitialImageAction = {
   type: 'SET_CANVAS_INITIAL_IMAGE';
 };
 
-export type ToastAction = {
+type ToastAction = {
   type: 'TOAST';
   toastOptions?: UseToastOptions;
 };
 
-export type AddToBatchAction = {
+type AddToBatchAction = {
   type: 'ADD_TO_BATCH';
 };
 

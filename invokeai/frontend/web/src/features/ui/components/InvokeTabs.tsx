@@ -35,7 +35,7 @@ import ResizeHandle from './tabs/ResizeHandle';
 import TextToImageTab from './tabs/TextToImageTab';
 import UnifiedCanvasTab from './tabs/UnifiedCanvasTab';
 
-export interface InvokeTabInfo {
+interface InvokeTabInfo {
   id: InvokeTabName;
   translationKey: string;
   icon: ReactElement;

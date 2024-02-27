@@ -1,7 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 
-export interface QueueState {
+interface QueueState {
   listCursor: number | undefined;
   listPriority: number | undefined;
   selectedQueueItem: string | undefined;

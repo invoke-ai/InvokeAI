@@ -14,7 +14,7 @@ export type AnyInvocation = NonNullable<NonNullable<Graph['nodes']>[string]>;
 
 export type AnyResult = NonNullable<GraphExecutionState['results'][string]>;
 
-export type BaseNode = {
+type BaseNode = {
   id: string;
   type: string;
   [key: string]: AnyInvocation[keyof AnyInvocation];
@@ -218,11 +218,11 @@ export type QueueItemStatusChangedEvent = {
   };
 };
 
-export type ClientEmitSubscribeQueue = {
+type ClientEmitSubscribeQueue = {
   queue_id: string;
 };
 
-export type ClientEmitUnsubscribeQueue = {
+type ClientEmitUnsubscribeQueue = {
   queue_id: string;
 };
 
@@ -245,11 +245,11 @@ export type BulkDownloadFailedEvent = {
   error: string;
 };
 
-export type ClientEmitSubscribeBulkDownload = {
+type ClientEmitSubscribeBulkDownload = {
   bulk_download_id: string;
 };
 
-export type ClientEmitUnsubscribeBulkDownload = {
+type ClientEmitUnsubscribeBulkDownload = {
   bulk_download_id: string;
 };
 

@@ -3,9 +3,9 @@ import type { LogLevel } from 'app/logging/logger';
 import type { ProgressImage } from 'services/events/types';
 import { z } from 'zod';
 
-export type SystemStatus = 'CONNECTED' | 'DISCONNECTED' | 'PROCESSING' | 'ERROR' | 'LOADING_MODEL';
+type SystemStatus = 'CONNECTED' | 'DISCONNECTED' | 'PROCESSING' | 'ERROR' | 'LOADING_MODEL';
 
-export type DenoiseProgress = {
+type DenoiseProgress = {
   session_id: string;
   batch_id: string;
   progress_image: ProgressImage | null | undefined;

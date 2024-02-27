@@ -7,7 +7,7 @@ import type { AnyModelConfig, BaseModelType, ModelType } from 'services/api/type
 /**
  * Raised when a model config is unable to be fetched.
  */
-export class ModelConfigNotFoundError extends Error {
+class ModelConfigNotFoundError extends Error {
   /**
    * Create ModelConfigNotFoundError
    * @param {String} message
@@ -58,11 +58,7 @@ export const fetchModelConfig = async (key: string): Promise<AnyModelConfig> => 
  * @returns A promise that resolves to the model config.
  * @throws {ModelConfigNotFoundError} If the model config is unable to be fetched.
  */
-export const fetchModelConfigByAttrs = async (
-  name: string,
-  base: BaseModelType,
-  type: ModelType
-): Promise<AnyModelConfig> => {
+const fetchModelConfigByAttrs = async (name: string, base: BaseModelType, type: ModelType): Promise<AnyModelConfig> => {
   const { dispatch } = getStore();
   try {
     const req = dispatch(modelsApi.endpoints.getModelConfigByAttrs.initiate({ name, base, type }));

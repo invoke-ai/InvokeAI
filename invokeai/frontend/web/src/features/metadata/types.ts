@@ -11,13 +11,6 @@ export type MetadataRenderValueFunc<T> = (value: T) => Promise<React.ReactNode>;
  */
 export type MetadataGetLabelFunc = () => string;
 
-export type MetadataParseOptions = {
-  toastOnFailure?: boolean;
-  toastOnSuccess?: boolean;
-};
-
-export type MetadataRecallOptions = MetadataParseOptions;
-
 /**
  * A function that recalls a parsed and validated metadata value.
  *
@@ -119,7 +112,7 @@ export type MetadataHandlers<TValue = unknown, TItem = unknown> = {
 // type MetadataHandlersInferItem<TValue> = TValue extends Array<infer TItem> ? MetadataParseFunc<TItem> : never
 // While this works for the types as expected, I couldn't satisfy TS in the implementations of the handlers.
 
-export type BuildMetadataHandlersArg<TValue, TItem> = {
+type BuildMetadataHandlersArg<TValue, TItem> = {
   parser: MetadataParseFunc<TValue>;
   itemParser?: MetadataParseFunc<TItem>;
   recaller?: MetadataRecallFunc<TValue>;

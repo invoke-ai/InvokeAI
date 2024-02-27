@@ -27,7 +27,7 @@ const workflowKeys = [
   'id',
 ] satisfies (keyof WorkflowV3)[];
 
-export type BuildWorkflowFunction = (arg: BuildWorkflowArg) => WorkflowV3;
+type BuildWorkflowFunction = (arg: BuildWorkflowArg) => WorkflowV3;
 
 export const buildWorkflowFast: BuildWorkflowFunction = ({ nodes, edges, workflow }: BuildWorkflowArg): WorkflowV3 => {
   const clonedWorkflow = pick(cloneDeep(workflow), workflowKeys);

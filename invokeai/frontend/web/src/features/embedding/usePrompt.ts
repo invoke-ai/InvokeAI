@@ -4,7 +4,7 @@ import type { ChangeEventHandler, KeyboardEventHandler, RefObject } from 'react'
 import { useCallback } from 'react';
 import { flushSync } from 'react-dom';
 
-export type UseInsertEmbeddingArg = {
+type UseInsertEmbeddingArg = {
   prompt: string;
   textareaRef: RefObject<HTMLTextAreaElement>;
   onChange: (v: string) => void;
