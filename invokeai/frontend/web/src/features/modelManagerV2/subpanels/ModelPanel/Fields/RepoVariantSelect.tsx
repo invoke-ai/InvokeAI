@@ -10,9 +10,6 @@ const options: ComboboxOption[] = [
   { value: 'none', label: '-' },
   { value: 'fp16', label: 'fp16' },
   { value: 'fp32', label: 'fp32' },
-  { value: 'onnx', label: 'onnx' },
-  { value: 'openvino', label: 'openvino' },
-  { value: 'flax', label: 'flax' },
 ];
 
 const RepoVariantSelect = <T extends AnyModelConfig>(props: UseControllerProps<T>) => {
