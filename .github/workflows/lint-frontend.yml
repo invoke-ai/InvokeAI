@@ -41,3 +41,5 @@ jobs:
         run: 'pnpm run lint:eslint'
       - name: Prettier
         run: 'pnpm run lint:prettier'
+      - name: Knip
+        run: 'pnpm run lint:knip'
