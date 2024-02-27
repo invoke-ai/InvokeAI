@@ -1,5 +1,6 @@
 import { Box, Button, Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
@@ -57,9 +58,11 @@ export const ImportQueue = () => {
         </Button>
       </Flex>
       <Box mt={3} layerStyle="first" p={3} borderRadius="base" w="full" h="full">
-        <Flex flexDir="column-reverse" gap="2">
-          {data?.map((model) => <ImportQueueItem key={model.id} model={model} />)}
-        </Flex>
+        <ScrollableContent>
+          <Flex flexDir="column-reverse" gap="2">
+            {data?.map((model) => <ImportQueueItem key={model.id} model={model} />)}
+          </Flex>
+        </ScrollableContent>
       </Box>
     </Flex>
   );
