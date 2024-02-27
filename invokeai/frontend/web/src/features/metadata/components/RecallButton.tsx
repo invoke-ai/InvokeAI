@@ -1,4 +1,4 @@
-import type { IconButtonProps} from '@invoke-ai/ui-library';
+import type { IconButtonProps } from '@invoke-ai/ui-library';
 import { IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';

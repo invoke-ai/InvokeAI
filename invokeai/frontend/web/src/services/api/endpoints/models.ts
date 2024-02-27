@@ -46,7 +46,7 @@ type InstallModelArg = {
   access_token?: paths['/api/v2/models/install']['post']['parameters']['query']['access_token'];
   // TODO(MM2): This is typed as `Optional[Dict[str, Any]]` in backend...
   config?: JSONObject;
-  // config: NonNullable<paths['/api/v2/models/heuristic_install']['post']['requestBody']>['content']['application/json'];
+  // config: NonNullable<paths['/api/v2/models/install']['post']['requestBody']>['content']['application/json'];
 };
 
 type InstallModelResponse = paths['/api/v2/models/install']['post']['responses']['201']['content']['application/json'];
@@ -180,7 +180,7 @@ export const modelsApi = api.injectEndpoints({
     installModel: build.mutation<InstallModelResponse, InstallModelArg>({
       query: ({ source, config, access_token }) => {
         return {
-          url: buildModelsUrl('heuristic_install'),
+          url: buildModelsUrl('install'),
           params: { source, access_token },
           method: 'POST',
           body: config,

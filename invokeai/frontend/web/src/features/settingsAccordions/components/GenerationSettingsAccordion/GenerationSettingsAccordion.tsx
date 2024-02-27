@@ -10,7 +10,7 @@ import {
   TabPanels,
   Tabs,
 } from '@invoke-ai/ui-library';
-import { EMPTY_ARRAY } from "app/store/constants";
+import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { LoRAList } from 'features/lora/components/LoRAList';
