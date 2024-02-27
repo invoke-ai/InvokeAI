@@ -3,14 +3,9 @@ import { z } from 'zod';
 import {
   zBoardField,
   zColorField,
-  zControlNetModelField,
   zImageField,
-  zIPAdapterModelField,
-  zLoRAModelField,
-  zMainModelField,
+  zModelIdentifierWithBase,
   zSchedulerField,
-  zT2IAdapterModelField,
-  zVAEModelField,
 } from './common';
 
 /**
@@ -313,7 +308,7 @@ export const isColorFieldInputTemplate = (val: unknown): val is ColorFieldInputT
 export const zMainModelFieldType = zFieldTypeBase.extend({
   name: z.literal('MainModelField'),
 });
-export const zMainModelFieldValue = zMainModelField.optional();
+export const zMainModelFieldValue = zModelIdentifierWithBase.optional();
 export const zMainModelFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zMainModelFieldValue,
 });
@@ -391,7 +386,7 @@ export const isSDXLRefinerModelFieldInputTemplate = (val: unknown): val is SDXLR
 export const zVAEModelFieldType = zFieldTypeBase.extend({
   name: z.literal('VAEModelField'),
 });
-export const zVAEModelFieldValue = zVAEModelField.optional();
+export const zVAEModelFieldValue = zModelIdentifierWithBase.optional();
 export const zVAEModelFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zVAEModelFieldValue,
 });
@@ -417,7 +412,7 @@ export const isVAEModelFieldInputTemplate = (val: unknown): val is VAEModelField
 export const zLoRAModelFieldType = zFieldTypeBase.extend({
   name: z.literal('LoRAModelField'),
 });
-export const zLoRAModelFieldValue = zLoRAModelField.optional();
+export const zLoRAModelFieldValue = zModelIdentifierWithBase.optional();
 export const zLoRAModelFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zLoRAModelFieldValue,
 });
@@ -443,7 +438,7 @@ export const isLoRAModelFieldInputTemplate = (val: unknown): val is LoRAModelFie
 export const zControlNetModelFieldType = zFieldTypeBase.extend({
   name: z.literal('ControlNetModelField'),
 });
-export const zControlNetModelFieldValue = zControlNetModelField.optional();
+export const zControlNetModelFieldValue = zModelIdentifierWithBase.optional();
 export const zControlNetModelFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zControlNetModelFieldValue,
 });
@@ -471,7 +466,7 @@ export const isControlNetModelFieldValue = (v: unknown): v is ControlNetModelFie
 export const zIPAdapterModelFieldType = zFieldTypeBase.extend({
   name: z.literal('IPAdapterModelField'),
 });
-export const zIPAdapterModelFieldValue = zIPAdapterModelField.optional();
+export const zIPAdapterModelFieldValue = zModelIdentifierWithBase.optional();
 export const zIPAdapterModelFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zIPAdapterModelFieldValue,
 });
@@ -499,7 +494,7 @@ export const isIPAdapterModelFieldValue = (val: unknown): val is IPAdapterModelF
 export const zT2IAdapterModelFieldType = zFieldTypeBase.extend({
   name: z.literal('T2IAdapterModelField'),
 });
-export const zT2IAdapterModelFieldValue = zT2IAdapterModelField.optional();
+export const zT2IAdapterModelFieldValue = zModelIdentifierWithBase.optional();
 export const zT2IAdapterModelFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zT2IAdapterModelFieldValue,
 });
