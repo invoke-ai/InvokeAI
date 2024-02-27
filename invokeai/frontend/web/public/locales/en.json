@@ -674,6 +674,7 @@
         "noMetaData": "No metadata found",
         "noRecallParameters": "No parameters to recall found",
         "parameterSet": "Parameter {{parameter}} set",
+        "parsingFailed": "Parsing Failed",
         "perlin": "Perlin Noise",
         "positivePrompt": "Positive Prompt",
         "recallParameters": "Recall Parameters",
