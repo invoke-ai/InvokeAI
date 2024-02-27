@@ -59,7 +59,6 @@ export const ModelEdit = () => {
 
   const onSubmit = useCallback<SubmitHandler<AnyModelConfig>>(
     (values) => {
-      console.log({ values });
       if (!data?.key) {
         return;
       }
