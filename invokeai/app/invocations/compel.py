@@ -84,16 +84,28 @@ class CompelInvocation(BaseInvocation):
 
         ti_list = []
         for trigger in extract_ti_triggers_from_prompt(self.prompt):
-            name = trigger[1:-1]
+            name_or_key = trigger[1:-1]
+            print(f"name_or_key: {name_or_key}")
             try:
-                loaded_model = context.models.load(key=name).model
-                assert isinstance(loaded_model, TextualInversionModelRaw)
-                ti_list.append((name, loaded_model))
+                loaded_model = context.models.load(key=name_or_key)
+                model = loaded_model.model
+                print(model)
+                assert isinstance(model, TextualInversionModelRaw)
+                ti_list.append((name_or_key, model))
             except UnknownModelException:
-                # print(e)
-                # import traceback
-                # print(traceback.format_exc())
-                print(f'Warn: trigger: "{trigger}" not found')
+                try:
+                    print(f"base: {text_encoder_info.config.base}")
+                    loaded_model = context.models.load_by_attrs(
+                        model_name=name_or_key, base_model=text_encoder_info.config.base, model_type=ModelType.TextualInversion
+                    )
+                    model = loaded_model.model
+                    print(model)
+                    assert isinstance(model, TextualInversionModelRaw)
+                    ti_list.append((name_or_key, model))
+                except UnknownModelException:
+                    logger.warning(f'trigger: "{trigger}" not found')
+            except ValueError:
+                logger.warning(f'trigger: "{trigger}" more than one similarly-named textual inversion models')
 
         with (
             ModelPatcher.apply_ti(tokenizer_info.model, text_encoder_info.model, ti_list) as (

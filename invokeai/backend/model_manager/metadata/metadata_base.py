@@ -73,7 +73,8 @@ class ModelMetadataBase(BaseModel):
 
     name: str = Field(description="model's name")
     author: str = Field(description="model's author")
-    tags: Set[str] = Field(description="tags provided by model source")
+    tags: Optional[Set[str]] = Field(description="tags provided by model source", default=None)
+    trigger_phrases: Optional[List[str]] = Field(description="trigger phrases for this model", default=None)
 
 
 class BaseMetadata(ModelMetadataBase):

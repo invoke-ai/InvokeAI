@@ -4,9 +4,22 @@ Storage for Model Metadata
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Set, Tuple
+from typing import List, Optional, Set, Tuple
+
+from pydantic import Field
+from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
+
+class ModelMetadataChanges(BaseModelExcludeNull, extra="allow"):
+    """A set of changes to apply to model metadata.
+
+    Only limited changes are valid:
+      - `trigger_phrases`: the list of trigger phrases for this model
+    """
+
+    trigger_phrases: Optional[List[str]] = Field(default=None, description="The model's list of trigger phrases")
+    """The model's list of trigger phrases"""
 
 
 class ModelMetadataStoreBase(ABC):
