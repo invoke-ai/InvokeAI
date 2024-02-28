@@ -71,5 +71,3 @@ class ConditioningData:
      ref [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/pdf/2305.08891.pdf)
     """
     guidance_rescale_multiplier: float = 0
-
-    ip_adapter_conditioning: Optional[list[IPAdapterConditioningInfo]] = None

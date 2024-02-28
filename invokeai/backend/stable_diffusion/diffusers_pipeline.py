@@ -24,7 +24,7 @@ from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.ip_adapter.unet_patcher import UNetPatcher
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData, IPAdapterConditioningInfo
 from invokeai.backend.stable_diffusion.diffusion.regional_prompt_attention import apply_regional_prompt_attn
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 
@@ -165,10 +165,11 @@ class ControlNetData:
 
 @dataclass
 class IPAdapterData:
-    ip_adapter_model: IPAdapter = Field(default=None)
-    # TODO: change to polymorphic so can do different weights per step (once implemented...)
+    ip_adapter_model: IPAdapter
+    ip_adapter_conditioning: IPAdapterConditioningInfo
+
+    # Either a single weight applied to all steps, or a list of weights for each step.
     weight: Union[float, List[float]] = Field(default=1.0)
-    # weight: float = Field(default=1.0)
     begin_step_percent: float = Field(default=0.0)
     end_step_percent: float = Field(default=1.0)
 
@@ -564,12 +565,17 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
             down_intrablock_additional_residuals = accum_adapter_state
 
+        ip_adapter_conditioning = None
+        if ip_adapter_data is not None:
+            ip_adapter_conditioning = [ipa.ip_adapter_conditioning for ipa in ip_adapter_data]
+
         uc_noise_pred, c_noise_pred = self.invokeai_diffuser.do_unet_step(
             sample=latent_model_input,
             timestep=t,  # TODO: debug how handled batched and non batched timesteps
             step_index=step_index,
             total_step_count=total_step_count,
             conditioning_data=conditioning_data,
+            ip_adapter_conditioning=ip_adapter_conditioning,
             down_block_additional_residuals=down_block_additional_residuals,  # for ControlNet
             mid_block_additional_residual=mid_block_additional_residual,  # for ControlNet
             down_intrablock_additional_residuals=down_intrablock_additional_residuals,  # for T2I-Adapter
