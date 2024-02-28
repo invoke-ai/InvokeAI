@@ -24,7 +24,7 @@ export type UpdateModelArg = {
   body: paths['/api/v2/models/i/{key}']['patch']['requestBody']['content']['application/json'];
 };
 
-export type UpdateModelMetadataArg = {
+type UpdateModelMetadataArg = {
   key: paths['/api/v2/models/i/{key}/metadata']['patch']['parameters']['path']['key'];
   body: paths['/api/v2/models/i/{key}/metadata']['patch']['requestBody']['content']['application/json'];
 };

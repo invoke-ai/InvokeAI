@@ -54,7 +54,6 @@ export const usePrompt = ({ prompt, textareaRef, onChange: _onChange }: UseInser
     [textareaRef, _onChange, prompt]
   );
 
-
   const onFocus = useCallback(() => {
     textareaRef.current?.focus();
   }, [textareaRef]);
@@ -64,7 +63,6 @@ export const usePrompt = ({ prompt, textareaRef, onChange: _onChange }: UseInser
     onFocus();
   }, [onFocus, onClose]);
 
-
   const onSelect = useCallback(
     (v: string) => {
       insertTrigger(v);
@@ -72,7 +70,6 @@ export const usePrompt = ({ prompt, textareaRef, onChange: _onChange }: UseInser
     },
     [handleClosePopover, insertTrigger]
   );
-
 
   const onKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = useCallback(
     (e) => {

@@ -8,13 +8,13 @@ import {
   TagCloseButton,
   TagLabel,
 } from '@invoke-ai/ui-library';
-import { useState, useMemo, useCallback } from 'react';
-import type { ChangeEvent } from 'react';
-import { ModelListHeader } from '../../ModelManagerPanel/ModelListHeader';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppSelector } from '../../../../../app/store/storeHooks';
-import { useGetModelMetadataQuery, useUpdateModelMetadataMutation } from '../../../../../services/api/endpoints/models';
+import { useAppSelector } from 'app/store/storeHooks';
+import { ModelListHeader } from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelListHeader';
+import type { ChangeEvent } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useGetModelMetadataQuery, useUpdateModelMetadataMutation } from 'services/api/endpoints/models';
 
 export const TriggerPhrases = () => {
   const { t } = useTranslation();
