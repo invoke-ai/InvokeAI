@@ -51,7 +51,7 @@ export const ParamPositivePrompt = memo(() => {
           value={prompt}
           placeholder={t('parameters.positivePromptPlaceholder')}
           onChange={onChange}
-          minH={32}
+          minH={28}
           onKeyDown={onKeyDown}
           variant="darkFilled"
         />
