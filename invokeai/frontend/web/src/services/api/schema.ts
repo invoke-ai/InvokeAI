@@ -516,7 +516,7 @@ export type paths = {
   };
 };
 
-export type webhooks = Record<string, never>;
+type webhooks = Record<string, never>;
 
 export type components = {
   schemas: {
@@ -11118,9 +11118,9 @@ export type components = {
   pathItems: never;
 };
 
-export type $defs = Record<string, never>;
+type $defs = Record<string, never>;
 
-export type external = Record<string, never>;
+type external = Record<string, never>;
 
 export type operations = {
   /**

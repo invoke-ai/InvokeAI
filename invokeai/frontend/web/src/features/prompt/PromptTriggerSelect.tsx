@@ -5,8 +5,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import type { PromptTriggerSelectProps } from 'features/prompt/types';
 import { t } from 'i18next';
 import { map } from 'lodash-es';
-import { useMemo } from 'react';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetModelMetadataQuery, useGetTextualInversionModelsQuery } from 'services/api/endpoints/models';
 
@@ -46,7 +45,7 @@ export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSel
         options: compatibleEmbeddingsArray.map((model) => ({ label: model.name, value: `<${model.name}>` })),
       },
     ];
-  }, [data, currentBaseModel]);
+  }, [data, currentBaseModel, t]);
 
   const options = useMemo(() => {
     if (!metadata || !metadata.trigger_phrases) {
@@ -60,7 +59,7 @@ export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSel
       },
     ];
     return [...metadataOptions, ...embeddingOptions];
-  }, [embeddingOptions, metadata]);
+  }, [embeddingOptions, metadata, t]);
 
   return (
     <FormControl>
