@@ -158,11 +158,11 @@ const GalleryImage = (props: HoverableImageProps) => {
             {isHovered && (
               <Text
                 position="absolute"
-                background="black"
-                color="white"
-                fontSize="12px"
+                background="base.950"
+                color="accent.50"
+                fontSize="base.50"
                 bottom={1.5}
-                right={8}
+                left={1}
                 px={2}
                 opacity={0.7}
                 borderRadius="base"
