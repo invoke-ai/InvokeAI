@@ -1,5 +1,6 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
+import inspect
 import math
 from contextlib import ExitStack
 from functools import singledispatchmethod
@@ -359,9 +360,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     def get_conditioning_data(
         self,
         context: InvocationContext,
-        scheduler: Scheduler,
         unet: UNet2DConditionModel,
-        seed: int,
     ) -> ConditioningData:
         positive_cond_data = context.conditioning.load(self.positive_conditioning.conditioning_name)
         c = positive_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
@@ -376,14 +375,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             guidance_rescale_multiplier=self.cfg_rescale_multiplier,
         )
 
-        conditioning_data = conditioning_data.add_scheduler_args_if_applicable(  # FIXME
-            scheduler,
-            # for ddim scheduler
-            eta=0.0,  # ddim_eta
-            # for ancestral and sde schedulers
-            # flip all bits to have noise different from initial
-            generator=torch.Generator(device=unet.device).manual_seed(seed ^ 0xFFFFFFFF),
-        )
         return conditioning_data
 
     def create_pipeline(
@@ -627,6 +618,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         steps: int,
         denoising_start: float,
         denoising_end: float,
+        seed: int,
     ) -> Tuple[int, List[int], int]:
         assert isinstance(scheduler, ConfigMixin)
         if scheduler.config.get("cpu_only", False):
@@ -655,7 +647,15 @@ class DenoiseLatentsInvocation(BaseInvocation):
         timesteps = timesteps[t_start_idx : t_start_idx + t_end_idx]
         num_inference_steps = len(timesteps) // scheduler.order
 
-        return num_inference_steps, timesteps, init_timestep
+        scheduler_step_kwargs = {}
+        scheduler_step_signature = inspect.signature(scheduler.step)
+        if "generator" in scheduler_step_signature.parameters:
+            # At some point, someone decided that schedulers that accept a generator should use the original seed with
+            # all bits flipped. I don't know the original rationale for this, but now we must keep it like this for
+            # reproducibility.
+            scheduler_step_kwargs = {"generator": torch.Generator(device=device).manual_seed(seed ^ 0xFFFFFFFF)}
+
+        return num_inference_steps, timesteps, init_timestep, scheduler_step_kwargs
 
     def prep_inpaint_mask(
         self, context: InvocationContext, latents: torch.Tensor
@@ -749,7 +749,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 )
 
                 pipeline = self.create_pipeline(unet, scheduler)
-                conditioning_data = self.get_conditioning_data(context, scheduler, unet, seed)
+                conditioning_data = self.get_conditioning_data(context, unet)
 
                 controlnet_data = self.prep_control_data(
                     context=context,
@@ -767,12 +767,13 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     exit_stack=exit_stack,
                 )
 
-                num_inference_steps, timesteps, init_timestep = self.init_scheduler(
+                num_inference_steps, timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
                     scheduler,
                     device=unet.device,
                     steps=self.steps,
                     denoising_start=self.denoising_start,
                     denoising_end=self.denoising_end,
+                    seed=seed,
                 )
 
                 result_latents = pipeline.latents_from_embeddings(
@@ -785,6 +786,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     masked_latents=masked_latents,
                     gradient_mask=gradient_mask,
                     num_inference_steps=num_inference_steps,
+                    scheduler_step_kwargs=scheduler_step_kwargs,
                     conditioning_data=conditioning_data,
                     control_data=controlnet_data,
                     ip_adapter_data=ip_adapter_data,
