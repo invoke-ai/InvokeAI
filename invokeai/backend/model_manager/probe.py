@@ -147,7 +147,7 @@ class ModelProbe(object):
         if not probe_class:
             raise InvalidModelConfigException(f"Unhandled combination of {format_type} and {model_type}")
 
-        hash = ModelHash.hash(model_path)
+        hash = ModelHash().hash(model_path)
         probe = probe_class(model_path)
 
         fields["path"] = model_path.as_posix()
