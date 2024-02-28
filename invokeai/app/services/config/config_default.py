@@ -288,7 +288,7 @@ class InvokeAIAppConfig(InvokeAISettings):
 
     # MODEL IMPORT
     civitai_api_key     : Optional[str] = Field(default=os.environ.get("CIVITAI_API_KEY"), description="API key for CivitAI", json_schema_extra=Categories.ModelImport)
-    model_sym_links     : bool = Field(default=False, description="If true, create symbolic links to models instead of copying them", json_schema_extra=Categories.ModelImport)
+    model_sym_links     : bool = Field(default=False, description="If true, create symbolic links to models instead of copying them. [REQUIRES ADMIN PERMISSIONS OR DEVELOPER MODE IN WINDOWS]", json_schema_extra=Categories.ModelImport)
 
     # DEPRECATED FIELDS - STILL HERE IN ORDER TO OBTAN VALUES FROM PRE-3.1 CONFIG FILES
     always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", json_schema_extra=Categories.MemoryPerformance)
