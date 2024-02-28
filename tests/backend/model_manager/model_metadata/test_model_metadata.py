@@ -133,7 +133,7 @@ def test_metadata_civitai_fetch(mm2_session: Session) -> None:
     assert metadata.id == 215485
     assert metadata.author == "test_author"  # note that this is not the same as the original from Civitai
     assert metadata.allow_commercial_use  # changed to make sure we are reading locally not remotely
-    assert metadata.restrictions.AllowCommercialUse == CommercialUsage("RentCivit")
+    assert CommercialUsage("RentCivit") in metadata.restrictions.AllowCommercialUse
     assert metadata.version_id == 242807
     assert metadata.tags == {"tool", "turbo", "sdxl turbo"}
 
