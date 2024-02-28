@@ -2,6 +2,7 @@
 # which are imported/used before parse_args() is called will get the default config values instead of the
 # values from the command line or config file.
 import sys
+from contextlib import asynccontextmanager
 
 from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 from invokeai.version.invokeai_version import __version__
@@ -71,9 +72,25 @@ logger = InvokeAILogger.get_logger(config=app_config)
 mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("text/css", ".css")
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Add startup event to load dependencies
+    ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, logger=logger)
+    yield
+    # Shut down threads
+    ApiDependencies.shutdown()
+
+
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
-app = FastAPI(title="Invoke - Community Edition", docs_url=None, redoc_url=None, separate_input_output_schemas=False)
+app = FastAPI(
+    title="Invoke - Community Edition",
+    docs_url=None,
+    redoc_url=None,
+    separate_input_output_schemas=False,
+    lifespan=lifespan,
+)
 
 # Add event handler
 event_handler_id: int = id(app)
@@ -94,18 +111,6 @@ app.add_middleware(
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
-
-
-# Add startup event to load dependencies
-@app.on_event("startup")
-async def startup_event() -> None:
-    ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, logger=logger)
-
-
-# Shut down threads
-@app.on_event("shutdown")
-async def shutdown_event() -> None:
-    ApiDependencies.shutdown()
 
 
 # Include all routers
