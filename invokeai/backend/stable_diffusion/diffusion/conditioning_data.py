@@ -54,7 +54,7 @@ class IPAdapterConditioningInfo:
 
 
 @dataclass
-class ConditioningData:
+class TextConditioningData:
     uncond_text_embeddings: Union[list[BasicConditioningInfo], list[SDXLConditioningInfo]]
     uncond_text_embedding_masks: list[Optional[torch.Tensor]]
     cond_text_embeddings: Union[list[BasicConditioningInfo], list[SDXLConditioningInfo]]

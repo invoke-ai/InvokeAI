@@ -43,9 +43,9 @@ from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
 from invokeai.backend.model_management.models import ModelType, SilenceWarnings
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
-    ConditioningData,
     IPAdapterConditioningInfo,
     SDXLConditioningInfo,
+    TextConditioningData,
 )
 
 from ...backend.model_management.lora import ModelPatcher
@@ -359,7 +359,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         scheduler,
         unet,
         seed,
-    ) -> ConditioningData:
+    ) -> TextConditioningData:
         cond_text_embeddings, cond_text_embedding_masks = self._get_text_embeddings_and_masks(
             self.positive_conditioning, context, unet.device, unet.dtype
         )
@@ -367,7 +367,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             self.negative_conditioning, context, unet.device, unet.dtype
         )
 
-        conditioning_data = ConditioningData(
+        conditioning_data = TextConditioningData(
             uncond_text_embeddings=uncond_text_embeddings,
             uncond_text_embedding_masks=uncond_text_embedding_masks,
             cond_text_embeddings=cond_text_embeddings,
