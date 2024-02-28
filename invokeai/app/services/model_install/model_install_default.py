@@ -166,7 +166,7 @@ class ModelInstallService(ModelInstallServiceBase):
             raise DuplicateModelException(
                 f"A model named {model_path.name} is already installed at {dest_path.as_posix()}"
             ) from excp
-        new_hash = ModelHash.hash(new_path)
+        new_hash = ModelHash().hash(new_path)
         assert new_hash == old_hash, f"{model_path}: Model hash changed during installation, possibly corrupted."
 
         return self._register(
@@ -468,7 +468,7 @@ class ModelInstallService(ModelInstallServiceBase):
         new_path = models_dir / model.base.value / model.type.value / model.name
         self._logger.info(f"Moving {model.name} to {new_path}.")
         new_path = self._move_model(old_path, new_path)
-        new_hash = ModelHash.hash(new_path)
+        new_hash = ModelHash().hash(new_path)
         model.path = new_path.relative_to(models_dir).as_posix()
         if model.current_hash != new_hash:
             assert (
