@@ -43,14 +43,6 @@ class SDXLConditioningInfo(BasicConditioningInfo):
         return super().to(device=device, dtype=dtype)
 
 
-@dataclass(frozen=True)
-class PostprocessingSettings:
-    threshold: float
-    warmup: float
-    h_symmetry_time_pct: Optional[float]
-    v_symmetry_time_pct: Optional[float]
-
-
 @dataclass
 class IPAdapterConditioningInfo:
     cond_image_prompt_embeds: torch.Tensor
@@ -82,10 +74,6 @@ class ConditioningData:
     """
     guidance_rescale_multiplier: float = 0
     scheduler_args: dict[str, Any] = field(default_factory=dict)
-    """
-    Additional arguments to pass to invokeai_diffuser.do_latent_postprocessing().
-    """
-    postprocessing_settings: Optional[PostprocessingSettings] = None
 
     ip_adapter_conditioning: Optional[list[IPAdapterConditioningInfo]] = None
 

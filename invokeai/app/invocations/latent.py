@@ -58,7 +58,6 @@ from ...backend.stable_diffusion.diffusers_pipeline import (
     T2IAdapterData,
     image_resized_to_grid_as_tensor,
 )
-from ...backend.stable_diffusion.diffusion.shared_invokeai_diffusion import PostprocessingSettings
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from ...backend.util.devices import choose_precision, choose_torch_device
 from .baseinvocation import (
@@ -374,12 +373,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             cond_text_embedding_masks=cond_text_embedding_masks,
             guidance_scale=self.cfg_scale,
             guidance_rescale_multiplier=self.cfg_rescale_multiplier,
-            postprocessing_settings=PostprocessingSettings(
-                threshold=0.0,  # threshold,
-                warmup=0.2,  # warmup,
-                h_symmetry_time_pct=None,  # h_symmetry_time_pct,
-                v_symmetry_time_pct=None,  # v_symmetry_time_pct,
-            ),
         )
 
         conditioning_data = conditioning_data.add_scheduler_args_if_applicable(
