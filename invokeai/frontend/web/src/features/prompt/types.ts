@@ -1,12 +1,13 @@
 import type { PropsWithChildren } from 'react';
 
-export type EmbeddingSelectProps = {
+export type PromptTriggerSelectProps = {
   onSelect: (v: string) => void;
   onClose: () => void;
 };
 
-export type EmbeddingPopoverProps = PropsWithChildren &
-  EmbeddingSelectProps & {
+export type PromptPopoverProps = PropsWithChildren &
+  PromptTriggerSelectProps & {
     isOpen: boolean;
     width?: number | string;
+
   };

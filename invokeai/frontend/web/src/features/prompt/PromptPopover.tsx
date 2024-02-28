@@ -1,9 +1,9 @@
 import { Popover, PopoverAnchor, PopoverBody, PopoverContent } from '@invoke-ai/ui-library';
-import { EmbeddingSelect } from 'features/embedding/EmbeddingSelect';
-import type { EmbeddingPopoverProps } from 'features/embedding/types';
+import { PromptTriggerSelect } from 'features/prompt/PromptTriggerSelect';
+import type { PromptPopoverProps } from 'features/prompt/types';
 import { memo } from 'react';
 
-export const EmbeddingPopover = memo((props: EmbeddingPopoverProps) => {
+export const PromptPopover = memo((props: PromptPopoverProps) => {
   const { onSelect, isOpen, onClose, width, children } = props;
 
   return (
@@ -14,7 +14,7 @@ export const EmbeddingPopover = memo((props: EmbeddingPopoverProps) => {
       openDelay={0}
       closeDelay={0}
       closeOnBlur={true}
-      returnFocusOnClose={true}
+      returnFocusOnClose={false}
       isLazy
     >
       <PopoverAnchor>{children}</PopoverAnchor>
@@ -27,11 +27,11 @@ export const EmbeddingPopover = memo((props: EmbeddingPopoverProps) => {
         borderStyle="solid"
       >
         <PopoverBody p={0} width={`calc(${width}px - 0.25rem)`}>
-          <EmbeddingSelect onClose={onClose} onSelect={onSelect} />
+          <PromptTriggerSelect onClose={onClose} onSelect={onSelect} />
         </PopoverBody>
       </PopoverContent>
     </Popover>
   );
 });
 
-EmbeddingPopover.displayName = 'EmbeddingPopover';
+PromptPopover.displayName = 'PromptPopover';
