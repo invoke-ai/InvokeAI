@@ -1007,7 +1007,8 @@
         "workflow": "Workflow",
         "scheduler": "Planer",
         "noRecallParameters": "Es wurden keine Parameter zum Abrufen gefunden",
-        "recallParameters": "Parameter wiederherstellen"
+        "recallParameters": "Parameter wiederherstellen",
+        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)"
     },
     "popovers": {
         "noiseUseCPU": {
