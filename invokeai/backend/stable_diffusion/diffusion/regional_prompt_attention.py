@@ -32,15 +32,16 @@ class RegionalPromptData:
 
         Args:
             masks (list[torch.Tensor]): masks[i] contains the regions masks for the i'th sample in the batch.
-                The shape of masks[i] is (num_prompts, height, width), and dtype=bool. The mask is set to True in
-                regions where the prompt should be applied, and 0.0 elsewhere.
+                The shape of masks[i] is (num_prompts, height, width). The mask is set to 1.0 in regions where the
+                prompt should be applied, and 0.0 elsewhere.
 
             embedding_ranges (list[list[Range]]): embedding_ranges[i][j] contains the embedding range for the j'th
                 prompt in the i'th batch sample. masks[i][j, ...] is applied to the embeddings in:
                 encoder_hidden_states[i, embedding_ranges[j].start:embedding_ranges[j].end, :].
 
             key_seq_len (int): The sequence length of the expected prompt embeddings (which act as the key in the
-                cross-attention layers).
+                cross-attention layers). This is most likely equal to the max embedding range end, but we pass it
+                explicitly to be sure.
         """
         attn_masks_by_seq_len = {}
 
