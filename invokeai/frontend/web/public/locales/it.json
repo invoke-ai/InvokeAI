@@ -47,7 +47,7 @@
         "statusModelConverted": "Modello Convertito",
         "statusConvertingModel": "Conversione Modello",
         "loading": "Caricamento in corso",
-        "loadingInvokeAI": "Caricamento Invoke AI",
+        "loadingInvokeAI": "Caricamento di Invoke AI",
         "postprocessing": "Post Elaborazione",
         "txt2img": "Testo a Immagine",
         "accept": "Accetta",
@@ -61,7 +61,7 @@
         "imagePrompt": "Prompt Immagine",
         "darkMode": "Modalità scura",
         "batch": "Gestione Lotto",
-        "modelManager": "Gestore modello",
+        "modelManager": "Gestore Modelli",
         "communityLabel": "Comunità",
         "nodeEditor": "Editor dei nodi",
         "statusProcessing": "Elaborazione in corso",
@@ -81,7 +81,7 @@
         "error": "Errore",
         "installed": "Installato",
         "template": "Schema",
-        "outputs": "Uscite",
+        "outputs": "Risultati",
         "data": "Dati",
         "somethingWentWrong": "Qualcosa è andato storto",
         "copyError": "$t(gallery.copy) Errore",
@@ -93,7 +93,7 @@
         "created": "Creato",
         "prevPage": "Pagina precedente",
         "delete": "Elimina",
-        "orderBy": "Ordinato per",
+        "orderBy": "Ordina per",
         "nextPage": "Pagina successiva",
         "saveAs": "Salva come",
         "unsaved": "Non salvato",
@@ -109,7 +109,12 @@
         "green": "Verde",
         "blue": "Blu",
         "alpha": "Alfa",
-        "copy": "Copia"
+        "copy": "Copia",
+        "on": "Attivato",
+        "checkpoint": "Checkpoint",
+        "safetensors": "Safetensors",
+        "ai": "ia",
+        "file": "File"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -1249,7 +1254,12 @@
         "dwOpenposeDescription": "Stima della posa umana utilizzando DW Openpose",
         "face": "Viso",
         "body": "Corpo",
-        "hands": "Mani"
+        "hands": "Mani",
+        "lineartAnime": "Linea Anime",
+        "base": "Base",
+        "lineart": "Linea",
+        "controlnet": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.controlNet))",
+        "mediapipeFace": "Mediapipe Volto"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -1758,7 +1768,8 @@
         "steps": "Passi",
         "scheduler": "Campionatore",
         "recallParameters": "Richiama i parametri",
-        "noRecallParameters": "Nessun parametro da richiamare trovato"
+        "noRecallParameters": "Nessun parametro da richiamare trovato",
+        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)"
     },
     "hrf": {
         "enableHrf": "Abilita Correzione Alta Risoluzione",
