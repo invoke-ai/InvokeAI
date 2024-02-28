@@ -9,5 +9,4 @@ export type PromptPopoverProps = PropsWithChildren &
   PromptTriggerSelectProps & {
     isOpen: boolean;
     width?: number | string;
-
   };
