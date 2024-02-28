@@ -151,7 +151,7 @@ class ModelSearch(ModelSearchBase):
                 or not absolute_path.exists() \
                     or absolute_path.parent in self.models_found:
             return
-        entries = os.scandir(absolute_path)
+        entries = os.scandir(absolute_path.as_posix())
         entries = [entry for entry in entries if not entry.name.startswith(".")]
         dirs = [entry for entry in entries if entry.is_dir()]
         file_names = [entry.name for entry in entries if entry.is_file()]
