@@ -1,7 +1,5 @@
-import dataclasses
-import inspect
-from dataclasses import dataclass, field
-from typing import Any, List, Optional, Union
+from dataclasses import dataclass
+from typing import List, Optional, Union
 
 import torch
 
@@ -71,23 +69,5 @@ class ConditioningData:
      ref [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/pdf/2305.08891.pdf)
     """
     guidance_rescale_multiplier: float = 0
-    scheduler_args: dict[str, Any] = field(default_factory=dict)
 
     ip_adapter_conditioning: Optional[list[IPAdapterConditioningInfo]] = None
-
-    @property
-    def dtype(self):
-        return self.text_embeddings.dtype
-
-    def add_scheduler_args_if_applicable(self, scheduler, **kwargs):
-        scheduler_args = dict(self.scheduler_args)
-        step_method = inspect.signature(scheduler.step)
-        for name, value in kwargs.items():
-            try:
-                step_method.bind_partial(**{name: value})
-            except TypeError:
-                # FIXME: don't silently discard arguments
-                pass  # debug("%s does not accept argument named %r", scheduler, name)
-            else:
-                scheduler_args[name] = value
-        return dataclasses.replace(self, scheduler_args=scheduler_args)
