@@ -22,7 +22,6 @@ export const usePrompt = ({ prompt, textareaRef, onChange: _onChange }: UseInser
 
   const insertTrigger = useCallback(
     (v: string) => {
-      console.log({ textareaRef })
       if (!textareaRef.current) {
         return;
       }
@@ -42,7 +41,6 @@ export const usePrompt = ({ prompt, textareaRef, onChange: _onChange }: UseInser
       const finalCaretPos = newPrompt.length;
 
       newPrompt += prompt.slice(caret);
-      console.log({ newPrompt })
 
       // must flush dom updates else selection gets reset
       flushSync(() => {
@@ -58,8 +56,6 @@ export const usePrompt = ({ prompt, textareaRef, onChange: _onChange }: UseInser
 
 
   const onFocus = useCallback(() => {
-    console.log("focus")
-    console.log(textareaRef.current)
     textareaRef.current?.focus();
   }, [textareaRef]);
 
