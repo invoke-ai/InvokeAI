@@ -1,8 +1,8 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { AddEmbeddingButton } from 'features/embedding/AddEmbeddingButton';
-import { EmbeddingPopover } from 'features/embedding/EmbeddingPopover';
-import { usePrompt } from 'features/embedding/usePrompt';
+import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
+import { PromptPopover } from 'features/prompt/PromptPopover';
+import { usePrompt } from 'features/prompt/usePrompt';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { setNegativeStylePromptSDXL } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback, useRef } from 'react';
@@ -20,7 +20,7 @@ export const ParamSDXLNegativeStylePrompt = memo(() => {
     },
     [dispatch]
   );
-  const { onChange, isOpen, onClose, onOpen, onSelectEmbedding, onKeyDown, onFocus } = usePrompt({
+  const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown, onFocus } = usePrompt({
     prompt,
     textareaRef: textareaRef,
     onChange: handleChange,
@@ -29,12 +29,7 @@ export const ParamSDXLNegativeStylePrompt = memo(() => {
   useHotkeys('alt+a', onFocus, []);
 
   return (
-    <EmbeddingPopover
-      isOpen={isOpen}
-      onClose={onClose}
-      onSelect={onSelectEmbedding}
-      width={textareaRef.current?.clientWidth}
-    >
+    <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
       <Box pos="relative">
         <Textarea
           id="prompt"
@@ -48,10 +43,10 @@ export const ParamSDXLNegativeStylePrompt = memo(() => {
           variant="darkFilled"
         />
         <PromptOverlayButtonWrapper>
-          <AddEmbeddingButton isOpen={isOpen} onOpen={onOpen} />
+          <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
         </PromptOverlayButtonWrapper>
       </Box>
-    </EmbeddingPopover>
+    </PromptPopover>
   );
 });
 

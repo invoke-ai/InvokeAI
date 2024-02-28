@@ -8,15 +8,15 @@ type Props = {
   onOpen: () => void;
 };
 
-export const AddEmbeddingButton = memo((props: Props) => {
+export const AddPromptTriggerButton = memo((props: Props) => {
   const { onOpen, isOpen } = props;
   const { t } = useTranslation();
   return (
-    <Tooltip label={t('embedding.addEmbedding')}>
+    <Tooltip label={t('prompt.addPromptTrigger')}>
       <IconButton
         variant="promptOverlay"
         isDisabled={isOpen}
-        aria-label={t('embedding.addEmbedding')}
+        aria-label={t('prompt.addPromptTrigger')}
         icon={<PiCodeBold />}
         onClick={onOpen}
       />
@@ -24,4 +24,4 @@ export const AddEmbeddingButton = memo((props: Props) => {
   );
 });
 
-AddEmbeddingButton.displayName = 'AddEmbeddingButton';
+AddPromptTriggerButton.displayName = 'AddPromptTriggerButton';
