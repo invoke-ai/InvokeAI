@@ -44,6 +44,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     ConditioningData,
     IPAdapterConditioningInfo,
+    SDXLConditioningInfo,
 )
 
 from ...backend.model_management.lora import ModelPatcher
@@ -233,8 +234,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
     positive_conditioning: Union[ConditioningField, list[ConditioningField]] = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection, ui_order=0
     )
-    negative_conditioning: ConditioningField = InputField(
-        description=FieldDescriptions.negative_cond, input=Input.Connection, ui_order=1
+    negative_conditioning: Union[ConditioningField, list[ConditioningField]] = InputField(
+        description=FieldDescriptions.negative_cond, input=Input.Connection, ui_order=0
     )
     noise: Optional[LatentsField] = InputField(
         default=None,
@@ -327,6 +328,31 @@ class DenoiseLatentsInvocation(BaseInvocation):
             base_model=base_model,
         )
 
+    def _get_text_embeddings_and_masks(
+        self,
+        cond_field: Union[ConditioningField, list[ConditioningField]],
+        context: InvocationContext,
+        device: torch.device,
+        dtype: torch.dtype,
+    ):
+        # Normalize cond_field to a list.
+        cond_list = cond_field
+        if not isinstance(cond_list, list):
+            cond_list = [cond_list]
+
+        text_embeddings: Union[list[BasicConditioningInfo], list[SDXLConditioningInfo]] = []
+        text_embeddings_masks: list[Optional[torch.Tensor]] = []
+        for cond in cond_list:
+            cond_data = context.services.latents.get(cond.conditioning_name)
+            text_embeddings.append(cond_data.conditionings[0].to(device=device, dtype=dtype))
+
+            mask = cond.mask
+            if mask is not None:
+                mask = context.services.latents.get(mask.mask_name)
+            text_embeddings_masks.append(mask)
+
+        return text_embeddings, text_embeddings_masks
+
     def get_conditioning_data(
         self,
         context: InvocationContext,
@@ -334,29 +360,18 @@ class DenoiseLatentsInvocation(BaseInvocation):
         unet,
         seed,
     ) -> ConditioningData:
-        # self.positive_conditioning could be a list or a single ConditioningField. Normalize to a list here.
-        positive_conditioning_list = self.positive_conditioning
-        if not isinstance(positive_conditioning_list, list):
-            positive_conditioning_list = [positive_conditioning_list]
-
-        text_embeddings: list[BasicConditioningInfo] = []
-        text_embeddings_masks: list[Optional[torch.Tensor]] = []
-        for positive_conditioning in positive_conditioning_list:
-            positive_cond_data = context.services.latents.get(positive_conditioning.conditioning_name)
-            text_embeddings.append(positive_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype))
-
-            mask = positive_conditioning.mask
-            if mask is not None:
-                mask = context.services.latents.get(mask.mask_name)
-            text_embeddings_masks.append(mask)
-
-        negative_cond_data = context.services.latents.get(self.negative_conditioning.conditioning_name)
-        uc = negative_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
+        cond_text_embeddings, cond_text_embedding_masks = self._get_text_embeddings_and_masks(
+            self.positive_conditioning, context, unet.device, unet.dtype
+        )
+        uncond_text_embeddings, uncond_text_embedding_masks = self._get_text_embeddings_and_masks(
+            self.negative_conditioning, context, unet.device, unet.dtype
+        )
 
         conditioning_data = ConditioningData(
-            unconditioned_embeddings=uc,
-            text_embeddings=text_embeddings,
-            text_embedding_masks=text_embeddings_masks,
+            uncond_text_embeddings=uncond_text_embeddings,
+            uncond_text_embedding_masks=uncond_text_embedding_masks,
+            cond_text_embeddings=cond_text_embeddings,
+            cond_text_embedding_masks=cond_text_embedding_masks,
             guidance_scale=self.cfg_scale,
             guidance_rescale_multiplier=self.cfg_rescale_multiplier,
             postprocessing_settings=PostprocessingSettings(

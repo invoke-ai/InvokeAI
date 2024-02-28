@@ -404,12 +404,13 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if timesteps.shape[0] == 0:
             return latents
 
-        extra_conditioning_info = conditioning_data.text_embeddings[0].extra_conditioning
+        extra_conditioning_info = conditioning_data.cond_text_embeddings[0].extra_conditioning
         use_cross_attention_control = (
             extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control
         )
         use_ip_adapter = ip_adapter_data is not None
-        use_regional_prompting = len(conditioning_data.text_embeddings) > 1
+        # HACK(ryand): Fix this logic.
+        use_regional_prompting = len(conditioning_data.cond_text_embeddings) > 1
         if sum([use_cross_attention_control, use_ip_adapter, use_regional_prompting]) > 1:
             raise Exception(
                 "Cross-attention control, IP-Adapter, and regional prompting cannot be used simultaneously (yet)."
