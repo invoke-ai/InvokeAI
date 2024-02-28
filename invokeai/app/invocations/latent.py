@@ -479,7 +479,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
         self,
         context: InvocationContext,
         ip_adapter: Optional[Union[IPAdapterField, list[IPAdapterField]]],
-        conditioning_data: ConditioningData,
         exit_stack: ExitStack,
     ) -> Optional[list[IPAdapterData]]:
         """If IP-Adapter is enabled, then this function loads the requisite models, and adds the image prompt embeddings
@@ -496,7 +495,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             return None
 
         ip_adapter_data_list = []
-        conditioning_data.ip_adapter_conditioning = []
         for single_ip_adapter in ip_adapter:
             ip_adapter_model: Union[IPAdapter, IPAdapterPlus] = exit_stack.enter_context(
                 context.models.load(single_ip_adapter.ip_adapter_model)
@@ -519,16 +517,13 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     single_ipa_images, image_encoder_model
                 )
 
-                conditioning_data.ip_adapter_conditioning.append(
-                    IPAdapterConditioningInfo(image_prompt_embeds, uncond_image_prompt_embeds)
-                )
-
             ip_adapter_data_list.append(
                 IPAdapterData(
                     ip_adapter_model=ip_adapter_model,
                     weight=single_ip_adapter.weight,
                     begin_step_percent=single_ip_adapter.begin_step_percent,
                     end_step_percent=single_ip_adapter.end_step_percent,
+                    ip_adapter_conditioning=IPAdapterConditioningInfo(image_prompt_embeds, uncond_image_prompt_embeds),
                 )
             )
 
@@ -763,7 +758,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 ip_adapter_data = self.prep_ip_adapter_data(
                     context=context,
                     ip_adapter=self.ip_adapter,
-                    conditioning_data=conditioning_data,
                     exit_stack=exit_stack,
                 )
 
