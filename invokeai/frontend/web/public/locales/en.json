@@ -304,6 +304,12 @@
             "method": "High Resolution Fix Method"
         }
     },
+    "prompt": {
+        "addPromptTrigger": "Add Prompt Trigger",
+        "compatibleEmbeddings": "Compatible Embeddings",
+        "noPromptTriggers": "No triggers available",
+        "noMatchingTriggers": "No matching triggers"
+    },
     "embedding": {
         "addEmbedding": "Add Embedding",
         "incompatibleModel": "Incompatible base model:",

@@ -11,13 +11,11 @@ export const ModelMetadata = () => {
   const { data } = useGetModelConfigQuery(selectedModelKey ?? skipToken);
 
   return (
-    <>
-      <Flex flexDir="column" height="full" gap="3">
-        <Box layerStyle="second" borderRadius="base" p={3}>
-          <TriggerPhrases />
-        </Box>
-        <DataViewer label="metadata" data={data?.source_api_response || {}} />
-      </Flex>
-    </>
+    <Flex flexDir="column" height="full" gap="3">
+      <Box layerStyle="second" borderRadius="base" p={3}>
+        <TriggerPhrases />
+      </Box>
+      <DataViewer label="metadata" data={data?.source_api_response || {}} />
+    </Flex>
   );
 };
