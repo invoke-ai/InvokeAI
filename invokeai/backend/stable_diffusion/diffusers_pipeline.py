@@ -309,6 +309,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         self,
         latents: torch.Tensor,
         num_inference_steps: int,
+        scheduler_step_kwargs: dict[str, Any],
         conditioning_data: ConditioningData,
         *,
         noise: Optional[torch.Tensor],
@@ -368,6 +369,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 latents,
                 timesteps,
                 conditioning_data,
+                scheduler_step_kwargs=scheduler_step_kwargs,
                 additional_guidance=additional_guidance,
                 control_data=control_data,
                 ip_adapter_data=ip_adapter_data,
@@ -388,6 +390,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         latents: torch.Tensor,
         timesteps,
         conditioning_data: ConditioningData,
+        scheduler_step_kwargs: dict[str, Any],
         *,
         additional_guidance: List[Callable] = None,
         control_data: List[ControlNetData] = None,
@@ -454,6 +457,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     conditioning_data,
                     step_index=i,
                     total_step_count=len(timesteps),
+                    scheduler_step_kwargs=scheduler_step_kwargs,
                     additional_guidance=additional_guidance,
                     control_data=control_data,
                     ip_adapter_data=ip_adapter_data,
@@ -485,6 +489,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         conditioning_data: ConditioningData,
         step_index: int,
         total_step_count: int,
+        scheduler_step_kwargs: dict[str, Any],
         additional_guidance: List[Callable] = None,
         control_data: List[ControlNetData] = None,
         ip_adapter_data: Optional[list[IPAdapterData]] = None,
@@ -584,7 +589,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             )
 
         # compute the previous noisy sample x_t -> x_t-1
-        step_output = self.scheduler.step(noise_pred, timestep, latents, **conditioning_data.scheduler_args)
+        step_output = self.scheduler.step(noise_pred, timestep, latents, **scheduler_step_kwargs)
 
         # TODO: issue to diffusers?
         # undo internal counter increment done by scheduler.step, so timestep can be resolved as before call

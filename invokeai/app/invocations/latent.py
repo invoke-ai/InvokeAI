@@ -1,5 +1,6 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
+import inspect
 import math
 from contextlib import ExitStack
 from functools import singledispatchmethod
@@ -375,14 +376,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             guidance_rescale_multiplier=self.cfg_rescale_multiplier,
         )
 
-        conditioning_data = conditioning_data.add_scheduler_args_if_applicable(
-            scheduler,
-            # for ddim scheduler
-            eta=0.0,  # ddim_eta
-            # for ancestral and sde schedulers
-            # flip all bits to have noise different from initial
-            generator=torch.Generator(device=unet.device).manual_seed(seed ^ 0xFFFFFFFF),
-        )
         return conditioning_data
 
     def create_pipeline(
@@ -642,7 +635,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
     # original idea by https://github.com/AmericanPresidentJimmyCarter
     # TODO: research more for second order schedulers timesteps
-    def init_scheduler(self, scheduler, device, steps, denoising_start, denoising_end):
+    def init_scheduler(self, scheduler, device, steps, denoising_start, denoising_end, seed: int):
         if scheduler.config.get("cpu_only", False):
             scheduler.set_timesteps(steps, device="cpu")
             timesteps = scheduler.timesteps.to(device=device)
@@ -669,7 +662,15 @@ class DenoiseLatentsInvocation(BaseInvocation):
         timesteps = timesteps[t_start_idx : t_start_idx + t_end_idx]
         num_inference_steps = len(timesteps) // scheduler.order
 
-        return num_inference_steps, timesteps, init_timestep
+        scheduler_step_kwargs = {}
+        scheduler_step_signature = inspect.signature(scheduler.step)
+        if "generator" in scheduler_step_signature.parameters:
+            # At some point, someone decided that schedulers that accept a generator should use the original seed with
+            # all bits flipped. I don't know the original rationale for this, but now we must keep it like this for
+            # reproducibility.
+            scheduler_step_kwargs = {"generator": torch.Generator(device=device).manual_seed(seed ^ 0xFFFFFFFF)}
+
+        return num_inference_steps, timesteps, init_timestep, scheduler_step_kwargs
 
     def prep_inpaint_mask(self, context, latents):
         if self.denoise_mask is None:
@@ -783,12 +784,13 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     exit_stack=exit_stack,
                 )
 
-                num_inference_steps, timesteps, init_timestep = self.init_scheduler(
+                num_inference_steps, timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
                     scheduler,
                     device=unet.device,
                     steps=self.steps,
                     denoising_start=self.denoising_start,
                     denoising_end=self.denoising_end,
+                    seed=seed,
                 )
 
                 result_latents = pipeline.latents_from_embeddings(
@@ -800,6 +802,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     mask=mask,
                     masked_latents=masked_latents,
                     num_inference_steps=num_inference_steps,
+                    scheduler_step_kwargs=scheduler_step_kwargs,
                     conditioning_data=conditioning_data,
                     control_data=controlnet_data,
                     ip_adapter_data=ip_adapter_data,
