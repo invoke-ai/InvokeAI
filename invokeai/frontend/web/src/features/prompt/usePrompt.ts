@@ -4,13 +4,13 @@ import type { ChangeEventHandler, KeyboardEventHandler, RefObject } from 'react'
 import { useCallback } from 'react';
 import { flushSync } from 'react-dom';
 
-type UseInsertEmbeddingArg = {
+type UseInsertTriggerArg = {
   prompt: string;
   textareaRef: RefObject<HTMLTextAreaElement>;
   onChange: (v: string) => void;
 };
 
-export const usePrompt = ({ prompt, textareaRef, onChange: _onChange }: UseInsertEmbeddingArg) => {
+export const usePrompt = ({ prompt, textareaRef, onChange: _onChange }: UseInsertTriggerArg) => {
   const { isOpen, onClose, onOpen } = useDisclosure();
 
   const onChange: ChangeEventHandler<HTMLTextAreaElement> = useCallback(
@@ -20,13 +20,14 @@ export const usePrompt = ({ prompt, textareaRef, onChange: _onChange }: UseInser
     [_onChange]
   );
 
-  const insertEmbedding = useCallback(
+  const insertTrigger = useCallback(
     (v: string) => {
+      console.log({ textareaRef })
       if (!textareaRef.current) {
         return;
       }
 
-      // this is where we insert the TI trigger
+      // this is where we insert the trigger
       const caret = textareaRef.current.selectionStart;
 
       if (isNil(caret)) {
@@ -35,45 +36,47 @@ export const usePrompt = ({ prompt, textareaRef, onChange: _onChange }: UseInser
 
       let newPrompt = prompt.slice(0, caret);
 
-      if (newPrompt[newPrompt.length - 1] !== '<') {
-        newPrompt += '<';
-      }
+      newPrompt += `${v}`;
 
-      newPrompt += `${v}>`;
-
-      // we insert the cursor after the `>`
+      // we insert the cursor after the end of trigger
       const finalCaretPos = newPrompt.length;
 
       newPrompt += prompt.slice(caret);
+      console.log({ newPrompt })
 
       // must flush dom updates else selection gets reset
       flushSync(() => {
         _onChange(newPrompt);
       });
 
-      // set the caret position to just after the TI trigger
+      // set the cursor position to just after the trigger
       textareaRef.current.selectionStart = finalCaretPos;
       textareaRef.current.selectionEnd = finalCaretPos;
     },
     [textareaRef, _onChange, prompt]
   );
 
+
   const onFocus = useCallback(() => {
+    console.log("focus")
+    console.log(textareaRef.current)
     textareaRef.current?.focus();
   }, [textareaRef]);
 
-  const handleClose = useCallback(() => {
+  const handleClosePopover = useCallback(() => {
     onClose();
     onFocus();
   }, [onFocus, onClose]);
 
-  const onSelectEmbedding = useCallback(
+
+  const onSelect = useCallback(
     (v: string) => {
-      insertEmbedding(v);
-      handleClose();
+      insertTrigger(v);
+      handleClosePopover();
     },
-    [handleClose, insertEmbedding]
+    [handleClosePopover, insertTrigger]
   );
+
 
   const onKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = useCallback(
     (e) => {
@@ -90,7 +93,7 @@ export const usePrompt = ({ prompt, textareaRef, onChange: _onChange }: UseInser
     isOpen,
     onClose,
     onOpen,
-    onSelectEmbedding,
+    onSelect,
     onKeyDown,
     onFocus,
   };
