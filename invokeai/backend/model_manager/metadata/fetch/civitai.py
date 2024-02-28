@@ -160,7 +160,7 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
             nsfw=model_json["nsfw"],
             restrictions=LicenseRestrictions(
                 AllowNoCredit=model_json["allowNoCredit"],
-                AllowCommercialUse=CommercialUsage(model_json["allowCommercialUse"]),
+                AllowCommercialUse={CommercialUsage(x) for x in model_json["allowCommercialUse"]},
                 AllowDerivatives=model_json["allowDerivatives"],
                 AllowDifferentLicense=model_json["allowDifferentLicense"],
             ),
