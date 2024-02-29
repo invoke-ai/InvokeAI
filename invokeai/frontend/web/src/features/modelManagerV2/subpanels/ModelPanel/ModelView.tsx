@@ -1,4 +1,4 @@
-import { Box, Button, Flex, Text } from '@invoke-ai/ui-library';
+import { Box, Button, Flex, Heading, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setSelectedModelMode } from 'features/modelManagerV2/store/modelManagerV2Slice';
@@ -19,6 +19,7 @@ import type {
 
 import { ModelAttrView } from './ModelAttrView';
 import { ModelConvert } from './ModelConvert';
+import { DefaultSettings } from './DefaultSettings';
 
 export const ModelView = () => {
   const { t } = useTranslation();
@@ -71,7 +72,7 @@ export const ModelView = () => {
     return <Text>{t('common.somethingWentWrong')}</Text>;
   }
   return (
-    <Flex flexDir="column" h="full">
+    <Flex flexDir="column" h="full" gap="2">
       <Box layerStyle="second" borderRadius="base" p={3}>
         <Flex gap="2" justifyContent="flex-end" w="full">
           <Button size="sm" leftIcon={<IoPencil />} colorScheme="invokeYellow" onClick={handleEditModel}>
@@ -117,6 +118,9 @@ export const ModelView = () => {
             </Flex>
           )}
         </Flex>
+      </Box>
+      <Box layerStyle="second" borderRadius="base" p={3}>
+        <DefaultSettings />
       </Box>
     </Flex>
   );
