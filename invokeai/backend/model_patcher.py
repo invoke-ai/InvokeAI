@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import pickle
 from contextlib import contextmanager
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
 from diffusers import OnnxRuntimeModel, UNet2DConditionModel
-from transformers import CLIPTextModel, CLIPTokenizer
+from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
 from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.model_manager import AnyModel
@@ -168,7 +168,7 @@ class ModelPatcher:
     def apply_ti(
         cls,
         tokenizer: CLIPTokenizer,
-        text_encoder: CLIPTextModel,
+        text_encoder: Union[CLIPTextModel, CLIPTextModelWithProjection],
         ti_list: List[Tuple[str, TextualInversionModelRaw]],
     ) -> Iterator[Tuple[CLIPTokenizer, TextualInversionManager]]:
         init_tokens_count = None
@@ -265,7 +265,7 @@ class ModelPatcher:
     @contextmanager
     def apply_clip_skip(
         cls,
-        text_encoder: CLIPTextModel,
+        text_encoder: Union[CLIPTextModel, CLIPTextModelWithProjection],
         clip_skip: int,
     ) -> None:
         skipped_layers = []
