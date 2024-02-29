@@ -221,29 +221,21 @@ class DownloadQueueService(DownloadQueueServiceBase):
             except Empty:
                 continue
             try:
-                print(f'DEBUG: job [{job.id}] started', flush=True)
                 job.job_started = get_iso_timestamp()
                 self._do_download(job)
-                print(f'DEBUG: job [{job.id}] download completed', flush=True)
                 self._signal_job_complete(job)
-                print(f'DEBUG: job [{job.id}] signaled completion', flush=True)
             except (OSError, HTTPError) as excp:
                 job.error_type = excp.__class__.__name__ + f"({str(excp)})"
                 job.error = traceback.format_exc()
                 self._signal_job_error(job, excp)
-                print(f'DEBUG: job [{job.id}] signaled error', flush=True)
             except DownloadJobCancelledException:
                 self._signal_job_cancelled(job)
                 self._cleanup_cancelled_job(job)
-                print(f'DEBUG: job [{job.id}] signaled cancelled', flush=True)
-                
+
             finally:
-                print(f'DEBUG: job [{job.id}] signalling completion', flush=True)
                 job.job_ended = get_iso_timestamp()
                 self._job_completed_event.set()  # signal a change to terminal state
-                print(f'DEBUG: job [{job.id}] set job completion event', flush=True)
                 self._queue.task_done()
-                print(f'DEBUG: job [{job.id}] done', flush=True)
         self._logger.debug(f"Download queue worker thread {threading.current_thread().name} exiting.")
 
     def _do_download(self, job: DownloadJob) -> None:
@@ -251,8 +243,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         url = job.source
         header = {"Authorization": f"Bearer {job.access_token}"} if job.access_token else {}
         open_mode = "wb"
-        print(f'DEBUG: In _do_download [0]', flush=True)
-        
+
         # Make a streaming request. This will retrieve headers including
         # content-length and content-disposition, but not fetch any content itself
         resp = self._requests.get(str(url), headers=header, stream=True)
@@ -262,8 +253,6 @@ class DownloadQueueService(DownloadQueueServiceBase):
         job.content_type = resp.headers.get("Content-Type")
         content_length = int(resp.headers.get("content-length", 0))
         job.total_bytes = content_length
-
-        print(f'DEBUG: In _do_download [1]')
 
         if job.dest.is_dir():
             file_name = os.path.basename(str(url.path))  # default is to use the last bit of the URL
@@ -292,7 +281,6 @@ class DownloadQueueService(DownloadQueueServiceBase):
         # signal caller that the download is starting. At this point, key fields such as
         # download_path and total_bytes will be populated. We call it here because the might
         # discover that the local file is already complete and generate a COMPLETED status.
-        print(f'DEBUG: In _do_download [2]', flush=True)
         self._signal_job_started(job)
 
         # "range not satisfiable" - local file is at least as large as the remote file
@@ -308,15 +296,12 @@ class DownloadQueueService(DownloadQueueServiceBase):
         elif resp.status_code != 200:
             raise HTTPError(resp.reason)
 
-        print(f'DEBUG: In _do_download [3]', flush=True)
-
         self._logger.debug(f"{job.source}: Downloading {job.download_path}")
         report_delta = job.total_bytes / 100  # report every 1% change
         last_report_bytes = 0
 
         # DOWNLOAD LOOP
         with open(in_progress_path, open_mode) as file:
-            print(f'DEBUG: In _do_download loop [4]', flush=True)
             for data in resp.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
                 if job.cancelled:
                     raise DownloadJobCancelledException("Job was cancelled at caller's request")
@@ -329,8 +314,6 @@ class DownloadQueueService(DownloadQueueServiceBase):
         # if we get here we are done and can rename the file to the original dest
         self._logger.debug(f"{job.source}: saved to {job.download_path} (bytes={job.bytes})")
         in_progress_path.rename(job.download_path)
-        print(f'DEBUG: In _do_download [5]', flush=True)
-
 
     def _validate_filename(self, directory: str, filename: str) -> bool:
         pc_name_max = os.pathconf(directory, "PC_NAME_MAX") if hasattr(os, "pathconf") else 260  # hardcoded for windows
