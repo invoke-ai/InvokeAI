@@ -6,7 +6,7 @@ from diffusers.models.attention_processor import Attention, AttnProcessor2_0
 from diffusers.utils import USE_PEFT_BACKEND
 
 from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionProcessorWeights
-from invokeai.backend.stable_diffusion.diffusion.regional_prompt_attention import RegionalPromptData
+from invokeai.backend.stable_diffusion.diffusion.regional_prompt_data import RegionalPromptData
 
 
 class CustomAttnProcessor2_0(AttnProcessor2_0):
@@ -149,10 +149,9 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
         # End unmodified block from AttnProcessor2_0.
 
         # Apply IP-Adapter conditioning.
-        if is_cross_attention:
+        if is_cross_attention and self._is_ip_adapter_enabled():
             if self._is_ip_adapter_enabled():
                 assert ip_adapter_image_prompt_embeds is not None
-
                 for ipa_embed, ipa_weights, scale in zip(
                     ip_adapter_image_prompt_embeds, self._ip_adapter_weights, self._ip_adapter_scales, strict=True
                 ):

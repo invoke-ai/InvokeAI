@@ -16,7 +16,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     TextConditioningData,
     TextConditioningRegions,
 )
-from invokeai.backend.stable_diffusion.diffusion.regional_prompt_attention import RegionalPromptData
+from invokeai.backend.stable_diffusion.diffusion.regional_prompt_data import RegionalPromptData
 
 from .cross_attention_control import (
     CrossAttentionType,
@@ -303,19 +303,13 @@ class InvokeAIDiffuserComponent:
         x_twice = torch.cat([x] * 2)
         sigma_twice = torch.cat([sigma] * 2)
 
-        cross_attention_kwargs = None
-
-        # TODO(ryand): Figure out interactions between regional prompting and IP-Adapter conditioning.
+        cross_attention_kwargs = {}
         if ip_adapter_conditioning is not None:
             # Note that we 'stack' to produce tensors of shape (batch_size, num_ip_images, seq_len, token_len).
-            cross_attention_kwargs = {
-                "ip_adapter_image_prompt_embeds": [
-                    torch.stack(
-                        [ipa_conditioning.uncond_image_prompt_embeds, ipa_conditioning.cond_image_prompt_embeds]
-                    )
-                    for ipa_conditioning in ip_adapter_conditioning
-                ]
-            }
+            cross_attention_kwargs["ip_adapter_image_prompt_embeds"] = [
+                torch.stack([ipa_conditioning.uncond_image_prompt_embeds, ipa_conditioning.cond_image_prompt_embeds])
+                for ipa_conditioning in ip_adapter_conditioning
+            ]
 
         uncond_text = conditioning_data.uncond_text
         cond_text = conditioning_data.cond_text
@@ -352,9 +346,9 @@ class InvokeAIDiffuserComponent:
                 regions.append(r)
 
             _, key_seq_len, _ = both_conditionings.shape
-            cross_attention_kwargs = {
-                "regional_prompt_data": RegionalPromptData.from_regions(regions=regions, key_seq_len=key_seq_len)
-            }
+            cross_attention_kwargs["regional_prompt_data"] = RegionalPromptData.from_regions(
+                regions=regions, key_seq_len=key_seq_len
+            )
 
         both_results = self.model_forward_callback(
             x_twice,
@@ -424,21 +418,19 @@ class InvokeAIDiffuserComponent:
         # Unconditioned pass
         #####################
 
-        cross_attention_kwargs = None
+        cross_attention_kwargs = {}
 
         # Prepare IP-Adapter cross-attention kwargs for the unconditioned pass.
         if ip_adapter_conditioning is not None:
             # Note that we 'unsqueeze' to produce tensors of shape (batch_size=1, num_ip_images, seq_len, token_len).
-            cross_attention_kwargs = {
-                "ip_adapter_image_prompt_embeds": [
-                    torch.unsqueeze(ipa_conditioning.uncond_image_prompt_embeds, dim=0)
-                    for ipa_conditioning in ip_adapter_conditioning
-                ]
-            }
+            cross_attention_kwargs["ip_adapter_image_prompt_embeds"] = [
+                torch.unsqueeze(ipa_conditioning.uncond_image_prompt_embeds, dim=0)
+                for ipa_conditioning in ip_adapter_conditioning
+            ]
 
         # Prepare cross-attention control kwargs for the unconditioned pass.
         if cross_attn_processor_context is not None:
-            cross_attention_kwargs = {"swap_cross_attn_context": cross_attn_processor_context}
+            cross_attention_kwargs["swap_cross_attn_context"] = cross_attn_processor_context
 
         # Prepare SDXL conditioning kwargs for the unconditioned pass.
         added_cond_kwargs = None
@@ -451,11 +443,9 @@ class InvokeAIDiffuserComponent:
         # Prepare prompt regions for the unconditioned pass.
         if conditioning_data.uncond_regions is not None:
             _, key_seq_len, _ = conditioning_data.uncond_text.embeds.shape
-            cross_attention_kwargs = {
-                "regional_prompt_data": RegionalPromptData.from_regions(
-                    regions=[conditioning_data.uncond_regions], key_seq_len=key_seq_len
-                )
-            }
+            cross_attention_kwargs["regional_prompt_data"] = RegionalPromptData.from_regions(
+                regions=[conditioning_data.uncond_regions], key_seq_len=key_seq_len
+            )
 
         # Run unconditioned UNet denoising (i.e. negative prompt).
         unconditioned_next_x = self.model_forward_callback(
@@ -473,22 +463,20 @@ class InvokeAIDiffuserComponent:
         # Conditioned pass
         ###################
 
-        cross_attention_kwargs = None
+        cross_attention_kwargs = {}
 
         # Prepare IP-Adapter cross-attention kwargs for the conditioned pass.
         if ip_adapter_conditioning is not None:
             # Note that we 'unsqueeze' to produce tensors of shape (batch_size=1, num_ip_images, seq_len, token_len).
-            cross_attention_kwargs = {
-                "ip_adapter_image_prompt_embeds": [
-                    torch.unsqueeze(ipa_conditioning.cond_image_prompt_embeds, dim=0)
-                    for ipa_conditioning in ip_adapter_conditioning
-                ]
-            }
+            cross_attention_kwargs["ip_adapter_image_prompt_embeds"] = [
+                torch.unsqueeze(ipa_conditioning.cond_image_prompt_embeds, dim=0)
+                for ipa_conditioning in ip_adapter_conditioning
+            ]
 
         # Prepare cross-attention control kwargs for the conditioned pass.
         if cross_attn_processor_context is not None:
             cross_attn_processor_context.cross_attention_types_to_do = cross_attention_control_types_to_do
-            cross_attention_kwargs = {"swap_cross_attn_context": cross_attn_processor_context}
+            cross_attention_kwargs["swap_cross_attn_context"] = cross_attn_processor_context
 
         # Prepare SDXL conditioning kwargs for the conditioned pass.
         added_cond_kwargs = None
@@ -501,11 +489,9 @@ class InvokeAIDiffuserComponent:
         # Prepare prompt regions for the conditioned pass.
         if conditioning_data.cond_regions is not None:
             _, key_seq_len, _ = conditioning_data.cond_text.embeds.shape
-            cross_attention_kwargs = {
-                "regional_prompt_data": RegionalPromptData.from_regions(
-                    regions=[conditioning_data.cond_regions], key_seq_len=key_seq_len
-                )
-            }
+            cross_attention_kwargs["regional_prompt_data"] = RegionalPromptData.from_regions(
+                regions=[conditioning_data.cond_regions], key_seq_len=key_seq_len
+            )
 
         # Run conditioned UNet denoising (i.e. positive prompt).
         conditioned_next_x = self.model_forward_callback(
