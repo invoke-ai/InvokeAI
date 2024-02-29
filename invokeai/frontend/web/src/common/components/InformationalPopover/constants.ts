@@ -82,19 +82,13 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
   loraWeight: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000159072-concepts-low-rank-adaptations-loras-',
   },
-  compositingBlur: {
+  compositingMaskBlur: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000158838-compositing-settings',
   },
   compositingBlurMethod: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000158838-compositing-settings',
   },
   compositingCoherenceMode: {
-    href: 'https://support.invoke.ai/support/solutions/articles/151000158838-compositing-settings',
-  },
-  compositingCoherenceSteps: {
-    href: 'https://support.invoke.ai/support/solutions/articles/151000158838-compositing-settings',
-  },
-  compositingStrength: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000158838-compositing-settings',
   },
   infillMethod: {
