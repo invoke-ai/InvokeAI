@@ -1,8 +1,7 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
+# This source code is licensed under the license provided at https://github.com/facebookresearch/segment-anything
 
 from typing import List, Tuple, Type
 
@@ -10,7 +9,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from .common import LayerNorm2d
+from invokeai.backend.image_util.segment_anything.modeling.common import LayerNorm2d
 
 
 class MaskDecoder(nn.Module):
@@ -58,15 +57,10 @@ class MaskDecoder(nn.Module):
             activation(),
         )
         self.output_hypernetworks_mlps = nn.ModuleList(
-            [
-                MLP(transformer_dim, transformer_dim, transformer_dim // 8, 3)
-                for i in range(self.num_mask_tokens)
-            ]
+            [MLP(transformer_dim, transformer_dim, transformer_dim // 8, 3) for i in range(self.num_mask_tokens)]
         )
 
-        self.iou_prediction_head = MLP(
-            transformer_dim, iou_head_hidden_dim, self.num_mask_tokens, iou_head_depth
-        )
+        self.iou_prediction_head = MLP(transformer_dim, iou_head_hidden_dim, self.num_mask_tokens, iou_head_depth)
 
     def forward(
         self,
@@ -163,9 +157,7 @@ class MLP(nn.Module):
         super().__init__()
         self.num_layers = num_layers
         h = [hidden_dim] * (num_layers - 1)
-        self.layers = nn.ModuleList(
-            nn.Linear(n, k) for n, k in zip([input_dim] + h, h + [output_dim])
-        )
+        self.layers = nn.ModuleList(nn.Linear(n, k) for n, k in zip([input_dim] + h, h + [output_dim]))
         self.sigmoid_output = sigmoid_output
 
     def forward(self, x):

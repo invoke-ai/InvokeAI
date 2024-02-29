@@ -1,8 +1,7 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
+# This source code is licensed under the license provided at https://github.com/facebookresearch/segment-anything
 
 from typing import Any, Optional, Tuple, Type
 
@@ -10,7 +9,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from .common import LayerNorm2d
+from invokeai.backend.image_util.segment_anything.modeling.common import LayerNorm2d
 
 
 class PromptEncoder(nn.Module):
@@ -204,9 +203,7 @@ class PositionEmbeddingRandom(nn.Module):
         pe = self._pe_encoding(torch.stack([x_embed, y_embed], dim=-1))
         return pe.permute(2, 0, 1)  # C x H x W
 
-    def forward_with_coords(
-        self, coords_input: torch.Tensor, image_size: Tuple[int, int]
-    ) -> torch.Tensor:
+    def forward_with_coords(self, coords_input: torch.Tensor, image_size: Tuple[int, int]) -> torch.Tensor:
         """Positionally encode points that are not normalized to [0,1]."""
         coords = coords_input.clone()
         coords[:, :, 0] = coords[:, :, 0] / image_size[1]

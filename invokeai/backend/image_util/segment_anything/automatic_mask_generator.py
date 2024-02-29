@@ -1,8 +1,7 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
+# This source code is licensed under the license provided at https://github.com/facebookresearch/segment-anything
 
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -10,9 +9,9 @@ import numpy as np
 import torch
 from torchvision.ops.boxes import batched_nms, box_area  # type: ignore
 
-from .modeling import Sam
-from .predictor import SamPredictor
-from .utils.amg import (
+from invokeai.backend.image_util.segment_anything.modeling.sam import Sam
+from invokeai.backend.image_util.segment_anything.predictor import SamPredictor
+from invokeai.backend.image_util.segment_anything.utils.amg import (
     MaskData,
     area_from_rle,
     batch_iterator,

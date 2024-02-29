@@ -1,8 +1,7 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
+# This source code is licensed under the license provided at https://github.com/facebookresearch/segment-anything
 
 from typing import Any, Dict, List, Tuple
 
@@ -10,9 +9,9 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from .image_encoder import ImageEncoderViT
-from .mask_decoder import MaskDecoder
-from .prompt_encoder import PromptEncoder
+from invokeai.backend.image_util.segment_anything.modeling.image_encoder import ImageEncoderViT
+from invokeai.backend.image_util.segment_anything.modeling.mask_decoder import MaskDecoder
+from invokeai.backend.image_util.segment_anything.modeling.prompt_encoder import PromptEncoder
 
 
 class Sam(nn.Module):

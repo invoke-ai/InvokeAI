@@ -1,14 +1,17 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
+# This source code is licensed under the license provided at https://github.com/facebookresearch/segment-anything
 
 from functools import partial
 
 import torch
 
-from .modeling import ImageEncoderViT, MaskDecoder, PromptEncoder, Sam, TwoWayTransformer
+from invokeai.backend.image_util.segment_anything.modeling.image_encoder import ImageEncoderViT
+from invokeai.backend.image_util.segment_anything.modeling.mask_decoder import MaskDecoder
+from invokeai.backend.image_util.segment_anything.modeling.prompt_encoder import PromptEncoder
+from invokeai.backend.image_util.segment_anything.modeling.sam import Sam
+from invokeai.backend.image_util.segment_anything.modeling.transformer import TwoWayTransformer
 
 
 def build_sam_vit_h(checkpoint=None):
