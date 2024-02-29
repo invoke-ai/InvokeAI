@@ -451,6 +451,7 @@ async def add_model_record(
 )
 async def install_model(
     source: str = Query(description="Model source to install, can be a local path, repo_id, or remote URL"),
+    inplace: Optional[bool] = Query(description="Whether or not to install a local model in place", default=False),
     # TODO(MM2): Can we type this?
     config: Optional[Dict[str, Any]] = Body(
         description="Dict of fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
@@ -493,6 +494,7 @@ async def install_model(
             source=source,
             config=config,
             access_token=access_token,
+            inplace=bool(inplace),
         )
         logger.info(f"Started installation of {source}")
     except UnknownModelException as e:
