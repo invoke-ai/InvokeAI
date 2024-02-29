@@ -28,6 +28,7 @@ class InstallStatus(str, Enum):
 
     WAITING = "waiting"  # waiting to be dequeued
     DOWNLOADING = "downloading"  # downloading of model files in process
+    DOWNLOADS_DONE = "downloads_done"  # downloading done, waiting to run
     RUNNING = "running"  # being processed
     COMPLETED = "completed"  # finished running
     ERROR = "error"  # terminated with an error message
@@ -228,6 +229,11 @@ class ModelInstallJob(BaseModel):
     def downloading(self) -> bool:
         """Return true if job is downloading."""
         return self.status == InstallStatus.DOWNLOADING
+
+    @property
+    def downloads_done(self) -> bool:
+        """Return true if job's downloads ae done."""
+        return self.status == InstallStatus.DOWNLOADS_DONE
 
     @property
     def running(self) -> bool:

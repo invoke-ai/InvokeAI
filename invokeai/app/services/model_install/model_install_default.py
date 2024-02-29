@@ -28,7 +28,6 @@ from invokeai.backend.model_manager.config import (
     ModelRepoVariant,
     ModelType,
 )
-from invokeai.backend.model_manager.hash import FastModelHash
 from invokeai.backend.model_manager.metadata import (
     AnyModelRepoMetadata,
     CivitaiMetadataFetch,
@@ -153,7 +152,6 @@ class ModelInstallService(ModelInstallServiceBase):
             config["source"] = model_path.resolve().as_posix()
 
         info: AnyModelConfig = self._probe_model(Path(model_path), config)
-        old_hash = info.current_hash
 
         if preferred_name := config.get("name"):
             preferred_name = Path(preferred_name).with_suffix(model_path.suffix)
@@ -167,8 +165,6 @@ class ModelInstallService(ModelInstallServiceBase):
             raise DuplicateModelException(
                 f"A model named {model_path.name} is already installed at {dest_path.as_posix()}"
             ) from excp
-        new_hash = FastModelHash.hash(new_path)
-        assert new_hash == old_hash, f"{model_path}: Model hash changed during installation, possibly corrupted."
 
         return self._register(
             new_path,
@@ -370,7 +366,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     self._signal_job_errored(job)
 
                 elif (
-                    job.waiting or job.downloading
+                    job.waiting or job.downloads_done
                 ):  # local jobs will be in waiting state, remote jobs will be downloading state
                     job.total_bytes = self._stat_size(job.local_path)
                     job.bytes = job.total_bytes
@@ -448,7 +444,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     installed.update(self.scan_directory(models_dir))
             self._logger.info(f"{len(installed)} new models registered; {len(defunct_models)} unregistered")
 
-    def _sync_model_path(self, key: str, ignore_hash_change: bool = False) -> AnyModelConfig:
+    def _sync_model_path(self, key: str) -> AnyModelConfig:
         """
         Move model into the location indicated by its basetype, type and name.
 
@@ -469,14 +465,7 @@ class ModelInstallService(ModelInstallServiceBase):
         new_path = models_dir / model.base.value / model.type.value / model.name
         self._logger.info(f"Moving {model.name} to {new_path}.")
         new_path = self._move_model(old_path, new_path)
-        new_hash = FastModelHash.hash(new_path)
         model.path = new_path.relative_to(models_dir).as_posix()
-        if model.current_hash != new_hash:
-            assert (
-                ignore_hash_change
-            ), f"{model.name}: Model hash changed during installation, model is possibly corrupted"
-            model.current_hash = new_hash
-            self._logger.info(f"Model has new hash {model.current_hash}, but will continue to be identified by {key}")
         self.record_store.update_model(key, model)
         return model
 
@@ -749,8 +738,8 @@ class ModelInstallService(ModelInstallServiceBase):
             self._download_cache.pop(download_job.source, None)
 
             # are there any more active jobs left in this task?
-            if all(x.complete for x in install_job.download_parts):
-                #  now enqueue job for actual installation into the models directory
+            if install_job.downloading and all(x.complete for x in install_job.download_parts):
+                install_job.status = InstallStatus.DOWNLOADS_DONE
                 self._install_queue.put(install_job)
 
             # Let other threads know that the number of downloads has changed
