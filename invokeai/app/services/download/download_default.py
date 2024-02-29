@@ -228,10 +228,16 @@ class DownloadQueueService(DownloadQueueServiceBase):
             except (OSError, HTTPError) as excp:
                 job.error_type = excp.__class__.__name__ + f"({str(excp)})"
                 job.error = traceback.format_exc()
-                self._signal_job_error(job, excp)
+                try:
+                    self._signal_job_error(job, excp)
+                except:
+                    pass
             except DownloadJobCancelledException:
-                self._signal_job_cancelled(job)
-                self._cleanup_cancelled_job(job)
+                try:
+                    self._signal_job_cancelled(job)
+                    self._cleanup_cancelled_job(job)
+                except:
+                    pass
 
             finally:
                 job.job_ended = get_iso_timestamp()
