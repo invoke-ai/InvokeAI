@@ -1,11 +1,12 @@
-import { FormControl, FormLabel, CompositeSlider, CompositeNumberInput, Flex } from '@invoke-ai/ui-library';
-import { useMemo } from 'react';
+import { CompositeNumberInput, CompositeSlider, Flex,FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { useCallback,useMemo  } from 'react';
+import type {UseControllerProps } from 'react-hook-form';
+import { useController } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useAppSelector } from '../../../../../app/store/storeHooks';
-import { InformationalPopover } from '../../../../../common/components/InformationalPopover/InformationalPopover';
-import { UseControllerProps, useController } from 'react-hook-form';
-import { DefaultSettingsFormData } from '../DefaultSettings';
-import { useCallback } from 'react';
+
+import type { DefaultSettingsFormData } from './DefaultSettingsForm';
 
 type DefaultSteps = DefaultSettingsFormData['steps'];
 

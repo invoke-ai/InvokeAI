@@ -735,6 +735,8 @@
         "customConfig": "Custom Config",
         "customConfigFileLocation": "Custom Config File Location",
         "customSaveLocation": "Custom Save Location",
+        "defaultSettings": "Default Settings",
+        "defaultSettingsSaved": "Default Settings Saved",
         "delete": "Delete",
         "deleteConfig": "Delete Config",
         "deleteModel": "Delete Model",

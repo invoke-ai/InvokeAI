@@ -1,14 +1,16 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { DefaultSettingsFormData } from '../DefaultSettings';
-import { UseControllerProps, useController } from 'react-hook-form';
-import { useGetModelConfigQuery, useGetVaeModelsQuery } from '../../../../../services/api/endpoints/models';
-import { map } from 'lodash-es';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppSelector } from '../../../../../app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { map } from 'lodash-es';
+import { useCallback, useMemo } from 'react';
+import type {UseControllerProps } from 'react-hook-form';
+import { useController } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
+import { useGetModelConfigQuery, useGetVaeModelsQuery } from 'services/api/endpoints/models';
+
+import type { DefaultSettingsFormData } from './DefaultSettingsForm';
 
 type DefaultVaeType = DefaultSettingsFormData['vae'];
 
@@ -25,13 +27,15 @@ export function DefaultVae(props: UseControllerProps<DefaultSettingsFormData>) {
         .filter((vae) => vae.base === modelData?.base)
         .map((vae) => ({ label: vae.name, value: vae.key }));
 
-      return { compatibleOptions };
+      const defaultOption = { label: 'Default VAE', value: 'default' };
+
+      return { compatibleOptions: [defaultOption, ...compatibleOptions] };
     },
   });
 
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {
-      const newValue = !v?.value ? null : v.value;
+      const newValue = !v?.value ? 'default' : v.value;
 
       const updatedValue = {
         ...(field.value as DefaultVaeType),
@@ -55,14 +59,7 @@ export function DefaultVae(props: UseControllerProps<DefaultSettingsFormData>) {
       <InformationalPopover feature="paramVAE">
         <FormLabel>{t('modelManager.vae')}</FormLabel>
       </InformationalPopover>
-      <Combobox
-        isDisabled={isDisabled}
-        isClearable
-        value={value}
-        placeholder={value ? value.value : t('models.defaultVAE')}
-        options={compatibleOptions}
-        onChange={onChange}
-      />
+      <Combobox isDisabled={isDisabled} value={value} options={compatibleOptions} onChange={onChange} />
     </FormControl>
   );
 }
