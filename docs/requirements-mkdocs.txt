@@ -1,5 +1,0 @@
-mkdocs
-mkdocs-material>=8, <9
-mkdocs-git-revision-date-localized-plugin
-mkdocs-redirects==1.2.0
-
