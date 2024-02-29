@@ -3,6 +3,7 @@ This module defines a singleton object, "safety_checker" that
 wraps the safety_checker model. It respects the global "nsfw_checker"
 configuration variable, that allows the checker to be supressed.
 """
+
 import numpy as np
 from PIL import Image
 

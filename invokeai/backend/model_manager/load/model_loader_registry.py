@@ -14,6 +14,7 @@ Use like this:
     ).load_model(model_config, submodel_type)
 
 """
+
 import hashlib
 from abc import ABC, abstractmethod
 from pathlib import Path

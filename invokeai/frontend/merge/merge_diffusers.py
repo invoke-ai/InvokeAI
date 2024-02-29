@@ -4,6 +4,7 @@ used to merge 2-3 models together and create a new InvokeAI-registered diffusion
 
 Copyright (c) 2023 Lincoln Stein and the InvokeAI Development Team
 """
+
 import argparse
 import curses
 import re

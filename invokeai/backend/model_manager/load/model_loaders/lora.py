@@ -1,7 +1,6 @@
 # Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Class for LoRA model loading in InvokeAI."""
 
-
 from logging import Logger
 from pathlib import Path
 from typing import Optional, Tuple

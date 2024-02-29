@@ -15,7 +15,7 @@
 #
 # Adapted for use in InvokeAI by Lincoln Stein, July 2023
 #
-""" Conversion script for the Stable Diffusion checkpoints."""
+"""Conversion script for the Stable Diffusion checkpoints."""
 
 import re
 from contextlib import nullcontext

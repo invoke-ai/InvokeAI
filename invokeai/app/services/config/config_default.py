@@ -166,6 +166,7 @@ two configs are kept in separate sections of the config file:
      ...
 
 """
+
 from __future__ import annotations
 
 import os

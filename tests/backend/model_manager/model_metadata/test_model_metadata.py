@@ -1,6 +1,7 @@
 """
 Test model metadata fetching and storage.
 """
+
 import datetime
 from pathlib import Path
 
