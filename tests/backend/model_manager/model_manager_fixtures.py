@@ -2,6 +2,7 @@
 
 import os
 import shutil
+import time
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -149,6 +150,7 @@ def mm2_installer(
 
     def stop_installer() -> None:
         installer.stop()
+        time.sleep(0.1)  # avoid error message from the logger when it is closed before thread prints final message
 
     request.addfinalizer(stop_installer)
     return installer
