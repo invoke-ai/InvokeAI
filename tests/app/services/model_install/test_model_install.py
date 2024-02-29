@@ -195,6 +195,7 @@ def test_delete_register(
     with pytest.raises(UnknownModelException):
         store.get_model(key)
 
+
 @pytest.mark.timeout(timeout=20, method="thread")
 def test_simple_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig) -> None:
     source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
