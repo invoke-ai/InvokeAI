@@ -6,7 +6,6 @@ This is the frontend to "textual_inversion_training.py".
 Copyright (c) 2023-24 Lincoln Stein and the InvokeAI Development Team
 """
 
-
 import os
 import re
 import shutil

@@ -39,7 +39,6 @@ Typical usage:
   configs = store.search_by_attr(base_model='sd-2', model_type='main')
 """
 
-
 import json
 import sqlite3
 from math import ceil

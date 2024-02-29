@@ -3,6 +3,7 @@
 Utility routine used for autodetection of optimal slice size
 for attention mechanism.
 """
+
 import psutil
 import torch
 

@@ -1,5 +1,6 @@
 # Copyright (c) 2024 Ryan Dick, Lincoln D. Stein, and the InvokeAI Development Team
 """These classes implement model patching with LoRAs and Textual Inversions."""
+
 from __future__ import annotations
 
 import pickle

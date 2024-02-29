@@ -1,6 +1,7 @@
 """
 Widget class definitions used by model_select.py, merge_diffusers.py and textual_inversion.py
 """
+
 import curses
 import math
 import os

@@ -1,4 +1,5 @@
 """Context class to silence transformers and diffusers warnings."""
+
 import warnings
 from typing import Any
 

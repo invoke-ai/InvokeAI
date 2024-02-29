@@ -340,14 +340,17 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
             logger.error(f"ERROR DOWNLOADING {url}: {resp.text}")
             return None
 
-        with open(dest, open_mode) as file, tqdm(
-            desc=str(dest),
-            initial=exist_size,
-            total=content_length,
-            unit="iB",
-            unit_scale=True,
-            unit_divisor=1000,
-        ) as bar:
+        with (
+            open(dest, open_mode) as file,
+            tqdm(
+                desc=str(dest),
+                initial=exist_size,
+                total=content_length,
+                unit="iB",
+                unit_scale=True,
+                unit_divisor=1000,
+            ) as bar,
+        ):
             for data in resp.iter_content(chunk_size=1024):
                 size = file.write(data)
                 bar.update(size)

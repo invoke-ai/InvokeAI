@@ -19,6 +19,7 @@ Typical usage:
 Validation errors will raise an InvalidModelConfigException error.
 
 """
+
 import time
 from enum import Enum
 from typing import Literal, Optional, Type, Union

@@ -1,4 +1,5 @@
 """Init file for model record services."""
+
 from .model_records_base import (  # noqa F401
     DuplicateModelException,
     InvalidModelException,
