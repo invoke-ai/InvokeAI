@@ -289,7 +289,7 @@ class ModelsInterface(InvocationContextInterface):
         )
 
     def load_by_attrs(
-        self, model_name: str, base_model: BaseModelType, model_type: ModelType, submodel: Optional[SubModelType] = None
+        self, name: str, base: BaseModelType, type: ModelType, submodel_type: Optional[SubModelType] = None
     ) -> LoadedModel:
         """
         Loads a model by its attributes.
@@ -300,10 +300,10 @@ class ModelsInterface(InvocationContextInterface):
         :param submodel: For main (pipeline models), the submodel to fetch
         """
         return self._services.model_manager.load_model_by_attr(
-            model_name=model_name,
-            base_model=base_model,
-            model_type=model_type,
-            submodel=submodel,
+            model_name=name,
+            base_model=base,
+            model_type=type,
+            submodel=submodel_type,
             context_data=self._data,
         )
 
@@ -333,10 +333,10 @@ class ModelsInterface(InvocationContextInterface):
 
     def search_by_attrs(
         self,
-        model_name: Optional[str] = None,
-        base_model: Optional[BaseModelType] = None,
-        model_type: Optional[ModelType] = None,
-        model_format: Optional[ModelFormat] = None,
+        name: Optional[str] = None,
+        base: Optional[BaseModelType] = None,
+        type: Optional[ModelType] = None,
+        format: Optional[ModelFormat] = None,
     ) -> list[AnyModelConfig]:
         """
         Searches for models by attributes.
@@ -348,10 +348,10 @@ class ModelsInterface(InvocationContextInterface):
         """
 
         return self._services.model_manager.store.search_by_attr(
-            model_name=model_name,
-            base_model=base_model,
-            model_type=model_type,
-            model_format=model_format,
+            model_name=name,
+            base_model=base,
+            model_type=type,
+            model_format=format,
         )
 
 
