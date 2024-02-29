@@ -1,4 +1,4 @@
-import { Box, Button, Flex, Heading, Text } from '@invoke-ai/ui-library';
+import { Box, Button, Flex, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setSelectedModelMode } from 'features/modelManagerV2/store/modelManagerV2Slice';
@@ -17,9 +17,9 @@ import type {
   VAEModelConfig,
 } from 'services/api/types';
 
+import { DefaultSettings } from './DefaultSettings';
 import { ModelAttrView } from './ModelAttrView';
 import { ModelConvert } from './ModelConvert';
-import { DefaultSettings } from './DefaultSettings';
 
 export const ModelView = () => {
   const { t } = useTranslation();

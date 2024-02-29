@@ -1,7 +1,7 @@
 import type { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import type { ParameterPrecision, ParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import type { InvokeTabName } from 'features/ui/store/tabMap';
 import type { O } from 'ts-toolbelt';
-import { ParameterPrecision, ParameterScheduler } from '../../features/parameters/types/parameterSchemas';
 
 /**
  * A disable-able application feature

@@ -1,8 +1,10 @@
-import { UseControllerProps, useController, useFormContext, useWatch } from 'react-hook-form';
-import { DefaultSettingsFormData, FormField } from '../DefaultSettings';
-import { useCallback } from 'react';
 import { Switch } from '@invoke-ai/ui-library';
-import { ChangeEvent } from 'react';
+import type { ChangeEvent } from 'react';
+import { useCallback , useMemo } from 'react';
+import type { UseControllerProps} from 'react-hook-form';
+import { useController } from 'react-hook-form';
+
+import type { DefaultSettingsFormData, FormField } from './DefaultSettingsForm';
 
 interface Props<T> extends UseControllerProps<DefaultSettingsFormData> {
   name: keyof DefaultSettingsFormData;
@@ -10,6 +12,10 @@ interface Props<T> extends UseControllerProps<DefaultSettingsFormData> {
 
 export function SettingToggle<T>(props: Props<T>) {
   const { field } = useController(props);
+
+  const value = useMemo(() => {
+    return !!(field.value as FormField<T>).isEnabled;
+  }, [field.value]);
 
   const onChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -22,5 +28,5 @@ export function SettingToggle<T>(props: Props<T>) {
     [field]
   );
 
-  return <Switch onChange={onChange} />;
+  return <Switch isChecked={value} onChange={onChange} />;
 }

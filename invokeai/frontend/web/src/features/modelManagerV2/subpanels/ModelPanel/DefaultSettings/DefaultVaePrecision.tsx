@@ -1,11 +1,13 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { isParameterPrecision, isParameterScheduler } from 'features/parameters/types/parameterSchemas';
+import { isParameterPrecision } from 'features/parameters/types/parameterSchemas';
 import { useCallback, useMemo } from 'react';
+import type {UseControllerProps } from 'react-hook-form';
+import { useController } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { DefaultSettingsFormData } from '../DefaultSettings';
-import { UseControllerProps, useController } from 'react-hook-form';
+
+import type { DefaultSettingsFormData } from './DefaultSettingsForm';
 
 const options = [
   { label: 'FP16', value: 'fp16' },
