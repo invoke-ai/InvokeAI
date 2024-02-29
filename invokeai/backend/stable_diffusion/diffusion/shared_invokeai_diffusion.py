@@ -448,6 +448,15 @@ class InvokeAIDiffuserComponent:
                 "time_ids": conditioning_data.uncond_text.add_time_ids,
             }
 
+        # Prepare prompt regions for the unconditioned pass.
+        if conditioning_data.uncond_regions is not None:
+            _, key_seq_len, _ = conditioning_data.uncond_text.embeds.shape
+            cross_attention_kwargs = {
+                "regional_prompt_data": RegionalPromptData.from_regions(
+                    regions=[conditioning_data.uncond_regions], key_seq_len=key_seq_len
+                )
+            }
+
         # Run unconditioned UNet denoising (i.e. negative prompt).
         unconditioned_next_x = self.model_forward_callback(
             x,
@@ -487,6 +496,15 @@ class InvokeAIDiffuserComponent:
             added_cond_kwargs = {
                 "text_embeds": conditioning_data.cond_text.pooled_embeds,
                 "time_ids": conditioning_data.cond_text.add_time_ids,
+            }
+
+        # Prepare prompt regions for the conditioned pass.
+        if conditioning_data.cond_regions is not None:
+            _, key_seq_len, _ = conditioning_data.cond_text.embeds.shape
+            cross_attention_kwargs = {
+                "regional_prompt_data": RegionalPromptData.from_regions(
+                    regions=[conditioning_data.cond_regions], key_seq_len=key_seq_len
+                )
             }
 
         # Run conditioned UNet denoising (i.e. positive prompt).

@@ -126,19 +126,21 @@ class RegionalPromptAttnProcessor2_0(AttnProcessor2_0):
             hidden_states.shape if encoder_hidden_states is None else encoder_hidden_states.shape
         )
 
-        if encoder_hidden_states is not None:
-            assert regional_prompt_data is not None
-            assert attention_mask is not None
+        if encoder_hidden_states is not None and regional_prompt_data is not None:
+            # If encoder_hidden_states is not None, that means we are doing cross-attention case.
             _, query_seq_len, _ = hidden_states.shape
             prompt_region_attention_mask = regional_prompt_data.get_attn_mask(query_seq_len)
             # TODO(ryand): Avoid redundant type/device conversion here.
             prompt_region_attention_mask = prompt_region_attention_mask.to(
-                dtype=attention_mask.dtype, device=attention_mask.device
+                dtype=encoder_hidden_states.dtype, device=encoder_hidden_states.device
             )
             prompt_region_attention_mask[prompt_region_attention_mask < 0.5] = -10000.0
             prompt_region_attention_mask[prompt_region_attention_mask >= 0.5] = 0.0
 
-            attention_mask = prompt_region_attention_mask + attention_mask
+            if attention_mask is None:
+                attention_mask = prompt_region_attention_mask
+            else:
+                attention_mask = prompt_region_attention_mask + attention_mask
 
         if attention_mask is not None:
             attention_mask = attn.prepare_attention_mask(attention_mask, sequence_length, batch_size)
