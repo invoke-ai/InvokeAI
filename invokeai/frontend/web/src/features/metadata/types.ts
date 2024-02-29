@@ -4,7 +4,7 @@ import type { O } from 'ts-toolbelt';
 /**
  * Renders a value of type T as a React node.
  */
-export type MetadataRenderValueFunc<T> = (value: T) => Promise<React.ReactNode>;
+export type MetadataRenderValueFunc<T> = (value: T) => Promise<string>;
 
 /**
  * Gets the label of the current metadata item as a string.

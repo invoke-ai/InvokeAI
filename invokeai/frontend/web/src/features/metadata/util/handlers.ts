@@ -150,7 +150,7 @@ const buildRecallItem =
     }
   };
 
-const resolveToString = (value: unknown) => new Promise<React.ReactNode>((resolve) => resolve(String(value)));
+const resolveToString = (value: unknown) => new Promise<string>((resolve) => resolve(String(value)));
 
 const buildHandlers: BuildMetadataHandlers = ({
   getLabel,
