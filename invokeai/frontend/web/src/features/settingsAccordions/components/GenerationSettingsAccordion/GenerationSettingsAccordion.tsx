@@ -21,6 +21,7 @@ import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
+import { UseDefaultSettingsButton } from 'features/parameters/components/MainModel/UseDefaultSettingsButton';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { filter } from 'lodash-es';
@@ -71,7 +72,10 @@ export const GenerationSettingsAccordion = memo(() => {
           <TabPanel overflow="visible" px={4} pt={4}>
             <Flex gap={4} alignItems="center">
               <ParamMainModelSelect />
-              <SyncModelsIconButton />
+              <Flex>
+                <UseDefaultSettingsButton />
+                <SyncModelsIconButton />
+              </Flex>
             </Flex>
             <Expander isOpen={isOpenExpander} onToggle={onToggleExpander}>
               <Flex gap={4} flexDir="column" pb={4}>
