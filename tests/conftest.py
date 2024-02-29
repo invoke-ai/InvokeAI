@@ -5,6 +5,8 @@
 # We import the model_installer and torch_device fixtures here so that they can be used by all tests. Flake8 does not
 # play well with fixtures (F401 and F811), so this is cleaner than importing in all files that use these fixtures.
 import logging
+import shutil
+from pathlib import Path
 
 import pytest
 
@@ -58,3 +60,11 @@ def mock_services() -> InvocationServices:
 @pytest.fixture()
 def mock_invoker(mock_services: InvocationServices) -> Invoker:
     return Invoker(services=mock_services)
+
+
+@pytest.fixture(scope="module")
+def invokeai_root_dir(tmp_path_factory) -> Path:
+    root_template = Path(__file__).parent.resolve() / "backend/model_manager/data/invokeai_root"
+    temp_dir: Path = tmp_path_factory.mktemp("data") / "invokeai_root"
+    shutil.copytree(root_template, temp_dir)
+    return temp_dir

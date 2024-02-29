@@ -166,7 +166,7 @@ def test_broken_callbacks(tmp_path: Path, session: Session, capsys) -> None:
     # assert re.search("division by zero", captured.err)
     queue.stop()
 
-
+@pytest.mark.timeout(timeout=15, method="thread")
 def test_cancel(tmp_path: Path, session: Session) -> None:
     event_bus = TestEventService()
 
@@ -181,6 +181,9 @@ def test_cancel(tmp_path: Path, session: Session) -> None:
     def cancelled_callback(job: DownloadJob) -> None:
         nonlocal cancelled
         cancelled = True
+
+    def handler(signum, frame):
+        raise TimeoutError("Join took too long to return")
 
     job = queue.download(
         source=AnyHttpUrl("http://www.civitai.com/models/12345"),
