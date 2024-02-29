@@ -6,29 +6,41 @@ from typing import List, Literal, Union
 
 import cv2
 import numpy as np
-from controlnet_aux import (CannyDetector, ContentShuffleDetector, HEDdetector,
-                            LeresDetector, LineartAnimeDetector,
-                            LineartDetector, MediapipeFaceDetector,
-                            MidasDetector, MLSDdetector, NormalBaeDetector,
-                            PidiNetDetector, ZoeDetector)
+from controlnet_aux import (
+    CannyDetector,
+    ContentShuffleDetector,
+    HEDdetector,
+    LeresDetector,
+    LineartAnimeDetector,
+    LineartDetector,
+    MediapipeFaceDetector,
+    MidasDetector,
+    MLSDdetector,
+    NormalBaeDetector,
+    PidiNetDetector,
+    ZoeDetector,
+)
 from controlnet_aux.util import HWC3
 from PIL import Image
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from invokeai.app.invocations.fields import (FieldDescriptions, ImageField,
-                                             Input, InputField, OutputField,
-                                             WithBoard, WithMetadata)
+from invokeai.app.invocations.fields import (
+    FieldDescriptions,
+    ImageField,
+    Input,
+    InputField,
+    OutputField,
+    WithBoard,
+    WithMetadata,
+)
 from invokeai.app.invocations.primitives import ImageOutput
-from invokeai.app.invocations.util import (validate_begin_end_step,
-                                           validate_weights)
+from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.depth_anything import DepthAnythingDetector
 from invokeai.backend.image_util.dw_openpose import DWOpenposeDetector
-from invokeai.backend.image_util.segment_anything.sam_image_predictor import \
-    SAMImagePredictor
+from invokeai.backend.image_util.segment_anything.sam_image_predictor import SAMImagePredictor
 
-from .baseinvocation import (BaseInvocation, BaseInvocationOutput, invocation,
-                             invocation_output)
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 
 CONTROLNET_MODE_VALUES = Literal["balanced", "more_prompt", "more_control", "unbalanced"]
 CONTROLNET_RESIZE_VALUES = Literal[
@@ -580,7 +592,7 @@ SEGMENT_ANYTHING_MODEL_TYPES = Literal["vit_h", "vit_l", "vit_b"]
 class SegmentAnythingImageProcessorInvocation(ImageProcessorInvocation):
     """Generates a mask of the text provided using Facebook's Segment Anything"""
 
-    model_type: SEGMENT_ANYTHING_MODEL_TYPES = InputField(default="vit_h", description="SAM Model")
+    model_type: SEGMENT_ANYTHING_MODEL_TYPES = InputField(default="vit_b", description="SAM Model")
     x_coordinate: int = InputField(default=0, ge=0, description="X-coordinate of your subject")
     y_coordinate: int = InputField(default=0, ge=0, description="Y-coordinate of your subject")
     background: bool = InputField(default=False, description="Object to mask is in the background")
