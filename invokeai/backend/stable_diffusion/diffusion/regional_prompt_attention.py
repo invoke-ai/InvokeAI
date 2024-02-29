@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-from dataclasses import dataclass
 from typing import Optional
 
 import torch
@@ -8,11 +7,9 @@ from diffusers import UNet2DConditionModel
 from diffusers.models.attention_processor import Attention, AttnProcessor2_0
 from diffusers.utils import USE_PEFT_BACKEND
 
-
-@dataclass
-class Range:
-    start: int
-    end: int
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    TextConditioningRegions,
+)
 
 
 class RegionalPromptData:
@@ -20,10 +17,9 @@ class RegionalPromptData:
         self._attn_masks_by_seq_len = attn_masks_by_seq_len
 
     @classmethod
-    def from_masks_and_ranges(
+    def from_regions(
         cls,
-        masks: list[torch.Tensor],
-        embedding_ranges: list[list[Range]],
+        regions: list[TextConditioningRegions],
         key_seq_len: int,
         # TODO(ryand): Pass in a list of downscale factors?
         max_downscale_factor: int = 8,
@@ -31,14 +27,8 @@ class RegionalPromptData:
         """Construct a `RegionalPromptData` object.
 
         Args:
-            masks (list[torch.Tensor]): masks[i] contains the regions masks for the i'th sample in the batch.
-                The shape of masks[i] is (num_prompts, height, width). The mask is set to 1.0 in regions where the
-                prompt should be applied, and 0.0 elsewhere.
-
-            embedding_ranges (list[list[Range]]): embedding_ranges[i][j] contains the embedding range for the j'th
-                prompt in the i'th batch sample. masks[i][j, ...] is applied to the embeddings in:
-                encoder_hidden_states[i, embedding_ranges[j].start:embedding_ranges[j].end, :].
-
+            regions (list[TextConditioningRegions]): regions[i] contains the prompt regions for the i'th sample in the
+                batch.
             key_seq_len (int): The sequence length of the expected prompt embeddings (which act as the key in the
                 cross-attention layers). This is most likely equal to the max embedding range end, but we pass it
                 explicitly to be sure.
@@ -48,11 +38,11 @@ class RegionalPromptData:
         # batch_attn_mask_by_seq_len[b][s] contains the attention mask for the b'th batch sample with a query sequence
         # length of s.
         batch_attn_masks_by_seq_len: list[dict[int, torch.Tensor]] = []
-        for batch_masks, batch_ranges in zip(masks, embedding_ranges, strict=True):
+        for batch_sample_regions in regions:
             batch_attn_masks_by_seq_len.append({})
 
             # Convert the bool masks to float masks so that max pooling can be applied.
-            batch_masks = batch_masks.to(dtype=torch.float32)
+            batch_masks = batch_sample_regions.masks.to(dtype=torch.float32)
 
             # Downsample the spatial dimensions by factors of 2 until max_downscale_factor is reached.
             downscale_factor = 1
@@ -69,7 +59,7 @@ class RegionalPromptData:
                 # TODO(ryand): What device / dtype should this be?
                 attn_mask = torch.zeros((1, query_seq_len, key_seq_len))
 
-                for prompt_idx, embedding_range in enumerate(batch_ranges):
+                for prompt_idx, embedding_range in enumerate(batch_sample_regions.ranges):
                     attn_mask[0, :, embedding_range.start : embedding_range.end] = batch_query_masks[
                         :, prompt_idx, :, :
                     ]

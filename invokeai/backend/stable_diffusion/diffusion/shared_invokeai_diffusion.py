@@ -5,19 +5,18 @@ from contextlib import contextmanager
 from typing import Any, Callable, Optional, Union
 
 import torch
-import torchvision
 from diffusers import UNet2DConditionModel
 from typing_extensions import TypeAlias
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
-    BasicConditioningInfo,
     ExtraConditioningInfo,
     IPAdapterConditioningInfo,
-    SDXLConditioningInfo,
+    Range,
     TextConditioningData,
+    TextConditioningRegions,
 )
-from invokeai.backend.stable_diffusion.diffusion.regional_prompt_attention import Range, RegionalPromptData
+from invokeai.backend.stable_diffusion.diffusion.regional_prompt_attention import RegionalPromptData
 
 from .cross_attention_control import (
     CrossAttentionType,
@@ -34,143 +33,6 @@ ModelForwardCallback: TypeAlias = Union[
     ],
     Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor],
 ]
-
-
-class RegionalTextConditioningInfo:
-    def __init__(
-        self,
-        text_conditioning: Union[BasicConditioningInfo, SDXLConditioningInfo],
-        masks: Optional[torch.Tensor] = None,
-        embedding_ranges: Optional[list[Range]] = None,
-    ):
-        """Initialize a RegionalTextConditioningInfo.
-
-        Args:
-            text_conditioning (Union[BasicConditioningInfo, SDXLConditioningInfo]): The text conditioning embeddings
-                after concatenating the embeddings for all regions.
-            masks (Optional[torch.Tensor], optional): Shape: (1, num_regions, h, w).
-            embedding_ranges (Optional[list[Range]], optional): The embedding range for each region.
-        """
-        self.text_conditioning = text_conditioning
-        self.masks = masks
-        self.embedding_ranges = embedding_ranges
-
-        assert (self.masks is None) == (self.embedding_ranges is None)
-        if self.masks is not None:
-            assert self.masks.shape[1] == len(self.embedding_ranges)
-
-    def has_region_masks(self):
-        if self.masks is None:
-            return False
-        return any(mask is not None for mask in self.masks)
-
-    def is_sdxl(self):
-        return isinstance(self.text_conditioning, SDXLConditioningInfo)
-
-    @classmethod
-    def _preprocess_regional_prompt_mask(
-        cls, mask: Optional[torch.Tensor], target_height: int, target_width: int
-    ) -> torch.Tensor:
-        """Preprocess a regional prompt mask to match the target height and width.
-
-        If mask is None, returns a mask of all ones with the target height and width.
-        If mask is not None, resizes the mask to the target height and width using nearest neighbor interpolation.
-
-        Returns:
-            torch.Tensor: The processed mask. dtype: torch.bool, shape: (1, 1, target_height, target_width).
-        """
-        if mask is None:
-            return torch.ones((1, 1, target_height, target_width), dtype=torch.bool)
-
-        tf = torchvision.transforms.Resize(
-            (target_height, target_width), interpolation=torchvision.transforms.InterpolationMode.NEAREST
-        )
-        mask = mask.unsqueeze(0)  # Shape: (1, h, w) -> (1, 1, h, w)
-        mask = tf(mask)
-
-        return mask
-
-    @classmethod
-    def from_text_conditioning_and_masks(
-        cls,
-        text_conditionings: list[Union[BasicConditioningInfo, SDXLConditioningInfo]],
-        masks: Optional[list[Optional[torch.Tensor]]],
-        latent_height: int,
-        latent_width: int,
-    ):
-        if masks is None:
-            masks = [None] * len(text_conditionings)
-        assert len(text_conditionings) == len(masks)
-
-        is_sdxl = type(text_conditionings[0]) is SDXLConditioningInfo
-
-        all_masks_are_none = all(mask is None for mask in masks)
-
-        text_embedding = []
-        pooled_embedding = None
-        add_time_ids = None
-        processed_masks = []
-        cur_text_embedding_len = 0
-        embedding_ranges: list[Range] = []
-
-        for text_embedding_info, mask in zip(text_conditionings, masks, strict=True):
-            # HACK(ryand): Figure out the intended relationship between CAC and other conditioning features.
-            assert (
-                text_embedding_info.extra_conditioning is None
-                or not text_embedding_info.extra_conditioning.wants_cross_attention_control
-            )
-
-            if is_sdxl:
-                # HACK(ryand): We just use the the first SDXLConditioningInfo's pooled_embeds and add_time_ids. This is
-                # fundamentally an interface issue, as the SDXL Compel nodes are not designed to be used in the way that
-                # we use them for regional prompting. Ideally, the DenoiseLatents invocation should accept a single
-                # pooled_embeds tensor and a list of standard text embeds with region masks. This change would be a
-                # pretty major breaking change to a popular node, so for now we use this hack.
-                #
-                # An improvement could be to use the pooled embeds from the prompt with the largest region, as this is
-                # most likely to be a global prompt.
-                if pooled_embedding is None:
-                    pooled_embedding = text_embedding_info.pooled_embeds
-                if add_time_ids is None:
-                    add_time_ids = text_embedding_info.add_time_ids
-
-            text_embedding.append(text_embedding_info.embeds)
-            embedding_ranges.append(
-                Range(start=cur_text_embedding_len, end=cur_text_embedding_len + text_embedding_info.embeds.shape[1])
-            )
-            cur_text_embedding_len += text_embedding_info.embeds.shape[1]
-
-            if not all_masks_are_none:
-                processed_masks.append(cls._preprocess_regional_prompt_mask(mask, latent_height, latent_width))
-
-        text_embedding = torch.cat(text_embedding, dim=1)
-        assert len(text_embedding.shape) == 3  # batch_size, seq_len, token_len
-
-        if not all_masks_are_none:
-            processed_masks = torch.cat(processed_masks, dim=1)
-        else:
-            processed_masks = None
-            embedding_ranges = None
-
-        if is_sdxl:
-            return cls(
-                text_conditioning=SDXLConditioningInfo(
-                    embeds=text_embedding,
-                    extra_conditioning=None,
-                    pooled_embeds=pooled_embedding,
-                    add_time_ids=add_time_ids,
-                ),
-                masks=processed_masks,
-                embedding_ranges=embedding_ranges,
-            )
-        return cls(
-            text_conditioning=BasicConditioningInfo(
-                embeds=text_embedding,
-                extra_conditioning=None,
-            ),
-            masks=processed_masks,
-            embedding_ranges=embedding_ranges,
-        )
 
 
 class InvokeAIDiffuserComponent:
@@ -233,10 +95,6 @@ class InvokeAIDiffuserComponent:
         conditioning_data: TextConditioningData,
     ):
         down_block_res_samples, mid_block_res_sample = None, None
-        # HACK(ryan): Currently, we just take the first text embedding if there's more than one. We should probably
-        # concatenate all of the embeddings for the ControlNet, but not apply embedding masks.
-        uncond_text_embeddings = conditioning_data.uncond_text_embeddings[0]
-        cond_text_embeddings = conditioning_data.cond_text_embeddings[0]
 
         # control_data should be type List[ControlNetData]
         # this loop covers both ControlNet (one ControlNetData in list)
@@ -267,25 +125,30 @@ class InvokeAIDiffuserComponent:
                 added_cond_kwargs = None
 
                 if cfg_injection:  # only applying ControlNet to conditional instead of in unconditioned
-                    if type(cond_text_embeddings) is SDXLConditioningInfo:
+                    if conditioning_data.is_sdxl():
                         added_cond_kwargs = {
-                            "text_embeds": cond_text_embeddings.pooled_embeds,
-                            "time_ids": cond_text_embeddings.add_time_ids,
+                            "text_embeds": conditioning_data.cond_text.pooled_embeds,
+                            "time_ids": conditioning_data.cond_text.add_time_ids,
                         }
-                    encoder_hidden_states = cond_text_embeddings.embeds
+                    encoder_hidden_states = conditioning_data.cond_text.embeds
                     encoder_attention_mask = None
                 else:
-                    if type(cond_text_embeddings) is SDXLConditioningInfo:
+                    if conditioning_data.is_sdxl():
                         added_cond_kwargs = {
                             "text_embeds": torch.cat(
-                                [uncond_text_embeddings.pooled_embeds, cond_text_embeddings.pooled_embeds], dim=0
+                                [
+                                    conditioning_data.uncond_text.pooled_embeds,
+                                    conditioning_data.cond_text.pooled_embeds,
+                                ],
+                                dim=0,
                             ),
                             "time_ids": torch.cat(
-                                [uncond_text_embeddings.add_time_ids, cond_text_embeddings.add_time_ids], dim=0
+                                [conditioning_data.uncond_text.add_time_ids, conditioning_data.cond_text.add_time_ids],
+                                dim=0,
                             ),
                         }
                     (encoder_hidden_states, encoder_attention_mask) = self._concat_conditionings_for_batch(
-                        uncond_text_embeddings.embeds, cond_text_embeddings.embeds
+                        conditioning_data.uncond_text.embeds, conditioning_data.cond_text.embeds
                     )
                 if isinstance(control_datum.weight, list):
                     # if controlnet has multiple weights, use the weight for the current step
@@ -440,52 +303,7 @@ class InvokeAIDiffuserComponent:
         x_twice = torch.cat([x] * 2)
         sigma_twice = torch.cat([sigma] * 2)
 
-        # TODO(ryand): We currently call from_text_conditioning_and_masks(...) and from_masks_and_ranges(...) for every
-        # denoising step. The text conditionings and masks are not changing from step-to-step, so this really only needs
-        # to be done once. While this seems painfully inefficient, the time spent is typically negligible compared to
-        # the forward inference pass of the UNet. The main reason that this hasn't been moved up to eliminate redundancy
-        # is that it is slightly awkward to handle both standard conditioning and sequential conditioning further up the
-        # stack.
         cross_attention_kwargs = None
-        _, _, h, w = x.shape
-        cond_text = RegionalTextConditioningInfo.from_text_conditioning_and_masks(
-            text_conditionings=conditioning_data.cond_text_embeddings,
-            masks=conditioning_data.cond_text_embedding_masks,
-            latent_height=h,
-            latent_width=w,
-        )
-        uncond_text = RegionalTextConditioningInfo.from_text_conditioning_and_masks(
-            text_conditionings=conditioning_data.uncond_text_embeddings,
-            masks=conditioning_data.uncond_text_embedding_masks,
-            latent_height=h,
-            latent_width=w,
-        )
-
-        if cond_text.has_region_masks() or uncond_text.has_region_masks():
-            masks = []
-            embedding_ranges = []
-            for c in [uncond_text, cond_text]:
-                if c.has_region_masks():
-                    masks.append(c.masks)
-                    embedding_ranges.append(c.embedding_ranges)
-                else:
-                    # Create a dummy mask and range for text conditioning that doesn't have region masks.
-                    masks.append(torch.ones((1, 1, h, w), dtype=torch.bool))
-                    embedding_ranges.append([Range(start=0, end=c.text_conditioning.embeds.shape[1])])
-
-            # The key_seq_len will be the maximum sequence length of all the conditioning embeddings. All other
-            # embeddings will be padded to match this length.
-            key_seq_len = 0
-            for c in [uncond_text, cond_text]:
-                _, seq_len, _ = c.text_conditioning.embeds.shape
-                if seq_len > key_seq_len:
-                    key_seq_len = seq_len
-
-            cross_attention_kwargs = {
-                "regional_prompt_data": RegionalPromptData.from_masks_and_ranges(
-                    masks=masks, embedding_ranges=embedding_ranges, key_seq_len=key_seq_len
-                )
-            }
 
         # TODO(ryand): Figure out interactions between regional prompting and IP-Adapter conditioning.
         if ip_adapter_conditioning is not None:
@@ -499,20 +317,45 @@ class InvokeAIDiffuserComponent:
                 ]
             }
 
+        uncond_text = conditioning_data.uncond_text
+        cond_text = conditioning_data.cond_text
+
         added_cond_kwargs = None
-        if cond_text.is_sdxl():
+        if conditioning_data.is_sdxl():
             added_cond_kwargs = {
-                "text_embeds": torch.cat(
-                    [uncond_text.text_conditioning.pooled_embeds, cond_text.text_conditioning.pooled_embeds], dim=0
-                ),
-                "time_ids": torch.cat(
-                    [uncond_text.text_conditioning.add_time_ids, cond_text.text_conditioning.add_time_ids], dim=0
-                ),
+                "text_embeds": torch.cat([uncond_text.pooled_embeds, cond_text.pooled_embeds], dim=0),
+                "time_ids": torch.cat([uncond_text.add_time_ids, cond_text.add_time_ids], dim=0),
             }
 
         both_conditionings, encoder_attention_mask = self._concat_conditionings_for_batch(
-            uncond_text.text_conditioning.embeds, cond_text.text_conditioning.embeds
+            uncond_text.embeds, cond_text.embeds
         )
+
+        if conditioning_data.cond_regions is not None or conditioning_data.uncond_regions is not None:
+            # TODO(ryand): We currently call from_regions(...) for every denoising step. The text conditionings and
+            # masks are not changing from step-to-step, so this really only needs to be done once. While this seems
+            # painfully inefficient, the time spent is typically negligible compared to the forward inference pass of
+            # the UNet. The main reason that this hasn't been moved up to eliminate redundancy is that it is slightly
+            # awkward to handle both standard conditioning and sequential conditioning further up the stack.
+            regions = []
+            for c, r in [
+                (conditioning_data.uncond_text, conditioning_data.uncond_regions),
+                (conditioning_data.cond_text, conditioning_data.cond_regions),
+            ]:
+                if r is None:
+                    # Create a dummy mask and range for text conditioning that doesn't have region masks.
+                    _, _, h, w = x.shape
+                    r = TextConditioningRegions(
+                        masks=torch.ones((1, 1, h, w), dtype=torch.bool),
+                        ranges=[Range(start=0, end=c.embeds.shape[1])],
+                    )
+                regions.append(r)
+
+            _, key_seq_len, _ = both_conditionings.shape
+            cross_attention_kwargs = {
+                "regional_prompt_data": RegionalPromptData.from_regions(regions=regions, key_seq_len=key_seq_len)
+            }
+
         both_results = self.model_forward_callback(
             x_twice,
             sigma_twice,
@@ -541,9 +384,6 @@ class InvokeAIDiffuserComponent:
         """Runs the conditioned and unconditioned UNet forward passes sequentially for lower memory usage at the cost of
         slower execution speed.
         """
-
-        assert len(conditioning_data.cond_text_embeddings) == 1
-        text_embeddings = conditioning_data.cond_text_embeddings[0]
 
         # Since we are running the conditioned and unconditioned passes sequentially, we need to split the ControlNet
         # and T2I-Adapter residuals into two chunks.
@@ -602,18 +442,17 @@ class InvokeAIDiffuserComponent:
 
         # Prepare SDXL conditioning kwargs for the unconditioned pass.
         added_cond_kwargs = None
-        is_sdxl = type(text_embeddings) is SDXLConditioningInfo
-        if is_sdxl:
+        if conditioning_data.is_sdxl():
             added_cond_kwargs = {
-                "text_embeds": conditioning_data.uncond_text_embeddings.pooled_embeds,
-                "time_ids": conditioning_data.uncond_text_embeddings.add_time_ids,
+                "text_embeds": conditioning_data.uncond_text.pooled_embeds,
+                "time_ids": conditioning_data.uncond_text.add_time_ids,
             }
 
         # Run unconditioned UNet denoising (i.e. negative prompt).
         unconditioned_next_x = self.model_forward_callback(
             x,
             sigma,
-            conditioning_data.uncond_text_embeddings.embeds,
+            conditioning_data.uncond_text.embeds,
             cross_attention_kwargs=cross_attention_kwargs,
             down_block_additional_residuals=uncond_down_block,
             mid_block_additional_residual=uncond_mid_block,
@@ -644,17 +483,17 @@ class InvokeAIDiffuserComponent:
 
         # Prepare SDXL conditioning kwargs for the conditioned pass.
         added_cond_kwargs = None
-        if is_sdxl:
+        if conditioning_data.is_sdxl():
             added_cond_kwargs = {
-                "text_embeds": text_embeddings.pooled_embeds,
-                "time_ids": text_embeddings.add_time_ids,
+                "text_embeds": conditioning_data.cond_text.pooled_embeds,
+                "time_ids": conditioning_data.cond_text.add_time_ids,
             }
 
         # Run conditioned UNet denoising (i.e. positive prompt).
         conditioned_next_x = self.model_forward_callback(
             x,
             sigma,
-            text_embeddings.embeds,
+            conditioning_data.cond_text.embeds,
             cross_attention_kwargs=cross_attention_kwargs,
             down_block_additional_residuals=cond_down_block,
             mid_block_additional_residual=cond_mid_block,

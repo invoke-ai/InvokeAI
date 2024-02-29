@@ -1,5 +1,4 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
-
 import inspect
 import math
 from contextlib import ExitStack
@@ -9,6 +8,7 @@ from typing import List, Literal, Optional, Union
 import einops
 import numpy as np
 import torch
+import torchvision
 import torchvision.transforms as T
 from diffusers import AutoencoderKL, AutoencoderTiny
 from diffusers.image_processor import VaeImageProcessor
@@ -44,8 +44,10 @@ from invokeai.backend.model_management.models import ModelType, SilenceWarnings
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     IPAdapterConditioningInfo,
+    Range,
     SDXLConditioningInfo,
     TextConditioningData,
+    TextConditioningRegions,
 )
 
 from ...backend.model_management.lora import ModelPatcher
@@ -334,7 +336,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
         context: InvocationContext,
         device: torch.device,
         dtype: torch.dtype,
-    ):
+    ) -> tuple[Union[list[BasicConditioningInfo], list[SDXLConditioningInfo]], list[Optional[torch.Tensor]]]:
+        """Get the text embeddings and masks from the input conditioning fields."""
         # Normalize cond_field to a list.
         cond_list = cond_field
         if not isinstance(cond_list, list):
@@ -353,12 +356,111 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         return text_embeddings, text_embeddings_masks
 
+    def _preprocess_regional_prompt_mask(
+        self, mask: Optional[torch.Tensor], target_height: int, target_width: int
+    ) -> torch.Tensor:
+        """Preprocess a regional prompt mask to match the target height and width.
+
+        If mask is None, returns a mask of all ones with the target height and width.
+        If mask is not None, resizes the mask to the target height and width using nearest neighbor interpolation.
+
+        Returns:
+            torch.Tensor: The processed mask. dtype: torch.bool, shape: (1, 1, target_height, target_width).
+        """
+        if mask is None:
+            return torch.ones((1, 1, target_height, target_width), dtype=torch.bool)
+
+        tf = torchvision.transforms.Resize(
+            (target_height, target_width), interpolation=torchvision.transforms.InterpolationMode.NEAREST
+        )
+        mask = mask.unsqueeze(0)  # Shape: (1, h, w) -> (1, 1, h, w)
+        mask = tf(mask)
+
+        return mask
+
+    def concat_regional_text_embeddings(
+        self,
+        text_conditionings: Union[list[BasicConditioningInfo], list[SDXLConditioningInfo]],
+        masks: Optional[list[Optional[torch.Tensor]]],
+        latent_height: int,
+        latent_width: int,
+    ) -> tuple[Union[BasicConditioningInfo, SDXLConditioningInfo], Optional[TextConditioningRegions]]:
+        """Concatenate regional text embeddings into a single embedding and track the region masks accordingly."""
+        if masks is None:
+            masks = [None] * len(text_conditionings)
+        assert len(text_conditionings) == len(masks)
+
+        is_sdxl = type(text_conditionings[0]) is SDXLConditioningInfo
+
+        all_masks_are_none = all(mask is None for mask in masks)
+
+        text_embedding = []
+        pooled_embedding = None
+        add_time_ids = None
+        cur_text_embedding_len = 0
+        processed_masks = []
+        embedding_ranges = []
+
+        for text_embedding_info, mask in zip(text_conditionings, masks, strict=True):
+            # HACK(ryand): Figure out the intended relationship with CAC. Probably want to raise if more than one text
+            # embedding is passed in and CAC is being used.
+            assert (
+                text_embedding_info.extra_conditioning is None
+                or not text_embedding_info.extra_conditioning.wants_cross_attention_control
+            )
+
+            if is_sdxl:
+                # HACK(ryand): We just use the the first SDXLConditioningInfo's pooled_embeds and add_time_ids. This is
+                # fundamentally an interface issue, as the SDXL Compel nodes are not designed to be used in the way that
+                # we use them for regional prompting. Ideally, the DenoiseLatents invocation should accept a single
+                # pooled_embeds tensor and a list of standard text embeds with region masks. This change would be a
+                # pretty major breaking change to a popular node, so for now we use this hack.
+                #
+                # An improvement could be to use the pooled embeds from the prompt with the largest region, as this is
+                # most likely to be a global prompt.
+                if pooled_embedding is None:
+                    pooled_embedding = text_embedding_info.pooled_embeds
+                if add_time_ids is None:
+                    add_time_ids = text_embedding_info.add_time_ids
+
+            text_embedding.append(text_embedding_info.embeds)
+            if not all_masks_are_none:
+                embedding_ranges.append(
+                    Range(
+                        start=cur_text_embedding_len, end=cur_text_embedding_len + text_embedding_info.embeds.shape[1]
+                    )
+                )
+                processed_masks.append(self._preprocess_regional_prompt_mask(mask, latent_height, latent_width))
+
+            cur_text_embedding_len += text_embedding_info.embeds.shape[1]
+
+        text_embedding = torch.cat(text_embedding, dim=1)
+        assert len(text_embedding.shape) == 3  # batch_size, seq_len, token_len
+
+        regions = None
+        if not all_masks_are_none:
+            regions = TextConditioningRegions(masks=torch.cat(processed_masks, dim=1), ranges=embedding_ranges)
+
+        if is_sdxl:
+            return SDXLConditioningInfo(
+                embeds=text_embedding,
+                # TODO(ryand): This should not be hard-coded to None.
+                extra_conditioning=None,
+                pooled_embeds=pooled_embedding,
+                add_time_ids=add_time_ids,
+            ), regions
+        return BasicConditioningInfo(
+            embeds=text_embedding,
+            # TODO(ryand): This should not be hard-coded to None.
+            extra_conditioning=None,
+        ), regions
+
     def get_conditioning_data(
         self,
         context: InvocationContext,
-        scheduler,
         unet,
-        seed,
+        latent_height: int,
+        latent_width: int,
     ) -> TextConditioningData:
         cond_text_embeddings, cond_text_embedding_masks = self._get_text_embeddings_and_masks(
             self.positive_conditioning, context, unet.device, unet.dtype
@@ -366,12 +468,23 @@ class DenoiseLatentsInvocation(BaseInvocation):
         uncond_text_embeddings, uncond_text_embedding_masks = self._get_text_embeddings_and_masks(
             self.negative_conditioning, context, unet.device, unet.dtype
         )
-
+        cond_text_embedding, cond_regions = self.concat_regional_text_embeddings(
+            text_conditionings=cond_text_embeddings,
+            masks=cond_text_embedding_masks,
+            latent_height=latent_height,
+            latent_width=latent_width,
+        )
+        uncond_text_embedding, uncond_regions = self.concat_regional_text_embeddings(
+            text_conditionings=uncond_text_embeddings,
+            masks=uncond_text_embedding_masks,
+            latent_height=latent_height,
+            latent_width=latent_width,
+        )
         conditioning_data = TextConditioningData(
-            uncond_text_embeddings=uncond_text_embeddings,
-            uncond_text_embedding_masks=uncond_text_embedding_masks,
-            cond_text_embeddings=cond_text_embeddings,
-            cond_text_embedding_masks=cond_text_embedding_masks,
+            uncond_text=uncond_text_embedding,
+            cond_text=cond_text_embedding,
+            uncond_regions=uncond_regions,
+            cond_regions=cond_regions,
             guidance_scale=self.cfg_scale,
             guidance_rescale_multiplier=self.cfg_rescale_multiplier,
         )
@@ -761,7 +874,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 )
 
                 pipeline = self.create_pipeline(unet, scheduler)
-                conditioning_data = self.get_conditioning_data(context, scheduler, unet, seed)
+                _, _, latent_height, latent_width = latents.shape
+                conditioning_data = self.get_conditioning_data(
+                    context=context, unet=unet, latent_height=latent_height, latent_width=latent_width
+                )
 
                 controlnet_data = self.prep_control_data(
                     context=context,
