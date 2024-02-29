@@ -284,7 +284,7 @@ class ModelInstallService(ModelInstallServiceBase):
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
         self._cached_model_paths = {Path(x.path) for x in self.record_store.all_models()}
         callback = self._scan_install if install else self._scan_register
-        search = ModelSearch(on_model_found=callback)
+        search = ModelSearch(on_model_found=callback, config=self._app_config)
         self._models_installed.clear()
         search.search(scan_dir)
         return list(self._models_installed)

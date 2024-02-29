@@ -195,7 +195,7 @@ def test_delete_register(
     with pytest.raises(UnknownModelException):
         store.get_model(key)
 
-
+@pytest.mark.timeout(timeout=20, method="thread")
 def test_simple_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig) -> None:
     source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
 
@@ -220,7 +220,7 @@ def test_simple_download(mm2_installer: ModelInstallServiceBase, mm2_app_config:
     event_names = [x.event_name for x in bus.events]
     assert event_names == ["model_install_downloading", "model_install_running", "model_install_completed"]
 
-
+@pytest.mark.timeout(timeout=20, method="thread")
 def test_huggingface_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig) -> None:
     source = URLModelSource(url=Url("https://huggingface.co/stabilityai/sdxl-turbo"))
 
