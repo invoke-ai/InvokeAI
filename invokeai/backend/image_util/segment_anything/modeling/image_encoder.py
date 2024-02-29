@@ -3,7 +3,7 @@
 
 # This source code is licensed under the license provided at https://github.com/facebookresearch/segment-anything
 
-from typing import Optional, Tuple, Type
+from typing import List, Optional, Tuple, Type
 
 import torch
 import torch.nn as nn
@@ -100,17 +100,20 @@ class ImageEncoderViT(nn.Module):
             LayerNorm2d(out_chans),
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, List[torch.Tensor]]:
         x = self.patch_embed(x)
         if self.pos_embed is not None:
             x = x + self.pos_embed
 
+        interm_embeddings = []
         for blk in self.blocks:
             x = blk(x)
+            if blk.window_size == 0:
+                interm_embeddings.append(x)
 
         x = self.neck(x.permute(0, 3, 1, 2))
 
-        return x
+        return x, interm_embeddings
 
 
 class Block(nn.Module):

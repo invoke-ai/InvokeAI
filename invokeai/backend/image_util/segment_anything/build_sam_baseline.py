@@ -3,23 +3,19 @@
 
 # This source code is licensed under the license provided at https://github.com/facebookresearch/segment-anything
 
-import pathlib
 from functools import partial
-from typing import Optional
 
 import torch
 
 from invokeai.backend.image_util.segment_anything.modeling.image_encoder import ImageEncoderViT
 from invokeai.backend.image_util.segment_anything.modeling.mask_decoder import MaskDecoder
-from invokeai.backend.image_util.segment_anything.modeling.mask_decoder_hq import MaskDecoderHQ
 from invokeai.backend.image_util.segment_anything.modeling.prompt_encoder import PromptEncoder
 from invokeai.backend.image_util.segment_anything.modeling.sam import Sam
 from invokeai.backend.image_util.segment_anything.modeling.tiny_vit_sam import TinyViT
 from invokeai.backend.image_util.segment_anything.modeling.transformer import TwoWayTransformer
-from invokeai.backend.util.devices import choose_torch_device
 
 
-def build_sam_vit_h(checkpoint: Optional[pathlib.Path] = None):
+def build_sam_vit_h(checkpoint=None):
     return _build_sam(
         encoder_embed_dim=1280,
         encoder_depth=32,
@@ -32,7 +28,7 @@ def build_sam_vit_h(checkpoint: Optional[pathlib.Path] = None):
 build_sam = build_sam_vit_h
 
 
-def build_sam_vit_l(checkpoint: Optional[pathlib.Path] = None):
+def build_sam_vit_l(checkpoint=None):
     return _build_sam(
         encoder_embed_dim=1024,
         encoder_depth=24,
@@ -42,7 +38,7 @@ def build_sam_vit_l(checkpoint: Optional[pathlib.Path] = None):
     )
 
 
-def build_sam_vit_b(checkpoint: Optional[pathlib.Path] = None):
+def build_sam_vit_b(checkpoint=None):
     return _build_sam(
         encoder_embed_dim=768,
         encoder_depth=12,
@@ -52,7 +48,7 @@ def build_sam_vit_b(checkpoint: Optional[pathlib.Path] = None):
     )
 
 
-def build_sam_vit_t(checkpoint: Optional[pathlib.Path] = None):
+def build_sam_vit_t(checkpoint=None):
     prompt_embed_dim = 256
     image_size = 1024
     vit_patch_size = 16
@@ -80,7 +76,7 @@ def build_sam_vit_t(checkpoint: Optional[pathlib.Path] = None):
             input_image_size=(image_size, image_size),
             mask_in_chans=16,
         ),
-        mask_decoder=MaskDecoderHQ(
+        mask_decoder=MaskDecoder(
             num_multimask_outputs=3,
             transformer=TwoWayTransformer(
                 depth=2,
@@ -91,34 +87,20 @@ def build_sam_vit_t(checkpoint: Optional[pathlib.Path] = None):
             transformer_dim=prompt_embed_dim,
             iou_head_depth=3,
             iou_head_hidden_dim=256,
-            vit_dim=160,
         ),
         pixel_mean=[123.675, 116.28, 103.53],
         pixel_std=[58.395, 57.12, 57.375],
     )
 
     mobile_sam.eval()
-
     if checkpoint is not None:
         with open(checkpoint, "rb") as f:
-            device = choose_torch_device()
-            state_dict = torch.load(f, map_location=device)
-        info = mobile_sam.load_state_dict(state_dict, strict=False)
-        print(info)
-
-    for n, p in mobile_sam.named_parameters():
-        if (
-            "hf_token" not in n
-            and "hf_mlp" not in n
-            and "compress_vit_feat" not in n
-            and "embedding_encoder" not in n
-            and "embedding_maskfeature" not in n
-        ):
-            p.requires_grad = False
+            state_dict = torch.load(f)
+        mobile_sam.load_state_dict(state_dict)
     return mobile_sam
 
 
-sam_model_registry = {
+sam_model_registry_baseline = {
     "default": build_sam_vit_h,
     "vit_h": build_sam_vit_h,
     "vit_l": build_sam_vit_l,
@@ -132,44 +114,12 @@ def _build_sam(
     encoder_depth,
     encoder_num_heads,
     encoder_global_attn_indexes,
-    checkpoint: Optional[pathlib.Path] = None,
+    checkpoint=None,
 ):
     prompt_embed_dim = 256
     image_size = 1024
     vit_patch_size = 16
     image_embedding_size = image_size // vit_patch_size
-
-    if not checkpoint:
-        raise Exception("Path to Segment Anything model not provided")
-
-    if "hq" in checkpoint.as_posix():
-        mask_decoder = MaskDecoderHQ(
-            num_multimask_outputs=3,
-            transformer=TwoWayTransformer(
-                depth=2,
-                embedding_dim=prompt_embed_dim,
-                mlp_dim=2048,
-                num_heads=8,
-            ),
-            transformer_dim=prompt_embed_dim,
-            iou_head_depth=3,
-            iou_head_hidden_dim=256,
-            vit_dim=encoder_embed_dim,
-        )
-    else:
-        mask_decoder = MaskDecoder(
-            num_multimask_outputs=3,
-            transformer=TwoWayTransformer(
-                depth=2,
-                embedding_dim=prompt_embed_dim,
-                mlp_dim=2048,
-                num_heads=8,
-            ),
-            transformer_dim=prompt_embed_dim,
-            iou_head_depth=3,
-            iou_head_hidden_dim=256,
-        )
-
     sam = Sam(
         image_encoder=ImageEncoderViT(
             depth=encoder_depth,
@@ -191,25 +141,24 @@ def _build_sam(
             input_image_size=(image_size, image_size),
             mask_in_chans=16,
         ),
-        mask_decoder=mask_decoder,
+        mask_decoder=MaskDecoder(
+            num_multimask_outputs=3,
+            transformer=TwoWayTransformer(
+                depth=2,
+                embedding_dim=prompt_embed_dim,
+                mlp_dim=2048,
+                num_heads=8,
+            ),
+            transformer_dim=prompt_embed_dim,
+            iou_head_depth=3,
+            iou_head_hidden_dim=256,
+        ),
         pixel_mean=[123.675, 116.28, 103.53],
         pixel_std=[58.395, 57.12, 57.375],
     )
     sam.eval()
-
-    with open(checkpoint, "rb") as f:
-        device = choose_torch_device()
-        state_dict = torch.load(f, map_location=device)
-    info = sam.load_state_dict(state_dict, strict=False)
-    print(info)
-    for n, p in sam.named_parameters():
-        if (
-            "hf_token" not in n
-            and "hf_mlp" not in n
-            and "compress_vit_feat" not in n
-            and "embedding_encoder" not in n
-            and "embedding_maskfeature" not in n
-        ):
-            p.requires_grad = False
-
+    if checkpoint is not None:
+        with open(checkpoint, "rb") as f:
+            state_dict = torch.load(f)
+        sam.load_state_dict(state_dict)
     return sam

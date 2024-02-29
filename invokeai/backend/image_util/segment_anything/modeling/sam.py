@@ -3,7 +3,7 @@
 
 # This source code is licensed under the license provided at https://github.com/facebookresearch/segment-anything
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 
 import torch
 from torch import nn
@@ -11,7 +11,9 @@ from torch.nn import functional as F
 
 from invokeai.backend.image_util.segment_anything.modeling.image_encoder import ImageEncoderViT
 from invokeai.backend.image_util.segment_anything.modeling.mask_decoder import MaskDecoder
+from invokeai.backend.image_util.segment_anything.modeling.mask_decoder_hq import MaskDecoderHQ
 from invokeai.backend.image_util.segment_anything.modeling.prompt_encoder import PromptEncoder
+from invokeai.backend.image_util.segment_anything.modeling.tiny_vit_sam import TinyViT
 
 
 class Sam(nn.Module):
@@ -20,11 +22,12 @@ class Sam(nn.Module):
 
     def __init__(
         self,
-        image_encoder: ImageEncoderViT,
+        image_encoder: Union[ImageEncoderViT, TinyViT],
         prompt_encoder: PromptEncoder,
-        mask_decoder: MaskDecoder,
+        mask_decoder: Union[MaskDecoder, MaskDecoderHQ],
         pixel_mean: List[float] = [123.675, 116.28, 103.53],
         pixel_std: List[float] = [58.395, 57.12, 57.375],
+        hq: bool = False,
     ) -> None:
         """
         SAM predicts object masks from an image and input prompts.
@@ -54,6 +57,7 @@ class Sam(nn.Module):
         self,
         batched_input: List[Dict[str, Any]],
         multimask_output: bool,
+        hq_token_only: bool = False,
     ) -> List[Dict[str, torch.Tensor]]:
         """
         Predicts masks end-to-end from provided images and prompts.
@@ -94,10 +98,11 @@ class Sam(nn.Module):
                 to subsequent iterations of prediction.
         """
         input_images = torch.stack([self.preprocess(x["image"]) for x in batched_input], dim=0)
-        image_embeddings = self.image_encoder(input_images)
+        image_embeddings, interm_embeddings = self.image_encoder(input_images)
+        interm_embeddings = interm_embeddings[0]  # early layer
 
         outputs = []
-        for image_record, curr_embedding in zip(batched_input, image_embeddings):
+        for image_record, curr_embedding, curr_interm in zip(batched_input, image_embeddings, interm_embeddings):
             if "point_coords" in image_record:
                 points = (image_record["point_coords"], image_record["point_labels"])
             else:
@@ -113,6 +118,8 @@ class Sam(nn.Module):
                 sparse_prompt_embeddings=sparse_embeddings,
                 dense_prompt_embeddings=dense_embeddings,
                 multimask_output=multimask_output,
+                hq_token_only=hq_token_only,
+                interm_embeddings=curr_interm.unsqueeze(0).unsqueeze(0),
             )
             masks = self.postprocess_masks(
                 low_res_masks,

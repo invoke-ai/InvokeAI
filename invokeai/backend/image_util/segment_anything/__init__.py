@@ -11,4 +11,5 @@ from invokeai.backend.image_util.segment_anything.build_sam import (  # noqa F40
     build_sam_vit_l,
     sam_model_registry,
 )
+from invokeai.backend.image_util.segment_anything.build_sam_baseline import sam_model_registry_baseline
 from invokeai.backend.image_util.segment_anything.predictor import SamPredictor  # noqa F401

@@ -579,7 +579,7 @@ class DWOpenposeImageProcessorInvocation(ImageProcessorInvocation):
         return processed_image
 
 
-SEGMENT_ANYTHING_MODEL_TYPES = Literal["vit_h", "vit_l", "vit_b"]
+SEGMENT_ANYTHING_MODEL_TYPES = Literal["small", "medium", "large", "small_hq", "medium_hq", "large_hq", "mobile"]
 
 
 @invocation(
@@ -592,7 +592,7 @@ SEGMENT_ANYTHING_MODEL_TYPES = Literal["vit_h", "vit_l", "vit_b"]
 class SegmentAnythingImageProcessorInvocation(ImageProcessorInvocation):
     """Generates a mask of the text provided using Facebook's Segment Anything"""
 
-    model_type: SEGMENT_ANYTHING_MODEL_TYPES = InputField(default="vit_b", description="SAM Model")
+    model_type: SEGMENT_ANYTHING_MODEL_TYPES = InputField(default="small", description="SAM Model")
     x_coordinate: int = InputField(default=0, ge=0, description="X-coordinate of your subject")
     y_coordinate: int = InputField(default=0, ge=0, description="Y-coordinate of your subject")
     background: bool = InputField(default=False, description="Object to mask is in the background")

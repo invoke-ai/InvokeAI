@@ -3,8 +3,6 @@
 
 # This source code is licensed under the license provided at https://github.com/facebookresearch/segment-anything
 
-from typing import Tuple
-
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -24,7 +22,8 @@ class SamOnnxModel(nn.Module):
     def __init__(
         self,
         model: Sam,
-        return_single_mask: bool,
+        hq_token_only: bool = False,
+        multimask_output: bool = False,
         use_stability_score: bool = False,
         return_extra_metrics: bool = False,
     ) -> None:
@@ -32,7 +31,8 @@ class SamOnnxModel(nn.Module):
         self.mask_decoder = model.mask_decoder
         self.model = model
         self.img_size = model.image_encoder.img_size
-        self.return_single_mask = return_single_mask
+        self.hq_token_only = hq_token_only
+        self.multimask_output = multimask_output
         self.use_stability_score = use_stability_score
         self.stability_score_offset = 1.0
         self.return_extra_metrics = return_extra_metrics
@@ -84,25 +84,11 @@ class SamOnnxModel(nn.Module):
         masks = F.interpolate(masks, size=(h, w), mode="bilinear", align_corners=False)
         return masks
 
-    def select_masks(
-        self, masks: torch.Tensor, iou_preds: torch.Tensor, num_points: int
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        # Determine if we should return the multiclick mask or not from the number of points.
-        # The reweighting is used to avoid control flow.
-        score_reweight = torch.tensor([[1000] + [0] * (self.model.mask_decoder.num_mask_tokens - 1)]).to(
-            iou_preds.device
-        )
-        score = iou_preds + (num_points - 2.5) * score_reweight
-        best_idx = torch.argmax(score, dim=1)
-        masks = masks[torch.arange(masks.shape[0]), best_idx, :, :].unsqueeze(1)
-        iou_preds = iou_preds[torch.arange(masks.shape[0]), best_idx].unsqueeze(1)
-
-        return masks, iou_preds
-
     @torch.no_grad()
     def forward(
         self,
         image_embeddings: torch.Tensor,
+        interm_embeddings: torch.Tensor,
         point_coords: torch.Tensor,
         point_labels: torch.Tensor,
         mask_input: torch.Tensor,
@@ -112,18 +98,44 @@ class SamOnnxModel(nn.Module):
         sparse_embedding = self._embed_points(point_coords, point_labels)
         dense_embedding = self._embed_masks(mask_input, has_mask_input)
 
+        vit_features = interm_embeddings[0].permute(
+            0, 3, 1, 2
+        )  # early-layer ViT feature, after 1st global attention block in ViT
+        hq_features = self.model.mask_decoder.embedding_encoder(
+            image_embeddings
+        ) + self.model.mask_decoder.compress_vit_feat(vit_features)
+
         masks, scores = self.model.mask_decoder.predict_masks(
             image_embeddings=image_embeddings,
             image_pe=self.model.prompt_encoder.get_dense_pe(),
             sparse_prompt_embeddings=sparse_embedding,
             dense_prompt_embeddings=dense_embedding,
+            hq_features=hq_features,
         )
 
         if self.use_stability_score:
             scores = calculate_stability_score(masks, self.model.mask_threshold, self.stability_score_offset)
 
-        if self.return_single_mask:
-            masks, scores = self.select_masks(masks, scores, point_coords.shape[1])
+        if self.multimask_output:
+            # mask with highest score
+            mask_slice = slice(1, self.model.mask_decoder.num_mask_tokens - 1)
+            scores = scores[:, mask_slice]
+            scores, max_iou_idx = torch.max(scores, dim=1)
+            scores = scores.unsqueeze(1)
+            masks_multi = masks[:, mask_slice, :, :]
+            masks_sam = masks_multi[torch.arange(masks_multi.size(0)), max_iou_idx].unsqueeze(1)
+        else:
+            # singale mask output, default
+            mask_slice = slice(0, 1)
+            scores = scores[:, mask_slice]
+            masks_sam = masks[:, mask_slice]
+
+        masks_hq = masks[:, slice(self.model.mask_decoder.num_mask_tokens - 1, self.model.mask_decoder.num_mask_tokens)]
+
+        if self.hq_token_only:
+            masks = masks_hq
+        else:
+            masks = masks_sam + masks_hq
 
         upscaled_masks = self.mask_postprocessing(masks, orig_im_size)
 
