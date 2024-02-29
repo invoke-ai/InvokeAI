@@ -118,7 +118,7 @@ class ModelSearch(ModelSearchBase):
     """
 
     models_found: Set[Path] = Field(default_factory=set)
-    config: InvokeAIAppConfig =  InvokeAIAppConfig.get_config()
+    config: InvokeAIAppConfig = InvokeAIAppConfig.get_config()
 
     def search_started(self) -> None:
         self.models_found = set()
@@ -147,9 +147,11 @@ class ModelSearch(ModelSearchBase):
 
     def _walk_directory(self, path: Union[Path, str], max_depth: int = 20) -> None:
         absolute_path = Path(path)
-        if len(absolute_path.parts) - len(self._directory.parts) > max_depth \
-                or not absolute_path.exists() \
-                    or absolute_path.parent in self.models_found:
+        if (
+            len(absolute_path.parts) - len(self._directory.parts) > max_depth
+            or not absolute_path.exists()
+            or absolute_path.parent in self.models_found
+        ):
             return
         entries = os.scandir(absolute_path.as_posix())
         entries = [entry for entry in entries if not entry.name.startswith(".")]
