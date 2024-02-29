@@ -596,9 +596,12 @@ class SegmentAnythingImageProcessorInvocation(ImageProcessorInvocation):
     x_coordinate: int = InputField(default=0, ge=0, description="X-coordinate of your subject")
     y_coordinate: int = InputField(default=0, ge=0, description="Y-coordinate of your subject")
     background: bool = InputField(default=False, description="Object to mask is in the background")
+    invert: bool = InputField(default=False, description="Invert the generated mask")
 
     def run_processor(self, image: Image.Image):
         sam_predictor = SAMImagePredictor()
         sam_predictor.load_model(self.model_type)
-        mask = sam_predictor(image, background=self.background, position=(self.x_coordinate, self.y_coordinate))
+        mask = sam_predictor(
+            image, background=self.background, position=(self.x_coordinate, self.y_coordinate), invert=self.invert
+        )
         return mask

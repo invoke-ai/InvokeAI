@@ -2,7 +2,7 @@ import pathlib
 from typing import Literal, Tuple
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.backend.image_util.segment_anything import SamPredictor, sam_model_registry
@@ -72,7 +72,9 @@ class SAMImagePredictor:
             )
             sam_predictor = sam_predictor = SamPredictor(sam_model)
 
-    def __call__(self, image: Image.Image, background: bool = False, position: Tuple[int, int] = (0, 0)) -> Image.Image:
+    def __call__(
+        self, image: Image.Image, background: bool = False, position: Tuple[int, int] = (0, 0), invert: bool = False
+    ) -> Image.Image:
         global sam_predictor
 
         input_image = np.array(image.convert("RGB")) if image.mode != "RGB" else np.array(image)
@@ -82,7 +84,9 @@ class SAMImagePredictor:
         if sam_predictor:
             sam_predictor.set_image(input_image)
             masks, _, _ = sam_predictor.predict(input_point, input_label)
-            mask = Image.fromarray(masks[0])
+            mask = Image.fromarray(masks[0]).convert("RGB")
+            if invert:
+                mask = ImageOps.invert(mask)
             return mask
         else:
             return Image.new("RGB", (image.width, image.height), color="black")
