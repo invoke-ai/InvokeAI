@@ -181,13 +181,14 @@ class ModelInstallService(ModelInstallServiceBase):
         source: str,
         config: Optional[Dict[str, Any]] = None,
         access_token: Optional[str] = None,
+        inplace: bool = False,
     ) -> ModelInstallJob:
         variants = "|".join(ModelRepoVariant.__members__.values())
         hf_repoid_re = f"^([^/:]+/[^/:]+)(?::({variants})?(?::/?([^:]+))?)?$"
         source_obj: Optional[StringLikeSource] = None
 
         if Path(source).exists():  # A local file or directory
-            source_obj = LocalModelSource(path=Path(source))
+            source_obj = LocalModelSource(path=Path(source), inplace=inplace)
         elif match := re.match(hf_repoid_re, source):
             source_obj = HFModelSource(
                 repo_id=match.group(1),
