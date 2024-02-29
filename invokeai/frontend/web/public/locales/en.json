@@ -854,6 +854,7 @@
         "upcastAttention": "Upcast Attention",
         "updateModel": "Update Model",
         "useCustomConfig": "Use Custom Config",
+        "useDefaultSettings": "Use Default Settings",
         "v1": "v1",
         "v2_768": "v2 (768px)",
         "v2_base": "v2 (512px)",

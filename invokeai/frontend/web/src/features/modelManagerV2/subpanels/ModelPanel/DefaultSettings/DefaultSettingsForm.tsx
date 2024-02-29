@@ -90,7 +90,7 @@ export const DefaultSettingsForm = ({
           }
         });
     },
-    [selectedModelKey, dispatch, editModelMetadata]
+    [selectedModelKey, dispatch, editModelMetadata, t]
   );
 
   return (
