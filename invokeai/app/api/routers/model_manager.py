@@ -267,11 +267,15 @@ async def update_model_metadata(
     try:
         original_metadata = record_store.get_metadata(key)
         if original_metadata:
-            original_metadata.trigger_phrases = changes.trigger_phrases
+            if changes.trigger_phrases:
+                original_metadata.trigger_phrases = changes.trigger_phrases
+
+            if changes.default_settings:
+                original_metadata.default_settings = changes.default_settings
 
             metadata_store.update_metadata(key, original_metadata)
         else:
-            metadata_store.add_metadata(key, BaseMetadata(name="", author="",trigger_phrases=changes.trigger_phrases))
+            metadata_store.add_metadata(key, BaseMetadata(name="", author="",trigger_phrases=changes.trigger_phrases, default_settings=changes.default_settings))
     except Exception as e:
         raise HTTPException(
             status_code=500,
