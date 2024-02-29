@@ -410,17 +410,19 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 extra_conditioning = text_embedding_info.extra_conditioning
 
             if is_sdxl:
-                # HACK(ryand): We just use the the first SDXLConditioningInfo's pooled_embeds and add_time_ids. This is
-                # fundamentally an interface issue, as the SDXL Compel nodes are not designed to be used in the way that
-                # we use them for regional prompting. Ideally, the DenoiseLatents invocation should accept a single
+                # We choose a random SDXLConditioningInfo's pooled_embeds and add_time_ids here, with a preference for
+                # prompts without a mask. We prefer prompts without a mask, because they are more likely to contain
+                # global prompt information.  In an ideal case, there should be exactly one global prompt without a
+                # mask, but we don't enforce this.
+
+                # HACK(ryand): The fact that we have to choose a single pooled_embedding and add_time_ids here is a
+                # fundamental interface issue. The SDXL Compel nodes are not designed to be used in the way that we use
+                # them for regional prompting. Ideally, the DenoiseLatents invocation should accept a single
                 # pooled_embeds tensor and a list of standard text embeds with region masks. This change would be a
                 # pretty major breaking change to a popular node, so for now we use this hack.
-                #
-                # An improvement could be to use the pooled embeds from the prompt with the largest region, as this is
-                # most likely to be a global prompt.
-                if pooled_embedding is None:
+                if pooled_embedding is None or mask is None:
                     pooled_embedding = text_embedding_info.pooled_embeds
-                if add_time_ids is None:
+                if add_time_ids is None or mask is None:
                     add_time_ids = text_embedding_info.add_time_ids
 
             text_embedding.append(text_embedding_info.embeds)
