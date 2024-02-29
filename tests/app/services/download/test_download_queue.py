@@ -166,6 +166,7 @@ def test_broken_callbacks(tmp_path: Path, session: Session, capsys) -> None:
     queue.stop()
 
 
+@pytest.mark.timeout(timeout=20, method="thread")
 def test_cancel(tmp_path: Path, session: Session) -> None:
     event_bus = TestEventService()
 

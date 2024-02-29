@@ -118,6 +118,7 @@ dependencies = [
   "pytest>6.0.0",
   "pytest-cov",
   "pytest-datadir",
+  "pytest-timeout",
   "requests_testadapter",
   "httpx",
 ]
@@ -185,9 +186,10 @@ version = { attr = "invokeai.version.__version__" }
 
 #=== Begin: PyTest and Coverage
 [tool.pytest.ini_options]
-addopts = "--cov-report term --cov-report html --cov-report xml --strict-markers -m \"not slow\""
+addopts = "--cov-report term --cov-report html --cov-report xml --timeout=60 --strict-markers -m \"not slow\""
 markers = [
   "slow: Marks tests as slow. Disabled by default. To run all tests, use -m \"\". To run only slow tests, use -m \"slow\".",
+  "timeout: Mark a timeout.",
 ]
 [tool.coverage.run]
 branch = true
