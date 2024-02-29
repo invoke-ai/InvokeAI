@@ -30,7 +30,7 @@ def generate_ti_list(
         except UnknownModelException:
             try:
                 loaded_model = context.models.load_by_attrs(
-                    model_name=name_or_key, base_model=base, model_type=ModelType.TextualInversion
+                    name=name_or_key, base=base, type=ModelType.TextualInversion
                 )
                 model = loaded_model.model
                 assert isinstance(model, TextualInversionModelRaw)

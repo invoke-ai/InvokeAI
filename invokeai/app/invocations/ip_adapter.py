@@ -93,7 +93,7 @@ class IPAdapterInvocation(BaseInvocation):
         image_encoder_model_id = ip_adapter_info.image_encoder_model_id
         image_encoder_model_name = image_encoder_model_id.split("/")[-1].strip()
         image_encoder_models = context.models.search_by_attrs(
-            model_name=image_encoder_model_name, base_model=BaseModelType.Any, model_type=ModelType.CLIPVision
+            name=image_encoder_model_name, base=BaseModelType.Any, type=ModelType.CLIPVision
         )
         assert len(image_encoder_models) == 1
         image_encoder_model = CLIPVisionModelField(key=image_encoder_models[0].key)
