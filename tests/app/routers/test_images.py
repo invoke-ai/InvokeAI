@@ -1,6 +1,8 @@
+import os
 from pathlib import Path
 from typing import Any
 
+import pytest
 from fastapi import BackgroundTasks
 from fastapi.testclient import TestClient
 
@@ -9,7 +11,11 @@ from invokeai.app.api_app import app
 from invokeai.app.services.board_records.board_records_common import BoardRecord
 from invokeai.app.services.invoker import Invoker
 
-client = TestClient(app)
+
+@pytest.fixture(autouse=True, scope="module")
+def client(invokeai_root_dir: Path) -> TestClient:
+    os.environ["INVOKEAI_ROOT"] = invokeai_root_dir.as_posix()
+    return TestClient(app)
 
 
 class MockApiDependencies(ApiDependencies):
@@ -19,7 +25,7 @@ class MockApiDependencies(ApiDependencies):
         self.invoker = invoker
 
 
-def test_download_images_from_list(monkeypatch: Any, mock_invoker: Invoker) -> None:
+def test_download_images_from_list(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
     prepare_download_images_test(monkeypatch, mock_invoker)
 
     response = client.post("/api/v1/images/download", json={"image_names": ["test.png"]})
@@ -28,7 +34,9 @@ def test_download_images_from_list(monkeypatch: Any, mock_invoker: Invoker) -> N
     assert json_response["bulk_download_item_name"] == "test.zip"
 
 
-def test_download_images_from_board_id_empty_image_name_list(monkeypatch: Any, mock_invoker: Invoker) -> None:
+def test_download_images_from_board_id_empty_image_name_list(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
     expected_board_name = "test"
 
     def mock_get(*args, **kwargs):
@@ -56,7 +64,9 @@ def prepare_download_images_test(monkeypatch: Any, mock_invoker: Invoker) -> Non
     monkeypatch.setattr(BackgroundTasks, "add_task", mock_add_task)
 
 
-def test_download_images_with_empty_image_list_and_no_board_id(monkeypatch: Any, mock_invoker: Invoker) -> None:
+def test_download_images_with_empty_image_list_and_no_board_id(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
     prepare_download_images_test(monkeypatch, mock_invoker)
 
     response = client.post("/api/v1/images/download", json={"image_names": []})
@@ -64,7 +74,7 @@ def test_download_images_with_empty_image_list_and_no_board_id(monkeypatch: Any,
     assert response.status_code == 400
 
 
-def test_get_bulk_download_image(tmp_path: Path, monkeypatch: Any, mock_invoker: Invoker) -> None:
+def test_get_bulk_download_image(tmp_path: Path, monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
     mock_file: Path = tmp_path / "test.zip"
     mock_file.write_text("contents")
 
@@ -82,7 +92,7 @@ def test_get_bulk_download_image(tmp_path: Path, monkeypatch: Any, mock_invoker:
     assert response.content == b"contents"
 
 
-def test_get_bulk_download_image_not_found(monkeypatch: Any, mock_invoker: Invoker) -> None:
+def test_get_bulk_download_image_not_found(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
     monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", MockApiDependencies(mock_invoker))
 
     def mock_add_task(*args, **kwargs):
@@ -96,7 +106,7 @@ def test_get_bulk_download_image_not_found(monkeypatch: Any, mock_invoker: Invok
 
 
 def test_get_bulk_download_image_image_deleted_after_response(
-    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path
+    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
 ) -> None:
     mock_file: Path = tmp_path / "test.zip"
     mock_file.write_text("contents")
