@@ -1,51 +1,38 @@
-name: mkdocs-material
+# This is a mostly a copy-paste from https://github.com/squidfunk/mkdocs-material/blob/master/docs/publishing-your-site.md
+
+name: mkdocs
+
 on:
   push:
     branches:
-      - 'refs/heads/main'
+      - main
+  workflow_dispatch:
 
 permissions:
-    contents: write
+  contents: write
 
 jobs:
-  mkdocs-material:
+  deploy:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     env:
       REPO_URL: '${{ github.server_url }}/${{ github.repository }}'
       REPO_NAME: '${{ github.repository }}'
       SITE_URL: 'https://${{ github.repository_owner }}.github.io/InvokeAI'
-    steps:
-      - name: checkout sources
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
 
-      - name: setup python
-        uses: actions/setup-python@v4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
           cache: pip
           cache-dependency-path: pyproject.toml
-
-      - name: install requirements
-        env:
-          PIP_USE_PEP517: 1
-        run: |
-          python -m \
-            pip install ".[docs]"
-
-      - name: confirm buildability
-        run: |
-          python -m \
-            mkdocs build \
-            --clean \
-            --verbose
-
-      - name: deploy to gh-pages
-        if: ${{ github.ref == 'refs/heads/main' }}
-        run: |
-          python -m \
-            mkdocs gh-deploy \
-            --clean \
-            --force
+      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
+      - uses: actions/cache@v4
+        with:
+          key: mkdocs-material-${{ env.cache_id }}
+          path: .cache
+          restore-keys: |
+            mkdocs-material-
+      - run: python -m pip install ".[docs]"
+      - run: mkdocs gh-deploy --force
