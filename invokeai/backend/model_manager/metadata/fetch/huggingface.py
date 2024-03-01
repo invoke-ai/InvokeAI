@@ -19,11 +19,12 @@ from typing import Optional
 
 import requests
 from huggingface_hub import HfApi, configure_http_backend, hf_hub_url
+from huggingface_hub.hf_api import RepoSibling
 from huggingface_hub.utils._errors import RepositoryNotFoundError, RevisionNotFoundError
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
 
-from invokeai.backend.model_manager import ModelRepoVariant
+from invokeai.backend.model_manager.config import ModelRepoVariant
 
 from ..metadata_base import (
     AnyModelRepoMetadata,
@@ -75,20 +76,8 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
         _, name = id.split("/")
         return HuggingFaceMetadata(
             id=model_info.id,
-            author=model_info.author,
             name=name,
-            last_modified=model_info.last_modified,
-            tag_dict=model_info.card_data.to_dict() if model_info.card_data else {},
-            tags=model_info.tags,
-            files=[
-                RemoteModelFile(
-                    url=hf_hub_url(id, x.rfilename, revision=variant),
-                    path=Path(name, x.rfilename),
-                    size=x.size,
-                    sha256=x.lfs.get("sha256") if x.lfs else None,
-                )
-                for x in model_info.siblings
-            ],
+            files=parse_siblings(id, model_info.siblings, variant),
         )
 
     def from_url(self, url: AnyHttpUrl) -> AnyModelRepoMetadata:
@@ -102,3 +91,27 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
             return self.from_id(repo_id)
         else:
             raise UnknownMetadataException(f"'{url}' does not look like a HuggingFace model page")
+
+
+def parse_siblings(
+    repo_id: str, siblings: Optional[list[RepoSibling]] = None, variant: Optional[ModelRepoVariant] = None
+) -> list[RemoteModelFile]:
+    """Parse the siblings list from the HuggingFace API into a list of RemoteModelFile objects."""
+    if not siblings:
+        return []
+
+    files: list[RemoteModelFile] = []
+
+    for s in siblings:
+        assert s.rfilename is not None
+        assert s.size is not None
+        files.append(
+            RemoteModelFile(
+                url=hf_hub_url(repo_id, s.rfilename, revision=variant.value if variant else None),
+                path=Path(s.rfilename),
+                size=s.size,
+                sha256=s.lfs.get("sha256") if s.lfs else None,
+            )
+        )
+
+    return files
