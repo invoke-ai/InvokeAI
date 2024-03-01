@@ -74,7 +74,7 @@ example_model_config = {
     "current_hash": "string",
     "description": "string",
     "source": "string",
-    "last_modified": 0,
+    "converted_at": 0,
     "variant": "normal",
     "prediction_type": "epsilon",
     "repo_variant": "fp16",

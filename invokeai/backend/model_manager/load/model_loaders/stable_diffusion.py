@@ -59,7 +59,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             return False
         elif (
             dest_path.exists()
-            and (dest_path / "model_index.json").stat().st_mtime >= (config.last_modified or 0.0)
+            and (dest_path / "model_index.json").stat().st_mtime >= (config.converted_at or 0.0)
             and (dest_path / "model_index.json").stat().st_mtime >= model_path.stat().st_mtime
         ):
             return False
