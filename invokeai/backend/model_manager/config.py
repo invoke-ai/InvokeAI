@@ -138,9 +138,7 @@ class ModelConfigBase(BaseModel):
 
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
-        schema["required"].extend(
-            ["key", "base", "type", "format", "original_hash", "current_hash", "source", "last_modified"]
-        )
+        schema["required"].extend(["key", "base", "type", "format", "original_hash", "current_hash", "source"])
 
     model_config = ConfigDict(
         use_enum_values=False,
@@ -159,7 +157,7 @@ class CheckpointConfigBase(ModelConfigBase):
 
     format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
     config_path: str = Field(description="path to the checkpoint model config file")
-    last_modified: Optional[float] = Field(
+    converted_at: Optional[float] = Field(
         description="When this model was last converted to diffusers", default_factory=time.time
     )
 
@@ -380,5 +378,5 @@ class ModelConfigFactory(object):
         if key:
             model.key = key
         if isinstance(model, CheckpointConfigBase) and timestamp is not None:
-            model.last_modified = timestamp
+            model.converted_at = timestamp
         return model  # type: ignore

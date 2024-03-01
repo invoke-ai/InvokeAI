@@ -31,7 +31,7 @@ class VaeLoader(GenericDiffusersLoader):
             return False
         elif (
             dest_path.exists()
-            and (dest_path / "config.json").stat().st_mtime >= (config.last_modified or 0.0)
+            and (dest_path / "config.json").stat().st_mtime >= (config.converted_at or 0.0)
             and (dest_path / "config.json").stat().st_mtime >= model_path.stat().st_mtime
         ):
             return False
