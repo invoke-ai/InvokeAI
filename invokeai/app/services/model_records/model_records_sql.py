@@ -101,16 +101,16 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             try:
                 self._cursor.execute(
                     """--sql
-                    INSERT INTO model_config (
+                    INSERT INTO models (
                        id,
-                       original_hash,
+                       hash,
                        config
                       )
                     VALUES (?,?,?);
                     """,
                     (
                         key,
-                        record.original_hash,
+                        record.hash,
                         json_serialized,
                     ),
                 )
@@ -119,9 +119,9 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             except sqlite3.IntegrityError as e:
                 self._db.conn.rollback()
                 if "UNIQUE constraint failed" in str(e):
-                    if "model_config.path" in str(e):
+                    if "models.path" in str(e):
                         msg = f"A model with path '{record.path}' is already installed"
-                    elif "model_config.name" in str(e):
+                    elif "models.name" in str(e):
                         msg = f"A model with name='{record.name}', type='{record.type}', base='{record.base}' is already installed"
                     else:
                         msg = f"A model with key '{key}' is already installed"
@@ -146,7 +146,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             try:
                 self._cursor.execute(
                     """--sql
-                    DELETE FROM model_config
+                    DELETE FROM models
                     WHERE id=?;
                     """,
                     (key,),
@@ -172,7 +172,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             try:
                 self._cursor.execute(
                     """--sql
-                    UPDATE model_config
+                    UPDATE models
                     SET
                         config=?
                     WHERE id=?;
@@ -199,7 +199,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.lock:
             self._cursor.execute(
                 """--sql
-                SELECT config, strftime('%s',updated_at) FROM model_config
+                SELECT config, strftime('%s',updated_at) FROM models
                 WHERE id=?;
                 """,
                 (key,),
@@ -220,7 +220,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.lock:
             self._cursor.execute(
                 """--sql
-                select count(*) FROM model_config
+                select count(*) FROM models
                 WHERE id=?;
                 """,
                 (key,),
@@ -265,7 +265,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.lock:
             self._cursor.execute(
                 f"""--sql
-                select config, strftime('%s',updated_at) FROM model_config
+                select config, strftime('%s',updated_at) FROM models
                 {where};
                 """,
                 tuple(bindings),
@@ -281,7 +281,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.lock:
             self._cursor.execute(
                 """--sql
-                SELECT config, strftime('%s',updated_at) FROM model_config
+                SELECT config, strftime('%s',updated_at) FROM models
                 WHERE path=?;
                 """,
                 (str(path),),
@@ -292,13 +292,13 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         return results
 
     def search_by_hash(self, hash: str) -> List[AnyModelConfig]:
-        """Return models with the indicated original_hash."""
+        """Return models with the indicated hash."""
         results = []
         with self._db.lock:
             self._cursor.execute(
                 """--sql
-                SELECT config, strftime('%s',updated_at) FROM model_config
-                WHERE original_hash=?;
+                SELECT config, strftime('%s',updated_at) FROM models
+                WHERE hash=?;
                 """,
                 (hash,),
             )
@@ -370,19 +370,19 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             # query1: get the total number of model configs
             self._cursor.execute(
                 """--sql
-                select count(*) from model_config;
+                select count(*) from models;
                 """,
                 (),
             )
             total = int(self._cursor.fetchone()[0])
 
-            # query2: fetch key fields from the join of model_config and model_metadata
+            # query2: fetch key fields from the join of models and model_metadata
             self._cursor.execute(
                 f"""--sql
                 SELECT a.id as key, a.type, a.base, a.format, a.name,
                        json_extract(a.config, '$.description') as description,
                        json_extract(b.metadata, '$.tags') as tags
-                FROM model_config AS a
+                FROM models AS a
                 LEFT JOIN model_metadata AS b on a.id=b.id
                 ORDER BY {ordering[order_by]} -- using ? to bind doesn't work here for some reason
                 LIMIT ?

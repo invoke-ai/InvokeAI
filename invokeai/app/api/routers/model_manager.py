@@ -70,7 +70,7 @@ example_model_config = {
     "format": "checkpoint",
     "config_path": "string",
     "key": "string",
-    "original_hash": "string",
+    "hash": "string",
     "description": "string",
     "source": "string",
     "converted_at": 0,
@@ -705,7 +705,7 @@ async def convert_model(
             config={
                 "name": original_name,
                 "description": model_config.description,
-                "original_hash": model_config.original_hash,
+                "hash": model_config.hash,
                 "source": model_config.source,
             },
         )
