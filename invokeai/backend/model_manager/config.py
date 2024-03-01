@@ -263,7 +263,6 @@ class _MainConfig(ModelConfigBase):
     variant: ModelVariantType = ModelVariantType.Normal
     prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon
     upcast_attention: bool = False
-    ztsnr_training: bool = False
 
 
 class MainCheckpointConfig(_CheckpointConfig, _MainConfig):
