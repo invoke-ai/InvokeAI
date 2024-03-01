@@ -392,7 +392,7 @@ class ModelInstallServiceBase(ABC):
          will override corresponding autoassigned probe fields in the
          model's config record. Use it to override
          `name`, `description`, `base_type`, `model_type`, `format`,
-         `prediction_type`, `image_size`, and/or `ztsnr_training`.
+         `prediction_type`, and/or `image_size`.
 
         This will download the model located at `source`,
         probe it, and install it into the models directory.
