@@ -97,8 +97,6 @@
         "featuresWillReset": "Als je deze afbeelding verwijdert, dan worden deze functies onmiddellijk teruggezet.",
         "loading": "Bezig met laden",
         "unableToLoad": "Kan galerij niet laden",
-        "preparingDownload": "Bezig met voorbereiden van download",
-        "preparingDownloadFailed": "Fout bij voorbereiden van download",
         "downloadSelection": "Download selectie",
         "currentlyInUse": "Deze afbeelding is momenteel in gebruik door de volgende functies:",
         "copy": "Kopieer",
@@ -535,8 +533,6 @@
         "coherencePassHeader": "Coherentiestap",
         "maskBlur": "Vervaag",
         "maskBlurMethod": "Vervagingsmethode",
-        "coherenceSteps": "Stappen",
-        "coherenceStrength": "Sterkte",
         "seamHighThreshold": "Hoog",
         "seamLowThreshold": "Laag",
         "invoke": {
@@ -1139,13 +1135,6 @@
                 "Een afbeeldingsgrootte (in aantal pixels) equivalent aan 512x512 wordt aanbevolen voor SD1.5-modellen. Een grootte-equivalent van 1024x1024 wordt aanbevolen voor SDXL-modellen."
             ]
         },
-        "compositingCoherenceSteps": {
-            "heading": "Stappen",
-            "paragraphs": [
-                "Het aantal te gebruiken ontruisingsstappen in de coherentiefase.",
-                "Gelijk aan de hoofdparameter Stappen."
-            ]
-        },
         "dynamicPrompts": {
             "paragraphs": [
                 "Dynamische prompts vormt een enkele prompt om in vele.",
@@ -1159,12 +1148,6 @@
                 "Het model gebruikt voor het vertalen van AI-uitvoer naar de uiteindelijke afbeelding."
             ],
             "heading": "VAE"
-        },
-        "compositingBlur": {
-            "heading": "Vervaging",
-            "paragraphs": [
-                "De vervagingsstraal van het masker."
-            ]
         },
         "paramIterations": {
             "paragraphs": [
@@ -1239,13 +1222,6 @@
                 "0 levert een identieke afbeelding op, waarbij 1 een volledig nieuwe afbeelding oplevert."
             ],
             "heading": "Ontruisingssterkte"
-        },
-        "compositingStrength": {
-            "heading": "Sterkte",
-            "paragraphs": [
-                "Ontruisingssterkte voor de coherentiefase.",
-                "Gelijk aan de parameter Ontruisingssterkte Afbeelding naar afbeelding."
-            ]
         },
         "paramNegativeConditioning": {
             "paragraphs": [
