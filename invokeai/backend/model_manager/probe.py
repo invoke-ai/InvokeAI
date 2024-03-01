@@ -169,7 +169,7 @@ class ModelProbe(object):
 
         # additional fields needed for main and controlnet models
         if fields["type"] in [ModelType.Main, ModelType.ControlNet, ModelType.Vae] and fields["format"] == ModelFormat.Checkpoint:
-            fields["config"] = cls._get_checkpoint_config_path(
+            fields["config_path"] = cls._get_checkpoint_config_path(
                 model_path,
                 model_type=fields["type"],
                 base_type=fields["base"],

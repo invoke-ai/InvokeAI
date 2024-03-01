@@ -74,7 +74,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             StableDiffusionInpaintPipeline if variant == ModelVariantType.Inpaint else StableDiffusionPipeline
         )
 
-        config_file = config.config
+        config_file = config.config_path
 
         self._logger.info(f"Converting {model_path} to diffusers format")
         convert_ckpt_to_diffusers(

@@ -158,7 +158,7 @@ class CheckpointConfigBase(ModelConfigBase):
     """Model config for checkpoint-style models."""
 
     format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
-    config: str = Field(description="path to the checkpoint model config file")
+    config_path: str = Field(description="path to the checkpoint model config file")
     last_modified: Optional[float] = Field(
         description="When this model was last converted to diffusers", default_factory=time.time
     )
