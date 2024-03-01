@@ -9,7 +9,7 @@ set INVOKEAI_ROOT=.
 :start
 echo Desired action:
 echo 1. Generate images with the browser-based interface
-echo 2. Run textual inversion training
+echo 2. Invoke Model Training
 echo 3. Merge models (diffusers type only)
 echo 4. Download and install models
 echo 5. Change InvokeAI startup options
@@ -25,8 +25,7 @@ IF /I "%choice%" == "1" (
     echo Starting the InvokeAI browser-based UI..
     python .venv\Scripts\invokeai-web.exe %*
 ) ELSE IF /I "%choice%" == "2" (
-    echo Starting textual inversion training..
-    python .venv\Scripts\invokeai-ti.exe --gui
+    echo To use Invoke Training for LoRA, TI, and more - Visit https://github.com/invoke-ai/invoke-training
 ) ELSE IF /I "%choice%" == "3" (
     echo Starting model merging script..
     python .venv\Scripts\invokeai-merge.exe --gui
