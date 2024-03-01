@@ -18,6 +18,7 @@ from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import ModelRecordServiceBase
 from invokeai.backend.model_manager import AnyModelConfig, ModelRepoVariant
+from invokeai.backend.model_manager.config import ModelSourceType
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
 
 from ..model_metadata import ModelMetadataStoreBase
@@ -150,6 +151,13 @@ class URLModelSource(StringLikeSource):
 ModelSource = Annotated[
     Union[LocalModelSource, HFModelSource, CivitaiModelSource, URLModelSource], Field(discriminator="type")
 ]
+
+MODEL_SOURCE_TO_TYPE_MAP = {
+    URLModelSource: ModelSourceType.Url,
+    HFModelSource: ModelSourceType.HFRepoID,
+    CivitaiModelSource: ModelSourceType.CivitAI,
+    LocalModelSource: ModelSourceType.Path,
+}
 
 
 class ModelInstallJob(BaseModel):

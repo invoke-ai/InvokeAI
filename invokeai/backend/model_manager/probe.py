@@ -147,7 +147,6 @@ class ModelProbe(object):
         if not probe_class:
             raise InvalidModelConfigException(f"Unhandled combination of {format_type} and {model_type}")
 
-        hash = ModelHash().hash(model_path)
         probe = probe_class(model_path)
 
         fields["path"] = model_path.as_posix()
@@ -161,13 +160,16 @@ class ModelProbe(object):
             fields.get("description") or f"{fields['base'].value} {fields['type'].value} model {fields['name']}"
         )
         fields["format"] = fields.get("format") or probe.get_format()
-        fields["hash"] = fields.get("hash") or hash
+        fields["hash"] = fields.get("hash") or ModelHash().hash(model_path)
 
         if format_type == ModelFormat.Diffusers and hasattr(probe, "get_repo_variant"):
             fields["repo_variant"] = fields.get("repo_variant") or probe.get_repo_variant()
 
         # additional fields needed for main and controlnet models
-        if fields["type"] in [ModelType.Main, ModelType.ControlNet, ModelType.Vae] and fields["format"] == ModelFormat.Checkpoint:
+        if (
+            fields["type"] in [ModelType.Main, ModelType.ControlNet, ModelType.Vae]
+            and fields["format"] is ModelFormat.Checkpoint
+        ):
             fields["config_path"] = cls._get_checkpoint_config_path(
                 model_path,
                 model_type=fields["type"],
