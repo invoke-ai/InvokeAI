@@ -967,7 +967,7 @@
         "resumeFailed": "Problem beim Fortsetzen des Prozesses",
         "pruneFailed": "Problem beim leeren der Warteschlange",
         "pauseTooltip": "Prozess anhalten",
-        "back": "Hinten",
+        "back": "Ende",
         "resumeSucceeded": "Prozess wird fortgesetzt",
         "resumeTooltip": "Prozess wieder aufnehmen",
         "time": "Zeit",
