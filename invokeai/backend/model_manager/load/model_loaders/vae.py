@@ -13,6 +13,7 @@ from invokeai.backend.model_manager import (
     ModelFormat,
     ModelType,
 )
+from invokeai.backend.model_manager.config import CheckpointConfigBase
 from invokeai.backend.model_manager.convert_ckpt_to_diffusers import convert_ldm_vae_to_diffusers
 
 from .. import ModelLoaderRegistry
@@ -26,7 +27,7 @@ class VaeLoader(GenericDiffusersLoader):
     """Class to load VAE models."""
 
     def _needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool:
-        if config.format != ModelFormat.Checkpoint:
+        if not isinstance(config, CheckpointConfigBase):
             return False
         elif (
             dest_path.exists()
@@ -38,13 +39,12 @@ class VaeLoader(GenericDiffusersLoader):
             return True
 
     def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Path) -> Path:
-        # TO DO: check whether sdxl VAE models convert.
+        # TODO(MM2): check whether sdxl VAE models convert.
         if config.base not in {BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2}:
-            raise Exception(f"Vae conversion not supported for model type: {config.base}")
+            raise Exception(f"VAE conversion not supported for model type: {config.base}")
         else:
-            config_file = (
-                "v1-inference.yaml" if config.base == BaseModelType.StableDiffusion1 else "v2-inference-v.yaml"
-            )
+            assert isinstance(config, CheckpointConfigBase)
+            config_file = config.config
 
         if model_path.suffix == ".safetensors":
             checkpoint = safetensors_load_file(model_path, device="cpu")
@@ -55,7 +55,7 @@ class VaeLoader(GenericDiffusersLoader):
         if "state_dict" in checkpoint:
             checkpoint = checkpoint["state_dict"]
 
-        ckpt_config = OmegaConf.load(self._app_config.legacy_conf_path / config_file)
+        ckpt_config = OmegaConf.load(self._app_config.root_path / config_file)
         assert isinstance(ckpt_config, DictConfig)
 
         vae_model = convert_ldm_vae_to_diffusers(
