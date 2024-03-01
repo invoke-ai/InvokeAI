@@ -114,7 +114,8 @@
         "checkpoint": "Checkpoint",
         "safetensors": "Safetensors",
         "ai": "ia",
-        "file": "File"
+        "file": "File",
+        "toResolve": "Da risolvere"
     },
     "gallery": {
         "generations": "Generazioni",
