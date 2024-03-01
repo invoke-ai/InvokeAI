@@ -150,6 +150,7 @@ class ModelInstallService(ModelInstallServiceBase):
         config = config or {}
         if not config.get("source"):
             config["source"] = model_path.resolve().as_posix()
+        config["key"] = config.get("key", self._create_key())
 
         info: AnyModelConfig = self._probe_model(Path(model_path), config)
 
@@ -278,7 +279,7 @@ class ModelInstallService(ModelInstallServiceBase):
         self._logger.info("Model installer (re)initialized")
 
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
-        self._cached_model_paths = {Path(x.path) for x in self.record_store.all_models()}
+        self._cached_model_paths = {Path(x.path).absolute() for x in self.record_store.all_models()}
         callback = self._scan_install if install else self._scan_register
         search = ModelSearch(on_model_found=callback, config=self._app_config)
         self._models_installed.clear()
@@ -531,9 +532,9 @@ class ModelInstallService(ModelInstallServiceBase):
     def _register(
         self, model_path: Path, config: Optional[Dict[str, Any]] = None, info: Optional[AnyModelConfig] = None
     ) -> str:
-        key = self._create_key()
-        if config and not config.get("key", None):
-            config["key"] = key
+        # Note that we may be passed a pre-populated AnyModelConfig object,
+        # in which case the key field should have been populated by the caller (e.g. in `install_path`).
+        config["key"] = config.get("key", self._create_key())
         info = info or ModelProbe.probe(model_path, config)
 
         model_path = model_path.absolute()
