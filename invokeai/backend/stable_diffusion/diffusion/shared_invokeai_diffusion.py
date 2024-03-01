@@ -346,9 +346,7 @@ class InvokeAIDiffuserComponent:
                 regions.append(r)
 
             _, key_seq_len, _ = both_conditionings.shape
-            cross_attention_kwargs["regional_prompt_data"] = RegionalPromptData.from_regions(
-                regions=regions, key_seq_len=key_seq_len
-            )
+            cross_attention_kwargs["regional_prompt_data"] = RegionalPromptData(regions=regions)
 
         both_results = self.model_forward_callback(
             x_twice,

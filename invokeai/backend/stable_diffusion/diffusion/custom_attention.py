@@ -92,15 +92,28 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
         # End unmodified block from AttnProcessor2_0.
 
         # Handle regional prompt attention masks.
-        if is_cross_attention and regional_prompt_data is not None:
+        if regional_prompt_data is not None:
             _, query_seq_len, _ = hidden_states.shape
-            prompt_region_attention_mask = regional_prompt_data.get_attn_mask(query_seq_len)
-            # TODO(ryand): Avoid redundant type/device conversion here.
-            prompt_region_attention_mask = prompt_region_attention_mask.to(
-                dtype=encoder_hidden_states.dtype, device=encoder_hidden_states.device
-            )
-            prompt_region_attention_mask[prompt_region_attention_mask < 0.5] = -10000.0
-            prompt_region_attention_mask[prompt_region_attention_mask >= 0.5] = 0.0
+            if is_cross_attention:
+                prompt_region_attention_mask = regional_prompt_data.get_cross_attn_mask(
+                    query_seq_len=query_seq_len, key_seq_len=sequence_length
+                )
+                # TODO(ryand): Avoid redundant type/device conversion here.
+                prompt_region_attention_mask = prompt_region_attention_mask.to(
+                    dtype=hidden_states.dtype, device=hidden_states.device
+                )
+                prompt_region_attention_mask[prompt_region_attention_mask < 0.5] = -10000.0
+                prompt_region_attention_mask[prompt_region_attention_mask >= 0.5] = 0.0
+
+            else:  # self-attention
+                prompt_region_attention_mask = regional_prompt_data.get_self_attn_mask(query_seq_len=query_seq_len)
+
+                # TODO(ryand): Avoid redundant type/device conversion here.
+                prompt_region_attention_mask = prompt_region_attention_mask.to(
+                    dtype=hidden_states.dtype, device=hidden_states.device
+                )
+                # prompt_region_attention_mask[prompt_region_attention_mask < 0.5] = -0.5
+                # prompt_region_attention_mask[prompt_region_attention_mask >= 0.5] = 0.0
 
             if attention_mask is None:
                 attention_mask = prompt_region_attention_mask
