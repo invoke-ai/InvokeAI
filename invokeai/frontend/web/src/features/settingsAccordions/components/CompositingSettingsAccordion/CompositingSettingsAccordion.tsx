@@ -9,11 +9,10 @@ import {
   TabPanels,
   Tabs,
 } from '@invoke-ai/ui-library';
+import ParamCanvasCoherenceEdgeSize from 'features/parameters/components/Canvas/Compositing/CoherencePass/ParamCanvasCoherenceEdgeSize';
+import ParamCanvasCoherenceMinDenoise from 'features/parameters/components/Canvas/Compositing/CoherencePass/ParamCanvasCoherenceMinDenoise';
 import ParamCanvasCoherenceMode from 'features/parameters/components/Canvas/Compositing/CoherencePass/ParamCanvasCoherenceMode';
-import ParamCanvasCoherenceSteps from 'features/parameters/components/Canvas/Compositing/CoherencePass/ParamCanvasCoherenceSteps';
-import ParamCanvasCoherenceStrength from 'features/parameters/components/Canvas/Compositing/CoherencePass/ParamCanvasCoherenceStrength';
 import ParamMaskBlur from 'features/parameters/components/Canvas/Compositing/MaskAdjustment/ParamMaskBlur';
-import ParamMaskBlurMethod from 'features/parameters/components/Canvas/Compositing/MaskAdjustment/ParamMaskBlurMethod';
 import ParamInfillMethod from 'features/parameters/components/Canvas/InfillAndScaling/ParamInfillMethod';
 import ParamInfillOptions from 'features/parameters/components/Canvas/InfillAndScaling/ParamInfillOptions';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
@@ -43,10 +42,11 @@ export const CompositingSettingsAccordion = memo(() => {
             <Flex gap={4} p={4} flexDir="column">
               <FormControlGroup formLabelProps={coherenceLabelProps}>
                 <ParamCanvasCoherenceMode />
-                <ParamCanvasCoherenceSteps />
-                <ParamCanvasCoherenceStrength />
-                <ParamMaskBlurMethod />
+                <ParamCanvasCoherenceEdgeSize />
+                <ParamCanvasCoherenceMinDenoise />
                 <ParamMaskBlur />
+                {/* <ParamMaskBlurMethod />
+                 */}
               </FormControlGroup>
             </Flex>
           </TabPanel>

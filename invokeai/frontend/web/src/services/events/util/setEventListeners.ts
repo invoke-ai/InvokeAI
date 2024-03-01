@@ -1,8 +1,13 @@
+import { $baseUrl } from 'app/store/nanostores/baseUrl';
+import { $bulkDownloadId } from 'app/store/nanostores/bulkDownloadId';
 import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppDispatch } from 'app/store/store';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import {
+  socketBulkDownloadCompleted,
+  socketBulkDownloadFailed,
+  socketBulkDownloadStarted,
   socketConnected,
   socketDisconnected,
   socketGeneratorProgress,
@@ -11,6 +16,9 @@ import {
   socketInvocationError,
   socketInvocationRetrievalError,
   socketInvocationStarted,
+  socketModelInstallCompleted,
+  socketModelInstallDownloading,
+  socketModelInstallError,
   socketModelLoadCompleted,
   socketModelLoadStarted,
   socketQueueItemStatusChanged,
@@ -34,6 +42,10 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
     dispatch(socketConnected());
     const queue_id = $queueId.get();
     socket.emit('subscribe_queue', { queue_id });
+    if (!$baseUrl.get()) {
+      const bulk_download_id = $bulkDownloadId.get();
+      socket.emit('subscribe_bulk_download', { bulk_download_id });
+    }
   });
 
   socket.on('connect_error', (error) => {
@@ -126,6 +138,39 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
   });
 
   /**
+   * Model Install Downloading
+   */
+  socket.on('model_install_downloading', (data) => {
+    dispatch(
+      socketModelInstallDownloading({
+        data,
+      })
+    );
+  });
+
+  /**
+   * Model Install Completed
+   */
+  socket.on('model_install_completed', (data) => {
+    dispatch(
+      socketModelInstallCompleted({
+        data,
+      })
+    );
+  });
+
+  /**
+   * Model Install Error
+   */
+  socket.on('model_install_error', (data) => {
+    dispatch(
+      socketModelInstallError({
+        data,
+      })
+    );
+  });
+
+  /**
    * Session retrieval error
    */
   socket.on('session_retrieval_error', (data) => {
@@ -149,5 +194,17 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
 
   socket.on('queue_item_status_changed', (data) => {
     dispatch(socketQueueItemStatusChanged({ data }));
+  });
+
+  socket.on('bulk_download_started', (data) => {
+    dispatch(socketBulkDownloadStarted({ data }));
+  });
+
+  socket.on('bulk_download_completed', (data) => {
+    dispatch(socketBulkDownloadCompleted({ data }));
+  });
+
+  socket.on('bulk_download_failed', (data) => {
+    dispatch(socketBulkDownloadFailed({ data }));
   });
 };

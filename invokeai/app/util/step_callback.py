@@ -1,12 +1,17 @@
+from typing import TYPE_CHECKING, Callable
+
 import torch
 from PIL import Image
 
-from invokeai.app.services.invocation_processor.invocation_processor_common import CanceledException, ProgressImage
+from invokeai.app.services.session_processor.session_processor_common import CanceledException, ProgressImage
+from invokeai.backend.model_manager.config import BaseModelType
 
-from ...backend.model_management.models import BaseModelType
 from ...backend.stable_diffusion import PipelineIntermediateState
 from ...backend.util.util import image_to_dataURL
-from ..invocations.baseinvocation import InvocationContext
+
+if TYPE_CHECKING:
+    from invokeai.app.services.events.events_base import EventServiceBase
+    from invokeai.app.services.shared.invocation_context import InvocationContextData
 
 
 def sample_to_lowres_estimated_image(samples, latent_rgb_factors, smooth_matrix=None):
@@ -25,13 +30,13 @@ def sample_to_lowres_estimated_image(samples, latent_rgb_factors, smooth_matrix=
 
 
 def stable_diffusion_step_callback(
-    context: InvocationContext,
+    context_data: "InvocationContextData",
     intermediate_state: PipelineIntermediateState,
-    node: dict,
-    source_node_id: str,
     base_model: BaseModelType,
-):
-    if context.services.queue.is_canceled(context.graph_execution_state_id):
+    events: "EventServiceBase",
+    is_canceled: Callable[[], bool],
+) -> None:
+    if is_canceled():
         raise CanceledException
 
     # Some schedulers report not only the noisy latents at the current timestep,
@@ -108,13 +113,13 @@ def stable_diffusion_step_callback(
 
     dataURL = image_to_dataURL(image, image_format="JPEG")
 
-    context.services.events.emit_generator_progress(
-        queue_id=context.queue_id,
-        queue_item_id=context.queue_item_id,
-        queue_batch_id=context.queue_batch_id,
-        graph_execution_state_id=context.graph_execution_state_id,
-        node=node,
-        source_node_id=source_node_id,
+    events.emit_generator_progress(
+        queue_id=context_data.queue_item.queue_id,
+        queue_item_id=context_data.queue_item.item_id,
+        queue_batch_id=context_data.queue_item.batch_id,
+        graph_execution_state_id=context_data.queue_item.session_id,
+        node_id=context_data.invocation.id,
+        source_node_id=context_data.source_invocation_id,
         progress_image=ProgressImage(width=width, height=height, dataURL=dataURL),
         step=intermediate_state.step,
         order=intermediate_state.order,

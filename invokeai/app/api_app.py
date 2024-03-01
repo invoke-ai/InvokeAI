@@ -2,10 +2,12 @@
 # which are imported/used before parse_args() is called will get the default config values instead of the
 # values from the command line or config file.
 import sys
+from contextlib import asynccontextmanager
 
 from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 from invokeai.version.invokeai_version import __version__
 
+from .invocations.fields import InputFieldJSONSchemaExtra, OutputFieldJSONSchemaExtra
 from .services.config import InvokeAIAppConfig
 
 app_config = InvokeAIAppConfig.get_config()
@@ -47,18 +49,14 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         boards,
         download_queue,
         images,
-        model_records,
-        models,
+        model_manager,
         session_queue,
-        sessions,
         utilities,
         workflows,
     )
     from .api.sockets import SocketIO
     from .invocations.baseinvocation import (
         BaseInvocation,
-        InputFieldJSONSchemaExtra,
-        OutputFieldJSONSchemaExtra,
         UIConfigBase,
     )
 
@@ -74,9 +72,25 @@ logger = InvokeAILogger.get_logger(config=app_config)
 mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("text/css", ".css")
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Add startup event to load dependencies
+    ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, logger=logger)
+    yield
+    # Shut down threads
+    ApiDependencies.shutdown()
+
+
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
-app = FastAPI(title="Invoke - Community Edition", docs_url=None, redoc_url=None, separate_input_output_schemas=False)
+app = FastAPI(
+    title="Invoke - Community Edition",
+    docs_url=None,
+    redoc_url=None,
+    separate_input_output_schemas=False,
+    lifespan=lifespan,
+)
 
 # Add event handler
 event_handler_id: int = id(app)
@@ -99,24 +113,9 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
-# Add startup event to load dependencies
-@app.on_event("startup")
-async def startup_event() -> None:
-    ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, logger=logger)
-
-
-# Shut down threads
-@app.on_event("shutdown")
-async def shutdown_event() -> None:
-    ApiDependencies.shutdown()
-
-
 # Include all routers
-app.include_router(sessions.session_router, prefix="/api")
-
 app.include_router(utilities.utilities_router, prefix="/api")
-app.include_router(models.models_router, prefix="/api")
-app.include_router(model_records.model_records_router, prefix="/api")
+app.include_router(model_manager.model_manager_router, prefix="/api")
 app.include_router(download_queue.download_queue_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
 app.include_router(boards.boards_router, prefix="/api")
@@ -154,6 +153,8 @@ def custom_openapi() -> dict[str, Any]:
         # TODO: note that we assume the schema_key here is the TYPE.__name__
         # This could break in some cases, figure out a better way to do it
         output_type_titles[schema_key] = output_schema["title"]
+        openapi_schema["components"]["schemas"][schema_key] = output_schema
+        openapi_schema["components"]["schemas"][schema_key]["class"] = "output"
 
     # Add Node Editor UI helper schemas
     ui_config_schemas = models_json_schema(
@@ -176,23 +177,24 @@ def custom_openapi() -> dict[str, Any]:
         outputs_ref = {"$ref": f"#/components/schemas/{output_type_title}"}
         invoker_schema["output"] = outputs_ref
         invoker_schema["class"] = "invocation"
-        openapi_schema["components"]["schemas"][f"{output_type_title}"]["class"] = "output"
 
-    from invokeai.backend.model_management.models import get_model_config_enums
+    # This code no longer seems to be necessary?
+    # Leave it here just in case
+    #
+    # from invokeai.backend.model_manager import get_model_config_formats
+    # formats = get_model_config_formats()
+    # for model_config_name, enum_set in formats.items():
 
-    for model_config_format_enum in set(get_model_config_enums()):
-        name = model_config_format_enum.__qualname__
+    #     if model_config_name in openapi_schema["components"]["schemas"]:
+    #         # print(f"Config with name {name} already defined")
+    #         continue
 
-        if name in openapi_schema["components"]["schemas"]:
-            # print(f"Config with name {name} already defined")
-            continue
-
-        openapi_schema["components"]["schemas"][name] = {
-            "title": name,
-            "description": "An enumeration.",
-            "type": "string",
-            "enum": [v.value for v in model_config_format_enum],
-        }
+    #     openapi_schema["components"]["schemas"][model_config_name] = {
+    #         "title": model_config_name,
+    #         "description": "An enumeration.",
+    #         "type": "string",
+    #         "enum": [v.value for v in enum_set],
+    #     }
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema

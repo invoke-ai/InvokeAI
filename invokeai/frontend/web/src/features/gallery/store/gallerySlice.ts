@@ -9,7 +9,7 @@ import type { ImageDTO } from 'services/api/types';
 import type { BoardId, GalleryState, GalleryView } from './types';
 import { IMAGE_LIMIT, INITIAL_IMAGE_LIMIT } from './types';
 
-export const initialGalleryState: GalleryState = {
+const initialGalleryState: GalleryState = {
   selection: [],
   shouldAutoSwitch: true,
   autoAssignBoardOnClick: true,
@@ -117,7 +117,7 @@ const isAnyBoardDeleted = isAnyOf(
 export const selectGallerySlice = (state: RootState) => state.gallery;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-export const migrateGalleryState = (state: any): any => {
+const migrateGalleryState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
   }

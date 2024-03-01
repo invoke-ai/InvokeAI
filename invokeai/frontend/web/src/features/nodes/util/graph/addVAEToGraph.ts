@@ -2,7 +2,6 @@ import type { RootState } from 'app/store/store';
 import type { NonNullableGraph } from 'services/api/types';
 
 import {
-  CANVAS_COHERENCE_INPAINT_CREATE_MASK,
   CANVAS_IMAGE_TO_IMAGE_GRAPH,
   CANVAS_INPAINT_GRAPH,
   CANVAS_OUTPAINT_GRAPH,
@@ -10,7 +9,6 @@ import {
   CANVAS_TEXT_TO_IMAGE_GRAPH,
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
-  INPAINT_CREATE_MASK,
   INPAINT_IMAGE,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
@@ -21,6 +19,7 @@ import {
   SDXL_IMAGE_TO_IMAGE_GRAPH,
   SDXL_REFINER_INPAINT_CREATE_MASK,
   SDXL_TEXT_TO_IMAGE_GRAPH,
+  SEAMLESS,
   TEXT_TO_IMAGE_GRAPH,
   VAE_LOADER,
 } from './constants';
@@ -31,15 +30,16 @@ export const addVAEToGraph = (
   graph: NonNullableGraph,
   modelLoaderNodeId: string = MAIN_MODEL_LOADER
 ): void => {
-  const { vae, canvasCoherenceMode } = state.generation;
+  const { vae, seamlessXAxis, seamlessYAxis } = state.generation;
   const { boundingBoxScaleMethod } = state.canvas;
   const { refinerModel } = state.sdxl;
 
   const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);
 
   const isAutoVae = !vae;
+  const isSeamlessEnabled = seamlessXAxis || seamlessYAxis;
 
-  if (!isAutoVae) {
+  if (!isAutoVae && !isSeamlessEnabled) {
     graph.nodes[VAE_LOADER] = {
       type: 'vae_loader',
       id: VAE_LOADER,
@@ -56,7 +56,7 @@ export const addVAEToGraph = (
   ) {
     graph.edges.push({
       source: {
-        node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+        node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -74,7 +74,7 @@ export const addVAEToGraph = (
   ) {
     graph.edges.push({
       source: {
-        node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+        node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -92,7 +92,7 @@ export const addVAEToGraph = (
   ) {
     graph.edges.push({
       source: {
-        node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+        node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -111,7 +111,7 @@ export const addVAEToGraph = (
     graph.edges.push(
       {
         source: {
-          node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+          node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
           field: 'vae',
         },
         destination: {
@@ -119,19 +119,10 @@ export const addVAEToGraph = (
           field: 'vae',
         },
       },
+
       {
         source: {
-          node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: INPAINT_CREATE_MASK,
-          field: 'vae',
-        },
-      },
-      {
-        source: {
-          node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+          node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
           field: 'vae',
         },
         destination: {
@@ -140,27 +131,13 @@ export const addVAEToGraph = (
         },
       }
     );
-
-    // Handle Coherence Mode
-    if (canvasCoherenceMode !== 'unmasked') {
-      graph.edges.push({
-        source: {
-          node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: CANVAS_COHERENCE_INPAINT_CREATE_MASK,
-          field: 'vae',
-        },
-      });
-    }
   }
 
   if (refinerModel) {
     if (graph.id === SDXL_CANVAS_INPAINT_GRAPH || graph.id === SDXL_CANVAS_OUTPAINT_GRAPH) {
       graph.edges.push({
         source: {
-          node_id: isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+          node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
           field: 'vae',
         },
         destination: {

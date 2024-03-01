@@ -8,7 +8,6 @@ import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
@@ -23,11 +22,10 @@ const selector = createMemoizedSelector(
     selectGenerationSlice,
     selectSystemSlice,
     selectNodesSlice,
-    selectNodeTemplatesSlice,
     selectDynamicPromptsSlice,
     activeTabNameSelector,
   ],
-  (controlAdapters, generation, system, nodes, nodeTemplates, dynamicPrompts, activeTabName) => {
+  (controlAdapters, generation, system, nodes, dynamicPrompts, activeTabName) => {
     const { initialImage, model, positivePrompt } = generation;
 
     const { isConnected } = system;
@@ -54,7 +52,7 @@ const selector = createMemoizedSelector(
             return;
           }
 
-          const nodeTemplate = nodeTemplates.templates[node.data.type];
+          const nodeTemplate = nodes.templates[node.data.type];
 
           if (!nodeTemplate) {
             // Node type not found
@@ -107,7 +105,7 @@ const selector = createMemoizedSelector(
               number: i + 1,
             })
           );
-        } else if (ca.model.base_model !== model?.base_model) {
+        } else if (ca.model.base !== model?.base) {
           // This should never happen, just a sanity check
           reasons.push(
             i18n.t('parameters.invoke.incompatibleBaseModelForControlAdapter', {

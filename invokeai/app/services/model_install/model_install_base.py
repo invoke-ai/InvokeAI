@@ -14,11 +14,13 @@ from typing_extensions import Annotated
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase
-from invokeai.app.services.events import EventServiceBase
+from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import ModelRecordServiceBase
 from invokeai.backend.model_manager import AnyModelConfig, ModelRepoVariant
-from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore
+from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
+
+from ..model_metadata import ModelMetadataStoreBase
 
 
 class InstallStatus(str, Enum):
@@ -26,6 +28,7 @@ class InstallStatus(str, Enum):
 
     WAITING = "waiting"  # waiting to be dequeued
     DOWNLOADING = "downloading"  # downloading of model files in process
+    DOWNLOADS_DONE = "downloads_done"  # downloading done, waiting to run
     RUNNING = "running"  # being processed
     COMPLETED = "completed"  # finished running
     ERROR = "error"  # terminated with an error message
@@ -127,8 +130,8 @@ class HFModelSource(StringLikeSource):
     def __str__(self) -> str:
         """Return string version of repoid when string rep needed."""
         base: str = self.repo_id
+        base += f":{self.variant or ''}"
         base += f":{self.subfolder}" if self.subfolder else ""
-        base += f" ({self.variant})" if self.variant else ""
         return base
 
 
@@ -154,6 +157,7 @@ class ModelInstallJob(BaseModel):
 
     id: int = Field(description="Unique ID for this job")
     status: InstallStatus = Field(default=InstallStatus.WAITING, description="Current status of install process")
+    error_reason: Optional[str] = Field(default=None, description="Information about why the job failed")
     config_in: Dict[str, Any] = Field(
         default_factory=dict, description="Configuration information (e.g. 'description') to apply to model."
     )
@@ -175,6 +179,12 @@ class ModelInstallJob(BaseModel):
     download_parts: Set[DownloadJob] = Field(
         default_factory=set, description="Download jobs contributing to this install"
     )
+    error: Optional[str] = Field(
+        default=None, description="On an error condition, this field will contain the text of the exception"
+    )
+    error_traceback: Optional[str] = Field(
+        default=None, description="On an error condition, this field will contain the exception traceback"
+    )
     # internal flags and transitory settings
     _install_tmpdir: Optional[Path] = PrivateAttr(default=None)
     _exception: Optional[Exception] = PrivateAttr(default=None)
@@ -182,7 +192,10 @@ class ModelInstallJob(BaseModel):
     def set_error(self, e: Exception) -> None:
         """Record the error and traceback from an exception."""
         self._exception = e
+        self.error = str(e)
+        self.error_traceback = self._format_error(e)
         self.status = InstallStatus.ERROR
+        self.error_reason = self._exception.__class__.__name__ if self._exception else None
 
     def cancel(self) -> None:
         """Call to cancel the job."""
@@ -193,10 +206,9 @@ class ModelInstallJob(BaseModel):
         """Class name of the exception that led to status==ERROR."""
         return self._exception.__class__.__name__ if self._exception else None
 
-    @property
-    def error(self) -> Optional[str]:
+    def _format_error(self, exception: Exception) -> str:
         """Error traceback."""
-        return "".join(traceback.format_exception(self._exception)) if self._exception else None
+        return "".join(traceback.format_exception(exception))
 
     @property
     def cancelled(self) -> bool:
@@ -217,6 +229,11 @@ class ModelInstallJob(BaseModel):
     def downloading(self) -> bool:
         """Return true if job is downloading."""
         return self.status == InstallStatus.DOWNLOADING
+
+    @property
+    def downloads_done(self) -> bool:
+        """Return true if job's downloads ae done."""
+        return self.status == InstallStatus.DOWNLOADS_DONE
 
     @property
     def running(self) -> bool:
@@ -243,7 +260,7 @@ class ModelInstallServiceBase(ABC):
         app_config: InvokeAIAppConfig,
         record_store: ModelRecordServiceBase,
         download_queue: DownloadQueueServiceBase,
-        metadata_store: ModelMetadataStore,
+        metadata_store: ModelMetadataStoreBase,
         event_bus: Optional["EventServiceBase"] = None,
     ):
         """
@@ -325,6 +342,43 @@ class ModelInstallServiceBase(ABC):
         """
 
     @abstractmethod
+    def heuristic_import(
+        self,
+        source: str,
+        config: Optional[Dict[str, Any]] = None,
+        access_token: Optional[str] = None,
+    ) -> ModelInstallJob:
+        r"""Install the indicated model using heuristics to interpret user intentions.
+
+        :param source: String source
+        :param config: Optional dict. Any fields in this dict
+         will override corresponding autoassigned probe fields in the
+         model's config record as described in `import_model()`.
+        :param access_token: Optional access token for remote sources.
+
+        The source can be:
+        1. A local file path in posix() format (`/foo/bar` or `C:\foo\bar`)
+        2. An http or https URL (`https://foo.bar/foo`)
+        3. A HuggingFace repo_id (`foo/bar`, `foo/bar:fp16`, `foo/bar:fp16:vae`)
+
+        We extend the HuggingFace repo_id syntax to include the variant and the
+        subfolder or path. The following are acceptable alternatives:
+            stabilityai/stable-diffusion-v4
+            stabilityai/stable-diffusion-v4:fp16
+            stabilityai/stable-diffusion-v4:fp16:vae
+            stabilityai/stable-diffusion-v4::/checkpoints/sd4.safetensors
+            stabilityai/stable-diffusion-v4:onnx:vae
+
+        Because a local file path can look like a huggingface repo_id, the logic
+        first checks whether the path exists on disk, and if not, it is treated as
+        a parseable huggingface repo.
+
+        The previous support for recursing into a local folder and loading all model-like files
+        has been removed.
+        """
+        pass
+
+    @abstractmethod
     def import_model(
         self,
         source: ModelSource,
@@ -386,6 +440,18 @@ class ModelInstallServiceBase(ABC):
         """Cancel the indicated job."""
 
     @abstractmethod
+    def wait_for_job(self, job: ModelInstallJob, timeout: int = 0) -> ModelInstallJob:
+        """Wait for the indicated job to reach a terminal state.
+
+        This will block until the indicated install job has completed,
+        been cancelled, or errored out.
+
+        :param job: The job to wait on.
+        :param timeout: Wait up to indicated number of seconds. Raise a TimeoutError if
+        the job hasn't completed within the indicated time.
+        """
+
+    @abstractmethod
     def wait_for_installs(self, timeout: int = 0) -> List[ModelInstallJob]:
         """
         Wait for all pending installs to complete.
@@ -394,7 +460,8 @@ class ModelInstallServiceBase(ABC):
         completed, been cancelled, or errored out.
 
         :param timeout: Wait up to indicated number of seconds. Raise an Exception('timeout') if
-        installs do not complete within the indicated time.
+        installs do not complete within the indicated time. A timeout of zero (the default)
+        will block indefinitely until the installs complete.
         """
 
     @abstractmethod
@@ -410,3 +477,22 @@ class ModelInstallServiceBase(ABC):
     @abstractmethod
     def sync_to_config(self) -> None:
         """Synchronize models on disk to those in the model record database."""
+
+    @abstractmethod
+    def download_and_cache(self, source: Union[str, AnyHttpUrl], access_token: Optional[str] = None) -> Path:
+        """
+        Download the model file located at source to the models cache and return its Path.
+
+        :param source: A Url or a string that can be converted into one.
+        :param access_token: Optional access token to access restricted resources.
+
+        The model file will be downloaded into the system-wide model cache
+        (`models/.cache`) if it isn't already there. Note that the model cache
+        is periodically cleared of infrequently-used entries when the model
+        converter runs.
+
+        Note that this doesn't automaticallly install or register the model, but is
+        intended for use by nodes that need access to models that aren't directly
+        supported by InvokeAI. The downloading process takes advantage of the download queue
+        to avoid interrupting other operations.
+        """

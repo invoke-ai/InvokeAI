@@ -2,7 +2,7 @@ from typing import Optional
 
 from PIL.Image import Image as PILImageType
 
-from invokeai.app.invocations.baseinvocation import MetadataField
+from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
@@ -154,7 +154,7 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error("Image record not found")
             raise
         except Exception as e:
-            self.__invoker.services.logger.error("Problem getting image DTO")
+            self.__invoker.services.logger.error("Problem getting image metadata")
             raise e
 
     def get_workflow(self, image_name: str) -> Optional[WorkflowWithoutID]:

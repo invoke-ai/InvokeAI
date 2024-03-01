@@ -7,9 +7,7 @@ import safetensors.torch
 import torch
 from picklescan.scanner import scan_file_path
 
-from invokeai.backend.model_management.models.base import read_checkpoint_meta
-from invokeai.backend.model_management.models.ip_adapter import IPAdapterModelFormat
-from invokeai.backend.model_management.util import lora_token_vector_length
+import invokeai.backend.util.logging as logger
 from invokeai.backend.util.util import SilenceWarnings
 
 from .config import (
@@ -18,18 +16,24 @@ from .config import (
     InvalidModelConfigException,
     ModelConfigFactory,
     ModelFormat,
+    ModelRepoVariant,
     ModelType,
     ModelVariantType,
     SchedulerPredictionType,
 )
 from .hash import FastModelHash
+from .util.model_util import lora_token_vector_length, read_checkpoint_meta
 
 CkptType = Dict[str, Any]
 
 LEGACY_CONFIGS: Dict[BaseModelType, Dict[ModelVariantType, Union[str, Dict[SchedulerPredictionType, str]]]] = {
     BaseModelType.StableDiffusion1: {
-        ModelVariantType.Normal: "v1-inference.yaml",
+        ModelVariantType.Normal: {
+            SchedulerPredictionType.Epsilon: "v1-inference.yaml",
+            SchedulerPredictionType.VPrediction: "v1-inference-v.yaml",
+        },
         ModelVariantType.Inpaint: "v1-inpainting-inference.yaml",
+        ModelVariantType.Depth: "v2-midas-inference.yaml",
     },
     BaseModelType.StableDiffusion2: {
         ModelVariantType.Normal: {
@@ -70,6 +74,10 @@ class ProbeBase(object):
 
     def get_scheduler_prediction_type(self) -> Optional[SchedulerPredictionType]:
         """Get model scheduler prediction type."""
+        return None
+
+    def get_image_encoder_model_id(self) -> Optional[str]:
+        """Get image encoder (IP adapters only)."""
         return None
 
 
@@ -147,6 +155,7 @@ class ModelProbe(object):
         fields["base"] = fields.get("base") or probe.get_base_type()
         fields["variant"] = fields.get("variant") or probe.get_variant_type()
         fields["prediction_type"] = fields.get("prediction_type") or probe.get_scheduler_prediction_type()
+        fields["image_encoder_model_id"] = fields.get("image_encoder_model_id") or probe.get_image_encoder_model_id()
         fields["name"] = fields.get("name") or cls.get_model_name(model_path)
         fields["description"] = (
             fields.get("description") or f"{fields['base'].value} {fields['type'].value} model {fields['name']}"
@@ -154,6 +163,9 @@ class ModelProbe(object):
         fields["format"] = fields.get("format") or probe.get_format()
         fields["original_hash"] = fields.get("original_hash") or hash
         fields["current_hash"] = fields.get("current_hash") or hash
+
+        if format_type == ModelFormat.Diffusers and hasattr(probe, "get_repo_variant"):
+            fields["repo_variant"] = fields.get("repo_variant") or probe.get_repo_variant()
 
         # additional fields needed for main and controlnet models
         if fields["type"] in [ModelType.Main, ModelType.ControlNet] and fields["format"] == ModelFormat.Checkpoint:
@@ -176,7 +188,7 @@ class ModelProbe(object):
                 and fields["prediction_type"] == SchedulerPredictionType.VPrediction
             )
 
-        model_info = ModelConfigFactory.make_config(fields)
+        model_info = ModelConfigFactory.make_config(fields)  # , key=fields.get("key", None))
         return model_info
 
     @classmethod
@@ -477,6 +489,21 @@ class FolderProbeBase(ProbeBase):
     def get_format(self) -> ModelFormat:
         return ModelFormat("diffusers")
 
+    def get_repo_variant(self) -> ModelRepoVariant:
+        # get all files ending in .bin or .safetensors
+        weight_files = list(self.model_path.glob("**/*.safetensors"))
+        weight_files.extend(list(self.model_path.glob("**/*.bin")))
+        for x in weight_files:
+            if ".fp16" in x.suffixes:
+                return ModelRepoVariant.FP16
+            if "openvino_model" in x.name:
+                return ModelRepoVariant.OPENVINO
+            if "flax_model" in x.name:
+                return ModelRepoVariant.FLAX
+            if x.suffix == ".onnx":
+                return ModelRepoVariant.ONNX
+        return ModelRepoVariant.DEFAULT
+
 
 class PipelineFolderProbe(FolderProbeBase):
     def get_base_type(self) -> BaseModelType:
@@ -567,12 +594,19 @@ class TextualInversionFolderProbe(FolderProbeBase):
         return TextualInversionCheckpointProbe(path).get_base_type()
 
 
-class ONNXFolderProbe(FolderProbeBase):
+class ONNXFolderProbe(PipelineFolderProbe):
+    def get_base_type(self) -> BaseModelType:
+        # Due to the way the installer is set up, the configuration file for safetensors
+        # will come along for the ride if both the onnx and safetensors forms
+        # share the same directory. We take advantage of this here.
+        if (self.model_path / "unet" / "config.json").exists():
+            return super().get_base_type()
+        else:
+            logger.warning('Base type probing is not implemented for ONNX models. Assuming "sd-1"')
+            return BaseModelType.StableDiffusion1
+
     def get_format(self) -> ModelFormat:
         return ModelFormat("onnx")
-
-    def get_base_type(self) -> BaseModelType:
-        return BaseModelType.StableDiffusion1
 
     def get_variant_type(self) -> ModelVariantType:
         return ModelVariantType.Normal
@@ -617,8 +651,8 @@ class LoRAFolderProbe(FolderProbeBase):
 
 
 class IPAdapterFolderProbe(FolderProbeBase):
-    def get_format(self) -> IPAdapterModelFormat:
-        return IPAdapterModelFormat.InvokeAI.value
+    def get_format(self) -> ModelFormat:
+        return ModelFormat.InvokeAI
 
     def get_base_type(self) -> BaseModelType:
         model_file = self.model_path / "ip_adapter.bin"
@@ -637,6 +671,14 @@ class IPAdapterFolderProbe(FolderProbeBase):
             raise InvalidModelConfigException(
                 f"IP-Adapter had unexpected cross-attention dimension: {cross_attention_dim}."
             )
+
+    def get_image_encoder_model_id(self) -> Optional[str]:
+        encoder_id_path = self.model_path / "image_encoder.txt"
+        if not encoder_id_path.exists():
+            return None
+        with open(encoder_id_path, "r") as f:
+            image_encoder_model = f.readline().strip()
+        return image_encoder_model
 
 
 class CLIPVisionFolderProbe(FolderProbeBase):

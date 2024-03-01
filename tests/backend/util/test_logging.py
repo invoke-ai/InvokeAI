@@ -1,6 +1,7 @@
 """
 Test interaction of logging with configuration system.
 """
+
 import io
 import logging
 import re

@@ -3,7 +3,7 @@
 
 from typing import Any, Dict, List, Optional, Union
 
-from invokeai.app.services.invocation_processor.invocation_processor_common import ProgressImage
+from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.session_queue.session_queue_common import (
     BatchStatus,
     EnqueueBatchResult,
@@ -11,12 +11,12 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueStatus,
 )
 from invokeai.app.util.misc import get_timestamp
-from invokeai.backend.model_management.model_manager import ModelInfo
-from invokeai.backend.model_management.models.base import BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager import AnyModelConfig
 
 
 class EventServiceBase:
     queue_event: str = "queue_event"
+    bulk_download_event: str = "bulk_download_event"
     download_event: str = "download_event"
     model_event: str = "model_event"
 
@@ -24,6 +24,14 @@ class EventServiceBase:
 
     def dispatch(self, event_name: str, payload: Any) -> None:
         pass
+
+    def _emit_bulk_download_event(self, event_name: str, payload: dict) -> None:
+        """Bulk download events are emitted to a room with queue_id as the room name"""
+        payload["timestamp"] = get_timestamp()
+        self.dispatch(
+            event_name=EventServiceBase.bulk_download_event,
+            payload={"event": event_name, "data": payload},
+        )
 
     def __emit_queue_event(self, event_name: str, payload: dict) -> None:
         """Queue events are emitted to a room with queue_id as the room name"""
@@ -55,7 +63,7 @@ class EventServiceBase:
         queue_item_id: int,
         queue_batch_id: str,
         graph_execution_state_id: str,
-        node: dict,
+        node_id: str,
         source_node_id: str,
         progress_image: Optional[ProgressImage],
         step: int,
@@ -70,7 +78,7 @@ class EventServiceBase:
                 "queue_item_id": queue_item_id,
                 "queue_batch_id": queue_batch_id,
                 "graph_execution_state_id": graph_execution_state_id,
-                "node_id": node.get("id"),
+                "node_id": node_id,
                 "source_node_id": source_node_id,
                 "progress_image": progress_image.model_dump() if progress_image is not None else None,
                 "step": step,
@@ -171,10 +179,7 @@ class EventServiceBase:
         queue_item_id: int,
         queue_batch_id: str,
         graph_execution_state_id: str,
-        model_name: str,
-        base_model: BaseModelType,
-        model_type: ModelType,
-        submodel: SubModelType,
+        model_config: AnyModelConfig,
     ) -> None:
         """Emitted when a model is requested"""
         self.__emit_queue_event(
@@ -184,10 +189,7 @@ class EventServiceBase:
                 "queue_item_id": queue_item_id,
                 "queue_batch_id": queue_batch_id,
                 "graph_execution_state_id": graph_execution_state_id,
-                "model_name": model_name,
-                "base_model": base_model,
-                "model_type": model_type,
-                "submodel": submodel,
+                "model_config": model_config.model_dump(),
             },
         )
 
@@ -197,11 +199,7 @@ class EventServiceBase:
         queue_item_id: int,
         queue_batch_id: str,
         graph_execution_state_id: str,
-        model_name: str,
-        base_model: BaseModelType,
-        model_type: ModelType,
-        submodel: SubModelType,
-        model_info: ModelInfo,
+        model_config: AnyModelConfig,
     ) -> None:
         """Emitted when a model is correctly loaded (returns model info)"""
         self.__emit_queue_event(
@@ -211,59 +209,7 @@ class EventServiceBase:
                 "queue_item_id": queue_item_id,
                 "queue_batch_id": queue_batch_id,
                 "graph_execution_state_id": graph_execution_state_id,
-                "model_name": model_name,
-                "base_model": base_model,
-                "model_type": model_type,
-                "submodel": submodel,
-                "hash": model_info.hash,
-                "location": str(model_info.location),
-                "precision": str(model_info.precision),
-            },
-        )
-
-    def emit_session_retrieval_error(
-        self,
-        queue_id: str,
-        queue_item_id: int,
-        queue_batch_id: str,
-        graph_execution_state_id: str,
-        error_type: str,
-        error: str,
-    ) -> None:
-        """Emitted when session retrieval fails"""
-        self.__emit_queue_event(
-            event_name="session_retrieval_error",
-            payload={
-                "queue_id": queue_id,
-                "queue_item_id": queue_item_id,
-                "queue_batch_id": queue_batch_id,
-                "graph_execution_state_id": graph_execution_state_id,
-                "error_type": error_type,
-                "error": error,
-            },
-        )
-
-    def emit_invocation_retrieval_error(
-        self,
-        queue_id: str,
-        queue_item_id: int,
-        queue_batch_id: str,
-        graph_execution_state_id: str,
-        node_id: str,
-        error_type: str,
-        error: str,
-    ) -> None:
-        """Emitted when invocation retrieval fails"""
-        self.__emit_queue_event(
-            event_name="invocation_retrieval_error",
-            payload={
-                "queue_id": queue_id,
-                "queue_item_id": queue_item_id,
-                "queue_batch_id": queue_batch_id,
-                "graph_execution_state_id": graph_execution_state_id,
-                "node_id": node_id,
-                "error_type": error_type,
-                "error": error,
+                "model_config": model_config.model_dump(),
             },
         )
 
@@ -411,6 +357,7 @@ class EventServiceBase:
         bytes: int,
         total_bytes: int,
         parts: List[Dict[str, Union[str, int]]],
+        id: int,
     ) -> None:
         """
         Emit at intervals while the install job is in progress (remote models only).
@@ -430,6 +377,7 @@ class EventServiceBase:
                 "bytes": bytes,
                 "total_bytes": total_bytes,
                 "parts": parts,
+                "id": id,
             },
         )
 
@@ -444,7 +392,7 @@ class EventServiceBase:
             payload={"source": source},
         )
 
-    def emit_model_install_completed(self, source: str, key: str, total_bytes: Optional[int] = None) -> None:
+    def emit_model_install_completed(self, source: str, key: str, id: int, total_bytes: Optional[int] = None) -> None:
         """
         Emit when an install job is completed successfully.
 
@@ -454,11 +402,7 @@ class EventServiceBase:
         """
         self.__emit_model_event(
             event_name="model_install_completed",
-            payload={
-                "source": source,
-                "total_bytes": total_bytes,
-                "key": key,
-            },
+            payload={"source": source, "total_bytes": total_bytes, "key": key, "id": id},
         )
 
     def emit_model_install_cancelled(self, source: str) -> None:
@@ -472,12 +416,7 @@ class EventServiceBase:
             payload={"source": source},
         )
 
-    def emit_model_install_error(
-        self,
-        source: str,
-        error_type: str,
-        error: str,
-    ) -> None:
+    def emit_model_install_error(self, source: str, error_type: str, error: str, id: int) -> None:
         """
         Emit when an install job encounters an exception.
 
@@ -487,9 +426,45 @@ class EventServiceBase:
         """
         self.__emit_model_event(
             event_name="model_install_error",
+            payload={"source": source, "error_type": error_type, "error": error, "id": id},
+        )
+
+    def emit_bulk_download_started(
+        self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+    ) -> None:
+        """Emitted when a bulk download starts"""
+        self._emit_bulk_download_event(
+            event_name="bulk_download_started",
             payload={
-                "source": source,
-                "error_type": error_type,
+                "bulk_download_id": bulk_download_id,
+                "bulk_download_item_id": bulk_download_item_id,
+                "bulk_download_item_name": bulk_download_item_name,
+            },
+        )
+
+    def emit_bulk_download_completed(
+        self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+    ) -> None:
+        """Emitted when a bulk download completes"""
+        self._emit_bulk_download_event(
+            event_name="bulk_download_completed",
+            payload={
+                "bulk_download_id": bulk_download_id,
+                "bulk_download_item_id": bulk_download_item_id,
+                "bulk_download_item_name": bulk_download_item_name,
+            },
+        )
+
+    def emit_bulk_download_failed(
+        self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str, error: str
+    ) -> None:
+        """Emitted when a bulk download fails"""
+        self._emit_bulk_download_event(
+            event_name="bulk_download_failed",
+            payload={
+                "bulk_download_id": bulk_download_id,
+                "bulk_download_item_id": bulk_download_item_id,
+                "bulk_download_item_name": bulk_download_item_name,
                 "error": error,
             },
         )

@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from invokeai.backend.model_management.models.base import BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager import BaseModelType, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import UNetAttentionPatcher
 from invokeai.backend.util.test_utils import install_and_load_model
 

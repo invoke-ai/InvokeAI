@@ -1,14 +1,12 @@
 """Utility (backend) functions used by model_install.py"""
-import re
+
 from logging import Logger
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import omegaconf
-from huggingface_hub import HfFolder
 from pydantic import BaseModel, Field
 from pydantic.dataclasses import dataclass
-from pydantic.networks import AnyHttpUrl
 from requests import HTTPError
 from tqdm import tqdm
 
@@ -18,13 +16,10 @@ from invokeai.app.services.download import DownloadQueueService
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.model_install import (
-    HFModelSource,
-    LocalModelSource,
     ModelInstallService,
     ModelInstallServiceBase,
-    ModelSource,
-    URLModelSource,
 )
+from invokeai.app.services.model_metadata import ModelMetadataStoreSQL
 from invokeai.app.services.model_records import ModelRecordServiceBase, ModelRecordServiceSQL
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.backend.model_manager import (
@@ -36,7 +31,7 @@ from invokeai.backend.model_manager.metadata import UnknownMetadataException
 from invokeai.backend.util.logging import InvokeAILogger
 
 # name of the starter models file
-INITIAL_MODELS = "INITIAL_MODELS2.yaml"
+INITIAL_MODELS = "INITIAL_MODELS.yaml"
 
 
 def initialize_record_store(app_config: InvokeAIAppConfig) -> ModelRecordServiceBase:
@@ -44,7 +39,7 @@ def initialize_record_store(app_config: InvokeAIAppConfig) -> ModelRecordService
     logger = InvokeAILogger.get_logger(config=app_config)
     image_files = DiskImageFileStorage(f"{app_config.output_path}/images")
     db = init_db(config=app_config, logger=logger, image_files=image_files)
-    obj: ModelRecordServiceBase = ModelRecordServiceSQL(db)
+    obj: ModelRecordServiceBase = ModelRecordServiceSQL(db, ModelMetadataStoreSQL(db))
     return obj
 
 
@@ -53,12 +48,10 @@ def initialize_installer(
 ) -> ModelInstallServiceBase:
     """Return an initialized ModelInstallService object."""
     record_store = initialize_record_store(app_config)
-    metadata_store = record_store.metadata_store
     download_queue = DownloadQueueService()
     installer = ModelInstallService(
         app_config=app_config,
         record_store=record_store,
-        metadata_store=metadata_store,
         download_queue=download_queue,
         event_bus=event_bus,
     )
@@ -98,11 +91,13 @@ class TqdmEventService(EventServiceBase):
         super().__init__()
         self._bars: Dict[str, tqdm] = {}
         self._last: Dict[str, int] = {}
+        self._logger = InvokeAILogger.get_logger(__name__)
 
     def dispatch(self, event_name: str, payload: Any) -> None:
         """Dispatch an event by appending it to self.events."""
+        data = payload["data"]
+        source = data["source"]
         if payload["event"] == "model_install_downloading":
-            data = payload["data"]
             dest = data["local_path"]
             total_bytes = data["total_bytes"]
             bytes = data["bytes"]
@@ -111,6 +106,12 @@ class TqdmEventService(EventServiceBase):
                 self._last[dest] = 0
             self._bars[dest].update(bytes - self._last[dest])
             self._last[dest] = bytes
+        elif payload["event"] == "model_install_completed":
+            self._logger.info(f"{source}: installed successfully.")
+        elif payload["event"] == "model_install_error":
+            self._logger.warning(f"{source}: installation failed with error {data['error']}")
+        elif payload["event"] == "model_install_cancelled":
+            self._logger.warning(f"{source}: installation cancelled")
 
 
 class InstallHelper(object):
@@ -218,29 +219,13 @@ class InstallHelper(object):
                     additional_models.append(reverse_source[requirement])
         model_list.extend(additional_models)
 
-    def _make_install_source(self, model_info: UnifiedModelInfo) -> ModelSource:
-        assert model_info.source
-        model_path_id_or_url = model_info.source.strip("\"' ")
-        model_path = Path(model_path_id_or_url)
-
-        if model_path.exists():  # local file on disk
-            return LocalModelSource(path=model_path.absolute(), inplace=True)
-        if re.match(r"^[^/]+/[^/]+$", model_path_id_or_url):  # hugging face repo_id
-            return HFModelSource(
-                repo_id=model_path_id_or_url,
-                access_token=HfFolder.get_token(),
-                subfolder=model_info.subfolder,
-            )
-        if re.match(r"^(http|https):", model_path_id_or_url):
-            return URLModelSource(url=AnyHttpUrl(model_path_id_or_url))
-        raise ValueError(f"Unsupported model source: {model_path_id_or_url}")
-
     def add_or_delete(self, selections: InstallSelections) -> None:
         """Add or delete selected models."""
         installer = self._installer
         self._add_required_models(selections.install_models)
         for model in selections.install_models:
-            source = self._make_install_source(model)
+            assert model.source
+            model_path_id_or_url = model.source.strip("\"' ")
             config = (
                 {
                     "description": model.description,
@@ -251,12 +236,12 @@ class InstallHelper(object):
             )
 
             try:
-                installer.import_model(
-                    source=source,
+                installer.heuristic_import(
+                    source=model_path_id_or_url,
                     config=config,
                 )
             except (UnknownMetadataException, InvalidModelConfigException, HTTPError, OSError) as e:
-                self._logger.warning(f"{source}: {e}")
+                self._logger.warning(f"{model.source}: {e}")
 
         for model_to_remove in selections.remove_models:
             parts = model_to_remove.split("/")
@@ -270,12 +255,14 @@ class InstallHelper(object):
                 model_name=model_name,
             )
             if len(matches) > 1:
-                print(f"{model} is ambiguous. Please use model_type:model_name (e.g. main:my_model) to disambiguate.")
+                self._logger.error(
+                    "{model_to_remove} is ambiguous. Please use model_base/model_type/model_name (e.g. sd-1/main/my_model) to disambiguate"
+                )
             elif not matches:
-                print(f"{model}: unknown model")
+                self._logger.error(f"{model_to_remove}: unknown model")
             else:
                 for m in matches:
-                    print(f"Deleting {m.type}:{m.name}")
+                    self._logger.info(f"Deleting {m.type}:{m.name}")
                     installer.delete(m.key)
 
         installer.wait_for_installs()

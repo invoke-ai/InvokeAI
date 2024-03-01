@@ -1,15 +1,11 @@
-import { createAction } from '@reduxjs/toolkit';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageCache } from 'services/api/types';
 import { getListImagesUrl, imagesSelectors } from 'services/api/util';
 
-import { startAppListening } from '..';
-
-export const appStarted = createAction('app/appStarted');
-
-export const addFirstListImagesListener = () => {
+export const addFirstListImagesListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher: imagesApi.endpoints.listImages.matchFulfilled,
     effect: async (action, { dispatch, unsubscribe, cancelActiveListeners }) => {

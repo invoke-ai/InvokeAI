@@ -1,6 +1,3 @@
-// bounding box anchor size
-export const TRANSFORMER_ANCHOR_SIZE = 15;
-
 // canvas wheel zoom exponential scale factor
 export const CANVAS_SCALE_BY = 0.999;
 

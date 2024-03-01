@@ -1,10 +1,8 @@
 import type { EntityState, Update } from '@reduxjs/toolkit';
 import type { PatchCollection } from '@reduxjs/toolkit/dist/query/core/buildThunks';
-import { logger } from 'app/logging/logger';
+import type { JSONObject } from 'common/types';
 import type { BoardId } from 'features/gallery/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES, IMAGE_LIMIT } from 'features/gallery/store/types';
-import type { CoreMetadata } from 'features/nodes/types/metadata';
-import { zCoreMetadata } from 'features/nodes/types/metadata';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { keyBy } from 'lodash-es';
@@ -26,8 +24,24 @@ import {
 } from 'services/api/util';
 
 import type { ApiTagDescription } from '..';
-import { api, LIST_TAG } from '..';
-import { boardsApi } from './boards';
+import { api, buildV1Url, LIST_TAG } from '..';
+import { boardsApi, buildBoardsUrl } from './boards';
+
+/**
+ * Builds an endpoint URL for the images router
+ * @example
+ * buildImagesUrl('some-path')
+ * // '/api/v1/images/some-path'
+ */
+const buildImagesUrl = (path: string = '') => buildV1Url(`images/${path}`);
+
+/**
+ * Builds an endpoint URL for the board_images router
+ * @example
+ * buildBoardImagesUrl('some-path')
+ * // '/api/v1/board_images/some-path'
+ */
+const buildBoardImagesUrl = (path: string = '') => buildV1Url(`board_images/${path}`);
 
 export const imagesApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -90,34 +104,21 @@ export const imagesApi = api.injectEndpoints({
       keepUnusedDataFor: 86400,
     }),
     getIntermediatesCount: build.query<number, void>({
-      query: () => ({ url: 'images/intermediates' }),
+      query: () => ({ url: buildImagesUrl('intermediates') }),
       providesTags: ['IntermediatesCount', 'FetchOnReconnect'],
     }),
     clearIntermediates: build.mutation<number, void>({
-      query: () => ({ url: `images/intermediates`, method: 'DELETE' }),
+      query: () => ({ url: buildImagesUrl('intermediates'), method: 'DELETE' }),
       invalidatesTags: ['IntermediatesCount'],
     }),
     getImageDTO: build.query<ImageDTO, string>({
-      query: (image_name) => ({ url: `images/i/${image_name}` }),
+      query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}`) }),
       providesTags: (result, error, image_name) => [{ type: 'Image', id: image_name }],
       keepUnusedDataFor: 86400, // 24 hours
     }),
-    getImageMetadata: build.query<CoreMetadata | undefined, string>({
-      query: (image_name) => ({ url: `images/i/${image_name}/metadata` }),
+    getImageMetadata: build.query<JSONObject | undefined, string>({
+      query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}/metadata`) }),
       providesTags: (result, error, image_name) => [{ type: 'ImageMetadata', id: image_name }],
-      transformResponse: (
-        response: paths['/api/v1/images/i/{image_name}/metadata']['get']['responses']['200']['content']['application/json']
-      ) => {
-        if (response) {
-          const result = zCoreMetadata.safeParse(response);
-          if (result.success) {
-            return result.data;
-          } else {
-            logger('images').warn('Problem parsing metadata');
-          }
-        }
-        return;
-      },
       keepUnusedDataFor: 86400, // 24 hours
     }),
     getImageWorkflow: build.query<
@@ -130,7 +131,7 @@ export const imagesApi = api.injectEndpoints({
     }),
     deleteImage: build.mutation<void, ImageDTO>({
       query: ({ image_name }) => ({
-        url: `images/i/${image_name}`,
+        url: buildImagesUrl(`i/${image_name}`),
         method: 'DELETE',
       }),
       async onQueryStarted(imageDTO, { dispatch, queryFulfilled }) {
@@ -185,7 +186,7 @@ export const imagesApi = api.injectEndpoints({
       query: ({ imageDTOs }) => {
         const image_names = imageDTOs.map((imageDTO) => imageDTO.image_name);
         return {
-          url: `images/delete`,
+          url: buildImagesUrl('delete'),
           method: 'POST',
           body: {
             image_names,
@@ -258,7 +259,7 @@ export const imagesApi = api.injectEndpoints({
      */
     changeImageIsIntermediate: build.mutation<ImageDTO, { imageDTO: ImageDTO; is_intermediate: boolean }>({
       query: ({ imageDTO, is_intermediate }) => ({
-        url: `images/i/${imageDTO.image_name}`,
+        url: buildImagesUrl(`i/${imageDTO.image_name}`),
         method: 'PATCH',
         body: { is_intermediate },
       }),
@@ -376,40 +377,6 @@ export const imagesApi = api.injectEndpoints({
       },
     }),
     /**
-     * Change an image's `session_id` association.
-     */
-    changeImageSessionId: build.mutation<ImageDTO, { imageDTO: ImageDTO; session_id: string }>({
-      query: ({ imageDTO, session_id }) => ({
-        url: `images/i/${imageDTO.image_name}`,
-        method: 'PATCH',
-        body: { session_id },
-      }),
-      async onQueryStarted({ imageDTO, session_id }, { dispatch, queryFulfilled }) {
-        /**
-         * Cache changes for `changeImageSessionId`:
-         * - *update* getImageDTO
-         */
-
-        // Store patches so we can undo if the query fails
-        const patches: PatchCollection[] = [];
-
-        // *update* getImageDTO
-        patches.push(
-          dispatch(
-            imagesApi.util.updateQueryData('getImageDTO', imageDTO.image_name, (draft) => {
-              Object.assign(draft, { session_id });
-            })
-          )
-        );
-
-        try {
-          await queryFulfilled;
-        } catch {
-          patches.forEach((patchResult) => patchResult.undo());
-        }
-      },
-    }),
-    /**
      * Star a list of images.
      */
     starImages: build.mutation<
@@ -417,7 +384,7 @@ export const imagesApi = api.injectEndpoints({
       { imageDTOs: ImageDTO[] }
     >({
       query: ({ imageDTOs: images }) => ({
-        url: `images/star`,
+        url: buildImagesUrl('star'),
         method: 'POST',
         body: { image_names: images.map((img) => img.image_name) },
       }),
@@ -511,7 +478,7 @@ export const imagesApi = api.injectEndpoints({
       { imageDTOs: ImageDTO[] }
     >({
       query: ({ imageDTOs: images }) => ({
-        url: `images/unstar`,
+        url: buildImagesUrl('unstar'),
         method: 'POST',
         body: { image_names: images.map((img) => img.image_name) },
       }),
@@ -611,7 +578,7 @@ export const imagesApi = api.injectEndpoints({
         const formData = new FormData();
         formData.append('file', file);
         return {
-          url: `images/upload`,
+          url: buildImagesUrl('upload'),
           method: 'POST',
           body: formData,
           params: {
@@ -674,7 +641,7 @@ export const imagesApi = api.injectEndpoints({
     }),
 
     deleteBoard: build.mutation<DeleteBoardResult, string>({
-      query: (board_id) => ({ url: `boards/${board_id}`, method: 'DELETE' }),
+      query: (board_id) => ({ url: buildBoardsUrl(board_id), method: 'DELETE' }),
       invalidatesTags: () => [
         { type: 'Board', id: LIST_TAG },
         // invalidate the 'No Board' cache
@@ -764,7 +731,7 @@ export const imagesApi = api.injectEndpoints({
 
     deleteBoardAndImages: build.mutation<DeleteBoardResult, string>({
       query: (board_id) => ({
-        url: `boards/${board_id}`,
+        url: buildBoardsUrl(board_id),
         method: 'DELETE',
         params: { include_images: true },
       }),
@@ -840,7 +807,7 @@ export const imagesApi = api.injectEndpoints({
       query: ({ board_id, imageDTO }) => {
         const { image_name } = imageDTO;
         return {
-          url: `board_images/`,
+          url: buildBoardImagesUrl(),
           method: 'POST',
           body: { board_id, image_name },
         };
@@ -961,7 +928,7 @@ export const imagesApi = api.injectEndpoints({
       query: ({ imageDTO }) => {
         const { image_name } = imageDTO;
         return {
-          url: `board_images/`,
+          url: buildBoardImagesUrl(),
           method: 'DELETE',
           body: { image_name },
         };
@@ -1080,7 +1047,7 @@ export const imagesApi = api.injectEndpoints({
       }
     >({
       query: ({ board_id, imageDTOs }) => ({
-        url: `board_images/batch`,
+        url: buildBoardImagesUrl('batch'),
         method: 'POST',
         body: {
           image_names: imageDTOs.map((i) => i.image_name),
@@ -1197,7 +1164,7 @@ export const imagesApi = api.injectEndpoints({
       }
     >({
       query: ({ imageDTOs }) => ({
-        url: `board_images/batch/delete`,
+        url: buildBoardImagesUrl('batch/delete'),
         method: 'POST',
         body: {
           image_names: imageDTOs.map((i) => i.image_name),
@@ -1321,7 +1288,7 @@ export const imagesApi = api.injectEndpoints({
       components['schemas']['Body_download_images_from_list']
     >({
       query: ({ image_names, board_id }) => ({
-        url: `images/download`,
+        url: buildImagesUrl('download'),
         method: 'POST',
         body: {
           image_names,
@@ -1335,13 +1302,10 @@ export const imagesApi = api.injectEndpoints({
 export const {
   useGetIntermediatesCountQuery,
   useListImagesQuery,
-  useLazyListImagesQuery,
   useGetImageDTOQuery,
   useGetImageMetadataQuery,
   useGetImageWorkflowQuery,
   useLazyGetImageWorkflowQuery,
-  useDeleteImageMutation,
-  useDeleteImagesMutation,
   useUploadImageMutation,
   useClearIntermediatesMutation,
   useAddImagesToBoardMutation,
@@ -1349,7 +1313,6 @@ export const {
   useAddImageToBoardMutation,
   useRemoveImageFromBoardMutation,
   useChangeImageIsIntermediateMutation,
-  useChangeImageSessionIdMutation,
   useDeleteBoardAndImagesMutation,
   useDeleteBoardMutation,
   useStarImagesMutation,

@@ -39,7 +39,6 @@ Typical usage:
   configs = store.search_by_attr(base_model='sd-2', model_type='main')
 """
 
-
 import json
 import sqlite3
 from math import ceil
@@ -54,8 +53,9 @@ from invokeai.backend.model_manager.config import (
     ModelFormat,
     ModelType,
 )
-from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore, UnknownMetadataException
+from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, UnknownMetadataException
 
+from ..model_metadata import ModelMetadataStoreBase, ModelMetadataStoreSQL
 from ..shared.sqlite.sqlite_database import SqliteDatabase
 from .model_records_base import (
     DuplicateModelException,
@@ -69,16 +69,16 @@ from .model_records_base import (
 class ModelRecordServiceSQL(ModelRecordServiceBase):
     """Implementation of the ModelConfigStore ABC using a SQL database."""
 
-    def __init__(self, db: SqliteDatabase):
+    def __init__(self, db: SqliteDatabase, metadata_store: ModelMetadataStoreBase):
         """
         Initialize a new object from preexisting sqlite3 connection and threading lock objects.
 
-        :param conn: sqlite3 connection object
-        :param lock: threading Lock object
+        :param db: Sqlite connection object
         """
         super().__init__()
         self._db = db
-        self._cursor = self._db.conn.cursor()
+        self._cursor = db.conn.cursor()
+        self._metadata_store = metadata_store
 
     @property
     def db(self) -> SqliteDatabase:
@@ -158,7 +158,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 self._db.conn.rollback()
                 raise e
 
-    def update_model(self, key: str, config: Union[dict, AnyModelConfig]) -> AnyModelConfig:
+    def update_model(self, key: str, config: Union[Dict[str, Any], AnyModelConfig]) -> AnyModelConfig:
         """
         Update the model, returning the updated version.
 
@@ -199,7 +199,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.lock:
             self._cursor.execute(
                 """--sql
-                SELECT config FROM model_config
+                SELECT config, strftime('%s',updated_at) FROM model_config
                 WHERE id=?;
                 """,
                 (key,),
@@ -207,7 +207,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             rows = self._cursor.fetchone()
             if not rows:
                 raise UnknownModelException("model not found")
-            model = ModelConfigFactory.make_config(json.loads(rows[0]))
+            model = ModelConfigFactory.make_config(json.loads(rows[0]), timestamp=rows[1])
         return model
 
     def exists(self, key: str) -> bool:
@@ -265,12 +265,14 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.lock:
             self._cursor.execute(
                 f"""--sql
-                select config FROM model_config
+                select config, strftime('%s',updated_at) FROM model_config
                 {where};
                 """,
                 tuple(bindings),
             )
-            results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
+            results = [
+                ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in self._cursor.fetchall()
+            ]
         return results
 
     def search_by_path(self, path: Union[str, Path]) -> List[AnyModelConfig]:
@@ -279,12 +281,14 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.lock:
             self._cursor.execute(
                 """--sql
-                SELECT config FROM model_config
+                SELECT config, strftime('%s',updated_at) FROM model_config
                 WHERE path=?;
                 """,
                 (str(path),),
             )
-            results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
+            results = [
+                ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in self._cursor.fetchall()
+            ]
         return results
 
     def search_by_hash(self, hash: str) -> List[AnyModelConfig]:
@@ -293,18 +297,20 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.lock:
             self._cursor.execute(
                 """--sql
-                SELECT config FROM model_config
+                SELECT config, strftime('%s',updated_at) FROM model_config
                 WHERE original_hash=?;
                 """,
                 (hash,),
             )
-            results = [ModelConfigFactory.make_config(json.loads(x[0])) for x in self._cursor.fetchall()]
+            results = [
+                ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in self._cursor.fetchall()
+            ]
         return results
 
     @property
-    def metadata_store(self) -> ModelMetadataStore:
+    def metadata_store(self) -> ModelMetadataStoreBase:
         """Return a ModelMetadataStore initialized on the same database."""
-        return ModelMetadataStore(self._db)
+        return self._metadata_store
 
     def get_metadata(self, key: str) -> Optional[AnyModelRepoMetadata]:
         """
@@ -325,18 +331,18 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         :param tags: Set of tags to search for. All tags must be present.
         """
-        store = ModelMetadataStore(self._db)
+        store = ModelMetadataStoreSQL(self._db)
         keys = store.search_by_tag(tags)
         return [self.get_model(x) for x in keys]
 
     def list_tags(self) -> Set[str]:
         """Return a unique set of all the model tags in the metadata database."""
-        store = ModelMetadataStore(self._db)
+        store = ModelMetadataStoreSQL(self._db)
         return store.list_tags()
 
     def list_all_metadata(self) -> List[Tuple[str, AnyModelRepoMetadata]]:
         """List metadata for all models that have it."""
-        store = ModelMetadataStore(self._db)
+        store = ModelMetadataStoreSQL(self._db)
         return store.list_all_metadata()
 
     def list_models(

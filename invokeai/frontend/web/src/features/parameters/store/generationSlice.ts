@@ -11,7 +11,6 @@ import type {
   ParameterCanvasCoherenceMode,
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
-  ParameterMaskBlurMethod,
   ParameterModel,
   ParameterPrecision,
   ParameterScheduler,
@@ -25,7 +24,7 @@ import type { ImageDTO } from 'services/api/types';
 
 import type { GenerationState } from './types';
 
-export const initialGenerationState: GenerationState = {
+const initialGenerationState: GenerationState = {
   _version: 1,
   cfgScale: 7.5,
   cfgRescaleMultiplier: 0,
@@ -38,9 +37,9 @@ export const initialGenerationState: GenerationState = {
   scheduler: 'euler',
   maskBlur: 16,
   maskBlurMethod: 'box',
-  canvasCoherenceMode: 'unmasked',
-  canvasCoherenceSteps: 20,
-  canvasCoherenceStrength: 0.3,
+  canvasCoherenceMode: 'Gaussian Blur',
+  canvasCoherenceMinDenoise: 0,
+  canvasCoherenceEdgeSize: 16,
   seed: 0,
   shouldFitToWidthHeight: true,
   shouldRandomizeSeed: true,
@@ -100,15 +99,6 @@ export const generationSlice = createSlice({
     setShouldFitToWidthHeight: (state, action: PayloadAction<boolean>) => {
       state.shouldFitToWidthHeight = action.payload;
     },
-    resetSeed: (state) => {
-      state.seed = -1;
-    },
-    resetParametersState: (state) => {
-      return {
-        ...state,
-        ...initialGenerationState,
-      };
-    },
     setShouldRandomizeSeed: (state, action: PayloadAction<boolean>) => {
       state.shouldRandomizeSeed = action.payload;
     },
@@ -118,17 +108,14 @@ export const generationSlice = createSlice({
     setMaskBlur: (state, action: PayloadAction<number>) => {
       state.maskBlur = action.payload;
     },
-    setMaskBlurMethod: (state, action: PayloadAction<ParameterMaskBlurMethod>) => {
-      state.maskBlurMethod = action.payload;
-    },
     setCanvasCoherenceMode: (state, action: PayloadAction<ParameterCanvasCoherenceMode>) => {
       state.canvasCoherenceMode = action.payload;
     },
-    setCanvasCoherenceSteps: (state, action: PayloadAction<number>) => {
-      state.canvasCoherenceSteps = action.payload;
+    setCanvasCoherenceEdgeSize: (state, action: PayloadAction<number>) => {
+      state.canvasCoherenceEdgeSize = action.payload;
     },
-    setCanvasCoherenceStrength: (state, action: PayloadAction<number>) => {
-      state.canvasCoherenceStrength = action.payload;
+    setCanvasCoherenceMinDenoise: (state, action: PayloadAction<number>) => {
+      state.canvasCoherenceMinDenoise = action.payload;
     },
     setInfillMethod: (state, action: PayloadAction<string>) => {
       state.infillMethod = action.payload;
@@ -158,15 +145,15 @@ export const generationSlice = createSlice({
         // Clamp ClipSkip Based On Selected Model
         // TODO(psyche): remove this special handling when https://github.com/invoke-ai/InvokeAI/issues/4583 is resolved
         // WIP PR here: https://github.com/invoke-ai/InvokeAI/pull/4624
-        if (newModel.base_model === 'sdxl') {
+        if (newModel.base === 'sdxl') {
           // We don't support clip skip for SDXL yet - it's not in the graphs
           state.clipSkip = 0;
         } else {
-          const { maxClip } = CLIP_SKIP_MAP[newModel.base_model];
+          const { maxClip } = CLIP_SKIP_MAP[newModel.base];
           state.clipSkip = clamp(state.clipSkip, 0, maxClip);
         }
 
-        if (action.meta.previousModel?.base_model === newModel.base_model) {
+        if (action.meta.previousModel?.base === newModel.base) {
           // The base model hasn't changed, we don't need to optimize the size
           return;
         }
@@ -261,8 +248,6 @@ export const generationSlice = createSlice({
 
 export const {
   clearInitialImage,
-  resetParametersState,
-  resetSeed,
   setCfgScale,
   setCfgRescaleMultiplier,
   setImg2imgStrength,
@@ -272,10 +257,9 @@ export const {
   setNegativePrompt,
   setScheduler,
   setMaskBlur,
-  setMaskBlurMethod,
   setCanvasCoherenceMode,
-  setCanvasCoherenceSteps,
-  setCanvasCoherenceStrength,
+  setCanvasCoherenceEdgeSize,
+  setCanvasCoherenceMinDenoise,
   setSeed,
   setShouldFitToWidthHeight,
   setShouldRandomizeSeed,
@@ -302,7 +286,7 @@ export const { selectOptimalDimension } = generationSlice.selectors;
 export const selectGenerationSlice = (state: RootState) => state.generation;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-export const migrateGenerationState = (state: any): GenerationState => {
+const migrateGenerationState = (state: any): GenerationState => {
   if (!('_version' in state)) {
     state._version = 1;
     state.aspectRatio = initialAspectRatioState;

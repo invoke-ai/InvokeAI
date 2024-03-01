@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
 import { controlAdapterImageProcessed } from 'features/controlAdapters/store/actions';
 import {
@@ -16,9 +17,7 @@ import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig, ImageDTO } from 'services/api/types';
 import { socketInvocationComplete } from 'services/events/actions';
 
-import { startAppListening } from '..';
-
-export const addControlNetImageProcessedListener = () => {
+export const addControlNetImageProcessedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: controlAdapterImageProcessed,
     effect: async (action, { dispatch, getState, take }) => {
@@ -51,6 +50,7 @@ export const addControlNetImageProcessedListener = () => {
                 image: { image_name: ca.controlImage },
               },
             },
+            edges: [],
           },
           runs: 1,
         },

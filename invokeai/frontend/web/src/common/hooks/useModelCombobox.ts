@@ -1,14 +1,14 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import type { EntityState } from '@reduxjs/toolkit';
+import type { ModelIdentifierWithBase } from 'features/nodes/types/common';
 import { map } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AnyModelConfigEntity } from 'services/api/endpoints/models';
-import { getModelId } from 'services/api/endpoints/models';
+import type { AnyModelConfig } from 'services/api/types';
 
-type UseModelComboboxArg<T extends AnyModelConfigEntity> = {
+type UseModelComboboxArg<T extends AnyModelConfig> = {
   modelEntities: EntityState<T, string> | undefined;
-  selectedModel?: Pick<T, 'base_model' | 'model_name' | 'model_type'> | null;
+  selectedModel?: ModelIdentifierWithBase | null;
   onChange: (value: T | null) => void;
   getIsDisabled?: (model: T) => boolean;
   optionsFilter?: (model: T) => boolean;
@@ -23,9 +23,7 @@ type UseModelComboboxReturn = {
   noOptionsMessage: () => string;
 };
 
-export const useModelCombobox = <T extends AnyModelConfigEntity>(
-  arg: UseModelComboboxArg<T>
-): UseModelComboboxReturn => {
+export const useModelCombobox = <T extends AnyModelConfig>(arg: UseModelComboboxArg<T>): UseModelComboboxReturn => {
   const { t } = useTranslation();
   const { modelEntities, selectedModel, getIsDisabled, onChange, isLoading, optionsFilter = () => true } = arg;
   const options = useMemo<ComboboxOption[]>(() => {
@@ -35,14 +33,14 @@ export const useModelCombobox = <T extends AnyModelConfigEntity>(
     return map(modelEntities.entities)
       .filter(optionsFilter)
       .map((model) => ({
-        label: model.model_name,
-        value: model.id,
+        label: model.name,
+        value: model.key,
         isDisabled: getIsDisabled ? getIsDisabled(model) : false,
       }));
   }, [optionsFilter, getIsDisabled, modelEntities]);
 
   const value = useMemo(
-    () => options.find((m) => (selectedModel ? m.value === getModelId(selectedModel) : false)),
+    () => options.find((m) => (selectedModel ? m.value === selectedModel.key : false)),
     [options, selectedModel]
   );
 

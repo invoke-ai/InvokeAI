@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.model_metadata import ModelMetadataStoreSQL
 from invokeai.app.services.model_records import (
     DuplicateModelException,
     ModelRecordOrderBy,
@@ -25,7 +26,7 @@ from invokeai.backend.model_manager.config import (
 )
 from invokeai.backend.model_manager.metadata import BaseMetadata
 from invokeai.backend.util.logging import InvokeAILogger
-from tests.backend.model_manager_2.model_manager_2_fixtures import *  # noqa F403
+from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 
@@ -36,7 +37,7 @@ def store(
     config = InvokeAIAppConfig(root=datadir)
     logger = InvokeAILogger.get_logger(config=config)
     db = create_mock_sqlite_database(config, logger)
-    return ModelRecordServiceSQL(db)
+    return ModelRecordServiceSQL(db, ModelMetadataStoreSQL(db))
 
 
 def example_config() -> TextualInversionConfig:

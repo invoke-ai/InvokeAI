@@ -2,11 +2,10 @@ import torch
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
-    InputField,
     InvocationContext,
-    WithMetadata,
     invocation,
 )
+from invokeai.app.invocations.fields import InputField, WithMetadata
 from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput, MaskField, MaskOutput
 
 
@@ -51,9 +50,7 @@ class RectangleMaskInvocation(BaseInvocation, WithMetadata):
             :, self.y_top : self.y_top + self.rectangle_height, self.x_left : self.x_left + self.rectangle_width
         ] = True
 
-        mask_name = f"{context.graph_execution_state_id}__{self.id}_mask"
-        context.services.latents.save(mask_name, mask)
-
+        mask_name = context.tensors.save(mask)
         return MaskOutput(
             mask=MaskField(mask_name=mask_name),
             width=self.width,

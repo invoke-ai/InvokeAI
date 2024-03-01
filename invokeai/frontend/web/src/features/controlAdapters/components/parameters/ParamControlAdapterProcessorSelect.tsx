@@ -2,6 +2,7 @@ import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterProcessorNode } from 'features/controlAdapters/hooks/useControlAdapterProcessorNode';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
@@ -58,7 +59,9 @@ const ParamControlAdapterProcessorSelect = ({ id }: Props) => {
   }
   return (
     <FormControl isDisabled={!isEnabled}>
-      <FormLabel>{t('controlnet.processor')}</FormLabel>
+      <InformationalPopover feature="controlNetProcessor">
+        <FormLabel>{t('controlnet.processor')}</FormLabel>
+      </InformationalPopover>
       <Combobox value={value} options={options} onChange={onChange} />
     </FormControl>
   );

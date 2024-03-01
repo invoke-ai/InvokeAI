@@ -7,8 +7,12 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { SelectInstance } from 'chakra-react-select';
 import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
-import { addNodePopoverClosed, addNodePopoverOpened, nodeAdded } from 'features/nodes/store/nodesSlice';
-import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
+import {
+  addNodePopoverClosed,
+  addNodePopoverOpened,
+  nodeAdded,
+  selectNodesSlice,
+} from 'features/nodes/store/nodesSlice';
 import { validateSourceAndTargetTypes } from 'features/nodes/store/util/validateSourceAndTargetTypes';
 import { filter, map, memoize, some } from 'lodash-es';
 import type { KeyboardEventHandler } from 'react';
@@ -54,10 +58,10 @@ const AddNodePopover = () => {
   const fieldFilter = useAppSelector((s) => s.nodes.connectionStartFieldType);
   const handleFilter = useAppSelector((s) => s.nodes.connectionStartParams?.handleType);
 
-  const selector = createMemoizedSelector(selectNodeTemplatesSlice, (nodeTemplates) => {
+  const selector = createMemoizedSelector(selectNodesSlice, (nodes) => {
     // If we have a connection in progress, we need to filter the node choices
     const filteredNodeTemplates = fieldFilter
-      ? filter(nodeTemplates.templates, (template) => {
+      ? filter(nodes.templates, (template) => {
           const handles = handleFilter === 'source' ? template.inputs : template.outputs;
 
           return some(handles, (handle) => {
@@ -67,7 +71,7 @@ const AddNodePopover = () => {
             return validateSourceAndTargetTypes(sourceType, targetType);
           });
         })
-      : map(nodeTemplates.templates);
+      : map(nodes.templates);
 
     const options: ComboboxOption[] = map(filteredNodeTemplates, (template) => {
       return {

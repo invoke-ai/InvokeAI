@@ -6,7 +6,6 @@ This is the frontend to "textual_inversion_training.py".
 Copyright (c) 2023-24 Lincoln Stein and the InvokeAI Development Team
 """
 
-
 import os
 import re
 import shutil
@@ -261,7 +260,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
     def validate_field_values(self) -> bool:
         bad_fields = []
         if self.model.value is None:
-            bad_fields.append("Model Name must correspond to a known model in models.yaml")
+            bad_fields.append("Model Name must correspond to a known model in invokeai.db")
         if not re.match("^[a-zA-Z0-9.-]+$", self.placeholder_token.value):
             bad_fields.append("Trigger term must only contain alphanumeric characters, the dot and hyphen")
         if self.train_data_dir.value is None:
@@ -442,7 +441,7 @@ def main() -> None:
         pass
     except (widget.NotEnoughSpaceForWidget, Exception) as e:
         if str(e).startswith("Height of 1 allocated"):
-            logger.error("You need to have at least one diffusers models defined in models.yaml in order to train")
+            logger.error("You need to have at least one diffusers models defined in invokeai.db in order to train")
         elif str(e).startswith("addwstr"):
             logger.error("Not enough window space for the interface. Please make your window larger and try again.")
         else:

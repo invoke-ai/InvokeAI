@@ -30,7 +30,6 @@ InvokeAI:
     lora_dir: null
     embedding_dir: null
     controlnet_dir: null
-    conf_path: configs/models.yaml
     models_dir: models
     legacy_conf_dir: configs/stable-diffusion
     db_dir: databases
@@ -123,7 +122,6 @@ a Path object:
 
  root_path          - path to InvokeAI root
  output_path        - path to default outputs directory
- model_conf_path    - path to models.yaml
  conf               - alias for the above
  embedding_path     - path to the embeddings directory
  lora_path          - path to the LoRA directory
@@ -163,17 +161,17 @@ two configs are kept in separate sections of the config file:
   InvokeAI:
      Paths:
         root: /home/lstein/invokeai-main
-        conf_path: configs/models.yaml
         legacy_conf_dir: configs/stable-diffusion
         outdir: outputs
      ...
 
 """
+
 from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Literal, Optional, Union
+from typing import Any, ClassVar, Dict, List, Literal, Optional
 
 from omegaconf import DictConfig, OmegaConf
 from pydantic import Field
@@ -185,7 +183,9 @@ from .config_base import InvokeAISettings
 INIT_FILE = Path("invokeai.yaml")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
-DEFAULT_MAX_VRAM = 0.5
+DEFAULT_RAM_CACHE = 10.0
+DEFAULT_VRAM_CACHE = 0.25
+DEFAULT_CONVERT_CACHE = 20.0
 
 
 class Categories(object):
@@ -235,8 +235,8 @@ class InvokeAIAppConfig(InvokeAISettings):
     # PATHS
     root                : Optional[Path] = Field(default=None, description='InvokeAI runtime root directory', json_schema_extra=Categories.Paths)
     autoimport_dir      : Path = Field(default=Path('autoimport'), description='Path to a directory of models files to be imported on startup.', json_schema_extra=Categories.Paths)
-    conf_path           : Path = Field(default=Path('configs/models.yaml'), description='Path to models definition file', json_schema_extra=Categories.Paths)
     models_dir          : Path = Field(default=Path('models'), description='Path to the models directory', json_schema_extra=Categories.Paths)
+    convert_cache_dir   : Path = Field(default=Path('models/.cache'), description='Path to the converted models cache directory', json_schema_extra=Categories.Paths)
     legacy_conf_dir     : Path = Field(default=Path('configs/stable-diffusion'), description='Path to directory of legacy checkpoint config files', json_schema_extra=Categories.Paths)
     db_dir              : Path = Field(default=Path('databases'), description='Path to InvokeAI databases directory', json_schema_extra=Categories.Paths)
     outdir              : Path = Field(default=Path('outputs'), description='Default folder for output images', json_schema_extra=Categories.Paths)
@@ -260,8 +260,10 @@ class InvokeAIAppConfig(InvokeAISettings):
     version             : bool = Field(default=False, description="Show InvokeAI version and exit", json_schema_extra=Categories.Other)
 
     # CACHE
-    ram                 : float = Field(default=7.5, gt=0, description="Maximum memory amount used by model cache for rapid switching (floating point number, GB)", json_schema_extra=Categories.ModelCache, )
-    vram                : float = Field(default=0.25, ge=0, description="Amount of VRAM reserved for model storage (floating point number, GB)", json_schema_extra=Categories.ModelCache, )
+    ram                 : float = Field(default=DEFAULT_RAM_CACHE, gt=0, description="Maximum memory amount used by model cache for rapid switching (floating point number, GB)", json_schema_extra=Categories.ModelCache, )
+    vram                : float = Field(default=DEFAULT_VRAM_CACHE, ge=0, description="Amount of VRAM reserved for model storage (floating point number, GB)", json_schema_extra=Categories.ModelCache, )
+    convert_cache       : float = Field(default=DEFAULT_CONVERT_CACHE, ge=0, description="Maximum size of on-disk converted models cache (GB)", json_schema_extra=Categories.ModelCache)
+
     lazy_offload        : bool = Field(default=True, description="Keep models in VRAM until their space is needed", json_schema_extra=Categories.ModelCache, )
     log_memory_usage    : bool = Field(default=False, description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.", json_schema_extra=Categories.ModelCache)
 
@@ -296,6 +298,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     lora_dir            : Optional[Path] = Field(default=None, description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', json_schema_extra=Categories.Paths)
     embedding_dir       : Optional[Path] = Field(default=None, description='Path to a directory of Textual Inversion embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
     controlnet_dir      : Optional[Path] = Field(default=None, description='Path to a directory of ControlNet embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
+    conf_path           : Path = Field(default=Path('configs/models.yaml'), description='Path to models definition file', json_schema_extra=Categories.Paths)
 
     # this is not referred to in the source code and can be removed entirely
     #free_gpu_mem        : Optional[bool] = Field(default=None, description="If true, purge model from GPU after each generation.", json_schema_extra=Categories.MemoryPerformance)
@@ -405,6 +408,11 @@ class InvokeAIAppConfig(InvokeAISettings):
         return self._resolve(self.models_dir)
 
     @property
+    def models_convert_cache_path(self) -> Path:
+        """Path to the converted cache models directory."""
+        return self._resolve(self.convert_cache_dir)
+
+    @property
     def custom_nodes_path(self) -> Path:
         """Path to the custom nodes directory."""
         custom_nodes_path = self._resolve(self.custom_nodes_dir)
@@ -433,14 +441,19 @@ class InvokeAIAppConfig(InvokeAISettings):
         return True
 
     @property
-    def ram_cache_size(self) -> Union[Literal["auto"], float]:
-        """Return the ram cache size using the legacy or modern setting."""
+    def ram_cache_size(self) -> float:
+        """Return the ram cache size using the legacy or modern setting (GB)."""
         return self.max_cache_size or self.ram
 
     @property
-    def vram_cache_size(self) -> Union[Literal["auto"], float]:
-        """Return the vram cache size using the legacy or modern setting."""
+    def vram_cache_size(self) -> float:
+        """Return the vram cache size using the legacy or modern setting (GB)."""
         return self.max_vram_cache_size or self.vram
+
+    @property
+    def convert_cache_size(self) -> float:
+        """Return the convert cache size on disk (GB)."""
+        return self.convert_cache
 
     @property
     def use_cpu(self) -> bool:

@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import {
   controlAdapterModelCleared,
   selectAllControlNets,
@@ -13,9 +14,7 @@ import { forEach, some } from 'lodash-es';
 import { mainModelsAdapterSelectors, modelsApi, vaeModelsAdapterSelectors } from 'services/api/endpoints/models';
 import type { TypeGuardFor } from 'services/api/types';
 
-import { startAppListening } from '..';
-
-export const addModelsLoadedListener = () => {
+export const addModelsLoadedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate: (action): action is TypeGuardFor<typeof modelsApi.endpoints.getMainModels.matchFulfilled> =>
       modelsApi.endpoints.getMainModels.matchFulfilled(action) &&
@@ -34,14 +33,7 @@ export const addModelsLoadedListener = () => {
         return;
       }
 
-      const isCurrentModelAvailable = currentModel
-        ? models.some(
-            (m) =>
-              m.model_name === currentModel.model_name &&
-              m.base_model === currentModel.base_model &&
-              m.model_type === currentModel.model_type
-          )
-        : false;
+      const isCurrentModelAvailable = currentModel ? models.some((m) => m.key === currentModel.key) : false;
 
       if (isCurrentModelAvailable) {
         return;
@@ -74,14 +66,7 @@ export const addModelsLoadedListener = () => {
         return;
       }
 
-      const isCurrentModelAvailable = currentModel
-        ? models.some(
-            (m) =>
-              m.model_name === currentModel.model_name &&
-              m.base_model === currentModel.base_model &&
-              m.model_type === currentModel.model_type
-          )
-        : false;
+      const isCurrentModelAvailable = currentModel ? models.some((m) => m.key === currentModel.key) : false;
 
       if (!isCurrentModelAvailable) {
         dispatch(refinerModelChanged(null));
@@ -103,10 +88,7 @@ export const addModelsLoadedListener = () => {
         return;
       }
 
-      const isCurrentVAEAvailable = some(
-        action.payload.entities,
-        (m) => m?.model_name === currentVae?.model_name && m?.base_model === currentVae?.base_model
-      );
+      const isCurrentVAEAvailable = some(action.payload.entities, (m) => m?.key === currentVae?.key);
 
       if (isCurrentVAEAvailable) {
         return;
@@ -140,10 +122,7 @@ export const addModelsLoadedListener = () => {
       const loras = getState().lora.loras;
 
       forEach(loras, (lora, id) => {
-        const isLoRAAvailable = some(
-          action.payload.entities,
-          (m) => m?.model_name === lora?.model_name && m?.base_model === lora?.base_model
-        );
+        const isLoRAAvailable = some(action.payload.entities, (m) => m?.key === lora?.model.key);
 
         if (isLoRAAvailable) {
           return;
@@ -161,10 +140,7 @@ export const addModelsLoadedListener = () => {
       log.info({ models: action.payload.entities }, `ControlNet models loaded (${action.payload.ids.length})`);
 
       selectAllControlNets(getState().controlAdapters).forEach((ca) => {
-        const isModelAvailable = some(
-          action.payload.entities,
-          (m) => m?.model_name === ca?.model?.model_name && m?.base_model === ca?.model?.base_model
-        );
+        const isModelAvailable = some(action.payload.entities, (m) => m?.key === ca?.model?.key);
 
         if (isModelAvailable) {
           return;
@@ -182,10 +158,7 @@ export const addModelsLoadedListener = () => {
       log.info({ models: action.payload.entities }, `T2I Adapter models loaded (${action.payload.ids.length})`);
 
       selectAllT2IAdapters(getState().controlAdapters).forEach((ca) => {
-        const isModelAvailable = some(
-          action.payload.entities,
-          (m) => m?.model_name === ca?.model?.model_name && m?.base_model === ca?.model?.base_model
-        );
+        const isModelAvailable = some(action.payload.entities, (m) => m?.key === ca?.model?.key);
 
         if (isModelAvailable) {
           return;
@@ -203,10 +176,7 @@ export const addModelsLoadedListener = () => {
       log.info({ models: action.payload.entities }, `IP Adapter models loaded (${action.payload.ids.length})`);
 
       selectAllIPAdapters(getState().controlAdapters).forEach((ca) => {
-        const isModelAvailable = some(
-          action.payload.entities,
-          (m) => m?.model_name === ca?.model?.model_name && m?.base_model === ca?.model?.base_model
-        );
+        const isModelAvailable = some(action.payload.entities, (m) => m?.key === ca?.model?.key);
 
         if (isModelAvailable) {
           return;

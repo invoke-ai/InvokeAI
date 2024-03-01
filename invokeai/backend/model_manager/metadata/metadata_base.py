@@ -54,8 +54,8 @@ class LicenseRestrictions(BaseModel):
     AllowDifferentLicense: bool = Field(
         description="if true, derivatives of this model be redistributed under a different license", default=False
     )
-    AllowCommercialUse: CommercialUsage = Field(
-        description="Type of commercial use allowed or 'No' if no commercial use is allowed.", default_factory=set
+    AllowCommercialUse: Optional[Set[CommercialUsage] | CommercialUsage] = Field(
+        description="Type of commercial use allowed if no commercial use is allowed.", default=None
     )
 
 
@@ -139,7 +139,13 @@ class CivitaiMetadata(ModelMetadataWithFiles):
     @property
     def allow_commercial_use(self) -> bool:
         """Return True if commercial use is allowed."""
-        return self.restrictions.AllowCommercialUse != CommercialUsage("None")
+        if self.restrictions.AllowCommercialUse is None:
+            return False
+        else:
+            # accommodate schema change
+            acu = self.restrictions.AllowCommercialUse
+            commercial_usage = acu if isinstance(acu, set) else {acu}
+            return CommercialUsage.No not in commercial_usage
 
     @property
     def allow_derivatives(self) -> bool:
@@ -184,7 +190,6 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
             [x.path for x in self.files], variant, subfolder
         )  #  all files in the model
         prefix = f"{subfolder}/" if subfolder else ""
-
         # the next step reads model_index.json to determine which subdirectories belong
         # to the model
         if Path(f"{prefix}model_index.json") in paths:

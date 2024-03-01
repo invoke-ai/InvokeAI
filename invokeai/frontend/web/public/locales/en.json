@@ -175,6 +175,7 @@
         "statusUpscaling": "Upscaling",
         "statusUpscalingESRGAN": "Upscaling (ESRGAN)",
         "template": "Template",
+        "toResolve": "To resolve",
         "training": "Training",
         "trainingDesc1": "A dedicated workflow for training your own embeddings and checkpoints using Textual Inversion and Dreambooth from the web interface.",
         "trainingDesc2": "InvokeAI already supports training custom embeddourings using Textual Inversion using the main script.",
@@ -423,8 +424,11 @@
         "uploads": "Uploads",
         "deleteSelection": "Delete Selection",
         "downloadSelection": "Download Selection",
-        "preparingDownload": "Preparing Download",
-        "preparingDownloadFailed": "Problem Preparing Download",
+        "bulkDownloadRequested": "Preparing Download",
+        "bulkDownloadRequestedDesc": "Your download request is being prepared. This may take a few moments.",
+        "bulkDownloadRequestFailed": "Problem Preparing Download",
+        "bulkDownloadStarting": "Download Starting",
+        "bulkDownloadFailed": "Download Failed",
         "problemDeletingImages": "Problem Deleting Images",
         "problemDeletingImagesDesc": "One or more images could not be deleted"
     },
@@ -652,6 +656,7 @@
         }
     },
     "metadata": {
+        "allPrompts": "All Prompts",
         "cfgScale": "CFG scale",
         "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
         "createdBy": "Created By",
@@ -660,6 +665,7 @@
         "height": "Height",
         "hiresFix": "High Resolution Optimization",
         "imageDetails": "Image Details",
+        "imageDimensions": "Image Dimensions",
         "initImage": "Initial image",
         "metadata": "Metadata",
         "model": "Model",
@@ -667,9 +673,12 @@
         "noImageDetails": "No image details found",
         "noMetaData": "No metadata found",
         "noRecallParameters": "No parameters to recall found",
+        "parameterSet": "Parameter {{parameter}} set",
+        "parsingFailed": "Parsing Failed",
         "perlin": "Perlin Noise",
         "positivePrompt": "Positive Prompt",
         "recallParameters": "Recall Parameters",
+        "recallParameter": "Recall {{label}}",
         "scheduler": "Scheduler",
         "seamless": "Seamless",
         "seed": "Seed",
@@ -683,20 +692,24 @@
     },
     "modelManager": {
         "active": "active",
+        "addAll": "Add All",
         "addCheckpointModel": "Add Checkpoint / Safetensor Model",
         "addDifference": "Add Difference",
         "addDiffuserModel": "Add Diffusers",
         "addManually": "Add Manually",
         "addModel": "Add Model",
+        "addModels": "Add Models",
         "addNew": "Add New",
         "addNewModel": "Add New Model",
         "addSelected": "Add Selected",
         "advanced": "Advanced",
+        "advancedImportInfo": "The advanced tab allows for manual configuration of core model settings. Only use this tab if you are confident that you know the correct model type and configuration for the selected model.",
         "allModels": "All Models",
         "alpha": "Alpha",
         "availableModels": "Available Models",
         "baseModel": "Base Model",
         "cached": "cached",
+        "cancel": "Cancel",
         "cannotUseSpaces": "Cannot Use Spaces",
         "checkpointFolder": "Checkpoint Folder",
         "checkpointModels": "Checkpoints",
@@ -730,6 +743,7 @@
         "descriptionValidationMsg": "Add a description for your model",
         "deselectAll": "Deselect All",
         "diffusersModels": "Diffusers",
+        "edit": "Edit",
         "findModels": "Find Models",
         "formMessageDiffusersModelLocation": "Diffusers Model Location",
         "formMessageDiffusersModelLocationDesc": "Please enter at least one.",
@@ -738,7 +752,9 @@
         "height": "Height",
         "heightValidationMsg": "Default height of your model.",
         "ignoreMismatch": "Ignore Mismatches Between Selected Models",
+        "imageEncoderModelId": "Image Encoder Model ID",
         "importModels": "Import Models",
+        "importQueue": "Import Queue",
         "inpainting": "v1 Inpainting",
         "interpolationType": "Interpolation Type",
         "inverseSigmoid": "Inverse Sigmoid",
@@ -767,8 +783,11 @@
         "modelMergeHeaderHelp1": "You can merge up to three different models to create a blend that suits your needs.",
         "modelMergeHeaderHelp2": "Only Diffusers are available for merging. If you want to merge a checkpoint model, please convert it to Diffusers first.",
         "modelMergeInterpAddDifferenceHelp": "In this mode, Model 3 is first subtracted from Model 2. The resulting version is blended with Model 1 with the alpha rate set above.",
+        "modelMetadata": "Model Metadata",
+        "modelName": "Model Name",
         "modelOne": "Model 1",
         "modelsFound": "Models Found",
+        "modelSettings": "Model Settings",
         "modelsMerged": "Models Merged",
         "modelsMergeFailed": "Model Merge Failed",
         "modelsSynced": "Models Synced",
@@ -788,16 +807,24 @@
         "notLoaded": "not loaded",
         "oliveModels": "Olives",
         "onnxModels": "Onnx",
+        "path": "Path",
         "pathToCustomConfig": "Path To Custom Config",
         "pickModelType": "Pick Model Type",
-        "predictionType": "Prediction Type (for Stable Diffusion 2.x Models and occasional Stable Diffusion 1.x Models)",
+        "predictionType": "Prediction Type",
+        "prune": "Prune",
+        "pruneTooltip": "Prune finished imports from queue",
         "quickAdd": "Quick Add",
+        "removeFromQueue": "Remove From Queue",
         "repo_id": "Repo ID",
         "repoIDValidationMsg": "Online repository of your model",
+        "repoVariant": "Repo Variant",
         "safetensorModels": "SafeTensors",
         "sameFolder": "Same folder",
+        "scan": "Scan",
+        "scanFolder": "Scan folder",
         "scanAgain": "Scan Again",
         "scanForModels": "Scan For Models",
+        "scanResults": "Scan Results",
         "search": "Search",
         "selectAll": "Select All",
         "selectAndAdd": "Select and Add Models Listed Below",
@@ -808,9 +835,11 @@
         "showExisting": "Show Existing",
         "sigmoid": "Sigmoid",
         "simpleModelDesc": "Provide a path to a local Diffusers model, local checkpoint / safetensors model a HuggingFace Repo ID, or a checkpoint/diffusers model URL.",
+        "source": "Source",
         "statusConverting": "Converting",
         "syncModels": "Sync Models",
-        "syncModelsDesc": "If your models are out of sync with the backend, you can refresh them up using this option. This is generally handy in cases where you manually update your models.yaml file or add models to the InvokeAI root folder after the application has booted.",
+        "syncModelsDesc": "If your models are out of sync with the backend, you can refresh them up using this option. This is generally handy in cases where you add models to the InvokeAI root folder or autoimport directory after the application has booted.",
+        "upcastAttention": "Upcast Attention",
         "updateModel": "Update Model",
         "useCustomConfig": "Use Custom Config",
         "v1": "v1",
@@ -825,7 +854,8 @@
         "variant": "Variant",
         "weightedSum": "Weighted Sum",
         "width": "Width",
-        "widthValidationMsg": "Default width of your model."
+        "widthValidationMsg": "Default width of your model.",
+        "ztsnrTraining": "ZTSNR Training"
     },
     "models": {
         "addLora": "Add LoRA",
@@ -900,6 +930,7 @@
         "doesNotExist": "does not exist",
         "downloadWorkflow": "Download Workflow JSON",
         "edge": "Edge",
+        "editMode": "Edit in Workflow Editor",
         "enum": "Enum",
         "enumDescription": "Enums are values that may be one of a number of options.",
         "executionStateCompleted": "Completed",
@@ -995,8 +1026,10 @@
         "problemReadingMetadata": "Problem reading metadata from image",
         "problemReadingWorkflow": "Problem reading workflow from image",
         "problemSettingTitle": "Problem Setting Title",
+        "resetToDefaultValue": "Reset to default value",
         "reloadNodeTemplates": "Reload Node Templates",
         "removeLinearView": "Remove from Linear View",
+        "reorderLinearView": "Reorder Linear View",
         "newWorkflow": "New Workflow",
         "newWorkflowDesc": "Create a new workflow?",
         "newWorkflowDesc2": "Your current workflow has unsaved changes.",
@@ -1067,6 +1100,7 @@
         "vaeModelFieldDescription": "TODO",
         "validateConnections": "Validate Connections and Graph",
         "validateConnectionsHelp": "Prevent invalid connections from being made, and invalid graphs from being invoked",
+        "viewMode": "Use in Linear View",
         "unableToGetWorkflowVersion": "Unable to get workflow schema version",
         "unrecognizedWorkflowVersion": "Unrecognized workflow schema version {{version}}",
         "version": "Version",
@@ -1115,8 +1149,8 @@
         "codeformerFidelity": "Fidelity",
         "coherenceMode": "Mode",
         "coherencePassHeader": "Coherence Pass",
-        "coherenceSteps": "Steps",
-        "coherenceStrength": "Strength",
+        "coherenceEdgeSize": "Edge Size",
+        "coherenceMinDenoise": "Min Denoise",
         "compositingSettingsHeader": "Compositing Settings",
         "controlNetControlMode": "Control Mode",
         "copyImage": "Copy Image",
@@ -1160,8 +1194,8 @@
             "unableToInvoke": "Unable to Invoke"
         },
         "maskAdjustmentsHeader": "Mask Adjustments",
-        "maskBlur": "Blur",
-        "maskBlurMethod": "Blur Method",
+        "maskBlur": "Mask Blur",
+        "maskBlurMethod": "Mask Blur Method",
         "maskEdge": "Mask Edge",
         "negativePromptPlaceholder": "Negative Prompt",
         "noiseSettings": "Noise",
@@ -1343,6 +1377,8 @@
         "modelAdded": "Model Added: {{modelName}}",
         "modelAddedSimple": "Model Added",
         "modelAddFailed": "Model Add Failed",
+        "modelImportCanceled": "Model Import Canceled",
+        "modelImportRemoved": "Model Import Removed",
         "nodesBrokenConnections": "Cannot load. Some connections are broken.",
         "nodesCorruptedGraph": "Cannot load. Graph seems to be corrupted.",
         "nodesLoaded": "Nodes Loaded",
@@ -1351,8 +1387,8 @@
         "nodesNotValidJSON": "Not a valid JSON",
         "nodesSaved": "Nodes Saved",
         "nodesUnrecognizedTypes": "Cannot load. Graph has unrecognized types",
-        "parameterNotSet": "Parameter not set",
-        "parameterSet": "Parameter set",
+        "parameterNotSet": "{{parameter}} not set",
+        "parameterSet": "{{parameter}} set",
         "parametersFailed": "Problem loading parameters",
         "parametersFailedDesc": "Unable to load init image.",
         "parametersNotSet": "Parameters Not Set",
@@ -1376,6 +1412,7 @@
         "promptNotSet": "Prompt Not Set",
         "promptNotSetDesc": "Could not find prompt for this image.",
         "promptSet": "Prompt Set",
+        "prunedQueue": "Pruned Queue",
         "resetInitialImage": "Reset Initial Image",
         "seedNotSet": "Seed Not Set",
         "seedNotSetDesc": "Could not find seed for this image.",
@@ -1419,9 +1456,8 @@
         "clipSkip": {
             "heading": "CLIP Skip",
             "paragraphs": [
-                "Choose how many layers of the CLIP model to skip.",
-                "Some models work better with certain CLIP Skip settings.",
-                "A higher value typically results in a less detailed image."
+                "How many layers of the CLIP model to skip.",
+                "Certain models are better suited to be used with CLIP Skip."
             ]
         },
         "paramNegativeConditioning": {
@@ -1441,11 +1477,12 @@
         "paramScheduler": {
             "heading": "Scheduler",
             "paragraphs": [
-                "Scheduler defines how to iteratively add noise to an image or how to update a sample based on a model's output."
+                "Scheduler used during the generation process.",
+                "Each scheduler defines how to iteratively add noise to an image or how to update a sample based on a model's output."
             ]
         },
-        "compositingBlur": {
-            "heading": "Blur",
+        "compositingMaskBlur": {
+            "heading": "Mask Blur",
             "paragraphs": ["The blur radius of the mask."]
         },
         "compositingBlurMethod": {
@@ -1458,37 +1495,22 @@
         },
         "compositingCoherenceMode": {
             "heading": "Mode",
-            "paragraphs": ["The mode of the Coherence Pass."]
+            "paragraphs": ["Method used to create a coherent image with the newly generated masked area."]
         },
-        "compositingCoherenceSteps": {
-            "heading": "Steps",
-            "paragraphs": ["Number of denoising steps used in the Coherence Pass.", "Same as the main Steps parameter."]
+        "compositingCoherenceEdgeSize": {
+            "heading": "Edge Size",
+            "paragraphs": ["The edge size of the coherence pass."]
         },
-        "compositingStrength": {
-            "heading": "Strength",
+        "compositingCoherenceMinDenoise": {
+            "heading": "Minimum Denoise",
             "paragraphs": [
-                "Denoising strength for the Coherence Pass.",
-                "Same as the Image to Image Denoising Strength parameter."
+                "Minimum denoise strength for the Coherence mode",
+                "The minimum denoise strength for the coherence region when inpainting or outpainting"
             ]
         },
         "compositingMaskAdjustments": {
             "heading": "Mask Adjustments",
             "paragraphs": ["Adjust the mask."]
-        },
-        "controlNetBeginEnd": {
-            "heading": "Begin / End Step Percentage",
-            "paragraphs": [
-                "Which steps of the denoising process will have the ControlNet applied.",
-                "ControlNets applied at the beginning of the process guide composition, and ControlNets applied at the end guide details."
-            ]
-        },
-        "controlNetControlMode": {
-            "heading": "Control Mode",
-            "paragraphs": ["Lends more weight to either the prompt or ControlNet."]
-        },
-        "controlNetResizeMode": {
-            "heading": "Resize Mode",
-            "paragraphs": ["How the ControlNet image will be fit to the image output size."]
         },
         "controlNet": {
             "heading": "ControlNet",
@@ -1496,9 +1518,32 @@
                 "ControlNets provide guidance to the generation process, helping create images with controlled composition, structure, or style, depending on the model selected."
             ]
         },
+        "controlNetBeginEnd": {
+            "heading": "Begin / End Step Percentage",
+            "paragraphs": [
+                "The part of the of the denoising process that will have the Control Adapter applied.",
+                "Generally, Control Adapters applied at the start of the process guide composition, and Control Adapters applied at the end guide details."
+            ]
+        },
+        "controlNetControlMode": {
+            "heading": "Control Mode",
+            "paragraphs": ["Lend more weight to either the prompt or ControlNet."]
+        },
+        "controlNetProcessor": {
+            "heading": "Processor",
+            "paragraphs": [
+                "Method of processing the input image to guide the generation process. Different processors will providedifferent effects or styles in your generated images."
+            ]
+        },
+        "controlNetResizeMode": {
+            "heading": "Resize Mode",
+            "paragraphs": ["Method to fit Control Adapter's input image size to the output generation size."]
+        },
         "controlNetWeight": {
             "heading": "Weight",
-            "paragraphs": ["How strongly the ControlNet will impact the generated image."]
+            "paragraphs": [
+                "Weight of the Control Adapter. Higher weight will lead to larger impacts on the final image."
+            ]
         },
         "dynamicPrompts": {
             "heading": "Dynamic Prompts",
@@ -1521,13 +1566,23 @@
                 "Per Image will use a unique seed for each image. This provides more variation."
             ]
         },
+        "imageFit": {
+            "heading": "Fit Initial Image to Output Size",
+            "paragraphs": [
+                "Resizes the initial image to the width and height of the output image. Recommended to enable."
+            ]
+        },
         "infillMethod": {
             "heading": "Infill Method",
-            "paragraphs": ["Method to infill the selected area."]
+            "paragraphs": ["Method of infilling during the Outpainting or Inpainting process."]
         },
         "lora": {
-            "heading": "LoRA Weight",
-            "paragraphs": ["Higher LoRA weight will lead to larger impacts on the final image."]
+            "heading": "LoRA",
+            "paragraphs": ["Lightweight models that are used in conjunction with base models."]
+        },
+        "loraWeight": {
+            "heading": "Weight",
+            "paragraphs": ["Weight of the LoRA. Higher weight will lead to larger impacts on the final image."]
         },
         "noiseUseCPU": {
             "heading": "Use CPU Noise",
@@ -1537,14 +1592,25 @@
                 "There is no performance impact to enabling CPU Noise."
             ]
         },
+        "paramAspect": {
+            "heading": "Aspect",
+            "paragraphs": [
+                "Aspect ratio of the generated image. Changing the ratio will update the Width and Height accordingly.",
+                "“Optimize” will set the Width and Height to optimal dimensions for the chosen model."
+            ]
+        },
         "paramCFGScale": {
             "heading": "CFG Scale",
-            "paragraphs": ["Controls how much your prompt influences the generation process."]
+            "paragraphs": [
+                "Controls how much the prompt influences the generation process.",
+                "High CFG Scale values can result in over-saturation and distorted generation results. "
+            ]
         },
         "paramCFGRescaleMultiplier": {
             "heading": "CFG Rescale Multiplier",
             "paragraphs": [
-                "Rescale multiplier for CFG guidance, used for models trained using zero-terminal SNR (ztsnr). Suggested value 0.7."
+                "Rescale multiplier for CFG guidance, used for models trained using zero-terminal SNR (ztsnr).",
+                "Suggested value of 0.7 for these models."
             ]
         },
         "paramDenoisingStrength": {
@@ -1552,6 +1618,16 @@
             "paragraphs": [
                 "How much noise is added to the input image.",
                 "0 will result in an identical image, while 1 will result in a completely new image."
+            ]
+        },
+        "paramHeight": {
+            "heading": "Height",
+            "paragraphs": ["Height of the generated image. Must be a multiple of 8."]
+        },
+        "paramHrf": {
+            "heading": "Enable High Resolution Fix",
+            "paragraphs": [
+                "Generate high quality images at a larger resolution than optimal for the model. Generally used to prevent duplication in the generated image."
             ]
         },
         "paramIterations": {
@@ -1564,8 +1640,7 @@
         "paramModel": {
             "heading": "Model",
             "paragraphs": [
-                "Model used for the denoising steps.",
-                "Different models are typically trained to specialize in producing particular aesthetic results and content."
+                "Model used for generation. Different models are trained to specialize in producing different aesthetic results and content."
             ]
         },
         "paramRatio": {
@@ -1579,7 +1654,7 @@
             "heading": "Seed",
             "paragraphs": [
                 "Controls the starting noise used for generation.",
-                "Disable “Random Seed” to produce identical results with the same generation settings."
+                "Disable the “Random” option to produce identical results with the same generation settings."
             ]
         },
         "paramSteps": {
@@ -1589,6 +1664,10 @@
                 "Higher step counts will typically create better images but will require more generation time."
             ]
         },
+        "paramUpscaleMethod": {
+            "heading": "Upscale Method",
+            "paragraphs": ["Method used to upscale the image for High Resolution Fix."]
+        },
         "paramVAE": {
             "heading": "VAE",
             "paragraphs": ["Model used for translating AI output into the final image."]
@@ -1596,14 +1675,82 @@
         "paramVAEPrecision": {
             "heading": "VAE Precision",
             "paragraphs": [
-                "The precision used during VAE encoding and decoding. FP16/half precision is more efficient, at the expense of minor image variations."
+                "The precision used during VAE encoding and decoding.",
+                "Fp16/Half precision is more efficient, at the expense of minor image variations."
+            ]
+        },
+        "paramWidth": {
+            "heading": "Width",
+            "paragraphs": ["Width of the generated image. Must be a multiple of 8."]
+        },
+        "patchmatchDownScaleSize": {
+            "heading": "Downscale",
+            "paragraphs": [
+                "How much downscaling occurs before infilling.",
+                "Higher downscaling will improve performance and reduce quality."
+            ]
+        },
+        "refinerModel": {
+            "heading": "Refiner Model",
+            "paragraphs": [
+                "Model used during the refiner portion of the generation process.",
+                "Similar to the Generation Model."
+            ]
+        },
+        "refinerPositiveAestheticScore": {
+            "heading": "Positive Aesthetic Score",
+            "paragraphs": [
+                "Weight generations to be more similar to images with a high aesthetic score, based on the training data."
+            ]
+        },
+        "refinerNegativeAestheticScore": {
+            "heading": "Negative Aesthetic Score",
+            "paragraphs": [
+                "Weight generations to be more similar to images with a low aesthetic score, based on the training data."
+            ]
+        },
+        "refinerScheduler": {
+            "heading": "Scheduler",
+            "paragraphs": [
+                "Scheduler used during the refiner portion of the generation process.",
+                "Similar to the Generation Scheduler."
+            ]
+        },
+        "refinerStart": {
+            "heading": "Refiner Start",
+            "paragraphs": [
+                "Where in the generation process the refiner will start to be used.",
+                "0 means the refiner will be used for the entire generation process, 0.8 means the refiner will be used for the last 20% of the generation process."
+            ]
+        },
+        "refinerSteps": {
+            "heading": "Steps",
+            "paragraphs": [
+                "Number of steps that will be performed during the refiner portion of the generation process.",
+                "Similar to the Generation Steps."
+            ]
+        },
+        "refinerCfgScale": {
+            "heading": "CFG Scale",
+            "paragraphs": [
+                "Controls how much the prompt influences the generation process.",
+                "Similar to the Generation CFG Scale."
             ]
         },
         "scaleBeforeProcessing": {
             "heading": "Scale Before Processing",
             "paragraphs": [
-                "Scales the selected area to the size best suited for the model before the image generation process."
+                "“Auto” scales the selected area to the size best suited for the model before the image generation process.",
+                "“Manual” allows you to choose the width and height the selected area will be scaled to before the image generation process."
             ]
+        },
+        "seamlessTilingXAxis": {
+            "heading": "Seamless Tiling X Axis",
+            "paragraphs": ["Seamlessly tile an image along the horizontal axis."]
+        },
+        "seamlessTilingYAxis": {
+            "heading": "Seamless Tiling Y Axis",
+            "paragraphs": ["Seamlessly tile an image along the vertical axis."]
         }
     },
     "ui": {
@@ -1637,6 +1784,9 @@
         "clearCanvasHistoryMessage": "Clearing the canvas history leaves your current canvas intact, but irreversibly clears the undo and redo history.",
         "clearHistory": "Clear History",
         "clearMask": "Clear Mask (Shift+C)",
+        "coherenceModeGaussianBlur": "Gaussian Blur",
+        "coherenceModeBoxBlur": "Box Blur",
+        "coherenceModeStaged": "Staged",
         "colorPicker": "Color Picker",
         "copyToClipboard": "Copy to Clipboard",
         "cursorPosition": "Cursor Position",

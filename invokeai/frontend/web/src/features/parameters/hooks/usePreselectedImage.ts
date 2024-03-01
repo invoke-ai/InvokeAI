@@ -2,6 +2,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppToaster } from 'app/components/Toaster';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
+import { parseAndRecallAllMetadata } from 'features/metadata/util/handlers';
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { setActiveTab } from 'features/ui/store/uiSlice';
@@ -9,14 +10,11 @@ import { t } from 'i18next';
 import { useCallback, useEffect } from 'react';
 import { useGetImageDTOQuery, useGetImageMetadataQuery } from 'services/api/endpoints/images';
 
-import { useRecallParameters } from './useRecallParameters';
-
 export const usePreselectedImage = (selectedImage?: {
   imageName: string;
   action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
 }) => {
   const dispatch = useAppDispatch();
-  const { recallAllParameters } = useRecallParameters();
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const toaster = useAppToaster();
 
@@ -45,10 +43,8 @@ export const usePreselectedImage = (selectedImage?: {
 
   const handleUseAllMetadata = useCallback(() => {
     if (selectedImageMetadata) {
-      recallAllParameters(selectedImageMetadata);
+      parseAndRecallAllMetadata(selectedImageMetadata);
     }
-    // disabled because `recallAllParameters` changes the model, but its dep to prepare LoRAs has model as a dep. this introduces circular logic that causes infinite re-renders
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedImageMetadata]);
 
   useEffect(() => {

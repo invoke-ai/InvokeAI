@@ -1,446 +1,339 @@
-import type { EntityState } from '@reduxjs/toolkit';
+import type { EntityAdapter, EntityState, ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { createEntityAdapter } from '@reduxjs/toolkit';
 import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
-import { cloneDeep } from 'lodash-es';
+import type { JSONObject } from 'common/types';
 import queryString from 'query-string';
 import type { operations, paths } from 'services/api/schema';
 import type {
   AnyModelConfig,
   BaseModelType,
-  CheckpointModelConfig,
   ControlNetModelConfig,
-  DiffusersModelConfig,
-  ImportModelConfig,
   IPAdapterModelConfig,
   LoRAModelConfig,
   MainModelConfig,
-  MergeModelConfig,
-  ModelType,
   T2IAdapterModelConfig,
   TextualInversionModelConfig,
-  VaeModelConfig,
+  VAEModelConfig,
 } from 'services/api/types';
 
-import type { ApiTagDescription } from '..';
-import { api, LIST_TAG } from '..';
+import type { ApiTagDescription, tagTypes } from '..';
+import { api, buildV2Url, LIST_TAG } from '..';
 
-export type DiffusersModelConfigEntity = DiffusersModelConfig & { id: string };
-export type CheckpointModelConfigEntity = CheckpointModelConfig & {
-  id: string;
-};
-export type MainModelConfigEntity = DiffusersModelConfigEntity | CheckpointModelConfigEntity;
-
-export type LoRAModelConfigEntity = LoRAModelConfig & { id: string };
-
-export type ControlNetModelConfigEntity = ControlNetModelConfig & {
-  id: string;
+export type UpdateModelArg = {
+  key: paths['/api/v2/models/i/{key}']['patch']['parameters']['path']['key'];
+  body: paths['/api/v2/models/i/{key}']['patch']['requestBody']['content']['application/json'];
 };
 
-export type IPAdapterModelConfigEntity = IPAdapterModelConfig & {
-  id: string;
-};
+type UpdateModelResponse = paths['/api/v2/models/i/{key}']['patch']['responses']['200']['content']['application/json'];
+type GetModelConfigResponse = paths['/api/v2/models/i/{key}']['get']['responses']['200']['content']['application/json'];
 
-export type T2IAdapterModelConfigEntity = T2IAdapterModelConfig & {
-  id: string;
-};
+type GetModelMetadataResponse =
+  paths['/api/v2/models/i/{key}/metadata']['get']['responses']['200']['content']['application/json'];
 
-export type TextualInversionModelConfigEntity = TextualInversionModelConfig & {
-  id: string;
-};
-
-export type VaeModelConfigEntity = VaeModelConfig & { id: string };
-
-export type AnyModelConfigEntity =
-  | MainModelConfigEntity
-  | LoRAModelConfigEntity
-  | ControlNetModelConfigEntity
-  | IPAdapterModelConfigEntity
-  | T2IAdapterModelConfigEntity
-  | TextualInversionModelConfigEntity
-  | VaeModelConfigEntity;
-
-type UpdateMainModelArg = {
-  base_model: BaseModelType;
-  model_name: string;
-  body: MainModelConfig;
-};
-
-type UpdateLoRAModelArg = {
-  base_model: BaseModelType;
-  model_name: string;
-  body: LoRAModelConfig;
-};
-
-type UpdateMainModelResponse =
-  paths['/api/v1/models/{base_model}/{model_type}/{model_name}']['patch']['responses']['200']['content']['application/json'];
-
-type UpdateLoRAModelResponse = UpdateMainModelResponse;
+type ListModelsArg = NonNullable<paths['/api/v2/models/']['get']['parameters']['query']>;
 
 type DeleteMainModelArg = {
-  base_model: BaseModelType;
-  model_name: string;
-  model_type: ModelType;
+  key: string;
 };
 
 type DeleteMainModelResponse = void;
 
-type DeleteLoRAModelArg = DeleteMainModelArg;
-
-type DeleteLoRAModelResponse = void;
-
-type ConvertMainModelArg = {
-  base_model: BaseModelType;
-  model_name: string;
-  convert_dest_directory?: string;
-};
-
 type ConvertMainModelResponse =
-  paths['/api/v1/models/convert/{base_model}/{model_type}/{model_name}']['put']['responses']['200']['content']['application/json'];
+  paths['/api/v2/models/convert/{key}']['put']['responses']['200']['content']['application/json'];
 
-type MergeMainModelArg = {
-  base_model: BaseModelType;
-  body: MergeModelConfig;
+type InstallModelArg = {
+  source: paths['/api/v2/models/install']['post']['parameters']['query']['source'];
+  access_token?: paths['/api/v2/models/install']['post']['parameters']['query']['access_token'];
+  // TODO(MM2): This is typed as `Optional[Dict[str, Any]]` in backend...
+  config?: JSONObject;
+  // config: NonNullable<paths['/api/v2/models/install']['post']['requestBody']>['content']['application/json'];
 };
 
-type MergeMainModelResponse =
-  paths['/api/v1/models/merge/{base_model}']['put']['responses']['200']['content']['application/json'];
+type InstallModelResponse = paths['/api/v2/models/install']['post']['responses']['201']['content']['application/json'];
 
-type ImportMainModelArg = {
-  body: ImportModelConfig;
-};
+type ListImportModelsResponse =
+  paths['/api/v2/models/import']['get']['responses']['200']['content']['application/json'];
 
-type ImportMainModelResponse =
-  paths['/api/v1/models/import']['post']['responses']['201']['content']['application/json'];
+type DeleteImportModelsResponse =
+  paths['/api/v2/models/import/{id}']['delete']['responses']['201']['content']['application/json'];
 
-type AddMainModelArg = {
-  body: MainModelConfig;
-};
+type PruneModelImportsResponse =
+  paths['/api/v2/models/import']['patch']['responses']['200']['content']['application/json'];
 
-type AddMainModelResponse = paths['/api/v1/models/add']['post']['responses']['201']['content']['application/json'];
+export type ScanFolderResponse =
+  paths['/api/v2/models/scan_folder']['get']['responses']['200']['content']['application/json'];
+type ScanFolderArg = operations['scan_for_models']['parameters']['query'];
 
-type SyncModelsResponse = paths['/api/v1/models/sync']['post']['responses']['201']['content']['application/json'];
+type GetByAttrsArg = operations['get_model_records_by_attrs']['parameters']['query'];
 
-export type SearchFolderResponse =
-  paths['/api/v1/models/search']['get']['responses']['200']['content']['application/json'];
-
-type CheckpointConfigsResponse =
-  paths['/api/v1/models/ckpt_confs']['get']['responses']['200']['content']['application/json'];
-
-type SearchFolderArg = operations['search_for_models']['parameters']['query'];
-
-export const mainModelsAdapter = createEntityAdapter<MainModelConfigEntity>({
-  sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
+const mainModelsAdapter = createEntityAdapter<MainModelConfig, string>({
+  selectId: (entity) => entity.key,
+  sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 export const mainModelsAdapterSelectors = mainModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-export const loraModelsAdapter = createEntityAdapter<LoRAModelConfigEntity>({
-  sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
+const loraModelsAdapter = createEntityAdapter<LoRAModelConfig, string>({
+  selectId: (entity) => entity.key,
+  sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
-export const loraModelsAdapterSelectors = loraModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-export const controlNetModelsAdapter = createEntityAdapter<ControlNetModelConfigEntity>({
-  sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
+const controlNetModelsAdapter = createEntityAdapter<ControlNetModelConfig, string>({
+  selectId: (entity) => entity.key,
+  sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 export const controlNetModelsAdapterSelectors = controlNetModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-export const ipAdapterModelsAdapter = createEntityAdapter<IPAdapterModelConfigEntity>({
-  sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
+const ipAdapterModelsAdapter = createEntityAdapter<IPAdapterModelConfig, string>({
+  selectId: (entity) => entity.key,
+  sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 export const ipAdapterModelsAdapterSelectors = ipAdapterModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-export const t2iAdapterModelsAdapter = createEntityAdapter<T2IAdapterModelConfigEntity>({
-  sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
+const t2iAdapterModelsAdapter = createEntityAdapter<T2IAdapterModelConfig, string>({
+  selectId: (entity) => entity.key,
+  sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 export const t2iAdapterModelsAdapterSelectors = t2iAdapterModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-export const textualInversionModelsAdapter = createEntityAdapter<TextualInversionModelConfigEntity>({
-  sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
+const textualInversionModelsAdapter = createEntityAdapter<TextualInversionModelConfig, string>({
+  selectId: (entity) => entity.key,
+  sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
-export const textualInversionModelsAdapterSelectors = textualInversionModelsAdapter.getSelectors(
-  undefined,
-  getSelectorsOptions
-);
-export const vaeModelsAdapter = createEntityAdapter<VaeModelConfigEntity>({
-  sortComparer: (a, b) => a.model_name.localeCompare(b.model_name),
+const vaeModelsAdapter = createEntityAdapter<VAEModelConfig, string>({
+  selectId: (entity) => entity.key,
+  sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 export const vaeModelsAdapterSelectors = vaeModelsAdapter.getSelectors(undefined, getSelectorsOptions);
 
-export const getModelId = ({
-  base_model,
-  model_type,
-  model_name,
-}: Pick<AnyModelConfig, 'base_model' | 'model_name' | 'model_type'>) => `${base_model}/${model_type}/${model_name}`;
+const anyModelConfigAdapter = createEntityAdapter<AnyModelConfig, string>({
+  selectId: (entity) => entity.key,
+  sortComparer: (a, b) => a.name.localeCompare(b.name),
+});
+const anyModelConfigAdapterSelectors = anyModelConfigAdapter.getSelectors(undefined, getSelectorsOptions);
 
-const createModelEntities = <T extends AnyModelConfigEntity>(models: AnyModelConfig[]): T[] => {
-  const entityArray: T[] = [];
-  models.forEach((model) => {
-    const entity = {
-      ...cloneDeep(model),
-      id: getModelId(model),
-    } as T;
-    entityArray.push(entity);
-  });
-  return entityArray;
-};
+const buildProvidesTags =
+  <TEntity extends AnyModelConfig>(tagType: (typeof tagTypes)[number]) =>
+  (result: EntityState<TEntity, string> | undefined) => {
+    const tags: ApiTagDescription[] = [{ type: tagType, id: LIST_TAG }, 'Model'];
+    if (result) {
+      tags.push(
+        ...result.ids.map((id) => ({
+          type: tagType,
+          id,
+        }))
+      );
+    }
+
+    return tags;
+  };
+
+const buildTransformResponse =
+  <T extends AnyModelConfig>(adapter: EntityAdapter<T, string>) =>
+  (response: { models: T[] }) => {
+    return adapter.setAll(adapter.getInitialState(), response.models);
+  };
+
+/**
+ * Builds an endpoint URL for the models router
+ * @example
+ * buildModelsUrl('some-path')
+ * // '/api/v1/models/some-path'
+ */
+const buildModelsUrl = (path: string = '') => buildV2Url(`models/${path}`);
 
 export const modelsApi = api.injectEndpoints({
   endpoints: (build) => ({
-    getMainModels: build.query<EntityState<MainModelConfigEntity, string>, BaseModelType[]>({
+    getMainModels: build.query<EntityState<MainModelConfig, string>, BaseModelType[]>({
       query: (base_models) => {
-        const params = {
+        const params: ListModelsArg = {
           model_type: 'main',
           base_models,
         };
 
         const query = queryString.stringify(params, { arrayFormat: 'none' });
-        return `models/?${query}`;
+        return buildModelsUrl(`?${query}`);
       },
-      providesTags: (result) => {
-        const tags: ApiTagDescription[] = [{ type: 'MainModel', id: LIST_TAG }, 'Model'];
-
-        if (result) {
-          tags.push(
-            ...result.ids.map((id) => ({
-              type: 'MainModel' as const,
-              id,
-            }))
-          );
-        }
-
-        return tags;
-      },
-      transformResponse: (response: { models: MainModelConfig[] }) => {
-        const entities = createModelEntities<MainModelConfigEntity>(response.models);
-        return mainModelsAdapter.setAll(mainModelsAdapter.getInitialState(), entities);
+      providesTags: buildProvidesTags<MainModelConfig>('MainModel'),
+      transformResponse: buildTransformResponse<MainModelConfig>(mainModelsAdapter),
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        queryFulfilled.then(({ data }) => {
+          upsertModelConfigs(data, dispatch);
+        });
       },
     }),
-    updateMainModels: build.mutation<UpdateMainModelResponse, UpdateMainModelArg>({
-      query: ({ base_model, model_name, body }) => {
+    getModelMetadata: build.query<GetModelMetadataResponse, string>({
+      query: (key) => {
+        return buildModelsUrl(`i/${key}/metadata`);
+      },
+      providesTags: ['Model'],
+    }),
+    updateModels: build.mutation<UpdateModelResponse, UpdateModelArg>({
+      query: ({ key, body }) => {
         return {
-          url: `models/${base_model}/main/${model_name}`,
+          url: buildModelsUrl(`i/${key}`),
           method: 'PATCH',
           body: body,
         };
       },
       invalidatesTags: ['Model'],
     }),
-    importMainModels: build.mutation<ImportMainModelResponse, ImportMainModelArg>({
-      query: ({ body }) => {
+    installModel: build.mutation<InstallModelResponse, InstallModelArg>({
+      query: ({ source, config, access_token }) => {
         return {
-          url: `models/import`,
+          url: buildModelsUrl('install'),
+          params: { source, access_token },
           method: 'POST',
-          body: body,
+          body: config,
         };
       },
-      invalidatesTags: ['Model'],
+      invalidatesTags: ['Model', 'ModelImports'],
     }),
-    addMainModels: build.mutation<AddMainModelResponse, AddMainModelArg>({
-      query: ({ body }) => {
+    deleteModels: build.mutation<DeleteMainModelResponse, DeleteMainModelArg>({
+      query: ({ key }) => {
         return {
-          url: `models/add`,
-          method: 'POST',
-          body: body,
-        };
-      },
-      invalidatesTags: ['Model'],
-    }),
-    deleteMainModels: build.mutation<DeleteMainModelResponse, DeleteMainModelArg>({
-      query: ({ base_model, model_name, model_type }) => {
-        return {
-          url: `models/${base_model}/${model_type}/${model_name}`,
+          url: buildModelsUrl(`i/${key}`),
           method: 'DELETE',
         };
       },
       invalidatesTags: ['Model'],
     }),
-    convertMainModels: build.mutation<ConvertMainModelResponse, ConvertMainModelArg>({
-      query: ({ base_model, model_name, convert_dest_directory }) => {
+    convertMainModels: build.mutation<ConvertMainModelResponse, string>({
+      query: (key) => {
         return {
-          url: `models/convert/${base_model}/main/${model_name}`,
+          url: buildModelsUrl(`convert/${key}`),
           method: 'PUT',
-          params: { convert_dest_directory },
         };
       },
-      invalidatesTags: ['Model'],
+      invalidatesTags: ['ModelConfig'],
     }),
-    mergeMainModels: build.mutation<MergeMainModelResponse, MergeMainModelArg>({
-      query: ({ base_model, body }) => {
-        return {
-          url: `models/merge/${base_model}`,
-          method: 'PUT',
-          body: body,
-        };
+    getModelConfig: build.query<GetModelConfigResponse, string>({
+      query: (key) => buildModelsUrl(`i/${key}`),
+      providesTags: (result) => {
+        const tags: ApiTagDescription[] = ['Model'];
+
+        if (result) {
+          tags.push({ type: 'ModelConfig', id: result.key });
+        }
+
+        return tags;
       },
-      invalidatesTags: ['Model'],
     }),
-    syncModels: build.mutation<SyncModelsResponse, void>({
+    getModelConfigByAttrs: build.query<AnyModelConfig, GetByAttrsArg>({
+      query: (arg) => buildModelsUrl(`get_by_attrs?${queryString.stringify(arg)}`),
+      providesTags: (result) => {
+        const tags: ApiTagDescription[] = ['Model'];
+
+        if (result) {
+          tags.push({ type: 'ModelConfig', id: result.key });
+        }
+
+        return tags;
+      },
+      serializeQueryArgs: ({ queryArgs }) => `${queryArgs.name}.${queryArgs.base}.${queryArgs.type}`,
+    }),
+    syncModels: build.mutation<void, void>({
       query: () => {
         return {
-          url: `models/sync`,
-          method: 'POST',
+          url: buildModelsUrl('sync'),
+          method: 'PATCH',
         };
       },
       invalidatesTags: ['Model'],
     }),
-    getLoRAModels: build.query<EntityState<LoRAModelConfigEntity, string>, void>({
-      query: () => ({ url: 'models/', params: { model_type: 'lora' } }),
-      providesTags: (result) => {
-        const tags: ApiTagDescription[] = [{ type: 'LoRAModel', id: LIST_TAG }, 'Model'];
-
-        if (result) {
-          tags.push(
-            ...result.ids.map((id) => ({
-              type: 'LoRAModel' as const,
-              id,
-            }))
-          );
-        }
-
-        return tags;
-      },
-      transformResponse: (response: { models: LoRAModelConfig[] }) => {
-        const entities = createModelEntities<LoRAModelConfigEntity>(response.models);
-        return loraModelsAdapter.setAll(loraModelsAdapter.getInitialState(), entities);
+    getLoRAModels: build.query<EntityState<LoRAModelConfig, string>, void>({
+      query: () => ({ url: buildModelsUrl(), params: { model_type: 'lora' } }),
+      providesTags: buildProvidesTags<LoRAModelConfig>('LoRAModel'),
+      transformResponse: buildTransformResponse<LoRAModelConfig>(loraModelsAdapter),
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        queryFulfilled.then(({ data }) => {
+          upsertModelConfigs(data, dispatch);
+        });
       },
     }),
-    updateLoRAModels: build.mutation<UpdateLoRAModelResponse, UpdateLoRAModelArg>({
-      query: ({ base_model, model_name, body }) => {
-        return {
-          url: `models/${base_model}/lora/${model_name}`,
-          method: 'PATCH',
-          body: body,
-        };
-      },
-      invalidatesTags: [{ type: 'LoRAModel', id: LIST_TAG }],
-    }),
-    deleteLoRAModels: build.mutation<DeleteLoRAModelResponse, DeleteLoRAModelArg>({
-      query: ({ base_model, model_name }) => {
-        return {
-          url: `models/${base_model}/lora/${model_name}`,
-          method: 'DELETE',
-        };
-      },
-      invalidatesTags: [{ type: 'LoRAModel', id: LIST_TAG }],
-    }),
-    getControlNetModels: build.query<EntityState<ControlNetModelConfigEntity, string>, void>({
-      query: () => ({ url: 'models/', params: { model_type: 'controlnet' } }),
-      providesTags: (result) => {
-        const tags: ApiTagDescription[] = [{ type: 'ControlNetModel', id: LIST_TAG }, 'Model'];
-
-        if (result) {
-          tags.push(
-            ...result.ids.map((id) => ({
-              type: 'ControlNetModel' as const,
-              id,
-            }))
-          );
-        }
-
-        return tags;
-      },
-      transformResponse: (response: { models: ControlNetModelConfig[] }) => {
-        const entities = createModelEntities<ControlNetModelConfigEntity>(response.models);
-        return controlNetModelsAdapter.setAll(controlNetModelsAdapter.getInitialState(), entities);
+    getControlNetModels: build.query<EntityState<ControlNetModelConfig, string>, void>({
+      query: () => ({ url: buildModelsUrl(), params: { model_type: 'controlnet' } }),
+      providesTags: buildProvidesTags<ControlNetModelConfig>('ControlNetModel'),
+      transformResponse: buildTransformResponse<ControlNetModelConfig>(controlNetModelsAdapter),
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        queryFulfilled.then(({ data }) => {
+          upsertModelConfigs(data, dispatch);
+        });
       },
     }),
-    getIPAdapterModels: build.query<EntityState<IPAdapterModelConfigEntity, string>, void>({
-      query: () => ({ url: 'models/', params: { model_type: 'ip_adapter' } }),
-      providesTags: (result) => {
-        const tags: ApiTagDescription[] = [{ type: 'IPAdapterModel', id: LIST_TAG }, 'Model'];
-
-        if (result) {
-          tags.push(
-            ...result.ids.map((id) => ({
-              type: 'IPAdapterModel' as const,
-              id,
-            }))
-          );
-        }
-
-        return tags;
-      },
-      transformResponse: (response: { models: IPAdapterModelConfig[] }) => {
-        const entities = createModelEntities<IPAdapterModelConfigEntity>(response.models);
-        return ipAdapterModelsAdapter.setAll(ipAdapterModelsAdapter.getInitialState(), entities);
+    getIPAdapterModels: build.query<EntityState<IPAdapterModelConfig, string>, void>({
+      query: () => ({ url: buildModelsUrl(), params: { model_type: 'ip_adapter' } }),
+      providesTags: buildProvidesTags<IPAdapterModelConfig>('IPAdapterModel'),
+      transformResponse: buildTransformResponse<IPAdapterModelConfig>(ipAdapterModelsAdapter),
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        queryFulfilled.then(({ data }) => {
+          upsertModelConfigs(data, dispatch);
+        });
       },
     }),
-    getT2IAdapterModels: build.query<EntityState<T2IAdapterModelConfigEntity, string>, void>({
-      query: () => ({ url: 'models/', params: { model_type: 't2i_adapter' } }),
-      providesTags: (result) => {
-        const tags: ApiTagDescription[] = [{ type: 'T2IAdapterModel', id: LIST_TAG }, 'Model'];
-
-        if (result) {
-          tags.push(
-            ...result.ids.map((id) => ({
-              type: 'T2IAdapterModel' as const,
-              id,
-            }))
-          );
-        }
-
-        return tags;
-      },
-      transformResponse: (response: { models: T2IAdapterModelConfig[] }) => {
-        const entities = createModelEntities<T2IAdapterModelConfigEntity>(response.models);
-        return t2iAdapterModelsAdapter.setAll(t2iAdapterModelsAdapter.getInitialState(), entities);
+    getT2IAdapterModels: build.query<EntityState<T2IAdapterModelConfig, string>, void>({
+      query: () => ({ url: buildModelsUrl(), params: { model_type: 't2i_adapter' } }),
+      providesTags: buildProvidesTags<T2IAdapterModelConfig>('T2IAdapterModel'),
+      transformResponse: buildTransformResponse<T2IAdapterModelConfig>(t2iAdapterModelsAdapter),
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        queryFulfilled.then(({ data }) => {
+          upsertModelConfigs(data, dispatch);
+        });
       },
     }),
-    getVaeModels: build.query<EntityState<VaeModelConfigEntity, string>, void>({
-      query: () => ({ url: 'models/', params: { model_type: 'vae' } }),
-      providesTags: (result) => {
-        const tags: ApiTagDescription[] = [{ type: 'VaeModel', id: LIST_TAG }, 'Model'];
-
-        if (result) {
-          tags.push(
-            ...result.ids.map((id) => ({
-              type: 'VaeModel' as const,
-              id,
-            }))
-          );
-        }
-
-        return tags;
-      },
-      transformResponse: (response: { models: VaeModelConfig[] }) => {
-        const entities = createModelEntities<VaeModelConfigEntity>(response.models);
-        return vaeModelsAdapter.setAll(vaeModelsAdapter.getInitialState(), entities);
+    getVaeModels: build.query<EntityState<VAEModelConfig, string>, void>({
+      query: () => ({ url: buildModelsUrl(), params: { model_type: 'vae' } }),
+      providesTags: buildProvidesTags<VAEModelConfig>('VaeModel'),
+      transformResponse: buildTransformResponse<VAEModelConfig>(vaeModelsAdapter),
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        queryFulfilled.then(({ data }) => {
+          upsertModelConfigs(data, dispatch);
+        });
       },
     }),
-    getTextualInversionModels: build.query<EntityState<TextualInversionModelConfigEntity, string>, void>({
-      query: () => ({ url: 'models/', params: { model_type: 'embedding' } }),
-      providesTags: (result) => {
-        const tags: ApiTagDescription[] = [{ type: 'TextualInversionModel', id: LIST_TAG }, 'Model'];
-
-        if (result) {
-          tags.push(
-            ...result.ids.map((id) => ({
-              type: 'TextualInversionModel' as const,
-              id,
-            }))
-          );
-        }
-
-        return tags;
-      },
-      transformResponse: (response: { models: TextualInversionModelConfig[] }) => {
-        const entities = createModelEntities<TextualInversionModelConfigEntity>(response.models);
-        return textualInversionModelsAdapter.setAll(textualInversionModelsAdapter.getInitialState(), entities);
+    getTextualInversionModels: build.query<EntityState<TextualInversionModelConfig, string>, void>({
+      query: () => ({ url: buildModelsUrl(), params: { model_type: 'embedding' } }),
+      providesTags: buildProvidesTags<TextualInversionModelConfig>('TextualInversionModel'),
+      transformResponse: buildTransformResponse<TextualInversionModelConfig>(textualInversionModelsAdapter),
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        queryFulfilled.then(({ data }) => {
+          upsertModelConfigs(data, dispatch);
+        });
       },
     }),
-    getModelsInFolder: build.query<SearchFolderResponse, SearchFolderArg>({
+    scanModels: build.query<ScanFolderResponse, ScanFolderArg>({
       query: (arg) => {
-        const folderQueryStr = queryString.stringify(arg, {});
+        const folderQueryStr = arg ? queryString.stringify(arg, {}) : '';
         return {
-          url: `/models/search?${folderQueryStr}`,
+          url: buildModelsUrl(`scan_folder?${folderQueryStr}`),
         };
       },
     }),
-    getCheckpointConfigs: build.query<CheckpointConfigsResponse, void>({
+    getModelImports: build.query<ListImportModelsResponse, void>({
       query: () => {
         return {
-          url: `/models/ckpt_confs`,
+          url: buildModelsUrl(`import`),
         };
       },
+      providesTags: ['ModelImports'],
+    }),
+    deleteModelImport: build.mutation<DeleteImportModelsResponse, number>({
+      query: (id) => {
+        return {
+          url: buildModelsUrl(`import/${id}`),
+          method: 'DELETE',
+        };
+      },
+      invalidatesTags: ['ModelImports'],
+    }),
+    pruneModelImports: build.mutation<PruneModelImportsResponse, void>({
+      query: () => {
+        return {
+          url: buildModelsUrl('import'),
+          method: 'PATCH',
+        };
+      },
+      invalidatesTags: ['ModelImports'],
     }),
   }),
 });
 
 export const {
+  useGetModelConfigQuery,
   useGetMainModelsQuery,
   useGetControlNetModelsQuery,
   useGetIPAdapterModelsQuery,
@@ -448,15 +341,26 @@ export const {
   useGetLoRAModelsQuery,
   useGetTextualInversionModelsQuery,
   useGetVaeModelsQuery,
-  useUpdateMainModelsMutation,
-  useDeleteMainModelsMutation,
-  useImportMainModelsMutation,
-  useAddMainModelsMutation,
+  useDeleteModelsMutation,
+  useUpdateModelsMutation,
+  useInstallModelMutation,
   useConvertMainModelsMutation,
-  useMergeMainModelsMutation,
-  useDeleteLoRAModelsMutation,
-  useUpdateLoRAModelsMutation,
   useSyncModelsMutation,
-  useGetModelsInFolderQuery,
-  useGetCheckpointConfigsQuery,
+  useLazyScanModelsQuery,
+  useGetModelImportsQuery,
+  useGetModelMetadataQuery,
+  useDeleteModelImportMutation,
+  usePruneModelImportsMutation,
 } = modelsApi;
+
+const upsertModelConfigs = (
+  modelConfigs: EntityState<AnyModelConfig, string>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  dispatch: ThunkDispatch<any, any, UnknownAction>
+) => {
+  anyModelConfigAdapterSelectors.selectAll(modelConfigs).forEach((modelConfig) => {
+    dispatch(modelsApi.util.upsertQueryData('getModelConfig', modelConfig.key, modelConfig));
+    const { base, name, type } = modelConfig;
+    dispatch(modelsApi.util.upsertQueryData('getModelConfigByAttrs', { base, name, type }, modelConfig));
+  });
+};

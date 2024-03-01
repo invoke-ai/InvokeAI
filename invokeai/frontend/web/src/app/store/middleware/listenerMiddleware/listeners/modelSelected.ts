@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import {
   controlAdapterIsEnabledChanged,
   selectControlAdapterAll,
@@ -12,9 +13,7 @@ import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
 import { forEach } from 'lodash-es';
 
-import { startAppListening } from '..';
-
-export const addModelSelectedListener = () => {
+export const addModelSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: modelSelected,
     effect: (action, { getState, dispatch }) => {
@@ -30,8 +29,8 @@ export const addModelSelectedListener = () => {
 
       const newModel = result.data;
 
-      const newBaseModel = newModel.base_model;
-      const didBaseModelChange = state.generation.model?.base_model !== newBaseModel;
+      const newBaseModel = newModel.base;
+      const didBaseModelChange = state.generation.model?.base !== newBaseModel;
 
       if (didBaseModelChange) {
         // we may need to reset some incompatible submodels
@@ -39,7 +38,7 @@ export const addModelSelectedListener = () => {
 
         // handle incompatible loras
         forEach(state.lora.loras, (lora, id) => {
-          if (lora.base_model !== newBaseModel) {
+          if (lora.model.base !== newBaseModel) {
             dispatch(loraRemoved(id));
             modelsCleared += 1;
           }
@@ -47,14 +46,14 @@ export const addModelSelectedListener = () => {
 
         // handle incompatible vae
         const { vae } = state.generation;
-        if (vae && vae.base_model !== newBaseModel) {
+        if (vae && vae.base !== newBaseModel) {
           dispatch(vaeSelected(null));
           modelsCleared += 1;
         }
 
         // handle incompatible controlnets
         selectControlAdapterAll(state.controlAdapters).forEach((ca) => {
-          if (ca.model?.base_model !== newBaseModel) {
+          if (ca.model?.base !== newBaseModel) {
             dispatch(controlAdapterIsEnabledChanged({ id: ca.id, isEnabled: false }));
             modelsCleared += 1;
           }

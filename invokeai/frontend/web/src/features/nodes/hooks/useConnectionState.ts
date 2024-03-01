@@ -11,10 +11,10 @@ const selectIsConnectionInProgress = createSelector(
   (nodes) => nodes.connectionStartFieldType !== null && nodes.connectionStartParams !== null
 );
 
-export type UseConnectionStateProps = {
+type UseConnectionStateProps = {
   nodeId: string;
   fieldName: string;
-  kind: 'input' | 'output';
+  kind: 'inputs' | 'outputs';
 };
 
 export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionStateProps) => {
@@ -26,8 +26,8 @@ export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionSta
         Boolean(
           nodes.edges.filter((edge) => {
             return (
-              (kind === 'input' ? edge.target : edge.source) === nodeId &&
-              (kind === 'input' ? edge.targetHandle : edge.sourceHandle) === fieldName
+              (kind === 'inputs' ? edge.target : edge.source) === nodeId &&
+              (kind === 'inputs' ? edge.targetHandle : edge.sourceHandle) === fieldName
             );
           }).length
         )
@@ -36,7 +36,7 @@ export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionSta
   );
 
   const selectConnectionError = useMemo(
-    () => makeConnectionErrorSelector(nodeId, fieldName, kind === 'input' ? 'target' : 'source', fieldType),
+    () => makeConnectionErrorSelector(nodeId, fieldName, kind === 'inputs' ? 'target' : 'source', fieldType),
     [nodeId, fieldName, kind, fieldType]
   );
 
@@ -46,7 +46,7 @@ export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionSta
         Boolean(
           nodes.connectionStartParams?.nodeId === nodeId &&
             nodes.connectionStartParams?.handleId === fieldName &&
-            nodes.connectionStartParams?.handleType === { input: 'target', output: 'source' }[kind]
+            nodes.connectionStartParams?.handleType === { inputs: 'target', outputs: 'source' }[kind]
         )
       ),
     [fieldName, kind, nodeId]

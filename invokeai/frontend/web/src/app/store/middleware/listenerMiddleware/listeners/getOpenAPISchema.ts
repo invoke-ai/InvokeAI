@@ -1,13 +1,12 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
-import { nodeTemplatesBuilt } from 'features/nodes/store/nodeTemplatesSlice';
+import { nodeTemplatesBuilt } from 'features/nodes/store/nodesSlice';
 import { parseSchema } from 'features/nodes/util/schema/parseSchema';
 import { size } from 'lodash-es';
 import { appInfoApi } from 'services/api/endpoints/appInfo';
 
-import { startAppListening } from '..';
-
-export const addGetOpenAPISchemaListener = () => {
+export const addGetOpenAPISchemaListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher: appInfoApi.endpoints.getOpenAPISchema.matchFulfilled,
     effect: (action, { dispatch, getState }) => {

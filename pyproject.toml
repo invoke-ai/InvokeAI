@@ -33,7 +33,7 @@ classifiers = [
 ]
 dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
-  "accelerate==0.26.1",
+  "accelerate==0.27.2",
   "clip_anytorch==2.5.2",       # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel==2.0.2",
   "controlnet-aux==0.0.7",
@@ -66,6 +66,7 @@ dependencies = [
   "albumentations",
   "click",
   "datasets",
+  "Deprecated",
   "dnspython~=2.4.0",
   "dynamicprompts",
   "easing-functions",
@@ -104,20 +105,23 @@ dependencies = [
 "onnx-directml" = ["onnxruntime-directml"]
 "dist" = ["pip-tools", "pipdeptree", "twine"]
 "docs" = [
-  "mkdocs-material<9.0",
+  "mkdocs-material",
   "mkdocs-git-revision-date-localized-plugin",
-  "mkdocs-redirects==1.2.0",
+  "mkdocs-redirects",
+  "mkdocstrings[python]",
 ]
 "dev" = ["jurigged", "pudb", "snakeviz", "gprof2dot"]
 "test" = [
-  "ruff==0.2.1",
+  "ruff",
   "ruff-lsp",
   "mypy",
   "pre-commit",
   "pytest>6.0.0",
   "pytest-cov",
+  "pytest-timeout",
   "pytest-datadir",
   "requests_testadapter",
+  "httpx",
 ]
 
 [project.scripts]
@@ -135,8 +139,7 @@ dependencies = [
 
 # full commands
 "invokeai-configure" = "invokeai.frontend.install.invokeai_configure:invokeai_configure"
-"invokeai-merge" = "invokeai.frontend.merge:invokeai_merge_diffusers"
-"invokeai-merge2" = "invokeai.frontend.merge.merge_diffusers2:main"
+"invokeai-merge" = "invokeai.frontend.merge.merge_diffusers:main"
 "invokeai-ti" = "invokeai.frontend.training:invokeai_textual_inversion"
 "invokeai-model-install" = "invokeai.frontend.install.model_install:main"
 "invokeai-model-install2" = "invokeai.frontend.install.model_install2:main"              # will eventually be renamed to invokeai-model-install
@@ -169,6 +172,7 @@ version = { attr = "invokeai.version.__version__" }
   "invokeai.frontend.web.static*",
   "invokeai.configs*",
   "invokeai.app*",
+  "invokeai.invocation_api*",
 ]
 
 [tool.setuptools.package-data]
@@ -183,9 +187,10 @@ version = { attr = "invokeai.version.__version__" }
 
 #=== Begin: PyTest and Coverage
 [tool.pytest.ini_options]
-addopts = "--cov-report term --cov-report html --cov-report xml --strict-markers -m \"not slow\""
+addopts = "--cov-report term --cov-report html --cov-report xml --strict-markers --timeout 60 -m \"not slow\""
 markers = [
   "slow: Marks tests as slow. Disabled by default. To run all tests, use -m \"\". To run only slow tests, use -m \"slow\".",
+  "timeout: Marks the timeout override."
 ]
 [tool.coverage.run]
 branch = true
@@ -244,7 +249,7 @@ module = [
   "invokeai.app.services.invocation_stats.invocation_stats_default",
   "invokeai.app.services.model_manager.model_manager_base",
   "invokeai.app.services.model_manager.model_manager_default",
-  "invokeai.app.services.model_records.model_records_sql",
+  "invokeai.app.services.model_manager.store.model_records_sql",
   "invokeai.app.util.controlnet_utils",
   "invokeai.backend.image_util.txt2mask",
   "invokeai.backend.image_util.safety_checker",
@@ -280,3 +285,38 @@ module = [
   "invokeai.frontend.install.model_install",
 ]
 #=== End: MyPy
+
+[tool.pyright]
+# Start from strict mode
+typeCheckingMode = "strict"
+# This errors whenever an import is missing a type stub file - way too noisy
+reportMissingTypeStubs = "none"
+# These are the rest of the rules enabled by strict mode - enable them @ warning
+reportConstantRedefinition = "warning"
+reportDeprecated = "warning"
+reportDuplicateImport = "warning"
+reportIncompleteStub = "warning"
+reportInconsistentConstructor = "warning"
+reportInvalidStubStatement = "warning"
+reportMatchNotExhaustive = "warning"
+reportMissingParameterType = "warning"
+reportMissingTypeArgument = "warning"
+reportPrivateUsage = "warning"
+reportTypeCommentUsage = "warning"
+reportUnknownArgumentType = "warning"
+reportUnknownLambdaType = "warning"
+reportUnknownMemberType = "warning"
+reportUnknownParameterType = "warning"
+reportUnknownVariableType = "warning"
+reportUnnecessaryCast = "warning"
+reportUnnecessaryComparison = "warning"
+reportUnnecessaryContains = "warning"
+reportUnnecessaryIsInstance = "warning"
+reportUnusedClass = "warning"
+reportUnusedImport = "warning"
+reportUnusedFunction = "warning"
+reportUnusedVariable = "warning"
+reportUntypedBaseClass = "warning"
+reportUntypedClassDecorator = "warning"
+reportUntypedFunctionDecorator = "warning"
+reportUntypedNamedTuple = "warning"

@@ -5,20 +5,22 @@ from pydantic import BaseModel, ConfigDict, Field
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    InputField,
-    InvocationContext,
-    MetadataField,
-    OutputField,
-    UIType,
     invocation,
     invocation_output,
 )
 from invokeai.app.invocations.controlnet_image_processors import ControlField
+from invokeai.app.invocations.fields import (
+    FieldDescriptions,
+    ImageField,
+    InputField,
+    MetadataField,
+    OutputField,
+    UIType,
+)
 from invokeai.app.invocations.ip_adapter import IPAdapterModelField
 from invokeai.app.invocations.model import LoRAModelField, MainModelField, VAEModelField
-from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
-from invokeai.app.shared.fields import FieldDescriptions
+from invokeai.app.services.shared.invocation_context import InvocationContext
 
 from ...version import __version__
 
@@ -31,7 +33,7 @@ class MetadataItemField(BaseModel):
 class LoRAMetadataField(BaseModel):
     """LoRA Metadata Field"""
 
-    lora: LoRAModelField = Field(description=FieldDescriptions.lora_model)
+    model: LoRAModelField = Field(description=FieldDescriptions.lora_model)
     weight: float = Field(description=FieldDescriptions.lora_weight)
 
 
@@ -112,7 +114,7 @@ GENERATION_MODES = Literal[
 ]
 
 
-@invocation("core_metadata", title="Core Metadata", tags=["metadata"], category="metadata", version="1.0.1")
+@invocation("core_metadata", title="Core Metadata", tags=["metadata"], category="metadata", version="1.1.1")
 class CoreMetadataInvocation(BaseInvocation):
     """Collects core generation metadata into a MetadataField"""
 

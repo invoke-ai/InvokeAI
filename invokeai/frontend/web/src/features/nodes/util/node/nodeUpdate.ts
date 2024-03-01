@@ -11,13 +11,14 @@ export const getNeedsUpdate = (node: InvocationNode, template: InvocationTemplat
     return true;
   }
   return node.data.version !== template.version;
-}; /**
+};
+
+/**
  * Checks if a node may be updated by comparing its major version with the template's major version.
  * @param node The node to check.
  * @param template The invocation template to check against.
  */
-
-export const getMayUpdateNode = (node: InvocationNode, template: InvocationTemplate): boolean => {
+const getMayUpdateNode = (node: InvocationNode, template: InvocationTemplate): boolean => {
   const needsUpdate = getNeedsUpdate(node, template);
   if (!needsUpdate || node.data.type !== template.type) {
     return false;
@@ -25,7 +26,9 @@ export const getMayUpdateNode = (node: InvocationNode, template: InvocationTempl
   const templateMajor = zParsedSemver.parse(template.version).major;
 
   return satisfies(node.data.version, `^${templateMajor}`);
-}; /**
+};
+
+/**
  * Updates a node to the latest version of its template:
  * - Create a new node data object with the latest version of the template.
  * - Recursively merge new node data object into the node to be updated.
@@ -34,7 +37,6 @@ export const getMayUpdateNode = (node: InvocationNode, template: InvocationTempl
  * @param template The invocation template to update to.
  * @throws {NodeUpdateError} If the node is not an invocation node.
  */
-
 export const updateNode = (node: InvocationNode, template: InvocationTemplate): InvocationNode => {
   const mayUpdate = getMayUpdateNode(node, template);
 
@@ -54,6 +56,5 @@ export const updateNode = (node: InvocationNode, template: InvocationTemplate): 
 
   // Remove any fields that are not in the template
   clone.data.inputs = pick(clone.data.inputs, keys(defaults.data.inputs));
-  clone.data.outputs = pick(clone.data.outputs, keys(defaults.data.outputs));
   return clone;
 };

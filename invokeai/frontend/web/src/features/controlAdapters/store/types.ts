@@ -4,7 +4,6 @@ import type {
   ParameterIPAdapterModel,
   ParameterT2IAdapterModel,
 } from 'features/parameters/types/parameterSchemas';
-import { isObject } from 'lodash-es';
 import type { components } from 'services/api/schema';
 import type {
   CannyImageProcessorInvocation,
@@ -81,7 +80,7 @@ export type RequiredDepthAnythingImageProcessorInvocation = O.Required<
   'type' | 'model_size' | 'resolution' | 'offload'
 >;
 
-export const zDepthAnythingModelSize = z.enum(['large', 'base', 'small']);
+const zDepthAnythingModelSize = z.enum(['large', 'base', 'small']);
 export type DepthAnythingModelSize = z.infer<typeof zDepthAnythingModelSize>;
 export const isDepthAnythingModelSize = (v: unknown): v is DepthAnythingModelSize =>
   zDepthAnythingModelSize.safeParse(v).success;
@@ -186,151 +185,9 @@ export type RequiredControlAdapterProcessorNode =
     >
   | { type: 'none' };
 
-/**
- * Type guard for CannyImageProcessorInvocation
- */
-export const isCannyImageProcessorInvocation = (obj: unknown): obj is CannyImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'canny_image_processor') {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for ColorMapImageProcessorInvocation
- */
-export const isColorMapImageProcessorInvocation = (obj: unknown): obj is ColorMapImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'color_map_image_processor') {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for ContentShuffleImageProcessorInvocation
- */
-export const isContentShuffleImageProcessorInvocation = (
-  obj: unknown
-): obj is ContentShuffleImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'content_shuffle_image_processor') {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for DepthAnythingImageProcessorInvocation
- */
-export const isDepthAnythingImageProcessorInvocation = (obj: unknown): obj is DepthAnythingImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'depth_anything_image_processor') {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for HedImageprocessorInvocation
- */
-export const isHedImageprocessorInvocation = (obj: unknown): obj is HedImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'hed_image_processor') {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for LineartAnimeImageProcessorInvocation
- */
-export const isLineartAnimeImageProcessorInvocation = (obj: unknown): obj is LineartAnimeImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'lineart_anime_image_processor') {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for LineartImageProcessorInvocation
- */
-export const isLineartImageProcessorInvocation = (obj: unknown): obj is LineartImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'lineart_image_processor') {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for MediapipeFaceProcessorInvocation
- */
-export const isMediapipeFaceProcessorInvocation = (obj: unknown): obj is MediapipeFaceProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'mediapipe_face_processor') {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for MidasDepthImageProcessorInvocation
- */
-export const isMidasDepthImageProcessorInvocation = (obj: unknown): obj is MidasDepthImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'midas_depth_image_processor') {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for MlsdImageProcessorInvocation
- */
-export const isMlsdImageProcessorInvocation = (obj: unknown): obj is MlsdImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'mlsd_image_processor') {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for NormalbaeImageProcessorInvocation
- */
-export const isNormalbaeImageProcessorInvocation = (obj: unknown): obj is NormalbaeImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'normalbae_image_processor') {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for DWOpenposeImageProcessorInvocation
- */
-export const isDWOpenposeImageProcessorInvocation = (obj: unknown): obj is DWOpenposeImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'dw_openpose_image_processor') {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for PidiImageProcessorInvocation
- */
-export const isPidiImageProcessorInvocation = (obj: unknown): obj is PidiImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'pidi_image_processor') {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for ZoeDepthImageProcessorInvocation
- */
-export const isZoeDepthImageProcessorInvocation = (obj: unknown): obj is ZoeDepthImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'zoe_depth_image_processor') {
-    return true;
-  }
-  return false;
-};
-
 export type ControlMode = NonNullable<components['schemas']['ControlNetInvocation']['control_mode']>;
 
-export const zResizeMode = z.enum(['just_resize', 'crop_resize', 'fill_resize', 'just_resize_simple']);
+const zResizeMode = z.enum(['just_resize', 'crop_resize', 'fill_resize', 'just_resize_simple']);
 export type ResizeMode = z.infer<typeof zResizeMode>;
 export const isResizeMode = (v: unknown): v is ResizeMode => zResizeMode.safeParse(v).success;
 

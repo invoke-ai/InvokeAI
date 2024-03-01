@@ -1,12 +1,12 @@
 import { Combobox, Flex, FormControl } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import { SyncModelsIconButton } from 'features/modelManager/components/SyncModels/SyncModelsIconButton';
+import { SyncModelsIconButton } from 'features/modelManagerV2/components/SyncModels/SyncModelsIconButton';
 import { fieldVaeModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type { VAEModelFieldInputInstance, VAEModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
-import type { VaeModelConfigEntity } from 'services/api/endpoints/models';
 import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
+import type { VAEModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
@@ -17,7 +17,7 @@ const VAEModelFieldInputComponent = (props: Props) => {
   const dispatch = useAppDispatch();
   const { data, isLoading } = useGetVaeModelsQuery();
   const _onChange = useCallback(
-    (value: VaeModelConfigEntity | null) => {
+    (value: VAEModelConfig | null) => {
       if (!value) {
         return;
       }
@@ -34,7 +34,7 @@ const VAEModelFieldInputComponent = (props: Props) => {
   const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
     modelEntities: data,
     onChange: _onChange,
-    selectedModel: field.value ? { ...field.value, model_type: 'vae' } : null,
+    selectedModel: field.value,
     isLoading,
   });
 

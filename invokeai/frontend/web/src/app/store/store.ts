@@ -3,6 +3,7 @@ import { autoBatchEnhancer, combineReducers, configureStore } from '@reduxjs/too
 import { logger } from 'app/logging/logger';
 import { idbKeyValDriver } from 'app/store/enhancers/reduxRemember/driver';
 import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
+import type { JSONObject } from 'common/types';
 import { canvasPersistConfig, canvasSlice } from 'features/canvas/store/canvasSlice';
 import { changeBoardModalSlice } from 'features/changeBoardModal/store/slice';
 import {
@@ -14,9 +15,8 @@ import { dynamicPromptsPersistConfig, dynamicPromptsSlice } from 'features/dynam
 import { galleryPersistConfig, gallerySlice } from 'features/gallery/store/gallerySlice';
 import { hrfPersistConfig, hrfSlice } from 'features/hrf/store/hrfSlice';
 import { loraPersistConfig, loraSlice } from 'features/lora/store/loraSlice';
-import { modelManagerPersistConfig, modelManagerSlice } from 'features/modelManager/store/modelManagerSlice';
+import { modelManagerV2PersistConfig, modelManagerV2Slice } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { nodesPersistConfig, nodesSlice } from 'features/nodes/store/nodesSlice';
-import { nodesTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
 import { workflowPersistConfig, workflowSlice } from 'features/nodes/store/workflowSlice';
 import { generationPersistConfig, generationSlice } from 'features/parameters/store/generationSlice';
 import { postprocessingPersistConfig, postprocessingSlice } from 'features/parameters/store/postprocessingSlice';
@@ -33,7 +33,6 @@ import { rememberEnhancer, rememberReducer } from 'redux-remember';
 import { serializeError } from 'serialize-error';
 import { api } from 'services/api';
 import { authToastMiddleware } from 'services/api/authToastMiddleware';
-import type { JsonObject } from 'type-fest';
 
 import { STORAGE_PREFIX } from './constants';
 import { actionSanitizer } from './middleware/devtools/actionSanitizer';
@@ -46,7 +45,6 @@ const allReducers = {
   [gallerySlice.name]: gallerySlice.reducer,
   [generationSlice.name]: generationSlice.reducer,
   [nodesSlice.name]: nodesSlice.reducer,
-  [nodesTemplatesSlice.name]: nodesTemplatesSlice.reducer,
   [postprocessingSlice.name]: postprocessingSlice.reducer,
   [systemSlice.name]: systemSlice.reducer,
   [configSlice.name]: configSlice.reducer,
@@ -56,7 +54,7 @@ const allReducers = {
   [deleteImageModalSlice.name]: deleteImageModalSlice.reducer,
   [changeBoardModalSlice.name]: changeBoardModalSlice.reducer,
   [loraSlice.name]: loraSlice.reducer,
-  [modelManagerSlice.name]: modelManagerSlice.reducer,
+  [modelManagerV2Slice.name]: modelManagerV2Slice.reducer,
   [sdxlSlice.name]: sdxlSlice.reducer,
   [queueSlice.name]: queueSlice.reducer,
   [workflowSlice.name]: workflowSlice.reducer,
@@ -103,7 +101,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [dynamicPromptsPersistConfig.name]: dynamicPromptsPersistConfig,
   [sdxlPersistConfig.name]: sdxlPersistConfig,
   [loraPersistConfig.name]: loraPersistConfig,
-  [modelManagerPersistConfig.name]: modelManagerPersistConfig,
+  [modelManagerV2PersistConfig.name]: modelManagerV2PersistConfig,
   [hrfPersistConfig.name]: hrfPersistConfig,
 };
 
@@ -127,7 +125,7 @@ const unserialize: UnserializeFunction = (data, key) => {
       {
         persistedData: parsed,
         rehydratedData: transformed,
-        diff: diff(parsed, transformed) as JsonObject, // this is always serializable
+        diff: diff(parsed, transformed) as JSONObject, // this is always serializable
       },
       `Rehydrated slice "${key}"`
     );
@@ -138,7 +136,7 @@ const unserialize: UnserializeFunction = (data, key) => {
   }
 };
 
-export const serialize: SerializeFunction = (data, key) => {
+const serialize: SerializeFunction = (data, key) => {
   const persistConfig = persistConfigs[key as keyof typeof persistConfigs];
   if (!persistConfig) {
     throw new Error(`No persist config for slice "${key}"`);
@@ -187,7 +185,6 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
     },
   });
 
-export type AppGetState = ReturnType<ReturnType<typeof createStore>['getState']>;
 export type RootState = ReturnType<ReturnType<typeof createStore>['getState']>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AppThunkDispatch = ThunkDispatch<RootState, any, UnknownAction>;

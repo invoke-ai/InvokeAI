@@ -1,5 +1,6 @@
 import { Box, Flex, FormControl, FormLabel, Icon, IconButton, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import ParamControlAdapterModel from 'features/controlAdapters/components/parameters/ParamControlAdapterModel';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
 import {
@@ -20,7 +21,6 @@ import ControlAdapterShouldAutoConfig from './ControlAdapterShouldAutoConfig';
 import ControlNetCanvasImageImports from './imports/ControlNetCanvasImageImports';
 import { ParamControlAdapterBeginEnd } from './parameters/ParamControlAdapterBeginEnd';
 import ParamControlAdapterControlMode from './parameters/ParamControlAdapterControlMode';
-import ParamControlAdapterModel from './parameters/ParamControlAdapterModel';
 import ParamControlAdapterProcessorSelect from './parameters/ParamControlAdapterProcessorSelect';
 import ParamControlAdapterResizeMode from './parameters/ParamControlAdapterResizeMode';
 import ParamControlAdapterWeight from './parameters/ParamControlAdapterWeight';

@@ -108,7 +108,16 @@
         "preferencesLabel": "Предпочтения",
         "or": "или",
         "advancedOptions": "Расширенные настройки",
-        "free": "Свободно"
+        "free": "Свободно",
+        "aboutHeading": "Владей своей творческой силой",
+        "red": "Красный",
+        "green": "Зеленый",
+        "blue": "Синий",
+        "alpha": "Альфа",
+        "toResolve": "Чтоб решить",
+        "copy": "Копировать",
+        "localSystem": "Локальная система",
+        "aboutDesc": "Используя Invoke для работы? Проверьте это:"
     },
     "gallery": {
         "generations": "Генерации",
@@ -152,17 +161,17 @@
     },
     "hotkeys": {
         "keyboardShortcuts": "Горячие клавиши",
-        "appHotkeys": "Горячие клавиши приложения",
-        "generalHotkeys": "Общие горячие клавиши",
-        "galleryHotkeys": "Горячие клавиши галереи",
-        "unifiedCanvasHotkeys": "Горячие клавиши Единого холста",
+        "appHotkeys": "Приложение",
+        "generalHotkeys": "Общее",
+        "galleryHotkeys": "Галлерея",
+        "unifiedCanvasHotkeys": "Единый холст",
         "invoke": {
             "title": "Invoke",
             "desc": "Сгенерировать изображение"
         },
         "cancel": {
             "title": "Отменить",
-            "desc": "Отменить генерацию изображения"
+            "desc": "Отменить текущий элемент"
         },
         "focusPrompt": {
             "title": "Переключиться на ввод запроса",
@@ -352,7 +361,7 @@
             "desc": "Открывает меню добавления узла",
             "title": "Добавление узлов"
         },
-        "nodesHotkeys": "Горячие клавиши узлов",
+        "nodesHotkeys": "Узлы",
         "cancelAndClear": {
             "desc": "Отмена текущего элемента очереди и очистка всех ожидающих элементов",
             "title": "Отменить и очистить"
@@ -367,7 +376,11 @@
             "desc": "Открытие и закрытие панели опций и галереи",
             "title": "Переключить опции и галерею"
         },
-        "clearSearch": "Очистить поиск"
+        "clearSearch": "Очистить поиск",
+        "remixImage": {
+            "desc": "Используйте все параметры, кроме сида из текущего изображения",
+            "title": "Ремикс изображения"
+        }
     },
     "modelManager": {
         "modelManager": "Менеджер моделей",
@@ -512,7 +525,8 @@
         "modelType": "Тип модели",
         "customConfigFileLocation": "Расположение пользовательского файла конфигурации",
         "vaePrecision": "Точность VAE",
-        "noModelSelected": "Модель не выбрана"
+        "noModelSelected": "Модель не выбрана",
+        "configFile": "Файл конфигурации"
     },
     "parameters": {
         "images": "Изображения",
@@ -583,8 +597,8 @@
         "copyImage": "Скопировать изображение",
         "showPreview": "Показать предпросмотр",
         "noiseSettings": "Шум",
-        "seamlessXAxis": "Горизонтальная",
-        "seamlessYAxis": "Вертикальная",
+        "seamlessXAxis": "Бесшовность по оси X",
+        "seamlessYAxis": "Бесшовность по оси Y",
         "scheduler": "Планировщик",
         "boundingBoxWidth": "Ширина ограничивающей рамки",
         "boundingBoxHeight": "Высота ограничивающей рамки",
@@ -612,7 +626,7 @@
             "noControlImageForControlAdapter": "Адаптер контроля #{{number}} не имеет изображения",
             "noModelForControlAdapter": "Не выбрана модель адаптера контроля #{{number}}.",
             "unableToInvoke": "Невозможно вызвать",
-            "incompatibleBaseModelForControlAdapter": "Модель контрольного адаптера №{{number}} недействительна для основной модели.",
+            "incompatibleBaseModelForControlAdapter": "Адаптер контроля №{{number}} несовместим с основной моделью.",
             "systemDisconnected": "Система отключена",
             "missingNodeTemplate": "Отсутствует шаблон узла",
             "readyToInvoke": "Готово к вызову",
@@ -653,7 +667,10 @@
         "setToOptimalSize": "Установить оптимальный для модели размер",
         "setToOptimalSizeTooSmall": "$t(parameters.setToOptimalSize) (может быть слишком маленьким)",
         "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (может быть слишком большим)",
-        "lockAspectRatio": "Заблокировать соотношение"
+        "lockAspectRatio": "Заблокировать соотношение",
+        "boxBlur": "Размытие прямоугольника",
+        "gaussianBlur": "Размытие по Гауссу",
+        "remixImage": "Ремикс изображения"
     },
     "settings": {
         "models": "Модели",
@@ -787,7 +804,10 @@
         "canvasSavedGallery": "Холст сохранен в галерею",
         "imageUploadFailed": "Не удалось загрузить изображение",
         "modelAdded": "Добавлена модель: {{modelName}}",
-        "problemImportingMask": "Проблема с импортом маски"
+        "problemImportingMask": "Проблема с импортом маски",
+        "problemDownloadingImage": "Не удается скачать изображение",
+        "uploadInitialImage": "Загрузить начальное изображение",
+        "resetInitialImage": "Сбросить начальное изображение"
     },
     "tooltip": {
         "feature": {
@@ -892,7 +912,8 @@
         "mode": "Режим",
         "loadMore": "Загрузить больше",
         "resetUI": "$t(accessibility.reset) интерфейс",
-        "createIssue": "Сообщить о проблеме"
+        "createIssue": "Сообщить о проблеме",
+        "about": "Об этом"
     },
     "ui": {
         "showProgressImages": "Показывать промежуточный итог",
@@ -1117,7 +1138,18 @@
         "unableToParseEdge": "Невозможно разобрать край",
         "unknownInput": "Неизвестный вход: {{name}}",
         "oNNXModelFieldDescription": "Поле модели ONNX.",
-        "imageCollection": "Коллекция изображений"
+        "imageCollection": "Коллекция изображений",
+        "newWorkflow": "Новый рабочий процесс",
+        "newWorkflowDesc": "Создать новый рабочий процесс?",
+        "clearWorkflow": "Очистить рабочий процесс",
+        "newWorkflowDesc2": "Текущий рабочий процесс имеет несохраненные изменения.",
+        "latentsCollection": "Коллекция латентов",
+        "clearWorkflowDesc": "Очистить этот рабочий процесс и создать новый?",
+        "clearWorkflowDesc2": "Текущий рабочий процесс имеет несохраненные измерения.",
+        "reorderLinearView": "Изменить порядок линейного просмотра",
+        "viewMode": "Использовать в линейном представлении",
+        "editMode": "Открыть в редакторе узлов",
+        "resetToDefaultValue": "Сбросить к стандартному значкнию"
     },
     "controlnet": {
         "amult": "a_mult",
@@ -1198,7 +1230,18 @@
         "enableIPAdapter": "Включить IP Adapter",
         "maxFaces": "Макс Лица",
         "mlsdDescription": "Минималистичный детектор отрезков линии",
-        "resizeSimple": "Изменить размер (простой)"
+        "resizeSimple": "Изменить размер (простой)",
+        "megaControl": "Mega контроль",
+        "base": "Базовый",
+        "depthAnything": "Глубина всего",
+        "depthAnythingDescription": "Создание карты глубины с использованием метода Depth Anything",
+        "face": "Лицо",
+        "dwOpenposeDescription": "Оценка позы человека с помощью DW Openpose",
+        "large": "Большой",
+        "modelSize": "Размер модели",
+        "small": "Маленький",
+        "body": "Тело",
+        "hands": "Руки"
     },
     "boards": {
         "autoAddBoard": "Авто добавление Доски",
@@ -1281,7 +1324,7 @@
         "compositingCoherenceSteps": {
             "heading": "Шаги",
             "paragraphs": [
-                null,
+                "Количество шагов снижения шума, используемых при прохождении когерентности.",
                 "То же, что и основной параметр «Шаги»."
             ]
         },
@@ -1319,7 +1362,10 @@
             ]
         },
         "compositingCoherenceMode": {
-            "heading": "Режим"
+            "heading": "Режим",
+            "paragraphs": [
+                "Режим прохождения когерентности."
+            ]
         },
         "paramSeed": {
             "paragraphs": [
@@ -1353,16 +1399,14 @@
         "clipSkip": {
             "paragraphs": [
                 "Выберите, сколько слоев модели CLIP нужно пропустить.",
-                "Некоторые модели работают лучше с определенными настройками пропуска CLIP.",
-                "Более высокое значение обычно приводит к менее детализированному изображению."
+                "Некоторые модели работают лучше с определенными настройками пропуска CLIP."
             ],
             "heading": "CLIP пропуск"
         },
         "paramModel": {
             "heading": "Модель",
             "paragraphs": [
-                "Модель, используемая для шагов шумоподавления.",
-                "Различные модели обычно обучаются, чтобы специализироваться на достижении определенных эстетических результатов и содержания."
+                "Модель, используемая для шагов шумоподавления."
             ]
         },
         "compositingCoherencePass": {
@@ -1601,7 +1645,7 @@
         "openWorkflow": "Открытый рабочий процесс",
         "clearWorkflowSearchFilter": "Очистить фильтр поиска рабочих процессов",
         "workflowLibrary": "Библиотека",
-        "downloadWorkflow": "Скачать рабочий процесс",
+        "downloadWorkflow": "Сохранить в файл",
         "noRecentWorkflows": "Нет недавних рабочих процессов",
         "workflowSaved": "Рабочий процесс сохранен",
         "workflowIsOpen": "Рабочий процесс открыт",
@@ -1614,9 +1658,12 @@
         "deleteWorkflow": "Удалить рабочий процесс",
         "workflows": "Рабочие процессы",
         "noDescription": "Без описания",
-        "uploadWorkflow": "Загрузить рабочий процесс",
+        "uploadWorkflow": "Загрузить из файла",
         "userWorkflows": "Мои рабочие процессы",
-        "newWorkflowCreated": "Создан новый рабочий процесс"
+        "newWorkflowCreated": "Создан новый рабочий процесс",
+        "saveWorkflowToProject": "Сохранить рабочий процесс в проект",
+        "workflowCleared": "Рабочий процесс очищен",
+        "noWorkflows": "Нет рабочих процессов"
     },
     "embedding": {
         "noEmbeddingsLoaded": "встраивания не загружены",

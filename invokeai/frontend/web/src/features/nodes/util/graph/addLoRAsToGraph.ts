@@ -2,16 +2,7 @@ import type { RootState } from 'app/store/store';
 import { filter, size } from 'lodash-es';
 import type { CoreMetadataInvocation, LoraLoaderInvocation, NonNullableGraph } from 'services/api/types';
 
-import {
-  CANVAS_COHERENCE_DENOISE_LATENTS,
-  CANVAS_INPAINT_GRAPH,
-  CANVAS_OUTPAINT_GRAPH,
-  CLIP_SKIP,
-  LORA_LOADER,
-  MAIN_MODEL_LOADER,
-  NEGATIVE_CONDITIONING,
-  POSITIVE_CONDITIONING,
-} from './constants';
+import { CLIP_SKIP, LORA_LOADER, MAIN_MODEL_LOADER, NEGATIVE_CONDITIONING, POSITIVE_CONDITIONING } from './constants';
 import { upsertMetadata } from './metadata';
 
 export const addLoRAsToGraph = (
@@ -28,6 +19,7 @@ export const addLoRAsToGraph = (
    * So we need to inject a LoRA chain into the graph.
    */
 
+  // TODO(MM2): check base model
   const enabledLoRAs = filter(state.lora.loras, (l) => l.isEnabled ?? false);
   const loraCount = size(enabledLoRAs);
 
@@ -48,19 +40,20 @@ export const addLoRAsToGraph = (
   const loraMetadata: CoreMetadataInvocation['loras'] = [];
 
   enabledLoRAs.forEach((lora) => {
-    const { model_name, base_model, weight } = lora;
-    const currentLoraNodeId = `${LORA_LOADER}_${model_name.replace('.', '_')}`;
+    const { weight } = lora;
+    const { key } = lora.model;
+    const currentLoraNodeId = `${LORA_LOADER}_${key}`;
 
     const loraLoaderNode: LoraLoaderInvocation = {
       type: 'lora_loader',
       id: currentLoraNodeId,
       is_intermediate: true,
-      lora: { model_name, base_model },
+      lora: { key },
       weight,
     };
 
     loraMetadata.push({
-      lora: { model_name, base_model },
+      model: { key },
       weight,
     });
 
@@ -125,19 +118,6 @@ export const addLoRAsToGraph = (
           field: 'unet',
         },
       });
-
-      if (graph.id && [CANVAS_INPAINT_GRAPH, CANVAS_OUTPAINT_GRAPH].includes(graph.id)) {
-        graph.edges.push({
-          source: {
-            node_id: currentLoraNodeId,
-            field: 'unet',
-          },
-          destination: {
-            node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-            field: 'unet',
-          },
-        });
-      }
 
       graph.edges.push({
         source: {

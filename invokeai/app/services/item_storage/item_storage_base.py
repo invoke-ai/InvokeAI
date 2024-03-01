@@ -30,7 +30,7 @@ class ItemStorageABC(ABC, Generic[T]):
     @abstractmethod
     def set(self, item: T) -> None:
         """
-        Sets the item. The id will be extracted based on id_field.
+        Sets the item.
         :param item: the item to set
         """
         pass

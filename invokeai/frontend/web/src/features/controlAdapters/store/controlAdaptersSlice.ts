@@ -30,20 +30,18 @@ import type {
 } from './types';
 import { isControlNet, isControlNetOrT2IAdapter, isIPAdapter, isT2IAdapter } from './types';
 
-export const caAdapter = createEntityAdapter<ControlAdapterConfig, string>({
+const caAdapter = createEntityAdapter<ControlAdapterConfig, string>({
   selectId: (ca) => ca.id,
 });
-export const caAdapterSelectors = caAdapter.getSelectors(undefined, getSelectorsOptions);
+const caAdapterSelectors = caAdapter.getSelectors(undefined, getSelectorsOptions);
 
 export const {
   selectById: selectControlAdapterById,
   selectAll: selectControlAdapterAll,
-  selectEntities: selectControlAdapterEntities,
   selectIds: selectControlAdapterIds,
-  selectTotal: selectControlAdapterTotal,
 } = caAdapterSelectors;
 
-export const initialControlAdaptersState: ControlAdaptersState = caAdapter.getInitialState<{
+const initialControlAdaptersState: ControlAdaptersState = caAdapter.getInitialState<{
   _version: 1;
   pendingControlImages: string[];
 }>({
@@ -129,22 +127,6 @@ export const controlAdaptersSlice = createSlice({
       },
       prepare: (id: string) => {
         return { payload: { id, newId: uuidv4() } };
-      },
-    },
-    controlAdapterAddedFromImage: {
-      reducer: (
-        state,
-        action: PayloadAction<{
-          id: string;
-          type: ControlAdapterType;
-          controlImage: string;
-        }>
-      ) => {
-        const { id, type, controlImage } = action.payload;
-        caAdapter.addOne(state, buildControlAdapter(id, type, { controlImage }));
-      },
-      prepare: (payload: { type: ControlAdapterType; controlImage: string }) => {
-        return { payload: { ...payload, id: uuidv4() } };
       },
     },
     controlAdapterRemoved: (state, action: PayloadAction<{ id: string }>) => {
@@ -236,7 +218,8 @@ export const controlAdaptersSlice = createSlice({
       let processorType: ControlAdapterProcessorType | undefined = undefined;
 
       for (const modelSubstring in CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS) {
-        if (model.model_name.includes(modelSubstring)) {
+        // TODO(MM2): matching modelSubstring to the model key is no longer a valid way to figure out the default processorType
+        if (model.key.includes(modelSubstring)) {
           processorType = CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS[modelSubstring];
           break;
         }
@@ -359,7 +342,8 @@ export const controlAdaptersSlice = createSlice({
         let processorType: ControlAdapterProcessorType | undefined = undefined;
 
         for (const modelSubstring in CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS) {
-          if (cn.model?.model_name.includes(modelSubstring)) {
+          // TODO(MM2): matching modelSubstring to the model key is no longer a valid way to figure out the default processorType
+          if (cn.model?.key.includes(modelSubstring)) {
             processorType = CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS[modelSubstring];
             break;
           }
@@ -405,7 +389,6 @@ export const {
   controlAdapterAdded,
   controlAdapterRecalled,
   controlAdapterDuplicated,
-  controlAdapterAddedFromImage,
   controlAdapterRemoved,
   controlAdapterImageChanged,
   controlAdapterProcessedImageChanged,
@@ -424,16 +407,12 @@ export const {
   controlAdapterModelCleared,
 } = controlAdaptersSlice.actions;
 
-export const isAnyControlAdapterAdded = isAnyOf(
-  controlAdapterAdded,
-  controlAdapterAddedFromImage,
-  controlAdapterRecalled
-);
+export const isAnyControlAdapterAdded = isAnyOf(controlAdapterAdded, controlAdapterRecalled);
 
 export const selectControlAdaptersSlice = (state: RootState) => state.controlAdapters;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-export const migrateControlAdaptersState = (state: any): any => {
+const migrateControlAdaptersState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
   }

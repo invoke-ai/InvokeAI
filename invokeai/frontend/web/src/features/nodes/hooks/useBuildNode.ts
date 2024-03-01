@@ -1,19 +1,14 @@
 import { useAppSelector } from 'app/store/storeHooks';
-import { DRAG_HANDLE_CLASSNAME, NODE_WIDTH } from 'features/nodes/types/constants';
+import { NODE_WIDTH } from 'features/nodes/types/constants';
 import type { AnyNode, InvocationTemplate } from 'features/nodes/types/invocation';
 import { buildCurrentImageNode } from 'features/nodes/util/node/buildCurrentImageNode';
 import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
 import { buildNotesNode } from 'features/nodes/util/node/buildNotesNode';
 import { useCallback } from 'react';
-import type { Node } from 'reactflow';
 import { useReactFlow } from 'reactflow';
 
-export const SHARED_NODE_PROPERTIES: Partial<Node> = {
-  dragHandle: `.${DRAG_HANDLE_CLASSNAME}`,
-};
-
 export const useBuildNode = () => {
-  const nodeTemplates = useAppSelector((s) => s.nodeTemplates.templates);
+  const nodeTemplates = useAppSelector((s) => s.nodes.templates);
 
   const flow = useReactFlow();
 

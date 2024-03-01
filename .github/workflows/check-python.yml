@@ -1,0 +1,33 @@
+# This workflow runs the python code quality checks.
+#
+# It may be triggered via dispatch, or by another workflow.
+#
+# TODO: Add mypy or pyright to the checks.
+
+name: 'Check: python'
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  check-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5 # expected run time: <1 min
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install python dependencies
+        uses: ./.github/actions/install-python-deps
+
+      - name: Install ruff
+        run: pip install ruff
+        shell: bash
+
+      - name: Ruff check
+        run: ruff check --output-format=github .
+        shell: bash
+
+      - name: Ruff format
+        run: ruff format --check .
+        shell: bash

@@ -18,7 +18,9 @@ from typing import Optional
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
 
-from ..metadata_base import AnyModelRepoMetadata, AnyModelRepoMetadataValidator
+from invokeai.backend.model_manager import ModelRepoVariant
+
+from ..metadata_base import AnyModelRepoMetadata, AnyModelRepoMetadataValidator, BaseMetadata
 
 
 class ModelMetadataFetchBase(ABC):
@@ -45,9 +47,12 @@ class ModelMetadataFetchBase(ABC):
         pass
 
     @abstractmethod
-    def from_id(self, id: str) -> AnyModelRepoMetadata:
+    def from_id(self, id: str, variant: Optional[ModelRepoVariant] = None) -> AnyModelRepoMetadata:
         """
         Given an ID for a model, return a ModelMetadata object.
+
+        :param id: An ID.
+        :param variant: A model variant from the ModelRepoVariant enum.
 
         This method will raise a `UnknownMetadataException`
         in the event that the requested model's metadata is not found at the provided id.
@@ -57,5 +62,5 @@ class ModelMetadataFetchBase(ABC):
     @classmethod
     def from_json(cls, json: str) -> AnyModelRepoMetadata:
         """Given the JSON representation of the metadata, return the corresponding Pydantic object."""
-        metadata = AnyModelRepoMetadataValidator.validate_json(json)
+        metadata: BaseMetadata = AnyModelRepoMetadataValidator.validate_json(json)  # type: ignore
         return metadata

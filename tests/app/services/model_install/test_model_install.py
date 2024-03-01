@@ -20,7 +20,7 @@ from invokeai.app.services.model_install import (
 )
 from invokeai.app.services.model_records import UnknownModelException
 from invokeai.backend.model_manager.config import BaseModelType, ModelFormat, ModelType
-from tests.backend.model_manager_2.model_manager_2_fixtures import *  # noqa F403
+from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 
 OS = platform.uname().system
 
@@ -31,6 +31,7 @@ def test_registration(mm2_installer: ModelInstallServiceBase, embedding_file: Pa
     assert len(matches) == 0
     key = mm2_installer.register_path(embedding_file)
     assert key is not None
+    assert key != "<NOKEY>"
     assert len(key) == 32
 
 
@@ -58,12 +59,13 @@ def test_registration_meta_override_fail(mm2_installer: ModelInstallServiceBase,
 def test_registration_meta_override_succeed(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
     store = mm2_installer.record_store
     key = mm2_installer.register_path(
-        embedding_file, {"name": "banana_sushi", "source": "fake/repo_id", "current_hash": "New Hash"}
+        embedding_file, {"name": "banana_sushi", "source": "fake/repo_id", "current_hash": "New Hash", "key": "xyzzy"}
     )
     model_record = store.get_model(key)
     assert model_record.name == "banana_sushi"
     assert model_record.source == "fake/repo_id"
     assert model_record.current_hash == "New Hash"
+    assert model_record.key == "xyzzy"
 
 
 def test_install(
@@ -129,6 +131,7 @@ def test_background_install(
     model_record = mm2_installer.record_store.get_model(key)
     assert model_record is not None
     assert model_record.path == destination
+    assert model_record.key != "<NOKEY>"
     assert Path(mm2_app_config.models_dir / model_record.path).exists()
 
     # see if metadata was properly passed through
@@ -196,6 +199,7 @@ def test_delete_register(
         store.get_model(key)
 
 
+@pytest.mark.timeout(timeout=20, method="thread")
 def test_simple_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig) -> None:
     source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
 
@@ -221,6 +225,7 @@ def test_simple_download(mm2_installer: ModelInstallServiceBase, mm2_app_config:
     assert event_names == ["model_install_downloading", "model_install_running", "model_install_completed"]
 
 
+@pytest.mark.timeout(timeout=20, method="thread")
 def test_huggingface_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig) -> None:
     source = URLModelSource(url=Url("https://huggingface.co/stabilityai/sdxl-turbo"))
 
@@ -256,4 +261,4 @@ def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: In
     assert job.error_type == "HTTPError"
     assert job.error
     assert "NOT FOUND" in job.error
-    assert "Traceback" in job.error
+    assert job.error_traceback.startswith("Traceback")

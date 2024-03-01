@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { isEqual } from 'lodash-es';
 import { atom } from 'nanostores';
@@ -6,13 +7,11 @@ import { api } from 'services/api';
 import { queueApi, selectQueueStatus } from 'services/api/endpoints/queue';
 import { socketConnected } from 'services/events/actions';
 
-import { startAppListening } from '../..';
-
 const log = logger('socketio');
 
 const $isFirstConnection = atom(true);
 
-export const addSocketConnectedEventListener = () => {
+export const addSocketConnectedEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketConnected,
     effect: async (action, { dispatch, getState, cancelActiveListeners, delay }) => {

@@ -3,6 +3,7 @@ import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
 import { dateComparator } from 'common/util/dateComparator';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import queryString from 'query-string';
+import { buildV1Url } from 'services/api';
 
 import type { ImageCache, ImageDTO, ListImagesArgs } from './types';
 
@@ -79,4 +80,4 @@ export const imagesSelectors = imagesAdapter.getSelectors(undefined, getSelector
 
 // Helper to create the url for the listImages endpoint. Also we use it to create the cache key.
 export const getListImagesUrl = (queryArgs: ListImagesArgs) =>
-  `images/?${queryString.stringify(queryArgs, { arrayFormat: 'none' })}`;
+  buildV1Url(`images/?${queryString.stringify(queryArgs, { arrayFormat: 'none' })}`);

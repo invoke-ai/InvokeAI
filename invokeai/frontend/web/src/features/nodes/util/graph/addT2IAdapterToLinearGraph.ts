@@ -9,12 +9,12 @@ import type {
   T2IAdapterInvocation,
 } from 'services/api/types';
 
-import { CANVAS_COHERENCE_DENOISE_LATENTS, T2I_ADAPTER_COLLECT } from './constants';
+import { T2I_ADAPTER_COLLECT } from './constants';
 import { upsertMetadata } from './metadata';
 
 export const addT2IAdaptersToLinearGraph = (state: RootState, graph: NonNullableGraph, baseNodeId: string): void => {
   const validT2IAdapters = selectValidT2IAdapters(state.controlAdapters).filter(
-    (ca) => ca.model?.base_model === state.generation.model?.base_model
+    (ca) => ca.model?.base === state.generation.model?.base
   );
 
   if (validT2IAdapters.length) {
@@ -33,15 +33,6 @@ export const addT2IAdaptersToLinearGraph = (state: RootState, graph: NonNullable
       },
     });
 
-    if (CANVAS_COHERENCE_DENOISE_LATENTS in graph.nodes) {
-      graph.edges.push({
-        source: { node_id: T2I_ADAPTER_COLLECT, field: 'collection' },
-        destination: {
-          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-          field: 't2i_adapter',
-        },
-      });
-    }
     const t2iAdapterMetdata: CoreMetadataInvocation['t2iAdapters'] = [];
 
     validT2IAdapters.forEach((t2iAdapter) => {

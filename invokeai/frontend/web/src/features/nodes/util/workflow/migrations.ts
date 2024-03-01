@@ -6,8 +6,10 @@ import { zSemVer } from 'features/nodes/types/semver';
 import { FIELD_TYPE_V1_TO_FIELD_TYPE_V2_MAPPING } from 'features/nodes/types/v1/fieldTypeMap';
 import type { WorkflowV1 } from 'features/nodes/types/v1/workflowV1';
 import { zWorkflowV1 } from 'features/nodes/types/v1/workflowV1';
-import type { WorkflowV2 } from 'features/nodes/types/workflow';
-import { zWorkflowV2 } from 'features/nodes/types/workflow';
+import type { WorkflowV2 } from 'features/nodes/types/v2/workflow';
+import { zWorkflowV2 } from 'features/nodes/types/v2/workflow';
+import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import { zWorkflowV3 } from 'features/nodes/types/workflow';
 import { t } from 'i18next';
 import { forEach } from 'lodash-es';
 import { z } from 'zod';
@@ -30,7 +32,7 @@ const zWorkflowMetaVersion = z.object({
  * - Workflow schema version bumped to 2.0.0
  */
 const migrateV1toV2 = (workflowToMigrate: WorkflowV1): WorkflowV2 => {
-  const invocationTemplates = $store.get()?.getState().nodeTemplates.templates;
+  const invocationTemplates = $store.get()?.getState().nodes.templates;
 
   if (!invocationTemplates) {
     throw new Error(t('app.storeNotInitialized'));
@@ -70,26 +72,34 @@ const migrateV1toV2 = (workflowToMigrate: WorkflowV1): WorkflowV2 => {
   return zWorkflowV2.parse(workflowToMigrate);
 };
 
+const migrateV2toV3 = (workflowToMigrate: WorkflowV2): WorkflowV3 => {
+  // Bump version
+  (workflowToMigrate as unknown as WorkflowV3).meta.version = '3.0.0';
+  // Parsing strips out any extra properties not in the latest version
+  return zWorkflowV3.parse(workflowToMigrate);
+};
+
 /**
  * Parses a workflow and migrates it to the latest version if necessary.
  */
-export const parseAndMigrateWorkflow = (data: unknown): WorkflowV2 => {
+export const parseAndMigrateWorkflow = (data: unknown): WorkflowV3 => {
   const workflowVersionResult = zWorkflowMetaVersion.safeParse(data);
 
   if (!workflowVersionResult.success) {
     throw new WorkflowVersionError(t('nodes.unableToGetWorkflowVersion'));
   }
 
-  const { version } = workflowVersionResult.data.meta;
+  let workflow = data as WorkflowV1 | WorkflowV2 | WorkflowV3;
 
-  if (version === '1.0.0') {
-    const v1 = zWorkflowV1.parse(data);
-    return migrateV1toV2(v1);
+  if (workflow.meta.version === '1.0.0') {
+    const v1 = zWorkflowV1.parse(workflow);
+    workflow = migrateV1toV2(v1);
   }
 
-  if (version === '2.0.0') {
-    return zWorkflowV2.parse(data);
+  if (workflow.meta.version === '2.0.0') {
+    const v2 = zWorkflowV2.parse(workflow);
+    workflow = migrateV2toV3(v2);
   }
 
-  throw new WorkflowVersionError(t('nodes.unrecognizedWorkflowVersion', { version }));
+  return workflow as WorkflowV3;
 };

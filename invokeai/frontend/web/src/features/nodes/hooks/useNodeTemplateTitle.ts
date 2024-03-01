@@ -1,21 +1,14 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
-import { isInvocationNode } from 'features/nodes/types/invocation';
+import { selectNodeTemplate } from 'features/nodes/store/selectors';
 import { useMemo } from 'react';
 
-export const useNodeTemplateTitle = (nodeId: string) => {
+export const useNodeTemplateTitle = (nodeId: string): string | null => {
   const selector = useMemo(
     () =>
-      createSelector(selectNodesSlice, selectNodeTemplatesSlice, (nodes, nodeTemplates) => {
-        const node = nodes.nodes.find((node) => node.id === nodeId);
-        if (!isInvocationNode(node)) {
-          return false;
-        }
-        const nodeTemplate = node ? nodeTemplates.templates[node.data.type] : undefined;
-
-        return nodeTemplate?.title;
+      createSelector(selectNodesSlice, (nodes) => {
+        return selectNodeTemplate(nodes, nodeId)?.title ?? null;
       }),
     [nodeId]
   );

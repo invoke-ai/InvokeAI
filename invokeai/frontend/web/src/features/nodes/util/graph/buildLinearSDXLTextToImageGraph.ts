@@ -4,7 +4,6 @@ import type { NonNullableGraph } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
-import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSDXLLoRAsToGraph } from './addSDXLLoRAstoGraph';
 import { addSDXLRefinerToGraph } from './addSDXLRefinerToGraph';
@@ -23,7 +22,7 @@ import {
   SDXL_TEXT_TO_IMAGE_GRAPH,
   SEAMLESS,
 } from './constants';
-import { getSDXLStylePrompts } from './getSDXLStylePrompt';
+import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from './graphBuilderUtils';
 import { addCoreMetadataNode } from './metadata';
 
 export const buildLinearSDXLTextToImageGraph = (state: RootState): NonNullableGraph => {
@@ -120,7 +119,8 @@ export const buildLinearSDXLTextToImageGraph = (state: RootState): NonNullableGr
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
         fp32,
-        is_intermediate,
+        is_intermediate: getIsIntermediate(state),
+        board: getBoardField(state),
         use_cache: false,
       },
     },
@@ -280,8 +280,6 @@ export const buildLinearSDXLTextToImageGraph = (state: RootState): NonNullableGr
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph);
   }
-
-  addLinearUIOutputNode(state, graph);
 
   return graph;
 };

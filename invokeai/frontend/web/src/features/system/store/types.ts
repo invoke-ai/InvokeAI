@@ -3,9 +3,9 @@ import type { LogLevel } from 'app/logging/logger';
 import type { ProgressImage } from 'services/events/types';
 import { z } from 'zod';
 
-export type SystemStatus = 'CONNECTED' | 'DISCONNECTED' | 'PROCESSING' | 'ERROR' | 'LOADING_MODEL';
+type SystemStatus = 'CONNECTED' | 'DISCONNECTED' | 'PROCESSING' | 'ERROR' | 'LOADING_MODEL';
 
-export type DenoiseProgress = {
+type DenoiseProgress = {
   session_id: string;
   batch_id: string;
   progress_image: ProgressImage | null | undefined;
@@ -15,7 +15,7 @@ export type DenoiseProgress = {
   percentage: number;
 };
 
-export const zLanguage = z.enum([
+const zLanguage = z.enum([
   'ar',
   'az',
   'de',
@@ -58,11 +58,3 @@ export interface SystemState {
   status: SystemStatus;
   shouldEnableInformationalPopovers: boolean;
 }
-
-export const STATUS_TRANSLATION_KEYS: Record<SystemStatus, string> = {
-  CONNECTED: 'common.statusConnected',
-  DISCONNECTED: 'common.statusDisconnected',
-  PROCESSING: 'common.statusProcessing',
-  ERROR: 'common.statusError',
-  LOADING_MODEL: 'common.statusLoadingModel',
-};

@@ -3,7 +3,7 @@ import type { EntityState } from '@reduxjs/toolkit';
 import type { components, paths } from 'services/api/schema';
 import type { O } from 'ts-toolbelt';
 
-type s = components['schemas'];
+export type S = components['schemas'];
 
 export type ImageCache = EntityState<ImageDTO, string>;
 
@@ -12,8 +12,6 @@ export type ListImagesArgs = NonNullable<paths['/api/v1/images/']['get']['parame
 export type DeleteBoardResult =
   paths['/api/v1/boards/{board_id}']['delete']['responses']['200']['content']['application/json'];
 
-export type ListBoardsArg = NonNullable<paths['/api/v1/boards/']['get']['parameters']['query']>;
-
 export type UpdateBoardArg = paths['/api/v1/boards/{board_id}']['patch']['parameters']['path'] & {
   changes: paths['/api/v1/boards/{board_id}']['patch']['requestBody']['content']['application/json'];
 };
@@ -21,182 +19,169 @@ export type UpdateBoardArg = paths['/api/v1/boards/{board_id}']['patch']['parame
 export type BatchConfig =
   paths['/api/v1/queue/{queue_id}/enqueue_batch']['post']['requestBody']['content']['application/json'];
 
-export type EnqueueBatchResult = components['schemas']['EnqueueBatchResult'];
-
-export type InputFieldJSONSchemaExtra = s['InputFieldJSONSchemaExtra'];
-export type OutputFieldJSONSchemaExtra = s['OutputFieldJSONSchemaExtra'];
-export type InvocationJSONSchemaExtra = s['UIConfigBase'];
+export type InputFieldJSONSchemaExtra = S['InputFieldJSONSchemaExtra'];
+export type OutputFieldJSONSchemaExtra = S['OutputFieldJSONSchemaExtra'];
+export type InvocationJSONSchemaExtra = S['UIConfigBase'];
 
 // App Info
-export type AppVersion = s['AppVersion'];
-export type AppConfig = s['AppConfig'];
-export type AppDependencyVersions = s['AppDependencyVersions'];
+export type AppVersion = S['AppVersion'];
+export type AppConfig = S['AppConfig'];
+export type AppDependencyVersions = S['AppDependencyVersions'];
 
 // Images
-export type ImageDTO = s['ImageDTO'];
-export type BoardDTO = s['BoardDTO'];
-export type BoardChanges = s['BoardChanges'];
-export type ImageChanges = s['ImageRecordChanges'];
-export type ImageCategory = s['ImageCategory'];
-export type ResourceOrigin = s['ResourceOrigin'];
-export type ImageField = s['ImageField'];
-export type OffsetPaginatedResults_BoardDTO_ = s['OffsetPaginatedResults_BoardDTO_'];
-export type OffsetPaginatedResults_ImageDTO_ = s['OffsetPaginatedResults_ImageDTO_'];
+export type ImageDTO = S['ImageDTO'];
+export type BoardDTO = S['BoardDTO'];
+export type ImageCategory = S['ImageCategory'];
+export type OffsetPaginatedResults_ImageDTO_ = S['OffsetPaginatedResults_ImageDTO_'];
 
 // Models
-export type ModelType = s['invokeai__backend__model_management__models__base__ModelType'];
-export type SubModelType = s['SubModelType'];
-export type BaseModelType = s['invokeai__backend__model_management__models__base__BaseModelType'];
-export type MainModelField = s['MainModelField'];
-export type VAEModelField = s['VAEModelField'];
-export type LoRAModelField = s['LoRAModelField'];
-export type LoRAModelFormat = s['LoRAModelFormat'];
-export type ControlNetModelField = s['ControlNetModelField'];
-export type IPAdapterModelField = s['IPAdapterModelField'];
-export type T2IAdapterModelField = s['T2IAdapterModelField'];
-export type ModelsList = s['invokeai__app__api__routers__models__ModelsList'];
-export type ControlField = s['ControlField'];
-export type IPAdapterField = s['IPAdapterField'];
+export type ModelType = S['ModelType'];
+export type SubModelType = S['SubModelType'];
+export type BaseModelType = S['BaseModelType'];
+export type ControlField = S['ControlField'];
 
 // Model Configs
-export type LoRAModelConfig = s['LoRAModelConfig'];
-export type VaeModelConfig = s['VaeModelConfig'];
-export type ControlNetModelCheckpointConfig = s['ControlNetModelCheckpointConfig'];
-export type ControlNetModelDiffusersConfig = s['ControlNetModelDiffusersConfig'];
-export type ControlNetModelConfig = ControlNetModelCheckpointConfig | ControlNetModelDiffusersConfig;
-export type IPAdapterModelInvokeAIConfig = s['IPAdapterModelInvokeAIConfig'];
-export type IPAdapterModelConfig = IPAdapterModelInvokeAIConfig;
-export type T2IAdapterModelDiffusersConfig = s['T2IAdapterModelDiffusersConfig'];
-export type T2IAdapterModelConfig = T2IAdapterModelDiffusersConfig;
-export type TextualInversionModelConfig = s['TextualInversionModelConfig'];
-export type DiffusersModelConfig =
-  | s['StableDiffusion1ModelDiffusersConfig']
-  | s['StableDiffusion2ModelDiffusersConfig']
-  | s['StableDiffusionXLModelDiffusersConfig'];
-export type CheckpointModelConfig =
-  | s['StableDiffusion1ModelCheckpointConfig']
-  | s['StableDiffusion2ModelCheckpointConfig']
-  | s['StableDiffusionXLModelCheckpointConfig'];
+
+// TODO(MM2): Can we make key required in the pydantic model?
+export type LoRAModelConfig = S['LoRAConfig'];
+// TODO(MM2): Can we rename this from Vae -> VAE
+export type VAEModelConfig = S['VaeCheckpointConfig'] | S['VaeDiffusersConfig'];
+export type ControlNetModelConfig = S['ControlNetDiffusersConfig'] | S['ControlNetCheckpointConfig'];
+export type IPAdapterModelConfig = S['IPAdapterConfig'];
+// TODO(MM2): Can we rename this to T2IAdapterConfig
+export type T2IAdapterModelConfig = S['T2IConfig'];
+export type TextualInversionModelConfig = S['TextualInversionConfig'];
+export type DiffusersModelConfig = S['MainDiffusersConfig'];
+export type CheckpointModelConfig = S['MainCheckpointConfig'];
+type CLIPVisionDiffusersConfig = S['CLIPVisionDiffusersConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
   | LoRAModelConfig
-  | VaeModelConfig
+  | VAEModelConfig
   | ControlNetModelConfig
   | IPAdapterModelConfig
   | T2IAdapterModelConfig
   | TextualInversionModelConfig
-  | MainModelConfig;
+  | MainModelConfig
+  | CLIPVisionDiffusersConfig;
 
-export type MergeModelConfig = s['Body_merge_models'];
-export type ImportModelConfig = s['Body_import_model'];
+export const isLoRAModelConfig = (config: AnyModelConfig): config is LoRAModelConfig => {
+  return config.type === 'lora';
+};
+
+export const isVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
+  return config.type === 'vae';
+};
+
+export const isControlNetModelConfig = (config: AnyModelConfig): config is ControlNetModelConfig => {
+  return config.type === 'controlnet';
+};
+
+export const isIPAdapterModelConfig = (config: AnyModelConfig): config is IPAdapterModelConfig => {
+  return config.type === 'ip_adapter';
+};
+
+export const isT2IAdapterModelConfig = (config: AnyModelConfig): config is T2IAdapterModelConfig => {
+  return config.type === 't2i_adapter';
+};
+
+export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base !== 'sdxl-refiner';
+};
+
+export const isRefinerMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'sdxl-refiner';
+};
+
+export type ModelInstallJob = S['ModelInstallJob'];
+export type ModelInstallStatus = S['InstallStatus'];
+
+export type HFModelSource = S['HFModelSource'];
+export type LocalModelSource = S['LocalModelSource'];
+export type URLModelSource = S['URLModelSource'];
 
 // Graphs
-export type Graph = s['Graph'];
+export type Graph = S['Graph'];
 export type NonNullableGraph = O.Required<Graph, 'nodes' | 'edges'>;
-export type Edge = s['Edge'];
-export type GraphExecutionState = s['GraphExecutionState'];
-export type Batch = s['Batch'];
-export type SessionQueueItemDTO = s['SessionQueueItemDTO'];
-export type SessionQueueItem = s['SessionQueueItem'];
-export type WorkflowRecordOrderBy = s['WorkflowRecordOrderBy'];
-export type SQLiteDirection = s['SQLiteDirection'];
-export type WorkflowDTO = s['WorkflowRecordDTO'];
-export type WorkflowRecordListItemDTO = s['WorkflowRecordListItemDTO'];
+export type Edge = S['Edge'];
+export type GraphExecutionState = S['GraphExecutionState'];
+export type Batch = S['Batch'];
+export type SessionQueueItemDTO = S['SessionQueueItemDTO'];
+export type WorkflowRecordOrderBy = S['WorkflowRecordOrderBy'];
+export type SQLiteDirection = S['SQLiteDirection'];
+export type WorkflowRecordListItemDTO = S['WorkflowRecordListItemDTO'];
 
 // General nodes
-export type CollectInvocation = s['CollectInvocation'];
-export type IterateInvocation = s['IterateInvocation'];
-export type RangeInvocation = s['RangeInvocation'];
-export type RandomRangeInvocation = s['RandomRangeInvocation'];
-export type RangeOfSizeInvocation = s['RangeOfSizeInvocation'];
-export type ImageResizeInvocation = s['ImageResizeInvocation'];
-export type ImageBlurInvocation = s['ImageBlurInvocation'];
-export type ImageScaleInvocation = s['ImageScaleInvocation'];
-export type InfillPatchMatchInvocation = s['InfillPatchMatchInvocation'];
-export type InfillTileInvocation = s['InfillTileInvocation'];
-export type CreateDenoiseMaskInvocation = s['CreateDenoiseMaskInvocation'];
-export type MaskEdgeInvocation = s['MaskEdgeInvocation'];
-export type RandomIntInvocation = s['RandomIntInvocation'];
-export type CompelInvocation = s['CompelInvocation'];
-export type DynamicPromptInvocation = s['DynamicPromptInvocation'];
-export type NoiseInvocation = s['NoiseInvocation'];
-export type DenoiseLatentsInvocation = s['DenoiseLatentsInvocation'];
-export type SDXLLoraLoaderInvocation = s['SDXLLoraLoaderInvocation'];
-export type ImageToLatentsInvocation = s['ImageToLatentsInvocation'];
-export type LatentsToImageInvocation = s['LatentsToImageInvocation'];
-export type ImageCollectionInvocation = s['ImageCollectionInvocation'];
-export type MainModelLoaderInvocation = s['MainModelLoaderInvocation'];
-export type LoraLoaderInvocation = s['LoraLoaderInvocation'];
-export type ESRGANInvocation = s['ESRGANInvocation'];
-export type DivideInvocation = s['DivideInvocation'];
-export type ImageNSFWBlurInvocation = s['ImageNSFWBlurInvocation'];
-export type ImageWatermarkInvocation = s['ImageWatermarkInvocation'];
-export type SeamlessModeInvocation = s['SeamlessModeInvocation'];
-export type LinearUIOutputInvocation = s['LinearUIOutputInvocation'];
-export type MetadataInvocation = s['MetadataInvocation'];
-export type CoreMetadataInvocation = s['CoreMetadataInvocation'];
-export type MetadataItemInvocation = s['MetadataItemInvocation'];
-export type MergeMetadataInvocation = s['MergeMetadataInvocation'];
-export type IPAdapterMetadataField = s['IPAdapterMetadataField'];
-export type T2IAdapterField = s['T2IAdapterField'];
-export type LoRAMetadataField = s['LoRAMetadataField'];
+export type CollectInvocation = S['CollectInvocation'];
+export type ImageResizeInvocation = S['ImageResizeInvocation'];
+export type InfillPatchMatchInvocation = S['InfillPatchMatchInvocation'];
+export type InfillTileInvocation = S['InfillTileInvocation'];
+export type CreateDenoiseMaskInvocation = S['CreateDenoiseMaskInvocation'];
+export type CreateGradientMaskInvocation = S['CreateGradientMaskInvocation'];
+export type CanvasPasteBackInvocation = S['CanvasPasteBackInvocation'];
+export type NoiseInvocation = S['NoiseInvocation'];
+export type DenoiseLatentsInvocation = S['DenoiseLatentsInvocation'];
+export type SDXLLoraLoaderInvocation = S['SDXLLoraLoaderInvocation'];
+export type ImageToLatentsInvocation = S['ImageToLatentsInvocation'];
+export type LatentsToImageInvocation = S['LatentsToImageInvocation'];
+export type LoraLoaderInvocation = S['LoraLoaderInvocation'];
+export type ESRGANInvocation = S['ESRGANInvocation'];
+export type ImageNSFWBlurInvocation = S['ImageNSFWBlurInvocation'];
+export type ImageWatermarkInvocation = S['ImageWatermarkInvocation'];
+export type SeamlessModeInvocation = S['SeamlessModeInvocation'];
+export type CoreMetadataInvocation = S['CoreMetadataInvocation'];
+export type IPAdapterMetadataField = S['IPAdapterMetadataField'];
+export type T2IAdapterField = S['T2IAdapterField'];
 
 // ControlNet Nodes
-export type ControlNetInvocation = s['ControlNetInvocation'];
-export type T2IAdapterInvocation = s['T2IAdapterInvocation'];
-export type IPAdapterInvocation = s['IPAdapterInvocation'];
-export type CannyImageProcessorInvocation = s['CannyImageProcessorInvocation'];
-export type ColorMapImageProcessorInvocation = s['ColorMapImageProcessorInvocation'];
-export type ContentShuffleImageProcessorInvocation = s['ContentShuffleImageProcessorInvocation'];
-export type DepthAnythingImageProcessorInvocation = s['DepthAnythingImageProcessorInvocation'];
-export type HedImageProcessorInvocation = s['HedImageProcessorInvocation'];
-export type LineartAnimeImageProcessorInvocation = s['LineartAnimeImageProcessorInvocation'];
-export type LineartImageProcessorInvocation = s['LineartImageProcessorInvocation'];
-export type MediapipeFaceProcessorInvocation = s['MediapipeFaceProcessorInvocation'];
-export type MidasDepthImageProcessorInvocation = s['MidasDepthImageProcessorInvocation'];
-export type MlsdImageProcessorInvocation = s['MlsdImageProcessorInvocation'];
-export type NormalbaeImageProcessorInvocation = s['NormalbaeImageProcessorInvocation'];
-export type DWOpenposeImageProcessorInvocation = s['DWOpenposeImageProcessorInvocation'];
-export type PidiImageProcessorInvocation = s['PidiImageProcessorInvocation'];
-export type ZoeDepthImageProcessorInvocation = s['ZoeDepthImageProcessorInvocation'];
+export type ControlNetInvocation = S['ControlNetInvocation'];
+export type T2IAdapterInvocation = S['T2IAdapterInvocation'];
+export type IPAdapterInvocation = S['IPAdapterInvocation'];
+export type CannyImageProcessorInvocation = S['CannyImageProcessorInvocation'];
+export type ColorMapImageProcessorInvocation = S['ColorMapImageProcessorInvocation'];
+export type ContentShuffleImageProcessorInvocation = S['ContentShuffleImageProcessorInvocation'];
+export type DepthAnythingImageProcessorInvocation = S['DepthAnythingImageProcessorInvocation'];
+export type HedImageProcessorInvocation = S['HedImageProcessorInvocation'];
+export type LineartAnimeImageProcessorInvocation = S['LineartAnimeImageProcessorInvocation'];
+export type LineartImageProcessorInvocation = S['LineartImageProcessorInvocation'];
+export type MediapipeFaceProcessorInvocation = S['MediapipeFaceProcessorInvocation'];
+export type MidasDepthImageProcessorInvocation = S['MidasDepthImageProcessorInvocation'];
+export type MlsdImageProcessorInvocation = S['MlsdImageProcessorInvocation'];
+export type NormalbaeImageProcessorInvocation = S['NormalbaeImageProcessorInvocation'];
+export type DWOpenposeImageProcessorInvocation = S['DWOpenposeImageProcessorInvocation'];
+export type PidiImageProcessorInvocation = S['PidiImageProcessorInvocation'];
+export type ZoeDepthImageProcessorInvocation = S['ZoeDepthImageProcessorInvocation'];
 
 // Node Outputs
-export type ImageOutput = s['ImageOutput'];
-export type StringOutput = s['StringOutput'];
-export type FloatOutput = s['FloatOutput'];
-export type IntegerOutput = s['IntegerOutput'];
-export type IterateInvocationOutput = s['IterateInvocationOutput'];
-export type CollectInvocationOutput = s['CollectInvocationOutput'];
-export type LatentsOutput = s['LatentsOutput'];
-export type GraphInvocationOutput = s['GraphInvocationOutput'];
+export type ImageOutput = S['ImageOutput'];
 
 // Post-image upload actions, controls workflows when images are uploaded
 
-export type ControlAdapterAction = {
+type ControlAdapterAction = {
   type: 'SET_CONTROL_ADAPTER_IMAGE';
   id: string;
 };
 
-export type InitialImageAction = {
+type InitialImageAction = {
   type: 'SET_INITIAL_IMAGE';
 };
 
-export type NodesAction = {
+type NodesAction = {
   type: 'SET_NODES_IMAGE';
   nodeId: string;
   fieldName: string;
 };
 
-export type CanvasInitialImageAction = {
+type CanvasInitialImageAction = {
   type: 'SET_CANVAS_INITIAL_IMAGE';
 };
 
-export type ToastAction = {
+type ToastAction = {
   type: 'TOAST';
   toastOptions?: UseToastOptions;
 };
 
-export type AddToBatchAction = {
+type AddToBatchAction = {
   type: 'ADD_TO_BATCH';
 };
 

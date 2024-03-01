@@ -1,11 +1,10 @@
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { stagingAreaImageSaved } from 'features/canvas/store/actions';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 
-import { startAppListening } from '..';
-
-export const addStagingAreaImageSavedListener = () => {
+export const addStagingAreaImageSavedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: stagingAreaImageSaved,
     effect: async (action, { dispatch, getState }) => {

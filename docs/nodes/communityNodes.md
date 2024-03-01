@@ -32,6 +32,7 @@ To use a community workflow, download the the `.json` node graph file and load i
     + [Image to Character Art Image Nodes](#image-to-character-art-image-nodes)
     + [Image Picker](#image-picker)
     + [Image Resize Plus](#image-resize-plus)
+    + [Latent Upscale](#latent-upscale)
     + [Load Video Frame](#load-video-frame)
     + [Make 3D](#make-3d)
     + [Mask Operations](#mask-operations)
@@ -291,6 +292,13 @@ View:
 
 
 --------------------------------
+### Latent Upscale
+
+**Description:** This node uses a small (~2.4mb) model to upscale the latents used in a Stable Diffusion 1.5 or Stable Diffusion XL image generation, rather than the typical interpolation method, avoiding the traditional downsides of the latent upscale technique.
+
+**Node Link:** [https://github.com/gogurtenjoyer/latent-upscale](https://github.com/gogurtenjoyer/latent-upscale)
+
+--------------------------------
 ### Load Video Frame
 
 **Description:** This is a video frame image provider + indexer/video creation nodes for hooking up to iterators and ranges and ControlNets and such for invokeAI node experimentation. Think animation + ControlNet outputs.
@@ -346,12 +354,21 @@ See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/mai
 
 **Description:** A set of nodes for Metadata. Collect Metadata from within an `iterate` node & extract metadata from an image.
 
-- `Metadata Item Linked` - Allows collecting of metadata while within an iterate node with no need for a collect node or conversion to metadata node.
-- `Metadata From Image` - Provides Metadata from an image.
-- `Metadata To String` - Extracts a String value of a label from metadata.
-- `Metadata To Integer` - Extracts an Integer value of a label from metadata.
-- `Metadata To Float` - Extracts a Float value of a label from metadata.
-- `Metadata To Scheduler` - Extracts a Scheduler value of a label from metadata.
+- `Metadata Item Linked` - Allows collecting of metadata while within an iterate node with no need for a collect node or conversion to metadata node
+- `Metadata From Image` - Provides Metadata from an image
+- `Metadata To String` - Extracts a String value of a label from metadata
+- `Metadata To Integer` - Extracts an Integer value of a label from metadata
+- `Metadata To Float` - Extracts a Float value of a label from metadata
+- `Metadata To Scheduler` - Extracts a Scheduler value of a label from metadata
+- `Metadata To Bool` - Extracts Bool types from metadata
+- `Metadata To Model` - Extracts model types from metadata
+- `Metadata To SDXL Model` - Extracts SDXL model types from metadata
+- `Metadata To LoRAs` - Extracts Loras from metadata. 
+- `Metadata To SDXL LoRAs` - Extracts SDXL Loras from metadata
+- `Metadata To ControlNets` - Extracts ControNets from metadata
+- `Metadata To IP-Adapters` - Extracts IP-Adapters from metadata
+- `Metadata To T2I-Adapters` - Extracts T2I-Adapters from metadata
+- `Denoise Latents + Metadata` - This is an inherited version of the existing `Denoise Latents` node but with a metadata input and output. 
 
 **Node Link:** https://github.com/skunkworxdark/metadata-linked-nodes
 

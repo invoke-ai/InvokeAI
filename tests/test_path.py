@@ -2,6 +2,7 @@
 Not really a test, but a way to verify that the paths are existing
 and fail early if they are not.
 """
+
 import pathlib
 import unittest
 from os import path as osp

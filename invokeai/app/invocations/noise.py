@@ -4,17 +4,15 @@
 import torch
 from pydantic import field_validator
 
-from invokeai.app.invocations.latent import LatentsField
-from invokeai.app.shared.fields import FieldDescriptions
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
+from invokeai.app.invocations.fields import FieldDescriptions, InputField, LatentsField, OutputField
+from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
 
 from ...backend.util.devices import choose_torch_device, torch_dtype
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    InputField,
-    InvocationContext,
-    OutputField,
     invocation,
     invocation_output,
 )
@@ -69,13 +67,13 @@ class NoiseOutput(BaseInvocationOutput):
     width: int = OutputField(description=FieldDescriptions.width)
     height: int = OutputField(description=FieldDescriptions.height)
 
-
-def build_noise_output(latents_name: str, latents: torch.Tensor, seed: int):
-    return NoiseOutput(
-        noise=LatentsField(latents_name=latents_name, seed=seed),
-        width=latents.size()[3] * 8,
-        height=latents.size()[2] * 8,
-    )
+    @classmethod
+    def build(cls, latents_name: str, latents: torch.Tensor, seed: int) -> "NoiseOutput":
+        return cls(
+            noise=LatentsField(latents_name=latents_name, seed=seed),
+            width=latents.size()[3] * LATENT_SCALE_FACTOR,
+            height=latents.size()[2] * LATENT_SCALE_FACTOR,
+        )
 
 
 @invocation(
@@ -96,13 +94,13 @@ class NoiseInvocation(BaseInvocation):
     )
     width: int = InputField(
         default=512,
-        multiple_of=8,
+        multiple_of=LATENT_SCALE_FACTOR,
         gt=0,
         description=FieldDescriptions.width,
     )
     height: int = InputField(
         default=512,
-        multiple_of=8,
+        multiple_of=LATENT_SCALE_FACTOR,
         gt=0,
         description=FieldDescriptions.height,
     )
@@ -124,6 +122,5 @@ class NoiseInvocation(BaseInvocation):
             seed=self.seed,
             use_cpu=self.use_cpu,
         )
-        name = f"{context.graph_execution_state_id}__{self.id}"
-        context.services.latents.save(name, noise)
-        return build_noise_output(latents_name=name, latents=noise, seed=self.seed)
+        name = context.tensors.save(tensor=noise)
+        return NoiseOutput.build(latents_name=name, latents=noise, seed=self.seed)

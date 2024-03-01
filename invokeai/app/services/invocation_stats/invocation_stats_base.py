@@ -3,7 +3,7 @@
 
 Usage:
 
-statistics = InvocationStatsService(graph_execution_manager)
+statistics = InvocationStatsService()
 with statistics.collect_stats(invocation, graph_execution_state.id):
       ... execute graphs...
 statistics.log_stats()
@@ -29,8 +29,8 @@ writes to the system log is stored in InvocationServices.performance_statistics.
 """
 
 from abc import ABC, abstractmethod
-from contextlib import AbstractContextManager
 from pathlib import Path
+from typing import ContextManager
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation
 from invokeai.app.services.invocation_stats.invocation_stats_common import InvocationStatsSummary
@@ -40,18 +40,17 @@ class InvocationStatsServiceBase(ABC):
     "Abstract base class for recording node memory/time performance statistics"
 
     @abstractmethod
-    def __init__(self):
+    def __init__(self) -> None:
         """
         Initialize the InvocationStatsService and reset counters to zero
         """
-        pass
 
     @abstractmethod
     def collect_stats(
         self,
         invocation: BaseInvocation,
         graph_execution_state_id: str,
-    ) -> AbstractContextManager:
+    ) -> ContextManager[None]:
         """
         Return a context object that will capture the statistics on the execution
         of invocaation. Use with: to place around the part of the code that executes the invocation.
@@ -61,16 +60,12 @@ class InvocationStatsServiceBase(ABC):
         pass
 
     @abstractmethod
-    def reset_stats(self, graph_execution_state_id: str):
-        """
-        Reset all statistics for the indicated graph.
-        :param graph_execution_state_id: The id of the session whose stats to reset.
-        :raises GESStatsNotFoundError: if the graph isn't tracked in the stats.
-        """
+    def reset_stats(self):
+        """Reset all stored statistics."""
         pass
 
     @abstractmethod
-    def log_stats(self, graph_execution_state_id: str):
+    def log_stats(self, graph_execution_state_id: str) -> None:
         """
         Write out the accumulated statistics to the log or somewhere else.
         :param graph_execution_state_id: The id of the session whose stats to log.

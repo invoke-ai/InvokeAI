@@ -378,7 +378,6 @@ class InvokeAIDiffuserComponent:
         """Runs the conditioned and unconditioned UNet forward passes sequentially for lower memory usage at the cost of
         slower execution speed.
         """
-
         # Since we are running the conditioned and unconditioned passes sequentially, we need to split the ControlNet
         # and T2I-Adapter residuals into two chunks.
         uncond_down_block, cond_down_block = None, None

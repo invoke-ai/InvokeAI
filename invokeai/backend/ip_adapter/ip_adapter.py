@@ -8,8 +8,8 @@ from PIL import Image
 from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
 from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionWeights
-from invokeai.backend.model_management.models.base import calc_model_size_by_data
 
+from ..raw_model import RawModel
 from .resampler import Resampler
 
 
@@ -92,7 +92,7 @@ class MLPProjModel(torch.nn.Module):
         return clip_extra_context_tokens
 
 
-class IPAdapter:
+class IPAdapter(RawModel):
     """IP-Adapter: https://arxiv.org/pdf/2308.06721.pdf"""
 
     def __init__(
@@ -124,6 +124,9 @@ class IPAdapter:
         self.attn_weights.to(device=self.device, dtype=self.dtype)
 
     def calc_size(self):
+        # workaround for circular import
+        from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
+
         return calc_model_size_by_data(self._image_proj_model) + calc_model_size_by_data(self.attn_weights)
 
     def _init_image_proj_model(self, state_dict):

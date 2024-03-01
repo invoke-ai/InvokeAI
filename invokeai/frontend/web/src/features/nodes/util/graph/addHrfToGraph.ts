@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
+import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import type {
   DenoiseLatentsInvocation,
@@ -23,6 +24,7 @@ import {
   NOISE,
   NOISE_HRF,
   RESIZE_HRF,
+  SEAMLESS,
   VAE_LOADER,
 } from './constants';
 import { setMetadataReceivingNode, upsertMetadata } from './metadata';
@@ -30,7 +32,6 @@ import { setMetadataReceivingNode, upsertMetadata } from './metadata';
 // Copy certain connections from previous DENOISE_LATENTS to new DENOISE_LATENTS_HRF.
 function copyConnectionsToDenoiseLatentsHrf(graph: NonNullableGraph): void {
   const destinationFields = [
-    'vae',
     'control',
     'ip_adapter',
     'metadata',
@@ -107,9 +108,10 @@ export const addHrfToGraph = (state: RootState, graph: NonNullableGraph): void =
   }
   const log = logger('txt2img');
 
-  const { vae } = state.generation;
+  const { vae, seamlessXAxis, seamlessYAxis } = state.generation;
   const { hrfStrength, hrfEnabled, hrfMethod } = state.hrf;
   const isAutoVae = !vae;
+  const isSeamlessEnabled = seamlessXAxis || seamlessYAxis;
   const width = state.generation.width;
   const height = state.generation.height;
   const optimalDimension = selectOptimalDimension(state);
@@ -158,7 +160,7 @@ export const addHrfToGraph = (state: RootState, graph: NonNullableGraph): void =
     },
     {
       source: {
-        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
+        node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -259,7 +261,7 @@ export const addHrfToGraph = (state: RootState, graph: NonNullableGraph): void =
   graph.edges.push(
     {
       source: {
-        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
+        node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -313,16 +315,21 @@ export const addHrfToGraph = (state: RootState, graph: NonNullableGraph): void =
   );
   copyConnectionsToDenoiseLatentsHrf(graph);
 
+  // The original l2i node is unnecessary now, remove it
+  graph.edges = graph.edges.filter((edge) => edge.destination.node_id !== LATENTS_TO_IMAGE);
+  delete graph.nodes[LATENTS_TO_IMAGE];
+
   graph.nodes[LATENTS_TO_IMAGE_HRF_HR] = {
     type: 'l2i',
     id: LATENTS_TO_IMAGE_HRF_HR,
     fp32: originalLatentsToImageNode?.fp32,
-    is_intermediate: true,
+    is_intermediate: getIsIntermediate(state),
+    board: getBoardField(state),
   };
   graph.edges.push(
     {
       source: {
-        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
+        node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
         field: 'vae',
       },
       destination: {

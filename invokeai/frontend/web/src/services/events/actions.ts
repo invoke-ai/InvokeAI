@@ -1,11 +1,17 @@
 import { createAction } from '@reduxjs/toolkit';
 import type {
+  BulkDownloadCompletedEvent,
+  BulkDownloadFailedEvent,
+  BulkDownloadStartedEvent,
   GeneratorProgressEvent,
   GraphExecutionStateCompleteEvent,
   InvocationCompleteEvent,
   InvocationErrorEvent,
   InvocationRetrievalErrorEvent,
   InvocationStartedEvent,
+  ModelInstallCompletedEvent,
+  ModelInstallDownloadingEvent,
+  ModelInstallErrorEvent,
   ModelLoadCompletedEvent,
   ModelLoadStartedEvent,
   QueueItemStatusChangedEvent,
@@ -53,6 +59,18 @@ export const socketModelLoadCompleted = createAction<{
   data: ModelLoadCompletedEvent;
 }>('socket/socketModelLoadCompleted');
 
+export const socketModelInstallDownloading = createAction<{
+  data: ModelInstallDownloadingEvent;
+}>('socket/socketModelInstallDownloading');
+
+export const socketModelInstallCompleted = createAction<{
+  data: ModelInstallCompletedEvent;
+}>('socket/socketModelInstallCompleted');
+
+export const socketModelInstallError = createAction<{
+  data: ModelInstallErrorEvent;
+}>('socket/socketModelInstallError');
+
 export const socketSessionRetrievalError = createAction<{
   data: SessionRetrievalErrorEvent;
 }>('socket/socketSessionRetrievalError');
@@ -64,3 +82,15 @@ export const socketInvocationRetrievalError = createAction<{
 export const socketQueueItemStatusChanged = createAction<{
   data: QueueItemStatusChangedEvent;
 }>('socket/socketQueueItemStatusChanged');
+
+export const socketBulkDownloadStarted = createAction<{
+  data: BulkDownloadStartedEvent;
+}>('socket/socketBulkDownloadStarted');
+
+export const socketBulkDownloadCompleted = createAction<{
+  data: BulkDownloadCompletedEvent;
+}>('socket/socketBulkDownloadCompleted');
+
+export const socketBulkDownloadFailed = createAction<{
+  data: BulkDownloadFailedEvent;
+}>('socket/socketBulkDownloadFailed');

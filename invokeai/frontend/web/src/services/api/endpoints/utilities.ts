@@ -1,6 +1,14 @@
 import type { components } from 'services/api/schema';
 
-import { api } from '..';
+import { api, buildV1Url } from '..';
+
+/**
+ * Builds an endpoint URL for the utilities router
+ * @example
+ * buildUtilitiesUrl('some-path')
+ * // '/api/v1/utilities/some-path'
+ */
+const buildUtilitiesUrl = (path: string = '') => buildV1Url(`utilities/${path}`);
 
 export const utilitiesApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -9,7 +17,7 @@ export const utilitiesApi = api.injectEndpoints({
       { prompt: string; max_prompts: number }
     >({
       query: (arg) => ({
-        url: 'utilities/dynamicprompts',
+        url: buildUtilitiesUrl('dynamicprompts'),
         body: arg,
         method: 'POST',
       }),
@@ -20,5 +28,3 @@ export const utilitiesApi = api.injectEndpoints({
     }),
   }),
 });
-
-export const { useDynamicPromptsQuery } = utilitiesApi;

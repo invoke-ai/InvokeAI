@@ -4,8 +4,8 @@ import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldIPAdapterModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type { IPAdapterModelFieldInputInstance, IPAdapterModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
-import type { IPAdapterModelConfigEntity } from 'services/api/endpoints/models';
 import { useGetIPAdapterModelsQuery } from 'services/api/endpoints/models';
+import type { IPAdapterModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
@@ -17,7 +17,7 @@ const IPAdapterModelFieldInputComponent = (
   const { data: ipAdapterModels } = useGetIPAdapterModelsQuery();
 
   const _onChange = useCallback(
-    (value: IPAdapterModelConfigEntity | null) => {
+    (value: IPAdapterModelConfig | null) => {
       if (!value) {
         return;
       }
@@ -35,7 +35,7 @@ const IPAdapterModelFieldInputComponent = (
   const { options, value, onChange } = useGroupedModelCombobox({
     modelEntities: ipAdapterModels,
     onChange: _onChange,
-    selectedModel: field.value ? { ...field.value, model_type: 'ip_adapter' } : undefined,
+    selectedModel: field.value,
   });
 
   return (

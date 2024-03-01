@@ -3,13 +3,14 @@ This module defines a singleton object, "safety_checker" that
 wraps the safety_checker model. It respects the global "nsfw_checker"
 configuration variable, that allows the checker to be supressed.
 """
+
 import numpy as np
 from PIL import Image
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend import SilenceWarnings
 from invokeai.backend.util.devices import choose_torch_device
+from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 config = InvokeAIAppConfig.get_config()
 

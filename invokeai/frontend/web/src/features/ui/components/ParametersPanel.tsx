@@ -22,7 +22,7 @@ const overlayScrollbarsStyles: CSSProperties = {
 
 const ParametersPanel = () => {
   const activeTabName = useAppSelector(activeTabNameSelector);
-  const isSDXL = useAppSelector((s) => s.generation.model?.base_model === 'sdxl');
+  const isSDXL = useAppSelector((s) => s.generation.model?.base === 'sdxl');
 
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>

@@ -19,7 +19,7 @@ declare global {
 }
 
 export const $socketOptions = map<Partial<ManagerOptions & SocketOptions>>({});
-export const $isSocketInitialized = atom<boolean>(false);
+const $isSocketInitialized = atom<boolean>(false);
 
 /**
  * Initializes the socket.io connection and sets up event listeners.

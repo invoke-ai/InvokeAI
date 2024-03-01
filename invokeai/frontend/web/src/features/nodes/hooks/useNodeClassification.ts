@@ -1,20 +1,15 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { selectNodeTemplatesSlice } from 'features/nodes/store/nodeTemplatesSlice';
-import { isInvocationNode } from 'features/nodes/types/invocation';
+import { selectNodeTemplate } from 'features/nodes/store/selectors';
+import type { Classification } from 'features/nodes/types/common';
 import { useMemo } from 'react';
 
-export const useNodeClassification = (nodeId: string) => {
+export const useNodeClassification = (nodeId: string): Classification | null => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(selectNodesSlice, selectNodeTemplatesSlice, (nodes, nodeTemplates) => {
-        const node = nodes.nodes.find((node) => node.id === nodeId);
-        if (!isInvocationNode(node)) {
-          return false;
-        }
-        const nodeTemplate = nodeTemplates.templates[node?.data.type ?? ''];
-        return nodeTemplate?.classification;
+      createSelector(selectNodesSlice, (nodes) => {
+        return selectNodeTemplate(nodes, nodeId)?.classification ?? null;
       }),
     [nodeId]
   );

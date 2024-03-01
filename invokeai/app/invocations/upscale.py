@@ -8,13 +8,15 @@ import torch
 from PIL import Image
 from pydantic import ConfigDict
 
-from invokeai.app.invocations.primitives import ImageField, ImageOutput
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.invocations.fields import ImageField
+from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.basicsr.rrdbnet_arch import RRDBNet
 from invokeai.backend.image_util.realesrgan.realesrgan import RealESRGAN
 from invokeai.backend.util.devices import choose_torch_device
 
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, WithMetadata, invocation
+from .baseinvocation import BaseInvocation, invocation
+from .fields import InputField, WithBoard, WithMetadata
 
 # TODO: Populate this from disk?
 # TODO: Use model manager to load?
@@ -29,8 +31,8 @@ if choose_torch_device() == torch.device("mps"):
     from torch import mps
 
 
-@invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="esrgan", version="1.3.0")
-class ESRGANInvocation(BaseInvocation, WithMetadata):
+@invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="esrgan", version="1.3.1")
+class ESRGANInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Upscales an image using RealESRGAN."""
 
     image: ImageField = InputField(description="The input image")
@@ -42,8 +44,8 @@ class ESRGANInvocation(BaseInvocation, WithMetadata):
     model_config = ConfigDict(protected_namespaces=())
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(self.image.image_name)
-        models_path = context.services.configuration.models_path
+        image = context.images.get_pil(self.image.image_name)
+        models_path = context.config.get().models_path
 
         rrdbnet_model = None
         netscale = None
@@ -87,7 +89,7 @@ class ESRGANInvocation(BaseInvocation, WithMetadata):
             netscale = 2
         else:
             msg = f"Invalid RealESRGAN model: {self.model_name}"
-            context.services.logger.error(msg)
+            context.logger.error(msg)
             raise ValueError(msg)
 
         esrgan_model_path = Path(f"core/upscaling/realesrgan/{self.model_name}")
@@ -110,19 +112,6 @@ class ESRGANInvocation(BaseInvocation, WithMetadata):
         if choose_torch_device() == torch.device("mps"):
             mps.empty_cache()
 
-        image_dto = context.services.images.create(
-            image=pil_image,
-            image_origin=ResourceOrigin.INTERNAL,
-            image_category=ImageCategory.GENERAL,
-            node_id=self.id,
-            session_id=context.graph_execution_state_id,
-            is_intermediate=self.is_intermediate,
-            metadata=self.metadata,
-            workflow=context.workflow,
-        )
+        image_dto = context.images.save(image=pil_image)
 
-        return ImageOutput(
-            image=ImageField(image_name=image_dto.image_name),
-            width=image_dto.width,
-            height=image_dto.height,
-        )
+        return ImageOutput.build(image_dto)

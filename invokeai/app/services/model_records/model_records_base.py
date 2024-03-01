@@ -11,8 +11,15 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from pydantic import BaseModel, Field
 
 from invokeai.app.services.shared.pagination import PaginatedResults
-from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelFormat, ModelType
-from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, ModelMetadataStore
+from invokeai.backend.model_manager import (
+    AnyModelConfig,
+    BaseModelType,
+    ModelFormat,
+    ModelType,
+)
+from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
+
+from ..model_metadata import ModelMetadataStoreBase
 
 
 class DuplicateModelException(Exception):
@@ -104,7 +111,7 @@ class ModelRecordServiceBase(ABC):
 
     @property
     @abstractmethod
-    def metadata_store(self) -> ModelMetadataStore:
+    def metadata_store(self) -> ModelMetadataStoreBase:
         """Return a ModelMetadataStore initialized on the same database."""
         pass
 
@@ -146,7 +153,7 @@ class ModelRecordServiceBase(ABC):
     @abstractmethod
     def exists(self, key: str) -> bool:
         """
-        Return True if a model with the indicated key exists in the databse.
+        Return True if a model with the indicated key exists in the database.
 
         :param key: Unique key for the model to be deleted
         """

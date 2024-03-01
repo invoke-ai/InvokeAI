@@ -14,11 +14,11 @@ const baseDimensionConfig: NumericalParameterConfig = {
   coarseStep: 64,
 };
 
-export const initialConfigState: AppConfig = {
+const initialConfigState: AppConfig = {
   shouldUpdateImagesOnConnect: false,
   shouldFetchMetadataFromApi: false,
   disabledTabs: [],
-  disabledFeatures: ['lightbox', 'faceRestore', 'batches', 'bulkDownload'],
+  disabledFeatures: ['lightbox', 'faceRestore', 'batches'],
   disabledSDFeatures: ['variation', 'symmetry', 'hires', 'perlinNoise', 'noiseThreshold'],
   nodesAllowlist: undefined,
   nodesDenylist: undefined,
@@ -86,14 +86,14 @@ export const initialConfigState: AppConfig = {
       fineStep: 0.01,
       coarseStep: 0.05,
     },
-    canvasCoherenceSteps: {
-      initial: 20,
-      sliderMin: 1,
-      sliderMax: 100,
-      numberInputMin: 1,
-      numberInputMax: 999,
-      fineStep: 1,
-      coarseStep: 1,
+    canvasCoherenceEdgeSize: {
+      initial: 16,
+      sliderMin: 0,
+      sliderMax: 128,
+      numberInputMin: 0,
+      numberInputMax: 1024,
+      fineStep: 8,
+      coarseStep: 16,
     },
     cfgRescaleMultiplier: {
       initial: 0,
@@ -134,7 +134,7 @@ export const initialConfigState: AppConfig = {
     maskBlur: {
       initial: 16,
       sliderMin: 0,
-      sliderMax: 64,
+      sliderMax: 128,
       numberInputMin: 0,
       numberInputMax: 512,
       fineStep: 1,

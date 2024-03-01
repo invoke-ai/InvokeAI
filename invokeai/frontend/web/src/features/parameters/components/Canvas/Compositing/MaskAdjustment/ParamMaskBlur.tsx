@@ -26,7 +26,7 @@ const ParamMaskBlur = () => {
 
   return (
     <FormControl>
-      <InformationalPopover feature="compositingBlur">
+      <InformationalPopover feature="compositingMaskBlur">
         <FormLabel>{t('parameters.maskBlur')}</FormLabel>
       </InformationalPopover>
       <CompositeSlider

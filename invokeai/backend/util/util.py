@@ -24,6 +24,22 @@ import invokeai.backend.util.logging as logger
 
 from .devices import torch_dtype
 
+# actual size of a gig
+GIG = 1073741824
+
+
+def directory_size(directory: Path) -> int:
+    """
+    Return the aggregate size of all files in a directory (bytes).
+    """
+    sum = 0
+    for root, dirs, files in os.walk(directory):
+        for f in files:
+            sum += Path(root, f).stat().st_size
+        for d in dirs:
+            sum += Path(root, d).stat().st_size
+    return sum
+
 
 def log_txt_as_img(wh, xc, size=10):
     # wh a tuple of (width, height)
@@ -324,14 +340,17 @@ def download_with_resume(url: str, dest: Path, access_token: str = None) -> Path
             logger.error(f"ERROR DOWNLOADING {url}: {resp.text}")
             return None
 
-        with open(dest, open_mode) as file, tqdm(
-            desc=str(dest),
-            initial=exist_size,
-            total=content_length,
-            unit="iB",
-            unit_scale=True,
-            unit_divisor=1000,
-        ) as bar:
+        with (
+            open(dest, open_mode) as file,
+            tqdm(
+                desc=str(dest),
+                initial=exist_size,
+                total=content_length,
+                unit="iB",
+                unit_scale=True,
+                unit_divisor=1000,
+            ) as bar,
+        ):
             for data in resp.iter_content(chunk_size=1024):
                 size = file.write(data)
                 bar.update(size)

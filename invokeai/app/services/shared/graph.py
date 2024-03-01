@@ -5,22 +5,25 @@ import itertools
 from typing import Annotated, Any, Optional, TypeVar, Union, get_args, get_origin, get_type_hints
 
 import networkx as nx
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    GetJsonSchemaHandler,
+    field_validator,
+)
 from pydantic.fields import Field
+from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import CoreSchema
 
 # Importing * is bad karma but needed here for node detection
 from invokeai.app.invocations import *  # noqa: F401 F403
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    Input,
-    InputField,
-    InvocationContext,
-    OutputField,
-    UIType,
     invocation,
     invocation_output,
 )
+from invokeai.app.invocations.fields import Input, InputField, OutputField, UIType
+from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import uuid_string
 
 # in 3.10 this would be "from types import NoneType"
@@ -179,35 +182,12 @@ class NodeIdMismatchError(ValueError):
     pass
 
 
-class InvalidSubGraphError(ValueError):
-    pass
-
-
 class CyclicalGraphError(ValueError):
     pass
 
 
 class UnknownGraphValidationError(ValueError):
     pass
-
-
-# TODO: Create and use an Empty output?
-@invocation_output("graph_output")
-class GraphInvocationOutput(BaseInvocationOutput):
-    pass
-
-
-# TODO: Fill this out and move to invocations
-@invocation("graph", version="1.0.0")
-class GraphInvocation(BaseInvocation):
-    """Execute a graph"""
-
-    # TODO: figure out how to create a default here
-    graph: "Graph" = InputField(description="The graph to run", default=None)
-
-    def invoke(self, context: InvocationContext) -> GraphInvocationOutput:
-        """Invoke with provided services and return outputs."""
-        return GraphInvocationOutput()
 
 
 @invocation_output("iterate_output")
@@ -263,20 +243,72 @@ class CollectInvocation(BaseInvocation):
         return CollectInvocationOutput(collection=copy.copy(self.collection))
 
 
-InvocationsUnion: Any = BaseInvocation.get_invocations_union()
-InvocationOutputsUnion: Any = BaseInvocationOutput.get_outputs_union()
-
-
 class Graph(BaseModel):
     id: str = Field(description="The id of this graph", default_factory=uuid_string)
     # TODO: use a list (and never use dict in a BaseModel) because pydantic/fastapi hates me
-    nodes: dict[str, Annotated[InvocationsUnion, Field(discriminator="type")]] = Field(
-        description="The nodes in this graph", default_factory=dict
-    )
+    nodes: dict[str, BaseInvocation] = Field(description="The nodes in this graph", default_factory=dict)
     edges: list[Edge] = Field(
         description="The connections between nodes and their fields in this graph",
         default_factory=list,
     )
+
+    @field_validator("nodes", mode="plain")
+    @classmethod
+    def validate_nodes(cls, v: dict[str, Any]):
+        """Validates the nodes in the graph by retrieving a union of all node types and validating each node."""
+
+        # Invocations register themselves as their python modules are executed. The union of all invocations is
+        # constructed at runtime. We use pydantic to validate `Graph.nodes` using that union.
+        #
+        # It's possible that when `graph.py` is executed, not all invocation-containing modules will have executed. If
+        # we construct the invocation union as `graph.py` is executed, we may miss some invocations. Those missing
+        # invocations will cause a graph to fail if they are used.
+        #
+        # We can get around this by validating the nodes in the graph using a "plain" validator, which overrides the
+        # pydantic validation entirely. This allows us to validate the nodes using the union of invocations at runtime.
+        #
+        # This same pattern is used in `GraphExecutionState`.
+
+        nodes: dict[str, BaseInvocation] = {}
+        typeadapter = BaseInvocation.get_typeadapter()
+        for node_id, node in v.items():
+            nodes[node_id] = typeadapter.validate_python(node)
+        return nodes
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, core_schema: CoreSchema, handler: GetJsonSchemaHandler) -> JsonSchemaValue:
+        # We use a "plain" validator to validate the nodes in the graph. Pydantic is unable to create a JSON Schema for
+        # fields that use "plain" validators, so we have to hack around this. Also, we need to add all invocations to
+        # the generated schema as options for the `nodes` field.
+        #
+        # The workaround is to create a new BaseModel that has the same fields as `Graph` but without the validator and
+        # with the invocation union as the type for the `nodes` field. Pydantic then generates the JSON Schema as
+        # expected.
+        #
+        # You might be tempted to do something like this:
+        #
+        # ```py
+        # cloned_model = create_model(cls.__name__, __base__=cls, nodes=...)
+        # delattr(cloned_model, "validate_nodes")
+        # cloned_model.model_rebuild(force=True)
+        # json_schema = handler(cloned_model.__pydantic_core_schema__)
+        # ```
+        #
+        # Unfortunately, this does not work. Calling `handler` here results in infinite recursion as pydantic attempts
+        # to build the JSON Schema for the cloned model. Instead, we have to manually clone the model.
+        #
+        # This same pattern is used in `GraphExecutionState`.
+
+        class Graph(BaseModel):
+            id: Optional[str] = Field(default=None, description="The id of this graph")
+            nodes: dict[
+                str, Annotated[Union[tuple(BaseInvocation._invocation_classes)], Field(discriminator="type")]
+            ] = Field(description="The nodes in this graph")
+            edges: list[Edge] = Field(description="The connections between nodes and their fields in this graph")
+
+        json_schema = handler(Graph.__pydantic_core_schema__)
+        json_schema = handler.resolve_ref_schema(json_schema)
+        return json_schema
 
     def add_node(self, node: BaseInvocation) -> None:
         """Adds a node to a graph
@@ -289,41 +321,21 @@ class Graph(BaseModel):
 
         self.nodes[node.id] = node
 
-    def _get_graph_and_node(self, node_path: str) -> tuple["Graph", str]:
-        """Returns the graph and node id for a node path."""
-        # Materialized graphs may have nodes at the top level
-        if node_path in self.nodes:
-            return (self, node_path)
-
-        node_id = node_path if "." not in node_path else node_path[: node_path.index(".")]
-        if node_id not in self.nodes:
-            raise NodeNotFoundError(f"Node {node_path} not found in graph")
-
-        node = self.nodes[node_id]
-
-        if not isinstance(node, GraphInvocation):
-            # There's more node path left but this isn't a graph - failure
-            raise NodeNotFoundError("Node path terminated early at a non-graph node")
-
-        return node.graph._get_graph_and_node(node_path[node_path.index(".") + 1 :])
-
-    def delete_node(self, node_path: str) -> None:
+    def delete_node(self, node_id: str) -> None:
         """Deletes a node from a graph"""
 
         try:
-            graph, node_id = self._get_graph_and_node(node_path)
-
             # Delete edges for this node
-            input_edges = self._get_input_edges_and_graphs(node_path)
-            output_edges = self._get_output_edges_and_graphs(node_path)
+            input_edges = self._get_input_edges(node_id)
+            output_edges = self._get_output_edges(node_id)
 
-            for edge_graph, _, edge in input_edges:
-                edge_graph.delete_edge(edge)
+            for edge in input_edges:
+                self.delete_edge(edge)
 
-            for edge_graph, _, edge in output_edges:
-                edge_graph.delete_edge(edge)
+            for edge in output_edges:
+                self.delete_edge(edge)
 
-            del graph.nodes[node_id]
+            del self.nodes[node_id]
 
         except NodeNotFoundError:
             pass  # Ignore, not doesn't exist (should this throw?)
@@ -372,13 +384,6 @@ class Graph(BaseModel):
         for k, v in self.nodes.items():
             if k != v.id:
                 raise NodeIdMismatchError(f"Node ids must match, got {k} and {v.id}")
-
-        # Validate all subgraphs
-        for gn in (n for n in self.nodes.values() if isinstance(n, GraphInvocation)):
-            try:
-                gn.graph.validate_self()
-            except Exception as e:
-                raise InvalidSubGraphError(f"Subgraph {gn.id} is invalid") from e
 
         # Validate that all edges match nodes and fields in the graph
         for edge in self.edges:
@@ -441,7 +446,6 @@ class Graph(BaseModel):
         except (
             DuplicateNodeIdError,
             NodeIdMismatchError,
-            InvalidSubGraphError,
             NodeNotFoundError,
             NodeFieldNotFoundError,
             CyclicalGraphError,
@@ -462,7 +466,7 @@ class Graph(BaseModel):
     def _validate_edge(self, edge: Edge):
         """Validates that a new edge doesn't create a cycle in the graph"""
 
-        # Validate that the nodes exist (edges may contain node paths, so we can't just check for nodes directly)
+        # Validate that the nodes exist
         try:
             from_node = self.get_node(edge.source.node_id)
             to_node = self.get_node(edge.destination.node_id)
@@ -529,171 +533,90 @@ class Graph(BaseModel):
                     f"Collector input type does not match collector output type: {edge.source.node_id}.{edge.source.field} to {edge.destination.node_id}.{edge.destination.field}"
                 )
 
-    def has_node(self, node_path: str) -> bool:
+    def has_node(self, node_id: str) -> bool:
         """Determines whether or not a node exists in the graph."""
         try:
-            n = self.get_node(node_path)
-            if n is not None:
-                return True
-            else:
-                return False
+            _ = self.get_node(node_id)
+            return True
         except NodeNotFoundError:
             return False
 
-    def get_node(self, node_path: str) -> InvocationsUnion:
-        """Gets a node from the graph using a node path."""
-        # Materialized graphs may have nodes at the top level
-        graph, node_id = self._get_graph_and_node(node_path)
-        return graph.nodes[node_id]
+    def get_node(self, node_id: str) -> BaseInvocation:
+        """Gets a node from the graph."""
+        try:
+            return self.nodes[node_id]
+        except KeyError as e:
+            raise NodeNotFoundError(f"Node {node_id} not found in graph") from e
 
-    def _get_node_path(self, node_id: str, prefix: Optional[str] = None) -> str:
-        return node_id if prefix is None or prefix == "" else f"{prefix}.{node_id}"
-
-    def update_node(self, node_path: str, new_node: BaseInvocation) -> None:
+    def update_node(self, node_id: str, new_node: BaseInvocation) -> None:
         """Updates a node in the graph."""
-        graph, node_id = self._get_graph_and_node(node_path)
-        node = graph.nodes[node_id]
+        node = self.nodes[node_id]
 
         # Ensure the node type matches the new node
         if type(node) is not type(new_node):
-            raise TypeError(f"Node {node_path} is type {type(node)} but new node is type {type(new_node)}")
+            raise TypeError(f"Node {node_id} is type {type(node)} but new node is type {type(new_node)}")
 
         # Ensure the new id is either the same or is not in the graph
-        prefix = None if "." not in node_path else node_path[: node_path.rindex(".")]
-        new_path = self._get_node_path(new_node.id, prefix=prefix)
-        if new_node.id != node.id and self.has_node(new_path):
-            raise NodeAlreadyInGraphError("Node with id {new_node.id} already exists in graph")
+        if new_node.id != node.id and self.has_node(new_node.id):
+            raise NodeAlreadyInGraphError(f"Node with id {new_node.id} already exists in graph")
 
         # Set the new node in the graph
-        graph.nodes[new_node.id] = new_node
+        self.nodes[new_node.id] = new_node
         if new_node.id != node.id:
-            input_edges = self._get_input_edges_and_graphs(node_path)
-            output_edges = self._get_output_edges_and_graphs(node_path)
+            input_edges = self._get_input_edges(node_id)
+            output_edges = self._get_output_edges(node_id)
 
             # Delete node and all edges
-            graph.delete_node(node_path)
+            self.delete_node(node_id)
 
             # Create new edges for each input and output
-            for graph, _, edge in input_edges:
-                # Remove the graph prefix from the node path
-                new_graph_node_path = (
-                    new_node.id
-                    if "." not in edge.destination.node_id
-                    else f'{edge.destination.node_id[edge.destination.node_id.rindex("."):]}.{new_node.id}'
-                )
-                graph.add_edge(
+            for edge in input_edges:
+                self.add_edge(
                     Edge(
                         source=edge.source,
-                        destination=EdgeConnection(node_id=new_graph_node_path, field=edge.destination.field),
+                        destination=EdgeConnection(node_id=new_node.id, field=edge.destination.field),
                     )
                 )
 
-            for graph, _, edge in output_edges:
-                # Remove the graph prefix from the node path
-                new_graph_node_path = (
-                    new_node.id
-                    if "." not in edge.source.node_id
-                    else f'{edge.source.node_id[edge.source.node_id.rindex("."):]}.{new_node.id}'
-                )
-                graph.add_edge(
+            for edge in output_edges:
+                self.add_edge(
                     Edge(
-                        source=EdgeConnection(node_id=new_graph_node_path, field=edge.source.field),
+                        source=EdgeConnection(node_id=new_node.id, field=edge.source.field),
                         destination=edge.destination,
                     )
                 )
 
-    def _get_input_edges(self, node_path: str, field: Optional[str] = None) -> list[Edge]:
-        """Gets all input edges for a node"""
-        edges = self._get_input_edges_and_graphs(node_path)
+    def _get_input_edges(self, node_id: str, field: Optional[str] = None) -> list[Edge]:
+        """Gets all input edges for a node. If field is provided, only edges to that field are returned."""
 
-        # Filter to edges that match the field
-        filtered_edges = (e for e in edges if field is None or e[2].destination.field == field)
+        edges = [e for e in self.edges if e.destination.node_id == node_id]
 
-        # Create full node paths for each edge
-        return [
-            Edge(
-                source=EdgeConnection(
-                    node_id=self._get_node_path(e.source.node_id, prefix=prefix),
-                    field=e.source.field,
-                ),
-                destination=EdgeConnection(
-                    node_id=self._get_node_path(e.destination.node_id, prefix=prefix),
-                    field=e.destination.field,
-                ),
-            )
-            for _, prefix, e in filtered_edges
-        ]
+        if field is None:
+            return edges
 
-    def _get_input_edges_and_graphs(
-        self, node_path: str, prefix: Optional[str] = None
-    ) -> list[tuple["Graph", Union[str, None], Edge]]:
-        """Gets all input edges for a node along with the graph they are in and the graph's path"""
-        edges = []
+        filtered_edges = [e for e in edges if e.destination.field == field]
 
-        # Return any input edges that appear in this graph
-        edges.extend([(self, prefix, e) for e in self.edges if e.destination.node_id == node_path])
+        return filtered_edges
 
-        node_id = node_path if "." not in node_path else node_path[: node_path.index(".")]
-        node = self.nodes[node_id]
+    def _get_output_edges(self, node_id: str, field: Optional[str] = None) -> list[Edge]:
+        """Gets all output edges for a node. If field is provided, only edges from that field are returned."""
+        edges = [e for e in self.edges if e.source.node_id == node_id]
 
-        if isinstance(node, GraphInvocation):
-            graph = node.graph
-            graph_path = node.id if prefix is None or prefix == "" else self._get_node_path(node.id, prefix=prefix)
-            graph_edges = graph._get_input_edges_and_graphs(node_path[(len(node_id) + 1) :], prefix=graph_path)
-            edges.extend(graph_edges)
+        if field is None:
+            return edges
 
-        return edges
+        filtered_edges = [e for e in edges if e.source.field == field]
 
-    def _get_output_edges(self, node_path: str, field: str) -> list[Edge]:
-        """Gets all output edges for a node"""
-        edges = self._get_output_edges_and_graphs(node_path)
-
-        # Filter to edges that match the field
-        filtered_edges = (e for e in edges if e[2].source.field == field)
-
-        # Create full node paths for each edge
-        return [
-            Edge(
-                source=EdgeConnection(
-                    node_id=self._get_node_path(e.source.node_id, prefix=prefix),
-                    field=e.source.field,
-                ),
-                destination=EdgeConnection(
-                    node_id=self._get_node_path(e.destination.node_id, prefix=prefix),
-                    field=e.destination.field,
-                ),
-            )
-            for _, prefix, e in filtered_edges
-        ]
-
-    def _get_output_edges_and_graphs(
-        self, node_path: str, prefix: Optional[str] = None
-    ) -> list[tuple["Graph", Union[str, None], Edge]]:
-        """Gets all output edges for a node along with the graph they are in and the graph's path"""
-        edges = []
-
-        # Return any input edges that appear in this graph
-        edges.extend([(self, prefix, e) for e in self.edges if e.source.node_id == node_path])
-
-        node_id = node_path if "." not in node_path else node_path[: node_path.index(".")]
-        node = self.nodes[node_id]
-
-        if isinstance(node, GraphInvocation):
-            graph = node.graph
-            graph_path = node.id if prefix is None or prefix == "" else self._get_node_path(node.id, prefix=prefix)
-            graph_edges = graph._get_output_edges_and_graphs(node_path[(len(node_id) + 1) :], prefix=graph_path)
-            edges.extend(graph_edges)
-
-        return edges
+        return filtered_edges
 
     def _is_iterator_connection_valid(
         self,
-        node_path: str,
+        node_id: str,
         new_input: Optional[EdgeConnection] = None,
         new_output: Optional[EdgeConnection] = None,
     ) -> bool:
-        inputs = [e.source for e in self._get_input_edges(node_path, "collection")]
-        outputs = [e.destination for e in self._get_output_edges(node_path, "item")]
+        inputs = [e.source for e in self._get_input_edges(node_id, "collection")]
+        outputs = [e.destination for e in self._get_output_edges(node_id, "item")]
 
         if new_input is not None:
             inputs.append(new_input)
@@ -721,12 +644,12 @@ class Graph(BaseModel):
 
     def _is_collector_connection_valid(
         self,
-        node_path: str,
+        node_id: str,
         new_input: Optional[EdgeConnection] = None,
         new_output: Optional[EdgeConnection] = None,
     ) -> bool:
-        inputs = [e.source for e in self._get_input_edges(node_path, "item")]
-        outputs = [e.destination for e in self._get_output_edges(node_path, "collection")]
+        inputs = [e.source for e in self._get_input_edges(node_id, "item")]
+        outputs = [e.destination for e in self._get_output_edges(node_id, "collection")]
 
         if new_input is not None:
             inputs.append(new_input)
@@ -782,27 +705,17 @@ class Graph(BaseModel):
         g.add_edges_from({(e.source.node_id, e.destination.node_id) for e in self.edges})
         return g
 
-    def nx_graph_flat(self, nx_graph: Optional[nx.DiGraph] = None, prefix: Optional[str] = None) -> nx.DiGraph:
+    def nx_graph_flat(self, nx_graph: Optional[nx.DiGraph] = None) -> nx.DiGraph:
         """Returns a flattened NetworkX DiGraph, including all subgraphs (but not with iterations expanded)"""
         g = nx_graph or nx.DiGraph()
 
         # Add all nodes from this graph except graph/iteration nodes
-        g.add_nodes_from(
-            [
-                self._get_node_path(n.id, prefix)
-                for n in self.nodes.values()
-                if not isinstance(n, GraphInvocation) and not isinstance(n, IterateInvocation)
-            ]
-        )
-
-        # Expand graph nodes
-        for sgn in (gn for gn in self.nodes.values() if isinstance(gn, GraphInvocation)):
-            g = sgn.graph.nx_graph_flat(g, self._get_node_path(sgn.id, prefix))
+        g.add_nodes_from([n.id for n in self.nodes.values() if not isinstance(n, IterateInvocation)])
 
         # TODO: figure out if iteration nodes need to be expanded
 
         unique_edges = {(e.source.node_id, e.destination.node_id) for e in self.edges}
-        g.add_edges_from([(self._get_node_path(e[0], prefix), self._get_node_path(e[1], prefix)) for e in unique_edges])
+        g.add_edges_from([(e[0], e[1]) for e in unique_edges])
         return g
 
 
@@ -827,9 +740,7 @@ class GraphExecutionState(BaseModel):
     )
 
     # The results of executed nodes
-    results: dict[str, Annotated[InvocationOutputsUnion, Field(discriminator="type")]] = Field(
-        description="The results of node executions", default_factory=dict
-    )
+    results: dict[str, BaseInvocationOutput] = Field(description="The results of node executions", default_factory=dict)
 
     # Errors raised when executing nodes
     errors: dict[str, str] = Field(description="Errors raised when executing nodes", default_factory=dict)
@@ -846,27 +757,51 @@ class GraphExecutionState(BaseModel):
         default_factory=dict,
     )
 
+    @field_validator("results", mode="plain")
+    @classmethod
+    def validate_results(cls, v: dict[str, BaseInvocationOutput]):
+        """Validates the results in the GES by retrieving a union of all output types and validating each result."""
+
+        # See the comment in `Graph.validate_nodes` for an explanation of this logic.
+        results: dict[str, BaseInvocationOutput] = {}
+        typeadapter = BaseInvocationOutput.get_typeadapter()
+        for result_id, result in v.items():
+            results[result_id] = typeadapter.validate_python(result)
+        return results
+
     @field_validator("graph")
     def graph_is_valid(cls, v: Graph):
         """Validates that the graph is valid"""
         v.validate_self()
         return v
 
-    model_config = ConfigDict(
-        json_schema_extra={
-            "required": [
-                "id",
-                "graph",
-                "execution_graph",
-                "executed",
-                "executed_history",
-                "results",
-                "errors",
-                "prepared_source_mapping",
-                "source_prepared_mapping",
-            ]
-        }
-    )
+    @classmethod
+    def __get_pydantic_json_schema__(cls, core_schema: CoreSchema, handler: GetJsonSchemaHandler) -> JsonSchemaValue:
+        # See the comment in `Graph.__get_pydantic_json_schema__` for an explanation of this logic.
+        class GraphExecutionState(BaseModel):
+            """Tracks the state of a graph execution"""
+
+            id: str = Field(description="The id of the execution state")
+            graph: Graph = Field(description="The graph being executed")
+            execution_graph: Graph = Field(description="The expanded graph of activated and executed nodes")
+            executed: set[str] = Field(description="The set of node ids that have been executed")
+            executed_history: list[str] = Field(
+                description="The list of node ids that have been executed, in order of execution"
+            )
+            results: dict[
+                str, Annotated[Union[tuple(BaseInvocationOutput._output_classes)], Field(discriminator="type")]
+            ] = Field(description="The results of node executions")
+            errors: dict[str, str] = Field(description="Errors raised when executing nodes")
+            prepared_source_mapping: dict[str, str] = Field(
+                description="The map of prepared nodes to original graph nodes"
+            )
+            source_prepared_mapping: dict[str, set[str]] = Field(
+                description="The map of original graph nodes to prepared nodes"
+            )
+
+        json_schema = handler(GraphExecutionState.__pydantic_core_schema__)
+        json_schema = handler.resolve_ref_schema(json_schema)
+        return json_schema
 
     def next(self) -> Optional[BaseInvocation]:
         """Gets the next node ready to execute."""
@@ -891,7 +826,7 @@ class GraphExecutionState(BaseModel):
         # If next is still none, there's no next node, return None
         return next_node
 
-    def complete(self, node_id: str, output: InvocationOutputsUnion):
+    def complete(self, node_id: str, output: BaseInvocationOutput) -> None:
         """Marks a node as complete"""
 
         if node_id not in self.execution_graph.nodes:
@@ -922,17 +857,17 @@ class GraphExecutionState(BaseModel):
         """Returns true if the graph has any errors"""
         return len(self.errors) > 0
 
-    def _create_execution_node(self, node_path: str, iteration_node_map: list[tuple[str, str]]) -> list[str]:
+    def _create_execution_node(self, node_id: str, iteration_node_map: list[tuple[str, str]]) -> list[str]:
         """Prepares an iteration node and connects all edges, returning the new node id"""
 
-        node = self.graph.get_node(node_path)
+        node = self.graph.get_node(node_id)
 
         self_iteration_count = -1
 
         # If this is an iterator node, we must create a copy for each iteration
         if isinstance(node, IterateInvocation):
             # Get input collection edge (should error if there are no inputs)
-            input_collection_edge = next(iter(self.graph._get_input_edges(node_path, "collection")))
+            input_collection_edge = next(iter(self.graph._get_input_edges(node_id, "collection")))
             input_collection_prepared_node_id = next(
                 n[1] for n in iteration_node_map if n[0] == input_collection_edge.source.node_id
             )
@@ -946,7 +881,7 @@ class GraphExecutionState(BaseModel):
             return new_nodes
 
         # Get all input edges
-        input_edges = self.graph._get_input_edges(node_path)
+        input_edges = self.graph._get_input_edges(node_id)
 
         # Create new edges for this iteration
         # For collect nodes, this may contain multiple inputs to the same field
@@ -973,10 +908,10 @@ class GraphExecutionState(BaseModel):
 
             # Add to execution graph
             self.execution_graph.add_node(new_node)
-            self.prepared_source_mapping[new_node.id] = node_path
-            if node_path not in self.source_prepared_mapping:
-                self.source_prepared_mapping[node_path] = set()
-            self.source_prepared_mapping[node_path].add(new_node.id)
+            self.prepared_source_mapping[new_node.id] = node_id
+            if node_id not in self.source_prepared_mapping:
+                self.source_prepared_mapping[node_id] = set()
+            self.source_prepared_mapping[node_id].add(new_node.id)
 
             # Add new edges to execution graph
             for edge in new_edges:
@@ -1080,13 +1015,13 @@ class GraphExecutionState(BaseModel):
 
     def _get_iteration_node(
         self,
-        source_node_path: str,
+        source_node_id: str,
         graph: nx.DiGraph,
         execution_graph: nx.DiGraph,
         prepared_iterator_nodes: list[str],
     ) -> Optional[str]:
         """Gets the prepared version of the specified source node that matches every iteration specified"""
-        prepared_nodes = self.source_prepared_mapping[source_node_path]
+        prepared_nodes = self.source_prepared_mapping[source_node_id]
         if len(prepared_nodes) == 1:
             return next(iter(prepared_nodes))
 
@@ -1097,7 +1032,7 @@ class GraphExecutionState(BaseModel):
 
         # Filter to only iterator nodes that are a parent of the specified node, in tuple format (prepared, source)
         iterator_source_node_mapping = [(n, self.prepared_source_mapping[n]) for n in prepared_iterator_nodes]
-        parent_iterators = [itn for itn in iterator_source_node_mapping if nx.has_path(graph, itn[1], source_node_path)]
+        parent_iterators = [itn for itn in iterator_source_node_mapping if nx.has_path(graph, itn[1], source_node_id)]
 
         return next(
             (n for n in prepared_nodes if all(nx.has_path(execution_graph, pit[0], n) for pit in parent_iterators)),
@@ -1166,19 +1101,19 @@ class GraphExecutionState(BaseModel):
     def add_node(self, node: BaseInvocation) -> None:
         self.graph.add_node(node)
 
-    def update_node(self, node_path: str, new_node: BaseInvocation) -> None:
-        if not self._is_node_updatable(node_path):
+    def update_node(self, node_id: str, new_node: BaseInvocation) -> None:
+        if not self._is_node_updatable(node_id):
             raise NodeAlreadyExecutedError(
-                f"Node {node_path} has already been prepared or executed and cannot be updated"
+                f"Node {node_id} has already been prepared or executed and cannot be updated"
             )
-        self.graph.update_node(node_path, new_node)
+        self.graph.update_node(node_id, new_node)
 
-    def delete_node(self, node_path: str) -> None:
-        if not self._is_node_updatable(node_path):
+    def delete_node(self, node_id: str) -> None:
+        if not self._is_node_updatable(node_id):
             raise NodeAlreadyExecutedError(
-                f"Node {node_path} has already been prepared or executed and cannot be deleted"
+                f"Node {node_id} has already been prepared or executed and cannot be deleted"
             )
-        self.graph.delete_node(node_path)
+        self.graph.delete_node(node_id)
 
     def add_edge(self, edge: Edge) -> None:
         if not self._is_node_updatable(edge.destination.node_id):
@@ -1193,63 +1128,3 @@ class GraphExecutionState(BaseModel):
                 f"Destination node {edge.destination.node_id} has already been prepared or executed and cannot have a source edge deleted"
             )
         self.graph.delete_edge(edge)
-
-
-class ExposedNodeInput(BaseModel):
-    node_path: str = Field(description="The node path to the node with the input")
-    field: str = Field(description="The field name of the input")
-    alias: str = Field(description="The alias of the input")
-
-
-class ExposedNodeOutput(BaseModel):
-    node_path: str = Field(description="The node path to the node with the output")
-    field: str = Field(description="The field name of the output")
-    alias: str = Field(description="The alias of the output")
-
-
-class LibraryGraph(BaseModel):
-    id: str = Field(description="The unique identifier for this library graph", default_factory=uuid_string)
-    graph: Graph = Field(description="The graph")
-    name: str = Field(description="The name of the graph")
-    description: str = Field(description="The description of the graph")
-    exposed_inputs: list[ExposedNodeInput] = Field(description="The inputs exposed by this graph", default_factory=list)
-    exposed_outputs: list[ExposedNodeOutput] = Field(
-        description="The outputs exposed by this graph", default_factory=list
-    )
-
-    @field_validator("exposed_inputs", "exposed_outputs")
-    def validate_exposed_aliases(cls, v: list[Union[ExposedNodeInput, ExposedNodeOutput]]):
-        if len(v) != len({i.alias for i in v}):
-            raise ValueError("Duplicate exposed alias")
-        return v
-
-    @model_validator(mode="after")
-    def validate_exposed_nodes(cls, values):
-        graph = values.graph
-
-        # Validate exposed inputs
-        for exposed_input in values.exposed_inputs:
-            if not graph.has_node(exposed_input.node_path):
-                raise ValueError(f"Exposed input node {exposed_input.node_path} does not exist")
-            node = graph.get_node(exposed_input.node_path)
-            if get_input_field(node, exposed_input.field) is None:
-                raise ValueError(
-                    f"Exposed input field {exposed_input.field} does not exist on node {exposed_input.node_path}"
-                )
-
-        # Validate exposed outputs
-        for exposed_output in values.exposed_outputs:
-            if not graph.has_node(exposed_output.node_path):
-                raise ValueError(f"Exposed output node {exposed_output.node_path} does not exist")
-            node = graph.get_node(exposed_output.node_path)
-            if get_output_field(node, exposed_output.field) is None:
-                raise ValueError(
-                    f"Exposed output field {exposed_output.field} does not exist on node {exposed_output.node_path}"
-                )
-
-        return values
-
-
-GraphInvocation.model_rebuild(force=True)
-Graph.model_rebuild(force=True)
-GraphExecutionState.model_rebuild(force=True)

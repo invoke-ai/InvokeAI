@@ -1,5 +1,6 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setInfillPatchmatchDownscaleSize } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -27,7 +28,9 @@ const ParamInfillPatchmatchDownscaleSize = () => {
 
   return (
     <FormControl isDisabled={infillMethod !== 'patchmatch'}>
-      <FormLabel>{t('parameters.patchmatchDownScaleSize')}</FormLabel>
+      <InformationalPopover feature="patchmatchDownScaleSize">
+        <FormLabel>{t('parameters.patchmatchDownScaleSize')}</FormLabel>
+      </InformationalPopover>
       <CompositeSlider
         min={sliderMin}
         max={sliderMax}

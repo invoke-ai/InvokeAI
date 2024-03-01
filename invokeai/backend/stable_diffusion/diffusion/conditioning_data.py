@@ -34,6 +34,11 @@ class BasicConditioningInfo:
 
 
 @dataclass
+class ConditioningFieldData:
+    conditionings: List[BasicConditioningInfo]
+
+
+@dataclass
 class SDXLConditioningInfo(BasicConditioningInfo):
     """SDXL text conditioning information produced by Compel."""
 

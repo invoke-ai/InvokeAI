@@ -6,8 +6,10 @@ from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPrompt
 from pydantic import field_validator
 
 from invokeai.app.invocations.primitives import StringCollectionOutput
+from invokeai.app.services.shared.invocation_context import InvocationContext
 
-from .baseinvocation import BaseInvocation, InputField, InvocationContext, UIComponent, invocation
+from .baseinvocation import BaseInvocation, invocation
+from .fields import InputField, UIComponent
 
 
 @invocation(

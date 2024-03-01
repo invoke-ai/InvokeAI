@@ -4,6 +4,7 @@ wraps the actual patchmatch object. It respects the global
 "try_patchmatch" attribute, so that patchmatch loading can
 be suppressed or deferred
 """
+
 import numpy as np
 
 import invokeai.backend.util.logging as logger

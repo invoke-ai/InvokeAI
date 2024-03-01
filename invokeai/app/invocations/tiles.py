@@ -8,16 +8,12 @@ from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
     Classification,
-    Input,
-    InputField,
-    InvocationContext,
-    OutputField,
-    WithMetadata,
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.primitives import ImageField, ImageOutput
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.invocations.fields import ImageField, Input, InputField, OutputField, WithBoard, WithMetadata
+from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.tiles.tiles import (
     calc_tiles_even_split,
     calc_tiles_min_overlap,
@@ -236,7 +232,7 @@ BLEND_MODES = Literal["Linear", "Seam"]
     version="1.1.0",
     classification=Classification.Beta,
 )
-class MergeTilesToImageInvocation(BaseInvocation, WithMetadata):
+class MergeTilesToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Merge multiple tile images into a single image."""
 
     # Inputs
@@ -268,7 +264,7 @@ class MergeTilesToImageInvocation(BaseInvocation, WithMetadata):
         # existed in memory at an earlier point in the graph.
         tile_np_images: list[np.ndarray] = []
         for image in images:
-            pil_image = context.services.images.get_pil_image(image.image_name)
+            pil_image = context.images.get_pil(image.image_name)
             pil_image = pil_image.convert("RGB")
             tile_np_images.append(np.array(pil_image))
 
@@ -291,18 +287,5 @@ class MergeTilesToImageInvocation(BaseInvocation, WithMetadata):
         # Convert into a PIL image and save
         pil_image = Image.fromarray(np_image)
 
-        image_dto = context.services.images.create(
-            image=pil_image,
-            image_origin=ResourceOrigin.INTERNAL,
-            image_category=ImageCategory.GENERAL,
-            node_id=self.id,
-            session_id=context.graph_execution_state_id,
-            is_intermediate=self.is_intermediate,
-            metadata=self.metadata,
-            workflow=context.workflow,
-        )
-        return ImageOutput(
-            image=ImageField(image_name=image_dto.image_name),
-            width=image_dto.width,
-            height=image_dto.height,
-        )
+        image_dto = context.images.save(image=pil_image)
+        return ImageOutput.build(image_dto)

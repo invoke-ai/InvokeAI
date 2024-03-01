@@ -1,6 +1,7 @@
 """
 Widget class definitions used by model_select.py, merge_diffusers.py and textual_inversion.py
 """
+
 import curses
 import math
 import os
@@ -263,6 +264,17 @@ class SingleSelectWithChanged(npyscreen.SelectOne):
 
     def h_select(self, ch):
         super().h_select(ch)
+        if self.on_changed:
+            self.on_changed(self.value)
+
+
+class CheckboxWithChanged(npyscreen.Checkbox):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.on_changed = None
+
+    def whenToggled(self):
+        super().whenToggled()
         if self.on_changed:
             self.on_changed(self.value)
 

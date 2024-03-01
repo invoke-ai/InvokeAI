@@ -1,12 +1,11 @@
 import { enqueueRequested } from 'app/store/actions';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
 import { buildWorkflowWithValidation } from 'features/nodes/util/workflow/buildWorkflow';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig } from 'services/api/types';
 
-import { startAppListening } from '..';
-
-export const addEnqueueRequestedNodes = () => {
+export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate: (action): action is ReturnType<typeof enqueueRequested> =>
       enqueueRequested.match(action) && action.payload.tabName === 'nodes',

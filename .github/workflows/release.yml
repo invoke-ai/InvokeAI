@@ -1,0 +1,103 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      skip_code_checks:
+        description: 'Skip code checks'
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: samuelcolvin/check-python-version@v4
+        id: check-python-version
+        with:
+          version_file_path: invokeai/version/invokeai_version.py
+
+  check-frontend:
+    if: github.event.inputs.skip_code_checks != 'true'
+    uses: ./.github/workflows/check-frontend.yml
+
+  check-python:
+    if: github.event.inputs.skip_code_checks != 'true'
+    uses: ./.github/workflows/check-python.yml
+
+  check-pytest:
+    if: github.event.inputs.skip_code_checks != 'true'
+    uses: ./.github/workflows/check-pytest.yml
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install python dependencies
+        uses: ./.github/actions/install-python-deps
+
+      - name: Install pypa/build
+        run: pip install --upgrade build
+
+      - name: Setup frontend
+        uses: ./.github/actions/install-frontend-deps
+
+      - name: Run create_installer.sh
+        id: create_installer
+        run: ./create_installer.sh --skip_frontend_checks
+        working-directory: installer
+
+      - name: Upload python distribution artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: ${{ steps.create_installer.outputs.DIST_PATH }}
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.create_installer.outputs.INSTALLER_FILENAME }}
+          path: ${{ steps.create_installer.outputs.INSTALLER_PATH }}
+
+  publish-testpypi:
+    runs-on: ubuntu-latest
+    needs: [check-version, check-frontend, check-python, check-pytest, build]
+    if: github.event_name != 'workflow_dispatch'
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/invokeai
+    steps:
+      - name: Download distribution from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish distribution to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    runs-on: ubuntu-latest
+    needs: [check-version, check-frontend, check-python, check-pytest, build]
+    if: github.event_name != 'workflow_dispatch'
+    environment:
+      name: pypi
+      url: https://pypi.org/p/invokeai
+    steps:
+      - name: Download distribution from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish distribution to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

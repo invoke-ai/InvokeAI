@@ -19,11 +19,21 @@ Typical usage:
 Validation errors will raise an InvalidModelConfigException error.
 
 """
+
+import time
 from enum import Enum
 from typing import Literal, Optional, Type, Union
 
+import torch
+from diffusers import ModelMixin
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from typing_extensions import Annotated, Any, Dict
+
+from ..raw_model import RawModel
+
+# ModelMixin is the base class for all diffusers and transformers models
+# RawModel is the InvokeAI wrapper class for ip_adapters, loras, textual_inversion and onnx runtime
+AnyModel = Union[ModelMixin, RawModel, torch.nn.Module]
 
 
 class InvalidModelConfigException(Exception):
@@ -102,7 +112,7 @@ class SchedulerPredictionType(str, Enum):
 class ModelRepoVariant(str, Enum):
     """Various hugging face variants on the diffusers format."""
 
-    DEFAULT = "default"  # model files without "fp16" or other qualifier
+    DEFAULT = ""  # model files without "fp16" or other qualifier - empty str
     FP16 = "fp16"
     FP32 = "fp32"
     ONNX = "onnx"
@@ -113,11 +123,11 @@ class ModelRepoVariant(str, Enum):
 class ModelConfigBase(BaseModel):
     """Base class for model configuration information."""
 
-    path: str
-    name: str
-    base: BaseModelType
-    type: ModelType
-    format: ModelFormat
+    path: str = Field(description="filesystem path to the model file or directory")
+    name: str = Field(description="model name")
+    base: BaseModelType = Field(description="base model")
+    type: ModelType = Field(description="type of the model")
+    format: ModelFormat = Field(description="model format")
     key: str = Field(description="unique key for model", default="<NOKEY>")
     original_hash: Optional[str] = Field(
         description="original fasthash of model contents", default=None
@@ -125,12 +135,20 @@ class ModelConfigBase(BaseModel):
     current_hash: Optional[str] = Field(
         description="current fasthash of model contents", default=None
     )  # if model is converted or otherwise modified, this will hold updated hash
-    description: Optional[str] = Field(default=None)
-    source: Optional[str] = Field(description="Model download source (URL or repo_id)", default=None)
+    description: Optional[str] = Field(description="human readable description of the model", default=None)
+    source: Optional[str] = Field(description="model original source (path, URL or repo_id)", default=None)
+    last_modified: Optional[float] = Field(description="timestamp for modification time", default_factory=time.time)
+
+    @staticmethod
+    def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
+        schema["required"].extend(
+            ["key", "base", "type", "format", "original_hash", "current_hash", "source", "last_modified"]
+        )
 
     model_config = ConfigDict(
         use_enum_values=False,
         validate_assignment=True,
+        json_schema_extra=json_schema_extra,
     )
 
     def update(self, attributes: Dict[str, Any]) -> None:
@@ -150,6 +168,7 @@ class _DiffusersConfig(ModelConfigBase):
     """Model config for diffusers-style models."""
 
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+    repo_variant: Optional[ModelRepoVariant] = ModelRepoVariant.DEFAULT
 
 
 class LoRAConfig(ModelConfigBase):
@@ -199,6 +218,8 @@ class _MainConfig(ModelConfigBase):
 
     vae: Optional[str] = Field(default=None)
     variant: ModelVariantType = ModelVariantType.Normal
+    prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon
+    upcast_attention: bool = False
     ztsnr_training: bool = False
 
 
@@ -212,35 +233,13 @@ class MainDiffusersConfig(_DiffusersConfig, _MainConfig):
     """Model config for main diffusers models."""
 
     type: Literal[ModelType.Main] = ModelType.Main
-    prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon
-    upcast_attention: bool = False
-
-
-class ONNXSD1Config(_MainConfig):
-    """Model config for ONNX format models based on sd-1."""
-
-    type: Literal[ModelType.ONNX] = ModelType.ONNX
-    format: Literal[ModelFormat.Onnx, ModelFormat.Olive]
-    base: Literal[BaseModelType.StableDiffusion1] = BaseModelType.StableDiffusion1
-    prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon
-    upcast_attention: bool = False
-
-
-class ONNXSD2Config(_MainConfig):
-    """Model config for ONNX format models based on sd-2."""
-
-    type: Literal[ModelType.ONNX] = ModelType.ONNX
-    format: Literal[ModelFormat.Onnx, ModelFormat.Olive]
-    # No yaml config file for ONNX, so these are part of config
-    base: Literal[BaseModelType.StableDiffusion2] = BaseModelType.StableDiffusion2
-    prediction_type: SchedulerPredictionType = SchedulerPredictionType.VPrediction
-    upcast_attention: bool = True
 
 
 class IPAdapterConfig(ModelConfigBase):
     """Model config for IP Adaptor format models."""
 
     type: Literal[ModelType.IPAdapter] = ModelType.IPAdapter
+    image_encoder_model_id: str
     format: Literal[ModelFormat.InvokeAI]
 
 
@@ -258,7 +257,6 @@ class T2IConfig(ModelConfigBase):
     format: Literal[ModelFormat.Diffusers]
 
 
-_ONNXConfig = Annotated[Union[ONNXSD1Config, ONNXSD2Config], Field(discriminator="base")]
 _ControlNetConfig = Annotated[
     Union[ControlNetDiffusersConfig, ControlNetCheckpointConfig],
     Field(discriminator="format"),
@@ -268,9 +266,9 @@ _MainModelConfig = Annotated[Union[MainDiffusersConfig, MainCheckpointConfig], F
 
 AnyModelConfig = Union[
     _MainModelConfig,
-    _ONNXConfig,
     _VaeConfig,
     _ControlNetConfig,
+    # ModelConfigBase,
     LoRAConfig,
     TextualInversionConfig,
     IPAdapterConfig,
@@ -279,6 +277,7 @@ AnyModelConfig = Union[
 ]
 
 AnyModelConfigValidator = TypeAdapter(AnyModelConfig)
+
 
 # IMPLEMENTATION NOTE:
 # The preferred alternative to the above is a discriminated Union as shown
@@ -308,9 +307,10 @@ class ModelConfigFactory(object):
     @classmethod
     def make_config(
         cls,
-        model_data: Union[dict, AnyModelConfig],
+        model_data: Union[Dict[str, Any], AnyModelConfig],
         key: Optional[str] = None,
-        dest_class: Optional[Type] = None,
+        dest_class: Optional[Type[ModelConfigBase]] = None,
+        timestamp: Optional[float] = None,
     ) -> AnyModelConfig:
         """
         Return the appropriate config object from raw dict values.
@@ -321,12 +321,17 @@ class ModelConfigFactory(object):
         :param dest_class: The config class to be returned. If not provided, will
         be selected automatically.
         """
+        model: Optional[ModelConfigBase] = None
         if isinstance(model_data, ModelConfigBase):
             model = model_data
         elif dest_class:
-            model = dest_class.validate_python(model_data)
+            model = dest_class.model_validate(model_data)
         else:
-            model = AnyModelConfigValidator.validate_python(model_data)
+            # mypy doesn't typecheck TypeAdapters well?
+            model = AnyModelConfigValidator.validate_python(model_data)  # type: ignore
+        assert model is not None
         if key:
             model.key = key
-        return model
+        if timestamp:
+            model.last_modified = timestamp
+        return model  # type: ignore

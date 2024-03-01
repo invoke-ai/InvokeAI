@@ -1,7 +1,7 @@
 import { Combobox, Flex, FormControl } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import { SyncModelsIconButton } from 'features/modelManager/components/SyncModels/SyncModelsIconButton';
+import { SyncModelsIconButton } from 'features/modelManagerV2/components/SyncModels/SyncModelsIconButton';
 import { fieldRefinerModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type {
   SDXLRefinerModelFieldInputInstance,
@@ -9,8 +9,8 @@ import type {
 } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
 import { REFINER_BASE_MODELS } from 'services/api/constants';
-import type { MainModelConfigEntity } from 'services/api/endpoints/models';
 import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import type { MainModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
@@ -21,7 +21,7 @@ const RefinerModelFieldInputComponent = (props: Props) => {
   const dispatch = useAppDispatch();
   const { data, isLoading } = useGetMainModelsQuery(REFINER_BASE_MODELS);
   const _onChange = useCallback(
-    (value: MainModelConfigEntity | null) => {
+    (value: MainModelConfig | null) => {
       if (!value) {
         return;
       }

@@ -4,10 +4,11 @@
 import os
 import re
 import threading
+import time
 import traceback
 from pathlib import Path
 from queue import Empty, PriorityQueue
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import requests
 from pydantic.networks import AnyHttpUrl
@@ -48,11 +49,12 @@ class DownloadQueueService(DownloadQueueServiceBase):
         :param max_parallel_dl: Number of simultaneous downloads allowed [5].
         :param requests_session: Optional requests.sessions.Session object, for unit tests.
         """
-        self._jobs = {}
+        self._jobs: Dict[int, DownloadJob] = {}
         self._next_job_id = 0
-        self._queue = PriorityQueue()
+        self._queue: PriorityQueue[DownloadJob] = PriorityQueue()
         self._stop_event = threading.Event()
-        self._worker_pool = set()
+        self._job_completed_event = threading.Event()
+        self._worker_pool: Set[threading.Thread] = set()
         self._lock = threading.Lock()
         self._logger = InvokeAILogger.get_logger("DownloadQueueService")
         self._event_bus = event_bus
@@ -188,6 +190,16 @@ class DownloadQueueService(DownloadQueueServiceBase):
             if not job.in_terminal_state:
                 self.cancel_job(job)
 
+    def wait_for_job(self, job: DownloadJob, timeout: int = 0) -> DownloadJob:
+        """Block until the indicated job has reached terminal state, or when timeout limit reached."""
+        start = time.time()
+        while not job.in_terminal_state:
+            if self._job_completed_event.wait(timeout=0.25):  # in case we miss an event
+                self._job_completed_event.clear()
+            if timeout > 0 and time.time() - start > timeout:
+                raise TimeoutError("Timeout exceeded")
+        return job
+
     def _start_workers(self, max_workers: int) -> None:
         """Start the requested number of worker threads."""
         self._stop_event.clear()
@@ -212,7 +224,6 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 job.job_started = get_iso_timestamp()
                 self._do_download(job)
                 self._signal_job_complete(job)
-
             except (OSError, HTTPError) as excp:
                 job.error_type = excp.__class__.__name__ + f"({str(excp)})"
                 job.error = traceback.format_exc()
@@ -223,6 +234,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
             finally:
                 job.job_ended = get_iso_timestamp()
+                self._job_completed_event.set()  # signal a change to terminal state
                 self._queue.task_done()
         self._logger.debug(f"Download queue worker thread {threading.current_thread().name} exiting.")
 
@@ -407,11 +419,11 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
 # Example on_progress event handler to display a TQDM status bar
 # Activate with:
-#   download_service.download('http://foo.bar/baz', '/tmp', on_progress=TqdmProgress().job_update
+#   download_service.download(DownloadJob('http://foo.bar/baz', '/tmp', on_progress=TqdmProgress().update))
 class TqdmProgress(object):
     """TQDM-based progress bar object to use in on_progress handlers."""
 
-    _bars: Dict[int, tqdm]  # the tqdm object
+    _bars: Dict[int, tqdm]  # type: ignore
     _last: Dict[int, int]  # last bytes downloaded
 
     def __init__(self) -> None:  # noqa D107

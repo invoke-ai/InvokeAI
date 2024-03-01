@@ -1,5 +1,6 @@
 import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setSeamlessXAxis } from 'features/parameters/store/generationSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -20,7 +21,9 @@ const ParamSeamlessXAxis = () => {
 
   return (
     <FormControl>
-      <FormLabel>{t('parameters.seamlessXAxis')}</FormLabel>
+      <InformationalPopover feature="seamlessTilingXAxis">
+        <FormLabel>{t('parameters.seamlessXAxis')}</FormLabel>
+      </InformationalPopover>
       <Switch isChecked={seamlessXAxis} onChange={handleChange} />
     </FormControl>
   );
