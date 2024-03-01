@@ -59,6 +59,7 @@ class ModelLoaderRegistryBase(ABC):
 
 TModelLoader = TypeVar("TModelLoader", bound=ModelLoaderBase)
 
+
 class ModelLoaderRegistry:
     """
     This class allows model loaders to register their type, base and format.

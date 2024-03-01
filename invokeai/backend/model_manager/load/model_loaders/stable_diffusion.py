@@ -4,7 +4,8 @@
 from pathlib import Path
 from typing import Optional
 
-from diffusers import StableDiffusionInpaintPipeline, StableDiffusionPipeline
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_inpaint import StableDiffusionInpaintPipeline
 
 from invokeai.backend.model_manager import (
     AnyModel,

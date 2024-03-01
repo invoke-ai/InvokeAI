@@ -3,9 +3,9 @@
 
 from pathlib import Path
 
-import safetensors
 import torch
 from omegaconf import DictConfig, OmegaConf
+from safetensors.torch import load_file as safetensors_load_file
 
 from invokeai.backend.model_manager import (
     AnyModelConfig,
@@ -47,7 +47,7 @@ class VaeLoader(GenericDiffusersLoader):
             )
 
         if model_path.suffix == ".safetensors":
-            checkpoint = safetensors.torch.load_file(model_path, device="cpu")
+            checkpoint = safetensors_load_file(model_path, device="cpu")
         else:
             checkpoint = torch.load(model_path, map_location="cpu")
 

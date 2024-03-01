@@ -3,7 +3,7 @@
 
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from diffusers.configuration_utils import ConfigMixin
 from diffusers.models.modeling_utils import ModelMixin
@@ -42,6 +42,7 @@ class GenericDiffusersLoader(ModelLoader):
     # TO DO: Add exception handling
     def get_hf_load_class(self, model_path: Path, submodel_type: Optional[SubModelType] = None) -> ModelMixin:
         """Given the model path and submodel, returns the diffusers ModelMixin subclass needed to load."""
+        result = None
         if submodel_type:
             try:
                 config = self._load_diffusers_config(model_path, config_name="model_index.json")
@@ -65,6 +66,7 @@ class GenericDiffusersLoader(ModelLoader):
                     raise InvalidModelConfigException("Unable to decifer Load Class based on given config.json")
             except KeyError as e:
                 raise InvalidModelConfigException("An expected config.json file is missing from this model.") from e
+        assert result is not None
         return result
 
     # TO DO: Add exception handling
@@ -76,7 +78,7 @@ class GenericDiffusersLoader(ModelLoader):
         result: ModelMixin = getattr(res_type, class_name)
         return result
 
-    def _load_diffusers_config(self, model_path: Path, config_name: str = "config.json") -> Dict[str, Any]:
+    def _load_diffusers_config(self, model_path: Path, config_name: str = "config.json") -> dict[str, Any]:
         return ConfigLoader.load_config(model_path, config_name=config_name)
 
 
@@ -84,8 +86,8 @@ class ConfigLoader(ConfigMixin):
     """Subclass of ConfigMixin for loading diffusers configuration files."""
 
     @classmethod
-    def load_config(cls, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    def load_config(cls, *args: Any, **kwargs: Any) -> dict[str, Any]:  # pyright: ignore [reportIncompatibleMethodOverride]
         """Load a diffusrs ConfigMixin configuration."""
         cls.config_name = kwargs.pop("config_name")
-        # Diffusers doesn't provide typing info
+        # TODO(psyche): the types on this diffusers method are not correct
         return super().load_config(*args, **kwargs)  # type: ignore
