@@ -17,7 +17,7 @@ from invokeai.backend.model_manager import (
     ModelVariantType,
     SubModelType,
 )
-from invokeai.backend.model_manager.config import MainCheckpointConfig
+from invokeai.backend.model_manager.config import CheckpointConfigBase, MainCheckpointConfig
 from invokeai.backend.model_manager.convert_ckpt_to_diffusers import convert_ckpt_to_diffusers
 
 from .. import ModelLoaderRegistry
@@ -55,7 +55,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         return result
 
     def _needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool:
-        if config.format != ModelFormat.Checkpoint:
+        if not isinstance(config, CheckpointConfigBase):
             return False
         elif (
             dest_path.exists()

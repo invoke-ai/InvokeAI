@@ -25,7 +25,7 @@ class ControlNetLoader(GenericDiffusersLoader):
     """Class to load ControlNet models."""
 
     def _needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool:
-        if config.format != ModelFormat.Checkpoint:
+        if not isinstance(config, CheckpointConfigBase):
             return False
         elif (
             dest_path.exists()
