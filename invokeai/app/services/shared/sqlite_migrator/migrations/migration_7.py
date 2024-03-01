@@ -18,16 +18,17 @@ class Migration7Callback:
             """--sql
             CREATE TABLE IF NOT EXISTS models (
                 id TEXT NOT NULL PRIMARY KEY,
-                -- The next 3 fields are enums in python, unrestricted string here
                 base TEXT GENERATED ALWAYS as (json_extract(config, '$.base')) VIRTUAL NOT NULL,
                 type TEXT GENERATED ALWAYS as (json_extract(config, '$.type')) VIRTUAL NOT NULL,
-                name TEXT GENERATED ALWAYS as (json_extract(config, '$.name')) VIRTUAL NOT NULL,
-                description TEXT GENERATED ALWAYS as (json_extract(config, '$.description')) VIRTUAL NOT NULL,
                 path TEXT GENERATED ALWAYS as (json_extract(config, '$.path')) VIRTUAL NOT NULL,
                 format TEXT GENERATED ALWAYS as (json_extract(config, '$.format')) VIRTUAL NOT NULL,
-                hash TEXT, -- could be null
-                -- Serialized JSON representation of the whole config object,
-                -- which will contain additional fields from subclasses
+                name TEXT GENERATED ALWAYS as (json_extract(config, '$.name')) VIRTUAL NOT NULL,
+                description TEXT GENERATED ALWAYS as (json_extract(config, '$.description')) VIRTUAL,
+                source TEXT GENERATED ALWAYS as (json_extract(config, '$.source')) VIRTUAL NOT NULL,
+                source_type TEXT GENERATED ALWAYS as (json_extract(config, '$.source_type')) VIRTUAL NOT NULL,
+                source_api_response TEXT GENERATED ALWAYS as (json_extract(config, '$.source_api_response')) VIRTUAL,
+                hash TEXT NOT NULL, -- could be null
+                -- Serialized JSON representation of the whole config object, which will contain additional fields from subclasses
                 config TEXT NOT NULL,
                 created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- Updated via trigger
