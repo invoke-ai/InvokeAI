@@ -129,7 +129,6 @@ class ModelConfigBase(BaseModel):
     key: str = Field(description="unique key for model", default="<NOKEY>")
     hash: Optional[str] = Field(description="original fasthash of model contents", default=None)
     description: Optional[str] = Field(description="human readable description of the model", default=None)
-    source: Optional[str] = Field(description="model original source (path, URL or repo_id)", default=None)
 
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
@@ -140,11 +139,6 @@ class ModelConfigBase(BaseModel):
         validate_assignment=True,
         json_schema_extra=json_schema_extra,
     )
-
-    def update(self, attributes: Dict[str, Any]) -> None:
-        """Update the object with fields in dict."""
-        for key, value in attributes.items():
-            setattr(self, key, value)  # may raise a validation error
 
 
 class CheckpointConfigBase(ModelConfigBase):
