@@ -103,14 +103,12 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                     """--sql
                     INSERT INTO models (
                        id,
-                       hash,
                        config
                       )
-                    VALUES (?,?,?);
+                    VALUES (?,?);
                     """,
                     (
                         key,
-                        record.hash,
                         json_serialized,
                     ),
                 )

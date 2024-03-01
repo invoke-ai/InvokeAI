@@ -8,16 +8,13 @@ class Migration7Callback:
         self._create_models_table(cursor)
 
     def _create_models_table(self, cursor: sqlite3.Cursor) -> None:
-        """
-        Adds the timestamp trigger to the model_config table.
-
-        This trigger was inadvertently dropped in earlier migration scripts.
-        """
+        """Creates the v4.0.0 models table."""
 
         tables = [
             """--sql
             CREATE TABLE IF NOT EXISTS models (
                 id TEXT NOT NULL PRIMARY KEY,
+                hash TEXT GENERATED ALWAYS as (json_extract(config, '$.hash')) VIRTUAL NOT NULL,
                 base TEXT GENERATED ALWAYS as (json_extract(config, '$.base')) VIRTUAL NOT NULL,
                 type TEXT GENERATED ALWAYS as (json_extract(config, '$.type')) VIRTUAL NOT NULL,
                 path TEXT GENERATED ALWAYS as (json_extract(config, '$.path')) VIRTUAL NOT NULL,
@@ -27,7 +24,6 @@ class Migration7Callback:
                 source TEXT GENERATED ALWAYS as (json_extract(config, '$.source')) VIRTUAL NOT NULL,
                 source_type TEXT GENERATED ALWAYS as (json_extract(config, '$.source_type')) VIRTUAL NOT NULL,
                 source_api_response TEXT GENERATED ALWAYS as (json_extract(config, '$.source_api_response')) VIRTUAL,
-                hash TEXT NOT NULL, -- could be null
                 -- Serialized JSON representation of the whole config object, which will contain additional fields from subclasses
                 config TEXT NOT NULL,
                 created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
@@ -66,12 +62,12 @@ class Migration7Callback:
 
 def build_migration_7() -> Migration:
     """
-    Build the migration from database version 5 to 6.
+    Build the migration from database version 6 to 7.
 
     This migration does the following:
-    - Adds the model_config_updated_at trigger if it does not exist
-    - Delete all ip_adapter models so that the model prober can find and
-      update with the correct image processor model.
+    - Adds the new models table
+    - TODO(MM2): Drops the old model_records, model_metadata, model_tags and tags tables.
+    - TODO(MM2): Migrates model names and descriptions from `models.yaml` to the new table (?).
     """
     migration_7 = Migration(
         from_version=6,
