@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.config import (
     CheckpointConfigBase,
     InvalidModelConfigException,
     ModelRepoVariant,
+    ModelSourceType,
     ModelType,
 )
 from invokeai.backend.model_manager.metadata import (
@@ -42,6 +43,7 @@ from invokeai.backend.util import Chdir, InvokeAILogger
 from invokeai.backend.util.devices import choose_precision, choose_torch_device
 
 from .model_install_base import (
+    MODEL_SOURCE_TO_TYPE_MAP,
     CivitaiModelSource,
     HFModelSource,
     InstallStatus,
@@ -140,6 +142,7 @@ class ModelInstallService(ModelInstallServiceBase):
         config = config or {}
         if not config.get("source"):
             config["source"] = model_path.resolve().as_posix()
+        config["source_type"] = ModelSourceType.Path
         return self._register(model_path, config)
 
     def install_path(
@@ -153,7 +156,7 @@ class ModelInstallService(ModelInstallServiceBase):
             config["source"] = model_path.resolve().as_posix()
         config["key"] = config.get("key", uuid_string())
 
-        info: AnyModelConfig = self._probe_model(Path(model_path), config)
+        info: AnyModelConfig = ModelProbe.probe(Path(model_path), config)
 
         if preferred_name := config.get("name"):
             preferred_name = Path(preferred_name).with_suffix(model_path.suffix)
@@ -375,6 +378,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     job.bytes = job.total_bytes
                     self._signal_job_running(job)
                     job.config_in["source"] = str(job.source)
+                    job.config_in["source_type"] = MODEL_SOURCE_TO_TYPE_MAP[job.source.__class__]
                     if job.inplace:
                         key = self.register_path(job.local_path, job.config_in)
                     else:
@@ -521,13 +525,6 @@ class ModelInstallService(ModelInstallServiceBase):
         move(old_path, new_path)
         return new_path
 
-    def _probe_model(self, model_path: Path, config: Optional[Dict[str, Any]] = None) -> AnyModelConfig:
-        info: AnyModelConfig = ModelProbe.probe(Path(model_path))
-        if config:  # used to override probe fields
-            for key, value in config.items():
-                setattr(info, key, value)
-        return info
-
     def _register(
         self, model_path: Path, config: Optional[Dict[str, Any]] = None, info: Optional[AnyModelConfig] = None
     ) -> str:
@@ -538,8 +535,8 @@ class ModelInstallService(ModelInstallServiceBase):
         info = info or ModelProbe.probe(model_path, config)
         override_key: Optional[str] = config.get("key") if config else None
 
-        assert info.original_hash  # always assigned by probe()
-        info.key = override_key or info.original_hash
+        assert info.hash  # always assigned by probe()
+        info.key = override_key or info.hash
 
         model_path = model_path.absolute()
         if model_path.is_relative_to(self.app_config.models_path):
@@ -573,7 +570,7 @@ class ModelInstallService(ModelInstallServiceBase):
             source=source,
             config_in=config or {},
             local_path=Path(source.path),
-            inplace=source.inplace,
+            inplace=source.inplace or False,
         )
 
     def _import_from_civitai(self, source: CivitaiModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
@@ -630,7 +627,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _import_remote_model(
         self,
-        source: ModelSource,
+        source: HFModelSource | CivitaiModelSource | URLModelSource,
         remote_files: List[RemoteModelFile],
         metadata: Optional[AnyModelRepoMetadata],
         config: Optional[Dict[str, Any]],
@@ -658,7 +655,7 @@ class ModelInstallService(ModelInstallServiceBase):
         # In the event that there is a subfolder specified in the source,
         # we need to remove it from the destination path in order to avoid
         # creating unwanted subfolders
-        if hasattr(source, "subfolder") and source.subfolder:
+        if isinstance(source, HFModelSource) and source.subfolder:
             root = Path(remote_files[0].path.parts[0])
             subfolder = root / source.subfolder
         else:

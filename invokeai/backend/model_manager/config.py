@@ -120,6 +120,15 @@ class ModelRepoVariant(str, Enum):
     FLAX = "flax"
 
 
+class ModelSourceType(str, Enum):
+    """Model source type."""
+
+    Path = "path"
+    Url = "url"
+    HFRepoID = "hf_repo_id"
+    CivitAI = "civitai"
+
+
 class ModelConfigBase(BaseModel):
     """Base class for model configuration information."""
 
@@ -128,7 +137,9 @@ class ModelConfigBase(BaseModel):
     base: BaseModelType = Field(description="base model")
     key: str = Field(description="unique key for model", default="<NOKEY>")
     hash: Optional[str] = Field(description="original fasthash of model contents", default=None)
-    description: Optional[str] = Field(description="human readable description of the model", default=None)
+    description: Optional[str] = Field(description="Model description", default=None)
+    source: str = Field(description="The source of the model (e.g. path, URL, HF Repo ID)")
+    source_type: ModelSourceType = Field(description="The type of source")
 
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
