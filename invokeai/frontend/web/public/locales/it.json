@@ -143,8 +143,6 @@
         "copy": "Copia",
         "download": "Scarica",
         "setCurrentImage": "Imposta come immagine corrente",
-        "preparingDownload": "Preparazione del download",
-        "preparingDownloadFailed": "Problema durante la preparazione del download",
         "downloadSelection": "Scarica gli elementi selezionati",
         "noImageSelected": "Nessuna immagine selezionata",
         "deleteSelection": "Elimina la selezione",
@@ -610,8 +608,6 @@
         "seamLowThreshold": "Basso",
         "seamHighThreshold": "Alto",
         "coherencePassHeader": "Passaggio di coerenza",
-        "coherenceSteps": "Passi",
-        "coherenceStrength": "Forza",
         "compositingSettingsHeader": "Impostazioni di composizione",
         "patchmatchDownScaleSize": "Ridimensiona",
         "coherenceMode": "Modalità",
@@ -1401,19 +1397,6 @@
                 "Regola la maschera."
             ]
         },
-        "compositingCoherenceSteps": {
-            "heading": "Passi",
-            "paragraphs": [
-                "Numero di passi utilizzati nel Passaggio di Coerenza.",
-                "Simile ai passi di generazione."
-            ]
-        },
-        "compositingBlur": {
-            "heading": "Sfocatura",
-            "paragraphs": [
-                "Il raggio di sfocatura della maschera."
-            ]
-        },
         "compositingCoherenceMode": {
             "heading": "Modalità",
             "paragraphs": [
@@ -1430,13 +1413,6 @@
             "heading": "Passaggio di Coerenza",
             "paragraphs": [
                 "Un secondo ciclo di riduzione del rumore aiuta a comporre l'immagine Inpaint/Outpaint."
-            ]
-        },
-        "compositingStrength": {
-            "heading": "Forza",
-            "paragraphs": [
-                "Quantità di rumore aggiunta per il Passaggio di Coerenza.",
-                "Simile alla forza di riduzione del rumore."
             ]
         },
         "paramNegativeConditioning": {
