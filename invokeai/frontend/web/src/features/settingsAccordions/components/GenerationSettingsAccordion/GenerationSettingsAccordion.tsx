@@ -10,6 +10,7 @@ import { SyncModelsIconButton } from 'features/modelManagerV2/components/SyncMod
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
+import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
@@ -56,7 +57,10 @@ export const GenerationSettingsAccordion = memo(() => {
         <Flex gap={4} flexDir="column">
           <Flex gap={4} alignItems="center">
             <ParamMainModelSelect />
-            <SyncModelsIconButton />
+            <Flex>
+              <SyncModelsIconButton />
+              <NavigateToModelManagerButton />
+            </Flex>
           </Flex>
           <Flex gap={4} flexDir="column">
             <LoRASelect />
