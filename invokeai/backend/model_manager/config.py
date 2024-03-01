@@ -130,15 +130,12 @@ class ModelConfigBase(BaseModel):
     original_hash: Optional[str] = Field(
         description="original fasthash of model contents", default=None
     )  # this is assigned at install time and will not change
-    current_hash: Optional[str] = Field(
-        description="current fasthash of model contents", default=None
-    )  # if model is converted or otherwise modified, this will hold updated hash
     description: Optional[str] = Field(description="human readable description of the model", default=None)
     source: Optional[str] = Field(description="model original source (path, URL or repo_id)", default=None)
 
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
-        schema["required"].extend(["key", "base", "type", "format", "original_hash", "current_hash", "source"])
+        schema["required"].extend(["key", "base", "type", "format", "original_hash", "source"])
 
     model_config = ConfigDict(
         use_enum_values=False,

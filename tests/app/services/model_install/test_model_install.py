@@ -59,12 +59,11 @@ def test_registration_meta_override_fail(mm2_installer: ModelInstallServiceBase,
 def test_registration_meta_override_succeed(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
     store = mm2_installer.record_store
     key = mm2_installer.register_path(
-        embedding_file, {"name": "banana_sushi", "source": "fake/repo_id", "current_hash": "New Hash", "key": "xyzzy"}
+        embedding_file, {"name": "banana_sushi", "source": "fake/repo_id", "key": "xyzzy"}
     )
     model_record = store.get_model(key)
     assert model_record.name == "banana_sushi"
     assert model_record.source == "fake/repo_id"
-    assert model_record.current_hash == "New Hash"
     assert model_record.key == "xyzzy"
 
 
