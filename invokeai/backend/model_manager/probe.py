@@ -137,7 +137,7 @@ class ModelProbe(object):
         format_type = ModelFormat.Diffusers if model_path.is_dir() else ModelFormat.Checkpoint
         model_info = None
         model_type = None
-        if format_type == "diffusers":
+        if format_type is ModelFormat.Diffusers:
             model_type = cls.get_model_type_from_folder(model_path)
         else:
             model_type = cls.get_model_type_from_checkpoint(model_path)
@@ -168,7 +168,7 @@ class ModelProbe(object):
             fields["repo_variant"] = fields.get("repo_variant") or probe.get_repo_variant()
 
         # additional fields needed for main and controlnet models
-        if fields["type"] in [ModelType.Main, ModelType.ControlNet] and fields["format"] == ModelFormat.Checkpoint:
+        if fields["type"] in [ModelType.Main, ModelType.ControlNet, ModelType.Vae] and fields["format"] == ModelFormat.Checkpoint:
             fields["config"] = cls._get_checkpoint_config_path(
                 model_path,
                 model_type=fields["type"],
@@ -285,13 +285,21 @@ class ModelProbe(object):
         if possible_conf.exists():
             return possible_conf.absolute()
 
-        if model_type == ModelType.Main:
+        if model_type is ModelType.Main:
             config_file = LEGACY_CONFIGS[base_type][variant_type]
             if isinstance(config_file, dict):  # need another tier for sd-2.x models
                 config_file = config_file[prediction_type]
-        elif model_type == ModelType.ControlNet:
+        elif model_type is ModelType.ControlNet:
             config_file = (
-                "../controlnet/cldm_v15.yaml" if base_type == BaseModelType("sd-1") else "../controlnet/cldm_v21.yaml"
+                "../controlnet/cldm_v15.yaml"
+                if base_type is BaseModelType.StableDiffusion1
+                else "../controlnet/cldm_v21.yaml"
+            )
+        elif model_type is ModelType.Vae:
+            config_file = (
+                "../stable-diffusion/v1-inference.yaml"
+                if base_type is BaseModelType.StableDiffusion1
+                else "../stable-diffusion/v2-inference.yaml"
             )
         else:
             raise InvalidModelConfigException(
