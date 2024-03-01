@@ -134,10 +134,6 @@ class ModelMerger(object):
                 "normal"
             ), f"{info.name} ({info.key}) is a {info.variant} model, which cannot currently be merged"
 
-            # pick up the first model's vae
-            if key == model_keys[0]:
-                vae = info.vae
-
             # tally base models used
             base_models.add(info.base)
             model_paths.extend([config.models_path / info.path])
