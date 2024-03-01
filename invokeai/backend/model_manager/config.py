@@ -260,7 +260,6 @@ class TextualInversionFolderConfig(ModelConfigBase):
 class _MainConfig(ModelConfigBase):
     """Model config for main models."""
 
-    vae: Optional[str] = Field(default=None)
     variant: ModelVariantType = ModelVariantType.Normal
     prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon
     upcast_attention: bool = False
