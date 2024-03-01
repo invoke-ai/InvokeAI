@@ -64,7 +64,7 @@ def test_add(store: ModelRecordServiceBase):
         "name": "model1",
         "base": BaseModelType("sd-1"),
         "type": "main",
-        "config": "/tmp/foo.yaml",
+        "config_path": "/tmp/foo.yaml",
         "variant": "normal",
         "format": "checkpoint",
         "original_hash": "111222333444",

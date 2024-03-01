@@ -550,8 +550,8 @@ class ModelInstallService(ModelInstallServiceBase):
         # add 'main' specific fields
         if isinstance(info, CheckpointConfigBase):
             # make config relative to our root
-            legacy_conf = (self.app_config.root_dir / self.app_config.legacy_conf_dir / info.config).resolve()
-            info.config = legacy_conf.relative_to(self.app_config.root_dir).as_posix()
+            legacy_conf = (self.app_config.root_dir / self.app_config.legacy_conf_dir / info.config_path).resolve()
+            info.config_path = legacy_conf.relative_to(self.app_config.root_dir).as_posix()
         self.record_store.add_model(info.key, info)
         return info.key
 

@@ -177,7 +177,7 @@ def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBas
         "format": ModelFormat("checkpoint"),
         "base": BaseModelType("sd-1"),
         "type": "main",
-        "config": "/tmp/foo.yaml",
+        "config_path": "/tmp/foo.yaml",
         "variant": "normal",
         "original_hash": "111222333444",
         "source": "https://civitai.com/models/206883/split",
