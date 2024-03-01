@@ -24,6 +24,7 @@ from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
+    CheckpointConfigBase,
     InvalidModelConfigException,
     ModelRepoVariant,
     ModelType,
@@ -532,7 +533,8 @@ class ModelInstallService(ModelInstallServiceBase):
     ) -> str:
         # Note that we may be passed a pre-populated AnyModelConfig object,
         # in which case the key field should have been populated by the caller (e.g. in `install_path`).
-        config["key"] = config.get("key", uuid_string())
+        if config is not None:
+            config["key"] = config.get("key", uuid_string())
         info = info or ModelProbe.probe(model_path, config)
         override_key: Optional[str] = config.get("key") if config else None
 
@@ -546,7 +548,7 @@ class ModelInstallService(ModelInstallServiceBase):
         info.path = model_path.as_posix()
 
         # add 'main' specific fields
-        if hasattr(info, "config"):
+        if isinstance(info, CheckpointConfigBase):
             # make config relative to our root
             legacy_conf = (self.app_config.root_dir / self.app_config.legacy_conf_dir / info.config).resolve()
             info.config = legacy_conf.relative_to(self.app_config.root_dir).as_posix()
