@@ -143,15 +143,7 @@ class ModelConfigBase(BaseModel):
     source: str = Field(description="The original source of the model (path, URL or repo_id).")
     source_type: ModelSourceType = Field(description="The type of source")
 
-    @staticmethod
-    def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
-        schema["required"].extend(["key", "base", "type", "format", "hash", "source"])
-
-    model_config = ConfigDict(
-        use_enum_values=False,
-        validate_assignment=True,
-        json_schema_extra=json_schema_extra,
-    )
+    model_config = ConfigDict(use_enum_values=False, validate_assignment=True)
 
 
 class CheckpointConfigBase(ModelConfigBase):
