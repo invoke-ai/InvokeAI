@@ -14,6 +14,7 @@ from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
 from invokeai.app.services.model_install import ModelInstallJob
+from invokeai.app.services.model_metadata.metadata_store_base import ModelMetadataChanges
 from invokeai.app.services.model_records import (
     DuplicateModelException,
     InvalidModelException,
@@ -32,6 +33,7 @@ from invokeai.backend.model_manager.config import (
 )
 from invokeai.backend.model_manager.merge import MergeInterpolationMethod, ModelMerger
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
+from invokeai.backend.model_manager.metadata.metadata_base import BaseMetadata
 from invokeai.backend.model_manager.search import ModelSearch
 
 from ..dependencies import ApiDependencies
@@ -238,6 +240,44 @@ async def get_model_metadata(
 ) -> Optional[AnyModelRepoMetadata]:
     """Get a model metadata object."""
     record_store = ApiDependencies.invoker.services.model_manager.store
+    result: Optional[AnyModelRepoMetadata] = record_store.get_metadata(key)
+
+    return result
+
+@model_manager_router.patch(
+    "/i/{key}/metadata",
+    operation_id="update_model_metadata",
+    responses={
+        201: {
+            "description": "The model metadata was updated successfully",
+            "content": {"application/json": {"example": example_model_metadata}},
+        },
+        400: {"description": "Bad request"},
+    },
+)
+async def update_model_metadata(
+    key: str = Path(description="Key of the model repo metadata to fetch."),
+    changes: ModelMetadataChanges = Body(description="The changes")
+) -> Optional[AnyModelRepoMetadata]:
+    """Updates or creates a model metadata object."""
+    record_store = ApiDependencies.invoker.services.model_manager.store
+    metadata_store = ApiDependencies.invoker.services.model_manager.store.metadata_store
+
+    try:
+        original_metadata = record_store.get_metadata(key)
+        if original_metadata:
+            if changes.default_settings:
+                original_metadata.default_settings = changes.default_settings
+
+            metadata_store.update_metadata(key, original_metadata)
+        else:
+            metadata_store.add_metadata(key, BaseMetadata(name="", author="",default_settings=changes.default_settings))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"An error occurred while updating the model metadata: {e}",
+        )
+
     result: Optional[AnyModelRepoMetadata] = record_store.get_metadata(key)
 
     return result
