@@ -66,12 +66,12 @@ provides the following fields:
 | `model_format`   | ModelFormat   | The format of the model (e.g. "diffusers"); also used as a Union discriminator |
 | `base_model`     | BaseModelType | The base model that the model is compatible with |
 | `path`           | str           | Location of model on disk |
-| `original_hash`  | str           | Hash of the model when it was first installed |
+| `hash`           | str           | Hash of the model |
 | `description`    | str           | Human-readable description of the model (optional) |
 | `source`         | str           | Model's source URL or repo id (optional) |
 
 The `key` is a unique 32-character random ID which was generated at
-install time. The `original_hash` field stores a hash of the model's
+install time. The `hash` field stores a hash of the model's
 contents at install time obtained by sampling several parts of the
 model's files using the `imohash` library. Over the course of the
 model's lifetime it may be transformed in various ways, such as
@@ -373,7 +373,7 @@ functionality:
   moving it into the InvokeAI root directory under the
   `models` folder (or wherever config parameter `models_dir`
   specifies).
- 
+
 * Probing of models to determine their type, base type and other key
   information.
   
