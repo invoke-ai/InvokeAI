@@ -5,7 +5,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from diffusers import ConfigMixin, ModelMixin
+from diffusers.configuration_utils import ConfigMixin
+from diffusers.models.modeling_utils import ModelMixin
 
 from invokeai.backend.model_manager import (
     AnyModel,
