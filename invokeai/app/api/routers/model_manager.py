@@ -96,7 +96,6 @@ example_model_config = {
     "prediction_type": "epsilon",
     "repo_variant": "fp16",
     "upcast_attention": False,
-    "ztsnr_training": False,
 }
 
 example_model_input = {
@@ -107,7 +106,6 @@ example_model_input = {
     "format": "checkpoint",
     "config": "configs/stable-diffusion/v1-inference.yaml",
     "description": "Model description",
-    "vae": None,
     "variant": "normal",
 }
 
