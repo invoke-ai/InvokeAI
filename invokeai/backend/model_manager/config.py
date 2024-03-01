@@ -326,7 +326,7 @@ def get_model_discriminator_value(v: Any) -> str:
     """
     if isinstance(v, dict):
         return f"{v.get('type')}.{v.get('format')}"  # pyright: ignore [reportUnknownMemberType]
-    return f"{v.getattr('type')}.{v.getattr('format')}"
+    return f"{v.type}.{v.format}"
 
 
 AnyModelConfig = Annotated[
