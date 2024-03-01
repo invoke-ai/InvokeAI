@@ -31,6 +31,7 @@ def test_registration(mm2_installer: ModelInstallServiceBase, embedding_file: Pa
     assert len(matches) == 0
     key = mm2_installer.register_path(embedding_file)
     assert key is not None
+    assert key != "<NOKEY>"
     assert len(key) == 32
 
 
@@ -58,12 +59,13 @@ def test_registration_meta_override_fail(mm2_installer: ModelInstallServiceBase,
 def test_registration_meta_override_succeed(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
     store = mm2_installer.record_store
     key = mm2_installer.register_path(
-        embedding_file, {"name": "banana_sushi", "source": "fake/repo_id", "current_hash": "New Hash"}
+        embedding_file, {"name": "banana_sushi", "source": "fake/repo_id", "current_hash": "New Hash", "key": "xyzzy"}
     )
     model_record = store.get_model(key)
     assert model_record.name == "banana_sushi"
     assert model_record.source == "fake/repo_id"
     assert model_record.current_hash == "New Hash"
+    assert model_record.key == "xyzzy"
 
 
 def test_install(
@@ -129,6 +131,7 @@ def test_background_install(
     model_record = mm2_installer.record_store.get_model(key)
     assert model_record is not None
     assert model_record.path == destination
+    assert model_record.key != "<NOKEY>"
     assert Path(mm2_app_config.models_dir / model_record.path).exists()
 
     # see if metadata was properly passed through
