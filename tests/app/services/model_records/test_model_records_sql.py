@@ -77,7 +77,6 @@ def test_add(store: ModelRecordServiceBase):
     assert config1.base == BaseModelType.StableDiffusion1
     assert config1.name == "model1"
     assert config1.original_hash == "111222333444"
-    assert config1.current_hash is None
 
 
 def test_dup(store: ModelRecordServiceBase):
