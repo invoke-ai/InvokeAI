@@ -25,7 +25,7 @@ from enum import Enum
 from typing import Literal, Optional, Type, Union
 
 import torch
-from diffusers import ModelMixin
+from diffusers.models.modeling_utils import ModelMixin
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, TypeAdapter
 from typing_extensions import Annotated, Any, Dict
 
