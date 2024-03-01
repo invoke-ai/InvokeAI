@@ -75,7 +75,6 @@ example_model_config = {
     "description": "string",
     "source": "string",
     "last_modified": 0,
-    "vae": "string",
     "variant": "normal",
     "prediction_type": "epsilon",
     "repo_variant": "fp16",
