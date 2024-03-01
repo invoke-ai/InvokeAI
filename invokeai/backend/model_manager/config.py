@@ -132,13 +132,15 @@ class ModelSourceType(str, Enum):
 class ModelConfigBase(BaseModel):
     """Base class for model configuration information."""
 
-    path: str = Field(description="filesystem path to the model file or directory")
-    name: str = Field(description="model name")
-    base: BaseModelType = Field(description="base model")
-    key: str = Field(description="unique key for model", default="<NOKEY>")
-    hash: Optional[str] = Field(description="original fasthash of model contents", default=None)
+    key: str = Field(description="A unique key for this model.")
+    hash: str = Field(description="The hash of the model file(s).")
+    path: str = Field(
+        description="Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+    )
+    name: str = Field(description="Name of the model.")
+    base: BaseModelType = Field(description="The base model.")
     description: Optional[str] = Field(description="Model description", default=None)
-    source: str = Field(description="The source of the model (e.g. path, URL, HF Repo ID)")
+    source: str = Field(description="The original source of the model (path, URL or repo_id).")
     source_type: ModelSourceType = Field(description="The type of source")
 
     @staticmethod
