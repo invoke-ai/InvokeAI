@@ -163,12 +163,8 @@ class ModelMerger(object):
 
         # update model's config
         model_config = self._installer.record_store.get_model(key)
-        model_config.update(
-            {
-                "name": merged_model_name,
-                "description": f"Merge of models {', '.join(model_names)}",
-                "vae": vae,
-            }
-        )
+        model_config.name = merged_model_name
+        model_config.description = f"Merge of models {', '.join(model_names)}"
+
         self._installer.record_store.update_model(key, model_config)
         return model_config
