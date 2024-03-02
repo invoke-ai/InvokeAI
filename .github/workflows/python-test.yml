@@ -1,10 +1,15 @@
-# This workflow runs pytest on the codebase in a matrix of platforms.
-#
-# It may be triggered via dispatch, or by another workflow.
-
-name: 'Check: pytest'
+name: 'python tests'
 
 on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    types:
+      - 'ready_for_review'
+      - 'opened'
+      - 'synchronize'
+  merge_group:
   workflow_dispatch:
   workflow_call:
 
@@ -44,29 +49,39 @@ jobs:
             github-env: $env:GITHUB_ENV
     name: ${{ matrix.pytorch }} on ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30 # expected run time: <10 min, depending on platform
+    timeout-minutes: 15 # expected run time: 2-6 min, depending on platform
     env:
       PIP_USE_PEP517: '1'
     steps:
-      - uses: actions/checkout@v4
+      - name: checkout
+        uses: actions/checkout@v4
 
-      - name: set test prompt to main branch validation
-        run: echo "TEST_PROMPTS=tests/validate_pr_prompt.txt" >> ${{ matrix.github-env }}
+      - name: check for changed python files
+        id: changed-files
+        uses: tj-actions/changed-files@v42
+        with:
+          files_yaml: |
+            python:
+              - 'pyproject.toml'
+              - 'invokeai/**'
+              - '!invokeai/frontend/web/**'
+              - 'tests/**'
 
       - name: setup python
+        if: ${{ steps.changed-files.outputs.python_any_changed == 'true' }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: pyproject.toml
 
-      - name: install invokeai
+      - name: install dependencies
+        if: ${{ steps.changed-files.outputs.python_any_changed == 'true' }}
         env:
           PIP_EXTRA_INDEX_URL: ${{ matrix.extra-index-url }}
         run: >
-          pip3 install
-          --editable=".[test]"
+          pip3 install --editable=".[test]"
 
       - name: run pytest
-        id: run-pytest
+        if: ${{ steps.changed-files.outputs.python_any_changed == 'true' }}
         run: pytest
