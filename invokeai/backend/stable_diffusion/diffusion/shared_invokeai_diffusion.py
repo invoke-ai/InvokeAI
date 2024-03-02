@@ -17,13 +17,11 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
 )
 
 from .cross_attention_control import (
-    Context,
     CrossAttentionType,
+    CrossAttnControlContext,
     SwapCrossAttnContext,
-    get_cross_attention_modules,
     setup_cross_attention_control_attention_processors,
 )
-from .cross_attention_map_saving import AttentionMapSaver
 
 ModelForwardCallback: TypeAlias = Union[
     # x, t, conditioning, Optional[cross-attention kwargs]
@@ -69,14 +67,12 @@ class InvokeAIDiffuserComponent:
         self,
         unet: UNet2DConditionModel,
         extra_conditioning_info: Optional[ExtraConditioningInfo],
-        step_count: int,
     ):
         old_attn_processors = unet.attn_processors
 
         try:
-            self.cross_attention_control_context = Context(
+            self.cross_attention_control_context = CrossAttnControlContext(
                 arguments=extra_conditioning_info.cross_attention_control_args,
-                step_count=step_count,
             )
             setup_cross_attention_control_attention_processors(
                 unet,
@@ -87,27 +83,6 @@ class InvokeAIDiffuserComponent:
         finally:
             self.cross_attention_control_context = None
             unet.set_attn_processor(old_attn_processors)
-            # TODO resuscitate attention map saving
-            # self.remove_attention_map_saving()
-
-    def setup_attention_map_saving(self, saver: AttentionMapSaver):
-        def callback(slice, dim, offset, slice_size, key):
-            if dim is not None:
-                # sliced tokens attention map saving is not implemented
-                return
-            saver.add_attention_maps(slice, key)
-
-        tokens_cross_attention_modules = get_cross_attention_modules(self.model, CrossAttentionType.TOKENS)
-        for identifier, module in tokens_cross_attention_modules:
-            key = "down" if identifier.startswith("down") else "up" if identifier.startswith("up") else "mid"
-            module.set_attention_slice_calculated_callback(
-                lambda slice, dim, offset, slice_size, key=key: callback(slice, dim, offset, slice_size, key)
-            )
-
-    def remove_attention_map_saving(self):
-        tokens_cross_attention_modules = get_cross_attention_modules(self.model, CrossAttentionType.TOKENS)
-        for _, module in tokens_cross_attention_modules:
-            module.set_attention_slice_calculated_callback(None)
 
     def do_controlnet_step(
         self,
@@ -592,54 +567,3 @@ class InvokeAIDiffuserComponent:
 
         self.last_percent_through = percent_through
         return latents.to(device=dev)
-
-    # todo: make this work
-    @classmethod
-    def apply_conjunction(cls, x, t, forward_func, uc, c_or_weighted_c_list, global_guidance_scale):
-        x_in = torch.cat([x] * 2)
-        t_in = torch.cat([t] * 2)  # aka sigmas
-
-        deltas = None
-        uncond_latents = None
-        weighted_cond_list = (
-            c_or_weighted_c_list if isinstance(c_or_weighted_c_list, list) else [(c_or_weighted_c_list, 1)]
-        )
-
-        # below is fugly omg
-        conditionings = [uc] + [c for c, weight in weighted_cond_list]
-        weights = [1] + [weight for c, weight in weighted_cond_list]
-        chunk_count = math.ceil(len(conditionings) / 2)
-        deltas = None
-        for chunk_index in range(chunk_count):
-            offset = chunk_index * 2
-            chunk_size = min(2, len(conditionings) - offset)
-
-            if chunk_size == 1:
-                c_in = conditionings[offset]
-                latents_a = forward_func(x_in[:-1], t_in[:-1], c_in)
-                latents_b = None
-            else:
-                c_in = torch.cat(conditionings[offset : offset + 2])
-                latents_a, latents_b = forward_func(x_in, t_in, c_in).chunk(2)
-
-            # first chunk is guaranteed to be 2 entries: uncond_latents + first conditioining
-            if chunk_index == 0:
-                uncond_latents = latents_a
-                deltas = latents_b - uncond_latents
-            else:
-                deltas = torch.cat((deltas, latents_a - uncond_latents))
-                if latents_b is not None:
-                    deltas = torch.cat((deltas, latents_b - uncond_latents))
-
-        # merge the weighted deltas together into a single merged delta
-        per_delta_weights = torch.tensor(weights[1:], dtype=deltas.dtype, device=deltas.device)
-        normalize = False
-        if normalize:
-            per_delta_weights /= torch.sum(per_delta_weights)
-        reshaped_weights = per_delta_weights.reshape(per_delta_weights.shape + (1, 1, 1))
-        deltas_merged = torch.sum(deltas * reshaped_weights, dim=0, keepdim=True)
-
-        # old_return_value = super().forward(x, sigma, uncond, cond, cond_scale)
-        # assert(0 == len(torch.nonzero(old_return_value - (uncond_latents + deltas_merged * cond_scale))))
-
-        return uncond_latents + deltas_merged * global_guidance_scale

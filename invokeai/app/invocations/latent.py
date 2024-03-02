@@ -775,10 +775,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     denoising_end=self.denoising_end,
                 )
 
-                (
-                    result_latents,
-                    result_attention_map_saver,
-                ) = pipeline.latents_from_embeddings(
+                result_latents = pipeline.latents_from_embeddings(
                     latents=latents,
                     timesteps=timesteps,
                     init_timestep=init_timestep,
