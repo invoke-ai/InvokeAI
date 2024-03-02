@@ -200,6 +200,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                                 self._invoker.services.logger.error(
                                     f"Error while invoking session {self._queue_item.session_id}, invocation {self._invocation.id} ({self._invocation.get_type()}):\n{e}"
                                 )
+                                self._invoker.services.logger.error(error)
 
                                 # Send error event
                                 self._invoker.services.events.emit_invocation_error(
