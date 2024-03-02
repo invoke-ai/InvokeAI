@@ -23,31 +23,32 @@ jobs:
       matrix:
         python-version:
           - '3.10'
-        pytorch:
+          - '3.11'
+        platform:
           - linux-cuda-11_7
           - linux-rocm-5_2
           - linux-cpu
           - macos-default
           - windows-cpu
         include:
-          - pytorch: linux-cuda-11_7
+          - platform: linux-cuda-11_7
             os: ubuntu-22.04
             github-env: $GITHUB_ENV
-          - pytorch: linux-rocm-5_2
+          - platform: linux-rocm-5_2
             os: ubuntu-22.04
             extra-index-url: 'https://download.pytorch.org/whl/rocm5.2'
             github-env: $GITHUB_ENV
-          - pytorch: linux-cpu
+          - platform: linux-cpu
             os: ubuntu-22.04
             extra-index-url: 'https://download.pytorch.org/whl/cpu'
             github-env: $GITHUB_ENV
-          - pytorch: macos-default
+          - platform: macos-default
             os: macOS-12
             github-env: $GITHUB_ENV
-          - pytorch: windows-cpu
+          - platform: windows-cpu
             os: windows-2022
             github-env: $env:GITHUB_ENV
-    name: ${{ matrix.pytorch }} on ${{ matrix.python-version }}
+    name: ${{ matrix.platform }} on py${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15 # expected run time: 2-6 min, depending on platform
     env:

@@ -16,7 +16,7 @@ on:
   workflow_call:
 
 jobs:
-  check-backend:
+  python-checks:
     runs-on: ubuntu-latest
     timeout-minutes: 5 # expected run time: <1 min
     steps:
