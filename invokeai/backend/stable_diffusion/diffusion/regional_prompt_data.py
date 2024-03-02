@@ -41,6 +41,17 @@ class RegionalPromptData:
             regions, max_downscale_factor
         )
 
+        # TODO: These should be indexed by batch sample index and prompt index.
+        # Next:
+        # - Add support for setting these one nodes. Might just need positive cross-attention mask score. Being able to downweight the global prompt mighth help alot.
+        # - Scale by region size.
+        self.negative_cross_attn_mask_score = -10000
+        self.positive_cross_attn_mask_score = 0.0
+        self.positive_self_attn_mask_score = 2.0
+        self.self_attn_mask_end_step_percent = 0.3
+        # This one is for regional prompting in general, so should be set on the DenoiseLatents node.
+        self.self_attn_score_range = 3.0
+
     def _prepare_spatial_masks(
         self, regions: list[TextConditioningRegions], max_downscale_factor: int = 8
     ) -> list[dict[int, torch.Tensor]]:
@@ -179,9 +190,14 @@ class RegionalPromptData:
                     0, prompt_idx, :, :
                 ]
 
+        pos_mask = attn_mask >= 0.5
+        attn_mask[~pos_mask] = self.negative_cross_attn_mask_score
+        attn_mask[pos_mask] = self.positive_cross_attn_mask_score
         return attn_mask
 
-    def get_self_attn_mask(self, query_seq_len: int) -> torch.Tensor:
+    def get_self_attn_mask(
+        self, query_seq_len: int, percent_through: float, device: torch.device, dtype: torch.dtype
+    ) -> torch.Tensor:
         """Get the self-attention mask for the given query sequence length.
 
         Args:
@@ -193,11 +209,15 @@ class RegionalPromptData:
                 dtype: float
                 The mask is a binary mask with values of 0.0 and 1.0.
         """
+        # TODO(ryand): Manage dtype and device properly. There's a lot of inefficient copying, conversion, and
+        # unnecessary CPU operations happening in this class.
         batch_size = len(self._spatial_masks_by_seq_len)
-        batch_spatial_masks = [self._spatial_masks_by_seq_len[b][query_seq_len] for b in range(batch_size)]
+        batch_spatial_masks = [
+            self._spatial_masks_by_seq_len[b][query_seq_len].to(device=device, dtype=dtype) for b in range(batch_size)
+        ]
 
         # Create an empty attention mask with the correct shape.
-        attn_mask = torch.zeros((batch_size, query_seq_len, query_seq_len))
+        attn_mask = torch.zeros((batch_size, query_seq_len, query_seq_len), dtype=dtype, device=device)
 
         for batch_idx in range(batch_size):
             batch_sample_spatial_masks = batch_spatial_masks[batch_idx]
@@ -207,11 +227,32 @@ class RegionalPromptData:
             batch_sample_query_masks = batch_sample_spatial_masks.view((1, num_prompts, query_seq_len, 1))
 
             for prompt_idx in range(num_prompts):
+                if percent_through > self.self_attn_mask_end_step_percent:
+                    continue
                 prompt_query_mask = batch_sample_query_masks[0, prompt_idx, :, 0]  # Shape: (query_seq_len,)
                 # Multiply a (1, query_seq_len) mask by a (query_seq_len, 1) mask to get a (query_seq_len,
                 # query_seq_len) mask.
-                attn_mask[batch_idx, :, :] += prompt_query_mask.unsqueeze(0) * prompt_query_mask.unsqueeze(1) * 0.5
+                attn_mask[batch_idx, :, :] += (
+                    prompt_query_mask.unsqueeze(0) * prompt_query_mask.unsqueeze(1) * self.positive_self_attn_mask_score
+                )
 
-        # Since we were adding masks in the previous loop, we need to clamp the values to 1.0.
-        # attn_mask[attn_mask > 0.5] = 1.0
+            # attn_mask_min = attn_mask[batch_idx].min()
+            # attn_mask_max = attn_mask[batch_idx].max()
+            # attn_mask_range = attn_mask_max - attn_mask_min
+
+            # if abs(attn_mask_range) < 0.0001:
+            #     # All attn_mask value in this batch sample are the same, set the attn_mask to 0.0s (to avoid divide by
+            #     # zero in the normalization).
+            #     attn_mask[batch_idx] = attn_mask[batch_idx] * 0.0
+            # else:
+            #     # Normalize from range [attn_mask_min, attn_mask_max] to [0, self.self_attn_score_range].
+            #     attn_mask[batch_idx] = (
+            #         (attn_mask[batch_idx] - attn_mask_min) / attn_mask_range * self.self_attn_score_range
+            #     )
+
+            attn_mask_min = attn_mask[batch_idx].min()
+
+            # Adjust so that the minimum value is 0.0 regardless of whether all pixels are covered or not.
+            if abs(attn_mask_min) > 0.0001:
+                attn_mask[batch_idx] = attn_mask[batch_idx] - attn_mask_min
         return attn_mask

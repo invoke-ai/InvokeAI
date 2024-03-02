@@ -58,6 +58,7 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
         scale: float = 1.0,
         # For regional prompting:
         regional_prompt_data: Optional[RegionalPromptData] = None,
+        percent_through: Optional[torch.FloatTensor] = None,
         # For IP-Adapter:
         ip_adapter_image_prompt_embeds: Optional[list[torch.Tensor]] = None,
     ) -> torch.FloatTensor:
@@ -93,6 +94,7 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
 
         # Handle regional prompt attention masks.
         if regional_prompt_data is not None:
+            assert percent_through is not None
             _, query_seq_len, _ = hidden_states.shape
             if is_cross_attention:
                 prompt_region_attention_mask = regional_prompt_data.get_cross_attn_mask(
@@ -102,16 +104,19 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
                 prompt_region_attention_mask = prompt_region_attention_mask.to(
                     dtype=hidden_states.dtype, device=hidden_states.device
                 )
-                prompt_region_attention_mask[prompt_region_attention_mask < 0.5] = -10000.0
-                prompt_region_attention_mask[prompt_region_attention_mask >= 0.5] = 0.0
 
             else:  # self-attention
-                prompt_region_attention_mask = regional_prompt_data.get_self_attn_mask(query_seq_len=query_seq_len)
+                prompt_region_attention_mask = regional_prompt_data.get_self_attn_mask(
+                    query_seq_len=query_seq_len,
+                    percent_through=percent_through,
+                    device=hidden_states.device,
+                    dtype=hidden_states.dtype,
+                )
 
                 # TODO(ryand): Avoid redundant type/device conversion here.
-                prompt_region_attention_mask = prompt_region_attention_mask.to(
-                    dtype=hidden_states.dtype, device=hidden_states.device
-                )
+                # prompt_region_attention_mask = prompt_region_attention_mask.to(
+                #     dtype=hidden_states.dtype, device=hidden_states.device
+                # )
                 # prompt_region_attention_mask[prompt_region_attention_mask < 0.5] = -0.5
                 # prompt_region_attention_mask[prompt_region_attention_mask >= 0.5] = 0.0
 

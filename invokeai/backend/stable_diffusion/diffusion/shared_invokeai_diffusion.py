@@ -200,9 +200,9 @@ class InvokeAIDiffuserComponent:
         mid_block_additional_residual: Optional[torch.Tensor] = None,  # for ControlNet
         down_intrablock_additional_residuals: Optional[torch.Tensor] = None,  # for T2I-Adapter
     ):
+        percent_through = step_index / total_step_count
         cross_attention_control_types_to_do = []
         if self.cross_attention_control_context is not None:
-            percent_through = step_index / total_step_count
             cross_attention_control_types_to_do = (
                 self.cross_attention_control_context.get_active_cross_attention_control_types_for_step(percent_through)
             )
@@ -219,6 +219,7 @@ class InvokeAIDiffuserComponent:
                 sigma=timestep,
                 conditioning_data=conditioning_data,
                 ip_adapter_conditioning=ip_adapter_conditioning,
+                percent_through=percent_through,
                 cross_attention_control_types_to_do=cross_attention_control_types_to_do,
                 down_block_additional_residuals=down_block_additional_residuals,
                 mid_block_additional_residual=mid_block_additional_residual,
@@ -232,6 +233,7 @@ class InvokeAIDiffuserComponent:
                 x=sample,
                 sigma=timestep,
                 conditioning_data=conditioning_data,
+                percent_through=percent_through,
                 ip_adapter_conditioning=ip_adapter_conditioning,
                 down_block_additional_residuals=down_block_additional_residuals,
                 mid_block_additional_residual=mid_block_additional_residual,
@@ -293,6 +295,7 @@ class InvokeAIDiffuserComponent:
         sigma,
         conditioning_data: TextConditioningData,
         ip_adapter_conditioning: Optional[list[IPAdapterConditioningInfo]],
+        percent_through: float,
         down_block_additional_residuals: Optional[torch.Tensor] = None,  # for ControlNet
         mid_block_additional_residual: Optional[torch.Tensor] = None,  # for ControlNet
         down_intrablock_additional_residuals: Optional[torch.Tensor] = None,  # for T2I-Adapter
@@ -326,8 +329,8 @@ class InvokeAIDiffuserComponent:
         )
 
         if conditioning_data.cond_regions is not None or conditioning_data.uncond_regions is not None:
-            # TODO(ryand): We currently call from_regions(...) for every denoising step. The text conditionings and
-            # masks are not changing from step-to-step, so this really only needs to be done once. While this seems
+            # TODO(ryand): We currently initialize RegionalPromptData for every denoising step. The text conditionings
+            # and masks are not changing from step-to-step, so this really only needs to be done once. While this seems
             # painfully inefficient, the time spent is typically negligible compared to the forward inference pass of
             # the UNet. The main reason that this hasn't been moved up to eliminate redundancy is that it is slightly
             # awkward to handle both standard conditioning and sequential conditioning further up the stack.
@@ -345,8 +348,8 @@ class InvokeAIDiffuserComponent:
                     )
                 regions.append(r)
 
-            _, key_seq_len, _ = both_conditionings.shape
             cross_attention_kwargs["regional_prompt_data"] = RegionalPromptData(regions=regions)
+            cross_attention_kwargs["percent_through"] = percent_through
 
         both_results = self.model_forward_callback(
             x_twice,
@@ -369,6 +372,7 @@ class InvokeAIDiffuserComponent:
         conditioning_data: TextConditioningData,
         ip_adapter_conditioning: Optional[list[IPAdapterConditioningInfo]],
         cross_attention_control_types_to_do: list[CrossAttentionType],
+        percent_through: float,
         down_block_additional_residuals: Optional[torch.Tensor] = None,  # for ControlNet
         mid_block_additional_residual: Optional[torch.Tensor] = None,  # for ControlNet
         down_intrablock_additional_residuals: Optional[torch.Tensor] = None,  # for T2I-Adapter
@@ -439,10 +443,10 @@ class InvokeAIDiffuserComponent:
 
         # Prepare prompt regions for the unconditioned pass.
         if conditioning_data.uncond_regions is not None:
-            _, key_seq_len, _ = conditioning_data.uncond_text.embeds.shape
-            cross_attention_kwargs["regional_prompt_data"] = RegionalPromptData.from_regions(
-                regions=[conditioning_data.uncond_regions], key_seq_len=key_seq_len
+            cross_attention_kwargs["regional_prompt_data"] = RegionalPromptData(
+                regions=[conditioning_data.uncond_regions]
             )
+            cross_attention_kwargs["percent_through"] = percent_through
 
         # Run unconditioned UNet denoising (i.e. negative prompt).
         unconditioned_next_x = self.model_forward_callback(
@@ -485,10 +489,10 @@ class InvokeAIDiffuserComponent:
 
         # Prepare prompt regions for the conditioned pass.
         if conditioning_data.cond_regions is not None:
-            _, key_seq_len, _ = conditioning_data.cond_text.embeds.shape
-            cross_attention_kwargs["regional_prompt_data"] = RegionalPromptData.from_regions(
-                regions=[conditioning_data.cond_regions], key_seq_len=key_seq_len
+            cross_attention_kwargs["regional_prompt_data"] = RegionalPromptData(
+                regions=[conditioning_data.cond_regions]
             )
+            cross_attention_kwargs["percent_through"] = percent_through
 
         # Run conditioned UNet denoising (i.e. positive prompt).
         conditioned_next_x = self.model_forward_callback(
