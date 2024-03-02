@@ -1,33 +1,33 @@
-name: Install frontend dependencies
+name: install frontend dependencies
 description: Installs frontend dependencies with pnpm, with caching
 runs:
   using: 'composite'
   steps:
-    - name: Setup Node 18
+    - name: setup node 18
       uses: actions/setup-node@v4
       with:
         node-version: '18'
 
-    - name: Setup pnpm
+    - name: setup pnpm
       uses: pnpm/action-setup@v2
       with:
         version: 8
         run_install: false
 
-    - name: Get pnpm store directory
+    - name: get pnpm store directory
       shell: bash
       run: |
         echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
-    - uses: actions/cache@v3
-      name: Setup pnpm cache
+    - name: setup cache
+      uses: actions/cache@v4
       with:
         path: ${{ env.STORE_PATH }}
         key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
         restore-keys: |
           ${{ runner.os }}-pnpm-store-
 
-    - name: Install frontend dependencies
+    - name: install frontend dependencies
       run: pnpm install --prefer-frozen-lockfile
       shell: bash
       working-directory: invokeai/frontend/web
