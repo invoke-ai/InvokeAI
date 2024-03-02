@@ -1,3 +1,8 @@
+# Runs python tests on a matrix of python versions and platforms.
+#
+# Checks for changes to python files before running the tests.
+# When manually triggered or called from another workflow, always runs the tests.
+
 name: 'python tests'
 
 on:
@@ -48,7 +53,7 @@ jobs:
           - platform: windows-cpu
             os: windows-2022
             github-env: $env:GITHUB_ENV
-    name: "py${{ matrix.python-version }}: ${{ matrix.platform }}"
+    name: 'py${{ matrix.python-version }}: ${{ matrix.platform }}'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15 # expected run time: 2-6 min, depending on platform
     env:
