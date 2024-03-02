@@ -1,3 +1,8 @@
+# Runs python code quality checks.
+#
+# Checks for changes to python files before running the checks.
+# When manually triggered or called from another workflow, always runs the tests.
+#
 # TODO: Add mypy or pyright to the checks.
 
 name: 'python checks'

@@ -1,3 +1,12 @@
+# Main release workflow. Triggered on tag push or manual trigger.
+#
+# - Runs all code checks and tests
+# - Verifies the app version matches the tag version.
+# - Builds the installer and build, uploading them as artifacts.
+# - Publishes to TestPyPI and PyPI. Both are conditional on the previous steps passing and require a manual approval.
+#
+# See docs/RELEASE.md for more information on the release process.
+
 name: release
 
 on:
