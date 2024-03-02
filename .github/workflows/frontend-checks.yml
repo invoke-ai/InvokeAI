@@ -1,3 +1,8 @@
+# Runs frontend code quality checks.
+#
+# Checks for changes to frontend files before running the checks.
+# When manually triggered or when called from another workflow, always runs the checks.
+
 name: 'frontend checks'
 
 on:

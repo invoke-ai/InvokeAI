@@ -1,3 +1,8 @@
+# Runs frontend tests.
+#
+# Checks for changes to frontend files before running the tests.
+# When manually triggered or called from another workflow, always runs the tests.
+
 name: 'frontend tests'
 
 on:

@@ -1,3 +1,5 @@
+# Builds and uploads the installer and python build artifacts.
+
 name: build installer
 
 on:
