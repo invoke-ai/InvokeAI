@@ -23,13 +23,13 @@ It is triggered on **tag push**, when the tag matches `v*`. It doesn't matter if
 
 Run `make tag-release` to tag the current commit and kick off the workflow.
 
-The release may also be run [manually].
+The release may also be dispatched [manually].
 
 ### Workflow Jobs and Process
 
 The workflow consists of a number of concurrently-run jobs, and two final publish jobs.
 
-The publish jobs run if the 5 concurrent jobs all succeed and if/when the publish jobs are approved.
+The publish jobs require manual approval and are only run if the other jobs succeed.
 
 #### `check-version` Job
 
@@ -43,17 +43,16 @@ This job uses [samuelcolvin/check-python-version].
 
 #### Check and Test Jobs
 
-This is our test suite.
-
-- **`check-pytest`**: runs `pytest` on matrix of platforms
-- **`check-python`**: runs `ruff` (format and lint)
-- **`check-frontend`**: runs `prettier` (format), `eslint` (lint), `madge` (circular refs) and `tsc` (static type check)
+- **`python-tests`**: runs `pytest` on matrix of platforms
+- **`python-checks`**: runs `ruff` (format and lint)
+- **`frontend-tests`**: runs `vitest`
+- **`frontend-checks`**: runs `prettier` (format), `eslint` (lint), `dpdm` (circular refs), `tsc` (static type check) and `knip` (unused imports)
 
 > **TODO** We should add `mypy` or `pyright` to the **`check-python`** job.
 
 > **TODO** We should add an end-to-end test job that generates an image.
 
-#### `build` Job
+#### `build-installer` Job
 
 This sets up both python and frontend dependencies and builds the python package. Internally, this runs `installer/create_installer.sh` and uploads two artifacts:
 
@@ -62,7 +61,7 @@ This sets up both python and frontend dependencies and builds the python package
 
 #### Sanity Check & Smoke Test
 
-At this point, the release workflow pauses (the remaining jobs all require approval).
+At this point, the release workflow pauses as the remaining publish jobs require approval.
 
 A maintainer should go to the **Summary** tab of the workflow, download the installer and test it. Ensure the app loads and generates.
 
@@ -70,7 +69,7 @@ A maintainer should go to the **Summary** tab of the workflow, download the inst
 
 #### PyPI Publish Jobs
 
-The publish jobs will skip if any of the previous jobs skip or fail.
+The publish jobs will run if any of the previous jobs fail.
 
 They use [GitHub environments], which are configured as [trusted publishers] on PyPI.
 
@@ -119,13 +118,17 @@ Once the release is published to PyPI, it's time to publish the GitHub release.
 
 > **TODO** Workflows can create a GitHub release from a template and upload release assets. One popular action to handle this is [ncipollo/release-action]. A future enhancement to the release process could set this up.
 
-## Manually Running the Release Workflow
+## Manual Build
 
-The release workflow can be run manually. This is useful to get an installer build and test it out without needing to push a tag.
+The `build installer` workflow can be dispatched manually. This is useful to test the installer for a given branch or tag.
 
-When run this way, you'll see **Skip code checks** checkbox. This allows the workflow to run without the time-consuming 3 code quality check jobs.
+No checks are run, it just builds.
 
-The publish jobs will skip if the workflow was run manually.
+## Manual Release
+
+The `release` workflow can be dispatched manually. You must dispatch the workflow from the right tag, else it will fail the version check.
+
+This functionality is available as a fallback in case something goes wonky. Typically, releases should be triggered via tag push as described above.
 
 [InvokeAI Releases Page]: https://github.com/invoke-ai/InvokeAI/releases
 [PyPI]: https://pypi.org/
@@ -136,4 +139,4 @@ The publish jobs will skip if the workflow was run manually.
 [GitHub environments]: https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment
 [trusted publishers]: https://docs.pypi.org/trusted-publishers/
 [samuelcolvin/check-python-version]: https://github.com/samuelcolvin/check-python-version
-[manually]: #manually-running-the-release-workflow
+[manually]: #manual-release
