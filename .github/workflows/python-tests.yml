@@ -48,7 +48,7 @@ jobs:
           - platform: windows-cpu
             os: windows-2022
             github-env: $env:GITHUB_ENV
-    name: ${{ matrix.platform }} on py${{ matrix.python-version }}
+    name: "py${{ matrix.python-version }}: ${{ matrix.platform }}"
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15 # expected run time: 2-6 min, depending on platform
     env:
