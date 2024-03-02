@@ -5,7 +5,7 @@ on:
   workflow_call:
 
 jobs:
-  build:
+  build-installer:
     runs-on: ubuntu-latest
     timeout-minutes: 5 # expected run time: <2 min
     steps:

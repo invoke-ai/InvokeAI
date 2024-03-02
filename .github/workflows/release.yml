@@ -1,4 +1,4 @@
-name: build & release
+name: release
 
 on:
   push:
@@ -20,31 +20,19 @@ jobs:
           version_file_path: invokeai/version/invokeai_version.py
 
   frontend-checks:
-    needs: check-version
     uses: ./.github/workflows/frontend-checks.yml
 
   frontend-tests:
-    needs: check-version
     uses: ./.github/workflows/frontend-tests.yml
 
   python-checks:
-    needs: check-version
     uses: ./.github/workflows/python-checks.yml
 
   python-tests:
-    needs: check-version
     uses: ./.github/workflows/python-tests.yml
 
   build:
-    needs:
-      [
-        check-version,
-        frontend-checks,
-        frontend-tests,
-        python-checks,
-        python-tests,
-      ]
-    uses: ./.github/workflows/build.yml
+    uses: ./.github/workflows/build-installer.yml
 
   publish-testpypi:
     runs-on: ubuntu-latest
