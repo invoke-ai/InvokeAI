@@ -21,9 +21,11 @@ class AddConditioningMaskInvocation(BaseInvocation):
 
     conditioning: ConditioningField = InputField(description="The conditioning tensor to add a mask to.")
     mask: MaskField = InputField(description="A mask to add to the conditioning tensor.")
+    positive_cross_attn_mask_score: float = InputField(default=0.0, description="")
 
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
         self.conditioning.mask = self.mask
+        self.conditioning.positive_cross_attn_mask_score = self.positive_cross_attn_mask_score
         return ConditioningOutput(conditioning=self.conditioning)
 
 

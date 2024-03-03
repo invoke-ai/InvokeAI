@@ -345,6 +345,7 @@ class InvokeAIDiffuserComponent:
                     r = TextConditioningRegions(
                         masks=torch.ones((1, 1, h, w), dtype=torch.bool),
                         ranges=[Range(start=0, end=c.embeds.shape[1])],
+                        positive_cross_attn_mask_scores=[0.0],
                     )
                 regions.append(r)
 

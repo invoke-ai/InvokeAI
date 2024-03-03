@@ -70,7 +70,7 @@ class Range:
 
 
 class TextConditioningRegions:
-    def __init__(self, masks: torch.Tensor, ranges: list[Range]):
+    def __init__(self, masks: torch.Tensor, ranges: list[Range], positive_cross_attn_mask_scores: list[float]):
         # A binary mask indicating the regions of the image that the prompt should be applied to.
         # Shape: (1, num_prompts, height, width)
         # Dtype: torch.bool
@@ -80,7 +80,12 @@ class TextConditioningRegions:
         # ranges[i] contains the embedding range for the i'th prompt / mask.
         self.ranges = ranges
 
+        # A list of positive cross attention mask scores for each prompt.
+        # positive_cross_attn_mask_scores[i] contains the positive cross attention mask score for the i'th prompt/mask.
+        self.positive_cross_attn_mask_scores = positive_cross_attn_mask_scores
+
         assert self.masks.shape[1] == len(self.ranges)
+        assert self.masks.shape[1] == len(self.positive_cross_attn_mask_scores)
 
 
 class TextConditioningData:

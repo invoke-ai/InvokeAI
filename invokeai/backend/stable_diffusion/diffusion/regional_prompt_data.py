@@ -46,7 +46,7 @@ class RegionalPromptData:
         # - Add support for setting these one nodes. Might just need positive cross-attention mask score. Being able to downweight the global prompt mighth help alot.
         # - Scale by region size.
         self.negative_cross_attn_mask_score = -10000
-        self.positive_cross_attn_mask_score = 0.0
+        # self.positive_cross_attn_mask_score = 0.0
         self.positive_self_attn_mask_score = 2.0
         self.self_attn_mask_end_step_percent = 0.3
         # This one is for regional prompting in general, so should be set on the DenoiseLatents node.
@@ -186,13 +186,14 @@ class RegionalPromptData:
             batch_sample_query_masks = batch_sample_spatial_masks.view((1, num_prompts, query_seq_len, 1))
 
             for prompt_idx, embedding_range in enumerate(batch_sample_regions.ranges):
-                attn_mask[batch_idx, :, embedding_range.start : embedding_range.end] = batch_sample_query_masks[
-                    0, prompt_idx, :, :
-                ]
+                batch_sample_query_scores = batch_sample_query_masks[0, prompt_idx, :, :].clone()
+                batch_sample_query_mask = batch_sample_query_scores > 0.5
+                batch_sample_query_scores[
+                    batch_sample_query_mask
+                ] = batch_sample_regions.positive_cross_attn_mask_scores[prompt_idx]
+                batch_sample_query_scores[~batch_sample_query_mask] = self.negative_cross_attn_mask_score  # TODO(ryand)
+                attn_mask[batch_idx, :, embedding_range.start : embedding_range.end] = batch_sample_query_scores
 
-        pos_mask = attn_mask >= 0.5
-        attn_mask[~pos_mask] = self.negative_cross_attn_mask_score
-        attn_mask[pos_mask] = self.positive_cross_attn_mask_score
         return attn_mask
 
     def get_self_attn_mask(

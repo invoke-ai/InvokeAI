@@ -236,6 +236,11 @@ class ConditioningField(BaseModel):
         description="The bool mask associated with this conditioning tensor. Excluded regions should be set to False, "
         "included regions should be set to True.",
     )
+    positive_cross_attn_mask_score: float = Field(
+        default=0.0,
+        # TODO(ryand): Add more details to this description
+        description="The weight of this conditioning tensor's mask relative to overlapping masks.",
+    )
 
 
 class MetadataField(RootModel):
