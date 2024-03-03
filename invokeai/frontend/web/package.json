@@ -78,6 +78,7 @@
     "query-string": "^9.0.0",
     "react": "^18.2.0",
     "react-colorful": "^5.6.1",
+    "react-cropper": "^2.3.3",
     "react-dom": "^18.2.0",
     "react-dropzone": "^14.2.3",
     "react-error-boundary": "^4.0.12",

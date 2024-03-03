@@ -280,6 +280,7 @@
         "scribble": "scribble",
         "selectModel": "Select a model",
         "setControlImageDimensions": "Set Control Image Dimensions To W/H",
+        "cropControlImage": "Crop Control Image",
         "showAdvanced": "Show Advanced",
         "small": "Small",
         "toggleControlNet": "Toggle this ControlNet",
@@ -289,6 +290,14 @@
         "ipAdapterModel": "Adapter Model",
         "resetIPAdapterImage": "Reset IP Adapter Image",
         "ipAdapterImageFallback": "No IP Adapter Image Selected"
+    },
+    "cropper": {
+        "cropBoxWidth": "Crop Box Width",
+        "cropBoxHeight": "Crop Box Height",
+        "cropImage": "Crop Image",
+        "preview": "Crop Preview",
+        "noPreview": "No Crop Preview",
+        "aspectRatio": "Aspect Ratio"
     },
     "hrf": {
         "hrf": "High Resolution Fix",

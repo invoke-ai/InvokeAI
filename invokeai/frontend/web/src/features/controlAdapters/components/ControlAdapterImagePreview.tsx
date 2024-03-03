@@ -16,10 +16,11 @@ import {
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { heightChanged, selectOptimalDimension, widthChanged } from 'features/parameters/store/generationSlice';
+import ImageCropper from 'features/ui/components/other/Cropper/ImageCropper';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold, PiFloppyDiskBold, PiRulerBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiCropBold, PiFloppyDiskBold, PiRulerBold } from 'react-icons/pi';
 import {
   useAddImageToBoardMutation,
   useChangeImageIsIntermediateMutation,
@@ -200,6 +201,14 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
           tooltip={t('controlnet.setControlImageDimensions')}
           styleOverrides={setControlImageDimensionsStyleOverrides}
         />
+        <ImageCropper imageDTO={controlImage}>
+          <IAIDndImageIcon
+            onClick={handleSetControlImageToDimensions}
+            icon={controlImage ? <PiCropBold size={16} /> : undefined}
+            tooltip={t('controlnet.cropControlImage')}
+            styleOverrides={setControlImageCropStyleOverrides}
+          />
+        </ImageCropper>
       </>
 
       {pendingControlImages.includes(id) && (
@@ -226,3 +235,4 @@ export default memo(ControlAdapterImagePreview);
 
 const saveControlImageStyleOverrides: SystemStyleObject = { mt: 6 };
 const setControlImageDimensionsStyleOverrides: SystemStyleObject = { mt: 12 };
+const setControlImageCropStyleOverrides: SystemStyleObject = { mt: '56px' };
