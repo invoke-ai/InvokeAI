@@ -230,6 +230,12 @@ export const generationSlice = createSlice({
           state.height = optimalDimension;
         }
       }
+      if (action.payload.sd?.scheduler) {
+        state.scheduler = action.payload.sd.scheduler;
+      }
+      if (action.payload.sd?.vaePrecision) {
+        state.vaePrecision = action.payload.sd.vaePrecision;
+      }
     });
 
     // TODO: This is a temp fix to reduce issues with T2I adapter having a different downscaling

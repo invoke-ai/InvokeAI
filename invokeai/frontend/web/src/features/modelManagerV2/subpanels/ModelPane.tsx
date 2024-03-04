@@ -8,7 +8,7 @@ export const ModelPane = () => {
   const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
   return (
     <Box layerStyle="first" p={2} borderRadius="base" w="50%" h="full">
-      {selectedModelKey ? <Model /> : <ImportModels />}
+      {selectedModelKey ? <Model key={selectedModelKey} /> : <ImportModels />}
     </Box>
   );
 };
