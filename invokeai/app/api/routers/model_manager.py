@@ -5,7 +5,6 @@ import pathlib
 import shutil
 from hashlib import sha1
 from random import randbytes
-import traceback
 from typing import Any, Dict, List, Optional, Set
 
 from fastapi import Body, Path, Query, Response
@@ -245,43 +244,6 @@ async def get_model_metadata(
 
     return result
 
-@model_manager_router.patch(
-    "/i/{key}/metadata",
-    operation_id="update_model_metadata",
-    responses={
-        201: {
-            "description": "The model metadata was updated successfully",
-            "content": {"application/json": {"example": example_model_metadata}},
-        },
-        400: {"description": "Bad request"},
-    },
-)
-async def update_model_metadata(
-    key: str = Path(description="Key of the model repo metadata to fetch."),
-    changes: ModelMetadataChanges = Body(description="The changes")
-) -> Optional[AnyModelRepoMetadata]:
-    """Updates or creates a model metadata object."""
-    record_store = ApiDependencies.invoker.services.model_manager.store
-    metadata_store = ApiDependencies.invoker.services.model_manager.store.metadata_store
-    
-    try:
-        original_metadata = record_store.get_metadata(key)
-        if original_metadata:
-            original_metadata.trigger_phrases = changes.trigger_phrases
-
-            metadata_store.update_metadata(key, original_metadata)
-        else:
-            metadata_store.add_metadata(key, BaseMetadata(name="", author="",trigger_phrases=changes.trigger_phrases))
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"An error occurred while updating the model metadata: {e}",
-        )
-
-    result: Optional[AnyModelRepoMetadata] = record_store.get_metadata(key)
-
-    return result
-
 
 @model_manager_router.patch(
     "/i/{key}/metadata",
@@ -308,10 +270,19 @@ async def update_model_metadata(
             if changes.default_settings:
                 original_metadata.default_settings = changes.default_settings
 
+            if changes.trigger_phrases:
+                original_metadata.trigger_phrases = changes.trigger_phrases
+
             metadata_store.update_metadata(key, original_metadata)
         else:
             metadata_store.add_metadata(
-                key, BaseMetadata(name="", author="", default_settings=changes.default_settings)
+                key,
+                BaseMetadata(
+                    name="",
+                    author="",
+                    default_settings=changes.default_settings,
+                    trigger_phrases=changes.trigger_phrases,
+                ),
             )
     except Exception as e:
         raise HTTPException(
