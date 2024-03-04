@@ -11,6 +11,7 @@ const STATUSES = {
   completed: { colorScheme: 'green', translationKey: 'queue.completed' },
   error: { colorScheme: 'red', translationKey: 'queue.failed' },
   cancelled: { colorScheme: 'orange', translationKey: 'queue.canceled' },
+  downloads_done: { colorScheme: 'yellow', translationKey: 'queue.in_progress' },
 };
 
 const ModelInstallQueueBadge = ({
