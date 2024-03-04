@@ -85,7 +85,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         """Return the underlying database."""
         return self._db
 
-    def add_model(self, key: str, config: Union[Dict[str, Any], AnyModelConfig]) -> AnyModelConfig:
+    def add_model(self, config: AnyModelConfig) -> AnyModelConfig:
         """
         Add a model to the database.
 
@@ -95,8 +95,6 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         Can raise DuplicateModelException and InvalidModelConfigException exceptions.
         """
-        record = ModelConfigFactory.make_config(config, key=key)  # ensure it is a valid config obect.
-        json_serialized = record.model_dump_json()  # and turn it into a json string.
         with self._db.lock:
             try:
                 self._cursor.execute(
@@ -108,8 +106,8 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                     VALUES (?,?);
                     """,
                     (
-                        key,
-                        json_serialized,
+                        config.key,
+                        config.model_dump_json(),
                     ),
                 )
                 self._db.conn.commit()
@@ -118,11 +116,11 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 self._db.conn.rollback()
                 if "UNIQUE constraint failed" in str(e):
                     if "models.path" in str(e):
-                        msg = f"A model with path '{record.path}' is already installed"
+                        msg = f"A model with path '{config.path}' is already installed"
                     elif "models.name" in str(e):
-                        msg = f"A model with name='{record.name}', type='{record.type}', base='{record.base}' is already installed"
+                        msg = f"A model with name='{config.name}', type='{config.type}', base='{config.base}' is already installed"
                     else:
-                        msg = f"A model with key '{key}' is already installed"
+                        msg = f"A model with key '{config.key}' is already installed"
                     raise DuplicateModelException(msg) from e
                 else:
                     raise e
@@ -130,7 +128,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 self._db.conn.rollback()
                 raise e
 
-        return self.get_model(key)
+        return self.get_model(config.key)
 
     def del_model(self, key: str) -> None:
         """
@@ -263,14 +261,13 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.lock:
             self._cursor.execute(
                 f"""--sql
-                select config, strftime('%s',updated_at) FROM models
+                SELECT config, strftime('%s',updated_at) FROM models
                 {where};
                 """,
                 tuple(bindings),
             )
-            results = [
-                ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in self._cursor.fetchall()
-            ]
+            result = self._cursor.fetchall()
+            results = [ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in result]
         return results
 
     def search_by_path(self, path: Union[str, Path]) -> List[AnyModelConfig]:
@@ -347,6 +344,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         self, page: int = 0, per_page: int = 10, order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default
     ) -> PaginatedResults[ModelSummary]:
         """Return a paginated summary listing of each model in the database."""
+        assert isinstance(order_by, ModelRecordOrderBy)
         ordering = {
             ModelRecordOrderBy.Default: "a.type, a.base, a.format, a.name",
             ModelRecordOrderBy.Type: "a.type",
@@ -354,14 +352,6 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             ModelRecordOrderBy.Name: "a.name",
             ModelRecordOrderBy.Format: "a.format",
         }
-
-        def _fixup(summary: Dict[str, str]) -> Dict[str, Union[str, int, Set[str]]]:
-            """Fix up results so that there are no null values."""
-            result: Dict[str, Union[str, int, Set[str]]] = {}
-            for key, item in summary.items():
-                result[key] = item or ""
-            result["tags"] = set(json.loads(summary["tags"] or "[]"))
-            return result
 
         # Lock so that the database isn't updated while we're doing the two queries.
         with self._db.lock:
@@ -377,11 +367,8 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             # query2: fetch key fields from the join of models and model_metadata
             self._cursor.execute(
                 f"""--sql
-                SELECT a.id as key, a.type, a.base, a.format, a.name,
-                       json_extract(a.config, '$.description') as description,
-                       json_extract(b.metadata, '$.tags') as tags
-                FROM models AS a
-                LEFT JOIN model_metadata AS b on a.id=b.id
+                SELECT config
+                FROM models
                 ORDER BY {ordering[order_by]} -- using ? to bind doesn't work here for some reason
                 LIMIT ?
                 OFFSET ?;
@@ -392,7 +379,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 ),
             )
             rows = self._cursor.fetchall()
-            items = [ModelSummary.model_validate(_fixup(dict(x))) for x in rows]
+            items = [ModelSummary.model_validate(dict(x)) for x in rows]
             return PaginatedResults(
                 page=page, pages=ceil(total / per_page), per_page=per_page, total=total, items=items
             )

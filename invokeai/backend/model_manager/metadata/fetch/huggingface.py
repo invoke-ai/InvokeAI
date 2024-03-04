@@ -13,6 +13,7 @@ metadata = fetcher.from_url("https://huggingface.co/stabilityai/sdxl-turbo")
 print(metadata.tags)
 """
 
+import json
 import re
 from pathlib import Path
 from typing import Optional
@@ -89,7 +90,9 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
                 )
             )
 
-        return HuggingFaceMetadata(id=model_info.id, name=name, files=files)
+        return HuggingFaceMetadata(
+            id=model_info.id, name=name, files=files, api_response=json.dumps(model_info.__dict__)
+        )
 
     def from_url(self, url: AnyHttpUrl) -> AnyModelRepoMetadata:
         """

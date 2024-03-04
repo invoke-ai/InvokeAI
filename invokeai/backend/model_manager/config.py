@@ -26,7 +26,7 @@ from typing import Literal, Optional, Type, Union
 
 import torch
 from diffusers.models.modeling_utils import ModelMixin
-from pydantic import BaseModel, ConfigDict, Discriminator, Field, JsonValue, Tag, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, TypeAdapter
 from typing_extensions import Annotated, Any, Dict
 
 from ..raw_model import RawModel
@@ -142,9 +142,7 @@ class ModelConfigBase(BaseModel):
     description: Optional[str] = Field(description="Model description", default=None)
     source: str = Field(description="The original source of the model (path, URL or repo_id).")
     source_type: ModelSourceType = Field(description="The type of source")
-    source_api_response: Optional[JsonValue] = Field(
-        description="The original API response from the source", default=None
-    )
+    source_api_response: Optional[str] = Field(description="The original API response from the source, as stringified JSON.", default=None)
     trigger_words: Optional[set[str]] = Field(description="Set of trigger words for this model", default=None)
 
     model_config = ConfigDict(use_enum_values=False, validate_assignment=True)
