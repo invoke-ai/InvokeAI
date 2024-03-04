@@ -4135,6 +4135,22 @@ export type components = {
        */
       type: "gradient_mask_output";
     };
+    /**
+     * GradientMaskOutput
+     * @description Outputs a denoise mask and an image representing the total gradient of the mask.
+     */
+    GradientMaskOutput: {
+      /** @description Mask for denoise model run */
+      denoise_mask: components["schemas"]["DenoiseMaskField"];
+      /** @description Image representing the total gradient area of the mask. For paste-back purposes. */
+      expanded_mask_area: components["schemas"]["ImageField"];
+      /**
+       * type
+       * @default gradient_mask_output
+       * @constant
+       */
+      type: "gradient_mask_output";
+    };
     /** Graph */
     Graph: {
       /**
@@ -7377,6 +7393,21 @@ export type components = {
       /** Cfg Rescale Multiplier */
       cfg_rescale_multiplier: number | null;
     };
+    /** ModelDefaultSettings */
+    ModelDefaultSettings: {
+      /** Vae */
+      vae: string | null;
+      /** Vae Precision */
+      vae_precision: string | null;
+      /** Scheduler */
+      scheduler: ("ddim" | "ddpm" | "deis" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_a" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "lcm") | null;
+      /** Steps */
+      steps: number | null;
+      /** Cfg Scale */
+      cfg_scale: number | null;
+      /** Cfg Rescale Multiplier */
+      cfg_rescale_multiplier: number | null;
+    };
     /**
      * ModelFormat
      * @description Storage format of model.
@@ -7526,9 +7557,12 @@ export type components = {
      * @description A set of changes to apply to model metadata.
      *
      * Only limited changes are valid:
+     *   - `default_settings`: the user-configured default settings for this model
      *   - `trigger_phrases`: the list of trigger phrases for this model
      */
     ModelMetadataChanges: {
+      /** @description The user-configured default settings for this model */
+      default_settings?: components["schemas"]["ModelDefaultSettings"] | null;
       /**
        * Trigger Phrases
        * @description The model's list of trigger phrases

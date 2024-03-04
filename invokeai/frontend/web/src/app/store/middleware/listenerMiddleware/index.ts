@@ -55,6 +55,7 @@ import { addUpscaleRequestedListener } from 'app/store/middleware/listenerMiddle
 import { addWorkflowLoadRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/workflowLoadRequested';
 import type { AppDispatch, RootState } from 'app/store/store';
 
+import { addPromptTriggerListChanged } from './listeners/promptTriggerListChanged';
 import { addSetDefaultSettingsListener } from './listeners/setDefaultSettings';
 
 export const listenerMiddleware = createListenerMiddleware();
@@ -153,7 +154,8 @@ addFirstListImagesListener(startAppListening);
 // Ad-hoc upscale workflwo
 addUpscaleRequestedListener(startAppListening);
 
-// Dynamic prompts
+// Prompts
 addDynamicPromptsListener(startAppListening);
+addPromptTriggerListChanged(startAppListening);
 
 addSetDefaultSettingsListener(startAppListening);
