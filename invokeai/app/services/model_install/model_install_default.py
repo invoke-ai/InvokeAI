@@ -94,7 +94,6 @@ class ModelInstallService(ModelInstallServiceBase):
         self._running = False
         self._session = session
         self._next_job_id = 0
-        self._metadata_store = record_store.metadata_store  # for convenience
 
     @property
     def app_config(self) -> InvokeAIAppConfig:  # noqa D102

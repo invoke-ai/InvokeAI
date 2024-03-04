@@ -21,8 +21,6 @@ from invokeai.backend.model_manager import AnyModelConfig, ModelRepoVariant
 from invokeai.backend.model_manager.config import ModelSourceType
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
 
-from ..model_metadata import ModelMetadataStoreBase
-
 
 class InstallStatus(str, Enum):
     """State of an install job running in the background."""
@@ -268,7 +266,6 @@ class ModelInstallServiceBase(ABC):
         app_config: InvokeAIAppConfig,
         record_store: ModelRecordServiceBase,
         download_queue: DownloadQueueServiceBase,
-        metadata_store: ModelMetadataStoreBase,
         event_bus: Optional["EventServiceBase"] = None,
     ):
         """

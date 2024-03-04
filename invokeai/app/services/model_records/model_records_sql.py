@@ -43,7 +43,7 @@ import json
 import sqlite3
 from math import ceil
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.backend.model_manager.config import (
@@ -53,9 +53,7 @@ from invokeai.backend.model_manager.config import (
     ModelFormat,
     ModelType,
 )
-from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata, UnknownMetadataException
 
-from ..model_metadata import ModelMetadataStoreBase, ModelMetadataStoreSQL
 from ..shared.sqlite.sqlite_database import SqliteDatabase
 from .model_records_base import (
     DuplicateModelException,
@@ -69,7 +67,7 @@ from .model_records_base import (
 class ModelRecordServiceSQL(ModelRecordServiceBase):
     """Implementation of the ModelConfigStore ABC using a SQL database."""
 
-    def __init__(self, db: SqliteDatabase, metadata_store: ModelMetadataStoreBase):
+    def __init__(self, db: SqliteDatabase):
         """
         Initialize a new object from preexisting sqlite3 connection and threading lock objects.
 
@@ -78,7 +76,6 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         super().__init__()
         self._db = db
         self._cursor = db.conn.cursor()
-        self._metadata_store = metadata_store
 
     @property
     def db(self) -> SqliteDatabase:
@@ -242,9 +239,8 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         If none of the optional filters are passed, will return all
         models in the database.
         """
-        results = []
-        where_clause = []
-        bindings = []
+        where_clause: list[str] = []
+        bindings: list[str] = []
         if model_name:
             where_clause.append("name=?")
             bindings.append(model_name)
@@ -302,55 +298,17 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             ]
         return results
 
-    @property
-    def metadata_store(self) -> ModelMetadataStoreBase:
-        """Return a ModelMetadataStore initialized on the same database."""
-        return self._metadata_store
-
-    def get_metadata(self, key: str) -> Optional[AnyModelRepoMetadata]:
-        """
-        Retrieve metadata (if any) from when model was downloaded from a repo.
-
-        :param key: Model key
-        """
-        store = self.metadata_store
-        try:
-            metadata = store.get_metadata(key)
-            return metadata
-        except UnknownMetadataException:
-            return None
-
-    def search_by_metadata_tag(self, tags: Set[str]) -> List[AnyModelConfig]:
-        """
-        Search model metadata for ones with all listed tags and return their corresponding configs.
-
-        :param tags: Set of tags to search for. All tags must be present.
-        """
-        store = ModelMetadataStoreSQL(self._db)
-        keys = store.search_by_tag(tags)
-        return [self.get_model(x) for x in keys]
-
-    def list_tags(self) -> Set[str]:
-        """Return a unique set of all the model tags in the metadata database."""
-        store = ModelMetadataStoreSQL(self._db)
-        return store.list_tags()
-
-    def list_all_metadata(self) -> List[Tuple[str, AnyModelRepoMetadata]]:
-        """List metadata for all models that have it."""
-        store = ModelMetadataStoreSQL(self._db)
-        return store.list_all_metadata()
-
     def list_models(
         self, page: int = 0, per_page: int = 10, order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default
     ) -> PaginatedResults[ModelSummary]:
         """Return a paginated summary listing of each model in the database."""
         assert isinstance(order_by, ModelRecordOrderBy)
         ordering = {
-            ModelRecordOrderBy.Default: "a.type, a.base, a.format, a.name",
-            ModelRecordOrderBy.Type: "a.type",
-            ModelRecordOrderBy.Base: "a.base",
-            ModelRecordOrderBy.Name: "a.name",
-            ModelRecordOrderBy.Format: "a.format",
+            ModelRecordOrderBy.Default: "type, base, format, name",
+            ModelRecordOrderBy.Type: "type",
+            ModelRecordOrderBy.Base: "base",
+            ModelRecordOrderBy.Name: "name",
+            ModelRecordOrderBy.Format: "format",
         }
 
         # Lock so that the database isn't updated while we're doing the two queries.
@@ -364,7 +322,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             )
             total = int(self._cursor.fetchone()[0])
 
-            # query2: fetch key fields from the join of models and model_metadata
+            # query2: fetch key fields
             self._cursor.execute(
                 f"""--sql
                 SELECT config

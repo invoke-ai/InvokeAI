@@ -18,6 +18,7 @@ from .config import (
     ModelConfigFactory,
     ModelFormat,
     ModelRepoVariant,
+    ModelSourceType,
     ModelType,
     ModelVariantType,
     SchedulerPredictionType,
@@ -150,7 +151,7 @@ class ModelProbe(object):
 
         probe = probe_class(model_path)
 
-        fields["source_type"] = fields.get("source_type")
+        fields["source_type"] = fields.get("source_type") or ModelSourceType.Path
         fields["source"] = fields.get("source") or model_path.as_posix()
         fields["key"] = fields.get("key", uuid_string())
         fields["path"] = model_path.as_posix()

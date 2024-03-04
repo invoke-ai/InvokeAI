@@ -6,6 +6,15 @@ from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import 
 class Migration7Callback:
     def __call__(self, cursor: sqlite3.Cursor) -> None:
         self._create_models_table(cursor)
+        self._drop_old_models_tables(cursor)
+
+    def _drop_old_models_tables(self, cursor: sqlite3.Cursor) -> None:
+        """Drops the old model_records, model_metadata, model_tags and tags tables."""
+
+        tables = ["model_records", "model_metadata", "model_tags", "tags"]
+
+        for table in tables:
+            cursor.execute(f"DROP TABLE IF EXISTS {table};")
 
     def _create_models_table(self, cursor: sqlite3.Cursor) -> None:
         """Creates the v4.0.0 models table."""
@@ -67,7 +76,7 @@ def build_migration_7() -> Migration:
 
     This migration does the following:
     - Adds the new models table
-    - TODO(MM2): Drops the old model_records, model_metadata, model_tags and tags tables.
+    - Drops the old model_records, model_metadata, model_tags and tags tables.
     - TODO(MM2): Migrates model names and descriptions from `models.yaml` to the new table (?).
     """
     migration_7 = Migration(

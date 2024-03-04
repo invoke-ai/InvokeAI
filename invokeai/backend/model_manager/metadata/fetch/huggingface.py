@@ -91,7 +91,7 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
             )
 
         return HuggingFaceMetadata(
-            id=model_info.id, name=name, files=files, api_response=json.dumps(model_info.__dict__)
+            id=model_info.id, name=name, files=files, api_response=json.dumps(model_info.__dict__, default=str)
         )
 
     def from_url(self, url: AnyHttpUrl) -> AnyModelRepoMetadata:

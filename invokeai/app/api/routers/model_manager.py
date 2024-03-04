@@ -12,7 +12,6 @@ from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
 from invokeai.app.services.model_install import ModelInstallJob
-from invokeai.app.services.model_metadata.metadata_store_base import ModelMetadataChanges
 from invokeai.app.services.model_records import (
     DuplicateModelException,
     InvalidModelException,
@@ -30,8 +29,6 @@ from invokeai.backend.model_manager.config import (
     SubModelType,
 )
 from invokeai.backend.model_manager.merge import MergeInterpolationMethod, ModelMerger
-from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
-from invokeai.backend.model_manager.metadata.metadata_base import BaseMetadata
 from invokeai.backend.model_manager.search import ModelSearch
 
 from ..dependencies import ApiDependencies
@@ -88,44 +85,6 @@ example_model_input = {
     "description": "Model description",
     "vae": None,
     "variant": "normal",
-}
-
-example_model_metadata = {
-    "name": "ip_adapter_sd_image_encoder",
-    "author": "InvokeAI",
-    "tags": [
-        "transformers",
-        "safetensors",
-        "clip_vision_model",
-        "endpoints_compatible",
-        "region:us",
-        "has_space",
-        "license:apache-2.0",
-    ],
-    "files": [
-        {
-            "url": "https://huggingface.co/InvokeAI/ip_adapter_sd_image_encoder/resolve/main/README.md",
-            "path": "ip_adapter_sd_image_encoder/README.md",
-            "size": 628,
-            "sha256": None,
-        },
-        {
-            "url": "https://huggingface.co/InvokeAI/ip_adapter_sd_image_encoder/resolve/main/config.json",
-            "path": "ip_adapter_sd_image_encoder/config.json",
-            "size": 560,
-            "sha256": None,
-        },
-        {
-            "url": "https://huggingface.co/InvokeAI/ip_adapter_sd_image_encoder/resolve/main/model.safetensors",
-            "path": "ip_adapter_sd_image_encoder/model.safetensors",
-            "size": 2528373448,
-            "sha256": "6ca9667da1ca9e0b0f75e46bb030f7e011f44f86cbfb8d5a36590fcd7507b030",
-        },
-    ],
-    "type": "huggingface",
-    "id": "InvokeAI/ip_adapter_sd_image_encoder",
-    "tag_dict": {"license": "apache-2.0"},
-    "last_modified": "2023-09-23T17:33:25Z",
 }
 
 ##############################################################################
@@ -219,79 +178,6 @@ async def list_model_summary(
     return results
 
 
-@model_manager_router.get(
-    "/i/{key}/metadata",
-    operation_id="get_model_metadata",
-    responses={
-        200: {
-            "description": "The model metadata was retrieved successfully",
-            "content": {"application/json": {"example": example_model_metadata}},
-        },
-        400: {"description": "Bad request"},
-    },
-)
-async def get_model_metadata(
-    key: str = Path(description="Key of the model repo metadata to fetch."),
-) -> Optional[AnyModelRepoMetadata]:
-    """Get a model metadata object."""
-    record_store = ApiDependencies.invoker.services.model_manager.store
-    result: Optional[AnyModelRepoMetadata] = record_store.get_metadata(key)
-
-    return result
-
-
-@model_manager_router.patch(
-    "/i/{key}/metadata",
-    operation_id="update_model_metadata",
-    responses={
-        201: {
-            "description": "The model metadata was updated successfully",
-            "content": {"application/json": {"example": example_model_metadata}},
-        },
-        400: {"description": "Bad request"},
-    },
-)
-async def update_model_metadata(
-    key: str = Path(description="Key of the model repo metadata to fetch."),
-    changes: ModelMetadataChanges = Body(description="The changes"),
-) -> Optional[AnyModelRepoMetadata]:
-    """Updates or creates a model metadata object."""
-    record_store = ApiDependencies.invoker.services.model_manager.store
-    metadata_store = ApiDependencies.invoker.services.model_manager.store.metadata_store
-
-    try:
-        original_metadata = record_store.get_metadata(key)
-        if original_metadata:
-            if changes.default_settings:
-                original_metadata.default_settings = changes.default_settings
-
-            metadata_store.update_metadata(key, original_metadata)
-        else:
-            metadata_store.add_metadata(
-                key, BaseMetadata(name="", author="", default_settings=changes.default_settings)
-            )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"An error occurred while updating the model metadata: {e}",
-        )
-
-    result: Optional[AnyModelRepoMetadata] = record_store.get_metadata(key)
-
-    return result
-
-
-@model_manager_router.get(
-    "/tags",
-    operation_id="list_tags",
-)
-async def list_tags() -> Set[str]:
-    """Get a unique set of all the model tags."""
-    record_store = ApiDependencies.invoker.services.model_manager.store
-    result: Set[str] = record_store.list_tags()
-    return result
-
-
 class FoundModel(BaseModel):
     path: str = Field(description="Path to the model")
     is_installed: bool = Field(description="Whether or not the model is already installed")
@@ -359,19 +245,6 @@ async def scan_for_models(
             detail=f"An error occurred while searching the directory: {e}",
         )
     return scan_results
-
-
-@model_manager_router.get(
-    "/tags/search",
-    operation_id="search_by_metadata_tags",
-)
-async def search_by_metadata_tags(
-    tags: Set[str] = Query(default=None, description="Tags to search for"),
-) -> ModelsList:
-    """Get a list of models."""
-    record_store = ApiDependencies.invoker.services.model_manager.store
-    results = record_store.search_by_metadata_tag(tags)
-    return ModelsList(models=results)
 
 
 @model_manager_router.patch(
@@ -562,9 +435,8 @@ async def list_model_install_jobs() -> List[ModelInstallJob]:
     * "cancelled" -- Job was cancelled before completion.
 
     Once completed, information about the model such as its size, base
-    model, type, and metadata can be retrieved from the `config_out`
-    field. For multi-file models such as diffusers, information on individual files
-    can be retrieved from `download_parts`.
+    model and type can be retrieved from the `config_out` field. For multi-file models such as diffusers,
+    information on individual files can be retrieved from `download_parts`.
 
     See the example and schema below for more information.
     """
@@ -707,10 +579,6 @@ async def convert_model(
     except DuplicateModelException as e:
         logger.error(str(e))
         raise HTTPException(status_code=409, detail=str(e))
-
-    # get the original metadata
-    if orig_metadata := store.get_metadata(key):
-        store.metadata_store.add_metadata(new_key, orig_metadata)
 
     # delete the original safetensors file
     installer.delete(key)
