@@ -29,6 +29,8 @@ from diffusers.models.modeling_utils import ModelMixin
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, TypeAdapter
 from typing_extensions import Annotated, Any, Dict
 
+from invokeai.app.util.misc import uuid_string
+
 from ..raw_model import RawModel
 
 # ModelMixin is the base class for all diffusers and transformers models
@@ -132,7 +134,7 @@ class ModelSourceType(str, Enum):
 class ModelConfigBase(BaseModel):
     """Base class for model configuration information."""
 
-    key: str = Field(description="A unique key for this model.")
+    key: str = Field(description="A unique key for this model.", default_factory=uuid_string)
     hash: str = Field(description="The hash of the model file(s).")
     path: str = Field(
         description="Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
@@ -142,7 +144,9 @@ class ModelConfigBase(BaseModel):
     description: Optional[str] = Field(description="Model description", default=None)
     source: str = Field(description="The original source of the model (path, URL or repo_id).")
     source_type: ModelSourceType = Field(description="The type of source")
-    source_api_response: Optional[str] = Field(description="The original API response from the source, as stringified JSON.", default=None)
+    source_api_response: Optional[str] = Field(
+        description="The original API response from the source, as stringified JSON.", default=None
+    )
     trigger_words: Optional[set[str]] = Field(description="Set of trigger words for this model", default=None)
 
     model_config = ConfigDict(use_enum_values=False, validate_assignment=True)
