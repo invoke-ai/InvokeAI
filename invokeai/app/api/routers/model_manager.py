@@ -72,6 +72,7 @@ example_model_input = {
     "description": "Model description",
     "vae": None,
     "variant": "normal",
+    "image": "blob"
 }
 
 ##############################################################################

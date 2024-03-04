@@ -23,6 +23,7 @@ import type { UpdateModelArg } from 'services/api/endpoints/models';
 import { useGetModelConfigQuery, useUpdateModelMutation } from 'services/api/endpoints/models';
 
 import BaseModelSelect from './Fields/BaseModelSelect';
+import ModelImageUpload from './Fields/ModelImageUpload';
 import ModelVariantSelect from './Fields/ModelVariantSelect';
 import PredictionTypeSelect from './Fields/PredictionTypeSelect';
 
@@ -58,6 +59,7 @@ export const ModelEdit = () => {
         key: data.key,
         body: values,
       };
+      console.log(responseBody, 'responseBody')
 
       updateModel(responseBody)
         .unwrap()
@@ -129,7 +131,8 @@ export const ModelEdit = () => {
         </Flex>
 
         <Flex flexDir="column" gap={3} mt="4">
-          <Flex>
+          <Flex gap="4" alignItems="center">
+            <ModelImageUpload control={control} name="image" />
             <FormControl flexDir="column" alignItems="flex-start" gap={1}>
               <FormLabel>{t('modelManager.description')}</FormLabel>
               <Textarea fontSize="md" resize="none" {...register('description')} />
