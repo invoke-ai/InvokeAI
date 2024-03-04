@@ -1,10 +1,10 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { loraAdded, loraRemoved } from 'features/lora/store/loraSlice';
+import { loraAdded, loraIsEnabledChanged, loraRecalled, loraRemoved } from 'features/lora/store/loraSlice';
 import { modelChanged, triggerPhrasesChanged } from 'features/parameters/store/generationSlice';
 import { modelsApi } from 'services/api/endpoints/models';
 
-const matcher = isAnyOf(loraAdded, loraRemoved, modelChanged);
+const matcher = isAnyOf(loraAdded, loraRemoved, loraRecalled, loraIsEnabledChanged, modelChanged);
 
 export const addPromptTriggerListChanged = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -27,7 +27,7 @@ export const addPromptTriggerListChanged = (startAppListening: AppStartListening
 
       for (let index = 0; index < Object.values(loras).length; index++) {
         const lora = Object.values(loras)[index];
-        if (lora) {
+        if (lora && lora.isEnabled) {
           const { data: loraData } = await dispatch(modelsApi.endpoints.getModelMetadata.initiate(lora.model.key));
           triggerPhrases = [...triggerPhrases, ...(loraData?.trigger_phrases || [])];
         }
