@@ -6,27 +6,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
 )
 from invokeai.app.invocations.fields import InputField, WithMetadata
-from invokeai.app.invocations.primitives import ConditioningField, ConditioningOutput, MaskField, MaskOutput
-
-
-@invocation(
-    "add_conditioning_mask",
-    title="Add Conditioning Mask",
-    tags=["conditioning"],
-    category="conditioning",
-    version="1.0.0",
-)
-class AddConditioningMaskInvocation(BaseInvocation):
-    """Add a mask to an existing conditioning tensor."""
-
-    conditioning: ConditioningField = InputField(description="The conditioning tensor to add a mask to.")
-    mask: MaskField = InputField(description="A mask to add to the conditioning tensor.")
-    positive_cross_attn_mask_score: float = InputField(default=0.0, description="")
-
-    def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        self.conditioning.mask = self.mask
-        self.conditioning.positive_cross_attn_mask_score = self.positive_cross_attn_mask_score
-        return ConditioningOutput(conditioning=self.conditioning)
+from invokeai.app.invocations.primitives import MaskField, MaskOutput
 
 
 @invocation(
