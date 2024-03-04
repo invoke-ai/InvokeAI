@@ -21,7 +21,7 @@ from .config import (
     ModelVariantType,
     SchedulerPredictionType,
 )
-from .hash import FastModelHash
+from .hash import ModelHash
 from .util.model_util import lora_token_vector_length, read_checkpoint_meta
 
 CkptType = Dict[str, Any]
@@ -147,7 +147,7 @@ class ModelProbe(object):
         if not probe_class:
             raise InvalidModelConfigException(f"Unhandled combination of {format_type} and {model_type}")
 
-        hash = FastModelHash.hash(model_path)
+        hash = ModelHash().hash(model_path)
         probe = probe_class(model_path)
 
         fields["path"] = model_path.as_posix()

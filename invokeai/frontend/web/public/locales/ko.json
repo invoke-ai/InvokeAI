@@ -123,8 +123,6 @@
         "autoSwitchNewImages": "새로운 이미지로 자동 전환",
         "loading": "불러오는 중",
         "unableToLoad": "갤러리를 로드할 수 없음",
-        "preparingDownload": "다운로드 준비",
-        "preparingDownloadFailed": "다운로드 준비 중 발생한 문제",
         "singleColumnLayout": "단일 열 레이아웃",
         "image": "이미지",
         "loadMore": "더 불러오기",

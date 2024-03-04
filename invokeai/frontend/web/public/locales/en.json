@@ -867,6 +867,7 @@
     "models": {
         "addLora": "Add LoRA",
         "allLoRAsAdded": "All LoRAs added",
+        "concepts": "Concepts",
         "loraAlreadyAdded": "LoRA already added",
         "esrganModel": "ESRGAN Model",
         "loading": "loading",

@@ -3,6 +3,7 @@ Test the model installer
 """
 
 import platform
+import uuid
 from pathlib import Path
 
 import pytest
@@ -30,9 +31,8 @@ def test_registration(mm2_installer: ModelInstallServiceBase, embedding_file: Pa
     matches = store.search_by_attr(model_name="test_embedding")
     assert len(matches) == 0
     key = mm2_installer.register_path(embedding_file)
-    assert key is not None
-    assert key != "<NOKEY>"
-    assert len(key) == 32
+    # Not raising here is sufficient - key should be UUIDv4
+    uuid.UUID(key, version=4)
 
 
 def test_registration_meta(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:

@@ -1,15 +1,5 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
-import {
-  Expander,
-  Flex,
-  FormControlGroup,
-  StandaloneAccordion,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
-} from '@invoke-ai/ui-library';
+import { Box, Expander, Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -20,6 +10,7 @@ import { SyncModelsIconButton } from 'features/modelManagerV2/components/SyncMod
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
+import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
 import { UseDefaultSettingsButton } from 'features/parameters/components/MainModel/UseDefaultSettingsButton';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
@@ -40,11 +31,11 @@ export const GenerationSettingsAccordion = memo(() => {
     () =>
       createMemoizedSelector(selectLoraSlice, (lora) => {
         const enabledLoRAsCount = filter(lora.loras, (l) => !!l.isEnabled).length;
-        const loraTabBadges = enabledLoRAsCount ? [enabledLoRAsCount] : EMPTY_ARRAY;
+        const loraTabBadges = enabledLoRAsCount ? [`${enabledLoRAsCount} ${t('models.concepts')}`] : EMPTY_ARRAY;
         const accordionBadges = modelConfig ? [modelConfig.name, modelConfig.base] : EMPTY_ARRAY;
         return { loraTabBadges, accordionBadges };
       }),
-    [modelConfig]
+    [modelConfig, t]
   );
   const { loraTabBadges, accordionBadges } = useAppSelector(selectBadges);
   const { isOpen: isOpenExpander, onToggle: onToggleExpander } = useExpanderToggle({
@@ -59,42 +50,35 @@ export const GenerationSettingsAccordion = memo(() => {
   return (
     <StandaloneAccordion
       label={t('accordions.generation.title')}
-      badges={accordionBadges}
+      badges={[...accordionBadges, ...loraTabBadges]}
       isOpen={isOpenAccordion}
       onToggle={onToggleAccordion}
     >
-      <Tabs variant="collapse">
-        <TabList>
-          <Tab>{t('accordions.generation.modelTab')}</Tab>
-          <Tab badges={loraTabBadges}>{t('accordions.generation.conceptsTab')}</Tab>
-        </TabList>
-        <TabPanels>
-          <TabPanel overflow="visible" px={4} pt={4}>
-            <Flex gap={4} alignItems="center">
-              <ParamMainModelSelect />
-              <Flex>
-                <UseDefaultSettingsButton />
-                <SyncModelsIconButton />
-              </Flex>
+      <Box px={4} pt={4}>
+        <Flex gap={4} flexDir="column">
+          <Flex gap={4} alignItems="center">
+            <ParamMainModelSelect />
+            <Flex>
+              <UseDefaultSettingsButton />
+              <SyncModelsIconButton />
+              <NavigateToModelManagerButton />
             </Flex>
-            <Expander isOpen={isOpenExpander} onToggle={onToggleExpander}>
-              <Flex gap={4} flexDir="column" pb={4}>
-                <FormControlGroup formLabelProps={formLabelProps}>
-                  <ParamScheduler />
-                  <ParamSteps />
-                  <ParamCFGScale />
-                </FormControlGroup>
-              </Flex>
-            </Expander>
-          </TabPanel>
-          <TabPanel>
-            <Flex gap={4} p={4} flexDir="column">
-              <LoRASelect />
-              <LoRAList />
-            </Flex>
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
+          </Flex>
+          <Flex gap={4} flexDir="column">
+            <LoRASelect />
+            <LoRAList />
+          </Flex>
+        </Flex>
+        <Expander isOpen={isOpenExpander} onToggle={onToggleExpander}>
+          <Flex gap={4} flexDir="column" pb={4}>
+            <FormControlGroup formLabelProps={formLabelProps}>
+              <ParamScheduler />
+              <ParamSteps />
+              <ParamCFGScale />
+            </FormControlGroup>
+          </Flex>
+        </Expander>
+      </Box>
     </StandaloneAccordion>
   );
 });

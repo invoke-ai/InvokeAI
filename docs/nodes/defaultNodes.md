@@ -19,6 +19,8 @@ their descriptions.
 | Conditioning Primitive                                        | A conditioning tensor primitive value                                                                                                                |
 | Content Shuffle Processor                                     | Applies content shuffle processing to image                                                                                                          |
 | ControlNet                                                    | Collects ControlNet info to pass to other nodes                                                                                                      |
+| Create Denoise Mask                                           | Converts a greyscale or transparency image into a mask for denoising.                                                                                |
+| Create Gradient Mask                                          | Creates a mask for Gradient ("soft", "differential") inpainting that gradually expands during denoising. Improves edge coherence.                    |
 | Denoise Latents                                               | Denoises noisy latents to decodable images                                                                                                           |
 | Divide Integers                                               | Divides two numbers                                                                                                                                  |
 | Dynamic Prompt                                                | Parses a prompt using adieyal/dynamicprompts' random or combinatorial generator                                                                      |
