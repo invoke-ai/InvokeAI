@@ -48,7 +48,7 @@ export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSel
     const metadataOptions = [
       {
         label: t('modelManager.triggerPhrases'),
-        options: triggerPhrases.map((phrase) => ({ label: phrase, value: phrase })),
+        options: triggerPhrases,
       },
     ];
     return [...metadataOptions, ...embeddingOptions];

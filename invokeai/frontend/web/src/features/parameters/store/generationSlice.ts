@@ -1,3 +1,4 @@
+import type { ComboboxOption } from '@invoke-ai/ui-library';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
@@ -208,7 +209,7 @@ export const generationSlice = createSlice({
     aspectRatioChanged: (state, action: PayloadAction<AspectRatioState>) => {
       state.aspectRatio = action.payload;
     },
-    triggerPhrasesChanged: (state, action: PayloadAction<string[]>) => {
+    triggerPhrasesChanged: (state, action: PayloadAction<ComboboxOption[]>) => {
       state.triggerPhrases = action.payload;
     },
   },
