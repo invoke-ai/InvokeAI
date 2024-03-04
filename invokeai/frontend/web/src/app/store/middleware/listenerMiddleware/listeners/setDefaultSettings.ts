@@ -36,8 +36,6 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
 
       const metadata = await dispatch(modelsApi.endpoints.getModelMetadata.initiate(currentModel.key)).unwrap();
 
-      console.log({ metadata });
-
       if (!metadata || !metadata.default_settings) {
         return;
       }
