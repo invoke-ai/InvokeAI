@@ -117,7 +117,6 @@ class ModelMerger(object):
         config = self._installer.app_config
         store = self._installer.record_store
         base_models: Set[BaseModelType] = set()
-        vae = None
         variant = None if self._installer.app_config.full_precision else "fp16"
 
         assert (
