@@ -12,6 +12,7 @@ import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
+import { UseDefaultSettingsButton } from 'features/parameters/components/MainModel/UseDefaultSettingsButton';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { filter } from 'lodash-es';
@@ -58,6 +59,7 @@ export const GenerationSettingsAccordion = memo(() => {
           <Flex gap={4} alignItems="center">
             <ParamMainModelSelect />
             <Flex>
+              <UseDefaultSettingsButton />
               <SyncModelsIconButton />
               <NavigateToModelManagerButton />
             </Flex>
