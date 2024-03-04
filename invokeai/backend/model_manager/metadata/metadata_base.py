@@ -68,6 +68,7 @@ class RemoteModelFile(BaseModel):
     size: int = Field(description="The size of this file, in bytes")
     sha256: Optional[str] = Field(description="SHA256 hash of this model (not always available)", default=None)
 
+
 class ModelDefaultSettings(BaseModel):
     vae: str | None
     vae_precision: str | None
@@ -83,7 +84,9 @@ class ModelMetadataBase(BaseModel):
     name: str = Field(description="model's name")
     author: str = Field(description="model's author")
     tags: Optional[Set[str]] = Field(description="tags provided by model source", default=None)
-    default_settings: Optional[ModelDefaultSettings] = Field(description="default settings for this model", default=None)
+    default_settings: Optional[ModelDefaultSettings] = Field(
+        description="default settings for this model", default=None
+    )
 
 
 class BaseMetadata(ModelMetadataBase):

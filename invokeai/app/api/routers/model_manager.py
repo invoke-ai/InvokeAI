@@ -244,6 +244,7 @@ async def get_model_metadata(
 
     return result
 
+
 @model_manager_router.patch(
     "/i/{key}/metadata",
     operation_id="update_model_metadata",
@@ -257,7 +258,7 @@ async def get_model_metadata(
 )
 async def update_model_metadata(
     key: str = Path(description="Key of the model repo metadata to fetch."),
-    changes: ModelMetadataChanges = Body(description="The changes")
+    changes: ModelMetadataChanges = Body(description="The changes"),
 ) -> Optional[AnyModelRepoMetadata]:
     """Updates or creates a model metadata object."""
     record_store = ApiDependencies.invoker.services.model_manager.store
@@ -271,7 +272,9 @@ async def update_model_metadata(
 
             metadata_store.update_metadata(key, original_metadata)
         else:
-            metadata_store.add_metadata(key, BaseMetadata(name="", author="",default_settings=changes.default_settings))
+            metadata_store.add_metadata(
+                key, BaseMetadata(name="", author="", default_settings=changes.default_settings)
+            )
     except Exception as e:
         raise HTTPException(
             status_code=500,

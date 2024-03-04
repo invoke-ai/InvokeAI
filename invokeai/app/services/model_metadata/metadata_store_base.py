@@ -19,8 +19,11 @@ class ModelMetadataChanges(BaseModelExcludeNull, extra="allow"):
       - `default_settings`: the user-configured default settings for this model
     """
 
-    default_settings: Optional[ModelDefaultSettings] = Field(default=None, description="The user-configured default settings for this model")
+    default_settings: Optional[ModelDefaultSettings] = Field(
+        default=None, description="The user-configured default settings for this model"
+    )
     """The user-configured default settings for this model"""
+
 
 class ModelMetadataStoreBase(ABC):
     """Store, search and fetch model metadata retrieved from remote repositories."""
