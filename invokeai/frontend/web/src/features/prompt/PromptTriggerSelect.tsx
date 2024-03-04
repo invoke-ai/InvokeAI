@@ -1,13 +1,13 @@
-import type { ChakraProps, ComboboxOnChange } from '@invoke-ai/ui-library';
+import type { ChakraProps, ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, FormControl } from '@invoke-ai/ui-library';
-import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
+import type { GroupBase, OptionsOrGroups } from 'chakra-react-select';
 import type { PromptTriggerSelectProps } from 'features/prompt/types';
 import { t } from 'i18next';
 import { map } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetModelMetadataQuery, useGetTextualInversionModelsQuery } from 'services/api/endpoints/models';
+import { useGetTextualInversionModelsQuery } from 'services/api/endpoints/models';
 
 const noOptionsMessage = () => t('prompt.noMatchingTriggers');
 
@@ -15,10 +15,9 @@ export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSel
   const { t } = useTranslation();
 
   const currentBaseModel = useAppSelector((s) => s.generation.model?.base);
-  const currentModelKey = useAppSelector((s) => s.generation.model?.key);
+  const triggerPhrases = useAppSelector((s) => s.generation.triggerPhrases);
 
   const { data, isLoading } = useGetTextualInversionModelsQuery();
-  const { data: metadata } = useGetModelMetadataQuery(currentModelKey ?? skipToken);
 
   const _onChange = useCallback<ComboboxOnChange>(
     (v) => {
@@ -32,34 +31,28 @@ export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSel
     [onSelect]
   );
 
-  const embeddingOptions = useMemo(() => {
-    if (!data) {
-      return [];
-    }
-
-    const compatibleEmbeddingsArray = map(data.entities).filter((model) => model.base === currentBaseModel);
-
-    return [
-      {
-        label: t('prompt.compatibleEmbeddings'),
-        options: compatibleEmbeddingsArray.map((model) => ({ label: model.name, value: `<${model.name}>` })),
-      },
-    ];
-  }, [data, currentBaseModel, t]);
-
   const options = useMemo(() => {
-    if (!metadata || !metadata.trigger_phrases) {
-      return [...embeddingOptions];
+    let embeddingOptions: OptionsOrGroups<ComboboxOption, GroupBase<ComboboxOption>> = [];
+
+    if (data) {
+      const compatibleEmbeddingsArray = map(data.entities).filter((model) => model.base === currentBaseModel);
+
+      embeddingOptions = [
+        {
+          label: t('prompt.compatibleEmbeddings'),
+          options: compatibleEmbeddingsArray.map((model) => ({ label: model.name, value: `<${model.name}>` })),
+        },
+      ];
     }
 
     const metadataOptions = [
       {
         label: t('modelManager.triggerPhrases'),
-        options: metadata.trigger_phrases.map((phrase) => ({ label: phrase, value: phrase })),
+        options: triggerPhrases.map((phrase) => ({ label: phrase, value: phrase })),
       },
     ];
     return [...metadataOptions, ...embeddingOptions];
-  }, [embeddingOptions, metadata, t]);
+  }, [data, currentBaseModel, triggerPhrases, t]);
 
   return (
     <FormControl>

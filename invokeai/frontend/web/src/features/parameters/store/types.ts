@@ -51,6 +51,7 @@ export interface GenerationState {
   shouldUseCpuNoise: boolean;
   shouldShowAdvancedOptions: boolean;
   aspectRatio: AspectRatioState;
+  triggerPhrases: string[];
 }
 
 export type PayloadActionWithOptimalDimension<T = void> = PayloadAction<T, string, { optimalDimension: number }>;
