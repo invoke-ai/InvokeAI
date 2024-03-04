@@ -47,7 +47,7 @@ class RegionalPromptData:
         # - Scale by region size.
         self.negative_cross_attn_mask_score = -10000
         # self.positive_cross_attn_mask_score = 0.0
-        self.positive_self_attn_mask_score = 2.0
+        self.positive_self_attn_mask_score = 1.0
         self.self_attn_mask_end_step_percent = 0.3
         # This one is for regional prompting in general, so should be set on the DenoiseLatents node.
         self.self_attn_score_range = 3.0
@@ -233,6 +233,7 @@ class RegionalPromptData:
                 prompt_query_mask = batch_sample_query_masks[0, prompt_idx, :, 0]  # Shape: (query_seq_len,)
                 # Multiply a (1, query_seq_len) mask by a (query_seq_len, 1) mask to get a (query_seq_len,
                 # query_seq_len) mask.
+                # TODO(ryand): Is += really the best option here?
                 attn_mask[batch_idx, :, :] += (
                     prompt_query_mask.unsqueeze(0) * prompt_query_mask.unsqueeze(1) * self.positive_self_attn_mask_score
                 )

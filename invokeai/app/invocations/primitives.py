@@ -427,10 +427,6 @@ class ConditioningOutput(BaseInvocationOutput):
 
     conditioning: ConditioningField = OutputField(description=FieldDescriptions.cond)
 
-    @classmethod
-    def build(cls, conditioning_name: str) -> "ConditioningOutput":
-        return cls(conditioning=ConditioningField(conditioning_name=conditioning_name))
-
 
 @invocation_output("conditioning_collection_output")
 class ConditioningCollectionOutput(BaseInvocationOutput):
