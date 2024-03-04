@@ -1,11 +1,12 @@
+import { Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import Loading from 'common/components/Loading/Loading';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { isNil } from 'lodash-es';
 import { useMemo } from 'react';
-import { useGetModelConfigQuery } from 'services/api/endpoints/models';
+import { useTranslation } from 'react-i18next';
+import { useGetModelConfigQuery  } from 'services/api/endpoints/models';
 
 import { DefaultSettingsForm } from './DefaultSettings/DefaultSettingsForm';
 
@@ -23,6 +24,7 @@ const initialStatesSelector = createMemoizedSelector(selectConfigSlice, (config)
 
 export const DefaultSettings = () => {
   const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
+  const { t } = useTranslation();
 
   const { data, isLoading } = useGetModelConfigQuery(selectedModelKey ?? skipToken);
   const { initialSteps, initialCfg, initialScheduler, initialCfgRescaleMultiplier, initialVaePrecision } =
@@ -59,7 +61,7 @@ export const DefaultSettings = () => {
   ]);
 
   if (isLoading) {
-    return <Loading />;
+    return <Text>{t('common.loading')}</Text>;
   }
 
   return <DefaultSettingsForm defaultSettingsDefaults={defaultSettingsDefaults} />;
