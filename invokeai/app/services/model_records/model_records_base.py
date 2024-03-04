@@ -64,7 +64,7 @@ class ModelRecordServiceBase(ABC):
     """Abstract base class for storage and retrieval of model configs."""
 
     @abstractmethod
-    def add_model(self, key: str, config: Union[Dict[str, Any], AnyModelConfig]) -> AnyModelConfig:
+    def add_model(self, config: AnyModelConfig) -> AnyModelConfig:
         """
         Add a model to the database.
 

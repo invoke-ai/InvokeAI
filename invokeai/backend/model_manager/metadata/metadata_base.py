@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import List, Literal, Optional, Union
 
 from huggingface_hub import configure_http_backend, hf_hub_url
-from pydantic import BaseModel, Field, JsonValue, TypeAdapter
+from pydantic import BaseModel, Field, TypeAdapter
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
 from typing_extensions import Annotated
@@ -93,7 +93,7 @@ class CivitaiMetadata(ModelMetadataWithFiles):
 
     type: Literal["civitai"] = "civitai"
     trigger_words: set[str] = Field(description="Trigger words extracted from the API response")
-    api_response: Optional[JsonValue] = Field(description="Response from the Civitai API", default=None)
+    api_response: Optional[str] = Field(description="Response from the Civitai API as stringified JSON", default=None)
 
 
 class HuggingFaceMetadata(ModelMetadataWithFiles):
@@ -101,7 +101,7 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
 
     type: Literal["huggingface"] = "huggingface"
     id: str = Field(description="The HF model id")
-    api_response: Optional[JsonValue] = Field(description="Response from the HF API", default=None)
+    api_response: Optional[str] = Field(description="Response from the HF API as stringified JSON", default=None)
 
     def download_urls(
         self,

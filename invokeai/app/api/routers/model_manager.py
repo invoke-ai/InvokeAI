@@ -3,8 +3,6 @@
 
 import pathlib
 import shutil
-from hashlib import sha1
-from random import randbytes
 from typing import Any, Dict, List, Optional, Set
 
 from fastapi import Body, Path, Query, Response
@@ -461,11 +459,8 @@ async def add_model_record(
     """Add a model using the configuration information appropriate for its type."""
     logger = ApiDependencies.invoker.services.logger
     record_store = ApiDependencies.invoker.services.model_manager.store
-    if config.key == "<NOKEY>":
-        config.key = sha1(randbytes(100)).hexdigest()
-        logger.info(f"Created model {config.key} for {config.name}")
     try:
-        record_store.add_model(config.key, config)
+        record_store.add_model(config)
     except DuplicateModelException as e:
         logger.error(str(e))
         raise HTTPException(status_code=409, detail=str(e))

@@ -556,7 +556,7 @@ class ModelInstallService(ModelInstallServiceBase):
             # make config relative to our root
             legacy_conf = (self.app_config.root_dir / self.app_config.legacy_conf_dir / info.config_path).resolve()
             info.config_path = legacy_conf.relative_to(self.app_config.root_dir).as_posix()
-        self.record_store.add_model(info.key, info)
+        self.record_store.add_model(info)
         return info.key
 
     def _next_id(self) -> int:
@@ -583,7 +583,9 @@ class ModelInstallService(ModelInstallServiceBase):
     def _import_from_civitai(self, source: CivitaiModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
         if not source.access_token:
             self._logger.info("No Civitai access token provided; some models may not be downloadable.")
-        metadata = CivitaiMetadataFetch(self._session).from_id(str(source.version_id))
+        metadata = CivitaiMetadataFetch(self._session, self.app_config.get_config().civitai_api_key).from_id(
+            str(source.version_id)
+        )
         assert isinstance(metadata, ModelMetadataWithFiles)
         remote_files = metadata.download_urls(session=self._session)
         return self._import_remote_model(source=source, config=config, metadata=metadata, remote_files=remote_files)
@@ -611,15 +613,17 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _import_from_url(self, source: URLModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
         # URLs from Civitai or HuggingFace will be handled specially
-        url_patterns = {
-            r"^https?://civitai.com/": CivitaiMetadataFetch,
-            r"^https?://huggingface.co/[^/]+/[^/]+$": HuggingFaceMetadataFetch,
-        }
         metadata = None
-        for pattern, fetcher in url_patterns.items():
-            if re.match(pattern, str(source.url), re.IGNORECASE):
-                metadata = fetcher(self._session).from_url(source.url)
-                break
+        fetcher = None
+        try:
+            fetcher = self.get_fetcher_from_url(str(source.url))
+        except ValueError:
+            pass
+        kwargs: dict[str, Any] = {"session": self._session}
+        if fetcher is CivitaiMetadataFetch:
+            kwargs["api_key"] = self._app_config.get_config().civitai_api_key
+        if fetcher is not None:
+            metadata = fetcher(**kwargs).from_url(source.url)
         self._logger.debug(f"metadata={metadata}")
         if metadata and isinstance(metadata, ModelMetadataWithFiles):
             remote_files = metadata.download_urls(session=self._session)
@@ -849,3 +853,11 @@ class ModelInstallService(ModelInstallServiceBase):
         self._logger.info(f"{job.source}: model installation was cancelled")
         if self._event_bus:
             self._event_bus.emit_model_install_cancelled(str(job.source))
+
+    @staticmethod
+    def get_fetcher_from_url(url: str):
+        if re.match(r"^https?://civitai.com/", url.lower()):
+            return CivitaiMetadataFetch
+        elif re.match(r"^https?://huggingface.co/[^/]+/[^/]+$", url.lower()):
+            return HuggingFaceMetadataFetch
+        raise ValueError(f"Unsupported model source: '{url}'")
