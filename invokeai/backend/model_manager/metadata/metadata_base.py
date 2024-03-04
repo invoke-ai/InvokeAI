@@ -24,8 +24,8 @@ from pydantic import BaseModel, Field, TypeAdapter
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
 from typing_extensions import Annotated
-from invokeai.app.invocations.constants import SCHEDULER_NAME_VALUES
 
+from invokeai.app.invocations.constants import SCHEDULER_NAME_VALUES
 from invokeai.backend.model_manager import ModelRepoVariant
 
 from ..util import select_hf_files

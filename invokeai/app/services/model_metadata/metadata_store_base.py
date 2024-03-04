@@ -7,10 +7,11 @@ from abc import ABC, abstractmethod
 from typing import List, Optional, Set, Tuple
 
 from pydantic import Field
-from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 
+from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
 from invokeai.backend.model_manager.metadata.metadata_base import ModelDefaultSettings
+
 
 class ModelMetadataChanges(BaseModelExcludeNull, extra="allow"):
     """A set of changes to apply to model metadata.
