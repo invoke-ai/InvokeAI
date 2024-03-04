@@ -136,8 +136,6 @@
         "copy": "复制",
         "download": "下载",
         "setCurrentImage": "设为当前图像",
-        "preparingDownload": "准备下载",
-        "preparingDownloadFailed": "准备下载时出现问题",
         "downloadSelection": "下载所选内容",
         "noImageSelected": "无选中的图像",
         "deleteSelection": "删除所选内容",
@@ -616,11 +614,9 @@
             "incompatibleBaseModelForControlAdapter": "有 #{{number}} 个 Control Adapter 模型与主模型不兼容。"
         },
         "patchmatchDownScaleSize": "缩小",
-        "coherenceSteps": "步数",
         "clipSkip": "CLIP 跳过层",
         "compositingSettingsHeader": "合成设置",
         "useCpuNoise": "使用 CPU 噪声",
-        "coherenceStrength": "强度",
         "enableNoiseSettings": "启用噪声设置",
         "coherenceMode": "模式",
         "cpuNoise": "CPU 噪声",
@@ -1402,19 +1398,6 @@
                 "图像尺寸（单位：像素）建议 SD 1.5 模型使用等效 512x512 的尺寸，SDXL 模型使用等效 1024x1024 的尺寸。"
             ]
         },
-        "compositingCoherenceSteps": {
-            "heading": "步数",
-            "paragraphs": [
-                "一致性层中使用的去噪步数。",
-                "与主参数中的步数相同。"
-            ]
-        },
-        "compositingBlur": {
-            "heading": "模糊",
-            "paragraphs": [
-                "遮罩模糊半径。"
-            ]
-        },
         "noiseUseCPU": {
             "heading": "使用 CPU 噪声",
             "paragraphs": [
@@ -1465,13 +1448,6 @@
             "heading": "一致性层",
             "paragraphs": [
                 "第二轮去噪有助于合成内补/外扩图像。"
-            ]
-        },
-        "compositingStrength": {
-            "heading": "强度",
-            "paragraphs": [
-                "一致性层使用的去噪强度。",
-                "去噪强度与图生图的参数相同。"
             ]
         },
         "paramNegativeConditioning": {

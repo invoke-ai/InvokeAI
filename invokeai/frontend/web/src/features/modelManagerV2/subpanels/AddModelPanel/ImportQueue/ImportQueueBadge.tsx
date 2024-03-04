@@ -15,7 +15,7 @@ const STATUSES = {
 const ImportQueueBadge = ({ status, errorReason }: { status?: ModelInstallStatus; errorReason?: string | null }) => {
   const { t } = useTranslation();
 
-  if (!status) {
+  if (!status || !Object.keys(STATUSES).includes(status)) {
     return <></>;
   }
 

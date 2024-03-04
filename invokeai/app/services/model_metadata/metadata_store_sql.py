@@ -184,7 +184,7 @@ class ModelMetadataStoreSQL(ModelMetadataStoreBase):
     def _update_tags(self, model_key: str, tags: Optional[Set[str]]) -> None:
         """Update tags for the model referenced by model_key."""
         if tags:
-        # remove previous tags from this model
+            # remove previous tags from this model
             self._cursor.execute(
                 """--sql
                 DELETE FROM model_tags

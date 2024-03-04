@@ -59,7 +59,7 @@ const LoRASelect = () => {
   return (
     <FormControl isDisabled={!options.length}>
       <InformationalPopover feature="lora">
-        <FormLabel>{t('models.lora')} </FormLabel>
+        <FormLabel>{t('models.concepts')} </FormLabel>
       </InformationalPopover>
       <Combobox
         placeholder={placeholder}

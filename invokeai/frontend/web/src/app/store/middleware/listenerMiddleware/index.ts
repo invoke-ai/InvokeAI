@@ -55,6 +55,8 @@ import { addUpscaleRequestedListener } from 'app/store/middleware/listenerMiddle
 import { addWorkflowLoadRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/workflowLoadRequested';
 import type { AppDispatch, RootState } from 'app/store/store';
 
+import { addSetDefaultSettingsListener } from './listeners/setDefaultSettings';
+
 export const listenerMiddleware = createListenerMiddleware();
 
 export type AppStartListening = TypedStartListening<RootState, AppDispatch>;
@@ -153,3 +155,5 @@ addUpscaleRequestedListener(startAppListening);
 
 // Dynamic prompts
 addDynamicPromptsListener(startAppListening);
+
+addSetDefaultSettingsListener(startAppListening);

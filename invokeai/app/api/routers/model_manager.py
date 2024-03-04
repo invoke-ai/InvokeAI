@@ -283,6 +283,47 @@ async def update_model_metadata(
     return result
 
 
+@model_manager_router.patch(
+    "/i/{key}/metadata",
+    operation_id="update_model_metadata",
+    responses={
+        201: {
+            "description": "The model metadata was updated successfully",
+            "content": {"application/json": {"example": example_model_metadata}},
+        },
+        400: {"description": "Bad request"},
+    },
+)
+async def update_model_metadata(
+    key: str = Path(description="Key of the model repo metadata to fetch."),
+    changes: ModelMetadataChanges = Body(description="The changes"),
+) -> Optional[AnyModelRepoMetadata]:
+    """Updates or creates a model metadata object."""
+    record_store = ApiDependencies.invoker.services.model_manager.store
+    metadata_store = ApiDependencies.invoker.services.model_manager.store.metadata_store
+
+    try:
+        original_metadata = record_store.get_metadata(key)
+        if original_metadata:
+            if changes.default_settings:
+                original_metadata.default_settings = changes.default_settings
+
+            metadata_store.update_metadata(key, original_metadata)
+        else:
+            metadata_store.add_metadata(
+                key, BaseMetadata(name="", author="", default_settings=changes.default_settings)
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"An error occurred while updating the model metadata: {e}",
+        )
+
+    result: Optional[AnyModelRepoMetadata] = record_store.get_metadata(key)
+
+    return result
+
+
 @model_manager_router.get(
     "/tags",
     operation_id="list_tags",
@@ -491,6 +532,7 @@ async def add_model_record(
 )
 async def install_model(
     source: str = Query(description="Model source to install, can be a local path, repo_id, or remote URL"),
+    inplace: Optional[bool] = Query(description="Whether or not to install a local model in place", default=False),
     # TODO(MM2): Can we type this?
     config: Optional[Dict[str, Any]] = Body(
         description="Dict of fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
@@ -533,6 +575,7 @@ async def install_model(
             source=source,
             config=config,
             access_token=access_token,
+            inplace=bool(inplace),
         )
         logger.info(f"Started installation of {source}")
     except UnknownModelException as e:

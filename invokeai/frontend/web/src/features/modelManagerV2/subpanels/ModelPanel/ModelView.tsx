@@ -17,6 +17,7 @@ import type {
   VAEModelConfig,
 } from 'services/api/types';
 
+import { DefaultSettings } from './DefaultSettings';
 import { ModelAttrView } from './ModelAttrView';
 import { ModelConvert } from './ModelConvert';
 
@@ -71,7 +72,7 @@ export const ModelView = () => {
     return <Text>{t('common.somethingWentWrong')}</Text>;
   }
   return (
-    <Flex flexDir="column" h="full">
+    <Flex flexDir="column" h="full" gap="2">
       <Box layerStyle="second" borderRadius="base" p={3}>
         <Flex gap="2" justifyContent="flex-end" w="full">
           <Button size="sm" leftIcon={<IoPencil />} colorScheme="invokeYellow" onClick={handleEditModel}>
@@ -117,6 +118,9 @@ export const ModelView = () => {
             </Flex>
           )}
         </Flex>
+      </Box>
+      <Box layerStyle="second" borderRadius="base" p={3}>
+        <DefaultSettings />
       </Box>
     </Flex>
   );
