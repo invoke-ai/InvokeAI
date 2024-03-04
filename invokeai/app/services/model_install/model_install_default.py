@@ -37,6 +37,7 @@ from invokeai.backend.model_manager.metadata import (
     ModelMetadataWithFiles,
     RemoteModelFile,
 )
+from invokeai.backend.model_manager.metadata.metadata_base import CivitaiMetadata, HuggingFaceMetadata
 from invokeai.backend.model_manager.probe import ModelProbe
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util import Chdir, InvokeAILogger
@@ -152,9 +153,6 @@ class ModelInstallService(ModelInstallServiceBase):
     ) -> str:  # noqa D102
         model_path = Path(model_path)
         config = config or {}
-        if not config.get("source"):
-            config["source"] = model_path.resolve().as_posix()
-        config["key"] = config.get("key", uuid_string())
 
         info: AnyModelConfig = ModelProbe.probe(Path(model_path), config)
 
@@ -379,15 +377,17 @@ class ModelInstallService(ModelInstallServiceBase):
                     self._signal_job_running(job)
                     job.config_in["source"] = str(job.source)
                     job.config_in["source_type"] = MODEL_SOURCE_TO_TYPE_MAP[job.source.__class__]
+                    # enter the metadata, if there is any
+                    if isinstance(job.source_metadata, (CivitaiMetadata, HuggingFaceMetadata)):
+                        job.config_in["source_api_response"] = job.source_metadata.api_response
+                    if isinstance(job.source_metadata, CivitaiMetadata) and job.source_metadata.trigger_words:
+                        job.config_in["trigger_words"] = job.source_metadata.trigger_words
+
                     if job.inplace:
                         key = self.register_path(job.local_path, job.config_in)
                     else:
                         key = self.install_path(job.local_path, job.config_in)
                     job.config_out = self.record_store.get_model(key)
-
-                    # enter the metadata, if there is any
-                    if job.source_metadata:
-                        self._metadata_store.add_metadata(key, job.source_metadata)
                     self._signal_job_completed(job)
 
             except InvalidModelConfigException as excp:
@@ -524,6 +524,13 @@ class ModelInstallService(ModelInstallServiceBase):
             counter += 1
         move(old_path, new_path)
         return new_path
+
+    # def _probe_model(self, model_path: Path, config: Optional[Dict[str, Any]] = None) -> AnyModelConfig:
+    #     info: AnyModelConfig = ModelProbe.probe(Path(model_path))
+    #     if config:  # used to override probe fields
+    #         for key, value in config.items():
+    #             setattr(info, key, value)
+    #     return info
 
     def _register(
         self, model_path: Path, config: Optional[Dict[str, Any]] = None, info: Optional[AnyModelConfig] = None

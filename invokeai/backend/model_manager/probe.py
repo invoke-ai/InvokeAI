@@ -8,6 +8,7 @@ import torch
 from picklescan.scanner import scan_file_path
 
 import invokeai.backend.util.logging as logger
+from invokeai.app.util.misc import uuid_string
 from invokeai.backend.util.util import SilenceWarnings
 
 from .config import (
@@ -149,6 +150,9 @@ class ModelProbe(object):
 
         probe = probe_class(model_path)
 
+        fields["source_type"] = fields.get("source_type")
+        fields["source"] = fields.get("source") or model_path.as_posix()
+        fields["key"] = fields.get("key", uuid_string())
         fields["path"] = model_path.as_posix()
         fields["type"] = fields.get("type") or model_type
         fields["base"] = fields.get("base") or probe.get_base_type()
@@ -162,7 +166,7 @@ class ModelProbe(object):
         fields["format"] = fields.get("format") or probe.get_format()
         fields["hash"] = fields.get("hash") or ModelHash().hash(model_path)
 
-        if format_type == ModelFormat.Diffusers and hasattr(probe, "get_repo_variant"):
+        if format_type == ModelFormat.Diffusers and isinstance(probe, FolderProbeBase):
             fields["repo_variant"] = fields.get("repo_variant") or probe.get_repo_variant()
 
         # additional fields needed for main and controlnet models
