@@ -7,7 +7,6 @@ import time
 from hashlib import sha256
 from pathlib import Path
 from queue import Empty, Queue
-from random import randbytes
 from shutil import copyfile, copytree, move, rmtree
 from tempfile import mkdtemp
 from typing import Any, Dict, List, Optional, Set, Union
@@ -21,6 +20,7 @@ from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase
+from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
@@ -150,7 +150,7 @@ class ModelInstallService(ModelInstallServiceBase):
         config = config or {}
         if not config.get("source"):
             config["source"] = model_path.resolve().as_posix()
-        config["key"] = config.get("key", self._create_key())
+        config["key"] = config.get("key", uuid_string())
 
         info: AnyModelConfig = self._probe_model(Path(model_path), config)
 
@@ -526,16 +526,17 @@ class ModelInstallService(ModelInstallServiceBase):
                 setattr(info, key, value)
         return info
 
-    def _create_key(self) -> str:
-        return sha256(randbytes(100)).hexdigest()[0:32]
-
     def _register(
         self, model_path: Path, config: Optional[Dict[str, Any]] = None, info: Optional[AnyModelConfig] = None
     ) -> str:
         # Note that we may be passed a pre-populated AnyModelConfig object,
         # in which case the key field should have been populated by the caller (e.g. in `install_path`).
-        config["key"] = config.get("key", self._create_key())
+        config["key"] = config.get("key", uuid_string())
         info = info or ModelProbe.probe(model_path, config)
+        override_key: Optional[str] = config.get("key") if config else None
+
+        assert info.original_hash  # always assigned by probe()
+        info.key = override_key or info.original_hash
 
         model_path = model_path.absolute()
         if model_path.is_relative_to(self.app_config.models_path):

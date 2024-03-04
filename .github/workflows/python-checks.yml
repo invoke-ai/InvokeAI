@@ -1,0 +1,64 @@
+# Runs python code quality checks.
+#
+# Checks for changes to python files before running the checks.
+# When manually triggered or called from another workflow, always runs the tests.
+#
+# TODO: Add mypy or pyright to the checks.
+
+name: 'python checks'
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    types:
+      - 'ready_for_review'
+      - 'opened'
+      - 'synchronize'
+  merge_group:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  python-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5 # expected run time: <1 min
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: check for changed python files
+        if: ${{ github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' }}
+        id: changed-files
+        uses: tj-actions/changed-files@v42
+        with:
+          files_yaml: |
+            python:
+              - 'pyproject.toml'
+              - 'invokeai/**'
+              - '!invokeai/frontend/web/**'
+              - 'tests/**'
+
+      - name: setup python
+        if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: install ruff
+        if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' }}
+        run: pip install ruff
+        shell: bash
+
+      - name: ruff check
+        if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' }}
+        run: ruff check --output-format=github .
+        shell: bash
+
+      - name: ruff format
+        if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' }}
+        run: ruff format --check .
+        shell: bash

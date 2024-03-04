@@ -143,8 +143,6 @@
         "problemDeletingImagesDesc": "Не удалось удалить одно или несколько изображений",
         "loading": "Загрузка",
         "unableToLoad": "Невозможно загрузить галерею",
-        "preparingDownload": "Подготовка к скачиванию",
-        "preparingDownloadFailed": "Проблема с подготовкой к скачиванию",
         "image": "изображение",
         "drop": "перебросить",
         "problemDeletingImages": "Проблема с удалением изображений",
@@ -612,9 +610,7 @@
         "maskBlurMethod": "Метод размытия",
         "seamLowThreshold": "Низкий",
         "seamHighThreshold": "Высокий",
-        "coherenceSteps": "Шагов",
         "coherencePassHeader": "Порог Coherence",
-        "coherenceStrength": "Сила",
         "compositingSettingsHeader": "Настройки компоновки",
         "invoke": {
             "noNodesInGraph": "Нет узлов в графе",
@@ -1321,13 +1317,6 @@
                 "Размер изображения (в пикселях), эквивалентный 512x512, рекомендуется для моделей SD1.5, а размер, эквивалентный 1024x1024, рекомендуется для моделей SDXL."
             ]
         },
-        "compositingCoherenceSteps": {
-            "heading": "Шаги",
-            "paragraphs": [
-                "Количество шагов снижения шума, используемых при прохождении когерентности.",
-                "То же, что и основной параметр «Шаги»."
-            ]
-        },
         "dynamicPrompts": {
             "paragraphs": [
                 "Динамические запросы превращают одно приглашение на множество.",
@@ -1341,12 +1330,6 @@
                 "Модель, используемая для преобразования вывода AI в конечное изображение."
             ],
             "heading": "VAE"
-        },
-        "compositingBlur": {
-            "heading": "Размытие",
-            "paragraphs": [
-                "Радиус размытия маски."
-            ]
         },
         "paramIterations": {
             "paragraphs": [
@@ -1421,13 +1404,6 @@
                 "0 приведет к идентичному изображению, а 1 - к совершенно новому."
             ],
             "heading": "Шумоподавление"
-        },
-        "compositingStrength": {
-            "heading": "Сила",
-            "paragraphs": [
-                null,
-                "То же, что параметр «Сила шумоподавления img2img»."
-            ]
         },
         "paramNegativeConditioning": {
             "paragraphs": [
