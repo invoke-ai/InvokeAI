@@ -355,8 +355,8 @@ export const buildCanvasSDXLInpaintGraph = (
       },
       {
         source: {
-          node_id: MASK_RESIZE_UP,
-          field: 'image',
+          node_id: INPAINT_CREATE_MASK,
+          field: 'expanded_mask_area',
         },
         destination: {
           node_id: MASK_RESIZE_DOWN,

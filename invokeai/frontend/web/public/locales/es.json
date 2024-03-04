@@ -505,8 +505,6 @@
         "seamLowThreshold": "Bajo",
         "coherencePassHeader": "Parámetros de la coherencia",
         "compositingSettingsHeader": "Ajustes de la composición",
-        "coherenceSteps": "Pasos",
-        "coherenceStrength": "Fuerza",
         "patchmatchDownScaleSize": "Reducir a escala",
         "coherenceMode": "Modo"
     },

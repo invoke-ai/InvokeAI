@@ -1,6 +1,6 @@
-name: "Pull Request Labeler"
+name: 'label PRs'
 on:
-- pull_request_target
+  - pull_request_target
 
 jobs:
   labeler:
@@ -9,8 +9,10 @@ jobs:
       pull-requests: write
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: checkout
         uses: actions/checkout@v4
-      - uses: actions/labeler@v5
+
+      - name: label PRs
+        uses: actions/labeler@v5
         with:
           configuration-path: .github/pr_labels.yml

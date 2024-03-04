@@ -179,44 +179,45 @@ class ModelMetadataStoreSQL(ModelMetadataStoreBase):
         )
         return {x[0] for x in self._cursor.fetchall()}
 
-    def _update_tags(self, model_key: str, tags: Set[str]) -> None:
+    def _update_tags(self, model_key: str, tags: Optional[Set[str]]) -> None:
         """Update tags for the model referenced by model_key."""
-        # remove previous tags from this model
-        self._cursor.execute(
-            """--sql
-            DELETE FROM model_tags
-            WHERE model_id=?;
-            """,
-            (model_key,),
-        )
+        if tags:
+            # remove previous tags from this model
+            self._cursor.execute(
+                """--sql
+                DELETE FROM model_tags
+                WHERE model_id=?;
+                """,
+                (model_key,),
+            )
 
-        for tag in tags:
-            self._cursor.execute(
-                """--sql
-                INSERT OR IGNORE INTO tags (
-                  tag_text
-                  )
-                VALUES (?);
-                """,
-                (tag,),
-            )
-            self._cursor.execute(
-                """--sql
-                SELECT tag_id
-                FROM tags
-                WHERE tag_text = ?
-                LIMIT 1;
-                """,
-                (tag,),
-            )
-            tag_id = self._cursor.fetchone()[0]
-            self._cursor.execute(
-                """--sql
-                INSERT OR IGNORE INTO model_tags (
-                   model_id,
-                   tag_id
-                  )
-                VALUES (?,?);
-                """,
-                (model_key, tag_id),
-            )
+            for tag in tags:
+                self._cursor.execute(
+                    """--sql
+                    INSERT OR IGNORE INTO tags (
+                    tag_text
+                    )
+                    VALUES (?);
+                    """,
+                    (tag,),
+                )
+                self._cursor.execute(
+                    """--sql
+                    SELECT tag_id
+                    FROM tags
+                    WHERE tag_text = ?
+                    LIMIT 1;
+                    """,
+                    (tag,),
+                )
+                tag_id = self._cursor.fetchone()[0]
+                self._cursor.execute(
+                    """--sql
+                    INSERT OR IGNORE INTO model_tags (
+                    model_id,
+                    tag_id
+                    )
+                    VALUES (?,?);
+                    """,
+                    (model_key, tag_id),
+                )

@@ -1,0 +1,45 @@
+# Builds and uploads the installer and python build artifacts.
+
+name: build installer
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-installer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5 # expected run time: <2 min
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: install pypa/build
+        run: pip install --upgrade build
+
+      - name: setup frontend
+        uses: ./.github/actions/install-frontend-deps
+
+      - name: create installer
+        id: create_installer
+        run: ./create_installer.sh
+        working-directory: installer
+
+      - name: upload python distribution artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: ${{ steps.create_installer.outputs.DIST_PATH }}
+
+      - name: upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.create_installer.outputs.INSTALLER_FILENAME }}
+          path: ${{ steps.create_installer.outputs.INSTALLER_PATH }}

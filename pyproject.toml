@@ -51,12 +51,12 @@ dependencies = [
   "torchmetrics==0.11.4",
   "torchsde==0.2.6",
   "torchvision==0.16.2",
-  "transformers==4.37.2",
+  "transformers==4.38.2",
 
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events==0.10.1",
   "fastapi==0.109.2",
-  "huggingface-hub==0.20.3",
+  "huggingface-hub==0.21.3",
   "pydantic-settings==2.1.0",
   "pydantic==2.6.1",
   "python-socketio==5.11.1",
@@ -64,6 +64,7 @@ dependencies = [
 
   # Auxiliary dependencies, pinned only if necessary.
   "albumentations",
+  "blake3",
   "click",
   "datasets",
   "Deprecated",
@@ -72,7 +73,6 @@ dependencies = [
   "easing-functions",
   "einops",
   "facexlib",
-  "imohash",
   "matplotlib",                            # needed for plotting of Penner easing functions
   "npyscreen",
   "omegaconf",
