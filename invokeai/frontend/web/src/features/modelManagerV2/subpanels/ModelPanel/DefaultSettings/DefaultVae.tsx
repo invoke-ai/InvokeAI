@@ -5,7 +5,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { map } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
-import type {UseControllerProps } from 'react-hook-form';
+import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useGetModelConfigQuery, useGetVaeModelsQuery } from 'services/api/endpoints/models';

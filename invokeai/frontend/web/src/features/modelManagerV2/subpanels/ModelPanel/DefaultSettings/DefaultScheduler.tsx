@@ -4,7 +4,7 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import { SCHEDULER_OPTIONS } from 'features/parameters/types/constants';
 import { isParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import { useCallback, useMemo } from 'react';
-import type {UseControllerProps } from 'react-hook-form';
+import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 

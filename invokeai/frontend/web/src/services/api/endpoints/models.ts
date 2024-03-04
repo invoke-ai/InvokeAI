@@ -24,7 +24,7 @@ export type UpdateModelArg = {
   body: paths['/api/v2/models/i/{key}']['patch']['requestBody']['content']['application/json'];
 };
 
-export type UpdateModelMetadataArg = {
+type UpdateModelMetadataArg = {
   key: paths['/api/v2/models/i/{key}/metadata']['patch']['parameters']['path']['key'];
   body: paths['/api/v2/models/i/{key}/metadata']['patch']['requestBody']['content']['application/json'];
 };
@@ -37,7 +37,6 @@ type GetModelConfigResponse = paths['/api/v2/models/i/{key}']['get']['responses'
 
 type GetModelMetadataResponse =
   paths['/api/v2/models/i/{key}/metadata']['get']['responses']['200']['content']['application/json'];
-
 
 type ListModelsArg = NonNullable<paths['/api/v2/models/']['get']['parameters']['query']>;
 
@@ -117,25 +116,25 @@ const anyModelConfigAdapterSelectors = anyModelConfigAdapter.getSelectors(undefi
 
 const buildProvidesTags =
   <TEntity extends AnyModelConfig>(tagType: (typeof tagTypes)[number]) =>
-    (result: EntityState<TEntity, string> | undefined) => {
-      const tags: ApiTagDescription[] = [{ type: tagType, id: LIST_TAG }, 'Model'];
-      if (result) {
-        tags.push(
-          ...result.ids.map((id) => ({
-            type: tagType,
-            id,
-          }))
-        );
-      }
+  (result: EntityState<TEntity, string> | undefined) => {
+    const tags: ApiTagDescription[] = [{ type: tagType, id: LIST_TAG }, 'Model'];
+    if (result) {
+      tags.push(
+        ...result.ids.map((id) => ({
+          type: tagType,
+          id,
+        }))
+      );
+    }
 
-      return tags;
-    };
+    return tags;
+  };
 
 const buildTransformResponse =
   <T extends AnyModelConfig>(adapter: EntityAdapter<T, string>) =>
-    (response: { models: T[] }) => {
-      return adapter.setAll(adapter.getInitialState(), response.models);
-    };
+  (response: { models: T[] }) => {
+    return adapter.setAll(adapter.getInitialState(), response.models);
+  };
 
 /**
  * Builds an endpoint URL for the models router

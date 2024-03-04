@@ -1,8 +1,8 @@
-import { Flex, Box } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppSelector } from '../../../../../app/store/storeHooks';
-import { useGetModelMetadataQuery } from '../../../../../services/api/endpoints/models';
-import DataViewer from '../../../../gallery/components/ImageMetadataViewer/DataViewer';
+import { useAppSelector } from 'app/store/storeHooks';
+import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
+import { useGetModelMetadataQuery } from 'services/api/endpoints/models';
 
 export const ModelMetadata = () => {
   const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);

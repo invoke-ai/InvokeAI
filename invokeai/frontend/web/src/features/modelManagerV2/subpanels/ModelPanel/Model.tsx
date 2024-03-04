@@ -1,13 +1,13 @@
+import { Box, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs, Text } from '@invoke-ai/ui-library';
+import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
+import { useTranslation } from 'react-i18next';
+import { useGetModelConfigQuery } from 'services/api/endpoints/models';
 
+import { ModelMetadata } from './Metadata/ModelMetadata';
+import { ModelAttrView } from './ModelAttrView';
 import { ModelEdit } from './ModelEdit';
 import { ModelView } from './ModelView';
-import { Tabs, TabList, Tab, TabPanels, TabPanel, Flex, Heading, Text, Box } from '@invoke-ai/ui-library';
-import { ModelMetadata } from './Metadata/ModelMetadata';
-import { skipToken } from '@reduxjs/toolkit/query';
-import { useGetModelConfigQuery } from '../../../../services/api/endpoints/models';
-import { ModelAttrView } from './ModelAttrView';
-import { useTranslation } from 'react-i18next';
 
 export const Model = () => {
   const { t } = useTranslation();

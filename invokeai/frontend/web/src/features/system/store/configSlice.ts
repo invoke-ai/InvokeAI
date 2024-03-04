@@ -41,8 +41,8 @@ const initialConfigState: AppConfig = {
     boundingBoxHeight: { ...baseDimensionConfig },
     scaledBoundingBoxWidth: { ...baseDimensionConfig },
     scaledBoundingBoxHeight: { ...baseDimensionConfig },
-    scheduler: "euler",
-    vaePrecision: "fp32",
+    scheduler: 'euler',
+    vaePrecision: 'fp32',
     steps: {
       initial: 30,
       sliderMin: 1,

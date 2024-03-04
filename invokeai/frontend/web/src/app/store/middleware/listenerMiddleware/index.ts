@@ -156,4 +156,4 @@ addUpscaleRequestedListener(startAppListening);
 // Dynamic prompts
 addDynamicPromptsListener(startAppListening);
 
-addSetDefaultSettingsListener(startAppListening)
+addSetDefaultSettingsListener(startAppListening);

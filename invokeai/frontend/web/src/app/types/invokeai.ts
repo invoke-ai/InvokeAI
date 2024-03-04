@@ -83,8 +83,8 @@ export type AppConfig = {
     guidance: NumericalParameterConfig;
     cfgRescaleMultiplier: NumericalParameterConfig;
     img2imgStrength: NumericalParameterConfig;
-    scheduler?: ParameterScheduler,
-    vaePrecision?: ParameterPrecision
+    scheduler?: ParameterScheduler;
+    vaePrecision?: ParameterPrecision;
     // Canvas
     boundingBoxHeight: NumericalParameterConfig; // initial value comes from model
     boundingBoxWidth: NumericalParameterConfig; // initial value comes from model

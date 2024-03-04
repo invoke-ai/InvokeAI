@@ -3,7 +3,7 @@ import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { isParameterPrecision } from 'features/parameters/types/parameterSchemas';
 import { useCallback, useMemo } from 'react';
-import type {UseControllerProps } from 'react-hook-form';
+import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 

@@ -1,88 +1,98 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { setDefaultSettings } from 'features/parameters/store/actions';
-import { setCfgRescaleMultiplier, setCfgScale, setScheduler, setSteps, vaePrecisionChanged, vaeSelected } from 'features/parameters/store/generationSlice';
-import { isParameterCFGRescaleMultiplier, isParameterCFGScale, isParameterPrecision, isParameterScheduler, isParameterSteps, zParameterVAEModel } from 'features/parameters/types/parameterSchemas';
+import {
+  setCfgRescaleMultiplier,
+  setCfgScale,
+  setScheduler,
+  setSteps,
+  vaePrecisionChanged,
+  vaeSelected,
+} from 'features/parameters/store/generationSlice';
+import {
+  isParameterCFGRescaleMultiplier,
+  isParameterCFGScale,
+  isParameterPrecision,
+  isParameterScheduler,
+  isParameterSteps,
+  zParameterVAEModel,
+} from 'features/parameters/types/parameterSchemas';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
 import { map } from 'lodash-es';
 import { modelsApi } from 'services/api/endpoints/models';
 
-
 export const addSetDefaultSettingsListener = (startAppListening: AppStartListening) => {
-    startAppListening({
-        actionCreator: setDefaultSettings,
-        effect: async (action, { dispatch, getState }) => {
-            const state = getState();
+  startAppListening({
+    actionCreator: setDefaultSettings,
+    effect: async (action, { dispatch, getState }) => {
+      const state = getState();
 
-            const currentModel = state.generation.model;
+      const currentModel = state.generation.model;
 
-            if (!currentModel) {
-                return
-            }
+      if (!currentModel) {
+        return;
+      }
 
-            const metadata = await dispatch(
-                modelsApi.endpoints.getModelMetadata.initiate(currentModel.key)
-            ).unwrap();
+      const metadata = await dispatch(modelsApi.endpoints.getModelMetadata.initiate(currentModel.key)).unwrap();
 
-            console.log({ metadata })
+      console.log({ metadata });
 
+      if (!metadata || !metadata.default_settings) {
+        return;
+      }
 
-            if (!metadata || !metadata.default_settings) {
-                return;
-            }
+      const { vae, vae_precision, cfg_scale, cfg_rescale_multiplier, steps, scheduler } = metadata.default_settings;
 
-            const { vae, vae_precision, cfg_scale, cfg_rescale_multiplier, steps, scheduler } = metadata.default_settings
+      if (vae) {
+        // we store this as "default" within default settings
+        // to distinguish it from no default set
+        if (vae === 'default') {
+          dispatch(vaeSelected(null));
+        } else {
+          const { data } = modelsApi.endpoints.getVaeModels.select()(state);
+          const vaeArray = map(data?.entities);
+          const validVae = vaeArray.find((model) => model.key === vae);
 
-            if (vae) {
-                // we store this as "default" within default settings 
-                // to distinguish it from no default set
-                if (vae === "default") {
-                    dispatch(vaeSelected(null))
-                } else {
-                    const { data } = modelsApi.endpoints.getVaeModels.select()(state)
-                    const vaeArray = map(data?.entities)
-                    const validVae = vaeArray.find(model => model.key === vae)
+          const result = zParameterVAEModel.safeParse(validVae);
+          if (!result.success) {
+            return;
+          }
+          dispatch(vaeSelected(result.data));
+        }
+      }
 
-                    const result = zParameterVAEModel.safeParse(validVae);
-                    if (!result.success) {
-                        return;
-                    }
-                    dispatch(vaeSelected(result.data));
-                }
-            }
+      if (vae_precision) {
+        if (isParameterPrecision(vae_precision)) {
+          dispatch(vaePrecisionChanged(vae_precision));
+        }
+      }
 
-            if (vae_precision) {
-                if (isParameterPrecision(vae_precision)) {
-                    dispatch(vaePrecisionChanged(vae_precision));
-                }
-            }
+      if (cfg_scale) {
+        if (isParameterCFGScale(cfg_scale)) {
+          dispatch(setCfgScale(cfg_scale));
+        }
+      }
 
-            if (cfg_scale) {
-                if (isParameterCFGScale(cfg_scale)) {
-                    dispatch(setCfgScale(cfg_scale));
-                }
-            }
+      if (cfg_rescale_multiplier) {
+        if (isParameterCFGRescaleMultiplier(cfg_rescale_multiplier)) {
+          dispatch(setCfgRescaleMultiplier(cfg_rescale_multiplier));
+        }
+      }
 
-            if (cfg_rescale_multiplier) {
-                if (isParameterCFGRescaleMultiplier(cfg_rescale_multiplier)) {
-                    dispatch(setCfgRescaleMultiplier(cfg_rescale_multiplier));
-                }
-            }
+      if (steps) {
+        if (isParameterSteps(steps)) {
+          dispatch(setSteps(steps));
+        }
+      }
 
-            if (steps) {
-                if (isParameterSteps(steps)) {
-                    dispatch(setSteps(steps));
-                }
-            }
+      if (scheduler) {
+        if (isParameterScheduler(scheduler)) {
+          dispatch(setScheduler(scheduler));
+        }
+      }
 
-            if (scheduler) {
-                if (isParameterScheduler(scheduler)) {
-                    dispatch(setScheduler(scheduler));
-                }
-            }
-
-            dispatch(addToast(makeToast({ title: t('toast.parameterSet', { parameter: "Default settings" }) })))
-        },
-    });
+      dispatch(addToast(makeToast({ title: t('toast.parameterSet', { parameter: 'Default settings' }) })));
+    },
+  });
 };
