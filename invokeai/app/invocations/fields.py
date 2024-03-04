@@ -241,6 +241,8 @@ class ConditioningField(BaseModel):
         # TODO(ryand): Add more details to this description
         description="The weight of this conditioning tensor's mask relative to overlapping masks.",
     )
+    positive_self_attn_mask_score: float = Field(default=1.0, description="")
+    self_attn_adjustment_end_step_percent: float = Field(default=0.0, description="")
 
 
 class MetadataField(RootModel):

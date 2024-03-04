@@ -70,7 +70,14 @@ class Range:
 
 
 class TextConditioningRegions:
-    def __init__(self, masks: torch.Tensor, ranges: list[Range], positive_cross_attn_mask_scores: list[float]):
+    def __init__(
+        self,
+        masks: torch.Tensor,
+        ranges: list[Range],
+        positive_cross_attn_mask_scores: list[float],
+        positive_self_attn_mask_scores: list[float],
+        self_attn_adjustment_end_step_percents: list[float],
+    ):
         # A binary mask indicating the regions of the image that the prompt should be applied to.
         # Shape: (1, num_prompts, height, width)
         # Dtype: torch.bool
@@ -80,12 +87,19 @@ class TextConditioningRegions:
         # ranges[i] contains the embedding range for the i'th prompt / mask.
         self.ranges = ranges
 
-        # A list of positive cross attention mask scores for each prompt.
-        # positive_cross_attn_mask_scores[i] contains the positive cross attention mask score for the i'th prompt/mask.
+        # The following fields control the cross-attention and self-attention handling of region masks. They are indexed
+        # by prompt / mask index.
         self.positive_cross_attn_mask_scores = positive_cross_attn_mask_scores
+        self.positive_self_attn_mask_scores = positive_self_attn_mask_scores
+        self.self_attn_adjustment_end_step_percents = self_attn_adjustment_end_step_percents
 
-        assert self.masks.shape[1] == len(self.ranges)
-        assert self.masks.shape[1] == len(self.positive_cross_attn_mask_scores)
+        assert (
+            self.masks.shape[1]
+            == len(self.ranges)
+            == len(self.positive_cross_attn_mask_scores)
+            == len(self.positive_self_attn_mask_scores)
+            == len(self.self_attn_adjustment_end_step_percents)
+        )
 
 
 class TextConditioningData:
@@ -102,23 +116,6 @@ class TextConditioningData:
         self.cond_text = cond_text
         self.uncond_regions = uncond_regions
         self.cond_regions = cond_regions
-        # All params:
-        # negative_cross_attn_mask_score: -10000 (recommended to leave this as -10000 to prevent leakage to the rest of the image)
-        # positive_cross_attn_mask_score: 0.0 (relative weightin of masks)
-        # positive_self_attn_mask_score: 0.3
-        # negative_self_attn_mask_score: This doesn't really make sense. It would effectively have the same effect as further increasing positive_self_attn_mask_score.
-        # cross_attn_start_step
-        # self_attn_mask_begin_step_percent: 0.0
-        # self_attn_mask_end_step percent: 0.5
-        # Should we allow cross_attn_mask_begin_step_percent and cross_attn_mask_end_step_percent? Probably not, this seems like more control than necessary. And easy to add in the future.
-        self.negative_cross_attn_mask_score = -10000
-        self.positive_cross_attn_mask_score = 0.0
-        self.positive_self_attn_mask_score = 0.3
-        self.self_attn_mask_end_step_percent = 0.5
-        # mask_weight: float = Field(
-        #     default=1.0,
-        #     description="The weight to apply to the mask. This weight controls the relative weighting of overlapping masks. This weight gets added to the attention map logits before applying a pixelwise softmax.",
-        # )
         # Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
         # `guidance_scale` is defined as `w` of equation 2. of [Imagen Paper](https://arxiv.org/pdf/2205.11487.pdf).
         # Guidance scale is enabled by setting `guidance_scale > 1`. Higher guidance scale encourages to generate

@@ -63,6 +63,8 @@ class CompelInvocation(BaseInvocation):
         default=None, description="A mask defining the region that this conditioning prompt applies to."
     )
     positive_cross_attn_mask_score: float = InputField(default=0.0, description="")
+    positive_self_attn_mask_score: float = InputField(default=1.0, description="")
+    self_attn_adjustment_end_step_percent: float = InputField(default=0.0, description="")
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
@@ -135,6 +137,8 @@ class CompelInvocation(BaseInvocation):
                 conditioning_name=conditioning_name,
                 mask=self.mask,
                 positive_cross_attn_mask_score=self.positive_cross_attn_mask_score,
+                positive_self_attn_mask_score=self.positive_self_attn_mask_score,
+                self_attn_adjustment_end_step_percent=self.self_attn_adjustment_end_step_percent,
             )
         )
 
@@ -278,6 +282,8 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
         default=None, description="A mask defining the region that this conditioning prompt applies to."
     )
     positive_cross_attn_mask_score: float = InputField(default=0.0, description="")
+    positive_self_attn_mask_score: float = InputField(default=1.0, description="")
+    self_attn_adjustment_end_step_percent: float = InputField(default=0.0, description="")
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
@@ -345,6 +351,8 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
                 conditioning_name=conditioning_name,
                 mask=self.mask,
                 positive_cross_attn_mask_score=self.positive_cross_attn_mask_score,
+                positive_self_attn_mask_score=self.positive_self_attn_mask_score,
+                self_attn_adjustment_end_step_percent=self.self_attn_adjustment_end_step_percent,
             )
         )
 

@@ -41,16 +41,7 @@ class RegionalPromptData:
             regions, max_downscale_factor
         )
 
-        # TODO: These should be indexed by batch sample index and prompt index.
-        # Next:
-        # - Add support for setting these one nodes. Might just need positive cross-attention mask score. Being able to downweight the global prompt mighth help alot.
-        # - Scale by region size.
         self.negative_cross_attn_mask_score = -10000
-        # self.positive_cross_attn_mask_score = 0.0
-        self.positive_self_attn_mask_score = 1.0
-        self.self_attn_mask_end_step_percent = 0.3
-        # This one is for regional prompting in general, so should be set on the DenoiseLatents node.
-        self.self_attn_score_range = 3.0
 
     def _prepare_spatial_masks(
         self, regions: list[TextConditioningRegions], max_downscale_factor: int = 8
@@ -222,20 +213,23 @@ class RegionalPromptData:
 
         for batch_idx in range(batch_size):
             batch_sample_spatial_masks = batch_spatial_masks[batch_idx]
+            batch_sample_regions = self._regions[batch_idx]
 
             # Flatten the spatial dimensions of the mask by reshaping to (1, num_prompts, query_seq_len, 1).
             _, num_prompts, _, _ = batch_sample_spatial_masks.shape
             batch_sample_query_masks = batch_sample_spatial_masks.view((1, num_prompts, query_seq_len, 1))
 
             for prompt_idx in range(num_prompts):
-                if percent_through > self.self_attn_mask_end_step_percent:
+                if percent_through > batch_sample_regions.self_attn_adjustment_end_step_percents[prompt_idx]:
                     continue
                 prompt_query_mask = batch_sample_query_masks[0, prompt_idx, :, 0]  # Shape: (query_seq_len,)
                 # Multiply a (1, query_seq_len) mask by a (query_seq_len, 1) mask to get a (query_seq_len,
                 # query_seq_len) mask.
                 # TODO(ryand): Is += really the best option here?
                 attn_mask[batch_idx, :, :] += (
-                    prompt_query_mask.unsqueeze(0) * prompt_query_mask.unsqueeze(1) * self.positive_self_attn_mask_score
+                    prompt_query_mask.unsqueeze(0)
+                    * prompt_query_mask.unsqueeze(1)
+                    * batch_sample_regions.positive_self_attn_mask_scores[prompt_idx]
                 )
 
             # attn_mask_min = attn_mask[batch_idx].min()

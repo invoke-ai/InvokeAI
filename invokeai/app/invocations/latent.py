@@ -391,22 +391,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
     def _get_text_embeddings_and_masks(
         self,
-        cond_field: Union[ConditioningField, list[ConditioningField]],
+        cond_list: list[ConditioningField],
         context: InvocationContext,
         device: torch.device,
         dtype: torch.dtype,
-    ) -> tuple[
-        Union[list[BasicConditioningInfo], list[SDXLConditioningInfo]], list[Optional[torch.Tensor]], list[float]
-    ]:
+    ) -> tuple[Union[list[BasicConditioningInfo], list[SDXLConditioningInfo]], list[Optional[torch.Tensor]]]:
         """Get the text embeddings and masks from the input conditioning fields."""
-        # Normalize cond_field to a list.
-        cond_list = cond_field
-        if not isinstance(cond_list, list):
-            cond_list = [cond_list]
-
         text_embeddings: Union[list[BasicConditioningInfo], list[SDXLConditioningInfo]] = []
         text_embeddings_masks: list[Optional[torch.Tensor]] = []
-        positive_cross_attn_mask_scores: list[float] = []
         for cond in cond_list:
             cond_data = context.conditioning.load(cond.conditioning_name)
             text_embeddings.append(cond_data.conditionings[0].to(device=device, dtype=dtype))
@@ -416,8 +408,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 mask = context.tensors.load(mask.mask_name)
             text_embeddings_masks.append(mask)
 
-            positive_cross_attn_mask_scores.append(cond.positive_cross_attn_mask_score)
-        return text_embeddings, text_embeddings_masks, positive_cross_attn_mask_scores
+        return text_embeddings, text_embeddings_masks
 
     def _preprocess_regional_prompt_mask(
         self, mask: Optional[torch.Tensor], target_height: int, target_width: int
@@ -445,7 +436,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         self,
         text_conditionings: Union[list[BasicConditioningInfo], list[SDXLConditioningInfo]],
         masks: Optional[list[Optional[torch.Tensor]]],
-        positive_cross_attn_mask_scores: list[float],
+        conditioning_fields: list[ConditioningField],
         latent_height: int,
         latent_width: int,
     ) -> tuple[Union[BasicConditioningInfo, SDXLConditioningInfo], Optional[TextConditioningRegions]]:
@@ -466,7 +457,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
         embedding_ranges = []
         extra_conditioning = None
 
-        for text_embedding_info, mask in zip(text_conditionings, masks, strict=True):
+        for prompt_idx, text_embedding_info in enumerate(text_conditionings):
+            mask = masks[prompt_idx]
             if (
                 text_embedding_info.extra_conditioning is not None
                 and text_embedding_info.extra_conditioning.wants_cross_attention_control
@@ -508,7 +500,11 @@ class DenoiseLatentsInvocation(BaseInvocation):
             regions = TextConditioningRegions(
                 masks=torch.cat(processed_masks, dim=1),
                 ranges=embedding_ranges,
-                positive_cross_attn_mask_scores=positive_cross_attn_mask_scores,
+                positive_cross_attn_mask_scores=[x.positive_cross_attn_mask_score for x in conditioning_fields],
+                positive_self_attn_mask_scores=[x.positive_self_attn_mask_score for x in conditioning_fields],
+                self_attn_adjustment_end_step_percents=[
+                    x.self_attn_adjustment_end_step_percent for x in conditioning_fields
+                ],
             )
 
         if extra_conditioning is not None and len(text_conditionings) > 1:
@@ -536,27 +532,32 @@ class DenoiseLatentsInvocation(BaseInvocation):
         latent_height: int,
         latent_width: int,
     ) -> TextConditioningData:
-        (
-            cond_text_embeddings,
-            cond_text_embedding_masks,
-            cond_positive_cross_attn_mask_scores,
-        ) = self._get_text_embeddings_and_masks(self.positive_conditioning, context, unet.device, unet.dtype)
-        (
-            uncond_text_embeddings,
-            uncond_text_embedding_masks,
-            uncond_positive_cross_attn_mask_scores,
-        ) = self._get_text_embeddings_and_masks(self.negative_conditioning, context, unet.device, unet.dtype)
+        # Normalize self.positive_conditioning and self.negative_conditioning to lists.
+        cond_list = self.positive_conditioning
+        if not isinstance(cond_list, list):
+            cond_list = [cond_list]
+        uncond_list = self.negative_conditioning
+        if not isinstance(uncond_list, list):
+            uncond_list = [uncond_list]
+
+        cond_text_embeddings, cond_text_embedding_masks = self._get_text_embeddings_and_masks(
+            cond_list, context, unet.device, unet.dtype
+        )
+
+        uncond_text_embeddings, uncond_text_embedding_masks = self._get_text_embeddings_and_masks(
+            uncond_list, context, unet.device, unet.dtype
+        )
         cond_text_embedding, cond_regions = self.concat_regional_text_embeddings(
             text_conditionings=cond_text_embeddings,
             masks=cond_text_embedding_masks,
-            positive_cross_attn_mask_scores=cond_positive_cross_attn_mask_scores,
+            conditioning_fields=cond_list,
             latent_height=latent_height,
             latent_width=latent_width,
         )
         uncond_text_embedding, uncond_regions = self.concat_regional_text_embeddings(
             text_conditionings=uncond_text_embeddings,
             masks=uncond_text_embedding_masks,
-            positive_cross_attn_mask_scores=uncond_positive_cross_attn_mask_scores,
+            conditioning_fields=uncond_list,
             latent_height=latent_height,
             latent_width=latent_width,
         )
