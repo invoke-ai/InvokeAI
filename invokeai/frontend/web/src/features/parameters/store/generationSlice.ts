@@ -1,4 +1,3 @@
-import type { ComboboxOption } from '@invoke-ai/ui-library';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
@@ -57,7 +56,6 @@ const initialGenerationState: GenerationState = {
   shouldUseCpuNoise: true,
   shouldShowAdvancedOptions: false,
   aspectRatio: { ...initialAspectRatioState },
-  triggerPhrases: [],
 };
 
 export const generationSlice = createSlice({
@@ -209,9 +207,6 @@ export const generationSlice = createSlice({
     aspectRatioChanged: (state, action: PayloadAction<AspectRatioState>) => {
       state.aspectRatio = action.payload;
     },
-    triggerPhrasesChanged: (state, action: PayloadAction<ComboboxOption[]>) => {
-      state.triggerPhrases = action.payload;
-    },
   },
   extraReducers: (builder) => {
     builder.addCase(configChanged, (state, action) => {
@@ -290,7 +285,6 @@ export const {
   heightChanged,
   widthRecalled,
   heightRecalled,
-  triggerPhrasesChanged,
 } = generationSlice.actions;
 
 export const { selectOptimalDimension } = generationSlice.selectors;
