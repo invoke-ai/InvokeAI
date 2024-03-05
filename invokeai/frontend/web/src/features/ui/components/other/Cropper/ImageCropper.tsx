@@ -31,7 +31,7 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { resizeBase64Image } from './cropperUtils';
 import { isCropperModalOpenChanged } from './store/slice';
 
-export const ImageCropper = () => {
+const ImageCropper = () => {
   // Global State
   const imageToCrop = useAppSelector((state) => state.cropper.imageToCrop);
   const isCropperModalOpen = useAppSelector((state) => state.cropper.isCropperModalOpen);
