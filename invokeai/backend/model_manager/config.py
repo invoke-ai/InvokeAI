@@ -164,7 +164,7 @@ class ModelConfigBase(BaseModel):
 
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
-        schema["required"].extend(["key"])
+        schema["required"].extend(["key", "type", "format"])
 
     model_config = ConfigDict(validate_assignment=True, json_schema_extra=json_schema_extra)
 
