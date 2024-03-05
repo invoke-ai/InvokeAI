@@ -2,6 +2,7 @@ import './cropper.min.css';
 
 import {
   Button,
+  Checkbox,
   CompositeNumberInput,
   CompositeSlider,
   Flex,
@@ -19,13 +20,15 @@ import {
 } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import type { ReactElement } from 'react';
-import { cloneElement, createRef, memo, useCallback, useEffect, useState } from 'react';
+import type { ChangeEvent, ReactElement } from 'react';
+import { cloneElement, createRef, memo, useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactCropperElement } from 'react-cropper';
 import Cropper from 'react-cropper';
 import { useTranslation } from 'react-i18next';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+
+import { resizeBase64Image } from './cropperUtils';
 
 type ImageCropperProps = {
   imageDTO: ImageDTO | undefined;
@@ -38,25 +41,41 @@ export const ImageCropper = (props: ImageCropperProps) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { t } = useTranslation();
 
-  // State
+  // Canvas State
   const [cropData, setCropData] = useState<string | null>(null);
-
   const [cropBoxSize, setCropBoxSize] = useState<{ width: number; height: number }>({
     width: 512,
     height: 512,
   });
-
   const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({
     width: 512,
     height: 512,
   });
 
+  // Custom Crop Size State
   const [isCustomCropSizeEnabled, setIsCustomCropSizeEnabled] = useState<boolean>(false);
-
   const [customCropSize, setCustomCropSize] = useState<{ width: number; height: number }>({
     width: 512,
     height: 512,
   });
+  const [isCustomCropSizeMultiplierEnabled, setIsCustomCropSizeMultiplierEnabled] = useState<boolean>(true);
+  const [customCropSizeMultiplier, setCustomCropSizeMultiplier] = useState<number>(2);
+
+  const cropSizeDerived = useMemo(
+    () => ({
+      width: !isCustomCropSizeEnabled
+        ? isCustomCropSizeMultiplierEnabled
+          ? Math.floor(cropBoxSize.width * customCropSizeMultiplier)
+          : customCropSize.width
+        : cropBoxSize.width,
+      height: !isCustomCropSizeEnabled
+        ? isCustomCropSizeMultiplierEnabled
+          ? Math.floor(cropBoxSize.height * customCropSizeMultiplier)
+          : customCropSize.height
+        : cropBoxSize.height,
+    }),
+    [cropBoxSize, customCropSize, customCropSizeMultiplier, isCustomCropSizeMultiplierEnabled, isCustomCropSizeEnabled]
+  );
 
   // Hooks
 
@@ -78,16 +97,18 @@ export const ImageCropper = (props: ImageCropperProps) => {
 
   const getCropData = useCallback(() => {
     if (typeof cropperRef.current?.cropper !== 'undefined') {
-      setCropData(
-        cropperRef.current?.cropper
-          .getCroppedCanvas({
-            width: !isCustomCropSizeEnabled ? customCropSize.width : cropBoxSize.width,
-            height: !isCustomCropSizeEnabled ? customCropSize.height : cropBoxSize.height,
-          })
-          .toDataURL()
-      );
+      const croppedCanvas = cropperRef.current?.cropper
+        .getCroppedCanvas({
+          width: cropBoxSize.width,
+          height: cropBoxSize.height,
+        })
+        .toDataURL();
+
+      resizeBase64Image(croppedCanvas, cropSizeDerived.width, cropSizeDerived.height).then((finalCrop) => {
+        setCropData(finalCrop as string);
+      });
     }
-  }, [cropperRef, customCropSize, isCustomCropSizeEnabled, cropBoxSize]);
+  }, [cropperRef, cropSizeDerived, cropBoxSize]);
 
   const handleCropBoxWidthChange = useCallback(
     (width: number) => {
@@ -118,6 +139,16 @@ export const ImageCropper = (props: ImageCropperProps) => {
     },
     [customCropSize]
   );
+
+  const handleCustomCropSizeMultiplierChange = useCallback((multiplier: number) => {
+    setCustomCropSizeMultiplier(multiplier);
+  }, []);
+
+  const handleCustomCropSizeMultiplierEnabledChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setIsCustomCropSizeMultiplierEnabled(e.target.checked);
+  }, []);
+
+  // Cropper Handlers
 
   const onCropperOpen = useCallback(() => {
     onOpen();
@@ -172,9 +203,7 @@ export const ImageCropper = (props: ImageCropperProps) => {
   }, [cropperRef]);
 
   // Badges
-  const customCropSizeBadges: (string | number)[] = [
-    `${!isCustomCropSizeEnabled ? customCropSize.width : cropBoxSize.width}x${!isCustomCropSizeEnabled ? customCropSize.height : cropBoxSize.height}`,
-  ];
+  const customCropSizeBadges: (string | number)[] = [`${cropSizeDerived.width}x${cropSizeDerived.height}`];
 
   return (
     <>
@@ -221,31 +250,55 @@ export const ImageCropper = (props: ImageCropperProps) => {
                   badges={customCropSizeBadges}
                   onToggle={onCustomSaveSizeToggle}
                 >
-                  <Flex p={4} gap={4} background="base.750" borderRadius="base" borderTopRadius={0}>
-                    <FormControl>
-                      <FormLabel>{t('cropper.width')}</FormLabel>
-                      <CompositeNumberInput
-                        value={!isCustomCropSizeEnabled ? customCropSize.width : cropBoxSize.width}
-                        onChange={handleCustomCropSizeWidthChange}
-                        min={0}
-                        max={4096}
-                        step={1}
-                        defaultValue={512}
-                        isDisabled={isCustomCropSizeEnabled}
-                      />
-                    </FormControl>
-                    <FormControl>
-                      <FormLabel>{t('cropper.height')}</FormLabel>
-                      <CompositeNumberInput
-                        value={!isCustomCropSizeEnabled ? customCropSize.height : cropBoxSize.height}
-                        onChange={handleCustomCropSizeHeightChange}
-                        min={0}
-                        max={4096}
-                        step={1}
-                        defaultValue={512}
-                        isDisabled={isCustomCropSizeEnabled}
-                      />
-                    </FormControl>
+                  <Flex p={4} gap={4} flexDir="column" background="base.750" borderRadius="base" borderTopRadius={0}>
+                    <Flex gap={4}>
+                      <FormControl sx={{ width: 'max-content' }}>
+                        <Checkbox
+                          isChecked={isCustomCropSizeMultiplierEnabled}
+                          onChange={handleCustomCropSizeMultiplierEnabledChange}
+                        />
+                      </FormControl>
+                      <FormControl>
+                        <FormLabel>{t('cropper.customSaveSize.scaleBy')}</FormLabel>
+                        <CompositeSlider
+                          value={customCropSizeMultiplier}
+                          onChange={handleCustomCropSizeMultiplierChange}
+                          defaultValue={1}
+                          min={0}
+                          max={20}
+                          step={1}
+                          fineStep={0.01}
+                          marks={[0, 1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20]}
+                          isDisabled={!isCustomCropSizeMultiplierEnabled}
+                        />
+                      </FormControl>
+                    </Flex>
+                    <Flex gap={4}>
+                      <FormControl>
+                        <FormLabel>{t('cropper.width')}</FormLabel>
+                        <CompositeNumberInput
+                          value={customCropSize.width}
+                          onChange={handleCustomCropSizeWidthChange}
+                          min={0}
+                          max={4096}
+                          step={1}
+                          defaultValue={512}
+                          isDisabled={!isCustomCropSizeEnabled && isCustomCropSizeMultiplierEnabled}
+                        />
+                      </FormControl>
+                      <FormControl>
+                        <FormLabel>{t('cropper.height')}</FormLabel>
+                        <CompositeNumberInput
+                          value={customCropSize.height}
+                          onChange={handleCustomCropSizeHeightChange}
+                          min={0}
+                          max={4096}
+                          step={1}
+                          defaultValue={512}
+                          isDisabled={!isCustomCropSizeEnabled && isCustomCropSizeMultiplierEnabled}
+                        />
+                      </FormControl>
+                    </Flex>
                   </Flex>
                 </StandaloneAccordion>
 

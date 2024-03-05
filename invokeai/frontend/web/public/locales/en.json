@@ -301,7 +301,8 @@
         "noPreview": "No Crop Preview",
         "aspectRatio": "Aspect Ratio",
         "customSaveSize": {
-            "title": "Custom Save Size"
+            "title": "Save Size",
+            "scaleBy": "Scale By"
         }
     },
     "hrf": {
