@@ -6,7 +6,7 @@ import { selectConfigSlice } from 'features/system/store/configSlice';
 import { isNil } from 'lodash-es';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetModelConfigQuery  } from 'services/api/endpoints/models';
+import { useGetModelConfigQuery } from 'services/api/endpoints/models';
 
 import { DefaultSettingsForm } from './DefaultSettings/DefaultSettingsForm';
 
