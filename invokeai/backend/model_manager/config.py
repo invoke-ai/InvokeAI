@@ -29,6 +29,7 @@ from diffusers.models.modeling_utils import ModelMixin
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, TypeAdapter
 from typing_extensions import Annotated, Any, Dict
 
+from invokeai.app.invocations.constants import SCHEDULER_NAME_VALUES
 from invokeai.app.util.misc import uuid_string
 
 from ..raw_model import RawModel
@@ -131,6 +132,15 @@ class ModelSourceType(str, Enum):
     CivitAI = "civitai"
 
 
+class ModelDefaultSettings(BaseModel):
+    vae: str | None
+    vae_precision: str | None
+    scheduler: SCHEDULER_NAME_VALUES | None
+    steps: int | None
+    cfg_scale: float | None
+    cfg_rescale_multiplier: float | None
+
+
 class ModelConfigBase(BaseModel):
     """Base class for model configuration information."""
 
@@ -148,6 +158,9 @@ class ModelConfigBase(BaseModel):
         description="The original API response from the source, as stringified JSON.", default=None
     )
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
+    default_settings: Optional[ModelDefaultSettings] = Field(
+        description="Default settings for this model", default=None
+    )
 
     model_config = ConfigDict(use_enum_values=False, validate_assignment=True)
 

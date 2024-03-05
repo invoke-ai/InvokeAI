@@ -11,12 +11,14 @@ from typing import Any, Dict, List, Optional, Set, Union
 from pydantic import BaseModel, Field
 
 from invokeai.app.services.shared.pagination import PaginatedResults
+from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 from invokeai.backend.model_manager import (
     AnyModelConfig,
     BaseModelType,
     ModelFormat,
     ModelType,
 )
+from invokeai.backend.model_manager.config import ModelDefaultSettings
 
 
 class DuplicateModelException(Exception):
@@ -55,6 +57,18 @@ class ModelSummary(BaseModel):
     name: str = Field(description="model name")
     description: str = Field(description="short description of model")
     tags: Set[str] = Field(description="tags associated with model")
+
+
+class ModelRecordChanges(BaseModelExcludeNull, extra="allow"):
+    """A set of changes to apply to model metadata.
+    Only limited changes are valid:
+      - `default_settings`: the user-configured default settings for this model
+    """
+
+    default_settings: Optional[ModelDefaultSettings] = Field(
+        default=None, description="The user-configured default settings for this model"
+    )
+    """The user-configured default settings for this model"""
 
 
 class ModelRecordServiceBase(ABC):

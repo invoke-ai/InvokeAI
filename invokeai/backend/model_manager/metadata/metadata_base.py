@@ -23,7 +23,6 @@ from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
 from typing_extensions import Annotated
 
-from invokeai.app.invocations.constants import SCHEDULER_NAME_VALUES
 from invokeai.backend.model_manager import ModelRepoVariant
 
 from ..util import select_hf_files
@@ -40,15 +39,6 @@ class RemoteModelFile(BaseModel):
     path: Path = Field(description="The path to the file, relative to the model root")
     size: int = Field(description="The size of this file, in bytes")
     sha256: Optional[str] = Field(description="SHA256 hash of this model (not always available)", default=None)
-
-
-class ModelDefaultSettings(BaseModel):
-    vae: str | None
-    vae_precision: str | None
-    scheduler: SCHEDULER_NAME_VALUES | None
-    steps: int | None
-    cfg_scale: float | None
-    cfg_rescale_multiplier: float | None
 
 
 class ModelMetadataBase(BaseModel):
