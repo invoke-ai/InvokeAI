@@ -352,6 +352,7 @@ class ModelInstallServiceBase(ABC):
         source: str,
         config: Optional[Dict[str, Any]] = None,
         access_token: Optional[str] = None,
+        inplace: Optional[bool] = False,
     ) -> ModelInstallJob:
         r"""Install the indicated model using heuristics to interpret user intentions.
 
