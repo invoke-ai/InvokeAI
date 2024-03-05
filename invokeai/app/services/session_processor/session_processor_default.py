@@ -265,7 +265,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     # Get the next session to process
                     self._queue_item = self._invoker.services.session_queue.dequeue()
                     if self._queue_item is not None and resume_event.is_set():
-
                         self._invoker.services.logger.debug(f"Executing queue item {self._queue_item.item_id}")
                         cancel_event.clear()
 
