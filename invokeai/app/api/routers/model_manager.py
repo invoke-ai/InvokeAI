@@ -19,6 +19,7 @@ from invokeai.app.services.model_records import (
     ModelSummary,
     UnknownModelException,
 )
+from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
@@ -263,15 +264,13 @@ async def scan_for_models(
 )
 async def update_model_record(
     key: Annotated[str, Path(description="Unique key of model")],
-    info: Annotated[
-        AnyModelConfig, Body(description="Model config", discriminator="type", example=example_model_input)
-    ],
+    changes: Annotated[ModelRecordChanges, Body(description="Model config", example=example_model_input)],
 ) -> AnyModelConfig:
-    """Update model contents with a new config. If the model name or base fields are changed, then the model is renamed."""
+    """Update a model's config."""
     logger = ApiDependencies.invoker.services.logger
     record_store = ApiDependencies.invoker.services.model_manager.store
     try:
-        model_response: AnyModelConfig = record_store.update_model(key, config=info)
+        model_response: AnyModelConfig = record_store.update_model(key, changes=changes)
         logger.info(f"Updated model: {key}")
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -563,7 +562,8 @@ async def convert_model(
     # temporarily rename the original safetensors file so that there is no naming conflict
     original_name = model_config.name
     model_config.name = f"{original_name}.DELETE"
-    store.update_model(key, config=model_config)
+    changes = ModelRecordChanges(name=model_config.name)
+    store.update_model(key, changes=changes)
 
     # install the diffusers
     try:

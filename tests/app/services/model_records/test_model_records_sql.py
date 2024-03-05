@@ -6,6 +6,7 @@ from hashlib import sha256
 from typing import Any, Optional
 
 import pytest
+from pydantic import ValidationError
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.model_records import (
@@ -14,6 +15,7 @@ from invokeai.app.services.model_records import (
     ModelRecordServiceSQL,
     UnknownModelException,
 )
+from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.backend.model_manager.config import (
     BaseModelType,
     MainDiffusersConfig,
@@ -73,34 +75,33 @@ def test_raises_on_violating_uniqueness(store: ModelRecordServiceBase):
         store.add_model(config2)
 
 
-def test_update(store: ModelRecordServiceBase):
+def test_model_records_updates_model(store: ModelRecordServiceBase):
     config = example_config("key1")
     store.add_model(config)
     config = store.get_model("key1")
     assert config.name == "old name"
-
-    config.name = "new name"
-    store.update_model(config.key, config)
+    new_name = "new name"
+    changes = ModelRecordChanges(name=new_name)
+    store.update_model(config.key, changes)
     new_config = store.get_model("key1")
-    assert new_config.name == "new name"
+    assert new_config.name == new_name
 
 
-def test_rename(store: ModelRecordServiceBase):
+def test_model_records_rejects_invalid_changes(store: ModelRecordServiceBase):
     config = example_config("key1")
     store.add_model(config)
     config = store.get_model("key1")
-    assert config.name == "old name"
-
-    store.rename_model("key1", "new name")
-    new_config = store.get_model("key1")
-    assert new_config.name == "new name"
+    # upcast_attention is an invalid field for TIs
+    changes = ModelRecordChanges(upcast_attention=True)
+    with pytest.raises(ValidationError):
+        store.update_model(config.key, changes)
 
 
 def test_unknown_key(store: ModelRecordServiceBase):
     config = example_config("key1")
     store.add_model(config)
     with pytest.raises(UnknownModelException):
-        store.update_model("unknown_key", config)
+        store.update_model("unknown_key", ModelRecordChanges())
 
 
 def test_delete(store: ModelRecordServiceBase):
