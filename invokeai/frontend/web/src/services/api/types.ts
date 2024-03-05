@@ -43,14 +43,13 @@ export type ControlField = S['ControlField'];
 // Model Configs
 
 // TODO(MM2): Can we make key required in the pydantic model?
-export type LoRAModelConfig = S['LoRAConfig'];
+export type LoRAModelConfig = S['LoRADiffusersConfig'] | S['LoRALyCORISConfig'];
 // TODO(MM2): Can we rename this from Vae -> VAE
-export type VAEModelConfig = S['VaeCheckpointConfig'] | S['VaeDiffusersConfig'];
+export type VAEModelConfig = S['VAECheckpointConfig'] | S['VAEDiffusersConfig'];
 export type ControlNetModelConfig = S['ControlNetDiffusersConfig'] | S['ControlNetCheckpointConfig'];
 export type IPAdapterModelConfig = S['IPAdapterConfig'];
-// TODO(MM2): Can we rename this to T2IAdapterConfig
-export type T2IAdapterModelConfig = S['T2IConfig'];
-export type TextualInversionModelConfig = S['TextualInversionConfig'];
+export type T2IAdapterModelConfig = S['T2IAdapterConfig'];
+export type TextualInversionModelConfig = S['TextualInversionFileConfig'] | S['TextualInversionFolderConfig'];
 export type DiffusersModelConfig = S['MainDiffusersConfig'];
 export type CheckpointModelConfig = S['MainCheckpointConfig'];
 type CLIPVisionDiffusersConfig = S['CLIPVisionDiffusersConfig'];

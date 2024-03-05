@@ -5,19 +5,19 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
 import { useCallback, useMemo } from 'react';
-import { useGetModelImportsQuery, usePruneModelImportsMutation } from 'services/api/endpoints/models';
+import { useListModelInstallsQuery, usePruneCompletedModelInstallsMutation } from 'services/api/endpoints/models';
 
-import { ImportQueueItem } from './ImportQueueItem';
+import { ModelInstallQueueItem } from './ModelInstallQueueItem';
 
-export const ImportQueue = () => {
+export const ModelInstallQueue = () => {
   const dispatch = useAppDispatch();
 
-  const { data } = useGetModelImportsQuery();
+  const { data } = useListModelInstallsQuery();
 
-  const [pruneModelImports] = usePruneModelImportsMutation();
+  const [_pruneCompletedModelInstalls] = usePruneCompletedModelInstallsMutation();
 
-  const pruneQueue = useCallback(() => {
-    pruneModelImports()
+  const pruneCompletedModelInstalls = useCallback(() => {
+    _pruneCompletedModelInstalls()
       .unwrap()
       .then((_) => {
         dispatch(
@@ -41,7 +41,7 @@ export const ImportQueue = () => {
           );
         }
       });
-  }, [pruneModelImports, dispatch]);
+  }, [_pruneCompletedModelInstalls, dispatch]);
 
   const pruneAvailable = useMemo(() => {
     return data?.some(
@@ -53,14 +53,19 @@ export const ImportQueue = () => {
     <Flex flexDir="column" p={3} h="full">
       <Flex justifyContent="space-between" alignItems="center">
         <Text>{t('modelManager.importQueue')}</Text>
-        <Button size="sm" isDisabled={!pruneAvailable} onClick={pruneQueue} tooltip={t('modelManager.pruneTooltip')}>
+        <Button
+          size="sm"
+          isDisabled={!pruneAvailable}
+          onClick={pruneCompletedModelInstalls}
+          tooltip={t('modelManager.pruneTooltip')}
+        >
           {t('modelManager.prune')}
         </Button>
       </Flex>
       <Box mt={3} layerStyle="first" p={3} borderRadius="base" w="full" h="full">
         <ScrollableContent>
           <Flex flexDir="column-reverse" gap="2">
-            {data?.map((model) => <ImportQueueItem key={model.id} model={model} />)}
+            {data?.map((model) => <ModelInstallQueueItem key={model.id} installJob={model} />)}
           </Flex>
         </ScrollableContent>
       </Box>

@@ -1,7 +1,6 @@
 import type { EntityAdapter, EntityState, ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
 import { createEntityAdapter } from '@reduxjs/toolkit';
 import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
-import type { JSONObject } from 'common/types';
 import queryString from 'query-string';
 import type { operations, paths } from 'services/api/schema';
 import type {
@@ -24,49 +23,33 @@ export type UpdateModelArg = {
   body: paths['/api/v2/models/i/{key}']['patch']['requestBody']['content']['application/json'];
 };
 
-type UpdateModelMetadataArg = {
-  key: paths['/api/v2/models/i/{key}/metadata']['patch']['parameters']['path']['key'];
-  body: paths['/api/v2/models/i/{key}/metadata']['patch']['requestBody']['content']['application/json'];
-};
-
 type UpdateModelResponse = paths['/api/v2/models/i/{key}']['patch']['responses']['200']['content']['application/json'];
-type UpdateModelMetadataResponse =
-  paths['/api/v2/models/i/{key}/metadata']['patch']['responses']['200']['content']['application/json'];
 
 type GetModelConfigResponse = paths['/api/v2/models/i/{key}']['get']['responses']['200']['content']['application/json'];
 
-type GetModelMetadataResponse =
-  paths['/api/v2/models/i/{key}/metadata']['get']['responses']['200']['content']['application/json'];
-
 type ListModelsArg = NonNullable<paths['/api/v2/models/']['get']['parameters']['query']>;
 
-type DeleteMainModelArg = {
+type DeleteModelArg = {
   key: string;
 };
-
-type DeleteMainModelResponse = void;
+type DeleteModelResponse = void;
 
 type ConvertMainModelResponse =
   paths['/api/v2/models/convert/{key}']['put']['responses']['200']['content']['application/json'];
 
 type InstallModelArg = {
   source: paths['/api/v2/models/install']['post']['parameters']['query']['source'];
-  access_token?: paths['/api/v2/models/install']['post']['parameters']['query']['access_token'];
-  // TODO(MM2): This is typed as `Optional[Dict[str, Any]]` in backend...
-  config?: JSONObject;
-  // config: NonNullable<paths['/api/v2/models/install']['post']['requestBody']>['content']['application/json'];
 };
-
 type InstallModelResponse = paths['/api/v2/models/install']['post']['responses']['201']['content']['application/json'];
 
-type ListImportModelsResponse =
-  paths['/api/v2/models/import']['get']['responses']['200']['content']['application/json'];
+type ListModelInstallsResponse =
+  paths['/api/v2/models/install']['get']['responses']['200']['content']['application/json'];
 
-type DeleteImportModelsResponse =
-  paths['/api/v2/models/import/{id}']['delete']['responses']['201']['content']['application/json'];
+type CancelModelInstallResponse =
+  paths['/api/v2/models/install/{id}']['delete']['responses']['201']['content']['application/json'];
 
-type PruneModelImportsResponse =
-  paths['/api/v2/models/import']['patch']['responses']['200']['content']['application/json'];
+type PruneCompletedModelInstallsResponse =
+  paths['/api/v2/models/install']['delete']['responses']['200']['content']['application/json'];
 
 export type ScanFolderResponse =
   paths['/api/v2/models/scan_folder']['get']['responses']['200']['content']['application/json'];
@@ -146,31 +129,7 @@ const buildModelsUrl = (path: string = '') => buildV2Url(`models/${path}`);
 
 export const modelsApi = api.injectEndpoints({
   endpoints: (build) => ({
-    getMainModels: build.query<EntityState<MainModelConfig, string>, BaseModelType[]>({
-      query: (base_models) => {
-        const params: ListModelsArg = {
-          model_type: 'main',
-          base_models,
-        };
-
-        const query = queryString.stringify(params, { arrayFormat: 'none' });
-        return buildModelsUrl(`?${query}`);
-      },
-      providesTags: buildProvidesTags<MainModelConfig>('MainModel'),
-      transformResponse: buildTransformResponse<MainModelConfig>(mainModelsAdapter),
-      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
-        queryFulfilled.then(({ data }) => {
-          upsertModelConfigs(data, dispatch);
-        });
-      },
-    }),
-    getModelMetadata: build.query<GetModelMetadataResponse, string>({
-      query: (key) => {
-        return buildModelsUrl(`i/${key}/metadata`);
-      },
-      providesTags: ['Model'],
-    }),
-    updateModels: build.mutation<UpdateModelResponse, UpdateModelArg>({
+    updateModel: build.mutation<UpdateModelResponse, UpdateModelArg>({
       query: ({ key, body }) => {
         return {
           url: buildModelsUrl(`i/${key}`),
@@ -180,28 +139,17 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['Model'],
     }),
-    updateModelMetadata: build.mutation<UpdateModelMetadataResponse, UpdateModelMetadataArg>({
-      query: ({ key, body }) => {
-        return {
-          url: buildModelsUrl(`i/${key}/metadata`),
-          method: 'PATCH',
-          body: body,
-        };
-      },
-      invalidatesTags: ['Model'],
-    }),
     installModel: build.mutation<InstallModelResponse, InstallModelArg>({
-      query: ({ source, config, access_token }) => {
+      query: ({ source }) => {
         return {
           url: buildModelsUrl('install'),
-          params: { source, access_token },
+          params: { source },
           method: 'POST',
-          body: config,
         };
       },
-      invalidatesTags: ['Model', 'ModelImports'],
+      invalidatesTags: ['Model', 'ModelInstalls'],
     }),
-    deleteModels: build.mutation<DeleteMainModelResponse, DeleteMainModelArg>({
+    deleteModels: build.mutation<DeleteModelResponse, DeleteModelArg>({
       query: ({ key }) => {
         return {
           url: buildModelsUrl(`i/${key}`),
@@ -210,7 +158,7 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['Model'],
     }),
-    convertMainModels: build.mutation<ConvertMainModelResponse, string>({
+    convertModel: build.mutation<ConvertMainModelResponse, string>({
       query: (key) => {
         return {
           url: buildModelsUrl(`convert/${key}`),
@@ -252,6 +200,57 @@ export const modelsApi = api.injectEndpoints({
         };
       },
       invalidatesTags: ['Model'],
+    }),
+    scanFolder: build.query<ScanFolderResponse, ScanFolderArg>({
+      query: (arg) => {
+        const folderQueryStr = arg ? queryString.stringify(arg, {}) : '';
+        return {
+          url: buildModelsUrl(`scan_folder?${folderQueryStr}`),
+        };
+      },
+    }),
+    listModelInstalls: build.query<ListModelInstallsResponse, void>({
+      query: () => {
+        return {
+          url: buildModelsUrl('install'),
+        };
+      },
+      providesTags: ['ModelInstalls'],
+    }),
+    cancelModelInstall: build.mutation<CancelModelInstallResponse, number>({
+      query: (id) => {
+        return {
+          url: buildModelsUrl(`install/${id}`),
+          method: 'DELETE',
+        };
+      },
+      invalidatesTags: ['ModelInstalls'],
+    }),
+    pruneCompletedModelInstalls: build.mutation<PruneCompletedModelInstallsResponse, void>({
+      query: () => {
+        return {
+          url: buildModelsUrl('install'),
+          method: 'DELETE',
+        };
+      },
+      invalidatesTags: ['ModelInstalls'],
+    }),
+    getMainModels: build.query<EntityState<MainModelConfig, string>, BaseModelType[]>({
+      query: (base_models) => {
+        const params: ListModelsArg = {
+          model_type: 'main',
+          base_models,
+        };
+        const query = queryString.stringify(params, { arrayFormat: 'none' });
+        return buildModelsUrl(`?${query}`);
+      },
+      providesTags: buildProvidesTags<MainModelConfig>('MainModel'),
+      transformResponse: buildTransformResponse<MainModelConfig>(mainModelsAdapter),
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        queryFulfilled.then(({ data }) => {
+          upsertModelConfigs(data, dispatch);
+        });
+      },
     }),
     getLoRAModels: build.query<EntityState<LoRAModelConfig, string>, void>({
       query: () => ({ url: buildModelsUrl(), params: { model_type: 'lora' } }),
@@ -313,40 +312,6 @@ export const modelsApi = api.injectEndpoints({
         });
       },
     }),
-    scanModels: build.query<ScanFolderResponse, ScanFolderArg>({
-      query: (arg) => {
-        const folderQueryStr = arg ? queryString.stringify(arg, {}) : '';
-        return {
-          url: buildModelsUrl(`scan_folder?${folderQueryStr}`),
-        };
-      },
-    }),
-    getModelImports: build.query<ListImportModelsResponse, void>({
-      query: () => {
-        return {
-          url: buildModelsUrl(`import`),
-        };
-      },
-      providesTags: ['ModelImports'],
-    }),
-    deleteModelImport: build.mutation<DeleteImportModelsResponse, number>({
-      query: (id) => {
-        return {
-          url: buildModelsUrl(`import/${id}`),
-          method: 'DELETE',
-        };
-      },
-      invalidatesTags: ['ModelImports'],
-    }),
-    pruneModelImports: build.mutation<PruneModelImportsResponse, void>({
-      query: () => {
-        return {
-          url: buildModelsUrl('import'),
-          method: 'PATCH',
-        };
-      },
-      invalidatesTags: ['ModelImports'],
-    }),
   }),
 });
 
@@ -360,16 +325,14 @@ export const {
   useGetTextualInversionModelsQuery,
   useGetVaeModelsQuery,
   useDeleteModelsMutation,
-  useUpdateModelsMutation,
+  useUpdateModelMutation,
   useInstallModelMutation,
-  useConvertMainModelsMutation,
+  useConvertModelMutation,
   useSyncModelsMutation,
-  useLazyScanModelsQuery,
-  useGetModelImportsQuery,
-  useGetModelMetadataQuery,
-  useDeleteModelImportMutation,
-  usePruneModelImportsMutation,
-  useUpdateModelMetadataMutation,
+  useLazyScanFolderQuery,
+  useListModelInstallsQuery,
+  useCancelModelInstallMutation,
+  usePruneCompletedModelInstallsMutation,
 } = modelsApi;
 
 const upsertModelConfigs = (

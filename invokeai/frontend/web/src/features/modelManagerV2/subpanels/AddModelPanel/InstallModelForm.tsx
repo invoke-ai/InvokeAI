@@ -12,7 +12,7 @@ type SimpleImportModelConfig = {
   location: string;
 };
 
-export const SimpleImport = () => {
+export const InstallModelForm = () => {
   const dispatch = useAppDispatch();
 
   const [installModel, { isLoading }] = useInstallModelMutation();

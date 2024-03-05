@@ -14,7 +14,7 @@ export const addModelInstallEventListener = (startAppListening: AppStartListenin
       const { bytes, total_bytes, id } = action.payload.data;
 
       dispatch(
-        modelsApi.util.updateQueryData('getModelImports', undefined, (draft) => {
+        modelsApi.util.updateQueryData('listModelInstalls', undefined, (draft) => {
           const modelImport = draft.find((m) => m.id === id);
           if (modelImport) {
             modelImport.bytes = bytes;
@@ -33,7 +33,7 @@ export const addModelInstallEventListener = (startAppListening: AppStartListenin
       const { id } = action.payload.data;
 
       dispatch(
-        modelsApi.util.updateQueryData('getModelImports', undefined, (draft) => {
+        modelsApi.util.updateQueryData('listModelInstalls', undefined, (draft) => {
           const modelImport = draft.find((m) => m.id === id);
           if (modelImport) {
             modelImport.status = 'completed';
@@ -41,7 +41,7 @@ export const addModelInstallEventListener = (startAppListening: AppStartListenin
           return draft;
         })
       );
-      dispatch(api.util.invalidateTags([{ type: 'ModelConfig' }]));
+      dispatch(api.util.invalidateTags(['Model']));
     },
   });
 
@@ -51,7 +51,7 @@ export const addModelInstallEventListener = (startAppListening: AppStartListenin
       const { id, error, error_type } = action.payload.data;
 
       dispatch(
-        modelsApi.util.updateQueryData('getModelImports', undefined, (draft) => {
+        modelsApi.util.updateQueryData('listModelInstalls', undefined, (draft) => {
           const modelImport = draft.find((m) => m.id === id);
           if (modelImport) {
             modelImport.status = 'error';

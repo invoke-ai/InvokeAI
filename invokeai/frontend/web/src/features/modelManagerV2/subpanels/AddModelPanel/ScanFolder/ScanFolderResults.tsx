@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 import { type ScanFolderResponse, useInstallModelMutation } from 'services/api/endpoints/models';
 
-import { ScanModelResultItem } from './ScanModelResultItem';
+import { ScanModelResultItem } from './ScanFolderResultItem';
 
 type ScanModelResultsProps = {
   results: ScanFolderResponse;
