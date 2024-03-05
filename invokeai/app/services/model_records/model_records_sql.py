@@ -43,7 +43,7 @@ import json
 import sqlite3
 from math import ceil
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import List, Optional, Union
 
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.backend.model_manager.config import (
@@ -57,6 +57,7 @@ from invokeai.backend.model_manager.config import (
 from ..shared.sqlite.sqlite_database import SqliteDatabase
 from .model_records_base import (
     DuplicateModelException,
+    ModelRecordChanges,
     ModelRecordOrderBy,
     ModelRecordServiceBase,
     ModelSummary,
@@ -151,16 +152,15 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 self._db.conn.rollback()
                 raise e
 
-    def update_model(self, key: str, config: Union[Dict[str, Any], AnyModelConfig]) -> AnyModelConfig:
-        """
-        Update the model, returning the updated version.
+    def update_model(self, key: str, changes: ModelRecordChanges) -> AnyModelConfig:
+        record = self.get_model(key)
 
-        :param key: Unique key for the model to be updated
-        :param config: Model configuration record. Either a dict with the
-         required fields, or a ModelConfigBase instance.
-        """
-        record = ModelConfigFactory.make_config(config, key=key)  # ensure it is a valid config obect
-        json_serialized = record.model_dump_json()  # and turn it into a json string.
+        # Model configs use pydantic's `validate_assignment`, so each change is validated by pydantic.
+        for field_name in changes.model_fields_set:
+            setattr(record, field_name, getattr(changes, field_name))
+
+        json_serialized = record.model_dump_json()
+
         with self._db.lock:
             try:
                 self._cursor.execute(

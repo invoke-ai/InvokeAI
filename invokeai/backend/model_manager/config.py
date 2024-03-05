@@ -162,7 +162,7 @@ class ModelConfigBase(BaseModel):
         description="Default settings for this model", default=None
     )
 
-    model_config = ConfigDict(use_enum_values=False, validate_assignment=True)
+    model_config = ConfigDict(validate_assignment=True)
 
 
 class CheckpointConfigBase(ModelConfigBase):

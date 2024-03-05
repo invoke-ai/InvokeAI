@@ -6,7 +6,7 @@ Abstract base class for storing and retrieving model configuration records.
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import List, Optional, Set, Union
 
 from pydantic import BaseModel, Field
 
@@ -18,7 +18,7 @@ from invokeai.backend.model_manager import (
     ModelFormat,
     ModelType,
 )
-from invokeai.backend.model_manager.config import ModelDefaultSettings
+from invokeai.backend.model_manager.config import ModelDefaultSettings, ModelVariantType, SchedulerPredictionType
 
 
 class DuplicateModelException(Exception):
@@ -60,15 +60,24 @@ class ModelSummary(BaseModel):
 
 
 class ModelRecordChanges(BaseModelExcludeNull, extra="allow"):
-    """A set of changes to apply to model metadata.
-    Only limited changes are valid:
-      - `default_settings`: the user-configured default settings for this model
-    """
+    """A set of changes to apply to a model."""
 
+    # Changes applicable to all models
+    name: Optional[str] = Field(description="Name of the model.", default=None)
+    description: Optional[str] = Field(description="Model description", default=None)
+    base: Optional[BaseModelType] = Field(description="The base model.", default=None)
+    trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
     default_settings: Optional[ModelDefaultSettings] = Field(
-        default=None, description="The user-configured default settings for this model"
+        description="Default settings for this model", default=None
     )
-    """The user-configured default settings for this model"""
+
+    # Checkpoint-specific changes
+    # TODO(MM2): Should we expose these? Feels footgun-y...
+    variant: Optional[ModelVariantType] = Field(description="The variant of the model.", default=None)
+    prediction_type: Optional[SchedulerPredictionType] = Field(
+        description="The prediction type of the model.", default=None
+    )
+    upcast_attention: Optional[bool] = Field(description="Whether to upcast attention.", default=None)
 
 
 class ModelRecordServiceBase(ABC):
@@ -99,13 +108,12 @@ class ModelRecordServiceBase(ABC):
         pass
 
     @abstractmethod
-    def update_model(self, key: str, config: Union[Dict[str, Any], AnyModelConfig]) -> AnyModelConfig:
+    def update_model(self, key: str, changes: ModelRecordChanges) -> AnyModelConfig:
         """
         Update the model, returning the updated version.
 
-        :param key: Unique key for the model to be updated
-        :param config: Model configuration record. Either a dict with the
-         required fields, or a ModelConfigBase instance.
+        :param key: Unique key for the model to be updated.
+        :param changes: A set of changes to apply to this model. Changes are validated before being written.
         """
         pass
 
@@ -194,21 +202,3 @@ class ModelRecordServiceBase(ABC):
                 f"More than one model matched the search criteria: base_model='{base_model}', model_type='{model_type}', model_name='{model_name}'."
             )
         return model_configs[0]
-
-    def rename_model(
-        self,
-        key: str,
-        new_name: str,
-    ) -> AnyModelConfig:
-        """
-        Rename the indicated model. Just a special case of update_model().
-
-        In some implementations, renaming the model may involve changing where
-        it is stored on the filesystem. So this is broken out.
-
-        :param key: Model key
-        :param new_name: New name for model
-        """
-        config = self.get_model(key)
-        config.name = new_name
-        return self.update_model(key, config)
