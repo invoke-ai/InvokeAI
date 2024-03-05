@@ -44,7 +44,7 @@ class MigrateModelYamlToDb1:
     logger: Logger
     cursor: sqlite3.Cursor
 
-    def __init__(self, config: InvokeAIAppConfig, logger: Logger, cursor: sqlite3.Cursor = None) -> None:
+    def __init__(self, config: InvokeAIAppConfig, logger: Logger, cursor: sqlite3.Cursor) -> None:
         self.config = config
         self.logger = logger
         self.cursor = cursor

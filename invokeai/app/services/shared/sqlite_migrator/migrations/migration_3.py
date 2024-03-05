@@ -1,21 +1,12 @@
 import sqlite3
-from logging import Logger
 
-from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
-
-from .util.migrate_yaml_config_1 import MigrateModelYamlToDb1
 
 
 class Migration3Callback:
-    def __init__(self, app_config: InvokeAIAppConfig, logger: Logger) -> None:
-        self._app_config = app_config
-        self._logger = logger
-
     def __call__(self, cursor: sqlite3.Cursor) -> None:
         self._drop_model_manager_metadata(cursor)
         self._recreate_model_config(cursor)
-        self._migrate_model_config_records(cursor)
 
     def _drop_model_manager_metadata(self, cursor: sqlite3.Cursor) -> None:
         """Drops the `model_manager_metadata` table."""
@@ -55,14 +46,8 @@ class Migration3Callback:
             """
         )
 
-    def _migrate_model_config_records(self, cursor: sqlite3.Cursor) -> None:
-        """After updating the model config table, we repopulate it."""
-        self._logger.info("Migrating model config records from models.yaml to database")
-        model_record_migrator = MigrateModelYamlToDb1(self._app_config, self._logger, cursor)
-        model_record_migrator.migrate()
 
-
-def build_migration_3(app_config: InvokeAIAppConfig, logger: Logger) -> Migration:
+def build_migration_3() -> Migration:
     """
     Build the migration from database version 2 to 3.
 
@@ -73,7 +58,7 @@ def build_migration_3(app_config: InvokeAIAppConfig, logger: Logger) -> Migratio
     migration_3 = Migration(
         from_version=2,
         to_version=3,
-        callback=Migration3Callback(app_config=app_config, logger=logger),
+        callback=Migration3Callback(),
     )
 
     return migration_3
