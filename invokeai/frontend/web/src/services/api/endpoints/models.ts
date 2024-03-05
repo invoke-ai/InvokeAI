@@ -66,6 +66,7 @@ const loraModelsAdapter = createEntityAdapter<LoRAModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
+export const loraModelsAdapterSelectors = loraModelsAdapter.getSelectors(undefined, getSelectorsOptions);
 const controlNetModelsAdapter = createEntityAdapter<ControlNetModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
@@ -85,6 +86,10 @@ const textualInversionModelsAdapter = createEntityAdapter<TextualInversionModelC
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
+export const textualInversionModelsAdapterSelectors = textualInversionModelsAdapter.getSelectors(
+  undefined,
+  getSelectorsOptions
+);
 const vaeModelsAdapter = createEntityAdapter<VAEModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),

@@ -1,4 +1,3 @@
-import type { ComboboxOption } from '@invoke-ai/ui-library';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { AspectRatioState } from 'features/parameters/components/ImageSize/types';
 import type {
@@ -52,7 +51,6 @@ export interface GenerationState {
   shouldUseCpuNoise: boolean;
   shouldShowAdvancedOptions: boolean;
   aspectRatio: AspectRatioState;
-  triggerPhrases: ComboboxOption[];
 }
 
 export type PayloadActionWithOptimalDimension<T = void> = PayloadAction<T, string, { optimalDimension: number }>;
