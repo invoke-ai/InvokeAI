@@ -21,6 +21,13 @@ export const ModelMetadata = () => {
     return MODEL_TYPE_TRIGGER_PHRASE.includes(data.type);
   }, [data]);
 
+  const apiResponseFormatted = useMemo(() => {
+    if (!data?.source_api_response) {
+      return {};
+    }
+    return JSON.parse(data.source_api_response);
+  }, [data?.source_api_response]);
+
   return (
     <Flex flexDir="column" height="full" gap="3">
       {shouldShowTriggerPhraseSettings && (
@@ -28,7 +35,7 @@ export const ModelMetadata = () => {
           <TriggerPhrases />
         </Box>
       )}
-      <DataViewer label="metadata" data={data?.source_api_response || {}} />
+      <DataViewer label="metadata" data={apiResponseFormatted} />
     </Flex>
   );
 };
