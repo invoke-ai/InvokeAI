@@ -7,12 +7,14 @@ import {
   selectAllT2IAdapters,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
-import { modelChanged, vaeSelected } from 'features/parameters/store/generationSlice';
+import { heightChanged, modelChanged, vaeSelected, widthChanged } from 'features/parameters/store/generationSlice';
 import { zParameterModel, zParameterVAEModel } from 'features/parameters/types/parameterSchemas';
 import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
 import { forEach, some } from 'lodash-es';
 import { mainModelsAdapterSelectors, modelsApi, vaeModelsAdapterSelectors } from 'services/api/endpoints/models';
 import type { TypeGuardFor } from 'services/api/types';
+import { calculateNewSize } from '../../../../../features/parameters/components/ImageSize/calculateNewSize';
+import { getIsSizeOptimal, getOptimalDimension } from '../../../../../features/parameters/util/optimalDimension';
 
 export const addModelsLoadedListener = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -25,6 +27,7 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
       log.info({ models: action.payload.entities }, `Main models loaded (${action.payload.ids.length})`);
 
       const currentModel = getState().generation.model;
+      console.log({ currentModel })
       const models = mainModelsAdapterSelectors.selectAll(action.payload);
 
       if (models.length === 0) {
@@ -35,8 +38,29 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
 
       const isCurrentModelAvailable = currentModel ? models.some((m) => m.key === currentModel.key) : false;
 
+
       if (isCurrentModelAvailable) {
         return;
+      }
+
+      const defaultModel = getState().config.sd.defaultModel;
+      const defaultModelInList = defaultModel ? models.find((m) => m.key === defaultModel) : false;
+
+      if (defaultModelInList) {
+        const result = zParameterModel.safeParse(defaultModelInList);
+        if (result.success) {
+          dispatch(modelChanged(defaultModelInList, currentModel));
+
+          const optimalDimension = getOptimalDimension(defaultModelInList);
+          if (getIsSizeOptimal(getState().generation.width, getState().generation.height, optimalDimension)) {
+            return;
+          }
+          const { width, height } = calculateNewSize(getState().generation.aspectRatio.value, optimalDimension * optimalDimension);
+
+          dispatch(widthChanged(width))
+          dispatch(heightChanged(height))
+          return
+        }
       }
 
       const result = zParameterModel.safeParse(models[0]);

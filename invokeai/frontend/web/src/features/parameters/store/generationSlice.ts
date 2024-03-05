@@ -210,26 +210,6 @@ export const generationSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(configChanged, (state, action) => {
-      const defaultModel = action.payload.sd?.defaultModel;
-
-      if (defaultModel && !state.model) {
-        const [base_model, model_type, model_name] = defaultModel.split('/');
-
-        const result = zParameterModel.safeParse({
-          model_name,
-          base_model,
-          model_type,
-        });
-
-        if (result.success) {
-          state.model = result.data;
-
-          const optimalDimension = getOptimalDimension(result.data);
-
-          state.width = optimalDimension;
-          state.height = optimalDimension;
-        }
-      }
       if (action.payload.sd?.scheduler) {
         state.scheduler = action.payload.sd.scheduler;
       }
