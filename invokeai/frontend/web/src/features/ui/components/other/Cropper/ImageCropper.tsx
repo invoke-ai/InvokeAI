@@ -216,10 +216,10 @@ export const ImageCropper = () => {
                     value={cropBoxSize.width ? cropBoxSize.width : 512}
                     onChange={handleCropBoxWidthChange}
                     defaultValue={512}
-                    min={0}
+                    min={1}
                     max={containerSize.width}
-                    step={1}
-                    fineStep={8}
+                    step={8}
+                    fineStep={1}
                   />
                 </FormControl>
                 <FormControl>
@@ -228,10 +228,10 @@ export const ImageCropper = () => {
                     value={cropBoxSize.height ? cropBoxSize.height : 512}
                     onChange={handleCropBoxHeightChange}
                     defaultValue={512}
-                    min={0}
+                    min={1}
                     max={containerSize.height}
-                    step={1}
-                    fineStep={8}
+                    step={8}
+                    fineStep={1}
                   />
                 </FormControl>
               </Flex>
@@ -257,7 +257,7 @@ export const ImageCropper = () => {
                         value={customCropSizeMultiplier}
                         onChange={handleCustomCropSizeMultiplierChange}
                         defaultValue={1}
-                        min={0}
+                        min={0.01}
                         max={20}
                         step={1}
                         fineStep={0.01}
@@ -272,7 +272,7 @@ export const ImageCropper = () => {
                       <CompositeNumberInput
                         value={customCropSize.width}
                         onChange={handleCustomCropSizeWidthChange}
-                        min={0}
+                        min={1}
                         max={4096}
                         step={1}
                         defaultValue={512}
@@ -284,7 +284,7 @@ export const ImageCropper = () => {
                       <CompositeNumberInput
                         value={customCropSize.height}
                         onChange={handleCustomCropSizeHeightChange}
-                        min={0}
+                        min={1}
                         max={4096}
                         step={1}
                         defaultValue={512}
@@ -295,7 +295,11 @@ export const ImageCropper = () => {
                 </Flex>
               </StandaloneAccordion>
 
-              <Button onClick={getCropData}>{t('cropper.preview')}</Button>
+              <Flex w="full" gap={2}>
+                <Button w="full" onClick={getCropData}>
+                  {t('cropper.preview')}
+                </Button>
+              </Flex>
 
               {/* Crop Preview */}
               <Flex flexDir="column" gap={2} width="full" height="full" position="relative">
@@ -346,9 +350,14 @@ export const ImageCropper = () => {
               onInitialized={handleCropperInitialization}
               cropend={handleCropEnd}
             />
-            <Text position="absolute" padding={2} background="black">
-              {cropBoxSize.width}X{cropBoxSize.height}
-            </Text>
+            <Flex position="absolute" top={2} left={2} gap={2}>
+              <Text padding={2} background="base.800" borderRadius="base">
+                W {cropBoxSize.width}
+              </Text>
+              <Text padding={2} background="base.800" borderRadius="base">
+                H {cropBoxSize.height}
+              </Text>
+            </Flex>
           </Flex>
         </ModalBody>
       </ModalContent>

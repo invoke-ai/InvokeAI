@@ -297,13 +297,14 @@
         "cropBoxWidth": "Crop Box Width",
         "cropBoxHeight": "Crop Box Height",
         "cropImage": "Crop Image",
-        "preview": "Crop Preview",
+        "preview": "Preview",
         "noPreview": "No Crop Preview",
         "aspectRatio": "Aspect Ratio",
         "customSaveSize": {
             "title": "Save Size",
             "scaleBy": "Scale By"
-        }
+        },
+        "save": "Save Cropped"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
