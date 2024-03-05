@@ -85,7 +85,7 @@ class SDXLModelLoaderInvocation(BaseInvocation):
             vae=VaeField(
                 vae=ModelInfo(
                     key=model_key,
-                    submodel_type=SubModelType.Vae,
+                    submodel_type=SubModelType.VAE,
                 ),
             ),
         )
@@ -142,7 +142,7 @@ class SDXLRefinerModelLoaderInvocation(BaseInvocation):
             vae=VaeField(
                 vae=ModelInfo(
                     key=model_key,
-                    submodel_type=SubModelType.Vae,
+                    submodel_type=SubModelType.VAE,
                 ),
             ),
         )
