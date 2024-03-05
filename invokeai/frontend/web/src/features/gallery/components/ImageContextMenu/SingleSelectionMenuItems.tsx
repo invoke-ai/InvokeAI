@@ -13,6 +13,7 @@ import { sentImageToCanvas, sentImageToImg2Img } from 'features/gallery/store/ac
 import { initialImageSelected } from 'features/parameters/store/actions';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { isCropperModalOpenChanged, setImageToCrop } from 'features/ui/components/other/Cropper/store/slice';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
 import { memo, useCallback } from 'react';
@@ -22,6 +23,7 @@ import {
   PiArrowsCounterClockwiseBold,
   PiAsteriskBold,
   PiCopyBold,
+  PiCropBold,
   PiDownloadSimpleBold,
   PiFlowArrowBold,
   PiFoldersBold,
@@ -99,6 +101,11 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     copyImageToClipboard(imageDTO.image_url);
   }, [copyImageToClipboard, imageDTO.image_url]);
 
+  const handleCropImage = useCallback(() => {
+    dispatch(setImageToCrop(imageDTO));
+    dispatch(isCropperModalOpenChanged(true));
+  }, [dispatch, imageDTO]);
+
   const handleStarImage = useCallback(() => {
     if (imageDTO) {
       starImages({ imageDTOs: [imageDTO] });
@@ -125,6 +132,9 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
           {t('parameters.copyImage')}
         </MenuItem>
       )}
+      <MenuItem icon={<PiCropBold />} onClickCapture={handleCropImage}>
+        {t('cropper.cropImage')}
+      </MenuItem>
       <MenuItem icon={<PiDownloadSimpleBold />} onClickCapture={handleDownloadImage}>
         {t('parameters.downloadImage')}
       </MenuItem>

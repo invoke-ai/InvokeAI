@@ -14,6 +14,7 @@ import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicP
 import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
+import ImageCropper from 'features/ui/components/other/Cropper/ImageCropper';
 import { AnimatePresence } from 'framer-motion';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
@@ -86,6 +87,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
           )}
         </AnimatePresence>
       </Box>
+      <ImageCropper />
       <DeleteImageModal />
       <ChangeBoardModal />
       <DynamicPromptsModal />

@@ -24,6 +24,7 @@ import { queueSlice } from 'features/queue/store/queueSlice';
 import { sdxlPersistConfig, sdxlSlice } from 'features/sdxl/store/sdxlSlice';
 import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';
+import { cropperSlice } from 'features/ui/components/other/Cropper/store/slice';
 import { uiPersistConfig, uiSlice } from 'features/ui/store/uiSlice';
 import { diff } from 'jsondiffpatch';
 import { defaultsDeep, keys, omit, pick } from 'lodash-es';
@@ -52,6 +53,7 @@ const allReducers = {
   [controlAdaptersSlice.name]: controlAdaptersSlice.reducer,
   [dynamicPromptsSlice.name]: dynamicPromptsSlice.reducer,
   [deleteImageModalSlice.name]: deleteImageModalSlice.reducer,
+  [cropperSlice.name]: cropperSlice.reducer,
   [changeBoardModalSlice.name]: changeBoardModalSlice.reducer,
   [loraSlice.name]: loraSlice.reducer,
   [modelManagerV2Slice.name]: modelManagerV2Slice.reducer,
