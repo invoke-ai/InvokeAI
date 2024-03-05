@@ -19,7 +19,6 @@ from invokeai.app.services.model_install import (
     ModelInstallService,
     ModelInstallServiceBase,
 )
-from invokeai.app.services.model_metadata import ModelMetadataStoreSQL
 from invokeai.app.services.model_records import ModelRecordServiceBase, ModelRecordServiceSQL
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.backend.model_manager import (
@@ -39,7 +38,7 @@ def initialize_record_store(app_config: InvokeAIAppConfig) -> ModelRecordService
     logger = InvokeAILogger.get_logger(config=app_config)
     image_files = DiskImageFileStorage(f"{app_config.output_path}/images")
     db = init_db(config=app_config, logger=logger, image_files=image_files)
-    obj: ModelRecordServiceBase = ModelRecordServiceSQL(db, ModelMetadataStoreSQL(db))
+    obj: ModelRecordServiceBase = ModelRecordServiceSQL(db)
     return obj
 
 
