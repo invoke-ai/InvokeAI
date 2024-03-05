@@ -104,7 +104,7 @@ def sdxl_base_files() -> List[Path]:
             ],
         ),
         (
-            ModelRepoVariant.DEFAULT,
+            ModelRepoVariant.Default,
             [
                 "model_index.json",
                 "scheduler/scheduler_config.json",
@@ -129,7 +129,7 @@ def sdxl_base_files() -> List[Path]:
             ],
         ),
         (
-            ModelRepoVariant.OPENVINO,
+            ModelRepoVariant.OpenVINO,
             [
                 "model_index.json",
                 "scheduler/scheduler_config.json",
@@ -211,7 +211,7 @@ def sdxl_base_files() -> List[Path]:
             ],
         ),
         (
-            ModelRepoVariant.FLAX,
+            ModelRepoVariant.Flax,
             [
                 "model_index.json",
                 "scheduler/scheduler_config.json",

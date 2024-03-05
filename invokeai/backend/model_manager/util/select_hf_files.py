@@ -35,7 +35,7 @@ def filter_files(
     The file list can be obtained from the `files` field of HuggingFaceMetadata,
     as defined in `invokeai.backend.model_manager.metadata.metadata_base`.
     """
-    variant = variant or ModelRepoVariant.DEFAULT
+    variant = variant or ModelRepoVariant.Default
     paths: List[Path] = []
     root = files[0].parts[0]
 
@@ -90,11 +90,11 @@ def _filter_by_variant(files: List[Path], variant: ModelRepoVariant) -> Set[Path
                 result.add(path)
 
         elif "openvino_model" in path.name:
-            if variant == ModelRepoVariant.OPENVINO:
+            if variant == ModelRepoVariant.OpenVINO:
                 result.add(path)
 
         elif "flax_model" in path.name:
-            if variant == ModelRepoVariant.FLAX:
+            if variant == ModelRepoVariant.Flax:
                 result.add(path)
 
         elif path.suffix in [".json", ".txt"]:
@@ -103,7 +103,7 @@ def _filter_by_variant(files: List[Path], variant: ModelRepoVariant) -> Set[Path
         elif variant in [
             ModelRepoVariant.FP16,
             ModelRepoVariant.FP32,
-            ModelRepoVariant.DEFAULT,
+            ModelRepoVariant.Default,
         ] and path.suffix in [".bin", ".safetensors", ".pt", ".ckpt"]:
             # For weights files, we want to select the best one for each subfolder. For example, we may have multiple
             # text encoders:
@@ -127,7 +127,7 @@ def _filter_by_variant(files: List[Path], variant: ModelRepoVariant) -> Set[Path
             # Some special handling is needed here if there is not an exact match and if we cannot infer the variant
             # from the file name. In this case, we only give this file a point if the requested variant is FP32 or DEFAULT.
             if candidate_variant_label == f".{variant}" or (
-                not candidate_variant_label and variant in [ModelRepoVariant.FP32, ModelRepoVariant.DEFAULT]
+                not candidate_variant_label and variant in [ModelRepoVariant.FP32, ModelRepoVariant.Default]
             ):
                 score += 1
 
@@ -148,7 +148,7 @@ def _filter_by_variant(files: List[Path], variant: ModelRepoVariant) -> Set[Path
     # config and text files then we return an empty list
     if (
         variant
-        and variant in [ModelRepoVariant.ONNX, ModelRepoVariant.OPENVINO, ModelRepoVariant.FLAX]
+        and variant in [ModelRepoVariant.ONNX, ModelRepoVariant.OpenVINO, ModelRepoVariant.Flax]
         and not any(variant.value in x.name for x in result)
     ):
         return set()

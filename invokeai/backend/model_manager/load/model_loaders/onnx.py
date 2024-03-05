@@ -18,7 +18,7 @@ from .. import ModelLoaderRegistry
 from .generic_diffusers import GenericDiffusersLoader
 
 
-@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.ONNX, format=ModelFormat.Onnx)
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.ONNX, format=ModelFormat.ONNX)
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.ONNX, format=ModelFormat.Olive)
 class OnnyxDiffusersModel(GenericDiffusersLoader):
     """Class to load onnx models."""

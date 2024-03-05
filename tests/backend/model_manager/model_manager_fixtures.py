@@ -28,7 +28,7 @@ from invokeai.backend.model_manager.config import (
     ModelSourceType,
     ModelType,
     ModelVariantType,
-    VaeDiffusersConfig,
+    VAEDiffusersConfig,
 )
 from invokeai.backend.model_manager.load import ModelCache, ModelConvertCache
 from invokeai.backend.util.logging import InvokeAILogger
@@ -162,13 +162,13 @@ def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBas
     db = create_mock_sqlite_database(mm2_app_config, logger)
     store = ModelRecordServiceSQL(db)
     # add five simple config records to the database
-    config1 = VaeDiffusersConfig(
+    config1 = VAEDiffusersConfig(
         key="test_config_1",
         path="/tmp/foo1",
         format=ModelFormat.Diffusers,
         name="test2",
         base=BaseModelType.StableDiffusion2,
-        type=ModelType.Vae,
+        type=ModelType.VAE,
         hash="111222333444",
         source="stabilityai/sdxl-vae",
         source_type=ModelSourceType.HFRepoID,
@@ -204,7 +204,7 @@ def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBas
         format=ModelFormat.Diffusers,
         name="test4",
         base=BaseModelType.StableDiffusionXL,
-        type=ModelType.Lora,
+        type=ModelType.LoRA,
         hash="111222333444",
         source="author4/model4",
         source_type=ModelSourceType.HFRepoID,
@@ -215,7 +215,7 @@ def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBas
         format=ModelFormat.Diffusers,
         name="test5",
         base=BaseModelType.StableDiffusion1,
-        type=ModelType.Lora,
+        type=ModelType.LoRA,
         hash="111222333444",
         source="author4/model5",
         source_type=ModelSourceType.HFRepoID,

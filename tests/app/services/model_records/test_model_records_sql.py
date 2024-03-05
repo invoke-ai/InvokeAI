@@ -23,7 +23,7 @@ from invokeai.backend.model_manager.config import (
     ModelSourceType,
     ModelType,
     TextualInversionFileConfig,
-    VaeDiffusersConfig,
+    VAEDiffusersConfig,
 )
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
@@ -141,12 +141,12 @@ def test_filter(store: ModelRecordServiceBase):
         source="test/source",
         source_type=ModelSourceType.Path,
     )
-    config3 = VaeDiffusersConfig(
+    config3 = VAEDiffusersConfig(
         key="config3",
         path="/tmp/config3",
         name="config3",
         base=BaseModelType("sd-2"),
-        type=ModelType.Vae,
+        type=ModelType.VAE,
         hash="CONFIG3HASH",
         source="test/source",
         source_type=ModelSourceType.Path,
@@ -157,7 +157,7 @@ def test_filter(store: ModelRecordServiceBase):
     assert len(matches) == 2
     assert matches[0].name in {"config1", "config2"}
 
-    matches = store.search_by_attr(model_type=ModelType.Vae)
+    matches = store.search_by_attr(model_type=ModelType.VAE)
     assert len(matches) == 1
     assert matches[0].name == "config3"
     assert matches[0].key == "config3"
@@ -190,10 +190,10 @@ def test_unique(store: ModelRecordServiceBase):
         source="test/source/",
         source_type=ModelSourceType.Path,
     )
-    config3 = VaeDiffusersConfig(
+    config3 = VAEDiffusersConfig(
         path="/tmp/config3",
         base=BaseModelType("sd-2"),
-        type=ModelType.Vae,
+        type=ModelType.VAE,
         name="nonuniquename",
         hash="CONFIG1HASH",
         source="test/source/",
@@ -257,11 +257,11 @@ def test_filter_2(store: ModelRecordServiceBase):
         source="test/source/",
         source_type=ModelSourceType.Path,
     )
-    config5 = VaeDiffusersConfig(
+    config5 = VAEDiffusersConfig(
         path="/tmp/config5",
         name="dup_name1",
         base=BaseModelType.StableDiffusion1,
-        type=ModelType.Vae,
+        type=ModelType.VAE,
         hash="CONFIG3HASH",
         source="test/source/",
         source_type=ModelSourceType.Path,
@@ -283,7 +283,7 @@ def test_filter_2(store: ModelRecordServiceBase):
 
     matches = store.search_by_attr(
         base_model=BaseModelType.StableDiffusion1,
-        model_type=ModelType.Vae,
+        model_type=ModelType.VAE,
         model_name="dup_name1",
     )
     assert len(matches) == 1

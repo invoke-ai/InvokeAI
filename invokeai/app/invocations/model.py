@@ -133,7 +133,7 @@ class MainModelLoaderInvocation(BaseInvocation):
             vae=VaeField(
                 vae=ModelInfo(
                     key=key,
-                    submodel_type=SubModelType.Vae,
+                    submodel_type=SubModelType.VAE,
                 ),
             ),
         )
