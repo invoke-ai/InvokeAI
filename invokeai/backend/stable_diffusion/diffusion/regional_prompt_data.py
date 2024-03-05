@@ -32,7 +32,7 @@ class RegionalPromptData:
         self._spatial_masks_by_seq_len: list[dict[int, torch.Tensor]] = self._prepare_spatial_masks(
             regions, max_downscale_factor
         )
-        self._negative_cross_attn_mask_score = 0.0
+        self._negative_cross_attn_mask_score = -10000.0
 
     def _prepare_spatial_masks(
         self, regions: list[TextConditioningRegions], max_downscale_factor: int = 8
