@@ -54,6 +54,7 @@ import { addUpdateAllNodesRequestedListener } from 'app/store/middleware/listene
 import { addUpscaleRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
 import { addWorkflowLoadRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/workflowLoadRequested';
 import type { AppDispatch, RootState } from 'app/store/store';
+import { addCropperImageToGalleryListener } from 'features/ui/components/other/Cropper/store/middleware/listenerMiddleware/listeners';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -153,3 +154,6 @@ addUpscaleRequestedListener(startAppListening);
 
 // Dynamic prompts
 addDynamicPromptsListener(startAppListening);
+
+// Cropper
+addCropperImageToGalleryListener(startAppListening);

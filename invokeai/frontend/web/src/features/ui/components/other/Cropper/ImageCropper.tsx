@@ -29,6 +29,7 @@ import { useTranslation } from 'react-i18next';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 import { resizeBase64Image } from './cropperUtils';
+import { cropperImageToGallery } from './store/actions';
 import { isCropperModalOpenChanged } from './store/slice';
 
 const ImageCropper = () => {
@@ -52,6 +53,16 @@ const ImageCropper = () => {
     width: 512,
     height: 512,
   });
+
+  const [isAspectRatioLocked, setIsAspectRatioLocked] = useState<boolean>(true);
+
+  const aspectRatio = useMemo(() => {
+    if (!isAspectRatioLocked) {
+      return cropBoxSize.width / cropBoxSize.height;
+    } else {
+      return 0;
+    }
+  }, [cropBoxSize, isAspectRatioLocked]);
 
   // Custom Crop Size State
   const [isCustomCropSizeEnabled, setIsCustomCropSizeEnabled] = useState<boolean>(false);
@@ -100,6 +111,12 @@ const ImageCropper = () => {
     }
   }, [cropperRef, cropSizeDerived, cropBoxSize]);
 
+  const saveImageToGallery = useCallback(() => {
+    if (cropData) {
+      dispatch(cropperImageToGallery({ id: cropData }));
+    }
+  }, [dispatch, cropData]);
+
   // Crop Box Size Handlers
   const handleCropBoxWidthChange = useCallback(
     (width: number) => {
@@ -115,6 +132,29 @@ const ImageCropper = () => {
       cropperRef.current?.cropper.setCropBoxData({ ...cropperRef.current.cropper.getCropBoxData(), height: height });
     },
     [cropBoxSize, cropperRef]
+  );
+
+  const handleIsAspectRatioLockedChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      if (!cropperRef.current) {
+        return;
+      }
+
+      const cropper = cropperRef.current.cropper;
+      const originalCropBox = cropper.getCropBoxData();
+
+      if (!e.target.checked) {
+        cropper.setAspectRatio(0);
+      }
+
+      if (e.target.checked) {
+        cropper.setAspectRatio(aspectRatio);
+      }
+
+      cropper.setCropBoxData({ ...originalCropBox });
+      setIsAspectRatioLocked(e.target.checked);
+    },
+    [cropperRef, aspectRatio]
   );
 
   // Custom Crop Size Handlers
@@ -163,6 +203,8 @@ const ImageCropper = () => {
       setTimeout(() => handleCropperInitialization(), 100);
       return;
     }
+
+    cropper.setAspectRatio(1);
 
     cropper.setCropBoxData({
       ...cropper.getCropBoxData(),
@@ -234,6 +276,10 @@ const ImageCropper = () => {
                     fineStep={1}
                   />
                 </FormControl>
+                <FormControl sx={{ width: 'max-content' }}>
+                  <Checkbox isChecked={isAspectRatioLocked} onChange={handleIsAspectRatioLockedChange} />
+                  <FormLabel>{t('cropper.lockAspectRatio')}</FormLabel>
+                </FormControl>
               </Flex>
 
               {/* Custom Save Size Accordion */}
@@ -299,6 +345,9 @@ const ImageCropper = () => {
                 <Button w="full" onClick={getCropData}>
                   {t('cropper.preview')}
                 </Button>
+                <Button w="full" onClick={saveImageToGallery} isDisabled={!cropData}>
+                  {t('cropper.save')}
+                </Button>
               </Flex>
 
               {/* Crop Preview */}
@@ -335,6 +384,7 @@ const ImageCropper = () => {
             <Cropper
               ref={cropperRef}
               style={{ height: '100%', width: '100%', overflow: 'hidden' }}
+              aspectRatio={aspectRatio}
               zoomTo={1}
               autoCropArea={1}
               src={imageDTO?.image_url}

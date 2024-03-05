@@ -294,6 +294,7 @@
     "cropper": {
         "width": "Width",
         "height": "Height",
+        "lockAspectRatio": "Lock Aspect Ratio",
         "cropBoxWidth": "Crop Box Width",
         "cropBoxHeight": "Crop Box Height",
         "cropImage": "Crop Image",
@@ -304,7 +305,8 @@
             "title": "Save Size",
             "scaleBy": "Scale By"
         },
-        "save": "Save Cropped"
+        "save": "Save Cropped",
+        "croppedImageSaved": "Cropped Image Saved"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
