@@ -145,9 +145,11 @@ class RegionalPromptData:
                     * batch_sample_regions.positive_self_attn_mask_scores[prompt_idx]
                 )
 
-            attn_mask_min = attn_mask[batch_idx].min()
+        attn_mask[attn_mask > 0.5] = 1.0
+        attn_mask[attn_mask <= 0.5] = 0.0
+        # attn_mask_min = attn_mask[batch_idx].min()
 
-            # Adjust so that the minimum value is 0.0 regardless of whether all pixels are covered or not.
-            if abs(attn_mask_min) > 0.0001:
-                attn_mask[batch_idx] = attn_mask[batch_idx] - attn_mask_min
+        # # Adjust so that the minimum value is 0.0 regardless of whether all pixels are covered or not.
+        # if abs(attn_mask_min) > 0.0001:
+        #     attn_mask[batch_idx] = attn_mask[batch_idx] - attn_mask_min
         return attn_mask
