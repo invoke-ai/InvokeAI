@@ -51,7 +51,6 @@ from invokeai.app.invocations.primitives import (
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import prepare_control_image
-from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
 from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import BaseModelType, LoadedModel
@@ -372,22 +371,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             if v < 1:
                 raise ValueError("cfg_scale must be greater than 1")
         return v
-
-    # TODO: pass this an emitter method or something? or a session for dispatching?
-    def dispatch_progress(
-        self,
-        context: InvocationContext,
-        source_node_id: str,
-        intermediate_state: PipelineIntermediateState,
-        base_model: BaseModelType,
-    ) -> None:
-        stable_diffusion_step_callback(
-            context=context,
-            intermediate_state=intermediate_state,
-            node=self.model_dump(),
-            source_node_id=source_node_id,
-            base_model=base_model,
-        )
 
     def _get_text_embeddings_and_masks(
         self,
