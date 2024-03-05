@@ -111,14 +111,6 @@ class ModelProbe(object):
         cls.PROBES[format][model_type] = probe_class
 
     @classmethod
-    def heuristic_probe(
-        cls,
-        model_path: Path,
-        fields: Optional[Dict[str, Any]] = None,
-    ) -> AnyModelConfig:
-        return cls.probe(model_path, fields)
-
-    @classmethod
     def probe(
         cls,
         model_path: Path,
