@@ -162,7 +162,11 @@ class ModelConfigBase(BaseModel):
         description="Default settings for this model", default=None
     )
 
-    model_config = ConfigDict(validate_assignment=True)
+    @staticmethod
+    def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
+        schema["required"].extend(["key"])
+
+    model_config = ConfigDict(validate_assignment=True, json_schema_extra=json_schema_extra)
 
 
 class CheckpointConfigBase(ModelConfigBase):
