@@ -154,6 +154,9 @@ class ModelInstallService(ModelInstallServiceBase):
         model_path = Path(model_path)
         config = config or {}
 
+        if self._app_config.skip_model_hash:
+            config["hash"] = uuid_string()
+
         info: AnyModelConfig = ModelProbe.probe(Path(model_path), config)
 
         if preferred_name := config.get("name"):
@@ -528,15 +531,12 @@ class ModelInstallService(ModelInstallServiceBase):
     def _register(
         self, model_path: Path, config: Optional[Dict[str, Any]] = None, info: Optional[AnyModelConfig] = None
     ) -> str:
-        # Note that we may be passed a pre-populated AnyModelConfig object,
-        # in which case the key field should have been populated by the caller (e.g. in `install_path`).
-        if config is not None:
-            config["key"] = config.get("key", uuid_string())
-        info = info or ModelProbe.probe(model_path, config)
-        override_key: Optional[str] = config.get("key") if config else None
+        config = config or {}
 
-        assert info.hash  # always assigned by probe()
-        info.key = override_key or info.hash
+        if self._app_config.skip_model_hash:
+            config["hash"] = uuid_string()
+
+        info = info or ModelProbe.probe(model_path, config)
 
         model_path = model_path.absolute()
         if model_path.is_relative_to(self.app_config.models_path):
