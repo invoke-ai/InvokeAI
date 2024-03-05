@@ -109,16 +109,7 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
                 prompt_region_attention_mask = regional_prompt_data.get_self_attn_mask(
                     query_seq_len=query_seq_len,
                     percent_through=percent_through,
-                    device=hidden_states.device,
-                    dtype=hidden_states.dtype,
                 )
-
-                # TODO(ryand): Avoid redundant type/device conversion here.
-                # prompt_region_attention_mask = prompt_region_attention_mask.to(
-                #     dtype=hidden_states.dtype, device=hidden_states.device
-                # )
-                # prompt_region_attention_mask[prompt_region_attention_mask < 0.5] = -0.5
-                # prompt_region_attention_mask[prompt_region_attention_mask >= 0.5] = 0.0
 
             if attention_mask is None:
                 attention_mask = prompt_region_attention_mask

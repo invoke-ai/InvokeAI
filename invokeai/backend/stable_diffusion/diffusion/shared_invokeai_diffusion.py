@@ -351,7 +351,9 @@ class InvokeAIDiffuserComponent:
                     )
                 regions.append(r)
 
-            cross_attention_kwargs["regional_prompt_data"] = RegionalPromptData(regions=regions)
+            cross_attention_kwargs["regional_prompt_data"] = RegionalPromptData(
+                regions=regions, device=x.device, dtype=x.dtype
+            )
             cross_attention_kwargs["percent_through"] = percent_through
 
         both_results = self.model_forward_callback(
@@ -447,7 +449,7 @@ class InvokeAIDiffuserComponent:
         # Prepare prompt regions for the unconditioned pass.
         if conditioning_data.uncond_regions is not None:
             cross_attention_kwargs["regional_prompt_data"] = RegionalPromptData(
-                regions=[conditioning_data.uncond_regions]
+                regions=[conditioning_data.uncond_regions], device=x.device, dtype=x.dtype
             )
             cross_attention_kwargs["percent_through"] = percent_through
 
@@ -493,7 +495,7 @@ class InvokeAIDiffuserComponent:
         # Prepare prompt regions for the conditioned pass.
         if conditioning_data.cond_regions is not None:
             cross_attention_kwargs["regional_prompt_data"] = RegionalPromptData(
-                regions=[conditioning_data.cond_regions]
+                regions=[conditioning_data.cond_regions], device=x.device, dtype=x.dtype
             )
             cross_attention_kwargs["percent_through"] = percent_through
 
