@@ -292,12 +292,17 @@
         "ipAdapterImageFallback": "No IP Adapter Image Selected"
     },
     "cropper": {
+        "width": "Width",
+        "height": "Height",
         "cropBoxWidth": "Crop Box Width",
         "cropBoxHeight": "Crop Box Height",
         "cropImage": "Crop Image",
         "preview": "Crop Preview",
         "noPreview": "No Crop Preview",
-        "aspectRatio": "Aspect Ratio"
+        "aspectRatio": "Aspect Ratio",
+        "customSaveSize": {
+            "title": "Custom Save Size"
+        }
     },
     "hrf": {
         "hrf": "High Resolution Fix",

@@ -2,6 +2,7 @@ import './cropper.min.css';
 
 import {
   Button,
+  CompositeNumberInput,
   CompositeSlider,
   Flex,
   FormControl,
@@ -12,10 +13,12 @@ import {
   ModalContent,
   ModalHeader,
   ModalOverlay,
+  StandaloneAccordion,
   Text,
   useDisclosure,
 } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
+import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import type { ReactElement } from 'react';
 import { cloneElement, createRef, memo, useCallback, useEffect, useState } from 'react';
 import type { ReactCropperElement } from 'react-cropper';
@@ -31,10 +34,13 @@ type ImageCropperProps = {
 
 export const ImageCropper = (props: ImageCropperProps) => {
   const { data: imageDTO } = useGetImageDTOQuery(props.imageDTO?.image_name ?? skipToken);
-  const [cropData, setCropData] = useState<string | null>(null);
   const cropperRef = createRef<ReactCropperElement>();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { t } = useTranslation();
+
+  // State
+  const [cropData, setCropData] = useState<string | null>(null);
+
   const [cropBoxSize, setCropBoxSize] = useState<{ width: number; height: number }>({
     width: 512,
     height: 512,
@@ -45,15 +51,43 @@ export const ImageCropper = (props: ImageCropperProps) => {
     height: 512,
   });
 
+  const [isCustomCropSizeEnabled, setIsCustomCropSizeEnabled] = useState<boolean>(false);
+
+  const [customCropSize, setCustomCropSize] = useState<{ width: number; height: number }>({
+    width: 512,
+    height: 512,
+  });
+
+  // Hooks
+
+  const { isOpen: isAccordionOpen, onToggle } = useStandaloneAccordionToggle({
+    id: 'cropper-custom-save-size',
+    defaultIsOpen: false,
+  });
+
+  const onCustomSaveSizeToggle = useCallback(() => {
+    if (isAccordionOpen) {
+      setIsCustomCropSizeEnabled(true);
+    } else {
+      setIsCustomCropSizeEnabled(false);
+    }
+    onToggle();
+  }, [isAccordionOpen, onToggle]);
+
+  // Handlers
+
   const getCropData = useCallback(() => {
     if (typeof cropperRef.current?.cropper !== 'undefined') {
       setCropData(
         cropperRef.current?.cropper
-          .getCroppedCanvas({ width: cropBoxSize.width, height: cropBoxSize.height })
+          .getCroppedCanvas({
+            width: !isCustomCropSizeEnabled ? customCropSize.width : cropBoxSize.width,
+            height: !isCustomCropSizeEnabled ? customCropSize.height : cropBoxSize.height,
+          })
           .toDataURL()
       );
     }
-  }, [cropperRef, cropBoxSize]);
+  }, [cropperRef, customCropSize, isCustomCropSizeEnabled, cropBoxSize]);
 
   const handleCropBoxWidthChange = useCallback(
     (width: number) => {
@@ -69,6 +103,20 @@ export const ImageCropper = (props: ImageCropperProps) => {
       cropperRef.current?.cropper.setCropBoxData({ ...cropperRef.current.cropper.getCropBoxData(), height: height });
     },
     [cropBoxSize, cropperRef]
+  );
+
+  const handleCustomCropSizeWidthChange = useCallback(
+    (width: number) => {
+      setCustomCropSize({ ...customCropSize, width: width });
+    },
+    [customCropSize]
+  );
+
+  const handleCustomCropSizeHeightChange = useCallback(
+    (height: number) => {
+      setCustomCropSize({ ...customCropSize, height: height });
+    },
+    [customCropSize]
   );
 
   const onCropperOpen = useCallback(() => {
@@ -104,7 +152,9 @@ export const ImageCropper = (props: ImageCropperProps) => {
       width: cropper.getContainerData().width,
       height: cropper.getContainerData().height,
     });
-  }, [cropperRef]);
+
+    onOpen();
+  }, [cropperRef, onOpen]);
 
   useEffect(() => {
     if (!cropperRef.current?.cropper) {
@@ -120,6 +170,11 @@ export const ImageCropper = (props: ImageCropperProps) => {
       });
     }
   }, [cropperRef]);
+
+  // Badges
+  const customCropSizeBadges: (string | number)[] = [
+    `${!isCustomCropSizeEnabled ? customCropSize.width : cropBoxSize.width}x${!isCustomCropSizeEnabled ? customCropSize.height : cropBoxSize.height}`,
+  ];
 
   return (
     <>
@@ -158,6 +213,42 @@ export const ImageCropper = (props: ImageCropperProps) => {
                     fineStep={8}
                   />
                 </FormControl>
+
+                {/* Custom Save Size Accordion */}
+                <StandaloneAccordion
+                  label={t('cropper.customSaveSize.title')}
+                  isOpen={isAccordionOpen}
+                  badges={customCropSizeBadges}
+                  onToggle={onCustomSaveSizeToggle}
+                >
+                  <Flex p={4} gap={4} background="base.750" borderRadius="base" borderTopRadius={0}>
+                    <FormControl>
+                      <FormLabel>{t('cropper.width')}</FormLabel>
+                      <CompositeNumberInput
+                        value={!isCustomCropSizeEnabled ? customCropSize.width : cropBoxSize.width}
+                        onChange={handleCustomCropSizeWidthChange}
+                        min={0}
+                        max={4096}
+                        step={1}
+                        defaultValue={512}
+                        isDisabled={isCustomCropSizeEnabled}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel>{t('cropper.height')}</FormLabel>
+                      <CompositeNumberInput
+                        value={!isCustomCropSizeEnabled ? customCropSize.height : cropBoxSize.height}
+                        onChange={handleCustomCropSizeHeightChange}
+                        min={0}
+                        max={4096}
+                        step={1}
+                        defaultValue={512}
+                        isDisabled={isCustomCropSizeEnabled}
+                      />
+                    </FormControl>
+                  </Flex>
+                </StandaloneAccordion>
+
                 <Button onClick={getCropData}>{t('cropper.preview')}</Button>
                 <Flex flexDir="column" w="full" h="full" gap={2}>
                   <Text>{t('cropper.preview')}</Text>
@@ -175,7 +266,7 @@ export const ImageCropper = (props: ImageCropperProps) => {
                 zoomTo={1}
                 autoCropArea={1}
                 src={imageDTO?.image_url}
-                viewMode={3}
+                viewMode={0}
                 dragMode="move"
                 responsive={true}
                 restore={true}
