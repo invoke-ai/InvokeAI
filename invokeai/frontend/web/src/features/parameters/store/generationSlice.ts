@@ -16,7 +16,6 @@ import type {
   ParameterScheduler,
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
-import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';

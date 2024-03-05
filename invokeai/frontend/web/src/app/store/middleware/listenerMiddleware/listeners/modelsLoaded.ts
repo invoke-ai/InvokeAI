@@ -7,14 +7,14 @@ import {
   selectAllT2IAdapters,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
+import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { heightChanged, modelChanged, vaeSelected, widthChanged } from 'features/parameters/store/generationSlice';
 import { zParameterModel, zParameterVAEModel } from 'features/parameters/types/parameterSchemas';
+import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
 import { forEach, some } from 'lodash-es';
 import { mainModelsAdapterSelectors, modelsApi, vaeModelsAdapterSelectors } from 'services/api/endpoints/models';
 import type { TypeGuardFor } from 'services/api/types';
-import { calculateNewSize } from '../../../../../features/parameters/components/ImageSize/calculateNewSize';
-import { getIsSizeOptimal, getOptimalDimension } from '../../../../../features/parameters/util/optimalDimension';
 
 export const addModelsLoadedListener = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -26,8 +26,9 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
       const log = logger('models');
       log.info({ models: action.payload.entities }, `Main models loaded (${action.payload.ids.length})`);
 
-      const currentModel = getState().generation.model;
-      console.log({ currentModel })
+      const state = getState();
+
+      const currentModel = state.generation.model;
       const models = mainModelsAdapterSelectors.selectAll(action.payload);
 
       if (models.length === 0) {
@@ -38,12 +39,11 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
 
       const isCurrentModelAvailable = currentModel ? models.some((m) => m.key === currentModel.key) : false;
 
-
       if (isCurrentModelAvailable) {
         return;
       }
 
-      const defaultModel = getState().config.sd.defaultModel;
+      const defaultModel = state.config.sd.defaultModel;
       const defaultModelInList = defaultModel ? models.find((m) => m.key === defaultModel) : false;
 
       if (defaultModelInList) {
@@ -52,14 +52,17 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
           dispatch(modelChanged(defaultModelInList, currentModel));
 
           const optimalDimension = getOptimalDimension(defaultModelInList);
-          if (getIsSizeOptimal(getState().generation.width, getState().generation.height, optimalDimension)) {
+          if (getIsSizeOptimal(state.generation.width, state.generation.height, optimalDimension)) {
             return;
           }
-          const { width, height } = calculateNewSize(getState().generation.aspectRatio.value, optimalDimension * optimalDimension);
+          const { width, height } = calculateNewSize(
+            state.generation.aspectRatio.value,
+            optimalDimension * optimalDimension
+          );
 
-          dispatch(widthChanged(width))
-          dispatch(heightChanged(height))
-          return
+          dispatch(widthChanged(width));
+          dispatch(heightChanged(height));
+          return;
         }
       }
 
