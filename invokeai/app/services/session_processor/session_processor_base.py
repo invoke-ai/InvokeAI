@@ -1,6 +1,35 @@
 from abc import ABC, abstractmethod
+from threading import Event
 
+from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
+from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
+
+
+class SessionRunnerBase(ABC):
+    """
+    Base class for session runner.
+    """
+
+    @abstractmethod
+    def start(self, services: InvocationServices, cancel_event: Event) -> None:
+        """Starts the session runner"""
+        pass
+
+    @abstractmethod
+    def run(self, queue_item: SessionQueueItem) -> None:
+        """Runs the session"""
+        pass
+
+    @abstractmethod
+    def complete(self, queue_item: SessionQueueItem) -> None:
+        """Completes the session"""
+        pass
+
+    @abstractmethod
+    def run_node(self, node_id: str, queue_item: SessionQueueItem) -> None:
+        """Runs an already prepared node on the session"""
+        pass
 
 
 class SessionProcessorBase(ABC):
