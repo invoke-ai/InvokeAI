@@ -8,6 +8,7 @@ import {
   Flex,
   FormControl,
   FormLabel,
+  Image,
   Modal,
   ModalBody,
   ModalCloseButton,
@@ -303,10 +304,29 @@ export const ImageCropper = (props: ImageCropperProps) => {
                 </StandaloneAccordion>
 
                 <Button onClick={getCropData}>{t('cropper.preview')}</Button>
-                <Flex flexDir="column" w="full" h="full" gap={2}>
+                <Flex flexDir="column" gap={2} width="full" height="full" position="relative">
                   <Text>{t('cropper.preview')}</Text>
-                  <Flex w="full" h="full" alignItems="center" justifyContent="center" borderRadius="base" bg="base.850">
-                    {cropData ? <img src={cropData} alt="cropped" /> : <Text>{t('cropper.noPreview')}</Text>}
+                  <Flex
+                    w="full"
+                    h="full"
+                    position="absolute"
+                    alignItems="center"
+                    justifyContent="center"
+                    borderRadius="base"
+                    bg="base.850"
+                  >
+                    {cropData ? (
+                      <Image
+                        src={cropData}
+                        w={imageDTO.width}
+                        objectFit="contain"
+                        maxW="full"
+                        maxH="full"
+                        borderRadius="base"
+                      />
+                    ) : (
+                      <Text>{t('cropper.noPreview')}</Text>
+                    )}
                   </Flex>
                 </Flex>
               </Flex>
