@@ -40,7 +40,7 @@ def store(
     return ModelRecordServiceSQL(db)
 
 
-def example_config(key: Optional[str] = None) -> TextualInversionFileConfig:
+def example_ti_config(key: Optional[str] = None) -> TextualInversionFileConfig:
     config = TextualInversionFileConfig(
         source="test/source/",
         source_type=ModelSourceType.Path,
@@ -57,7 +57,7 @@ def example_config(key: Optional[str] = None) -> TextualInversionFileConfig:
 
 
 def test_type(store: ModelRecordServiceBase):
-    config = example_config("key1")
+    config = example_ti_config("key1")
     store.add_model(config)
     config1 = store.get_model("key1")
     assert isinstance(config1, TextualInversionFileConfig)
@@ -65,7 +65,7 @@ def test_type(store: ModelRecordServiceBase):
 
 def test_raises_on_violating_uniqueness(store: ModelRecordServiceBase):
     # Models have a uniqueness constraint by their name, base and type
-    config1 = example_config("key1")
+    config1 = example_ti_config("key1")
     config2 = config1.model_copy(deep=True)
     config2.key = "key2"
     store.add_model(config1)
@@ -76,7 +76,7 @@ def test_raises_on_violating_uniqueness(store: ModelRecordServiceBase):
 
 
 def test_model_records_updates_model(store: ModelRecordServiceBase):
-    config = example_config("key1")
+    config = example_ti_config("key1")
     store.add_model(config)
     config = store.get_model("key1")
     assert config.name == "old name"
@@ -88,7 +88,7 @@ def test_model_records_updates_model(store: ModelRecordServiceBase):
 
 
 def test_model_records_rejects_invalid_changes(store: ModelRecordServiceBase):
-    config = example_config("key1")
+    config = example_ti_config("key1")
     store.add_model(config)
     config = store.get_model("key1")
     # upcast_attention is an invalid field for TIs
@@ -98,14 +98,14 @@ def test_model_records_rejects_invalid_changes(store: ModelRecordServiceBase):
 
 
 def test_unknown_key(store: ModelRecordServiceBase):
-    config = example_config("key1")
+    config = example_ti_config("key1")
     store.add_model(config)
     with pytest.raises(UnknownModelException):
         store.update_model("unknown_key", ModelRecordChanges())
 
 
 def test_delete(store: ModelRecordServiceBase):
-    config = example_config("key1")
+    config = example_ti_config("key1")
     store.add_model(config)
     config = store.get_model("key1")
     store.del_model("key1")
@@ -114,7 +114,7 @@ def test_delete(store: ModelRecordServiceBase):
 
 
 def test_exists(store: ModelRecordServiceBase):
-    config = example_config("key1")
+    config = example_ti_config("key1")
     store.add_model(config)
     assert store.exists("key1")
     assert not store.exists("key2")
