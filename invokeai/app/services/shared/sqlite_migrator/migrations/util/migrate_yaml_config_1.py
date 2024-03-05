@@ -80,8 +80,7 @@ class MigrateModelYamlToDb1:
             stanza["base"] = BaseModelType(base_type)
             stanza["type"] = ModelType(model_type)
             stanza["name"] = model_name
-            stanza["original_hash"] = hash
-            stanza["current_hash"] = hash
+            stanza["hash"] = hash
             new_key = hash  # deterministic key assignment
 
             # special case for ip adapters, which need the new `image_encoder_model_id` field
@@ -112,7 +111,7 @@ class MigrateModelYamlToDb1:
     def _search_by_path(self, path: Path) -> Optional[AnyModelConfig]:
         self.cursor.execute(
             """--sql
-            SELECT config FROM model_config
+            SELECT config FROM models
             WHERE path=?;
             """,
             (str(path),),
@@ -125,7 +124,7 @@ class MigrateModelYamlToDb1:
         json_serialized = record.model_dump_json()  # and turn it into a json string.
         self.cursor.execute(
             """--sql
-            UPDATE model_config
+            UPDATE models
             SET
                 config=?
             WHERE id=?;
@@ -141,16 +140,14 @@ class MigrateModelYamlToDb1:
         try:
             self.cursor.execute(
                 """--sql
-                INSERT INTO model_config (
+                INSERT INTO models (
                    id,
-                   original_hash,
                    config
                   )
                 VALUES (?,?,?);
                 """,
                 (
                     key,
-                    record.hash,
                     json_serialized,
                 ),
             )
