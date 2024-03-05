@@ -59,7 +59,7 @@ class ModelSummary(BaseModel):
     tags: Set[str] = Field(description="tags associated with model")
 
 
-class ModelRecordChanges(BaseModelExcludeNull, extra="allow"):
+class ModelRecordChanges(BaseModelExcludeNull):
     """A set of changes to apply to a model."""
 
     # Changes applicable to all models
