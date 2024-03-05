@@ -2,24 +2,24 @@ import { Button, Flex, FormControl, FormErrorMessage, FormLabel, Input } from '@
 import type { ChangeEventHandler } from 'react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLazyScanModelsQuery } from 'services/api/endpoints/models';
+import { useLazyScanFolderQuery } from 'services/api/endpoints/models';
 
-import { ScanModelsResults } from './ScanModelsResults';
+import { ScanModelsResults } from './ScanFolderResults';
 
 export const ScanModelsForm = () => {
   const [scanPath, setScanPath] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const { t } = useTranslation();
 
-  const [_scanModels, { isLoading, data }] = useLazyScanModelsQuery();
+  const [_scanFolder, { isLoading, data }] = useLazyScanFolderQuery();
 
-  const handleSubmitScan = useCallback(async () => {
-    _scanModels({ scan_path: scanPath }).catch((error) => {
+  const scanFolder = useCallback(async () => {
+    _scanFolder({ scan_path: scanPath }).catch((error) => {
       if (error) {
         setErrorMessage(error.data.detail);
       }
     });
-  }, [_scanModels, scanPath]);
+  }, [_scanFolder, scanPath]);
 
   const handleSetScanPath: ChangeEventHandler<HTMLInputElement> = useCallback((e) => {
     setScanPath(e.target.value);
@@ -36,7 +36,7 @@ export const ScanModelsForm = () => {
               <Input value={scanPath} onChange={handleSetScanPath} />
             </Flex>
 
-            <Button onClick={handleSubmitScan} isLoading={isLoading} isDisabled={scanPath.length === 0}>
+            <Button onClick={scanFolder} isLoading={isLoading} isDisabled={scanPath.length === 0}>
               {t('modelManager.scanFolder')}
             </Button>
           </Flex>

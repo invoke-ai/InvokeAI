@@ -3,9 +3,9 @@ import { Combobox } from '@invoke-ai/ui-library';
 import { typedMemo } from 'common/util/typedMemo';
 import { MODEL_TYPE_MAP } from 'features/parameters/types/constants';
 import { useCallback, useMemo } from 'react';
-import type { UseControllerProps } from 'react-hook-form';
+import type { Control } from 'react-hook-form';
 import { useController } from 'react-hook-form';
-import type { AnyModelConfig } from 'services/api/types';
+import type { UpdateModelArg } from 'services/api/endpoints/models';
 
 const options: ComboboxOption[] = [
   { value: 'sd-1', label: MODEL_TYPE_MAP['sd-1'] },
@@ -14,8 +14,12 @@ const options: ComboboxOption[] = [
   { value: 'sdxl-refiner', label: MODEL_TYPE_MAP['sdxl-refiner'] },
 ];
 
-const BaseModelSelect = (props: UseControllerProps<AnyModelConfig>) => {
-  const { field } = useController(props);
+type Props = {
+  control: Control<UpdateModelArg['body']>;
+};
+
+const BaseModelSelect = ({ control }: Props) => {
+  const { field } = useController({ control, name: 'base' });
   const value = useMemo(() => options.find((o) => o.value === field.value), [field.value]);
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {

@@ -13,7 +13,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useConvertMainModelsMutation } from 'services/api/endpoints/models';
+import { useConvertModelMutation } from 'services/api/endpoints/models';
 import type { CheckpointModelConfig } from 'services/api/types';
 
 interface ModelConvertProps {
@@ -24,7 +24,7 @@ export const ModelConvert = (props: ModelConvertProps) => {
   const { model } = props;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const [convertModel, { isLoading }] = useConvertMainModelsMutation();
+  const [convertModel, { isLoading }] = useConvertModelMutation();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   const modelConvertHandler = useCallback(() => {

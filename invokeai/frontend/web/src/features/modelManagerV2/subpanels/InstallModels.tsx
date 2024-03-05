@@ -1,12 +1,11 @@
 import { Box, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useTranslation } from 'react-i18next';
 
-import { AdvancedImport } from './AddModelPanel/AdvancedImport';
-import { ImportQueue } from './AddModelPanel/ImportQueue/ImportQueue';
-import { ScanModelsForm } from './AddModelPanel/ScanModels/ScanModelsForm';
-import { SimpleImport } from './AddModelPanel/SimpleImport';
+import { InstallModelForm } from './AddModelPanel/InstallModelForm';
+import { ModelInstallQueue } from './AddModelPanel/ModelInstallQueue/ModelInstallQueue';
+import { ScanModelsForm } from './AddModelPanel/ScanFolder/ScanFolderForm';
 
-export const ImportModels = () => {
+export const InstallModels = () => {
   const { t } = useTranslation();
   return (
     <Flex layerStyle="first" p={3} borderRadius="base" w="full" h="full" flexDir="column" gap={2}>
@@ -17,15 +16,11 @@ export const ImportModels = () => {
         <Tabs variant="collapse" height="100%">
           <TabList>
             <Tab>{t('common.simple')}</Tab>
-            <Tab>{t('modelManager.advanced')}</Tab>
             <Tab>{t('modelManager.scan')}</Tab>
           </TabList>
           <TabPanels p={3} height="100%">
             <TabPanel>
-              <SimpleImport />
-            </TabPanel>
-            <TabPanel height="100%">
-              <AdvancedImport />
+              <InstallModelForm />
             </TabPanel>
             <TabPanel height="100%">
               <ScanModelsForm />
@@ -34,7 +29,7 @@ export const ImportModels = () => {
         </Tabs>
       </Box>
       <Box layerStyle="second" borderRadius="base" w="full" h="50%">
-        <ImportQueue />
+        <ModelInstallQueue />
       </Box>
     </Flex>
   );

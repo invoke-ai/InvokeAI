@@ -5,7 +5,7 @@ import Loading from 'common/components/Loading/Loading';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { isNil } from 'lodash-es';
 import { useMemo } from 'react';
-import { useGetModelMetadataQuery } from 'services/api/endpoints/models';
+import { useGetModelConfigQuery } from 'services/api/endpoints/models';
 
 import { DefaultSettingsForm } from './DefaultSettings/DefaultSettingsForm';
 
@@ -24,7 +24,7 @@ const initialStatesSelector = createMemoizedSelector(selectConfigSlice, (config)
 export const DefaultSettings = () => {
   const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
 
-  const { data, isLoading } = useGetModelMetadataQuery(selectedModelKey ?? skipToken);
+  const { data, isLoading } = useGetModelConfigQuery(selectedModelKey ?? skipToken);
   const { initialSteps, initialCfg, initialScheduler, initialCfgRescaleMultiplier, initialVaePrecision } =
     useAppSelector(initialStatesSelector);
 

@@ -8,7 +8,7 @@ import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { IoPencil } from 'react-icons/io5';
-import { useUpdateModelMetadataMutation } from 'services/api/endpoints/models';
+import { useUpdateModelMutation } from 'services/api/endpoints/models';
 
 import { DefaultCfgRescaleMultiplier } from './DefaultCfgRescaleMultiplier';
 import { DefaultCfgScale } from './DefaultCfgScale';
@@ -41,7 +41,7 @@ export const DefaultSettingsForm = ({
   const { t } = useTranslation();
   const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
 
-  const [editModelMetadata, { isLoading }] = useUpdateModelMetadataMutation();
+  const [updateModel, { isLoading }] = useUpdateModelMutation();
 
   const { handleSubmit, control, formState } = useForm<DefaultSettingsFormData>({
     defaultValues: defaultSettingsDefaults,
@@ -62,7 +62,7 @@ export const DefaultSettingsForm = ({
         scheduler: data.scheduler.isEnabled ? data.scheduler.value : null,
       };
 
-      editModelMetadata({
+      updateModel({
         key: selectedModelKey,
         body: { default_settings: body },
       })
@@ -90,7 +90,7 @@ export const DefaultSettingsForm = ({
           }
         });
     },
-    [selectedModelKey, dispatch, editModelMetadata, t]
+    [selectedModelKey, dispatch, updateModel, t]
   );
 
   return (

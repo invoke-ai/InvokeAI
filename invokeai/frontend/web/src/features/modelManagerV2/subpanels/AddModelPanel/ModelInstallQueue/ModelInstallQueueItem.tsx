@@ -3,15 +3,16 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
+import { isNil } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import { PiXBold } from 'react-icons/pi';
-import { useDeleteModelImportMutation } from 'services/api/endpoints/models';
+import { useCancelModelInstallMutation } from 'services/api/endpoints/models';
 import type { HFModelSource, LocalModelSource, ModelInstallJob, URLModelSource } from 'services/api/types';
 
-import ImportQueueBadge from './ImportQueueBadge';
+import ModelInstallQueueBadge from './ModelInstallQueueBadge';
 
 type ModelListItemProps = {
-  model: ModelInstallJob;
+  installJob: ModelInstallJob;
 };
 
 const formatBytes = (bytes: number) => {
@@ -26,26 +27,26 @@ const formatBytes = (bytes: number) => {
   return `${bytes.toFixed(2)} ${units[i]}`;
 };
 
-export const ImportQueueItem = (props: ModelListItemProps) => {
-  const { model } = props;
+export const ModelInstallQueueItem = (props: ModelListItemProps) => {
+  const { installJob } = props;
   const dispatch = useAppDispatch();
 
-  const [deleteImportModel] = useDeleteModelImportMutation();
+  const [deleteImportModel] = useCancelModelInstallMutation();
 
   const source = useMemo(() => {
-    if (model.source.type === 'hf') {
-      return model.source as HFModelSource;
-    } else if (model.source.type === 'local') {
-      return model.source as LocalModelSource;
-    } else if (model.source.type === 'url') {
-      return model.source as URLModelSource;
+    if (installJob.source.type === 'hf') {
+      return installJob.source as HFModelSource;
+    } else if (installJob.source.type === 'local') {
+      return installJob.source as LocalModelSource;
+    } else if (installJob.source.type === 'url') {
+      return installJob.source as URLModelSource;
     } else {
-      return model.source as LocalModelSource;
+      return installJob.source as LocalModelSource;
     }
-  }, [model.source]);
+  }, [installJob.source]);
 
   const handleDeleteModelImport = useCallback(() => {
-    deleteImportModel(model.id)
+    deleteImportModel(installJob.id)
       .unwrap()
       .then((_) => {
         dispatch(
@@ -69,7 +70,7 @@ export const ImportQueueItem = (props: ModelListItemProps) => {
           );
         }
       });
-  }, [deleteImportModel, model, dispatch]);
+  }, [deleteImportModel, installJob, dispatch]);
 
   const modelName = useMemo(() => {
     switch (source.type) {
@@ -85,19 +86,23 @@ export const ImportQueueItem = (props: ModelListItemProps) => {
   }, [source]);
 
   const progressValue = useMemo(() => {
-    if (model.bytes === undefined || model.total_bytes === undefined) {
+    if (isNil(installJob.bytes) || isNil(installJob.total_bytes)) {
+      return null;
+    }
+
+    if (installJob.total_bytes === 0) {
       return 0;
     }
 
-    return (model.bytes / model.total_bytes) * 100;
-  }, [model.bytes, model.total_bytes]);
+    return (installJob.bytes / installJob.total_bytes) * 100;
+  }, [installJob.bytes, installJob.total_bytes]);
 
   const progressString = useMemo(() => {
-    if (model.status !== 'downloading' || model.bytes === undefined || model.total_bytes === undefined) {
+    if (installJob.status !== 'downloading' || installJob.bytes === undefined || installJob.total_bytes === undefined) {
       return '';
     }
-    return `${formatBytes(model.bytes)} / ${formatBytes(model.total_bytes)}`;
-  }, [model.bytes, model.total_bytes, model.status]);
+    return `${formatBytes(installJob.bytes)} / ${formatBytes(installJob.total_bytes)}`;
+  }, [installJob.bytes, installJob.total_bytes, installJob.status]);
 
   return (
     <Flex gap="2" w="full" alignItems="center">
@@ -109,19 +114,21 @@ export const ImportQueueItem = (props: ModelListItemProps) => {
       <Flex flexDir="column" flex={1}>
         <Tooltip label={progressString}>
           <Progress
-            value={progressValue}
-            isIndeterminate={progressValue === undefined}
+            value={progressValue ?? 0}
+            isIndeterminate={progressValue === null}
             aria-label={t('accessibility.invokeProgressBar')}
             h={2}
           />
         </Tooltip>
       </Flex>
       <Box minW="100px" textAlign="center">
-        <ImportQueueBadge status={model.status} errorReason={model.error_reason} />
+        <ModelInstallQueueBadge status={installJob.status} errorReason={installJob.error_reason} />
       </Box>
 
       <Box minW="20px">
-        {(model.status === 'downloading' || model.status === 'waiting' || model.status === 'running') && (
+        {(installJob.status === 'downloading' ||
+          installJob.status === 'waiting' ||
+          installJob.status === 'running') && (
           <IconButton
             isRound={true}
             size="xs"

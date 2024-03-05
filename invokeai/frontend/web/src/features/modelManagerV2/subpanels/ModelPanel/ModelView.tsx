@@ -91,26 +91,19 @@ export const ModelView = () => {
             <ModelAttrView label={t('modelManager.path')} value={modelData.path} />
           </Flex>
           {modelData.type === 'main' && (
-            <>
-              <Flex gap={2}>
-                {modelData.format === 'diffusers' && (
-                  <ModelAttrView label={t('modelManager.repoVariant')} value={modelData.repo_variant} />
-                )}
-                {modelData.format === 'checkpoint' && (
-                  <ModelAttrView label={t('modelManager.pathToConfig')} value={modelData.config} />
-                )}
-
-                <ModelAttrView label={t('modelManager.variant')} value={modelData.variant} />
-              </Flex>
-              <Flex gap={2}>
-                <ModelAttrView label={t('modelManager.predictionType')} value={modelData.prediction_type} />
-                <ModelAttrView label={t('modelManager.upcastAttention')} value={`${modelData.upcast_attention}`} />
-              </Flex>
-              <Flex gap={2}>
-                <ModelAttrView label={t('modelManager.ztsnrTraining')} value={`${modelData.ztsnr_training}`} />
-                <ModelAttrView label={t('modelManager.vae')} value={modelData.vae} />
-              </Flex>
-            </>
+            <Flex gap={2}>
+              {modelData.format === 'diffusers' && modelData.repo_variant && (
+                <ModelAttrView label={t('modelManager.repoVariant')} value={modelData.repo_variant} />
+              )}
+              {modelData.format === 'checkpoint' && (
+                <>
+                  <ModelAttrView label={t('modelManager.pathToConfig')} value={modelData.config_path} />
+                  <ModelAttrView label={t('modelManager.variant')} value={modelData.variant} />
+                  <ModelAttrView label={t('modelManager.predictionType')} value={modelData.prediction_type} />
+                  <ModelAttrView label={t('modelManager.upcastAttention')} value={`${modelData.upcast_attention}`} />
+                </>
+              )}
+            </Flex>
           )}
           {modelData.type === 'ip_adapter' && (
             <Flex gap={2}>
