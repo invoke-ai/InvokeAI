@@ -79,23 +79,12 @@ export const ImageCropper = (props: ImageCropperProps) => {
   );
 
   // Hooks
-
   const { isOpen: isAccordionOpen, onToggle } = useStandaloneAccordionToggle({
     id: 'cropper-custom-save-size',
     defaultIsOpen: false,
   });
 
-  const onCustomSaveSizeToggle = useCallback(() => {
-    if (isAccordionOpen) {
-      setIsCustomCropSizeEnabled(true);
-    } else {
-      setIsCustomCropSizeEnabled(false);
-    }
-    onToggle();
-  }, [isAccordionOpen, onToggle]);
-
-  // Handlers
-
+  // Canvas Handlers
   const getCropData = useCallback(() => {
     if (typeof cropperRef.current?.cropper !== 'undefined') {
       const croppedCanvas = cropperRef.current?.cropper
@@ -111,6 +100,7 @@ export const ImageCropper = (props: ImageCropperProps) => {
     }
   }, [cropperRef, cropSizeDerived, cropBoxSize]);
 
+  // Crop Box Size Handlers
   const handleCropBoxWidthChange = useCallback(
     (width: number) => {
       setCropBoxSize({ ...cropBoxSize, width: width });
@@ -127,6 +117,24 @@ export const ImageCropper = (props: ImageCropperProps) => {
     [cropBoxSize, cropperRef]
   );
 
+  // Custom Crop Size Handlers
+  const onCustomSaveSizeToggle = useCallback(() => {
+    if (isAccordionOpen) {
+      setIsCustomCropSizeEnabled(true);
+    } else {
+      setIsCustomCropSizeEnabled(false);
+    }
+    onToggle();
+  }, [isAccordionOpen, onToggle]);
+
+  const handleCustomCropSizeMultiplierEnabledChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setIsCustomCropSizeMultiplierEnabled(e.target.checked);
+  }, []);
+
+  const handleCustomCropSizeMultiplierChange = useCallback((multiplier: number) => {
+    setCustomCropSizeMultiplier(multiplier);
+  }, []);
+
   const handleCustomCropSizeWidthChange = useCallback(
     (width: number) => {
       setCustomCropSize({ ...customCropSize, width: width });
@@ -141,16 +149,7 @@ export const ImageCropper = (props: ImageCropperProps) => {
     [customCropSize]
   );
 
-  const handleCustomCropSizeMultiplierChange = useCallback((multiplier: number) => {
-    setCustomCropSizeMultiplier(multiplier);
-  }, []);
-
-  const handleCustomCropSizeMultiplierEnabledChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    setIsCustomCropSizeMultiplierEnabled(e.target.checked);
-  }, []);
-
   // Cropper Handlers
-
   const onCropperOpen = useCallback(() => {
     onOpen();
   }, [onOpen]);
@@ -219,30 +218,33 @@ export const ImageCropper = (props: ImageCropperProps) => {
           <ModalBody as={Flex} gap={4} w="full" h="full" pb={4}>
             {imageDTO && (
               <Flex w="30%" gap={4} flexDir="column">
-                <FormControl>
-                  <FormLabel>{t('cropper.cropBoxWidth')}</FormLabel>
-                  <CompositeSlider
-                    value={cropBoxSize.width ? cropBoxSize.width : 512}
-                    onChange={handleCropBoxWidthChange}
-                    defaultValue={512}
-                    min={0}
-                    max={containerSize.width}
-                    step={1}
-                    fineStep={8}
-                  />
-                </FormControl>
-                <FormControl>
-                  <FormLabel>{t('cropper.cropBoxHeight')}</FormLabel>
-                  <CompositeSlider
-                    value={cropBoxSize.height ? cropBoxSize.height : 512}
-                    onChange={handleCropBoxHeightChange}
-                    defaultValue={512}
-                    min={0}
-                    max={containerSize.height}
-                    step={1}
-                    fineStep={8}
-                  />
-                </FormControl>
+                {/* Crop Box Size */}
+                <Flex flexDir="column" gap={2}>
+                  <FormControl>
+                    <FormLabel>{t('cropper.cropBoxWidth')}</FormLabel>
+                    <CompositeSlider
+                      value={cropBoxSize.width ? cropBoxSize.width : 512}
+                      onChange={handleCropBoxWidthChange}
+                      defaultValue={512}
+                      min={0}
+                      max={containerSize.width}
+                      step={1}
+                      fineStep={8}
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>{t('cropper.cropBoxHeight')}</FormLabel>
+                    <CompositeSlider
+                      value={cropBoxSize.height ? cropBoxSize.height : 512}
+                      onChange={handleCropBoxHeightChange}
+                      defaultValue={512}
+                      min={0}
+                      max={containerSize.height}
+                      step={1}
+                      fineStep={8}
+                    />
+                  </FormControl>
+                </Flex>
 
                 {/* Custom Save Size Accordion */}
                 <StandaloneAccordion
@@ -304,6 +306,8 @@ export const ImageCropper = (props: ImageCropperProps) => {
                 </StandaloneAccordion>
 
                 <Button onClick={getCropData}>{t('cropper.preview')}</Button>
+
+                {/* Crop Preview */}
                 <Flex flexDir="column" gap={2} width="full" height="full" position="relative">
                   <Text>{t('cropper.preview')}</Text>
                   <Flex
@@ -332,6 +336,7 @@ export const ImageCropper = (props: ImageCropperProps) => {
               </Flex>
             )}
 
+            {/* Cropper Module */}
             <Flex gap={4} w="full" h="full" position="relative">
               <Cropper
                 ref={cropperRef}
