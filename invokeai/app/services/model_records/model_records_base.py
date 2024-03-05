@@ -64,6 +64,7 @@ class ModelRecordChanges(BaseModelExcludeNull):
 
     # Changes applicable to all models
     name: Optional[str] = Field(description="Name of the model.", default=None)
+    path: Optional[str] = Field(description="Path to the model.", default=None)
     description: Optional[str] = Field(description="Model description", default=None)
     base: Optional[BaseModelType] = Field(description="The base model.", default=None)
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
