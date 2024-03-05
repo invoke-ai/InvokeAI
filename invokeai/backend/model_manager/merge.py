@@ -16,6 +16,7 @@ from diffusers import AutoPipelineForText2Image
 from diffusers.utils import logging as dlogging
 
 from invokeai.app.services.model_install import ModelInstallServiceBase
+from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.backend.util.devices import choose_torch_device, torch_dtype
 
 from . import (
@@ -161,5 +162,7 @@ class ModelMerger(object):
         model_config.name = merged_model_name
         model_config.description = f"Merge of models {', '.join(model_names)}"
 
-        self._installer.record_store.update_model(key, model_config)
+        self._installer.record_store.update_model(
+            key, ModelRecordChanges(name=model_config.name, description=model_config.description)
+        )
         return model_config
