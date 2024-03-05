@@ -20,7 +20,7 @@ const sx: ChakraProps['sx'] = {
   '.react-colorful__hue-pointer': colorPickerPointerStyles,
   '.react-colorful__saturation-pointer': colorPickerPointerStyles,
   '.react-colorful__alpha-pointer': colorPickerPointerStyles,
-  gap: 2,
+  gap: 5,
   flexDir: 'column',
 };
 
@@ -39,8 +39,8 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
     <Flex sx={sx}>
       <RgbaColorPicker color={color} onChange={onChange} style={colorPickerStyles} {...rest} />
       {withNumberInput && (
-        <Flex>
-          <FormControl>
+        <Flex gap={5}>
+          <FormControl gap={0}>
             <FormLabel>{t('common.red')}</FormLabel>
             <CompositeNumberInput
               value={color.r}
@@ -52,7 +52,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
               defaultValue={90}
             />
           </FormControl>
-          <FormControl>
+          <FormControl gap={0}>
             <FormLabel>{t('common.green')}</FormLabel>
             <CompositeNumberInput
               value={color.g}
@@ -64,7 +64,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
               defaultValue={90}
             />
           </FormControl>
-          <FormControl>
+          <FormControl gap={0}>
             <FormLabel>{t('common.blue')}</FormLabel>
             <CompositeNumberInput
               value={color.b}
@@ -76,7 +76,7 @@ const IAIColorPicker = (props: IAIColorPickerProps) => {
               defaultValue={255}
             />
           </FormControl>
-          <FormControl>
+          <FormControl gap={0}>
             <FormLabel>{t('common.alpha')}</FormLabel>
             <CompositeNumberInput
               value={color.a}
