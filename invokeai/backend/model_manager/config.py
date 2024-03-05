@@ -147,7 +147,7 @@ class ModelConfigBase(BaseModel):
     source_api_response: Optional[str] = Field(
         description="The original API response from the source, as stringified JSON.", default=None
     )
-    trigger_words: Optional[set[str]] = Field(description="Set of trigger words for this model", default=None)
+    trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
 
     model_config = ConfigDict(use_enum_values=False, validate_assignment=True)
 

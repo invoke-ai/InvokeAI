@@ -379,8 +379,8 @@ class ModelInstallService(ModelInstallServiceBase):
                     # enter the metadata, if there is any
                     if isinstance(job.source_metadata, (CivitaiMetadata, HuggingFaceMetadata)):
                         job.config_in["source_api_response"] = job.source_metadata.api_response
-                    if isinstance(job.source_metadata, CivitaiMetadata) and job.source_metadata.trigger_words:
-                        job.config_in["trigger_words"] = job.source_metadata.trigger_words
+                    if isinstance(job.source_metadata, CivitaiMetadata) and job.source_metadata.trigger_phrases:
+                        job.config_in["trigger_phrases"] = job.source_metadata.trigger_phrases
 
                     if job.inplace:
                         key = self.register_path(job.local_path, job.config_in)

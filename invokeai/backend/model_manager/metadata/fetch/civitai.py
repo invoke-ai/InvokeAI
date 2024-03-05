@@ -144,14 +144,14 @@ class CivitaiMetadataFetch(ModelMetadataFetchBase):
         ]
 
         try:
-            trigger_words = StringSetAdapter.validate_python(version_json.get("trainedWords"))
+            trigger_phrases = StringSetAdapter.validate_python(version_json.get("trainedWords"))
         except ValidationError:
-            trigger_words: set[str] = set()
+            trigger_phrases: set[str] = set()
 
         return CivitaiMetadata(
             name=version_json["name"],
             files=model_files,
-            trigger_words=trigger_words,
+            trigger_phrases=trigger_phrases,
             api_response=json.dumps(version_json),
         )
 
