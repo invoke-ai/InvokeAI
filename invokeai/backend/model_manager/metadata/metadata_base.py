@@ -92,7 +92,7 @@ class CivitaiMetadata(ModelMetadataWithFiles):
     """Extended metadata fields provided by Civitai."""
 
     type: Literal["civitai"] = "civitai"
-    trigger_words: set[str] = Field(description="Trigger words extracted from the API response")
+    trigger_phrases: set[str] = Field(description="Trigger phrases extracted from the API response")
     api_response: Optional[str] = Field(description="Response from the Civitai API as stringified JSON", default=None)
 
 
