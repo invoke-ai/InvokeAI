@@ -20,6 +20,7 @@ from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase
+from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
@@ -472,7 +473,7 @@ class ModelInstallService(ModelInstallServiceBase):
         self._logger.info(f"Moving {model.name} to {new_path}.")
         new_path = self._move_model(old_path, new_path)
         model.path = new_path.relative_to(models_dir).as_posix()
-        self.record_store.update_model(key, model)
+        self.record_store.update_model(key, ModelRecordChanges(path=model.path))
         return model
 
     def _scan_register(self, model: Path) -> bool:
@@ -523,13 +524,6 @@ class ModelInstallService(ModelInstallServiceBase):
             counter += 1
         move(old_path, new_path)
         return new_path
-
-    # def _probe_model(self, model_path: Path, config: Optional[Dict[str, Any]] = None) -> AnyModelConfig:
-    #     info: AnyModelConfig = ModelProbe.probe(Path(model_path))
-    #     if config:  # used to override probe fields
-    #         for key, value in config.items():
-    #             setattr(info, key, value)
-    #     return info
 
     def _register(
         self, model_path: Path, config: Optional[Dict[str, Any]] = None, info: Optional[AnyModelConfig] = None
