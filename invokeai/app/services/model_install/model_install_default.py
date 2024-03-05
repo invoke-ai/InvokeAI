@@ -179,7 +179,7 @@ class ModelInstallService(ModelInstallServiceBase):
         source: str,
         config: Optional[Dict[str, Any]] = None,
         access_token: Optional[str] = None,
-        inplace: bool = False,
+        inplace: Optional[bool] = False,
     ) -> ModelInstallJob:
         variants = "|".join(ModelRepoVariant.__members__.values())
         hf_repoid_re = f"^([^/:]+/[^/:]+)(?::({variants})?(?::/?([^:]+))?)?$"
