@@ -23,8 +23,9 @@ class ModelImagesService(ModelImagesBase):
     __invoker: Invoker
 
     def __init__(self, model_images_folder: Union[str, Path]):
-
-        self.__model_images_folder: Path = model_images_folder if isinstance(model_images_folder, Path) else Path(model_images_folder)
+        self.__model_images_folder: Path = (
+            model_images_folder if isinstance(model_images_folder, Path) else Path(model_images_folder)
+        )
         # Validate required folders at launch
         self.__validate_storage_folders()
 
@@ -50,7 +51,7 @@ class ModelImagesService(ModelImagesBase):
     ) -> None:
         try:
             self.__validate_storage_folders()
-            image_path = self.__model_images_folder / (model_key + '.webp')
+            image_path = self.__model_images_folder / (model_key + ".webp")
             image = make_thumbnail(image, 256)
 
             image.save(image_path, format="webp")
@@ -59,7 +60,7 @@ class ModelImagesService(ModelImagesBase):
             raise ModelImageFileSaveException from e
 
     def get_path(self, model_key: str) -> Path:
-        path = self.__model_images_folder / (model_key + '.webp')
+        path = self.__model_images_folder / (model_key + ".webp")
 
         return path
 
@@ -75,7 +76,7 @@ class ModelImagesService(ModelImagesBase):
             path = self.get_path(model_key)
 
             if not self.validate_path(path):
-              raise ModelImageFileNotFoundException
+                raise ModelImageFileNotFoundException
 
             send2trash(path)
 

@@ -287,7 +287,7 @@ async def update_model_record(
             "description": "The model image was fetched successfully",
         },
         400: {"description": "Bad request"},
-        404: {"description": "The model image could not be found"}
+        404: {"description": "The model image could not be found"},
     },
     status_code=200,
 )
@@ -309,6 +309,7 @@ async def get_model_image(
         return response
     except Exception:
         raise HTTPException(status_code=404)
+
 
 @model_manager_router.patch(
     "/i/{key}/image",
@@ -375,6 +376,7 @@ async def delete_model(
     except UnknownModelException as e:
         logger.error(str(e))
         raise HTTPException(status_code=404, detail=str(e))
+
 
 @model_manager_router.delete(
     "/i/{key}/image",
