@@ -51,11 +51,11 @@ const ClearStagingIntermediatesIconButton = () => {
   const { t } = useTranslation();
 
   const handleDiscardStagingArea = useCallback(() => {
-    dispatch(discardStagedImages())
+    dispatch(discardStagedImages());
   }, [dispatch]);
 
   const handleDiscardStagingImage = useCallback(() => {
-    dispatch(discardStagedImage())
+    dispatch(discardStagedImage());
   }, [dispatch]);
 
   return (
@@ -77,8 +77,8 @@ const ClearStagingIntermediatesIconButton = () => {
         fontSize={16}
       />
     </>
-  )
-}
+  );
+};
 
 const IAICanvasStagingAreaToolbar = () => {
   const dispatch = useAppDispatch();
