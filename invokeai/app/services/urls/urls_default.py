@@ -15,3 +15,6 @@ class LocalUrlService(UrlServiceBase):
             return f"{self._base_url}/images/i/{image_basename}/thumbnail"
 
         return f"{self._base_url}/images/i/{image_basename}/full"
+
+    def get_model_image_url(self, model_key: str) -> str:
+        return f"{self._base_url}/model_images/{model_key}.png"

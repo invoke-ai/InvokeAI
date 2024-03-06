@@ -161,6 +161,7 @@ class ModelConfigBase(BaseModel):
     default_settings: Optional[ModelDefaultSettings] = Field(
         description="Default settings for this model", default=None
     )
+    image: Optional[str] = Field(description="Image to preview model", default=None)
 
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
@@ -372,6 +373,10 @@ AnyModelConfig = Annotated[
 ]
 
 AnyModelConfigValidator = TypeAdapter(AnyModelConfig)
+
+
+class ModelImage(str, Enum):
+    path: str
 
 
 class ModelConfigFactory(object):
