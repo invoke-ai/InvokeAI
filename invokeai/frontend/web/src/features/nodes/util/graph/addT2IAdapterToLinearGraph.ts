@@ -37,7 +37,7 @@ export const addT2IAdaptersToLinearGraph = async (
       },
     });
 
-    const t2iAdapterMetdata: CoreMetadataInvocation['t2iAdapters'] = [];
+    const t2iAdapterMetadata: CoreMetadataInvocation['t2iAdapters'] = [];
 
     validT2IAdapters.forEach(async (t2iAdapter) => {
       if (!t2iAdapter.model) {
@@ -85,7 +85,7 @@ export const addT2IAdaptersToLinearGraph = async (
 
       const modelConfig = await fetchModelConfigWithTypeGuard(t2iAdapter.model.key, isT2IAdapterModelConfig);
 
-      t2iAdapterMetdata.push({
+      t2iAdapterMetadata.push({
         begin_step_percent: beginStepPct,
         end_step_percent: endStepPct,
         resize_mode: resizeMode,
@@ -103,6 +103,6 @@ export const addT2IAdaptersToLinearGraph = async (
       });
     });
 
-    upsertMetadata(graph, { t2iAdapters: t2iAdapterMetdata });
+    upsertMetadata(graph, { t2iAdapters: t2iAdapterMetadata });
   }
 };
