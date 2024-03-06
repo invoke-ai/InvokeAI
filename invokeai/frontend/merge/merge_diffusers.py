@@ -20,7 +20,6 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadQueueService
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.model_install import ModelInstallService
-from invokeai.app.services.model_metadata import ModelMetadataStoreSQL
 from invokeai.app.services.model_records import ModelRecordServiceBase, ModelRecordServiceSQL
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.backend.model_manager import (
@@ -413,7 +412,7 @@ def get_config_store() -> ModelRecordServiceSQL:
     assert output_path is not None
     image_files = DiskImageFileStorage(output_path / "images")
     db = init_db(config=config, logger=InvokeAILogger.get_logger(), image_files=image_files)
-    return ModelRecordServiceSQL(db, ModelMetadataStoreSQL(db))
+    return ModelRecordServiceSQL(db)
 
 
 def get_model_merger(record_store: ModelRecordServiceBase) -> ModelMerger:

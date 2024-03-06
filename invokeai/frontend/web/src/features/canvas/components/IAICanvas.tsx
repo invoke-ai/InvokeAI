@@ -29,7 +29,7 @@ import { Layer, Stage } from 'react-konva';
 import IAICanvasBoundingBoxOverlay from './IAICanvasBoundingBoxOverlay';
 import IAICanvasGrid from './IAICanvasGrid';
 import IAICanvasIntermediateImage from './IAICanvasIntermediateImage';
-import IAICanvasMaskCompositer from './IAICanvasMaskCompositer';
+import IAICanvasMaskCompositor from './IAICanvasMaskCompositor';
 import IAICanvasMaskLines from './IAICanvasMaskLines';
 import IAICanvasObjectRenderer from './IAICanvasObjectRenderer';
 import IAICanvasStagingArea from './IAICanvasStagingArea';
@@ -176,7 +176,7 @@ const IAICanvas = () => {
           </Layer>
           <Layer id="mask" visible={isMaskEnabled && !isStaging} listening={false}>
             <IAICanvasMaskLines visible={true} listening={false} />
-            <IAICanvasMaskCompositer listening={false} />
+            <IAICanvasMaskCompositor listening={false} />
           </Layer>
           <Layer listening={false}>
             <IAICanvasBoundingBoxOverlay />

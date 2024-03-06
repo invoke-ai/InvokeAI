@@ -16,9 +16,9 @@ const canvasMaskCompositerSelector = createMemoizedSelector(selectCanvasSlice, (
   };
 });
 
-type IAICanvasMaskCompositerProps = RectConfig;
+type IAICanvasMaskCompositorProps = RectConfig;
 
-const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
+const IAICanvasMaskCompositor = (props: IAICanvasMaskCompositorProps) => {
   const { ...rest } = props;
 
   const { stageCoordinates, stageDimensions } = useAppSelector(canvasMaskCompositerSelector);
@@ -89,4 +89,4 @@ const IAICanvasMaskCompositer = (props: IAICanvasMaskCompositerProps) => {
   );
 };
 
-export default memo(IAICanvasMaskCompositer);
+export default memo(IAICanvasMaskCompositor);
