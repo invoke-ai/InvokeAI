@@ -79,6 +79,7 @@ class ModelRecordChanges(BaseModelExcludeNull):
         description="The prediction type of the model.", default=None
     )
     upcast_attention: Optional[bool] = Field(description="Whether to upcast attention.", default=None)
+    config_path: Optional[str] = Field(description="Path to config file for model", default=None)
 
 
 class ModelRecordServiceBase(ABC):
