@@ -9,7 +9,12 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.util.thumbnails import make_thumbnail
 
 from .model_images_base import ModelImagesBase
-from .model_images_common import ModelImageFileDeleteException, ModelImageFileNotFoundException, ModelImageFileSaveException
+from .model_images_common import (
+    ModelImageFileDeleteException,
+    ModelImageFileNotFoundException,
+    ModelImageFileSaveException,
+)
+
 
 class ModelImagesService(ModelImagesBase):
     """Stores images on disk"""
@@ -29,7 +34,7 @@ class ModelImagesService(ModelImagesBase):
     def get(self, model_key: str) -> PILImageType:
         try:
             path = self.get_path(model_key)
-            
+
             if not self.validate_path(path):
                 raise ModelImageFileNotFoundException
 
@@ -57,14 +62,14 @@ class ModelImagesService(ModelImagesBase):
         path = self.__model_images_folder / (model_key + '.webp')
 
         return path
-    
+
     def get_url(self, model_key: str) -> str | None:
         path = self.get_path(model_key)
         if not self.validate_path(path):
             return
-        
+
         return self.__invoker.services.urls.get_model_image_url(model_key)
-    
+
     def delete(self, model_key: str) -> None:
         try:
             path = self.get_path(model_key)
@@ -76,7 +81,7 @@ class ModelImagesService(ModelImagesBase):
 
         except Exception as e:
             raise ModelImageFileDeleteException from e
-        
+
     def validate_path(self, path: Union[str, Path]) -> bool:
         """Validates the path given for an image."""
         path = path if isinstance(path, Path) else Path(path)

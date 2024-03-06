@@ -1,24 +1,22 @@
-import { Box, IconButton, Image } from '@invoke-ai/ui-library';
-import { typedMemo } from 'common/util/typedMemo';
-import { useCallback, useState } from 'react';
+import { Box, Button, IconButton, Image } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-
-import { Button } from '@invoke-ai/ui-library';
-import { useDropzone } from 'react-dropzone';
-import { PiArrowCounterClockwiseBold, PiUploadSimpleBold } from 'react-icons/pi';
-import { useUpdateModelImageMutation, useDeleteModelImageMutation } from 'services/api/endpoints/models';
-import { useTranslation } from 'react-i18next';
+import { typedMemo } from 'common/util/typedMemo';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
+import { useCallback, useState } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { useTranslation } from 'react-i18next';
+import { PiArrowCounterClockwiseBold, PiUploadSimpleBold } from 'react-icons/pi';
+import { useDeleteModelImageMutation, useUpdateModelImageMutation } from 'services/api/endpoints/models';
 
 type Props = {
-    model_key: string | null;
-    model_image: string | null;
-  };
-  
-  const ModelImageUpload = ({ model_key, model_image }: Props) => {
+  model_key: string | null;
+  model_image?: string | null;
+};
+
+const ModelImageUpload = ({ model_key, model_image }: Props) => {
   const dispatch = useAppDispatch();
-  const [image, setImage] = useState<string | null>(model_image);
+  const [image, setImage] = useState<string | null>(model_image || null);
   const { t } = useTranslation();
 
   const [updateModelImage] = useUpdateModelImageMutation();
@@ -28,19 +26,50 @@ type Props = {
     (files: File[]) => {
       const file = files[0];
 
-      if (!file) {
+      if (!file || !model_key) {
         return;
       }
 
       setImage(URL.createObjectURL(file));
 
       updateModelImage({ key: model_key, image: file })
+        .unwrap()
+        .then(() => {
+          dispatch(
+            addToast(
+              makeToast({
+                title: t('modelManager.modelImageUpdated'),
+                status: 'success',
+              })
+            )
+          );
+        })
+        .catch((_) => {
+          dispatch(
+            addToast(
+              makeToast({
+                title: t('modelManager.modelImageUpdateFailed'),
+                status: 'error',
+              })
+            )
+          );
+        });
+    },
+    [dispatch, model_key, t, updateModelImage]
+  );
+
+  const handleResetImage = useCallback(() => {
+    if (!model_key) {
+      return;
+    }
+    setImage(null);
+    deleteModelImage(model_key)
       .unwrap()
       .then(() => {
         dispatch(
           addToast(
             makeToast({
-              title: t('modelManager.modelImageUpdated'),
+              title: t('modelManager.modelImageDeleted'),
               status: 'success',
             })
           )
@@ -50,44 +79,13 @@ type Props = {
         dispatch(
           addToast(
             makeToast({
-              title: t('modelManager.modelImageUpdateFailed'),
+              title: t('modelManager.modelImageDeleteFailed'),
               status: 'error',
             })
           )
         );
       });
-    },
-    []
-  );
-
-  const handleResetImage = useCallback(() => {
-    if (!model_key) {
-      return;
-    }
-    setImage(null);
-    deleteModelImage(model_key)
-    .unwrap()
-    .then(() => {
-      dispatch(
-        addToast(
-          makeToast({
-            title: t('modelManager.modelImageDeleted'),
-            status: 'success',
-          })
-        )
-      );
-    })
-    .catch((_) => {
-      dispatch(
-        addToast(
-          makeToast({
-            title: t('modelManager.modelImageDeleteFailed'),
-            status: 'error',
-          })
-        )
-      );
-    });
-  }, []);
+  }, [dispatch, model_key, t, deleteModelImage]);
 
   const { getInputProps, getRootProps } = useDropzone({
     accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg', '.png'] },
@@ -98,9 +96,7 @@ type Props = {
 
   if (image) {
     return (
-      <Box
-        position="relative"
-      >
+      <Box position="relative">
         <Image
           src={image}
           objectFit="cover"

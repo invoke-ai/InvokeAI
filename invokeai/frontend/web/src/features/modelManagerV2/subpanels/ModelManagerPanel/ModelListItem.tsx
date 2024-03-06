@@ -21,6 +21,7 @@ import { IoWarning } from 'react-icons/io5';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 import { useDeleteModelsMutation } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
+
 import ModelImage from './ModelImage';
 
 type ModelListItemProps = {
