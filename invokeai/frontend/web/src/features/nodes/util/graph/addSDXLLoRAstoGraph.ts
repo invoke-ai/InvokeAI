@@ -5,7 +5,7 @@ import {
   type CoreMetadataInvocation,
   isLoRAModelConfig,
   type NonNullableGraph,
-  type SDXLLoraLoaderInvocation,
+  type SDXLLoRALoaderInvocation,
 } from 'services/api/types';
 
 import {
@@ -66,7 +66,7 @@ export const addSDXLLoRAsToGraph = async (
     const { key } = lora.model;
     const currentLoraNodeId = `${LORA_LOADER}_${key}`;
 
-    const loraLoaderNode: SDXLLoraLoaderInvocation = {
+    const loraLoaderNode: SDXLLoRALoaderInvocation = {
       type: 'sdxl_lora_loader',
       id: currentLoraNodeId,
       is_intermediate: true,

@@ -4,7 +4,7 @@ import { filter, size } from 'lodash-es';
 import {
   type CoreMetadataInvocation,
   isLoRAModelConfig,
-  type LoraLoaderInvocation,
+  type LoRALoaderInvocation,
   type NonNullableGraph,
 } from 'services/api/types';
 
@@ -50,7 +50,7 @@ export const addLoRAsToGraph = async (
     const { key } = lora.model;
     const currentLoraNodeId = `${LORA_LOADER}_${key}`;
 
-    const loraLoaderNode: LoraLoaderInvocation = {
+    const loraLoaderNode: LoRALoaderInvocation = {
       type: 'lora_loader',
       id: currentLoraNodeId,
       is_intermediate: true,
