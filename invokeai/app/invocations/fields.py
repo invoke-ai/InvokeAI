@@ -228,7 +228,7 @@ class ConditioningField(BaseModel):
     # endregion
 
 
-class MetadataField(RootModel):
+class MetadataField(RootModel[dict[str, Any]]):
     """
     Pydantic model for metadata with custom root of type dict[str, Any].
     Metadata is stored without a strict schema.

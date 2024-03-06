@@ -131,6 +131,17 @@ class ModelRecordServiceBase(ABC):
         pass
 
     @abstractmethod
+    def get_model_by_hash(self, hash: str) -> AnyModelConfig:
+        """
+        Retrieve the configuration for the indicated model.
+
+        :param hash: Hash of model config to be fetched.
+
+        Exceptions: UnknownModelException
+        """
+        pass
+
+    @abstractmethod
     def list_models(
         self, page: int = 0, per_page: int = 10, order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default
     ) -> PaginatedResults[ModelSummary]:
