@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { stagingAreaImageSaved } from 'features/canvas/store/actions';
 import {
   commitStagingAreaImage,
+  discardStagedImage,
   discardStagedImages,
   nextStagingAreaImage,
   prevStagingAreaImage,
@@ -22,6 +23,7 @@ import {
   PiEyeBold,
   PiEyeSlashBold,
   PiFloppyDiskBold,
+  PiTrashSimpleBold,
   PiXBold,
 } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
@@ -43,6 +45,40 @@ const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
     shouldShowStagingOutline,
   };
 });
+
+const ClearStagingIntermediatesIconButton = () => {
+  const dispatch = useAppDispatch();
+  const { t } = useTranslation();
+
+  const handleDiscardStagingArea = useCallback(() => {
+    dispatch(discardStagedImages())
+  }, [dispatch]);
+
+  const handleDiscardStagingImage = useCallback(() => {
+    dispatch(discardStagedImage())
+  }, [dispatch]);
+
+  return (
+    <>
+      <IconButton
+        tooltip={`${t('unifiedCanvas.discardCurrent')}`}
+        aria-label={t('unifiedCanvas.discardCurrent')}
+        icon={<PiXBold />}
+        onClick={handleDiscardStagingImage}
+        colorScheme="invokeBlue"
+        fontSize={16}
+      />
+      <IconButton
+        tooltip={`${t('unifiedCanvas.discardAll')} (Esc)`}
+        aria-label={t('unifiedCanvas.discardAll')}
+        icon={<PiTrashSimpleBold />}
+        onClick={handleDiscardStagingArea}
+        colorScheme="error"
+        fontSize={16}
+      />
+    </>
+  )
+}
 
 const IAICanvasStagingAreaToolbar = () => {
   const dispatch = useAppDispatch();
@@ -185,14 +221,7 @@ const IAICanvasStagingAreaToolbar = () => {
           onClick={handleSaveToGallery}
           colorScheme="invokeBlue"
         />
-        <IconButton
-          tooltip={`${t('unifiedCanvas.discardAll')} (Esc)`}
-          aria-label={t('unifiedCanvas.discardAll')}
-          icon={<PiXBold />}
-          onClick={handleDiscardStagingArea}
-          colorScheme="error"
-          fontSize={20}
-        />
+        <ClearStagingIntermediatesIconButton />
       </ButtonGroup>
     </Flex>
   );

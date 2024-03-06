@@ -1815,6 +1815,7 @@
         "cursorPosition": "Cursor Position",
         "darkenOutsideSelection": "Darken Outside Selection",
         "discardAll": "Discard All",
+        "discardCurrent": "Discard Current",
         "downloadAsImage": "Download As Image",
         "emptyFolder": "Empty Folder",
         "emptyTempImageFolder": "Empty Temp Image Folder",

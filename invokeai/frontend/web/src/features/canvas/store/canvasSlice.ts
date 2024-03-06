@@ -292,6 +292,24 @@ export const canvasSlice = createSlice({
       state.shouldShowStagingImage = true;
       state.batchIds = [];
     },
+    discardStagedImage: (state) => {
+      const { images, selectedImageIndex } = state.layerState.stagingArea;
+
+      if (!images.length) {
+        return;
+      }
+
+      images.splice(selectedImageIndex, 1);
+
+      if (selectedImageIndex >= images.length) {
+        state.layerState.stagingArea.selectedImageIndex = images.length - 1;
+      }
+
+      if (!images.length) {
+        state.shouldShowStagingImage = false;
+        state.shouldShowStagingOutline = false;
+      }
+    },
     addFillRect: (state) => {
       const { boundingBoxCoordinates, boundingBoxDimensions, brushColor } = state;
 
@@ -659,6 +677,7 @@ export const {
   commitColorPickerColor,
   commitStagingAreaImage,
   discardStagedImages,
+  discardStagedImage,
   nextStagingAreaImage,
   prevStagingAreaImage,
   redo,
