@@ -101,7 +101,7 @@ export const addEnqueueRequestedCanvasListener = (startAppListening: AppStartLis
         ).unwrap();
       }
 
-      const graph = buildCanvasGraph(state, generationMode, canvasInitImage, canvasMaskImage);
+      const graph = await buildCanvasGraph(state, generationMode, canvasInitImage, canvasMaskImage);
 
       log.debug({ graph: parseify(graph) }, `Canvas graph built`);
 

@@ -20,15 +20,15 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       if (model && model.base === 'sdxl') {
         if (action.payload.tabName === 'txt2img') {
-          graph = buildLinearSDXLTextToImageGraph(state);
+          graph = await buildLinearSDXLTextToImageGraph(state);
         } else {
-          graph = buildLinearSDXLImageToImageGraph(state);
+          graph = await buildLinearSDXLImageToImageGraph(state);
         }
       } else {
         if (action.payload.tabName === 'txt2img') {
-          graph = buildLinearTextToImageGraph(state);
+          graph = await buildLinearTextToImageGraph(state);
         } else {
-          graph = buildLinearImageToImageGraph(state);
+          graph = await buildLinearImageToImageGraph(state);
         }
       }
 

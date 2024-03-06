@@ -55,8 +55,22 @@ export type SchedulerField = z.infer<typeof zSchedulerField>;
 
 // #region Model-related schemas
 const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
+const zSubModelType = z.enum([
+  'unet',
+  'text_encoder',
+  'text_encoder_2',
+  'tokenizer',
+  'tokenizer_2',
+  'vae',
+  'vae_decoder',
+  'vae_encoder',
+  'scheduler',
+  'safety_checker',
+]);
+
 const zModelIdentifier = z.object({
   key: z.string().min(1),
+  submodel_type: zSubModelType.nullish(),
 });
 export const isModelIdentifier = (field: unknown): field is ModelIdentifier =>
   zModelIdentifier.safeParse(field).success;
