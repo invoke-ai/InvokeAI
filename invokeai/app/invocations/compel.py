@@ -54,16 +54,16 @@ class CompelInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        tokenizer_info = context.models.load(**self.clip.tokenizer.model_dump())
+        tokenizer_info = context.models.load(self.clip.tokenizer)
         tokenizer_model = tokenizer_info.model
         assert isinstance(tokenizer_model, CLIPTokenizer)
-        text_encoder_info = context.models.load(**self.clip.text_encoder.model_dump())
+        text_encoder_info = context.models.load(self.clip.text_encoder)
         text_encoder_model = text_encoder_info.model
         assert isinstance(text_encoder_model, CLIPTextModel)
 
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
             for lora in self.clip.loras:
-                lora_info = context.models.load(**lora.model_dump(exclude={"weight"}))
+                lora_info = context.models.load(lora.lora)
                 assert isinstance(lora_info.model, LoRAModelRaw)
                 yield (lora_info.model, lora.weight)
                 del lora_info
@@ -133,10 +133,10 @@ class SDXLPromptInvocationBase:
         lora_prefix: str,
         zero_on_empty: bool,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[ExtraConditioningInfo]]:
-        tokenizer_info = context.models.load(**clip_field.tokenizer.model_dump())
+        tokenizer_info = context.models.load(clip_field.tokenizer)
         tokenizer_model = tokenizer_info.model
         assert isinstance(tokenizer_model, CLIPTokenizer)
-        text_encoder_info = context.models.load(**clip_field.text_encoder.model_dump())
+        text_encoder_info = context.models.load(clip_field.text_encoder)
         text_encoder_model = text_encoder_info.model
         assert isinstance(text_encoder_model, (CLIPTextModel, CLIPTextModelWithProjection))
 
@@ -163,7 +163,7 @@ class SDXLPromptInvocationBase:
 
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
             for lora in clip_field.loras:
-                lora_info = context.models.load(**lora.model_dump(exclude={"weight"}))
+                lora_info = context.models.load(lora.lora)
                 lora_model = lora_info.model
                 assert isinstance(lora_model, LoRAModelRaw)
                 yield (lora_model, lora.weight)

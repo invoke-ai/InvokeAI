@@ -203,6 +203,21 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             model = ModelConfigFactory.make_config(json.loads(rows[0]), timestamp=rows[1])
         return model
 
+    def get_model_by_hash(self, hash: str) -> AnyModelConfig:
+        with self._db.lock:
+            self._cursor.execute(
+                """--sql
+                SELECT config, strftime('%s',updated_at) FROM models
+                WHERE hash=?;
+                """,
+                (hash,),
+            )
+            rows = self._cursor.fetchone()
+            if not rows:
+                raise UnknownModelException("model not found")
+            model = ModelConfigFactory.make_config(json.loads(rows[0]), timestamp=rows[1])
+        return model
+
     def exists(self, key: str) -> bool:
         """
         Return True if a model with the indicated key exists in the databse.
