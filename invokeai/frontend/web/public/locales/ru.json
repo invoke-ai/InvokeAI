@@ -52,7 +52,7 @@
         "accept": "Принять",
         "postprocessing": "Постобработка",
         "txt2img": "Текст в изображение (txt2img)",
-        "linear": "Линейная обработка",
+        "linear": "Линейный вид",
         "dontAskMeAgain": "Больше не спрашивать",
         "areYouSure": "Вы уверены?",
         "random": "Случайное",
@@ -117,7 +117,8 @@
         "toResolve": "Чтоб решить",
         "copy": "Копировать",
         "localSystem": "Локальная система",
-        "aboutDesc": "Используя Invoke для работы? Проверьте это:"
+        "aboutDesc": "Используя Invoke для работы? Проверьте это:",
+        "add": "Добавить"
     },
     "gallery": {
         "generations": "Генерации",
@@ -155,7 +156,12 @@
         "noImageSelected": "Изображение не выбрано",
         "setCurrentImage": "Установить как текущее изображение",
         "starImage": "Добавить в избранное",
-        "dropToUpload": "$t(gallery.drop) чтоб загрузить"
+        "dropToUpload": "$t(gallery.drop) чтоб загрузить",
+        "bulkDownloadFailed": "Загрузка не удалась",
+        "bulkDownloadStarting": "Начало загрузки",
+        "bulkDownloadRequested": "Подготовка к скачиванию",
+        "bulkDownloadRequestedDesc": "Ваш запрос на скачивание готовится. Это может занять несколько минут.",
+        "bulkDownloadRequestFailed": "Возникла проблема при подготовке скачивания"
     },
     "hotkeys": {
         "keyboardShortcuts": "Горячие клавиши",
@@ -504,7 +510,7 @@
         "settings": "Настройки",
         "selectModel": "Выберите модель",
         "syncModels": "Синхронизация моделей",
-        "syncModelsDesc": "Если ваши модели не синхронизированы с серверной частью, вы можете обновить их, используя эту опцию. Обычно это удобно в тех случаях, когда вы вручную обновляете свой файл \"models.yaml\" или добавляете модели в корневую папку InvokeAI после загрузки приложения.",
+        "syncModelsDesc": "Если ваши модели не синхронизированы с серверной частью, вы можете обновить их с помощью этой опции. Обычно это удобно в тех случаях, когда вы добавляете модели в корневую папку InvokeAI или каталог автоимпорта после загрузки приложения.",
         "modelUpdateFailed": "Не удалось обновить модель",
         "modelConversionFailed": "Не удалось сконвертировать модель",
         "modelsMergeFailed": "Не удалось выполнить слияние моделей",
@@ -513,7 +519,7 @@
         "oliveModels": "Модели Olives",
         "conversionNotSupported": "Преобразование не поддерживается",
         "noModels": "Нет моделей",
-        "predictionType": "Тип прогноза (для моделей Stable Diffusion 2.x и периодических моделей Stable Diffusion 1.x)",
+        "predictionType": "Тип прогноза",
         "quickAdd": "Быстрое добавление",
         "simpleModelDesc": "Укажите путь к локальной модели Diffusers , локальной модели checkpoint / safetensors, идентификатор репозитория HuggingFace или URL-адрес модели контрольной checkpoint / diffusers.",
         "advanced": "Продвинутый",
@@ -524,7 +530,33 @@
         "customConfigFileLocation": "Расположение пользовательского файла конфигурации",
         "vaePrecision": "Точность VAE",
         "noModelSelected": "Модель не выбрана",
-        "configFile": "Файл конфигурации"
+        "configFile": "Файл конфигурации",
+        "addAll": "Добавить всё",
+        "addModels": "Добавить модели",
+        "cancel": "Отмена",
+        "defaultSettings": "Стандартные настройки",
+        "importQueue": "Импортировать очередь",
+        "metadata": "Метаданные",
+        "imageEncoderModelId": "ID модели-энкодера изображений",
+        "typePhraseHere": "Введите фразы здесь",
+        "advancedImportInfo": "Вкладка «Дополнительно» позволяет вручную настроить основные параметры модели. Используйте эту вкладку только в том случае, если вы уверены, что знаете правильный тип модели и конфигурацию выбранной модели.",
+        "defaultSettingsSaved": "Стандартные настройки сохранены",
+        "edit": "Редактировать",
+        "path": "Путь",
+        "prune": "Удалить",
+        "pruneTooltip": "Удалить готовые импорты из очереди",
+        "removeFromQueue": "Удалить из очереди",
+        "repoVariant": "Вариант репозитория",
+        "scan": "Сканировать",
+        "scanFolder": "Сканировать папку",
+        "scanResults": "Результаты сканирования",
+        "source": "Источник",
+        "triggerPhrases": "Триггерные фразы",
+        "useDefaultSettings": "Использовать стандартные настройки",
+        "modelMetadata": "Метаданные модели",
+        "modelName": "Название модели",
+        "modelSettings": "Настройки модели",
+        "upcastAttention": "Внимание"
     },
     "parameters": {
         "images": "Изображения",
@@ -591,7 +623,7 @@
         "hSymmetryStep": "Шаг гор. симметрии",
         "hidePreview": "Скрыть предпросмотр",
         "imageToImage": "Изображение в изображение",
-        "denoisingStrength": "Сила шумоподавления",
+        "denoisingStrength": "Сила зашумления",
         "copyImage": "Скопировать изображение",
         "showPreview": "Показать предпросмотр",
         "noiseSettings": "Шум",
@@ -606,8 +638,8 @@
         "clipSkip": "CLIP Пропуск",
         "aspectRatio": "Соотношение",
         "maskAdjustmentsHeader": "Настройка маски",
-        "maskBlur": "Размытие",
-        "maskBlurMethod": "Метод размытия",
+        "maskBlur": "Размытие маски",
+        "maskBlurMethod": "Метод размытия маски",
         "seamLowThreshold": "Низкий",
         "seamHighThreshold": "Высокий",
         "coherencePassHeader": "Порог Coherence",
@@ -666,7 +698,9 @@
         "lockAspectRatio": "Заблокировать соотношение",
         "boxBlur": "Размытие прямоугольника",
         "gaussianBlur": "Размытие по Гауссу",
-        "remixImage": "Ремикс изображения"
+        "remixImage": "Ремикс изображения",
+        "coherenceMinDenoise": "Мин. шумоподавление",
+        "coherenceEdgeSize": "Размер края"
     },
     "settings": {
         "models": "Модели",
@@ -749,8 +783,8 @@
         "canceled": "Обработка отменена",
         "problemCopyingImageLink": "Не удалось скопировать ссылку на изображение",
         "uploadFailedInvalidUploadDesc": "Должно быть одно изображение в формате PNG или JPEG",
-        "parameterNotSet": "Параметр не задан",
-        "parameterSet": "Параметр задан",
+        "parameterNotSet": "Параметр {{parameter}} не задан",
+        "parameterSet": "Параметр {{parameter}} задан",
         "nodesLoaded": "Узлы загружены",
         "problemCopyingImage": "Не удается скопировать изображение",
         "nodesLoadedFailed": "Не удалось загрузить Узлы",
@@ -803,7 +837,10 @@
         "problemImportingMask": "Проблема с импортом маски",
         "problemDownloadingImage": "Не удается скачать изображение",
         "uploadInitialImage": "Загрузить начальное изображение",
-        "resetInitialImage": "Сбросить начальное изображение"
+        "resetInitialImage": "Сбросить начальное изображение",
+        "prunedQueue": "Урезанная очередь",
+        "modelImportCanceled": "Импорт модели отменен",
+        "modelImportRemoved": "Импорт модели удален"
     },
     "tooltip": {
         "feature": {
@@ -1145,7 +1182,11 @@
         "reorderLinearView": "Изменить порядок линейного просмотра",
         "viewMode": "Использовать в линейном представлении",
         "editMode": "Открыть в редакторе узлов",
-        "resetToDefaultValue": "Сбросить к стандартному значкнию"
+        "resetToDefaultValue": "Сбросить к стандартному значкнию",
+        "latentsField": "Латенты",
+        "latentsCollectionDescription": "Латенты могут передаваться между узлами.",
+        "latentsPolymorphicDescription": "Латенты могут передаваться между узлами.",
+        "latentsFieldDescription": "Латенты могут передаваться между узлами."
     },
     "controlnet": {
         "amult": "a_mult",
@@ -1294,7 +1335,8 @@
         },
         "paramScheduler": {
             "paragraphs": [
-                "Планировщик определяет, как итеративно добавлять шум к изображению или как обновлять образец на основе выходных данных модели."
+                "Планировщик, используемый в процессе генерации.",
+                "Каждый планировщик определяет, как итеративно добавлять шум к изображению или как обновлять образец на основе выходных данных модели."
             ],
             "heading": "Планировщик"
         },
@@ -1347,7 +1389,7 @@
         "compositingCoherenceMode": {
             "heading": "Режим",
             "paragraphs": [
-                "Режим прохождения когерентности."
+                "Метод, используемый для создания связного изображения с вновь созданной замаскированной областью."
             ]
         },
         "paramSeed": {
@@ -1365,7 +1407,7 @@
         },
         "controlNetBeginEnd": {
             "paragraphs": [
-                "На каких этапах процесса шумоподавления будет применена ControlNet.",
+                "Часть процесса шумоподавления, к которой будет применен адаптер контроля.",
                 "ControlNet, применяемые в начале процесса, направляют композицию, а ControlNet, применяемые в конце, направляют детали."
             ],
             "heading": "Процент начала/конца шага"
@@ -1381,8 +1423,8 @@
         },
         "clipSkip": {
             "paragraphs": [
-                "Выберите, сколько слоев модели CLIP нужно пропустить.",
-                "Некоторые модели работают лучше с определенными настройками пропуска CLIP."
+                "Сколько слоев модели CLIP пропустить.",
+                "Некоторые модели лучше подходят для использования с CLIP Skip."
             ],
             "heading": "CLIP пропуск"
         },
@@ -1479,6 +1521,25 @@
             "paragraphs": [
                 "Более высокий вес LoRA приведет к большему влиянию на конечное изображение."
             ]
+        },
+        "compositingMaskBlur": {
+            "heading": "Размытие маски",
+            "paragraphs": [
+                "Радиус размытия маски."
+            ]
+        },
+        "compositingCoherenceMinDenoise": {
+            "heading": "Минимальное шумоподавление",
+            "paragraphs": [
+                "Минимальный уровень шумоподавления для режима Coherence",
+                "Минимальный уровень шумоподавления для области когерентности при перерисовывании или дорисовке"
+            ]
+        },
+        "compositingCoherenceEdgeSize": {
+            "heading": "Размер края",
+            "paragraphs": [
+                "Размер края прохода когерентности."
+            ]
         }
     },
     "metadata": {
@@ -1509,7 +1570,12 @@
         "steps": "Шаги",
         "scheduler": "Планировщик",
         "noRecallParameters": "Параметры для вызова не найдены",
-        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)"
+        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
+        "parameterSet": "Параметр {{parameter}} установлен",
+        "parsingFailed": "Не удалось выполнить синтаксический анализ",
+        "recallParameter": "Отозвать {{label}}",
+        "allPrompts": "Все запросы",
+        "imageDimensions": "Размеры изображения"
     },
     "queue": {
         "status": "Статус",
@@ -1588,10 +1654,11 @@
         "denoisingStrength": "Шумоподавление",
         "refinermodel": "Модель перерисовщик",
         "posAestheticScore": "Положительная эстетическая оценка",
-        "concatPromptStyle": "Объединение запроса и стиля",
+        "concatPromptStyle": "Связывание запроса и стиля",
         "loading": "Загрузка...",
         "steps": "Шаги",
-        "posStylePrompt": "Запрос стиля"
+        "posStylePrompt": "Запрос стиля",
+        "freePromptStyle": "Ручной запрос стиля"
     },
     "invocationCache": {
         "useCache": "Использовать кэш",
@@ -1678,7 +1745,8 @@
         "allLoRAsAdded": "Все LoRA добавлены",
         "defaultVAE": "Стандартное VAE",
         "incompatibleBaseModel": "Несовместимая базовая модель",
-        "loraAlreadyAdded": "LoRA уже добавлена"
+        "loraAlreadyAdded": "LoRA уже добавлена",
+        "concepts": "Концепты"
     },
     "app": {
         "storeNotInitialized": "Магазин не инициализирован"
@@ -1696,7 +1764,7 @@
         },
         "generation": {
             "title": "Генерация",
-            "conceptsTab": "Концепты",
+            "conceptsTab": "LoRA",
             "modelTab": "Модель"
         },
         "advanced": {
