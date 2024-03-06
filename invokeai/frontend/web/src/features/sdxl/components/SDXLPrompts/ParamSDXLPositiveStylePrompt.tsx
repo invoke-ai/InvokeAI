@@ -38,6 +38,7 @@ export const ParamSDXLPositiveStylePrompt = memo(() => {
           onKeyDown={onKeyDown}
           fontSize="sm"
           variant="darkFilled"
+          paddingRight={30}
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
