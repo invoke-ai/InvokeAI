@@ -287,20 +287,17 @@ async def update_model_record(
             "description": "The model image was fetched successfully",
         },
         400: {"description": "Bad request"},
-        404: {"description": "The model could not be found"},
+        404: {"description": "The model image could not be found"}
     },
     status_code=200,
 )
 async def get_model_image(
     key: str = Path(description="The name of model image file to get"),
 ) -> FileResponse:
-    """Gets a full-resolution image file"""
+    """Gets an image file that previews the model"""
 
     try:
         path = ApiDependencies.invoker.services.model_images.get_path(key)
-
-        if not path:
-            raise HTTPException(status_code=404)
 
         response = FileResponse(
             path,

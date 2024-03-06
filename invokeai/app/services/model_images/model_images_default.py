@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Union
 
-from PIL import Image, PngImagePlugin
+from PIL import Image
 from PIL.Image import Image as PILImageType
 from send2trash import send2trash
 
@@ -45,25 +45,16 @@ class ModelImagesService(ModelImagesBase):
     ) -> None:
         try:
             self.__validate_storage_folders()
-            logger = self.__invoker.services.logger
-            image_path = self.__model_images_folder / (model_key + '.png')
-            logger.debug(f"Saving image for model {model_key} to image_path {image_path}")
-            
-            pnginfo = PngImagePlugin.PngInfo()  
+            image_path = self.__model_images_folder / (model_key + '.webp')
             image = make_thumbnail(image, 256)
 
-            image.save(
-                image_path,
-                "PNG",
-                pnginfo=pnginfo,
-                compress_level=self.__invoker.services.configuration.png_compress_level,
-            )
+            image.save(image_path, format="webp")
 
         except Exception as e:
             raise ModelImageFileSaveException from e
 
     def get_path(self, model_key: str) -> Path:
-        path = self.__model_images_folder / (model_key + '.png')
+        path = self.__model_images_folder / (model_key + '.webp')
 
         return path
     
