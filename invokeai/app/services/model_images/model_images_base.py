@@ -12,13 +12,13 @@ class ModelImagesBase(ABC):
         pass
 
     @abstractmethod
-    def get_path(self, model_key: str) -> Path | None:
+    def get_path(self, model_key: str) -> Path:
         """Gets the internal path to a model image."""
         pass
 
     @abstractmethod
     def get_url(self, model_key: str) -> str | None:
-        """Gets the URL to a model image."""
+        """Gets the URL to fetch a model image."""
         pass
 
     @abstractmethod
@@ -27,7 +27,7 @@ class ModelImagesBase(ABC):
         image: PILImageType,
         model_key: str,
     ) -> None:
-        """Saves a model image. Returns a tuple of the image name and created timestamp."""
+        """Saves a model image."""
         pass
 
     @abstractmethod

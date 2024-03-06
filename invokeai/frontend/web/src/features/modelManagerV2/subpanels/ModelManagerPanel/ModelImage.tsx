@@ -9,7 +9,7 @@ type Props = {
 
 const ModelImage = ({ image_url }: Props) => {
 
-  if (!image_url) return <Box height="50px" width="50px" />;
+  if (!image_url) return <Box height="50px" minWidth="50px" />;
 
     return (
       <Image
@@ -18,6 +18,8 @@ const ModelImage = ({ image_url }: Props) => {
         objectPosition="50% 50%"
         height="50px"
         width="50px"
+        minHeight="50px"
+        minWidth="50px"
         borderRadius="base"
       />
     );

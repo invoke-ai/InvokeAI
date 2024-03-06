@@ -64,7 +64,7 @@ type Props = {
     if (!model_key) {
       return;
     }
-    setImage(undefined);
+    setImage(null);
     deleteModelImage(model_key)
     .unwrap()
     .then(() => {
@@ -102,11 +102,11 @@ type Props = {
         position="relative"
       >
         <Image
-          onError={() => setImage(undefined)}
           src={image}
-          objectFit="contain"
-          maxW="full"
-          maxH="100px"
+          objectFit="cover"
+          objectPosition="50% 50%"
+          height="100px"
+          width="100px"
           borderRadius="base"
         />
         <IconButton

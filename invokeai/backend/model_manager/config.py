@@ -20,7 +20,6 @@ Validation errors will raise an InvalidModelConfigException error.
 
 """
 
-from pathlib import Path
 import time
 from enum import Enum
 from typing import Literal, Optional, Type, Union
