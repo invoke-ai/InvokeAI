@@ -90,21 +90,26 @@ export const ModelView = () => {
             <ModelAttrView label={t('common.format')} value={modelData.format} />
             <ModelAttrView label={t('modelManager.path')} value={modelData.path} />
           </Flex>
-          {modelData.type === 'main' && (
+
+          {modelData.type === 'main' && modelData.format === 'diffusers' && modelData.repo_variant && (
             <Flex gap={2}>
-              {modelData.format === 'diffusers' && modelData.repo_variant && (
-                <ModelAttrView label={t('modelManager.repoVariant')} value={modelData.repo_variant} />
-              )}
-              {modelData.format === 'checkpoint' && (
-                <>
-                  <ModelAttrView label={t('modelManager.pathToConfig')} value={modelData.config_path} />
-                  <ModelAttrView label={t('modelManager.variant')} value={modelData.variant} />
-                  <ModelAttrView label={t('modelManager.predictionType')} value={modelData.prediction_type} />
-                  <ModelAttrView label={t('modelManager.upcastAttention')} value={`${modelData.upcast_attention}`} />
-                </>
-              )}
+              <ModelAttrView label={t('modelManager.repoVariant')} value={modelData.repo_variant} />
             </Flex>
           )}
+
+          {modelData.type === 'main' && modelData.format === 'checkpoint' && (
+            <>
+              <Flex gap={2}>
+                <ModelAttrView label={t('modelManager.pathToConfig')} value={modelData.config_path} />
+                <ModelAttrView label={t('modelManager.variant')} value={modelData.variant} />
+              </Flex>
+              <Flex gap={2}>
+                <ModelAttrView label={t('modelManager.predictionType')} value={modelData.prediction_type} />
+                <ModelAttrView label={t('modelManager.upcastAttention')} value={`${modelData.upcast_attention}`} />
+              </Flex>
+            </>
+          )}
+
           {modelData.type === 'ip_adapter' && (
             <Flex gap={2}>
               <ModelAttrView label={t('modelManager.imageEncoderModelId')} value={modelData.image_encoder_model_id} />

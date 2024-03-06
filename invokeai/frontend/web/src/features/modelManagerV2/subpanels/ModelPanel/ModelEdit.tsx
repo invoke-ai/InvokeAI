@@ -145,20 +145,32 @@ export const ModelEdit = () => {
             </FormControl>
           </Flex>
           {data.type === 'main' && data.format === 'checkpoint' && (
-            <Flex gap={4}>
-              <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                <FormLabel>{t('modelManager.variant')}</FormLabel>
-                <ModelVariantSelect control={control} />
-              </FormControl>
-              <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                <FormLabel>{t('modelManager.predictionType')}</FormLabel>
-                <PredictionTypeSelect control={control} />
-              </FormControl>
-              <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                <FormLabel>{t('modelManager.upcastAttention')}</FormLabel>
-                <Checkbox {...register('upcast_attention')} />
-              </FormControl>
-            </Flex>
+            <>
+              <Flex gap={4}>
+                <FormControl flexDir="column" alignItems="flex-start" gap={1}>
+                  <FormLabel>{t('modelManager.pathToConfig')}</FormLabel>
+                  <Input
+                    {...register('config_path', {
+                      validate: (value) => (value && value.trim().length > 3) || 'Must be at least 3 characters',
+                    })}
+                  />
+                </FormControl>
+                <FormControl flexDir="column" alignItems="flex-start" gap={1}>
+                  <FormLabel>{t('modelManager.variant')}</FormLabel>
+                  <ModelVariantSelect control={control} />
+                </FormControl>
+              </Flex>
+              <Flex gap={4}>
+                <FormControl flexDir="column" alignItems="flex-start" gap={1}>
+                  <FormLabel>{t('modelManager.predictionType')}</FormLabel>
+                  <PredictionTypeSelect control={control} />
+                </FormControl>
+                <FormControl flexDir="column" alignItems="flex-start" gap={1}>
+                  <FormLabel>{t('modelManager.upcastAttention')}</FormLabel>
+                  <Checkbox {...register('upcast_attention')} />
+                </FormControl>
+              </Flex>
+            </>
           )}
         </Flex>
       </form>
