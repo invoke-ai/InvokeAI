@@ -1221,6 +1221,23 @@ export type components = {
        */
       type: "boolean_output";
     };
+    /** CLIPField */
+    CLIPField: {
+      /** @description Info to load tokenizer submodel */
+      tokenizer: components["schemas"]["ModelField"];
+      /** @description Info to load text_encoder submodel */
+      text_encoder: components["schemas"]["ModelField"];
+      /**
+       * Skipped Layers
+       * @description Number of skipped layers in text_encoder
+       */
+      skipped_layers: number;
+      /**
+       * Loras
+       * @description LoRAs to apply on model loading
+       */
+      loras: components["schemas"]["LoRAField"][];
+    };
     /**
      * CLIPOutput
      * @description Base class for invocations that output a CLIP field
@@ -1230,7 +1247,7 @@ export type components = {
        * CLIP
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip: components["schemas"]["ClipField"];
+      clip: components["schemas"]["CLIPField"];
       /**
        * type
        * @default clip_output
@@ -1239,8 +1256,66 @@ export type components = {
       type: "clip_output";
     };
     /**
+     * CLIP Skip
+     * @description Skip layers in clip text_encoder model.
+     */
+    CLIPSkipInvocation: {
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
+       * CLIP
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip?: components["schemas"]["CLIPField"];
+      /**
+       * Skipped Layers
+       * @description Number of layers to skip in text encoder
+       * @default 0
+       */
+      skipped_layers?: number;
+      /**
+       * type
+       * @default clip_skip
+       * @constant
+       */
+      type: "clip_skip";
+    };
+    /**
+     * CLIPSkipInvocationOutput
+     * @description CLIP skip node output
+     */
+    CLIPSkipInvocationOutput: {
+      /**
+       * CLIP
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       * @default null
+       */
+      clip: components["schemas"]["CLIPField"] | null;
+      /**
+       * type
+       * @default clip_skip_output
+       * @constant
+       */
+      type: "clip_skip_output";
+    };
+    /**
      * CLIPVisionDiffusersConfig
-     * @description Model config for ClipVision.
+     * @description Model config for CLIPVision.
      */
     CLIPVisionDiffusersConfig: {
       /**
@@ -1745,81 +1820,6 @@ export type components = {
        */
       deleted: number;
     };
-    /** ClipField */
-    ClipField: {
-      /** @description Info to load tokenizer submodel */
-      tokenizer: components["schemas"]["ModelField"];
-      /** @description Info to load text_encoder submodel */
-      text_encoder: components["schemas"]["ModelField"];
-      /**
-       * Skipped Layers
-       * @description Number of skipped layers in text_encoder
-       */
-      skipped_layers: number;
-      /**
-       * Loras
-       * @description Loras to apply on model loading
-       */
-      loras: components["schemas"]["LoRAField"][];
-    };
-    /**
-     * CLIP Skip
-     * @description Skip layers in clip text_encoder model.
-     */
-    ClipSkipInvocation: {
-      /**
-       * Id
-       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
-       */
-      id: string;
-      /**
-       * Is Intermediate
-       * @description Whether or not this is an intermediate invocation.
-       * @default false
-       */
-      is_intermediate?: boolean;
-      /**
-       * Use Cache
-       * @description Whether or not to use the cache
-       * @default true
-       */
-      use_cache?: boolean;
-      /**
-       * CLIP
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       */
-      clip?: components["schemas"]["ClipField"];
-      /**
-       * Skipped Layers
-       * @description Number of layers to skip in text encoder
-       * @default 0
-       */
-      skipped_layers?: number;
-      /**
-       * type
-       * @default clip_skip
-       * @constant
-       */
-      type: "clip_skip";
-    };
-    /**
-     * ClipSkipInvocationOutput
-     * @description Clip skip node output
-     */
-    ClipSkipInvocationOutput: {
-      /**
-       * CLIP
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       * @default null
-       */
-      clip: components["schemas"]["ClipField"] | null;
-      /**
-       * type
-       * @default clip_skip_output
-       * @constant
-       */
-      type: "clip_skip_output";
-    };
     /**
      * CollectInvocation
      * @description Collects values into a collection
@@ -2089,7 +2089,7 @@ export type components = {
        * CLIP
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip?: components["schemas"]["ClipField"];
+      clip?: components["schemas"]["CLIPField"];
       /**
        * type
        * @default compel
@@ -2781,7 +2781,7 @@ export type components = {
        */
       use_cache?: boolean;
       /** @description VAE */
-      vae?: components["schemas"]["VaeField"];
+      vae?: components["schemas"]["VAEField"];
       /** @description Image which will be masked */
       image?: components["schemas"]["ImageField"] | null;
       /** @description The mask to use when pasting */
@@ -4130,7 +4130,7 @@ export type components = {
        * @description The nodes in this graph
        */
       nodes: {
-        [key: string]: components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["LoraLoaderInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["DWOpenposeImageProcessorInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SDXLLoraLoaderInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["DepthAnythingImageProcessorInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["ClipSkipInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["VaeLoaderInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["StepParamEasingInvocation"];
+        [key: string]: components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["StepParamEasingInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["MlsdImageProcessorInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ContentShuffleImageProcessorInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["MediapipeFaceProcessorInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["NormalbaeImageProcessorInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DWOpenposeImageProcessorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ZoeDepthImageProcessorInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["PidiImageProcessorInvocation"] | components["schemas"]["LeresImageProcessorInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["SegmentAnythingProcessorInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["StringInvocation"] | components["schemas"]["LineartAnimeImageProcessorInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["AddInvocation"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["FloatInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["CannyImageProcessorInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["DepthAnythingImageProcessorInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["ColorMapImageProcessorInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["TileResamplerProcessorInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["HedImageProcessorInvocation"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["LineartImageProcessorInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MidasDepthImageProcessorInvocation"] | components["schemas"]["InfillColorInvocation"];
       };
       /**
        * Edges
@@ -4167,7 +4167,7 @@ export type components = {
        * @description The results of node executions
        */
       results: {
-        [key: string]: components["schemas"]["StringCollectionOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["ClipSkipInvocationOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["String2Output"] | components["schemas"]["LoraLoaderOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["SDXLLoraLoaderOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["IdealSizeOutput"];
+        [key: string]: components["schemas"]["StringOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["String2Output"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["SchedulerOutput"];
       };
       /**
        * Errors
@@ -5486,7 +5486,7 @@ export type components = {
       /** @description The image to encode */
       image?: components["schemas"]["ImageField"];
       /** @description VAE */
-      vae?: components["schemas"]["VaeField"];
+      vae?: components["schemas"]["VAEField"];
       /**
        * Tiled
        * @description Processing using overlapping tiles (reduce memory consumption)
@@ -6171,7 +6171,7 @@ export type components = {
       /** @description Latents tensor */
       latents?: components["schemas"]["LatentsField"];
       /** @description VAE */
-      vae?: components["schemas"]["VaeField"];
+      vae?: components["schemas"]["VAEField"];
       /**
        * Tiled
        * @description Processing using overlapping tiles (reduce memory consumption)
@@ -6431,6 +6431,80 @@ export type components = {
       weight: number;
     };
     /**
+     * LoRA
+     * @description Apply selected lora to unet and text_encoder.
+     */
+    LoRALoaderInvocation: {
+      /**
+       * Id
+       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+       */
+      id: string;
+      /**
+       * Is Intermediate
+       * @description Whether or not this is an intermediate invocation.
+       * @default false
+       */
+      is_intermediate?: boolean;
+      /**
+       * Use Cache
+       * @description Whether or not to use the cache
+       * @default true
+       */
+      use_cache?: boolean;
+      /**
+       * LoRA
+       * @description LoRA model to load
+       */
+      lora: components["schemas"]["ModelField"];
+      /**
+       * Weight
+       * @description The weight at which the LoRA is applied to each model
+       * @default 0.75
+       */
+      weight?: number;
+      /**
+       * UNet
+       * @description UNet (scheduler, LoRAs)
+       */
+      unet?: components["schemas"]["UNetField"] | null;
+      /**
+       * CLIP
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       */
+      clip?: components["schemas"]["CLIPField"] | null;
+      /**
+       * type
+       * @default lora_loader
+       * @constant
+       */
+      type: "lora_loader";
+    };
+    /**
+     * LoRALoaderOutput
+     * @description Model loader output
+     */
+    LoRALoaderOutput: {
+      /**
+       * UNet
+       * @description UNet (scheduler, LoRAs)
+       * @default null
+       */
+      unet: components["schemas"]["UNetField"] | null;
+      /**
+       * CLIP
+       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+       * @default null
+       */
+      clip: components["schemas"]["CLIPField"] | null;
+      /**
+       * type
+       * @default lora_loader_output
+       * @constant
+       */
+      type: "lora_loader_output";
+    };
+    /**
      * LoRALyCORISConfig
      * @description Model config for LoRA/Lycoris models.
      */
@@ -6531,80 +6605,6 @@ export type components = {
      * @enum {integer}
      */
     LogLevel: 0 | 10 | 20 | 30 | 40 | 50;
-    /**
-     * LoRA
-     * @description Apply selected lora to unet and text_encoder.
-     */
-    LoraLoaderInvocation: {
-      /**
-       * Id
-       * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
-       */
-      id: string;
-      /**
-       * Is Intermediate
-       * @description Whether or not this is an intermediate invocation.
-       * @default false
-       */
-      is_intermediate?: boolean;
-      /**
-       * Use Cache
-       * @description Whether or not to use the cache
-       * @default true
-       */
-      use_cache?: boolean;
-      /**
-       * LoRA
-       * @description LoRA model to load
-       */
-      lora: components["schemas"]["ModelField"];
-      /**
-       * Weight
-       * @description The weight at which the LoRA is applied to each model
-       * @default 0.75
-       */
-      weight?: number;
-      /**
-       * UNet
-       * @description UNet (scheduler, LoRAs)
-       */
-      unet?: components["schemas"]["UNetField"] | null;
-      /**
-       * CLIP
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       */
-      clip?: components["schemas"]["ClipField"] | null;
-      /**
-       * type
-       * @default lora_loader
-       * @constant
-       */
-      type: "lora_loader";
-    };
-    /**
-     * LoraLoaderOutput
-     * @description Model loader output
-     */
-    LoraLoaderOutput: {
-      /**
-       * UNet
-       * @description UNet (scheduler, LoRAs)
-       * @default null
-       */
-      unet: components["schemas"]["UNetField"] | null;
-      /**
-       * CLIP
-       * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
-       * @default null
-       */
-      clip: components["schemas"]["ClipField"] | null;
-      /**
-       * type
-       * @default lora_loader_output
-       * @constant
-       */
-      type: "lora_loader_output";
-    };
     /**
      * MainCheckpointConfig
      * @description Model config for main checkpoint models.
@@ -7396,7 +7396,7 @@ export type components = {
        * VAE
        * @description VAE
        */
-      vae: components["schemas"]["VaeField"];
+      vae: components["schemas"]["VAEField"];
       /**
        * type
        * @default model_loader_output
@@ -7407,7 +7407,7 @@ export type components = {
        * CLIP
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip: components["schemas"]["ClipField"];
+      clip: components["schemas"]["CLIPField"];
       /**
        * UNet
        * @description UNet (scheduler, LoRAs)
@@ -8375,12 +8375,12 @@ export type components = {
        * CLIP 1
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip?: components["schemas"]["ClipField"];
+      clip?: components["schemas"]["CLIPField"];
       /**
        * CLIP 2
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip2?: components["schemas"]["ClipField"];
+      clip2?: components["schemas"]["CLIPField"];
       /**
        * type
        * @default sdxl_compel_prompt
@@ -8392,7 +8392,7 @@ export type components = {
      * SDXL LoRA
      * @description Apply selected lora to unet and text_encoder.
      */
-    SDXLLoraLoaderInvocation: {
+    SDXLLoRALoaderInvocation: {
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -8430,12 +8430,12 @@ export type components = {
        * CLIP 1
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip?: components["schemas"]["ClipField"] | null;
+      clip?: components["schemas"]["CLIPField"] | null;
       /**
        * CLIP 2
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip2?: components["schemas"]["ClipField"] | null;
+      clip2?: components["schemas"]["CLIPField"] | null;
       /**
        * type
        * @default sdxl_lora_loader
@@ -8444,10 +8444,10 @@ export type components = {
       type: "sdxl_lora_loader";
     };
     /**
-     * SDXLLoraLoaderOutput
+     * SDXLLoRALoaderOutput
      * @description SDXL LoRA Loader Output
      */
-    SDXLLoraLoaderOutput: {
+    SDXLLoRALoaderOutput: {
       /**
        * UNet
        * @description UNet (scheduler, LoRAs)
@@ -8459,13 +8459,13 @@ export type components = {
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        * @default null
        */
-      clip: components["schemas"]["ClipField"] | null;
+      clip: components["schemas"]["CLIPField"] | null;
       /**
        * CLIP 2
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        * @default null
        */
-      clip2: components["schemas"]["ClipField"] | null;
+      clip2: components["schemas"]["CLIPField"] | null;
       /**
        * type
        * @default sdxl_lora_loader_output
@@ -8518,17 +8518,17 @@ export type components = {
        * CLIP 1
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip: components["schemas"]["ClipField"];
+      clip: components["schemas"]["CLIPField"];
       /**
        * CLIP 2
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip2: components["schemas"]["ClipField"];
+      clip2: components["schemas"]["CLIPField"];
       /**
        * VAE
        * @description VAE
        */
-      vae: components["schemas"]["VaeField"];
+      vae: components["schemas"]["VAEField"];
       /**
        * type
        * @default sdxl_model_loader_output
@@ -8591,7 +8591,7 @@ export type components = {
        */
       aesthetic_score?: number;
       /** @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count */
-      clip2?: components["schemas"]["ClipField"];
+      clip2?: components["schemas"]["CLIPField"];
       /**
        * type
        * @default sdxl_refiner_compel_prompt
@@ -8644,12 +8644,12 @@ export type components = {
        * CLIP 2
        * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
        */
-      clip2: components["schemas"]["ClipField"];
+      clip2: components["schemas"]["CLIPField"];
       /**
        * VAE
        * @description VAE
        */
-      vae: components["schemas"]["VaeField"];
+      vae: components["schemas"]["VAEField"];
       /**
        * type
        * @default sdxl_refiner_model_loader_output
@@ -8834,7 +8834,7 @@ export type components = {
        * VAE
        * @description VAE model to load
        */
-      vae?: components["schemas"]["VaeField"] | null;
+      vae?: components["schemas"]["VAEField"] | null;
       /**
        * Seamless Y
        * @description Specify whether Y axis is seamless
@@ -8870,7 +8870,7 @@ export type components = {
        * @description VAE
        * @default null
        */
-      vae: components["schemas"]["VaeField"] | null;
+      vae: components["schemas"]["VAEField"] | null;
       /**
        * type
        * @default seamless_output
@@ -10146,7 +10146,7 @@ export type components = {
       scheduler: components["schemas"]["ModelField"];
       /**
        * Loras
-       * @description Loras to apply on model loading
+       * @description LoRAs to apply on model loading
        */
       loras: components["schemas"]["LoRAField"][];
       /**
@@ -10394,25 +10394,8 @@ export type components = {
        */
       format: "diffusers";
     };
-    /**
-     * VAEOutput
-     * @description Base class for invocations that output a VAE field
-     */
-    VAEOutput: {
-      /**
-       * VAE
-       * @description VAE
-       */
-      vae: components["schemas"]["VaeField"];
-      /**
-       * type
-       * @default vae_output
-       * @constant
-       */
-      type: "vae_output";
-    };
-    /** VaeField */
-    VaeField: {
+    /** VAEField */
+    VAEField: {
       /** @description Info to load vae submodel */
       vae: components["schemas"]["ModelField"];
       /**
@@ -10425,7 +10408,7 @@ export type components = {
      * VAE
      * @description Loads a VAE model, outputting a VaeLoaderOutput
      */
-    VaeLoaderInvocation: {
+    VAELoaderInvocation: {
       /**
        * Id
        * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -10454,6 +10437,23 @@ export type components = {
        * @constant
        */
       type: "vae_loader";
+    };
+    /**
+     * VAEOutput
+     * @description Base class for invocations that output a VAE field
+     */
+    VAEOutput: {
+      /**
+       * VAE
+       * @description VAE
+       */
+      vae: components["schemas"]["VAEField"];
+      /**
+       * type
+       * @default vae_output
+       * @constant
+       */
+      type: "vae_output";
     };
     /** ValidationError */
     ValidationError: {
