@@ -24,7 +24,7 @@ from .. import ModelLoader, ModelLoaderRegistry
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.LoRA, format=ModelFormat.Diffusers)
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.LoRA, format=ModelFormat.LyCORIS)
-class LoraLoader(ModelLoader):
+class LoRALoader(ModelLoader):
     """Class to load LoRA models."""
 
     # We cheat a little bit to get access to the model base

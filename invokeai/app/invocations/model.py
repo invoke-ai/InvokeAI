@@ -29,20 +29,19 @@ class LoRAField(BaseModel):
 class UNetField(BaseModel):
     unet: ModelField = Field(description="Info to load unet submodel")
     scheduler: ModelField = Field(description="Info to load scheduler submodel")
-    loras: List[LoRAField] = Field(description="Loras to apply on model loading")
+    loras: List[LoRAField] = Field(description="LoRAs to apply on model loading")
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')
     freeu_config: Optional[FreeUConfig] = Field(default=None, description="FreeU configuration")
 
 
-class ClipField(BaseModel):
+class CLIPField(BaseModel):
     tokenizer: ModelField = Field(description="Info to load tokenizer submodel")
     text_encoder: ModelField = Field(description="Info to load text_encoder submodel")
     skipped_layers: int = Field(description="Number of skipped layers in text_encoder")
-    loras: List[LoRAField] = Field(description="Loras to apply on model loading")
+    loras: List[LoRAField] = Field(description="LoRAs to apply on model loading")
 
 
-class VaeField(BaseModel):
-    # TODO: better naming?
+class VAEField(BaseModel):
     vae: ModelField = Field(description="Info to load vae submodel")
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')
 
@@ -58,14 +57,14 @@ class UNetOutput(BaseInvocationOutput):
 class VAEOutput(BaseInvocationOutput):
     """Base class for invocations that output a VAE field"""
 
-    vae: VaeField = OutputField(description=FieldDescriptions.vae, title="VAE")
+    vae: VAEField = OutputField(description=FieldDescriptions.vae, title="VAE")
 
 
 @invocation_output("clip_output")
 class CLIPOutput(BaseInvocationOutput):
     """Base class for invocations that output a CLIP field"""
 
-    clip: ClipField = OutputField(description=FieldDescriptions.clip, title="CLIP")
+    clip: CLIPField = OutputField(description=FieldDescriptions.clip, title="CLIP")
 
 
 @invocation_output("model_loader_output")
@@ -101,21 +100,21 @@ class MainModelLoaderInvocation(BaseInvocation):
 
         return ModelLoaderOutput(
             unet=UNetField(unet=unet, scheduler=scheduler, loras=[]),
-            clip=ClipField(tokenizer=tokenizer, text_encoder=text_encoder, loras=[], skipped_layers=0),
-            vae=VaeField(vae=vae),
+            clip=CLIPField(tokenizer=tokenizer, text_encoder=text_encoder, loras=[], skipped_layers=0),
+            vae=VAEField(vae=vae),
         )
 
 
 @invocation_output("lora_loader_output")
-class LoraLoaderOutput(BaseInvocationOutput):
+class LoRALoaderOutput(BaseInvocationOutput):
     """Model loader output"""
 
     unet: Optional[UNetField] = OutputField(default=None, description=FieldDescriptions.unet, title="UNet")
-    clip: Optional[ClipField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
+    clip: Optional[CLIPField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
 
 
 @invocation("lora_loader", title="LoRA", tags=["model"], category="model", version="1.0.1")
-class LoraLoaderInvocation(BaseInvocation):
+class LoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
     lora: ModelField = InputField(description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA")
@@ -126,26 +125,26 @@ class LoraLoaderInvocation(BaseInvocation):
         input=Input.Connection,
         title="UNet",
     )
-    clip: Optional[ClipField] = InputField(
+    clip: Optional[CLIPField] = InputField(
         default=None,
         description=FieldDescriptions.clip,
         input=Input.Connection,
         title="CLIP",
     )
 
-    def invoke(self, context: InvocationContext) -> LoraLoaderOutput:
+    def invoke(self, context: InvocationContext) -> LoRALoaderOutput:
         lora_key = self.lora.key
 
         if not context.models.exists(lora_key):
             raise Exception(f"Unkown lora: {lora_key}!")
 
         if self.unet is not None and any(lora.lora.key == lora_key for lora in self.unet.loras):
-            raise Exception(f'Lora "{lora_key}" already applied to unet')
+            raise Exception(f'LoRA "{lora_key}" already applied to unet')
 
         if self.clip is not None and any(lora.lora.key == lora_key for lora in self.clip.loras):
-            raise Exception(f'Lora "{lora_key}" already applied to clip')
+            raise Exception(f'LoRA "{lora_key}" already applied to clip')
 
-        output = LoraLoaderOutput()
+        output = LoRALoaderOutput()
 
         if self.unet is not None:
             output.unet = self.unet.model_copy(deep=True)
@@ -169,12 +168,12 @@ class LoraLoaderInvocation(BaseInvocation):
 
 
 @invocation_output("sdxl_lora_loader_output")
-class SDXLLoraLoaderOutput(BaseInvocationOutput):
+class SDXLLoRALoaderOutput(BaseInvocationOutput):
     """SDXL LoRA Loader Output"""
 
     unet: Optional[UNetField] = OutputField(default=None, description=FieldDescriptions.unet, title="UNet")
-    clip: Optional[ClipField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP 1")
-    clip2: Optional[ClipField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP 2")
+    clip: Optional[CLIPField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP 1")
+    clip2: Optional[CLIPField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP 2")
 
 
 @invocation(
@@ -184,7 +183,7 @@ class SDXLLoraLoaderOutput(BaseInvocationOutput):
     category="model",
     version="1.0.1",
 )
-class SDXLLoraLoaderInvocation(BaseInvocation):
+class SDXLLoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
     lora: ModelField = InputField(description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA")
@@ -195,35 +194,35 @@ class SDXLLoraLoaderInvocation(BaseInvocation):
         input=Input.Connection,
         title="UNet",
     )
-    clip: Optional[ClipField] = InputField(
+    clip: Optional[CLIPField] = InputField(
         default=None,
         description=FieldDescriptions.clip,
         input=Input.Connection,
         title="CLIP 1",
     )
-    clip2: Optional[ClipField] = InputField(
+    clip2: Optional[CLIPField] = InputField(
         default=None,
         description=FieldDescriptions.clip,
         input=Input.Connection,
         title="CLIP 2",
     )
 
-    def invoke(self, context: InvocationContext) -> SDXLLoraLoaderOutput:
+    def invoke(self, context: InvocationContext) -> SDXLLoRALoaderOutput:
         lora_key = self.lora.key
 
         if not context.models.exists(lora_key):
             raise Exception(f"Unknown lora: {lora_key}!")
 
         if self.unet is not None and any(lora.lora.key == lora_key for lora in self.unet.loras):
-            raise Exception(f'Lora "{lora_key}" already applied to unet')
+            raise Exception(f'LoRA "{lora_key}" already applied to unet')
 
         if self.clip is not None and any(lora.lora.key == lora_key for lora in self.clip.loras):
-            raise Exception(f'Lora "{lora_key}" already applied to clip')
+            raise Exception(f'LoRA "{lora_key}" already applied to clip')
 
         if self.clip2 is not None and any(lora.lora.key == lora_key for lora in self.clip2.loras):
-            raise Exception(f'Lora "{lora_key}" already applied to clip2')
+            raise Exception(f'LoRA "{lora_key}" already applied to clip2')
 
-        output = SDXLLoraLoaderOutput()
+        output = SDXLLoRALoaderOutput()
 
         if self.unet is not None:
             output.unet = self.unet.model_copy(deep=True)
@@ -256,7 +255,7 @@ class SDXLLoraLoaderInvocation(BaseInvocation):
 
 
 @invocation("vae_loader", title="VAE", tags=["vae", "model"], category="model", version="1.0.1")
-class VaeLoaderInvocation(BaseInvocation):
+class VAELoaderInvocation(BaseInvocation):
     """Loads a VAE model, outputting a VaeLoaderOutput"""
 
     vae_model: ModelField = InputField(
@@ -271,7 +270,7 @@ class VaeLoaderInvocation(BaseInvocation):
         if not context.models.exists(key):
             raise Exception(f"Unkown vae: {key}!")
 
-        return VAEOutput(vae=VaeField(vae=self.vae_model))
+        return VAEOutput(vae=VAEField(vae=self.vae_model))
 
 
 @invocation_output("seamless_output")
@@ -279,7 +278,7 @@ class SeamlessModeOutput(BaseInvocationOutput):
     """Modified Seamless Model output"""
 
     unet: Optional[UNetField] = OutputField(default=None, description=FieldDescriptions.unet, title="UNet")
-    vae: Optional[VaeField] = OutputField(default=None, description=FieldDescriptions.vae, title="VAE")
+    vae: Optional[VAEField] = OutputField(default=None, description=FieldDescriptions.vae, title="VAE")
 
 
 @invocation(
@@ -298,7 +297,7 @@ class SeamlessModeInvocation(BaseInvocation):
         input=Input.Connection,
         title="UNet",
     )
-    vae: Optional[VaeField] = InputField(
+    vae: Optional[VAEField] = InputField(
         default=None,
         description=FieldDescriptions.vae_model,
         input=Input.Connection,

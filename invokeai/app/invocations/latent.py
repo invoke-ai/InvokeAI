@@ -76,7 +76,7 @@ from .baseinvocation import (
     invocation_output,
 )
 from .controlnet_image_processors import ControlField
-from .model import ModelField, UNetField, VaeField
+from .model import ModelField, UNetField, VAEField
 
 if choose_torch_device() == torch.device("mps"):
     from torch import mps
@@ -119,7 +119,7 @@ class SchedulerInvocation(BaseInvocation):
 class CreateDenoiseMaskInvocation(BaseInvocation):
     """Creates mask for denoising model run."""
 
-    vae: VaeField = InputField(description=FieldDescriptions.vae, input=Input.Connection, ui_order=0)
+    vae: VAEField = InputField(description=FieldDescriptions.vae, input=Input.Connection, ui_order=0)
     image: Optional[ImageField] = InputField(default=None, description="Image which will be masked", ui_order=1)
     mask: ImageField = InputField(description="The mask to use when pasting", ui_order=2)
     tiled: bool = InputField(default=False, description=FieldDescriptions.tiled, ui_order=3)
@@ -832,7 +832,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         description=FieldDescriptions.latents,
         input=Input.Connection,
     )
-    vae: VaeField = InputField(
+    vae: VAEField = InputField(
         description=FieldDescriptions.vae,
         input=Input.Connection,
     )
@@ -1010,7 +1010,7 @@ class ImageToLatentsInvocation(BaseInvocation):
     image: ImageField = InputField(
         description="The image to encode",
     )
-    vae: VaeField = InputField(
+    vae: VAEField = InputField(
         description=FieldDescriptions.vae,
         input=Input.Connection,
     )

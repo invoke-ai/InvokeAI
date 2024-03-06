@@ -33,15 +33,15 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.latent import SchedulerOutput
 from invokeai.app.invocations.metadata import MetadataItemField, MetadataItemOutput, MetadataOutput
 from invokeai.app.invocations.model import (
-    ClipField,
+    CLIPField,
     CLIPOutput,
-    LoraLoaderOutput,
+    LoRALoaderOutput,
     ModelField,
     ModelLoaderOutput,
-    SDXLLoraLoaderOutput,
+    SDXLLoRALoaderOutput,
     UNetField,
     UNetOutput,
-    VaeField,
+    VAEField,
     VAEOutput,
 )
 from invokeai.app.invocations.primitives import (
@@ -116,14 +116,14 @@ __all__ = [
     # invokeai.app.invocations.model
     "ModelField",
     "UNetField",
-    "ClipField",
-    "VaeField",
+    "CLIPField",
+    "VAEField",
     "UNetOutput",
     "VAEOutput",
     "CLIPOutput",
     "ModelLoaderOutput",
-    "LoraLoaderOutput",
-    "SDXLLoraLoaderOutput",
+    "LoRALoaderOutput",
+    "SDXLLoRALoaderOutput",
     # invokeai.app.invocations.primitives
     "BooleanCollectionOutput",
     "BooleanOutput",
