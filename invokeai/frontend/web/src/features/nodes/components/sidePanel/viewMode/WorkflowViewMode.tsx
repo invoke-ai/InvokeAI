@@ -7,8 +7,8 @@ import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
 import { t } from 'i18next';
 import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 
-import WorkflowField from './WorkflowField';
 import { EmptyState } from './EmptyState';
+import WorkflowField from './WorkflowField';
 
 const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
   return {
