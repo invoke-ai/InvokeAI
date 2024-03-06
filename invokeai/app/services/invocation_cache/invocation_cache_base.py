@@ -41,8 +41,9 @@ class InvocationCacheBase(ABC):
         """Clears the cache"""
         pass
 
+    @staticmethod
     @abstractmethod
-    def create_key(self, invocation: BaseInvocation) -> int:
+    def create_key(invocation: BaseInvocation) -> int:
         """Gets the key for the invocation's cache item"""
         pass
 
