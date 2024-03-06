@@ -168,7 +168,7 @@ export const ModelEdit = () => {
 
         <Flex flexDir="column" gap={3} mt="4">
           <Flex gap="4" alignItems="center">
-            <ModelImageUpload control={control} name="image" />
+            <ModelImageUpload control={control} />
             <FormControl flexDir="column" alignItems="flex-start" gap={1}>
               <FormLabel>{t('modelManager.description')}</FormLabel>
               <Textarea fontSize="md" resize="none" {...register('description')} />
