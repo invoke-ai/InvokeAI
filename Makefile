@@ -10,10 +10,11 @@ help:
 	@echo "ruff-unsafe       Run ruff, fixing all fixable errors and formatting"
 	@echo "mypy              Run mypy using the config in pyproject.toml to identify type mismatches and other coding errors"
 	@echo "mypy-all          Run mypy ignoring the config in pyproject.tom but still ignoring missing imports"
-	@echo "test"             Run the unit tests.
-	@echo "frontend-install" Install the pnpm modules needed for the front end
+	@echo "test              Run the unit tests."
+	@echo "frontend-install  Install the pnpm modules needed for the front end"
 	@echo "frontend-build    Build the frontend in order to run on localhost:9090"
 	@echo "frontend-dev      Run the frontend in developer mode on localhost:5173"
+	@echo "frontend-typegen  Generate types for the frontend from the OpenAPI schema"
 	@echo "installer-zip     Build the installer .zip file for the current version"
 	@echo "tag-release       Tag the GitHub repository with the current version (use at release time only!)"
 
@@ -52,6 +53,9 @@ frontend-build:
 # Run the frontend in dev mode
 frontend-dev:
 	cd invokeai/frontend/web && pnpm dev
+
+frontend-typegen:
+	cd invokeai/frontend/web && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
 
 # Installer zip file
 installer-zip:
