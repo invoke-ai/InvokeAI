@@ -125,7 +125,7 @@ export const imagesApi = api.injectEndpoints({
       paths['/api/v1/images/i/{image_name}/workflow']['get']['responses']['200']['content']['application/json'],
       string
     >({
-      query: (image_name) => ({ url: `images/i/${image_name}/workflow` }),
+      query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}/workflow`) }),
       providesTags: (result, error, image_name) => [{ type: 'ImageWorkflow', id: image_name }],
       keepUnusedDataFor: 86400, // 24 hours
     }),
