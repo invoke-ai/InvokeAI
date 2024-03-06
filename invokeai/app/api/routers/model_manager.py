@@ -113,6 +113,9 @@ async def list_model_records(
         found_models.extend(
             record_store.search_by_attr(model_type=model_type, model_name=model_name, model_format=model_format)
         )
+    for model in found_models:
+        cover_image = ApiDependencies.invoker.services.model_images.get_url(model.key)
+        model.cover_image = cover_image
     return ModelsList(models=found_models)
 
 
@@ -156,6 +159,8 @@ async def get_model_record(
     record_store = ApiDependencies.invoker.services.model_manager.store
     try:
         config: AnyModelConfig = record_store.get_model(key)
+        cover_image = ApiDependencies.invoker.services.model_images.get_url(key)
+        config.cover_image = cover_image
         return config
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -292,8 +297,7 @@ async def get_model_image(
     """Gets a full-resolution image file"""
 
     try:
-        # still need to handle this gracefully when path doesnt exist instead of throwing error
-        path = ApiDependencies.invoker.services.model_images.get_path(key + ".png")
+        path = ApiDependencies.invoker.services.model_images.get_path(key)
 
         if not path:
             raise HTTPException(status_code=404)

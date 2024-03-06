@@ -138,7 +138,7 @@ const buildTransformResponse =
  * buildModelsUrl('some-path')
  * // '/api/v1/models/some-path'
  */
-export const buildModelsUrl = (path: string = '') => buildV2Url(`models/${path}`);
+const buildModelsUrl = (path: string = '') => buildV2Url(`models/${path}`);
 
 export const modelsApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -162,6 +162,7 @@ export const modelsApi = api.injectEndpoints({
           body: formData,
         };
       },
+      invalidatesTags: ['Model'],
     }),
     installModel: build.mutation<InstallModelResponse, InstallModelArg>({
       query: ({ source }) => {
@@ -189,6 +190,7 @@ export const modelsApi = api.injectEndpoints({
           method: 'DELETE',
         };
       },
+      invalidatesTags: ['Model'],
     }),
     getModelImage: build.query<string, string>({
       query: (key) => buildModelsUrl(`i/${key}/image`)

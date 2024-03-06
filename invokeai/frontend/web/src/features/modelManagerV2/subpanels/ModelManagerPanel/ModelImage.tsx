@@ -1,22 +1,19 @@
 import { Box, Image } from '@invoke-ai/ui-library';
 import { typedMemo } from 'common/util/typedMemo';
-import { useState } from 'react';
 
-import { buildModelsUrl } from 'services/api/endpoints/models';
+import { useGetModelConfigQuery } from 'services/api/endpoints/models';
 
 type Props = {
-  model_key: string;
+  image_url?: string;
 };
 
-const ModelImage = ({ model_key }: Props) => {
-  const [image, setImage] = useState<string | undefined>(buildModelsUrl(`i/${model_key}/image`));
+const ModelImage = ({ image_url }: Props) => {
 
-  if (!image) return <Box height="50px" width="50px"></Box>;
+  if (!image_url) return <Box height="50px" width="50px" />;
 
     return (
       <Image
-        onError={() => setImage(undefined)}
-        src={image}
+        src={image_url}
         objectFit="cover"
         objectPosition="50% 50%"
         height="50px"
