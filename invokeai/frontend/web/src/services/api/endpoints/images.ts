@@ -109,7 +109,7 @@ export const imagesApi = api.injectEndpoints({
     }),
     clearIntermediates: build.mutation<number, void>({
       query: () => ({ url: buildImagesUrl('intermediates'), method: 'DELETE' }),
-      invalidatesTags: ['IntermediatesCount'],
+      invalidatesTags: ['IntermediatesCount', 'InvocationCacheStatus'],
     }),
     getImageDTO: build.query<ImageDTO, string>({
       query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}`) }),
