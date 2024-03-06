@@ -32,7 +32,7 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
       // Invert the delta if the property is set to true
       let delta = e.evt.deltaY;
       if (shouldInvertBrushSizeScrollDirection) {
-        delta = -delta
+        delta = -delta;
       }
 
       if ($ctrl.get() || $meta.get()) {
