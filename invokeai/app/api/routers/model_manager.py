@@ -539,7 +539,7 @@ async def convert_model(
         raise HTTPException(400, f"The model with key {key} is not a main checkpoint model.")
 
     # loading the model will convert it into a cached diffusers file
-    model_manager.load_model_by_config(model_config, submodel_type=SubModelType.Scheduler)
+    model_manager.load.load_model(model_config, submodel_type=SubModelType.Scheduler)
 
     # Get the path of the converted model from the loader
     cache_path = loader.convert_cache.cache_path(key)
