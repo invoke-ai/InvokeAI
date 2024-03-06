@@ -17,11 +17,6 @@ class ModelImagesBase(ABC):
         pass
 
     @abstractmethod
-    def get_url(self, model_key: str) -> str:
-        """Gets the url for a model image."""
-        pass
-
-    @abstractmethod
     def save(
         self,
         image: PILImageType,
