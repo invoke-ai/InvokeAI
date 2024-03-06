@@ -33,12 +33,11 @@ from invokeai.backend.model_manager.config import (
 )
 from invokeai.backend.model_manager.metadata import (
     AnyModelRepoMetadata,
-    CivitaiMetadataFetch,
     HuggingFaceMetadataFetch,
     ModelMetadataWithFiles,
     RemoteModelFile,
 )
-from invokeai.backend.model_manager.metadata.metadata_base import CivitaiMetadata, HuggingFaceMetadata
+from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata
 from invokeai.backend.model_manager.probe import ModelProbe
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util import Chdir, InvokeAILogger
@@ -46,7 +45,6 @@ from invokeai.backend.util.devices import choose_precision, choose_torch_device
 
 from .model_install_base import (
     MODEL_SOURCE_TO_TYPE_MAP,
-    CivitaiModelSource,
     HFModelSource,
     InstallStatus,
     LocalModelSource,
@@ -216,8 +214,6 @@ class ModelInstallService(ModelInstallServiceBase):
         if isinstance(source, LocalModelSource):
             install_job = self._import_local_model(source, config)
             self._install_queue.put(install_job)  # synchronously install
-        elif isinstance(source, CivitaiModelSource):
-            install_job = self._import_from_civitai(source, config)
         elif isinstance(source, HFModelSource):
             install_job = self._import_from_hf(source, config)
         elif isinstance(source, URLModelSource):
@@ -381,10 +377,8 @@ class ModelInstallService(ModelInstallServiceBase):
                     job.config_in["source"] = str(job.source)
                     job.config_in["source_type"] = MODEL_SOURCE_TO_TYPE_MAP[job.source.__class__]
                     # enter the metadata, if there is any
-                    if isinstance(job.source_metadata, (CivitaiMetadata, HuggingFaceMetadata)):
+                    if isinstance(job.source_metadata, (HuggingFaceMetadata)):
                         job.config_in["source_api_response"] = job.source_metadata.api_response
-                    if isinstance(job.source_metadata, CivitaiMetadata) and job.source_metadata.trigger_phrases:
-                        job.config_in["trigger_phrases"] = job.source_metadata.trigger_phrases
 
                     if job.inplace:
                         key = self.register_path(job.local_path, job.config_in)
@@ -573,16 +567,6 @@ class ModelInstallService(ModelInstallServiceBase):
             inplace=source.inplace or False,
         )
 
-    def _import_from_civitai(self, source: CivitaiModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
-        if not source.access_token:
-            self._logger.info("No Civitai access token provided; some models may not be downloadable.")
-        metadata = CivitaiMetadataFetch(self._session, self.app_config.get_config().civitai_api_key).from_id(
-            str(source.version_id)
-        )
-        assert isinstance(metadata, ModelMetadataWithFiles)
-        remote_files = metadata.download_urls(session=self._session)
-        return self._import_remote_model(source=source, config=config, metadata=metadata, remote_files=remote_files)
-
     def _import_from_hf(self, source: HFModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
         # Add user's cached access token to HuggingFace requests
         source.access_token = source.access_token or HfFolder.get_token()
@@ -613,8 +597,6 @@ class ModelInstallService(ModelInstallServiceBase):
         except ValueError:
             pass
         kwargs: dict[str, Any] = {"session": self._session}
-        if fetcher is CivitaiMetadataFetch:
-            kwargs["api_key"] = self._app_config.get_config().civitai_api_key
         if fetcher is not None:
             metadata = fetcher(**kwargs).from_url(source.url)
         self._logger.debug(f"metadata={metadata}")
@@ -631,7 +613,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _import_remote_model(
         self,
-        source: HFModelSource | CivitaiModelSource | URLModelSource,
+        source: HFModelSource | URLModelSource,
         remote_files: List[RemoteModelFile],
         metadata: Optional[AnyModelRepoMetadata],
         config: Optional[Dict[str, Any]],
@@ -849,8 +831,6 @@ class ModelInstallService(ModelInstallServiceBase):
 
     @staticmethod
     def get_fetcher_from_url(url: str):
-        if re.match(r"^https?://civitai.com/", url.lower()):
-            return CivitaiMetadataFetch
-        elif re.match(r"^https?://huggingface.co/[^/]+/[^/]+$", url.lower()):
+        if re.match(r"^https?://huggingface.co/[^/]+/[^/]+$", url.lower()):
             return HuggingFaceMetadataFetch
         raise ValueError(f"Unsupported model source: '{url}'")
