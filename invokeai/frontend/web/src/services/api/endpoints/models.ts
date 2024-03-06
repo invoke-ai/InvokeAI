@@ -193,7 +193,7 @@ export const modelsApi = api.injectEndpoints({
       invalidatesTags: ['Model'],
     }),
     getModelImage: build.query<string, string>({
-      query: (key) => buildModelsUrl(`i/${key}/image`)
+      query: (key) => buildModelsUrl(`i/${key}/image`),
     }),
     convertModel: build.mutation<ConvertMainModelResponse, string>({
       query: (key) => {

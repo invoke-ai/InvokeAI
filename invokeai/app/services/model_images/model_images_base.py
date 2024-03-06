@@ -3,6 +3,7 @@ from pathlib import Path
 
 from PIL.Image import Image as PILImageType
 
+
 class ModelImagesBase(ABC):
     """Low-level service responsible for storing and retrieving image files."""
 
