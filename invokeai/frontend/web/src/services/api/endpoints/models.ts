@@ -23,7 +23,16 @@ export type UpdateModelArg = {
   body: paths['/api/v2/models/i/{key}']['patch']['requestBody']['content']['application/json'];
 };
 
+export type UpdateModelImageArg = {
+  key: paths['/api/v2/models/i/{key}/image']['patch']['parameters']['path']['key'];
+  image: paths['/api/v2/models/i/{key}/image']['patch']['formData']['content']['multipart/form-data'];
+};
+
 type UpdateModelResponse = paths['/api/v2/models/i/{key}']['patch']['responses']['200']['content']['application/json'];
+type UpdateModelImageResponse =
+  paths['/api/v2/models/i/{key}/image']['patch']['responses']['200']['content']['application/json'];
+type GetModelImageResponse =
+  paths['/api/v2/models/i/{key}/image']['get']['responses']['200']['content']['application/json'];
 
 type GetModelConfigResponse = paths['/api/v2/models/i/{key}']['get']['responses']['200']['content']['application/json'];
 
@@ -140,6 +149,21 @@ export const modelsApi = api.injectEndpoints({
           url: buildModelsUrl(`i/${key}`),
           method: 'PATCH',
           body: body,
+        };
+      },
+      invalidatesTags: ['Model'],
+    }),
+    getModelImage: build.query<GetModelImageResponse, string>({
+      query: (key) => buildModelsUrl(`i/${key}/image`),
+    }),
+    updateModelImage: build.mutation<UpdateModelImageResponse, UpdateModelImageArg>({
+      query: ({ key, image }) => {
+        const formData = new FormData();
+        formData.append('image', image);
+        return {
+          url: buildModelsUrl(`i/${key}/image`),
+          method: 'PATCH',
+          body: formData,
         };
       },
       invalidatesTags: ['Model'],
@@ -330,7 +354,9 @@ export const {
   useGetTextualInversionModelsQuery,
   useGetVaeModelsQuery,
   useDeleteModelsMutation,
-  useUpdateModelMutation,
+  useUpdateModelsMutation,
+  useGetModelImageQuery,
+  useUpdateModelImageMutation,
   useInstallModelMutation,
   useConvertModelMutation,
   useSyncModelsMutation,

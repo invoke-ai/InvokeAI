@@ -20,7 +20,11 @@ import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import type { UpdateModelArg } from 'services/api/endpoints/models';
-import { useGetModelConfigQuery, useUpdateModelMutation } from 'services/api/endpoints/models';
+import {
+  useGetModelConfigQuery,
+  useUpdateModelImageMutation,
+  useUpdateModelsMutation,
+} from 'services/api/endpoints/models';
 
 import BaseModelSelect from './Fields/BaseModelSelect';
 import ModelImageUpload from './Fields/ModelImageUpload';
@@ -32,7 +36,8 @@ export const ModelEdit = () => {
   const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
   const { data, isLoading } = useGetModelConfigQuery(selectedModelKey ?? skipToken);
 
-  const [updateModel, { isLoading: isSubmitting }] = useUpdateModelMutation();
+  const [updateModel, { isLoading: isSubmitting }] = useUpdateModelsMutation();
+  const [updateModelImage] = useUpdateModelImageMutation();
 
   const { t } = useTranslation();
 
@@ -55,11 +60,15 @@ export const ModelEdit = () => {
         return;
       }
 
+      // remove image from body
+      const image = values.image;
+      if (values.image) {
+        delete values.image;
+      }
       const responseBody: UpdateModelArg = {
         key: data.key,
         body: values,
       };
-      console.log(responseBody, 'responseBody')
 
       updateModel(responseBody)
         .unwrap()
@@ -86,6 +95,33 @@ export const ModelEdit = () => {
             )
           );
         });
+      if (image) {
+        updateModelImage({ key: data.key, image: image })
+          .unwrap()
+          .then((payload) => {
+            reset(payload, { keepDefaultValues: true });
+            dispatch(setSelectedModelMode('view'));
+            dispatch(
+              addToast(
+                makeToast({
+                  title: t('modelManager.modelUpdated'),
+                  status: 'success',
+                })
+              )
+            );
+          })
+          .catch((_) => {
+            reset();
+            dispatch(
+              addToast(
+                makeToast({
+                  title: t('modelManager.modelUpdateFailed'),
+                  status: 'error',
+                })
+              )
+            );
+          });
+      }
     },
     [dispatch, data?.key, reset, t, updateModel]
   );

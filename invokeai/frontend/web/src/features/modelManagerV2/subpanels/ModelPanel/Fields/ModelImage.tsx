@@ -1,21 +1,16 @@
 import { Box, IconButton, Image } from '@invoke-ai/ui-library';
 import { typedMemo } from 'common/util/typedMemo';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
-import { useController, useWatch } from 'react-hook-form';
+import { useController } from 'react-hook-form';
 import type { AnyModelConfig } from 'services/api/types';
 
 import { Button } from '@invoke-ai/ui-library';
 import { useDropzone } from 'react-dropzone';
 import { PiArrowCounterClockwiseBold, PiUploadSimpleBold } from 'react-icons/pi';
-import { useGetModelImageQuery } from 'services/api/endpoints/models';
 
 const ModelImageUpload = (props: UseControllerProps<AnyModelConfig>) => {
   const { field } = useController(props);
-
-  const key = useWatch({ control: props.control, name: 'key' });
-
-  const { data } = useGetModelImageQuery(key);
 
   const onDropAccepted = useCallback(
     (files: File[]) => {
@@ -34,6 +29,8 @@ const ModelImageUpload = (props: UseControllerProps<AnyModelConfig>) => {
     field.onChange(undefined);
   }, [field]);
 
+  console.log('field', field);
+
   const { getInputProps, getRootProps } = useDropzone({
     accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg', '.png'] },
     onDropAccepted,
@@ -41,20 +38,11 @@ const ModelImageUpload = (props: UseControllerProps<AnyModelConfig>) => {
     multiple: false,
   });
 
-  const image = useMemo(() => {
-    console.log(field.value, 'asdf' );
-    if (field.value) {
-      return URL.createObjectURL(field.value);
-    }
-
-    return data;
-  }, [field.value, data]);
-
-  if (image) {
+  if (field.value) {
     return (
       <Box>
         <Image
-          src={image}
+          src={field.value ? URL.createObjectURL(field.value) : 'http://localhost:5173/api/v2/models/i/6b8a6c0d68127ad8db5550f16d9a304b/image'}
           objectFit="contain"
           maxW="full"
           maxH="200px"

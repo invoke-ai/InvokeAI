@@ -1,12 +1,16 @@
 # Copyright (c) 2023 Lincoln D. Stein
 """FastAPI route for model configuration records."""
 
+import io
 import pathlib
 import shutil
+import traceback
 from typing import Any, Dict, List, Optional
 
-from fastapi import Body, Path, Query, Response
+from fastapi import Body, Path, Query, Response, UploadFile
+from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
+from PIL import Image
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
@@ -30,6 +34,9 @@ from invokeai.backend.model_manager.search import ModelSearch
 from ..dependencies import ApiDependencies
 
 model_manager_router = APIRouter(prefix="/v2/models", tags=["model_manager"])
+
+# images are immutable; set a high max-age
+IMAGE_MAX_AGE = 31536000
 
 
 class ModelsList(BaseModel):
@@ -72,7 +79,7 @@ example_model_input = {
     "description": "Model description",
     "vae": None,
     "variant": "normal",
-    "image": "blob"
+    "image": "blob",
 }
 
 ##############################################################################
@@ -265,6 +272,93 @@ async def update_model_record(
         logger.error(str(e))
         raise HTTPException(status_code=409, detail=str(e))
     return model_response
+
+
+@model_manager_router.get(
+    "/i/{key}/image",
+    operation_id="get_model_image",
+    responses={
+        200: {
+            "description": "The model image was fetched successfully",
+        },
+        400: {"description": "Bad request"},
+        404: {"description": "The model could not be found"},
+    },
+    status_code=200,
+)
+async def get_model_image(
+    key: str = Path(description="The name of model image file to get"),
+) -> FileResponse:
+    """Gets a full-resolution image file"""
+
+    try:
+        path = ApiDependencies.invoker.services.model_images.get_path(key + ".png")
+
+        if not path:
+            raise HTTPException(status_code=404)
+
+        response = FileResponse(
+            path,
+            media_type="image/png",
+            filename=key + ".png",
+            content_disposition_type="inline",
+        )
+        response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
+        return response
+    except Exception:
+        raise HTTPException(status_code=404)
+
+
+# async def get_model_image(
+#     key: Annotated[str, Path(description="Unique key of model")],
+# ) -> Optional[str]:
+#     model_images = ApiDependencies.invoker.services.model_images
+#     try:
+#         url = model_images.get_url(key)
+
+#         if not url:
+#             return None
+
+#         return url
+#     except Exception:
+#         raise HTTPException(status_code=404)
+
+
+@model_manager_router.patch(
+    "/i/{key}/image",
+    operation_id="update_model_image",
+    responses={
+        200: {
+            "description": "The model image was updated successfully",
+        },
+        400: {"description": "Bad request"},
+    },
+    status_code=200,
+)
+async def update_model_image(
+    key: Annotated[str, Path(description="Unique key of model")],
+    image: UploadFile,
+) -> None:
+    if not image.content_type or not image.content_type.startswith("image"):
+        raise HTTPException(status_code=415, detail="Not an image")
+
+    contents = await image.read()
+    try:
+        pil_image = Image.open(io.BytesIO(contents))
+
+    except Exception:
+        ApiDependencies.invoker.services.logger.error(traceback.format_exc())
+        raise HTTPException(status_code=415, detail="Failed to read image")
+
+    logger = ApiDependencies.invoker.services.logger
+    model_images = ApiDependencies.invoker.services.model_images
+    try:
+        model_images.save(pil_image, key)
+        logger.info(f"Updated image for model: {key}")
+    except ValueError as e:
+        logger.error(str(e))
+        raise HTTPException(status_code=409, detail=str(e))
+    return
 
 
 @model_manager_router.delete(
