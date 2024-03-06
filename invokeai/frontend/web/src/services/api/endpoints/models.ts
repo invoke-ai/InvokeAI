@@ -24,8 +24,8 @@ export type UpdateModelArg = {
 };
 
 export type UpdateModelImageArg = {
-  key: paths['/api/v2/models/i/{key}/image']['patch']['parameters']['path']['key'];
-  image: paths['/api/v2/models/i/{key}/image']['patch']['requestBody']['content']['multipart/form-data'];
+  key: string;
+  image: Blob;
 };
 
 type UpdateModelResponse = paths['/api/v2/models/i/{key}']['patch']['responses']['200']['content']['application/json'];
@@ -155,7 +155,7 @@ export const modelsApi = api.injectEndpoints({
     updateModelImage: build.mutation<UpdateModelImageResponse, UpdateModelImageArg>({
       query: ({ key, image }) => {
         const formData = new FormData();
-        formData.append('image', image.image);
+        formData.append('image', image);
         return {
           url: buildModelsUrl(`i/${key}/image`),
           method: 'PATCH',
