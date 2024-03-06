@@ -818,6 +818,7 @@
         "oliveModels": "Olives",
         "onnxModels": "Onnx",
         "path": "Path",
+        "pathToConfig": "Path To Config",
         "pathToCustomConfig": "Path To Custom Config",
         "pickModelType": "Pick Model Type",
         "predictionType": "Prediction Type",
