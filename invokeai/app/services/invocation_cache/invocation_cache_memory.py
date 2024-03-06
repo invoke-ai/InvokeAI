@@ -81,7 +81,7 @@ class MemoryInvocationCache(InvocationCacheBase):
         with self._lock:
             return self._delete(key)
 
-    def clear(self, *args, **kwargs) -> None:
+    def clear(self) -> None:
         with self._lock:
             if self._max_cache_size == 0:
                 return
