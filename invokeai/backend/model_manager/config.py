@@ -310,7 +310,7 @@ class IPAdapterConfig(ModelConfigBase):
 
 
 class CLIPVisionDiffusersConfig(ModelConfigBase):
-    """Model config for ClipVision."""
+    """Model config for CLIPVision."""
 
     type: Literal[ModelType.CLIPVision] = ModelType.CLIPVision
     format: Literal[ModelFormat.Diffusers]

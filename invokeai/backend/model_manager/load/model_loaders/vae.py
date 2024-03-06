@@ -23,7 +23,7 @@ from .generic_diffusers import GenericDiffusersLoader
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.VAE, format=ModelFormat.Diffusers)
 @ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion1, type=ModelType.VAE, format=ModelFormat.Checkpoint)
 @ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion2, type=ModelType.VAE, format=ModelFormat.Checkpoint)
-class VaeLoader(GenericDiffusersLoader):
+class VAELoader(GenericDiffusersLoader):
     """Class to load VAE models."""
 
     def _needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool:

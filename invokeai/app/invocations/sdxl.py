@@ -8,7 +8,7 @@ from .baseinvocation import (
     invocation,
     invocation_output,
 )
-from .model import ClipField, ModelField, UNetField, VaeField
+from .model import CLIPField, ModelField, UNetField, VAEField
 
 
 @invocation_output("sdxl_model_loader_output")
@@ -16,9 +16,9 @@ class SDXLModelLoaderOutput(BaseInvocationOutput):
     """SDXL base model loader output"""
 
     unet: UNetField = OutputField(description=FieldDescriptions.unet, title="UNet")
-    clip: ClipField = OutputField(description=FieldDescriptions.clip, title="CLIP 1")
-    clip2: ClipField = OutputField(description=FieldDescriptions.clip, title="CLIP 2")
-    vae: VaeField = OutputField(description=FieldDescriptions.vae, title="VAE")
+    clip: CLIPField = OutputField(description=FieldDescriptions.clip, title="CLIP 1")
+    clip2: CLIPField = OutputField(description=FieldDescriptions.clip, title="CLIP 2")
+    vae: VAEField = OutputField(description=FieldDescriptions.vae, title="VAE")
 
 
 @invocation_output("sdxl_refiner_model_loader_output")
@@ -26,8 +26,8 @@ class SDXLRefinerModelLoaderOutput(BaseInvocationOutput):
     """SDXL refiner model loader output"""
 
     unet: UNetField = OutputField(description=FieldDescriptions.unet, title="UNet")
-    clip2: ClipField = OutputField(description=FieldDescriptions.clip, title="CLIP 2")
-    vae: VaeField = OutputField(description=FieldDescriptions.vae, title="VAE")
+    clip2: CLIPField = OutputField(description=FieldDescriptions.clip, title="CLIP 2")
+    vae: VAEField = OutputField(description=FieldDescriptions.vae, title="VAE")
 
 
 @invocation("sdxl_model_loader", title="SDXL Main Model", tags=["model", "sdxl"], category="model", version="1.0.1")
@@ -56,9 +56,9 @@ class SDXLModelLoaderInvocation(BaseInvocation):
 
         return SDXLModelLoaderOutput(
             unet=UNetField(unet=unet, scheduler=scheduler, loras=[]),
-            clip=ClipField(tokenizer=tokenizer, text_encoder=text_encoder, loras=[], skipped_layers=0),
-            clip2=ClipField(tokenizer=tokenizer2, text_encoder=text_encoder2, loras=[], skipped_layers=0),
-            vae=VaeField(vae=vae),
+            clip=CLIPField(tokenizer=tokenizer, text_encoder=text_encoder, loras=[], skipped_layers=0),
+            clip2=CLIPField(tokenizer=tokenizer2, text_encoder=text_encoder2, loras=[], skipped_layers=0),
+            vae=VAEField(vae=vae),
         )
 
 
@@ -92,6 +92,6 @@ class SDXLRefinerModelLoaderInvocation(BaseInvocation):
 
         return SDXLRefinerModelLoaderOutput(
             unet=UNetField(unet=unet, scheduler=scheduler, loras=[]),
-            clip2=ClipField(tokenizer=tokenizer2, text_encoder=text_encoder2, loras=[], skipped_layers=0),
-            vae=VaeField(vae=vae),
+            clip2=CLIPField(tokenizer=tokenizer2, text_encoder=text_encoder2, loras=[], skipped_layers=0),
+            vae=VAEField(vae=vae),
         )
