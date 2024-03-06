@@ -91,21 +91,6 @@ class LocalModelSource(StringLikeSource):
         return Path(self.path).as_posix()
 
 
-class CivitaiModelSource(StringLikeSource):
-    """A Civitai version id, with optional variant and access token."""
-
-    version_id: int
-    variant: Optional[ModelRepoVariant] = None
-    access_token: Optional[str] = None
-    type: Literal["civitai"] = "civitai"
-
-    def __str__(self) -> str:
-        """Return string version of repoid when string rep needed."""
-        base: str = str(self.version_id)
-        base += f" ({self.variant})" if self.variant else ""
-        return base
-
-
 class HFModelSource(StringLikeSource):
     """
     A HuggingFace repo_id with optional variant, sub-folder and access token.
@@ -147,13 +132,12 @@ class URLModelSource(StringLikeSource):
 
 
 ModelSource = Annotated[
-    Union[LocalModelSource, HFModelSource, CivitaiModelSource, URLModelSource], Field(discriminator="type")
+    Union[LocalModelSource, HFModelSource, URLModelSource], Field(discriminator="type")
 ]
 
 MODEL_SOURCE_TO_TYPE_MAP = {
     URLModelSource: ModelSourceType.Url,
     HFModelSource: ModelSourceType.HFRepoID,
-    CivitaiModelSource: ModelSourceType.CivitAI,
     LocalModelSource: ModelSourceType.Path,
 }
 

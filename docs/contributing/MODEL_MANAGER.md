@@ -583,31 +583,6 @@ there is special-case code in the installer that looks for HuggingFace
 and Civitai URLs and fetches the corresponding model metadata from
 the corresponding repo.
 
-#### CivitaiModelSource
-
-This is used for a model that is hosted by the Civitai web site.
-
-| **Argument**     | **Type**                     | **Default** | **Description**                           |
-|------------------|------------------------------|-------------|-------------------------------------------|
-| `version_id`     | int                          | None        | The ID of the particular version of the desired model. |
-| `access_token`   | str                          | None        | An access token needed to gain access to a subscriber's-only model. |
-
-Civitai has two model IDs, both of which are integers. The `model_id`
-corresponds to a collection of model versions that may different in
-arbitrary ways, such as derivation from different checkpoint training
-steps, SFW vs NSFW generation, pruned vs non-pruned, etc. The
-`version_id` points to a specific version. Please use the latter.
-
-Some Civitai models require an access token to download. These can be
-generated from the Civitai profile page of a logged-in
-account. Somewhat annoyingly, if you fail to provide the access token
-when downloading a model that needs it, Civitai generates a redirect
-to a login page rather than a 403 Forbidden error. The installer
-attempts to catch this event and issue an informative error
-message. Otherwise you will get an "unrecognized model suffix" error
-when the model prober tries to identify the type of the HTML login
-page.
-
 #### HFModelSource
 
 HuggingFace has the most complicated `ModelSource` structure:
