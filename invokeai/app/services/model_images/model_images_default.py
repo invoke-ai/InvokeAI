@@ -6,6 +6,7 @@ from PIL.Image import Image as PILImageType
 from send2trash import send2trash
 
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.util.thumbnails import make_thumbnail
 
 from .model_images_base import ModelImagesBase
 from .model_images_common import ModelImageFileDeleteException, ModelImageFileNotFoundException, ModelImageFileSaveException
@@ -27,9 +28,12 @@ class ModelImagesService(ModelImagesBase):
 
     def get(self, model_key: str) -> PILImageType:
         try:
-            image_path = self.get_path(model_key + '.png')
+            path = self.get_path(model_key)
+            
+            if not self.validate_path(path):
+                raise ModelImageFileNotFoundException
 
-            image = Image.open(image_path)
+            image = Image.open(path)
             return image
         except FileNotFoundError as e:
             raise ModelImageFileNotFoundException from e
@@ -41,8 +45,12 @@ class ModelImagesService(ModelImagesBase):
     ) -> None:
         try:
             self.__validate_storage_folders()
-            image_path = self.get_path(model_key + '.png')
-            pnginfo = PngImagePlugin.PngInfo()
+            logger = self.__invoker.services.logger
+            image_path = self.__model_images_folder / (model_key + '.png')
+            logger.debug(f"Saving image for model {model_key} to image_path {image_path}")
+            
+            pnginfo = PngImagePlugin.PngInfo()  
+            image = make_thumbnail(image, 256)
 
             image.save(
                 image_path,
@@ -55,22 +63,33 @@ class ModelImagesService(ModelImagesBase):
             raise ModelImageFileSaveException from e
 
     def get_path(self, model_key: str) -> Path:
-        path = self.__model_images_folder / model_key
+        path = self.__model_images_folder / (model_key + '.png')
 
         return path
     
-    def get_url(self, model_key: str) -> str:
+    def get_url(self, model_key: str) -> str | None:
+        path = self.get_path(model_key)
+        if not self.validate_path(path):
+            return
+        
         return self.__invoker.services.urls.get_model_image_url(model_key)
     
     def delete(self, model_key: str) -> None:
         try:
-            image_path = self.get_path(model_key + '.png')
+            path = self.get_path(model_key)
 
-            if image_path.exists():
-                send2trash(image_path)
+            if not self.validate_path(path):
+              raise ModelImageFileNotFoundException
+
+            send2trash(path)
 
         except Exception as e:
             raise ModelImageFileDeleteException from e
+        
+    def validate_path(self, path: Union[str, Path]) -> bool:
+        """Validates the path given for an image."""
+        path = path if isinstance(path, Path) else Path(path)
+        return path.exists()
 
     def __validate_storage_folders(self) -> None:
         """Checks if the required folders exist and create them if they don't"""

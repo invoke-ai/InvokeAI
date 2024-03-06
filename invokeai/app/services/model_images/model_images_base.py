@@ -12,8 +12,13 @@ class ModelImagesBase(ABC):
         pass
 
     @abstractmethod
-    def get_path(self, model_key: str) -> Path:
+    def get_path(self, model_key: str) -> Path | None:
         """Gets the internal path to a model image."""
+        pass
+
+    @abstractmethod
+    def get_url(self, model_key: str) -> str | None:
+        """Gets the URL to a model image."""
         pass
 
     @abstractmethod

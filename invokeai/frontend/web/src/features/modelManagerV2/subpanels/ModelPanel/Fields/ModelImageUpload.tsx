@@ -6,18 +6,19 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { Button } from '@invoke-ai/ui-library';
 import { useDropzone } from 'react-dropzone';
 import { PiArrowCounterClockwiseBold, PiUploadSimpleBold } from 'react-icons/pi';
-import { buildModelsUrl, useUpdateModelImageMutation, useDeleteModelImageMutation } from 'services/api/endpoints/models';
+import { useUpdateModelImageMutation, useDeleteModelImageMutation } from 'services/api/endpoints/models';
 import { useTranslation } from 'react-i18next';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 
 type Props = {
-    model_key: string;
+    model_key: string | null;
+    model_image: string | null;
   };
   
-  const ModelImageUpload = ({ model_key }: Props) => {
+  const ModelImageUpload = ({ model_key, model_image }: Props) => {
   const dispatch = useAppDispatch();
-  const [image, setImage] = useState<string | undefined>(buildModelsUrl(`i/${model_key}/image`));
+  const [image, setImage] = useState<string | null>(model_image);
   const { t } = useTranslation();
 
   const [updateModelImage] = useUpdateModelImageMutation();
@@ -33,7 +34,7 @@ type Props = {
 
       setImage(URL.createObjectURL(file));
 
-      updateModelImage({ key: model_key, image: image })
+      updateModelImage({ key: model_key, image: file })
       .unwrap()
       .then(() => {
         dispatch(
@@ -60,6 +61,9 @@ type Props = {
   );
 
   const handleResetImage = useCallback(() => {
+    if (!model_key) {
+      return;
+    }
     setImage(undefined);
     deleteModelImage(model_key)
     .unwrap()

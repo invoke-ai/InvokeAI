@@ -41,7 +41,7 @@ export const Model = () => {
           <ModelAttrView label="Description" value={data.description} />
         </Box>
       </Flex>
-      <ModelImageUpload model_key={selectedModelKey || ''} />
+      <ModelImageUpload model_key={selectedModelKey} model_image={data.cover_image} />
       </Flex>
 
       <Tabs mt="4" h="100%">

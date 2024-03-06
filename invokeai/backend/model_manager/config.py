@@ -20,6 +20,7 @@ Validation errors will raise an InvalidModelConfigException error.
 
 """
 
+from pathlib import Path
 import time
 from enum import Enum
 from typing import Literal, Optional, Type, Union
@@ -161,7 +162,7 @@ class ModelConfigBase(BaseModel):
     default_settings: Optional[ModelDefaultSettings] = Field(
         description="Default settings for this model", default=None
     )
-    image: Optional[str] = Field(description="Image to preview model", default=None)
+    cover_image: Optional[str] = Field(description="Url for image to preview model", default=None)
 
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
