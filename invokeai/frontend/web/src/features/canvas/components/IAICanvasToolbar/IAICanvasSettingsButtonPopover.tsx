@@ -18,6 +18,7 @@ import {
   setShouldAutoSave,
   setShouldCropToBoundingBoxOnSave,
   setShouldDarkenOutsideBoundingBox,
+  setShouldInvertBrushSizeScrollDirection,
   setShouldRestrictStrokesToBox,
   setShouldShowCanvasDebugInfo,
   setShouldShowGrid,
@@ -40,6 +41,7 @@ const IAICanvasSettingsButtonPopover = () => {
   const shouldAutoSave = useAppSelector((s) => s.canvas.shouldAutoSave);
   const shouldCropToBoundingBoxOnSave = useAppSelector((s) => s.canvas.shouldCropToBoundingBoxOnSave);
   const shouldDarkenOutsideBoundingBox = useAppSelector((s) => s.canvas.shouldDarkenOutsideBoundingBox);
+  const shouldInvertBrushSizeScrollDirection = useAppSelector((s) => s.canvas.shouldInvertBrushSizeScrollDirection);
   const shouldShowCanvasDebugInfo = useAppSelector((s) => s.canvas.shouldShowCanvasDebugInfo);
   const shouldShowGrid = useAppSelector((s) => s.canvas.shouldShowGrid);
   const shouldShowIntermediates = useAppSelector((s) => s.canvas.shouldShowIntermediates);
@@ -74,6 +76,10 @@ const IAICanvasSettingsButtonPopover = () => {
   );
   const handleChangeShouldDarkenOutsideBoundingBox = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => dispatch(setShouldDarkenOutsideBoundingBox(e.target.checked)),
+    [dispatch]
+  );
+  const handleChangeShouldInvertBrushSizeScrollDirection = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => dispatch(setShouldInvertBrushSizeScrollDirection(e.target.checked)),
     [dispatch]
   );
   const handleChangeShouldAutoSave = useCallback(
@@ -143,6 +149,13 @@ const IAICanvasSettingsButtonPopover = () => {
               <FormControl>
                 <FormLabel>{t('unifiedCanvas.limitStrokesToBox')}</FormLabel>
                 <Checkbox isChecked={shouldRestrictStrokesToBox} onChange={handleChangeShouldRestrictStrokesToBox} />
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('unifiedCanvas.invertBrushSizeScrollDirection')}</FormLabel>
+                <Checkbox
+                  isChecked={shouldInvertBrushSizeScrollDirection}
+                  onChange={handleChangeShouldInvertBrushSizeScrollDirection}
+                />
               </FormControl>
               <FormControl>
                 <FormLabel>{t('unifiedCanvas.showCanvasDebugInfo')}</FormLabel>

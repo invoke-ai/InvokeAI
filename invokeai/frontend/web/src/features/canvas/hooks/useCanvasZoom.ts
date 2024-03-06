@@ -15,6 +15,7 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
   const stageScale = useAppSelector((s) => s.canvas.stageScale);
   const isMoveStageKeyHeld = useStore($isMoveStageKeyHeld);
   const brushSize = useAppSelector((s) => s.canvas.brushSize);
+  const shouldInvertBrushSizeScrollDirection = useAppSelector((s) => s.canvas.shouldInvertBrushSizeScrollDirection);
 
   return useCallback(
     (e: KonvaEventObject<WheelEvent>) => {
@@ -28,10 +29,16 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
       // checking for ctrl key is pressed or not,
       // so that brush size can be controlled using ctrl + scroll up/down
 
+      // Invert the delta if the property is set to true
+      let delta = e.evt.deltaY;
+      if (shouldInvertBrushSizeScrollDirection) {
+        delta = -delta
+      }
+
       if ($ctrl.get() || $meta.get()) {
         // This equation was derived by fitting a curve to the desired brush sizes and deltas
         // see https://github.com/invoke-ai/InvokeAI/pull/5542#issuecomment-1915847565
-        const targetDelta = Math.sign(e.evt.deltaY) * 0.7363 * Math.pow(1.0394, brushSize);
+        const targetDelta = Math.sign(delta) * 0.7363 * Math.pow(1.0394, brushSize);
         // This needs to be clamped to prevent the delta from getting too large
         const finalDelta = clamp(targetDelta, -20, 20);
         // The new brush size is also clamped to prevent it from getting too large or small
@@ -67,7 +74,7 @@ const useCanvasWheel = (stageRef: MutableRefObject<Konva.Stage | null>) => {
         dispatch(setStageCoordinates(newCoordinates));
       }
     },
-    [stageRef, isMoveStageKeyHeld, stageScale, dispatch, brushSize]
+    [stageRef, isMoveStageKeyHeld, brushSize, dispatch, stageScale, shouldInvertBrushSizeScrollDirection]
   );
 };
 

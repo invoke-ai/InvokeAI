@@ -65,6 +65,7 @@ const initialCanvasState: CanvasState = {
   shouldAutoSave: false,
   shouldCropToBoundingBoxOnSave: false,
   shouldDarkenOutsideBoundingBox: false,
+  shouldInvertBrushSizeScrollDirection: false,
   shouldLockBoundingBox: false,
   shouldPreserveMaskedArea: false,
   shouldRestrictStrokesToBox: true,
@@ -219,6 +220,9 @@ export const canvasSlice = createSlice({
     },
     setShouldDarkenOutsideBoundingBox: (state, action: PayloadAction<boolean>) => {
       state.shouldDarkenOutsideBoundingBox = action.payload;
+    },
+    setShouldInvertBrushSizeScrollDirection: (state, action: PayloadAction<boolean>) => {
+      state.shouldInvertBrushSizeScrollDirection = action.payload;
     },
     clearCanvasHistory: (state) => {
       state.pastLayerStates = [];
@@ -674,6 +678,7 @@ export const {
   setShouldAutoSave,
   setShouldCropToBoundingBoxOnSave,
   setShouldDarkenOutsideBoundingBox,
+  setShouldInvertBrushSizeScrollDirection,
   setShouldPreserveMaskedArea,
   setShouldShowBoundingBox,
   setShouldShowCanvasDebugInfo,

@@ -1818,6 +1818,7 @@
         "eraseBoundingBox": "Erase Bounding Box",
         "eraser": "Eraser",
         "fillBoundingBox": "Fill Bounding Box",
+        "invertBrushSizeScrollDirection": "Invert Scroll for Brush Size",
         "layer": "Layer",
         "limitStrokesToBox": "Limit Strokes to Box",
         "mask": "Mask",

@@ -120,6 +120,7 @@ export interface CanvasState {
   shouldAutoSave: boolean;
   shouldCropToBoundingBoxOnSave: boolean;
   shouldDarkenOutsideBoundingBox: boolean;
+  shouldInvertBrushSizeScrollDirection: boolean;
   shouldLockBoundingBox: boolean;
   shouldPreserveMaskedArea: boolean;
   shouldRestrictStrokesToBox: boolean;
