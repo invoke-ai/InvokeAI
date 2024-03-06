@@ -112,9 +112,11 @@ export const ModelView = () => {
           )}
         </Flex>
       </Box>
-      <Box layerStyle="second" borderRadius="base" p={3}>
-        <DefaultSettings />
-      </Box>
+      {modelData.type === 'main' && (
+        <Box layerStyle="second" borderRadius="base" p={3}>
+          <DefaultSettings />
+        </Box>
+      )}
     </Flex>
   );
 };
