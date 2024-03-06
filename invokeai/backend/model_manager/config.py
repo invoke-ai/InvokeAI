@@ -374,6 +374,7 @@ AnyModelConfig = Annotated[
 
 AnyModelConfigValidator = TypeAdapter(AnyModelConfig)
 
+
 class ModelConfigFactory(object):
     """Class for parsing config dicts into StableDiffusion Config obects."""
 

@@ -30,11 +30,10 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
         return;
       }
 
-      setImage(URL.createObjectURL(file));
-
       updateModelImage({ key: model_key, image: file })
         .unwrap()
         .then(() => {
+          setImage(URL.createObjectURL(file));
           dispatch(
             addToast(
               makeToast({
@@ -103,6 +102,7 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
           objectPosition="50% 50%"
           height="100px"
           width="100px"
+          minWidth="100px"
           borderRadius="base"
         />
         <IconButton

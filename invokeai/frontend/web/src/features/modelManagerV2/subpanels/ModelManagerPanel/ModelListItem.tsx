@@ -75,7 +75,7 @@ const ModelListItem = (props: ModelListItemProps) => {
 
   return (
     <Flex gap={2} alignItems="center" w="full">
-      <ModelImage image_url={model.cover_image} />
+      <ModelImage image_url={model.cover_image || ''} />
       <Flex
         as={Button}
         isChecked={isSelected}
