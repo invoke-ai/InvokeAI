@@ -1,21 +1,24 @@
 import { Box, IconButton, Image } from '@invoke-ai/ui-library';
 import { typedMemo } from 'common/util/typedMemo';
-import { useCallback, useEffect, useMemo } from 'react';
-import type { UseControllerProps } from 'react-hook-form';
+import { useCallback, useState } from 'react';
+import type { Control } from 'react-hook-form';
 import { useController, useWatch } from 'react-hook-form';
-import type { AnyModelConfig } from 'services/api/types';
 
 import { Button } from '@invoke-ai/ui-library';
 import { useDropzone } from 'react-dropzone';
 import { PiArrowCounterClockwiseBold, PiUploadSimpleBold } from 'react-icons/pi';
-import { useGetModelImageQuery } from 'services/api/endpoints/models';
+import { UpdateModelArg, buildModelsUrl } from 'services/api/endpoints/models';
+import { useTranslation } from 'react-i18next';
 
-const ModelImageUpload = (props: UseControllerProps<AnyModelConfig>) => {
-  const { field } = useController(props);
+type Props = {
+  control: Control<UpdateModelArg['body']>;
+};
 
-  const key = useWatch({ control: props.control, name: 'key' });
-
-  const { data } = useGetModelImageQuery(key);
+const ModelImageUpload = ({ control }: Props) => {
+  const key = useWatch({ control, name: 'key' });
+  const [image, setImage] = useState<string | undefined>(buildModelsUrl(`i/${key}/image`));
+  const { field } = useController({ control, name: 'image' });
+  const { t } = useTranslation();
 
   const onDropAccepted = useCallback(
     (files: File[]) => {
@@ -26,12 +29,14 @@ const ModelImageUpload = (props: UseControllerProps<AnyModelConfig>) => {
       }
 
       field.onChange(file);
+      setImage(URL.createObjectURL(file));
     },
     [field]
   );
 
-  const handleResetControlImage = useCallback(() => {
+  const handleResetImage = useCallback(() => {
     field.onChange(undefined);
+    setImage(undefined);
   }, [field]);
 
   const { getInputProps, getRootProps } = useDropzone({
@@ -41,29 +46,28 @@ const ModelImageUpload = (props: UseControllerProps<AnyModelConfig>) => {
     multiple: false,
   });
 
-  const image = useMemo(() => {
-    console.log(field.value, 'asdf' );
-    if (field.value) {
-      return URL.createObjectURL(field.value);
-    }
-
-    return data;
-  }, [field.value, data]);
-
   if (image) {
     return (
-      <Box>
+      <Box
+        position="relative"
+        _hover={{ filter: 'brightness(50%)' }}
+        transition="filter ease 0.2s"
+      >
         <Image
+          onError={() => setImage(undefined)}
           src={image}
           objectFit="contain"
           maxW="full"
-          maxH="200px"
+          maxH="100px"
           borderRadius="base"
         />
         <IconButton
-          onClick={handleResetControlImage}
-          aria-label="reset this image"
-          tooltip="reset this image"
+          position="absolute"
+          top="1"
+          right="1"
+          onClick={handleResetImage}
+          aria-label={t('modelManager.resetImage')}
+          tooltip={t('modelManager.resetImage')}
           icon={<PiArrowCounterClockwiseBold size={16} />}
           size="sm"
           variant="link"
@@ -75,7 +79,7 @@ const ModelImageUpload = (props: UseControllerProps<AnyModelConfig>) => {
   return (
     <>
       <Button leftIcon={<PiUploadSimpleBold />} {...getRootProps()} pointerEvents="auto">
-        Upload Image
+        {t('modelManager.uploadImage')}
       </Button>
       <input {...getInputProps()} />
     </>
