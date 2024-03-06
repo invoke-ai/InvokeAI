@@ -38,7 +38,7 @@ export const addCanvasImageToControlNetListener = (startAppListening: AppStartLi
             type: 'image/png',
           }),
           image_category: 'control',
-          is_intermediate: false,
+          is_intermediate: true,
           board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
           crop_visible: false,
           postUploadAction: {
