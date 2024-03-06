@@ -15,7 +15,7 @@ export const MetadataItemView = memo(
     return (
       <Flex gap={2}>
         {onRecall && <RecallButton label={label} onClick={onRecall} isDisabled={isDisabled} />}
-        <Flex direction={direction}>
+        <Flex direction={direction} fontSize="sm">
           <Text fontWeight="semibold" whiteSpace="pre-wrap" pr={2}>
             {label}:
           </Text>
