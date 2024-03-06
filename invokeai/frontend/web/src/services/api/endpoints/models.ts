@@ -40,6 +40,7 @@ type DeleteModelArg = {
   key: string;
 };
 type DeleteModelResponse = void;
+type DeleteModelImageResponse = void;
 
 type ConvertMainModelResponse =
   paths['/api/v2/models/convert/{key}']['put']['responses']['200']['content']['application/json'];
@@ -161,7 +162,6 @@ export const modelsApi = api.injectEndpoints({
           body: formData,
         };
       },
-      invalidatesTags: ['Model'],
     }),
     installModel: build.mutation<InstallModelResponse, InstallModelArg>({
       query: ({ source }) => {
@@ -181,6 +181,17 @@ export const modelsApi = api.injectEndpoints({
         };
       },
       invalidatesTags: ['Model'],
+    }),
+    deleteModelImage: build.mutation<DeleteModelImageResponse, string>({
+      query: (key) => {
+        return {
+          url: buildModelsUrl(`i/${key}/image`),
+          method: 'DELETE',
+        };
+      },
+    }),
+    getModelImage: build.query<string, string>({
+      query: (key) => buildModelsUrl(`i/${key}/image`)
     }),
     convertModel: build.mutation<ConvertMainModelResponse, string>({
       query: (key) => {
@@ -349,6 +360,7 @@ export const {
   useGetTextualInversionModelsQuery,
   useGetVaeModelsQuery,
   useDeleteModelsMutation,
+  useDeleteModelImageMutation,
   useUpdateModelMutation,
   useUpdateModelImageMutation,
   useInstallModelMutation,

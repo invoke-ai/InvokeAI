@@ -8,6 +8,7 @@ import { ModelMetadata } from './Metadata/ModelMetadata';
 import { ModelAttrView } from './ModelAttrView';
 import { ModelEdit } from './ModelEdit';
 import { ModelView } from './ModelView';
+import ModelImageUpload from './Fields/ModelImageUpload';
 
 export const Model = () => {
   const { t } = useTranslation();
@@ -25,6 +26,7 @@ export const Model = () => {
 
   return (
     <>
+    <Flex alignItems="center" justifyContent="space-between" gap="4" paddingRight="5">
       <Flex flexDir="column" gap={1} p={2}>
         <Heading as="h2" fontSize="lg">
           {data.name}
@@ -38,6 +40,8 @@ export const Model = () => {
         <Box mt="4">
           <ModelAttrView label="Description" value={data.description} />
         </Box>
+      </Flex>
+      <ModelImageUpload model_key={selectedModelKey || ''} />
       </Flex>
 
       <Tabs mt="4" h="100%">

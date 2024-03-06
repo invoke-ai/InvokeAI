@@ -1,24 +1,27 @@
 import { Box, IconButton, Image } from '@invoke-ai/ui-library';
 import { typedMemo } from 'common/util/typedMemo';
 import { useCallback, useState } from 'react';
-import type { Control } from 'react-hook-form';
-import { useController, useWatch } from 'react-hook-form';
+import { useAppDispatch } from 'app/store/storeHooks';
 
 import { Button } from '@invoke-ai/ui-library';
 import { useDropzone } from 'react-dropzone';
 import { PiArrowCounterClockwiseBold, PiUploadSimpleBold } from 'react-icons/pi';
-import { UpdateModelArg, buildModelsUrl } from 'services/api/endpoints/models';
+import { buildModelsUrl, useUpdateModelImageMutation, useDeleteModelImageMutation } from 'services/api/endpoints/models';
 import { useTranslation } from 'react-i18next';
+import { addToast } from 'features/system/store/systemSlice';
+import { makeToast } from 'features/system/util/makeToast';
 
 type Props = {
-  control: Control<UpdateModelArg['body']>;
-};
-
-const ModelImageUpload = ({ control }: Props) => {
-  const key = useWatch({ control, name: 'key' });
-  const [image, setImage] = useState<string | undefined>(buildModelsUrl(`i/${key}/image`));
-  const { field } = useController({ control, name: 'image' });
+    model_key: string;
+  };
+  
+  const ModelImageUpload = ({ model_key }: Props) => {
+  const dispatch = useAppDispatch();
+  const [image, setImage] = useState<string | undefined>(buildModelsUrl(`i/${model_key}/image`));
   const { t } = useTranslation();
+
+  const [updateModelImage] = useUpdateModelImageMutation();
+  const [deleteModelImage] = useDeleteModelImageMutation();
 
   const onDropAccepted = useCallback(
     (files: File[]) => {
@@ -28,16 +31,59 @@ const ModelImageUpload = ({ control }: Props) => {
         return;
       }
 
-      field.onChange(file);
       setImage(URL.createObjectURL(file));
+
+      updateModelImage({ key: model_key, image: image })
+      .unwrap()
+      .then(() => {
+        dispatch(
+          addToast(
+            makeToast({
+              title: t('modelManager.modelImageUpdated'),
+              status: 'success',
+            })
+          )
+        );
+      })
+      .catch((_) => {
+        dispatch(
+          addToast(
+            makeToast({
+              title: t('modelManager.modelImageUpdateFailed'),
+              status: 'error',
+            })
+          )
+        );
+      });
     },
-    [field]
+    []
   );
 
   const handleResetImage = useCallback(() => {
-    field.onChange(undefined);
     setImage(undefined);
-  }, [field]);
+    deleteModelImage(model_key)
+    .unwrap()
+    .then(() => {
+      dispatch(
+        addToast(
+          makeToast({
+            title: t('modelManager.modelImageDeleted'),
+            status: 'success',
+          })
+        )
+      );
+    })
+    .catch((_) => {
+      dispatch(
+        addToast(
+          makeToast({
+            title: t('modelManager.modelImageDeleteFailed'),
+            status: 'error',
+          })
+        )
+      );
+    });
+  }, []);
 
   const { getInputProps, getRootProps } = useDropzone({
     accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg', '.png'] },
@@ -50,8 +96,6 @@ const ModelImageUpload = ({ control }: Props) => {
     return (
       <Box
         position="relative"
-        _hover={{ filter: 'brightness(50%)' }}
-        transition="filter ease 0.2s"
       >
         <Image
           onError={() => setImage(undefined)}
@@ -66,11 +110,12 @@ const ModelImageUpload = ({ control }: Props) => {
           top="1"
           right="1"
           onClick={handleResetImage}
-          aria-label={t('modelManager.resetImage')}
-          tooltip={t('modelManager.resetImage')}
+          aria-label={t('modelManager.deleteModelImage')}
+          tooltip={t('modelManager.deleteModelImage')}
           icon={<PiArrowCounterClockwiseBold size={16} />}
           size="sm"
           variant="link"
+          _hover={{ color: 'base.100' }}
         />
       </Box>
     );

@@ -292,6 +292,7 @@ async def get_model_image(
     """Gets a full-resolution image file"""
 
     try:
+        # still need to handle this gracefully when path doesnt exist instead of throwing error
         path = ApiDependencies.invoker.services.model_images.get_path(key + ".png")
 
         if not path:
@@ -307,22 +308,6 @@ async def get_model_image(
         return response
     except Exception:
         raise HTTPException(status_code=404)
-
-
-# async def get_model_image(
-#     key: Annotated[str, Path(description="Unique key of model")],
-# ) -> Optional[str]:
-#     model_images = ApiDependencies.invoker.services.model_images
-#     try:
-#         url = model_images.get_url(key)
-
-#         if not url:
-#             return None
-
-#         return url
-#     except Exception:
-#         raise HTTPException(status_code=404)
-
 
 @model_manager_router.patch(
     "/i/{key}/image",
@@ -386,6 +371,28 @@ async def delete_model(
         installer.delete(key)
         logger.info(f"Deleted model: {key}")
         return Response(status_code=204)
+    except UnknownModelException as e:
+        logger.error(str(e))
+        raise HTTPException(status_code=404, detail=str(e))
+
+@model_manager_router.delete(
+    "/i/{key}/image",
+    operation_id="delete_model_image",
+    responses={
+        204: {"description": "Model image deleted successfully"},
+        404: {"description": "Model image not found"},
+    },
+    status_code=204,
+)
+async def delete_model_image(
+    key: str = Path(description="Unique key of model image to remove from model_images directory."),
+) -> None:
+    logger = ApiDependencies.invoker.services.logger
+    model_images = ApiDependencies.invoker.services.model_images
+    try:
+        model_images.delete(key)
+        logger.info(f"Deleted model image: {key}")
+        return
     except UnknownModelException as e:
         logger.error(str(e))
         raise HTTPException(status_code=404, detail=str(e))
