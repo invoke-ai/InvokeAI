@@ -61,9 +61,7 @@ class MemoryInvocationCache(InvocationCacheBase):
             self._delete_oldest_access(number_to_delete)
             self._cache[key] = CachedItem(
                 invocation_output,
-                invocation_output.model_dump_json(
-                    warnings=False, exclude_defaults=True, exclude_unset=True, include={"type"}
-                ),
+                invocation_output.model_dump_json(warnings=False, exclude_defaults=True, exclude_unset=True),
             )
 
     def _delete_oldest_access(self, number_to_delete: int) -> None:
