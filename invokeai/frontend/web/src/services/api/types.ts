@@ -38,7 +38,6 @@ export type OffsetPaginatedResults_ImageDTO_ = S['OffsetPaginatedResults_ImageDT
 export type ModelType = S['ModelType'];
 export type SubModelType = S['SubModelType'];
 export type BaseModelType = S['BaseModelType'];
-export type ControlField = S['ControlField'];
 
 // Model Configs
 
@@ -129,8 +128,9 @@ export type ImageNSFWBlurInvocation = S['ImageNSFWBlurInvocation'];
 export type ImageWatermarkInvocation = S['ImageWatermarkInvocation'];
 export type SeamlessModeInvocation = S['SeamlessModeInvocation'];
 export type CoreMetadataInvocation = S['CoreMetadataInvocation'];
-export type IPAdapterMetadataField = S['IPAdapterMetadataField'];
-export type T2IAdapterField = S['T2IAdapterField'];
+
+// Metadata fields
+export type ModelMetadataField = S['ModelMetadataField'];
 
 // ControlNet Nodes
 export type ControlNetInvocation = S['ControlNetInvocation'];

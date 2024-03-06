@@ -1,6 +1,12 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
-import type { ImageDTO, ImageToLatentsInvocation, NonNullableGraph } from 'services/api/types';
+import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import {
+  type ImageDTO,
+  type ImageToLatentsInvocation,
+  isNonRefinerMainModelConfig,
+  type NonNullableGraph,
+} from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
@@ -26,12 +32,15 @@ import {
   SEAMLESS,
 } from './constants';
 import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from './graphBuilderUtils';
-import { addCoreMetadataNode } from './metadata';
+import { addCoreMetadataNode, getModelMetadataField } from './metadata';
 
 /**
  * Builds the Canvas tab's Image to Image graph.
  */
-export const buildCanvasSDXLImageToImageGraph = (state: RootState, initialImage: ImageDTO): NonNullableGraph => {
+export const buildCanvasSDXLImageToImageGraph = async (
+  state: RootState,
+  initialImage: ImageDTO
+): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
     positivePrompt,
@@ -307,6 +316,8 @@ export const buildCanvasSDXLImageToImageGraph = (state: RootState, initialImage:
     });
   }
 
+  const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
+
   addCoreMetadataNode(
     graph,
     {
@@ -317,7 +328,7 @@ export const buildCanvasSDXLImageToImageGraph = (state: RootState, initialImage:
       height: !isUsingScaledDimensions ? height : scaledBoundingBoxDimensions.height,
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
-      model,
+      model: getModelMetadataField(modelConfig),
       seed,
       steps,
       rand_device: use_cpu ? 'cpu' : 'cuda',
@@ -338,24 +349,24 @@ export const buildCanvasSDXLImageToImageGraph = (state: RootState, initialImage:
 
   // Add Refiner if enabled
   if (refinerModel) {
-    addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
+    await addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
     if (seamlessXAxis || seamlessYAxis) {
       modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
     }
   }
 
   // optionally add custom VAE
-  addVAEToGraph(state, graph, modelLoaderNodeId);
+  await addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add LoRA support
-  addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
+  await addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
+  await addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // Add IP Adapter
-  addIPAdapterToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
-  addT2IAdaptersToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
+  await addIPAdapterToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
+  await addT2IAdaptersToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

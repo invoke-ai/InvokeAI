@@ -41,11 +41,11 @@ import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from './graphBu
 /**
  * Builds the Canvas tab's Inpaint graph.
  */
-export const buildCanvasSDXLInpaintGraph = (
+export const buildCanvasSDXLInpaintGraph = async (
   state: RootState,
   canvasInitImage: ImageDTO,
   canvasMaskImage: ImageDTO
-): NonNullableGraph => {
+): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
     positivePrompt,
@@ -426,24 +426,31 @@ export const buildCanvasSDXLInpaintGraph = (
 
   // Add Refiner if enabled
   if (refinerModel) {
-    addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId, canvasInitImage, canvasMaskImage);
+    await addSDXLRefinerToGraph(
+      state,
+      graph,
+      SDXL_DENOISE_LATENTS,
+      modelLoaderNodeId,
+      canvasInitImage,
+      canvasMaskImage
+    );
     if (seamlessXAxis || seamlessYAxis) {
       modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
     }
   }
 
   // Add VAE
-  addVAEToGraph(state, graph, modelLoaderNodeId);
+  await addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add LoRA support
-  addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
+  await addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
+  await addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // Add IP Adapter
-  addIPAdapterToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
-  addT2IAdaptersToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
+  await addIPAdapterToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
+  await addT2IAdaptersToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

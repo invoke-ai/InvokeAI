@@ -1,16 +1,22 @@
 import type { RootState } from 'app/store/store';
+import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { filter, size } from 'lodash-es';
-import type { CoreMetadataInvocation, LoraLoaderInvocation, NonNullableGraph } from 'services/api/types';
+import {
+  type CoreMetadataInvocation,
+  isLoRAModelConfig,
+  type LoraLoaderInvocation,
+  type NonNullableGraph,
+} from 'services/api/types';
 
 import { CLIP_SKIP, LORA_LOADER, MAIN_MODEL_LOADER, NEGATIVE_CONDITIONING, POSITIVE_CONDITIONING } from './constants';
-import { upsertMetadata } from './metadata';
+import { getModelMetadataField, upsertMetadata } from './metadata';
 
-export const addLoRAsToGraph = (
+export const addLoRAsToGraph = async (
   state: RootState,
   graph: NonNullableGraph,
   baseNodeId: string,
   modelLoaderNodeId: string = MAIN_MODEL_LOADER
-): void => {
+): Promise<void> => {
   /**
    * LoRA nodes get the UNet and CLIP models from the main model loader and apply the LoRA to them.
    * They then output the UNet and CLIP models references on to either the next LoRA in the chain,
@@ -39,7 +45,7 @@ export const addLoRAsToGraph = (
   let currentLoraIndex = 0;
   const loraMetadata: CoreMetadataInvocation['loras'] = [];
 
-  enabledLoRAs.forEach((lora) => {
+  enabledLoRAs.forEach(async (lora) => {
     const { weight } = lora;
     const { key } = lora.model;
     const currentLoraNodeId = `${LORA_LOADER}_${key}`;
@@ -52,8 +58,10 @@ export const addLoRAsToGraph = (
       weight,
     };
 
+    const modelConfig = await fetchModelConfigWithTypeGuard(key, isLoRAModelConfig);
+
     loraMetadata.push({
-      model: { key },
+      model: getModelMetadataField(modelConfig),
       weight,
     });
 

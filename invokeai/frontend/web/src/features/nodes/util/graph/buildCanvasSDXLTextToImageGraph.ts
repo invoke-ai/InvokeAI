@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
-import type { NonNullableGraph } from 'services/api/types';
+import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
@@ -24,12 +25,12 @@ import {
   SEAMLESS,
 } from './constants';
 import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from './graphBuilderUtils';
-import { addCoreMetadataNode } from './metadata';
+import { addCoreMetadataNode, getModelMetadataField } from './metadata';
 
 /**
  * Builds the Canvas tab's Text to Image graph.
  */
-export const buildCanvasSDXLTextToImageGraph = (state: RootState): NonNullableGraph => {
+export const buildCanvasSDXLTextToImageGraph = async (state: RootState): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
     positivePrompt,
@@ -272,6 +273,8 @@ export const buildCanvasSDXLTextToImageGraph = (state: RootState): NonNullableGr
     });
   }
 
+  const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
+
   addCoreMetadataNode(
     graph,
     {
@@ -284,7 +287,7 @@ export const buildCanvasSDXLTextToImageGraph = (state: RootState): NonNullableGr
       negative_prompt: negativePrompt,
       positive_style_prompt: positiveStylePrompt,
       negative_style_prompt: negativeStylePrompt,
-      model,
+      model: getModelMetadataField(modelConfig),
       seed,
       steps,
       rand_device: use_cpu ? 'cpu' : 'cuda',
@@ -301,24 +304,24 @@ export const buildCanvasSDXLTextToImageGraph = (state: RootState): NonNullableGr
 
   // Add Refiner if enabled
   if (refinerModel) {
-    addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
+    await addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
     if (seamlessXAxis || seamlessYAxis) {
       modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
     }
   }
 
   // add LoRA support
-  addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
+  await addSDXLLoRAsToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
 
   // optionally add custom VAE
-  addVAEToGraph(state, graph, modelLoaderNodeId);
+  await addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
+  await addControlNetToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // Add IP Adapter
-  addIPAdapterToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
-  addT2IAdaptersToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
+  await addIPAdapterToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
+  await addT2IAdaptersToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {

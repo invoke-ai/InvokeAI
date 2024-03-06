@@ -40,11 +40,11 @@ import { getBoardField, getIsIntermediate } from './graphBuilderUtils';
 /**
  * Builds the Canvas tab's Inpaint graph.
  */
-export const buildCanvasInpaintGraph = (
+export const buildCanvasInpaintGraph = async (
   state: RootState,
   canvasInitImage: ImageDTO,
   canvasMaskImage: ImageDTO
-): NonNullableGraph => {
+): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
     positivePrompt,
@@ -414,17 +414,17 @@ export const buildCanvasInpaintGraph = (
   }
 
   // Add VAE
-  addVAEToGraph(state, graph, modelLoaderNodeId);
+  await addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
+  await addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
+  await addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // Add IP Adapter
-  addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
-  addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
+  await addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
+  await addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
     // must add before watermarker!

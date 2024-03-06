@@ -1,18 +1,22 @@
 import type { RootState } from 'app/store/store';
 import { selectValidIPAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { omit } from 'lodash-es';
+import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import type {
   CollectInvocation,
   CoreMetadataInvocation,
   IPAdapterInvocation,
-  IPAdapterMetadataField,
   NonNullableGraph,
 } from 'services/api/types';
+import { isIPAdapterModelConfig } from 'services/api/types';
 
 import { IP_ADAPTER_COLLECT } from './constants';
-import { upsertMetadata } from './metadata';
+import { getModelMetadataField, upsertMetadata } from './metadata';
 
-export const addIPAdapterToLinearGraph = (state: RootState, graph: NonNullableGraph, baseNodeId: string): void => {
+export const addIPAdapterToLinearGraph = async (
+  state: RootState,
+  graph: NonNullableGraph,
+  baseNodeId: string
+): Promise<void> => {
   const validIPAdapters = selectValidIPAdapters(state.controlAdapters).filter(
     (ca) => ca.model?.base === state.generation.model?.base
   );
@@ -35,7 +39,7 @@ export const addIPAdapterToLinearGraph = (state: RootState, graph: NonNullableGr
 
     const ipAdapterMetdata: CoreMetadataInvocation['ipAdapters'] = [];
 
-    validIPAdapters.forEach((ipAdapter) => {
+    validIPAdapters.forEach(async (ipAdapter) => {
       if (!ipAdapter.model) {
         return;
       }
@@ -58,9 +62,17 @@ export const addIPAdapterToLinearGraph = (state: RootState, graph: NonNullableGr
         return;
       }
 
-      graph.nodes[ipAdapterNode.id] = ipAdapterNode as IPAdapterInvocation;
+      graph.nodes[ipAdapterNode.id] = ipAdapterNode;
 
-      ipAdapterMetdata.push(omit(ipAdapterNode, ['id', 'type', 'is_intermediate']) as IPAdapterMetadataField);
+      const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isIPAdapterModelConfig);
+
+      ipAdapterMetdata.push({
+        weight: weight,
+        ip_adapter_model: getModelMetadataField(modelConfig),
+        begin_step_percent: beginStepPct,
+        end_step_percent: endStepPct,
+        image: ipAdapterNode.image,
+      });
 
       graph.edges.push({
         source: { node_id: ipAdapterNode.id, field: 'ip_adapter' },

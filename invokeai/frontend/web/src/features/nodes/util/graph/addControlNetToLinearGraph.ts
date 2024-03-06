@@ -1,18 +1,22 @@
 import type { RootState } from 'app/store/store';
 import { selectValidControlNets } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { omit } from 'lodash-es';
+import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import type {
   CollectInvocation,
-  ControlField,
   ControlNetInvocation,
   CoreMetadataInvocation,
   NonNullableGraph,
 } from 'services/api/types';
+import { isControlNetModelConfig } from 'services/api/types';
 
 import { CONTROL_NET_COLLECT } from './constants';
-import { upsertMetadata } from './metadata';
+import { getModelMetadataField, upsertMetadata } from './metadata';
 
-export const addControlNetToLinearGraph = (state: RootState, graph: NonNullableGraph, baseNodeId: string): void => {
+export const addControlNetToLinearGraph = async (
+  state: RootState,
+  graph: NonNullableGraph,
+  baseNodeId: string
+): Promise<void> => {
   const validControlNets = selectValidControlNets(state.controlAdapters).filter(
     (ca) => ca.model?.base === state.generation.model?.base
   );
@@ -39,7 +43,7 @@ export const addControlNetToLinearGraph = (state: RootState, graph: NonNullableG
       },
     });
 
-    validControlNets.forEach((controlNet) => {
+    validControlNets.forEach(async (controlNet) => {
       if (!controlNet.model) {
         return;
       }
@@ -85,7 +89,17 @@ export const addControlNetToLinearGraph = (state: RootState, graph: NonNullableG
 
       graph.nodes[controlNetNode.id] = controlNetNode as ControlNetInvocation;
 
-      controlNetMetadata.push(omit(controlNetNode, ['id', 'type', 'is_intermediate']) as ControlField);
+      const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isControlNetModelConfig);
+
+      controlNetMetadata.push({
+        control_model: getModelMetadataField(modelConfig),
+        control_weight: weight,
+        control_mode: controlMode,
+        begin_step_percent: beginStepPct,
+        end_step_percent: endStepPct,
+        resize_mode: resizeMode,
+        image: controlNetNode.image,
+      });
 
       graph.edges.push({
         source: { node_id: controlNetNode.id, field: 'control' },
