@@ -1,4 +1,4 @@
-import { Button, Flex, FormControl, FormLabel, Input } from '@invoke-ai/ui-library';
+import { Button, Checkbox, Flex, FormControl, FormLabel, Input, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
@@ -10,6 +10,7 @@ import { useInstallModelMutation } from 'services/api/endpoints/models';
 
 type SimpleImportModelConfig = {
   location: string;
+  inplace: boolean;
 };
 
 export const InstallModelForm = () => {
@@ -20,6 +21,7 @@ export const InstallModelForm = () => {
   const { register, handleSubmit, formState, reset } = useForm<SimpleImportModelConfig>({
     defaultValues: {
       location: '',
+      inplace: true,
     },
     mode: 'onChange',
   });
@@ -30,7 +32,7 @@ export const InstallModelForm = () => {
         return;
       }
 
-      installModel({ source: values.location })
+      installModel({ source: values.location, inplace: values.inplace })
         .unwrap()
         .then((_) => {
           dispatch(
@@ -41,10 +43,10 @@ export const InstallModelForm = () => {
               })
             )
           );
-          reset();
+          reset(undefined, { keepValues: true });
         })
         .catch((error) => {
-          reset();
+          reset(undefined, { keepValues: true });
           if (error) {
             dispatch(
               addToast(
@@ -73,6 +75,17 @@ export const InstallModelForm = () => {
           {t('modelManager.addModel')}
         </Button>
       </Flex>
+
+      <FormControl flexDir="column" gap="1" alignItems="flex-start" mt={3}>
+        <Tooltip label={t('modelManager.inplaceInstallTooltip')}>
+          <Flex gap={3}>
+            <Checkbox {...register('inplace')} />
+            <FormLabel>
+              {t('modelManager.inplaceInstall')} ({t('modelManager.localOnly')})
+            </FormLabel>
+          </Flex>
+        </Tooltip>
+      </FormControl>
     </form>
   );
 };
