@@ -199,7 +199,7 @@ class ModelInstallService(ModelInstallServiceBase):
         elif re.match(r"^https?://[^/]+", source):
             source_obj = URLModelSource(
                 url=AnyHttpUrl(source),
-                access_token=access_token,
+                access_token=self.app_config.remote_repo_api_key,
             )
         else:
             raise ValueError(f"Unsupported model source: '{source}'")
