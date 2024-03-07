@@ -48,7 +48,7 @@ export function DefaultCfgRescaleMultiplier(props: UseControllerProps<DefaultSet
         <InformationalPopover feature="paramCFGRescaleMultiplier">
           <FormLabel>{t('parameters.cfgRescaleMultiplier')}</FormLabel>
         </InformationalPopover>
-        <SettingToggle control={props.control} name="vae" />
+        <SettingToggle control={props.control} name="cfgRescaleMultiplier" />
       </Flex>
 
       <Flex w="full" gap={4}>
