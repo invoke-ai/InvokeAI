@@ -241,12 +241,15 @@ class DownloadQueueService(DownloadQueueServiceBase):
     def _do_download(self, job: DownloadJob) -> None:
         """Do the actual download."""
         url = job.source
+        query_params = url.query_params()
+        if job.access_token:
+            query_params.append(("access_token", job.access_token))
         header = {"Authorization": f"Bearer {job.access_token}"} if job.access_token else {}
         open_mode = "wb"
 
         # Make a streaming request. This will retrieve headers including
         # content-length and content-disposition, but not fetch any content itself
-        resp = self._requests.get(str(url), headers=header, stream=True)
+        resp = self._requests.get(str(url), params=query_params, headers=header, stream=True)
         if not resp.ok:
             raise HTTPError(resp.reason)
 
