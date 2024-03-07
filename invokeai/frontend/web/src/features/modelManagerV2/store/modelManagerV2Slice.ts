@@ -54,5 +54,5 @@ export const modelManagerV2PersistConfig: PersistConfig<ModelManagerState> = {
   name: modelManagerV2Slice.name,
   initialState: initialModelManagerState,
   migrate: migrateModelManagerState,
-  persistDenylist: [],
+  persistDenylist: ['selectedModelKey', 'selectedModelMode', 'filteredModelType', 'searchTerm'],
 };
