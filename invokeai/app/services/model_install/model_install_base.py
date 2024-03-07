@@ -131,9 +131,7 @@ class URLModelSource(StringLikeSource):
         return str(self.url)
 
 
-ModelSource = Annotated[
-    Union[LocalModelSource, HFModelSource, URLModelSource], Field(discriminator="type")
-]
+ModelSource = Annotated[Union[LocalModelSource, HFModelSource, URLModelSource], Field(discriminator="type")]
 
 MODEL_SOURCE_TO_TYPE_MAP = {
     URLModelSource: ModelSourceType.Url,
