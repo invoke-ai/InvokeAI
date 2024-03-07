@@ -104,7 +104,7 @@ export const ModelEdit = () => {
       <form onSubmit={handleSubmit(onSubmit)}>
         <Flex w="full" justifyContent="space-between" gap={4} alignItems="center">
           <FormControl flexDir="column" alignItems="flex-start" gap={1} isInvalid={Boolean(errors.name)}>
-            <FormLabel hidden={true}>{t('modelManager.modelName')}</FormLabel>
+            <FormLabel>{t('modelManager.modelName')}</FormLabel>
             <Input
               {...register('name', {
                 validate: (value) => (value && value.trim().length > 3) || 'Must be at least 3 characters',
@@ -132,7 +132,7 @@ export const ModelEdit = () => {
           <Flex gap="4" alignItems="center">
             <FormControl flexDir="column" alignItems="flex-start" gap={1}>
               <FormLabel>{t('modelManager.description')}</FormLabel>
-              <Textarea fontSize="md" resize="none" {...register('description')} />
+              <Textarea fontSize="md" {...register('description')} />
             </FormControl>
           </Flex>
           <Heading as="h3" fontSize="md" mt="4">

@@ -8,42 +8,47 @@ import {
   UnorderedList,
   useDisclosure,
 } from '@invoke-ai/ui-library';
+import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useConvertModelMutation } from 'services/api/endpoints/models';
-import type { CheckpointModelConfig } from 'services/api/types';
+import { useConvertModelMutation, useGetModelConfigQuery } from 'services/api/endpoints/models';
 
 interface ModelConvertProps {
-  model: CheckpointModelConfig;
+  modelKey: string | null;
 }
 
-export const ModelConvert = (props: ModelConvertProps) => {
-  const { model } = props;
+export const ModelConvertButton = (props: ModelConvertProps) => {
+  const { modelKey } = props;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const { data } = useGetModelConfigQuery(modelKey ?? skipToken);
   const [convertModel, { isLoading }] = useConvertModelMutation();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   const modelConvertHandler = useCallback(() => {
+    if (!data || isLoading) {
+      return;
+    }
+
     dispatch(
       addToast(
         makeToast({
-          title: `${t('modelManager.convertingModelBegin')}: ${model.name}`,
+          title: `${t('modelManager.convertingModelBegin')}: ${data?.name}`,
           status: 'info',
         })
       )
     );
 
-    convertModel(model.key)
+    convertModel(data?.key)
       .unwrap()
       .then(() => {
         dispatch(
           addToast(
             makeToast({
-              title: `${t('modelManager.modelConverted')}: ${model.name}`,
+              title: `${t('modelManager.modelConverted')}: ${data?.name}`,
               status: 'success',
             })
           )
@@ -53,13 +58,13 @@ export const ModelConvert = (props: ModelConvertProps) => {
         dispatch(
           addToast(
             makeToast({
-              title: `${t('modelManager.modelConversionFailed')}: ${model.name}`,
+              title: `${t('modelManager.modelConversionFailed')}: ${data?.name}`,
               status: 'error',
             })
           )
         );
       });
-  }, [convertModel, dispatch, model.key, model.name, t]);
+  }, [data, isLoading, dispatch, t, convertModel]);
 
   return (
     <>
@@ -69,11 +74,12 @@ export const ModelConvert = (props: ModelConvertProps) => {
         aria-label={t('modelManager.convertToDiffusers')}
         className=" modal-close-btn"
         isLoading={isLoading}
+        flexShrink={0}
       >
         🧨 {t('modelManager.convertToDiffusers')}
       </Button>
       <ConfirmationAlertDialog
-        title={`${t('modelManager.convert')} ${model.name}`}
+        title={`${t('modelManager.convert')} ${data?.name}`}
         acceptCallback={modelConvertHandler}
         acceptButtonText={`${t('modelManager.convert')}`}
         isOpen={isOpen}

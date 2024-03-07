@@ -1,12 +1,12 @@
-import { Box, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs, Text } from '@invoke-ai/ui-library';
+import { Flex, Heading, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
+import { ModelConvertButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelConvertButton';
+import { ModelEditButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelEditButton';
 import { useTranslation } from 'react-i18next';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
 
 import ModelImageUpload from './Fields/ModelImageUpload';
-import { ModelMetadata } from './Metadata/ModelMetadata';
-import { ModelAttrView } from './ModelAttrView';
 import { ModelEdit } from './ModelEdit';
 import { ModelView } from './ModelView';
 
@@ -25,38 +25,28 @@ export const Model = () => {
   }
 
   return (
-    <>
-      <Flex alignItems="center" justifyContent="space-between" gap="4" paddingRight="5">
-        <Flex flexDir="column" gap={1} p={2}>
-          <Heading as="h2" fontSize="lg">
-            {data.name}
-          </Heading>
-
+    <Flex flexDir="column" gap={4}>
+      <Flex alignItems="flex-start" gap={4}>
+        <ModelImageUpload model_key={selectedModelKey} model_image={data.cover_image} />
+        <Flex flexDir="column" gap={1} flexGrow={1}>
+          <Flex gap={2} position="relative">
+            <Heading as="h2" fontSize="lg" w="full">
+              {data.name}
+            </Heading>
+            <Flex position="absolute" gap={2} right={0} top={0}>
+              <ModelEditButton />
+              <ModelConvertButton modelKey={selectedModelKey} />
+            </Flex>
+          </Flex>
           {data.source && (
             <Text variant="subtext">
               {t('modelManager.source')}: {data?.source}
             </Text>
           )}
-          <Box mt="4">
-            <ModelAttrView label="Description" value={data.description} />
-          </Box>
+          <Text noOfLines={3}>{data.description}</Text>
         </Flex>
-        <ModelImageUpload model_key={selectedModelKey} model_image={data.cover_image} />
       </Flex>
-
-      <Tabs mt="4" h="100%">
-        <TabList>
-          <Tab>{t('modelManager.settings')}</Tab>
-          <Tab>{t('modelManager.metadata')}</Tab>
-        </TabList>
-
-        <TabPanels h="100%">
-          <TabPanel>{selectedModelMode === 'view' ? <ModelView /> : <ModelEdit />}</TabPanel>
-          <TabPanel h="full">
-            <ModelMetadata />
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
-    </>
+      {selectedModelMode === 'view' ? <ModelView /> : <ModelEdit />}
+    </Flex>
   );
 };

@@ -1,4 +1,4 @@
-import { Box, Button, IconButton, Image } from '@invoke-ai/ui-library';
+import { Box, Button, Flex, Icon, IconButton, Image, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { typedMemo } from 'common/util/typedMemo';
 import { addToast } from 'features/system/store/systemSlice';
@@ -95,7 +95,7 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
 
   if (image) {
     return (
-      <Box position="relative">
+      <Box position="relative" flexShrink={0}>
         <Image
           src={image}
           objectFit="cover"
@@ -107,15 +107,14 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
         />
         <IconButton
           position="absolute"
-          top="1"
-          right="1"
+          insetInlineEnd={0}
+          insetBlockStart={0}
           onClick={handleResetImage}
           aria-label={t('modelManager.deleteModelImage')}
           tooltip={t('modelManager.deleteModelImage')}
-          icon={<PiArrowCounterClockwiseBold size={16} />}
-          size="sm"
-          variant="link"
-          _hover={{ color: 'base.100' }}
+          icon={<PiArrowCounterClockwiseBold />}
+          size="md"
+          variant="ghost"
         />
       </Box>
     );
@@ -123,9 +122,21 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
 
   return (
     <>
-      <Button leftIcon={<PiUploadSimpleBold />} {...getRootProps()} pointerEvents="auto">
-        {t('modelManager.uploadImage')}
-      </Button>
+      <Tooltip label={t('modelManager.uploadImage')}>
+        <Flex
+          as={Button}
+          w={100}
+          h={100}
+          opacity={0.3}
+          borderRadius="base"
+          alignItems="center"
+          justifyContent="center"
+          flexShrink={0}
+          {...getRootProps()}
+        >
+          <Icon as={PiUploadSimpleBold} w={16} h={16} />
+        </Flex>
+      </Tooltip>
       <input {...getInputProps()} />
     </>
   );
