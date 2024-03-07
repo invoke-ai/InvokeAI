@@ -1,31 +1,27 @@
-import {
-  Badge,
-  Box,
-  Button,
-  ConfirmationAlertDialog,
-  Flex,
-  Icon,
-  IconButton,
-  Text,
-  Tooltip,
-  useDisclosure,
-} from '@invoke-ai/ui-library';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { ConfirmationAlertDialog, Flex, IconButton, Spacer, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
-import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
+import ModelBaseBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
+import ModelFormatBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelFormatBadge';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
+import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IoWarning } from 'react-icons/io5';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 import { useDeleteModelsMutation } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 
-import ModelImage from './ModelImage';
+import ModelImage, { MODEL_IMAGE_THUMBNAIL_SIZE } from './ModelImage';
 
 type ModelListItemProps = {
   model: AnyModelConfig;
+};
+
+const sx: SystemStyleObject = {
+  _hover: { bg: 'base.700' },
+  "&[aria-selected='true']": { bg: 'base.700' },
 };
 
 const ModelListItem = (props: ModelListItemProps) => {
@@ -40,6 +36,14 @@ const ModelListItem = (props: ModelListItemProps) => {
   const handleSelectModel = useCallback(() => {
     dispatch(setSelectedModelKey(model.key));
   }, [model.key, dispatch]);
+
+  const onClickDeleteButton = useCallback(
+    (e: MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      onOpen();
+    },
+    [onOpen]
+  );
 
   const isSelected = useMemo(() => {
     return selectedModelKey === model.key;
@@ -74,41 +78,47 @@ const ModelListItem = (props: ModelListItemProps) => {
   }, [deleteModel, model, dispatch, t]);
 
   return (
-    <Flex gap={2} alignItems="center" w="full">
-      <ModelImage image_url={model.cover_image || ''} />
-      <Flex
-        as={Button}
-        isChecked={isSelected}
-        variant={isSelected ? 'solid' : 'ghost'}
-        justifyContent="start"
-        p={2}
-        borderRadius="base"
-        w="full"
-        alignItems="center"
-        onClick={handleSelectModel}
-      >
-        <Flex gap={4} alignItems="center">
-          <Badge minWidth={14} p={0.5} fontSize="sm" variant="solid">
-            {MODEL_TYPE_SHORT_MAP[model.base as keyof typeof MODEL_TYPE_SHORT_MAP]}
-          </Badge>
-          <Tooltip label={model.description} placement="bottom">
-            <Text>{model.name}</Text>
-          </Tooltip>
-          {model.format === 'checkpoint' && (
-            <Tooltip label="Checkpoint">
-              <Box>
-                <Icon as={IoWarning} />
-              </Box>
-            </Tooltip>
-          )}
+    <Flex
+      sx={sx}
+      aria-selected={isSelected}
+      justifyContent="flex-start"
+      p={2}
+      borderRadius="base"
+      w="full"
+      alignItems="center"
+      gap={2}
+      cursor="pointer"
+      onClick={handleSelectModel}
+    >
+      <Flex gap={2} w="full" h="full">
+        <ModelImage image_url={model.cover_image} />
+        <Flex gap={1} alignItems="flex-start" flexDir="column" w="full">
+          <Flex gap={2} w="full" alignItems="flex-start">
+            <Text fontWeight="semibold">{model.name}</Text>
+            <Spacer />
+          </Flex>
+          <Text variant="subtext" noOfLines={1}>
+            {model.description || 'No Description'}
+          </Text>
+        </Flex>
+        <Flex
+          h={MODEL_IMAGE_THUMBNAIL_SIZE}
+          flexDir="column"
+          alignItems="flex-end"
+          justifyContent="space-between"
+          gap={2}
+        >
+          <ModelBaseBadge base={model.base} />
+          <ModelFormatBadge format={model.format} />
         </Flex>
       </Flex>
-
       <IconButton
-        onClick={onOpen}
-        icon={<PiTrashSimpleBold />}
+        onClick={onClickDeleteButton}
+        icon={<PiTrashSimpleBold size={16} />}
         aria-label={t('modelManager.deleteConfig')}
         colorScheme="error"
+        h={MODEL_IMAGE_THUMBNAIL_SIZE}
+        w={MODEL_IMAGE_THUMBNAIL_SIZE}
       />
       <ConfirmationAlertDialog
         isOpen={isOpen}
