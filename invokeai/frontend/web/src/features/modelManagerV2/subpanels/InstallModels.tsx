@@ -1,6 +1,7 @@
 import { Box, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useTranslation } from 'react-i18next';
 
+import { HuggingFaceForm } from './AddModelPanel/HuggingFaceFolder/HuggingFaceForm';
 import { InstallModelForm } from './AddModelPanel/InstallModelForm';
 import { ModelInstallQueue } from './AddModelPanel/ModelInstallQueue/ModelInstallQueue';
 import { ScanModelsForm } from './AddModelPanel/ScanFolder/ScanFolderForm';
@@ -16,11 +17,15 @@ export const InstallModels = () => {
         <Tabs variant="collapse" height="100%">
           <TabList>
             <Tab>{t('common.simple')}</Tab>
+            <Tab>{t('modelManager.huggingFace')}</Tab>
             <Tab>{t('modelManager.scan')}</Tab>
           </TabList>
           <TabPanels p={3} height="100%">
             <TabPanel>
               <InstallModelForm />
+            </TabPanel>
+            <TabPanel height="100%">
+              <HuggingFaceForm />
             </TabPanel>
             <TabPanel height="100%">
               <ScanModelsForm />

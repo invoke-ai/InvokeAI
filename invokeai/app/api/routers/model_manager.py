@@ -11,7 +11,7 @@ from fastapi import Body, Path, Query, Response, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from PIL import Image
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
@@ -29,6 +29,7 @@ from invokeai.backend.model_manager.config import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.model_manager.metadata.metadata_base import RemoteModelFile
 from invokeai.backend.model_manager.search import ModelSearch
 
 from ..dependencies import ApiDependencies
@@ -244,6 +245,29 @@ async def scan_for_models(
             detail=f"An error occurred while searching the directory: {e}",
         )
     return scan_results
+
+
+@model_manager_router.get(
+    "/hugging_face",
+    operation_id="get_hugging_face_models",
+    responses={
+        200: {"description": "Hugging Face repo scanned successfully"},
+        400: {"description": "Invalid hugging face repo"},
+    },
+    status_code=200,
+    response_model=List[AnyHttpUrl],
+)
+async def get_hugging_face_models(
+    hugging_face_repo: str = Query(description="Hugging face repo to search for models", default=None),
+) -> List[AnyHttpUrl]:
+    get_hugging_face_models = ApiDependencies.invoker.services.model_manager.install.get_hugging_face_models
+    get_hugging_face_models(hugging_face_repo)
+
+    result = get_hugging_face_models(
+        source=hugging_face_repo,
+    )
+
+    return result
 
 
 @model_manager_router.patch(

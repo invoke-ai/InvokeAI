@@ -762,6 +762,8 @@
         "formMessageDiffusersVAELocationDesc": "If not provided, InvokeAI will look for the VAE file inside the model location given above.",
         "height": "Height",
         "heightValidationMsg": "Default height of your model.",
+        "huggingFace": "Hugging Face",
+        "huggingFaceRepoID": "HuggingFace Repo ID",
         "ignoreMismatch": "Ignore Mismatches Between Selected Models",
         "imageEncoderModelId": "Image Encoder Model ID",
         "importModels": "Import Models",

@@ -233,6 +233,22 @@ class ModelInstallService(ModelInstallServiceBase):
         self._install_jobs.append(install_job)
         return install_job
 
+    def get_hugging_face_models(self, source: str) -> List[AnyHttpUrl]:
+        # Add user's cached access token to HuggingFace requests
+        access_token = HfFolder.get_token()
+        if not access_token:
+            self._logger.info("No HuggingFace access token present; some models may not be downloadable.")
+
+        metadata = HuggingFaceMetadataFetch(self._session).from_id(source)
+        self._logger.info(f"metadata is {metadata}")
+        assert isinstance(metadata, ModelMetadataWithFiles)
+        remote_files = metadata.download_urls(
+            session=self._session,
+        )
+
+        # return array of remote_files.url
+        return [x.url for x in remote_files]
+
     def list_jobs(self) -> List[ModelInstallJob]:  # noqa D102
         return self._install_jobs
 
