@@ -59,7 +59,7 @@ class ModelImageFileStorageDisk(ModelImageFileStorageBase):
 
         url = self._invoker.services.urls.get_model_image_url(model_key)
 
-        # The image file
+        # The image URL never changes, so we must add random query string to it to prevent caching
         url += f"?{uuid_string()}"
 
         return url
