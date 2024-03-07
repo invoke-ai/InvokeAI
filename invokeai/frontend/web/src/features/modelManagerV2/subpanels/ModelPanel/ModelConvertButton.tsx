@@ -76,7 +76,7 @@ export const ModelConvertButton = (props: ModelConvertProps) => {
         isLoading={isLoading}
         flexShrink={0}
       >
-        🧨 {t('modelManager.convertToDiffusers')}
+        🧨 {t('modelManager.convert')}
       </Button>
       <ConfirmationAlertDialog
         title={`${t('modelManager.convert')} ${data?.name}`}
