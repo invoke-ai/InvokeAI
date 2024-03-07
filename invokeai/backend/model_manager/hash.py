@@ -12,6 +12,8 @@ import hashlib
 import os
 from pathlib import Path
 from typing import Callable, Literal, Optional, Union
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 
 from blake3 import blake3
 
@@ -105,12 +107,12 @@ class ModelHash:
         """
         model_component_paths = self._get_file_paths(dir, self._file_filter)
 
-        component_hashes: list[str] = []
-        for component in sorted(model_component_paths):
-            component_hashes.append(self._hash_file(component))
+        # Use ThreadPoolExecutor to hash files in parallel
+        with ThreadPoolExecutor() as executor:
+            future_to_component = {executor.submit(self._hash_file, component): component for component in sorted(model_component_paths)}
+            component_hashes = [future.result() for future in as_completed(future_to_component)]
 
-        # BLAKE3 is cryptographically secure. We may as well fall back on a secure algorithm
-        # for the composite hash
+        # BLAKE3 to hash the hashes
         composite_hasher = blake3()
         for h in component_hashes:
             composite_hasher.update(h.encode("utf-8"))
