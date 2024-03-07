@@ -7,9 +7,17 @@ type Props = {
   base: BaseModelType;
 };
 
+const BASE_COLOR_MAP: Record<BaseModelType, string> = {
+  any: 'base',
+  'sd-1': 'green',
+  'sd-2': 'teal',
+  sdxl: 'invokeBlue',
+  'sdxl-refiner': 'invokeBlue',
+};
+
 const ModelBaseBadge = ({ base }: Props) => {
   return (
-    <Badge flexGrow={0} colorScheme="invokeBlue" variant="subtle">
+    <Badge flexGrow={0} colorScheme={BASE_COLOR_MAP[base]} variant="subtle">
       {MODEL_TYPE_SHORT_MAP[base]}
     </Badge>
   );
