@@ -7,7 +7,7 @@ import { useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { IoPencil } from 'react-icons/io5';
+import { PiCheckBold } from 'react-icons/pi';
 import { useUpdateModelMutation } from 'services/api/endpoints/models';
 
 import { DefaultCfgRescaleMultiplier } from './DefaultCfgRescaleMultiplier';
@@ -100,7 +100,7 @@ export const DefaultSettingsForm = ({
         <Heading fontSize="md">{t('modelManager.defaultSettings')}</Heading>
         <Button
           size="sm"
-          leftIcon={<IoPencil />}
+          leftIcon={<PiCheckBold />}
           colorScheme="invokeYellow"
           isDisabled={!formState.isDirty}
           onClick={handleSubmit(onSubmit)}
