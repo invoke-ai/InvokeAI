@@ -5,11 +5,10 @@ This module is the base class for subclasses that fetch metadata from model repo
 
 Usage:
 
-from invokeai.backend.model_manager.metadata.fetch import CivitAIMetadataFetch
+from invokeai.backend.model_manager.metadata.fetch import HuggingFaceMetadataFetch
 
-fetcher = CivitaiMetadataFetch()
-metadata = fetcher.from_url("https://civitai.com/models/206883/split")
-print(metadata.trained_words)
+data = HuggingFaceMetadataFetch().from_id("<REPO_ID>")
+assert isinstance(data, HuggingFaceMetadata)
 """
 
 from abc import ABC, abstractmethod

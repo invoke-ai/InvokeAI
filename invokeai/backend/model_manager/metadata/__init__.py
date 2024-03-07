@@ -10,12 +10,10 @@ from invokeai.backend.model_manager.metadata import(
    HuggingFaceMetadata,
 )
 
-from invokeai.backend.model_manager.metadata.fetch import CivitaiMetadataFetch
+from invokeai.backend.model_manager.metadata.fetch import HuggingFaceMetadataFetch
 
-data = CivitaiMetadataFetch().from_url("https://civitai.com/models/206883/split")
-assert isinstance(data, CivitaiMetadata)
-if data.allow_commercial_use:
-   print("Commercial use of this model is allowed")
+data = HuggingFaceMetadataFetch().from_id("<REPO_ID>")
+assert isinstance(data, HuggingFaceMetadata)
 """
 
 from .fetch import HuggingFaceMetadataFetch, ModelMetadataFetchBase

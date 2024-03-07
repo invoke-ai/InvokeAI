@@ -184,7 +184,7 @@ def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBas
         variant=ModelVariantType.Normal,
         hash="111222333444",
         source="https://civitai.com/models/206883/split",
-        source_type=ModelSourceType.CivitAI,
+        source_type=ModelSourceType.Url,
     )
     config3 = MainDiffusersConfig(
         key="test_config_3",

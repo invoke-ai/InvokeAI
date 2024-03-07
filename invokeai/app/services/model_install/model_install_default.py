@@ -589,7 +589,7 @@ class ModelInstallService(ModelInstallServiceBase):
         )
 
     def _import_from_url(self, source: URLModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
-        # URLs from Civitai or HuggingFace will be handled specially
+        # URLs from HuggingFace will be handled specially
         metadata = None
         fetcher = None
         try:
