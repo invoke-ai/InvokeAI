@@ -16,12 +16,12 @@ import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 import { useGetModelConfigQuery, useUpdateModelMutation } from 'services/api/endpoints/models';
-import { isNonRefinerMainModelConfig } from 'services/api/types';
+import { isLoRAModelConfig, isNonRefinerMainModelConfig } from 'services/api/types';
 
 export const TriggerPhrases = () => {
   const { t } = useTranslation();
   const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
-  const { data: modelConfig } = useGetModelConfigQuery(selectedModelKey ?? skipToken);
+  const { currentData: modelConfig } = useGetModelConfigQuery(selectedModelKey ?? skipToken);
   const [phrase, setPhrase] = useState('');
 
   const [updateModel, { isLoading }] = useUpdateModelMutation();
@@ -31,7 +31,7 @@ export const TriggerPhrases = () => {
   }, []);
 
   const triggerPhrases = useMemo(() => {
-    if (!modelConfig || !isNonRefinerMainModelConfig(modelConfig)) {
+    if (!modelConfig || (!isNonRefinerMainModelConfig(modelConfig) && !isLoRAModelConfig(modelConfig))) {
       return [];
     }
     return modelConfig?.trigger_phrases || [];
