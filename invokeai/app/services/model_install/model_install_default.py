@@ -240,7 +240,6 @@ class ModelInstallService(ModelInstallServiceBase):
             self._logger.info("No HuggingFace access token present; some models may not be downloadable.")
 
         metadata = HuggingFaceMetadataFetch(self._session).from_id(source)
-        self._logger.info(f"metadata is {metadata}")
         assert isinstance(metadata, ModelMetadataWithFiles)
         remote_files = metadata.download_urls(
             session=self._session,
