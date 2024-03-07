@@ -21,6 +21,7 @@ import type {
   T2IAdapterConfig,
 } from './types';
 import { isControlNet, isControlNetOrT2IAdapter, isIPAdapter, isT2IAdapter } from './types';
+import { ParameterControlNetModel, ParameterT2IAdapterModel, ParameterIPAdapterModel } from '../../parameters/types/parameterSchemas';
 
 const caAdapter = createEntityAdapter<ControlAdapterConfig, string>({
   selectId: (ca) => ca.id,
@@ -182,6 +183,33 @@ export const controlAdaptersSlice = createSlice({
         changes: { model: null },
       });
     },
+    controlAdapterModelChanged: (
+      state,
+      action: PayloadAction<{
+        id: string;
+        model: ParameterControlNetModel | ParameterT2IAdapterModel | ParameterIPAdapterModel;
+      }>
+    ) => {
+      const { id, model } = action.payload;
+      const cn = selectControlAdapterById(state, id);
+      if (!cn) {
+        return;
+      }
+
+      if (!isControlNetOrT2IAdapter(cn)) {
+        caAdapter.updateOne(state, { id, changes: { model } });
+        return;
+      }
+
+      const update: Update<ControlNetConfig | T2IAdapterConfig, string> = {
+        id,
+        changes: { model, shouldAutoConfig: true },
+      };
+
+      update.changes.processedControlImage = null;
+
+      caAdapter.updateOne(state, update);
+    },
     controlAdapterWeightChanged: (state, action: PayloadAction<{ id: string; weight: number }>) => {
       const { id, weight } = action.payload;
       caAdapter.updateOne(state, { id, changes: { weight } });
@@ -319,6 +347,7 @@ export const {
   controlAdapterImageChanged,
   controlAdapterProcessedImageChanged,
   controlAdapterIsEnabledChanged,
+  controlAdapterModelChanged,
   controlAdapterWeightChanged,
   controlAdapterBeginStepPctChanged,
   controlAdapterEndStepPctChanged,

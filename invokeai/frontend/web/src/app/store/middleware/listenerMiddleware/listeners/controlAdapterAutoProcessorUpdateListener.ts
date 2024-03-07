@@ -1,9 +1,9 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { controlAdapterModelChanged } from 'features/controlAdapters/store/actions';
 import { CONTROLNET_MODEL_DEFAULT_PROCESSORS } from 'features/controlAdapters/store/constants';
 import {
   controlAdapterAutoConfigToggled,
+  controlAdapterModelChanged,
   controlAdapterProcessortTypeChanged,
   selectControlAdapterById,
 } from 'features/controlAdapters/store/controlAdaptersSlice';

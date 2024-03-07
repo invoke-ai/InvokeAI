@@ -2,10 +2,11 @@ import type { AnyListenerPredicate } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import type { RootState } from 'app/store/store';
-import { controlAdapterImageProcessed, controlAdapterModelChanged } from 'features/controlAdapters/store/actions';
+import { controlAdapterImageProcessed } from 'features/controlAdapters/store/actions';
 import {
   controlAdapterAutoConfigToggled,
   controlAdapterImageChanged,
+  controlAdapterModelChanged,
   controlAdapterProcessorParamsChanged,
   controlAdapterProcessortTypeChanged,
   selectControlAdapterById,
