@@ -30,7 +30,7 @@ export type UpdateModelArg = {
   body: paths['/api/v2/models/i/{key}']['patch']['requestBody']['content']['application/json'];
 };
 
-export type UpdateModelImageArg = {
+type UpdateModelImageArg = {
   key: string;
   image: Blob;
 };

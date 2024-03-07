@@ -1,7 +1,7 @@
 import { Box, Flex, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
-import { TriggerPhrases } from 'features/modelManagerV2/subpanels/ModelPanel/Metadata/TriggerPhrases';
+import { TriggerPhrases } from 'features/modelManagerV2/subpanels/ModelPanel/TriggerPhrases';
 import { useTranslation } from 'react-i18next';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
 
