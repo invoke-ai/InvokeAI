@@ -294,6 +294,11 @@ export const canvasSlice = createSlice({
     },
     discardStagedImage: (state) => {
       const { images, selectedImageIndex } = state.layerState.stagingArea;
+      state.pastLayerStates.push(cloneDeep(state.layerState));
+
+      if (state.pastLayerStates.length > MAX_HISTORY) {
+        state.pastLayerStates.shift();
+      }
 
       if (!images.length) {
         return;
@@ -309,6 +314,8 @@ export const canvasSlice = createSlice({
         state.shouldShowStagingImage = false;
         state.shouldShowStagingOutline = false;
       }
+
+      state.futureLayerStates = [];
     },
     addFillRect: (state) => {
       const { boundingBoxCoordinates, boundingBoxDimensions, brushColor } = state;
