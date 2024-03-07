@@ -307,12 +307,19 @@ class ModelInstallService(ModelInstallServiceBase):
                     ), f"This script works on version 3.0.0 yaml files, but your configuration points to a {stanza['version']} version"
                     continue
 
-                base_type, model_type, model_name = str(model_key).split("/")
-                model_path = stanza["path"]
+                _, _, model_name = str(model_key).split("/")
+                import pathlib
+                model_path = pathlib.Path(stanza["path"])
+                if not model_path.is_absolute():
+                    model_path = (self._app_config.models_path / model_path)
+                model_path.resolve()
                 description = stanza["description"]
                 model_info = {"name": model_name, "description":description }
 
-                self.heuristic_import(source=model_path, config=model_info, inplace=True)
+                try:
+                    self.register_path(model_path=model_path, config=model_info)
+                except Exception as e:
+                    self._logger.warning(f"Model at {model_path} could not be loaded into database: {e}")
 
 
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
