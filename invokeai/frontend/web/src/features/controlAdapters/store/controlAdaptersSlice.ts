@@ -3,6 +3,11 @@ import { createEntityAdapter, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { buildControlAdapter } from 'features/controlAdapters/util/buildControlAdapter';
+import type {
+  ParameterControlNetModel,
+  ParameterIPAdapterModel,
+  ParameterT2IAdapterModel,
+} from 'features/parameters/types/parameterSchemas';
 import { cloneDeep, merge, uniq } from 'lodash-es';
 import { socketInvocationError } from 'services/events/actions';
 import { v4 as uuidv4 } from 'uuid';
@@ -21,7 +26,6 @@ import type {
   T2IAdapterConfig,
 } from './types';
 import { isControlNet, isControlNetOrT2IAdapter, isIPAdapter, isT2IAdapter } from './types';
-import { ParameterControlNetModel, ParameterT2IAdapterModel, ParameterIPAdapterModel } from '../../parameters/types/parameterSchemas';
 
 const caAdapter = createEntityAdapter<ControlAdapterConfig, string>({
   selectId: (ca) => ca.id,
