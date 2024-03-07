@@ -1,8 +1,9 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/DefaultSettings/SettingToggle';
 import { map } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
@@ -55,10 +56,13 @@ export function DefaultVae(props: UseControllerProps<DefaultSettingsFormData>) {
   }, [field.value]);
 
   return (
-    <FormControl flexDir="column" gap={1} alignItems="flex-start">
-      <InformationalPopover feature="paramVAE">
-        <FormLabel>{t('modelManager.vae')}</FormLabel>
-      </InformationalPopover>
+    <FormControl flexDir="column" gap={2} alignItems="flex-start">
+      <Flex justifyContent="space-between" w="full">
+        <InformationalPopover feature="paramVAE">
+          <FormLabel>{t('modelManager.vae')}</FormLabel>
+        </InformationalPopover>
+        <SettingToggle control={props.control} name="vae" />
+      </Flex>
       <Combobox isDisabled={isDisabled} value={value} options={compatibleOptions} onChange={onChange} />
     </FormControl>
   );

@@ -1,6 +1,7 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/DefaultSettings/SettingToggle';
 import { SCHEDULER_OPTIONS } from 'features/parameters/types/constants';
 import { isParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import { useCallback, useMemo } from 'react';
@@ -40,10 +41,13 @@ export function DefaultScheduler(props: UseControllerProps<DefaultSettingsFormDa
   }, [field.value]);
 
   return (
-    <FormControl flexDir="column" gap={1} alignItems="flex-start">
-      <InformationalPopover feature="paramScheduler">
-        <FormLabel>{t('parameters.scheduler')}</FormLabel>
-      </InformationalPopover>
+    <FormControl flexDir="column" gap={2} alignItems="flex-start">
+      <Flex justifyContent="space-between" w="full">
+        <InformationalPopover feature="paramScheduler">
+          <FormLabel>{t('parameters.scheduler')}</FormLabel>
+        </InformationalPopover>
+        <SettingToggle control={props.control} name="scheduler" />
+      </Flex>
       <Combobox isDisabled={isDisabled} value={value} options={SCHEDULER_OPTIONS} onChange={onChange} />
     </FormControl>
   );

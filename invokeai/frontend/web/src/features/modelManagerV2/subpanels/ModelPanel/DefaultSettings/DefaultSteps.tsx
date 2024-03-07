@@ -1,6 +1,7 @@
 import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/DefaultSettings/SettingToggle';
 import { useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
@@ -42,11 +43,15 @@ export function DefaultSteps(props: UseControllerProps<DefaultSettingsFormData>)
   }, [field.value]);
 
   return (
-    <FormControl flexDir="column" gap={1} alignItems="flex-start">
-      <InformationalPopover feature="paramSteps">
-        <FormLabel>{t('parameters.steps')}</FormLabel>
-      </InformationalPopover>
-      <Flex w="full" gap={1}>
+    <FormControl flexDir="column" gap={2} alignItems="flex-start">
+      <Flex justifyContent="space-between" w="full">
+        <InformationalPopover feature="paramSteps">
+          <FormLabel>{t('parameters.steps')}</FormLabel>
+        </InformationalPopover>
+        <SettingToggle control={props.control} name="steps" />
+      </Flex>
+
+      <Flex w="full" gap={4}>
         <CompositeSlider
           value={value}
           min={sliderMin}

@@ -24,5 +24,5 @@ export function SettingToggle<T>(props: UseControllerProps<DefaultSettingsFormDa
     [field]
   );
 
-  return <Switch isChecked={value} onChange={onChange} />;
+  return <Switch size="sm" isChecked={value} onChange={onChange} />;
 }
