@@ -129,6 +129,8 @@ class ModelProbe(object):
         if fields is None:
             fields = {}
 
+        model_path = model_path.resolve()
+
         format_type = ModelFormat.Diffusers if model_path.is_dir() else ModelFormat.Checkpoint
         model_info = None
         model_type = None
