@@ -3,6 +3,7 @@ import {
   Flex,
   FormControl,
   FormErrorMessage,
+  FormLabel,
   Input,
   Tag,
   TagCloseButton,
@@ -10,10 +11,10 @@ import {
 } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
-import { ModelListHeader } from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelListHeader';
 import type { ChangeEvent } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiPlusBold } from 'react-icons/pi';
 import { useGetModelConfigQuery, useUpdateModelMutation } from 'services/api/endpoints/models';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 
@@ -77,13 +78,15 @@ export const TriggerPhrases = () => {
 
   return (
     <Flex flexDir="column" w="full" gap="5">
-      <ModelListHeader title={t('modelManager.triggerPhrases')} />
       <form>
-        <FormControl w="full" isInvalid={Boolean(errors.length)}>
+        <FormControl w="full" isInvalid={Boolean(errors.length)} orientation="vertical">
+          <FormLabel>{t('modelManager.triggerPhrases')}</FormLabel>
           <Flex flexDir="column" w="full">
             <Flex gap="3" alignItems="center" w="full">
               <Input value={phrase} onChange={handlePhraseChange} placeholder={t('modelManager.typePhraseHere')} />
               <Button
+                leftIcon={<PiPlusBold />}
+                size="sm"
                 type="submit"
                 onClick={addTriggerPhrase}
                 isDisabled={Boolean(errors.length)}
@@ -97,9 +100,9 @@ export const TriggerPhrases = () => {
         </FormControl>
       </form>
 
-      <Flex gap="4" flexWrap="wrap" mt="3" mb="3">
+      <Flex gap="4" flexWrap="wrap">
         {triggerPhrases.map((phrase, index) => (
-          <Tag size="md" key={index}>
+          <Tag size="md" key={index} py={2} px={4} bg="base.700">
             <TagLabel>{phrase}</TagLabel>
             <TagCloseButton onClick={removeTriggerPhrase.bind(null, phrase)} isDisabled={isLoading} />
           </Tag>
