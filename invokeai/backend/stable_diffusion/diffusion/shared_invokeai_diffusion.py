@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import time
 from contextlib import contextmanager
 from typing import Any, Callable, Optional, Union
 
@@ -345,9 +346,7 @@ class InvokeAIDiffuserComponent:
                     r = TextConditioningRegions(
                         masks=torch.ones((1, 1, h, w), dtype=torch.bool),
                         ranges=[Range(start=0, end=c.embeds.shape[1])],
-                        positive_cross_attn_mask_scores=[0.0],
-                        positive_self_attn_mask_scores=[0.0],
-                        self_attn_adjustment_end_step_percents=[0.0],
+                        mask_weights=[0.0],
                     )
                 regions.append(r)
 
@@ -355,6 +354,7 @@ class InvokeAIDiffuserComponent:
                 regions=regions, device=x.device, dtype=x.dtype
             )
             cross_attention_kwargs["percent_through"] = percent_through
+            time.sleep(1.0)
 
         both_results = self.model_forward_callback(
             x_twice,

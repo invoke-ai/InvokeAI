@@ -44,7 +44,7 @@ from .model import ClipField
     title="Prompt",
     tags=["prompt", "compel"],
     category="conditioning",
-    version="1.1.0",
+    version="1.2.0",
 )
 class CompelInvocation(BaseInvocation):
     """Parse prompt using compel package to conditioning."""
@@ -62,9 +62,7 @@ class CompelInvocation(BaseInvocation):
     mask: Optional[MaskField] = InputField(
         default=None, description="A mask defining the region that this conditioning prompt applies to."
     )
-    positive_cross_attn_mask_score: float = InputField(default=0.0, description="")
-    positive_self_attn_mask_score: float = InputField(default=1.0, description="")
-    self_attn_adjustment_end_step_percent: float = InputField(default=0.0, description="")
+    mask_weight: float = InputField(default=1.0, description="")
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
@@ -136,9 +134,7 @@ class CompelInvocation(BaseInvocation):
             conditioning=ConditioningField(
                 conditioning_name=conditioning_name,
                 mask=self.mask,
-                positive_cross_attn_mask_score=self.positive_cross_attn_mask_score,
-                positive_self_attn_mask_score=self.positive_self_attn_mask_score,
-                self_attn_adjustment_end_step_percent=self.self_attn_adjustment_end_step_percent,
+                mask_weight=self.mask_weight,
             )
         )
 
@@ -254,7 +250,7 @@ class SDXLPromptInvocationBase:
     title="SDXL Prompt",
     tags=["sdxl", "compel", "prompt"],
     category="conditioning",
-    version="1.1.0",
+    version="1.2.0",
 )
 class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     """Parse prompt using compel package to conditioning."""
@@ -281,9 +277,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     mask: Optional[MaskField] = InputField(
         default=None, description="A mask defining the region that this conditioning prompt applies to."
     )
-    positive_cross_attn_mask_score: float = InputField(default=0.0, description="")
-    positive_self_attn_mask_score: float = InputField(default=1.0, description="")
-    self_attn_adjustment_end_step_percent: float = InputField(default=0.0, description="")
+    mask_weight: float = InputField(default=1.0, description="")
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
@@ -350,9 +344,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
             conditioning=ConditioningField(
                 conditioning_name=conditioning_name,
                 mask=self.mask,
-                positive_cross_attn_mask_score=self.positive_cross_attn_mask_score,
-                positive_self_attn_mask_score=self.positive_self_attn_mask_score,
-                self_attn_adjustment_end_step_percent=self.self_attn_adjustment_end_step_percent,
+                mask_weight=self.mask_weight,
             )
         )
 
@@ -403,7 +395,7 @@ class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase
 
         conditioning_name = context.conditioning.save(conditioning_data)
 
-        return ConditioningOutput(conditioning=ConditioningField(conditioning_name=conditioning_name))
+        return ConditioningOutput(conditioning=ConditioningField(conditioning_name=conditioning_name, mask_weight=1.0))
 
 
 @invocation_output("clip_skip_output")

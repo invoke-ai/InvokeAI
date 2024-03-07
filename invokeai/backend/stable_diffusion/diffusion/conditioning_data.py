@@ -74,9 +74,7 @@ class TextConditioningRegions:
         self,
         masks: torch.Tensor,
         ranges: list[Range],
-        positive_cross_attn_mask_scores: list[float],
-        positive_self_attn_mask_scores: list[float],
-        self_attn_adjustment_end_step_percents: list[float],
+        mask_weights: list[float],
     ):
         # A binary mask indicating the regions of the image that the prompt should be applied to.
         # Shape: (1, num_prompts, height, width)
@@ -87,19 +85,9 @@ class TextConditioningRegions:
         # ranges[i] contains the embedding range for the i'th prompt / mask.
         self.ranges = ranges
 
-        # The following fields control the cross-attention and self-attention handling of region masks. They are indexed
-        # by prompt / mask index.
-        self.positive_cross_attn_mask_scores = positive_cross_attn_mask_scores
-        self.positive_self_attn_mask_scores = positive_self_attn_mask_scores
-        self.self_attn_adjustment_end_step_percents = self_attn_adjustment_end_step_percents
+        self.mask_weights = mask_weights
 
-        assert (
-            self.masks.shape[1]
-            == len(self.ranges)
-            == len(self.positive_cross_attn_mask_scores)
-            == len(self.positive_self_attn_mask_scores)
-            == len(self.self_attn_adjustment_end_step_percents)
-        )
+        assert self.masks.shape[1] == len(self.ranges) == len(self.mask_weights)
 
 
 class TextConditioningData:

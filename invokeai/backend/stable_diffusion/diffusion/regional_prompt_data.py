@@ -33,6 +33,7 @@ class RegionalPromptData:
             regions, max_downscale_factor
         )
         self._negative_cross_attn_mask_score = 0.0
+        self._size_weight = 1.0
 
     def _prepare_spatial_masks(
         self, regions: list[TextConditioningRegions], max_downscale_factor: int = 8
@@ -96,13 +97,16 @@ class RegionalPromptData:
             batch_sample_query_masks = batch_sample_spatial_masks.view((1, num_prompts, query_seq_len, 1))
 
             for prompt_idx, embedding_range in enumerate(batch_sample_regions.ranges):
-                batch_sample_query_scores = batch_sample_query_masks[0, prompt_idx, :, :].clone()
+                batch_sample_query_scores = batch_sample_query_masks[0, prompt_idx, :, :]
                 size = batch_sample_query_scores.sum() / batch_sample_query_scores.numel()
-                size = size.to(dtype=batch_sample_query_scores.dtype)
-                batch_sample_query_mask = batch_sample_query_scores > 0.5
-                batch_sample_query_scores[batch_sample_query_mask] = 1.0 * (1.0 - size)
-                batch_sample_query_scores[~batch_sample_query_mask] = 0.0
-                attn_mask[batch_idx, :, embedding_range.start : embedding_range.end] = batch_sample_query_scores
+                mask_weight = batch_sample_regions.mask_weights[prompt_idx]
+                # size = size.to(dtype=batch_sample_query_scores.dtype)
+                # batch_sample_query_mask = batch_sample_query_scores > 0.5
+                # batch_sample_query_scores[batch_sample_query_mask] = 1.0 * (1.0 - size)
+                # batch_sample_query_scores[~batch_sample_query_mask] = 0.0
+                attn_mask[batch_idx, :, embedding_range.start : embedding_range.end] = batch_sample_query_scores * (
+                    mask_weight + self._size_weight * (1 - size)
+                )
 
         return attn_mask
 
@@ -136,11 +140,15 @@ class RegionalPromptData:
                 prompt_query_mask = batch_sample_query_masks[0, prompt_idx, :, 0]  # Shape: (query_seq_len,)
                 size = prompt_query_mask.sum() / prompt_query_mask.numel()
                 size = size.to(dtype=prompt_query_mask.dtype)
+                mask_weight = batch_sample_regions.mask_weights[prompt_idx]
                 # Multiply a (1, query_seq_len) mask by a (query_seq_len, 1) mask to get a (query_seq_len,
                 # query_seq_len) mask.
-                # TODO(ryand): Is += really the best option here?
-                attn_mask[batch_idx, :, :] += (
-                    prompt_query_mask.unsqueeze(0) * prompt_query_mask.unsqueeze(1) * (1 - size)
+                # TODO(ryand): Is += really the best option here? Maybe elementwise max is better?
+                attn_mask[batch_idx, :, :] = torch.maximum(
+                    attn_mask[batch_idx, :, :],
+                    prompt_query_mask.unsqueeze(0)
+                    * prompt_query_mask.unsqueeze(1)
+                    * (mask_weight + self._size_weight * (1 - size)),
                 )
 
             # if attn_mask[batch_idx].max() < 0.01:

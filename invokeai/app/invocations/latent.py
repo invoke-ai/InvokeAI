@@ -466,9 +466,18 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
             text_embedding.append(text_embedding_info.embeds)
             if not all_masks_are_none:
+                # embedding_ranges.append(
+                #     Range(
+                #         start=cur_text_embedding_len, end=cur_text_embedding_len + text_embedding_info.embeds.shape[1]
+                #     )
+                # )
+                # HACK(ryand): Contrary to its name, tokens_count_including_eos_bos does not seem to include eos and bos
+                # in the count.
                 embedding_ranges.append(
                     Range(
-                        start=cur_text_embedding_len, end=cur_text_embedding_len + text_embedding_info.embeds.shape[1]
+                        start=cur_text_embedding_len + 1,
+                        end=cur_text_embedding_len
+                        + text_embedding_info.extra_conditioning.tokens_count_including_eos_bos,
                     )
                 )
                 processed_masks.append(self._preprocess_regional_prompt_mask(mask, latent_height, latent_width))
@@ -483,11 +492,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             regions = TextConditioningRegions(
                 masks=torch.cat(processed_masks, dim=1),
                 ranges=embedding_ranges,
-                positive_cross_attn_mask_scores=[x.positive_cross_attn_mask_score for x in conditioning_fields],
-                positive_self_attn_mask_scores=[x.positive_self_attn_mask_score for x in conditioning_fields],
-                self_attn_adjustment_end_step_percents=[
-                    x.self_attn_adjustment_end_step_percent for x in conditioning_fields
-                ],
+                mask_weights=[x.mask_weight for x in conditioning_fields],
             )
 
         if extra_conditioning is not None and len(text_conditionings) > 1:
