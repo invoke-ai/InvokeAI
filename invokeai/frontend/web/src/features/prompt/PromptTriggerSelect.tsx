@@ -18,6 +18,7 @@ import {
   useGetModelConfigQuery,
   useGetTextualInversionModelsQuery,
 } from 'services/api/endpoints/models';
+import { isNonRefinerMainModelConfig } from 'services/api/types';
 
 const noOptionsMessage = () => t('prompt.noMatchingTriggers');
 
@@ -84,7 +85,7 @@ export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSel
       }
     }
 
-    if (mainModelConfig && mainModelConfig.trigger_phrases?.length) {
+    if (mainModelConfig && isNonRefinerMainModelConfig(mainModelConfig) && mainModelConfig.trigger_phrases?.length) {
       _options.push({
         label: t('modelManager.mainModelTriggerPhrases'),
         options: mainModelConfig.trigger_phrases.map((triggerPhrase) => ({
