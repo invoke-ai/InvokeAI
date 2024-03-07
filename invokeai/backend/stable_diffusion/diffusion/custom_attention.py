@@ -106,13 +106,13 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
                     dtype=hidden_states.dtype, device=hidden_states.device
                 )
 
-                attn_mask_weight = 0.8
+                attn_mask_weight = 1.0 * ((1 - percent_through) ** 5)
             else:  # self-attention
                 prompt_region_attention_mask = regional_prompt_data.get_self_attn_mask(
                     query_seq_len=query_seq_len,
                     percent_through=percent_through,
                 )
-                attn_mask_weight = 0.5
+                attn_mask_weight = 0.3 * ((1 - percent_through) ** 5)
 
         if attn.group_norm is not None:
             hidden_states = attn.group_norm(hidden_states.transpose(1, 2)).transpose(1, 2)
@@ -142,7 +142,9 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
             # (batch, heads, source_length, target_length)
             attention_mask = attention_mask.view(batch_size, attn.heads, -1, attention_mask.shape[-1])
 
-        if regional_prompt_data is not None and percent_through < 0.5:
+        if regional_prompt_data is not None and percent_through < 0.3:
+            # Don't apply to uncond????
+
             prompt_region_attention_mask = attn.prepare_attention_mask(
                 prompt_region_attention_mask, sequence_length, batch_size
             )
@@ -154,8 +156,8 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
 
             scale_factor = 1 / math.sqrt(query.size(-1))
             attn_weight = query @ key.transpose(-2, -1) * scale_factor
-            m_pos = attn_weight.max() - attn_weight
-            m_neg = attn_weight - attn_weight.min()
+            m_pos = attn_weight.max(dim=-1, keepdim=True)[0] - attn_weight
+            m_neg = attn_weight - attn_weight.min(dim=-1, keepdim=True)[0]
 
             prompt_region_attention_mask = attn_mask_weight * (
                 m_pos * prompt_region_attention_mask - m_neg * (1.0 - prompt_region_attention_mask)

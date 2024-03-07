@@ -97,11 +97,11 @@ class RegionalPromptData:
 
             for prompt_idx, embedding_range in enumerate(batch_sample_regions.ranges):
                 batch_sample_query_scores = batch_sample_query_masks[0, prompt_idx, :, :].clone()
+                size = batch_sample_query_scores.sum() / batch_sample_query_scores.numel()
+                size = size.to(dtype=batch_sample_query_scores.dtype)
                 batch_sample_query_mask = batch_sample_query_scores > 0.5
-                batch_sample_query_scores[
-                    batch_sample_query_mask
-                ] = batch_sample_regions.positive_cross_attn_mask_scores[prompt_idx]
-                batch_sample_query_scores[~batch_sample_query_mask] = self._negative_cross_attn_mask_score
+                batch_sample_query_scores[batch_sample_query_mask] = 1.0 * (1.0 - size)
+                batch_sample_query_scores[~batch_sample_query_mask] = 0.0
                 attn_mask[batch_idx, :, embedding_range.start : embedding_range.end] = batch_sample_query_scores
 
         return attn_mask
@@ -133,20 +133,21 @@ class RegionalPromptData:
             batch_sample_query_masks = batch_sample_spatial_masks.view((1, num_prompts, query_seq_len, 1))
 
             for prompt_idx in range(num_prompts):
-                if percent_through > batch_sample_regions.self_attn_adjustment_end_step_percents[prompt_idx]:
-                    continue
                 prompt_query_mask = batch_sample_query_masks[0, prompt_idx, :, 0]  # Shape: (query_seq_len,)
+                size = prompt_query_mask.sum() / prompt_query_mask.numel()
+                size = size.to(dtype=prompt_query_mask.dtype)
                 # Multiply a (1, query_seq_len) mask by a (query_seq_len, 1) mask to get a (query_seq_len,
                 # query_seq_len) mask.
                 # TODO(ryand): Is += really the best option here?
                 attn_mask[batch_idx, :, :] += (
-                    prompt_query_mask.unsqueeze(0)
-                    * prompt_query_mask.unsqueeze(1)
-                    * batch_sample_regions.positive_self_attn_mask_scores[prompt_idx]
+                    prompt_query_mask.unsqueeze(0) * prompt_query_mask.unsqueeze(1) * (1 - size)
                 )
 
-        attn_mask[attn_mask > 0.5] = 1.0
-        attn_mask[attn_mask <= 0.5] = 0.0
+            # if attn_mask[batch_idx].max() < 0.01:
+            #     attn_mask[batch_idx, ...] = 1.0
+
+        # attn_mask[attn_mask > 0.5] = 1.0
+        # attn_mask[attn_mask <= 0.5] = 0.0
         # attn_mask_min = attn_mask[batch_idx].min()
 
         # # Adjust so that the minimum value is 0.0 regardless of whether all pixels are covered or not.
