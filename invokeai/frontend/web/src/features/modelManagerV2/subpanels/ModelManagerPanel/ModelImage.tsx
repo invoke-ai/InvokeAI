@@ -1,13 +1,28 @@
-import { Box, Image } from '@invoke-ai/ui-library';
+import { Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { typedMemo } from 'common/util/typedMemo';
+import { PiImage } from 'react-icons/pi';
 
 type Props = {
-  image_url?: string;
+  image_url?: string | null;
 };
+
+export const MODEL_IMAGE_THUMBNAIL_SIZE = '40px';
+const FALLBACK_ICON_SIZE = '24px';
 
 const ModelImage = ({ image_url }: Props) => {
   if (!image_url) {
-    return <Box height="50px" minWidth="50px" />;
+    return (
+      <Flex
+        height={MODEL_IMAGE_THUMBNAIL_SIZE}
+        minWidth={MODEL_IMAGE_THUMBNAIL_SIZE}
+        bg="base.650"
+        borderRadius="base"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Icon color="base.500" as={PiImage} boxSize={FALLBACK_ICON_SIZE} />
+      </Flex>
+    );
   }
 
   return (
@@ -15,10 +30,10 @@ const ModelImage = ({ image_url }: Props) => {
       src={image_url}
       objectFit="cover"
       objectPosition="50% 50%"
-      height="50px"
-      width="50px"
-      minHeight="50px"
-      minWidth="50px"
+      height={MODEL_IMAGE_THUMBNAIL_SIZE}
+      width={MODEL_IMAGE_THUMBNAIL_SIZE}
+      minHeight={MODEL_IMAGE_THUMBNAIL_SIZE}
+      minWidth={MODEL_IMAGE_THUMBNAIL_SIZE}
       borderRadius="base"
     />
   );
