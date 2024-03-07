@@ -166,7 +166,7 @@ class ModelHash:
             """Hashes a file using a hashlib algorithm."""
             hasher = hashlib.new(algorithm)
             with open(file_path, "rb") as f:
-                for chunk in iter(lambda: f.read(128 * 1024), b""):
+                for chunk in iter(lambda: f.read(8 * 1024), b""):
                     hasher.update(chunk)
             return hasher.hexdigest()
 
