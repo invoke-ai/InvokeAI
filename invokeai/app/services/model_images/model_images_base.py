@@ -4,7 +4,7 @@ from pathlib import Path
 from PIL.Image import Image as PILImageType
 
 
-class ModelImagesBase(ABC):
+class ModelImageFileStorageBase(ABC):
     """Low-level service responsible for storing and retrieving image files."""
 
     @abstractmethod
@@ -23,11 +23,7 @@ class ModelImagesBase(ABC):
         pass
 
     @abstractmethod
-    def save(
-        self,
-        image: PILImageType,
-        model_key: str,
-    ) -> None:
+    def save(self, image: PILImageType, model_key: str) -> None:
         """Saves a model image."""
         pass
 

@@ -25,7 +25,7 @@ from ..services.invocation_cache.invocation_cache_memory import MemoryInvocation
 from ..services.invocation_services import InvocationServices
 from ..services.invocation_stats.invocation_stats_default import InvocationStatsService
 from ..services.invoker import Invoker
-from ..services.model_images.model_images_default import ModelImagesService
+from ..services.model_images.model_images_default import ModelImageFileStorageDisk
 from ..services.model_manager.model_manager_default import ModelManagerService
 from ..services.model_records import ModelRecordServiceSQL
 from ..services.names.names_default import SimpleNameService
@@ -95,7 +95,7 @@ class ApiDependencies:
             ObjectSerializerDisk[ConditioningFieldData](output_folder / "conditioning", ephemeral=True)
         )
         download_queue_service = DownloadQueueService(event_bus=events)
-        model_images_service = ModelImagesService(model_images_folder / "model_images")
+        model_images_service = ModelImageFileStorageDisk(model_images_folder / "model_images")
         model_manager = ModelManagerService.build_model_manager(
             app_config=configuration,
             model_record_service=ModelRecordServiceSQL(db=db),
