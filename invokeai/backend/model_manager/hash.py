@@ -108,7 +108,7 @@ class ModelHash:
         model_component_paths = self._get_file_paths(dir, self._file_filter)
 
         # Use ThreadPoolExecutor to hash files in parallel
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(min(((os.cpu_count() or 1) + 4), len(model_component_paths))) as executor:
             future_to_component = {executor.submit(self._hash_file, component): component for component in sorted(model_component_paths)}
             component_hashes = [future.result() for future in as_completed(future_to_component)]
 

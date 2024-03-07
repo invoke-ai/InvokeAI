@@ -84,6 +84,9 @@ class ProbeBase(object):
 
 
 class ModelProbe(object):
+
+    hasher = ModelHash()
+
     PROBES: Dict[str, Dict[ModelType, type[ProbeBase]]] = {
         "diffusers": {},
         "checkpoint": {},
@@ -157,7 +160,7 @@ class ModelProbe(object):
             fields.get("description") or f"{fields['base'].value} {fields['type'].value} model {fields['name']}"
         )
         fields["format"] = fields.get("format") or probe.get_format()
-        fields["hash"] = fields.get("hash") or ModelHash().hash(model_path)
+        fields["hash"] = fields.get("hash") or cls.hasher.hash(model_path)
 
         if format_type == ModelFormat.Diffusers and isinstance(probe, FolderProbeBase):
             fields["repo_variant"] = fields.get("repo_variant") or probe.get_repo_variant()

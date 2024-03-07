@@ -4,6 +4,7 @@ import os
 import re
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from hashlib import sha256
 from pathlib import Path
 from queue import Empty, Queue
@@ -280,12 +281,18 @@ class ModelInstallService(ModelInstallServiceBase):
         self._scan_models_directory()
         if autoimport := self._app_config.autoimport_dir:
             self._logger.info("Scanning autoimport directory for new models")
-            installed = self.scan_directory(self._app_config.root_path / autoimport)
+            installed: List[str] = []
+            # Use ThreadPoolExecutor to scan dirs in parallel
+            with ThreadPoolExecutor() as executor:
+                future_models = [executor.submit(self.scan_directory, self._app_config.root_path / autoimport / cur_model_type.value) for cur_model_type in ModelType]
+                [installed.extend(models.result()) for models in as_completed(future_models)]
             self._logger.info(f"{len(installed)} new models registered")
         self._logger.info("Model installer (re)initialized")
 
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
         self._cached_model_paths = {Path(x.path).absolute() for x in self.record_store.all_models()}
+        if len([entry for entry in os.scandir(scan_dir) if not entry.name.startswith(".")]) == 0:
+            return []
         callback = self._scan_install if install else self._scan_register
         search = ModelSearch(on_model_found=callback, config=self._app_config)
         self._models_installed.clear()
@@ -448,10 +455,10 @@ class ModelInstallService(ModelInstallServiceBase):
                 self.unregister(key)
 
             self._logger.info(f"Scanning {self._app_config.models_path} for new and orphaned models")
-            for cur_base_model in BaseModelType:
-                for cur_model_type in ModelType:
-                    models_dir = Path(cur_base_model.value, cur_model_type.value)
-                    installed.update(self.scan_directory(models_dir))
+            # Use ThreadPoolExecutor to scan dirs in parallel
+            with ThreadPoolExecutor() as executor:
+                future_models = [executor.submit(self.scan_directory, Path(cur_base_model.value, cur_model_type.value)) for cur_base_model in BaseModelType for cur_model_type in ModelType]
+                [installed.update(models.result()) for models in as_completed(future_models)]
             self._logger.info(f"{len(installed)} new models registered; {len(defunct_models)} unregistered")
 
     def _sync_model_path(self, key: str) -> AnyModelConfig:
