@@ -64,7 +64,7 @@ export const ModelView = () => {
           <DefaultSettings />
         </Box>
       )}
-      {data.type === 'lora' && (
+      {(data.type === 'main' || data.type === 'lora') && (
         <Box layerStyle="second" borderRadius="base" p={4}>
           <TriggerPhrases />
         </Box>
