@@ -56,11 +56,12 @@ export const TriggerPhrases = () => {
       return;
     }
 
+    setPhrase('');
+
     await updateModel({
       key: selectedModelKey,
       body: { trigger_phrases: [...triggerPhrases, phrase] },
     }).unwrap();
-    setPhrase('');
   }, [updateModel, selectedModelKey, phrase, triggerPhrases]);
 
   const removeTriggerPhrase = useCallback(
