@@ -54,6 +54,7 @@ type ConvertMainModelResponse =
 
 type InstallModelArg = {
   source: paths['/api/v2/models/install']['post']['parameters']['query']['source'];
+  inplace: paths['/api/v2/models/install']['post']['parameters']['query']['inplace'];
 };
 type InstallModelResponse = paths['/api/v2/models/install']['post']['responses']['201']['content']['application/json'];
 
@@ -176,10 +177,10 @@ export const modelsApi = api.injectEndpoints({
       invalidatesTags: ['Model'],
     }),
     installModel: build.mutation<InstallModelResponse, InstallModelArg>({
-      query: ({ source }) => {
+      query: ({ source, inplace }) => {
         return {
           url: buildModelsUrl('install'),
-          params: { source },
+          params: { source, inplace },
           method: 'POST',
         };
       },
