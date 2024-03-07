@@ -34,7 +34,7 @@ export const ModelTypeFilter = () => {
 
   return (
     <Menu>
-      <MenuButton as={Button} leftIcon={<IoFilter />}>
+      <MenuButton as={Button} size="sm" leftIcon={<IoFilter />}>
         {filteredModelType ? MODEL_TYPE_LABELS[filteredModelType] : t('modelManager.allModels')}
       </MenuButton>
       <MenuList>

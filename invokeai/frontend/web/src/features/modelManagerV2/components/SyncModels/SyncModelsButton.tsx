@@ -21,6 +21,7 @@ export const SyncModelsButton = memo((props: Omit<ButtonProps, 'aria-label'>) =>
       leftIcon={<PiArrowsClockwiseBold />}
       isLoading={isLoading}
       onClick={syncModels}
+      size="sm"
       variant="ghost"
       {...props}
     >

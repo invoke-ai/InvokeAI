@@ -21,8 +21,8 @@ export const ModelManager = () => {
       <Flex w="full" gap={4} justifyContent="space-between" alignItems="center">
         <Heading fontSize="xl">{t('common.modelManager')}</Heading>
         <Spacer />
-        <SyncModelsButton />
-        <Button colorScheme="invokeYellow" leftIcon={<PiPlusBold />} onClick={handleClickAddModel}>
+        <SyncModelsButton size="sm" />
+        <Button size="sm" colorScheme="invokeYellow" leftIcon={<PiPlusBold />} onClick={handleClickAddModel}>
           {t('modelManager.addModels')}
         </Button>
       </Flex>
