@@ -15,6 +15,7 @@ import type { ChangeEvent } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetModelConfigQuery, useUpdateModelMutation } from 'services/api/endpoints/models';
+import { isNonRefinerMainModelConfig } from 'services/api/types';
 
 export const TriggerPhrases = () => {
   const { t } = useTranslation();
@@ -29,8 +30,11 @@ export const TriggerPhrases = () => {
   }, []);
 
   const triggerPhrases = useMemo(() => {
+    if (!modelConfig || !isNonRefinerMainModelConfig(modelConfig)) {
+      return [];
+    }
     return modelConfig?.trigger_phrases || [];
-  }, [modelConfig?.trigger_phrases]);
+  }, [modelConfig]);
 
   const errors = useMemo(() => {
     const errors = [];
