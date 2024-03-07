@@ -855,6 +855,7 @@
         "statusConverting": "Converting",
         "syncModels": "Sync Models",
         "syncModelsDesc": "If your models are out of sync with the backend, you can refresh them up using this option. This is generally handy in cases where you add models to the InvokeAI root folder or autoimport directory after the application has booted.",
+        "triggerPhrases": "Trigger Phrases",
         "loraTriggerPhrases": "LoRA Trigger Phrases",
         "mainModelTriggerPhrases": "Main Model Trigger Phrases",
         "typePhraseHere": "Type phrase here",
