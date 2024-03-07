@@ -3,20 +3,12 @@ import { createEntityAdapter, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { buildControlAdapter } from 'features/controlAdapters/util/buildControlAdapter';
-import type {
-  ParameterControlNetModel,
-  ParameterIPAdapterModel,
-  ParameterT2IAdapterModel,
-} from 'features/parameters/types/parameterSchemas';
 import { cloneDeep, merge, uniq } from 'lodash-es';
 import { socketInvocationError } from 'services/events/actions';
 import { v4 as uuidv4 } from 'uuid';
 
 import { controlAdapterImageProcessed } from './actions';
-import {
-  CONTROLNET_MODEL_DEFAULT_PROCESSORS as CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS,
-  CONTROLNET_PROCESSORS,
-} from './constants';
+import { CONTROLNET_PROCESSORS } from './constants';
 import type {
   ControlAdapterConfig,
   ControlAdapterProcessorType,
@@ -190,52 +182,6 @@ export const controlAdaptersSlice = createSlice({
         changes: { model: null },
       });
     },
-    controlAdapterModelChanged: (
-      state,
-      action: PayloadAction<{
-        id: string;
-        model: ParameterControlNetModel | ParameterT2IAdapterModel | ParameterIPAdapterModel;
-      }>
-    ) => {
-      const { id, model } = action.payload;
-      const cn = selectControlAdapterById(state, id);
-      if (!cn) {
-        return;
-      }
-
-      if (!isControlNetOrT2IAdapter(cn)) {
-        caAdapter.updateOne(state, { id, changes: { model } });
-        return;
-      }
-
-      const update: Update<ControlNetConfig | T2IAdapterConfig, string> = {
-        id,
-        changes: { model, shouldAutoConfig: true },
-      };
-
-      update.changes.processedControlImage = null;
-
-      let processorType: ControlAdapterProcessorType | undefined = undefined;
-
-      for (const modelSubstring in CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS) {
-        // TODO(MM2): matching modelSubstring to the model key is no longer a valid way to figure out the default processorType
-        if (model.key.includes(modelSubstring)) {
-          processorType = CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS[modelSubstring];
-          break;
-        }
-      }
-
-      if (processorType) {
-        update.changes.processorType = processorType;
-        update.changes.processorNode = CONTROLNET_PROCESSORS[processorType]
-          .default as RequiredControlAdapterProcessorNode;
-      } else {
-        update.changes.processorType = 'none';
-        update.changes.processorNode = CONTROLNET_PROCESSORS.none.default as RequiredControlAdapterProcessorNode;
-      }
-
-      caAdapter.updateOne(state, update);
-    },
     controlAdapterWeightChanged: (state, action: PayloadAction<{ id: string; weight: number }>) => {
       const { id, weight } = action.payload;
       caAdapter.updateOne(state, { id, changes: { weight } });
@@ -298,17 +244,19 @@ export const controlAdaptersSlice = createSlice({
       action: PayloadAction<{
         id: string;
         processorType: ControlAdapterProcessorType;
+        shouldAutoConfig?: boolean;
       }>
     ) => {
-      const { id, processorType } = action.payload;
+      const { id, processorType, shouldAutoConfig = false } = action.payload;
       const cn = selectControlAdapterById(state, id);
       if (!cn || !isControlNetOrT2IAdapter(cn)) {
         return;
       }
 
-      const processorNode = cloneDeep(
-        CONTROLNET_PROCESSORS[processorType].default
-      ) as RequiredControlAdapterProcessorNode;
+      const processorNode =
+        processorType === 'none'
+          ? (cloneDeep(CONTROLNET_PROCESSORS.none.default) as RequiredControlAdapterProcessorNode)
+          : (cloneDeep(CONTROLNET_PROCESSORS[processorType].default) as RequiredControlAdapterProcessorNode);
 
       caAdapter.updateOne(state, {
         id,
@@ -316,7 +264,7 @@ export const controlAdaptersSlice = createSlice({
           processorType,
           processedControlImage: null,
           processorNode,
-          shouldAutoConfig: false,
+          shouldAutoConfig,
         },
       });
     },
@@ -336,28 +284,6 @@ export const controlAdaptersSlice = createSlice({
         id,
         changes: { shouldAutoConfig: !cn.shouldAutoConfig },
       };
-
-      if (update.changes.shouldAutoConfig) {
-        // manage the processor for the user
-        let processorType: ControlAdapterProcessorType | undefined = undefined;
-
-        for (const modelSubstring in CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS) {
-          // TODO(MM2): matching modelSubstring to the model key is no longer a valid way to figure out the default processorType
-          if (cn.model?.key.includes(modelSubstring)) {
-            processorType = CONTROLADAPTER_MODEL_DEFAULT_PROCESSORS[modelSubstring];
-            break;
-          }
-        }
-
-        if (processorType) {
-          update.changes.processorType = processorType;
-          update.changes.processorNode = CONTROLNET_PROCESSORS[processorType]
-            .default as RequiredControlAdapterProcessorNode;
-        } else {
-          update.changes.processorType = 'none';
-          update.changes.processorNode = CONTROLNET_PROCESSORS.none.default as RequiredControlAdapterProcessorNode;
-        }
-      }
 
       caAdapter.updateOne(state, update);
     },
@@ -393,7 +319,6 @@ export const {
   controlAdapterImageChanged,
   controlAdapterProcessedImageChanged,
   controlAdapterIsEnabledChanged,
-  controlAdapterModelChanged,
   controlAdapterWeightChanged,
   controlAdapterBeginStepPctChanged,
   controlAdapterEndStepPctChanged,

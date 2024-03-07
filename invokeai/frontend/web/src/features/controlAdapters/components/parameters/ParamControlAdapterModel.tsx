@@ -5,7 +5,7 @@ import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useCo
 import { useControlAdapterModel } from 'features/controlAdapters/hooks/useControlAdapterModel';
 import { useControlAdapterModelQuery } from 'features/controlAdapters/hooks/useControlAdapterModelQuery';
 import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
-import { controlAdapterModelChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { controlAdapterModelChanged } from 'features/controlAdapters/store/actions';
 import { getModelKeyAndBase } from 'features/metadata/util/modelFetchingHelpers';
 import { memo, useCallback, useMemo } from 'react';
 import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
@@ -25,6 +25,7 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
 
   const _onChange = useCallback(
     (model: ControlNetModelConfig | IPAdapterModelConfig | T2IAdapterModelConfig | null) => {
+      console.log('on change');
       if (!model) {
         return;
       }

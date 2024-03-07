@@ -55,6 +55,7 @@ import { addUpscaleRequestedListener } from 'app/store/middleware/listenerMiddle
 import { addWorkflowLoadRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/workflowLoadRequested';
 import type { AppDispatch, RootState } from 'app/store/store';
 
+import { addControlAdapterAutoProcessorUpdateListener } from './listeners/controlAdapterAutoProcessorUpdateListener';
 import { addSetDefaultSettingsListener } from './listeners/setDefaultSettings';
 
 export const listenerMiddleware = createListenerMiddleware();
@@ -125,6 +126,7 @@ addBulkDownloadListeners(startAppListening);
 // ControlNet
 addControlNetImageProcessedListener(startAppListening);
 addControlNetAutoProcessListener(startAppListening);
+addControlAdapterAutoProcessorUpdateListener(startAppListening);
 
 // Boards
 addImageAddedToBoardFulfilledListener(startAppListening);
