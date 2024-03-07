@@ -137,8 +137,7 @@ class ModelSearch(ModelSearchBase):
 
     def search(self, directory: Union[Path, str]) -> Set[Path]:
         self._directory = Path(directory)
-        if not self._directory.is_absolute():
-            self._directory = self.config.models_path / self._directory
+        self._directory = self._directory.resolve()
         self.stats = SearchStats()  # zero out
         self.search_started()  # This will initialize _models_found to empty
         self._walk_directory(self._directory)
