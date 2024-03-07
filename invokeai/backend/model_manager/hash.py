@@ -114,6 +114,7 @@ class ModelHash:
 
         # BLAKE3 to hash the hashes
         composite_hasher = blake3()
+        component_hashes.sort()
         for h in component_hashes:
             composite_hasher.update(h.encode("utf-8"))
         return composite_hasher.hexdigest()
@@ -131,10 +132,12 @@ class ModelHash:
         """
 
         files: list[Path] = []
-        for root, _dirs, _files in os.walk(model_path):
-            for file in _files:
-                if file_filter(file):
-                    files.append(Path(root, file))
+        entries = [entry for entry in os.scandir(model_path.as_posix()) if not entry.name.startswith(".")]
+        dirs = [entry for entry in entries if entry.is_dir()]
+        file_paths = [entry.path for entry in entries if entry.is_file() and file_filter(entry.path)]
+        files.extend([Path(file) for file in file_paths])
+        for dir in dirs:
+            files.extend(ModelHash._get_file_paths(Path(dir.path), file_filter))
         return files
 
     @staticmethod
