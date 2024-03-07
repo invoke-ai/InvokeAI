@@ -581,6 +581,9 @@ class ModelInstallService(ModelInstallServiceBase):
 
         info = info or ModelProbe.probe(model_path, config)
 
+        if not model_path.is_absolute():
+            model_path = (self._app_config.models_path / model_path)
+
         model_path = model_path.resolve()
 
         info.path = model_path.as_posix()
