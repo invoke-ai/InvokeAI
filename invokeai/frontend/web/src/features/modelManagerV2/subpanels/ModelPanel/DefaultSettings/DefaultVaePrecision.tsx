@@ -1,6 +1,7 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/DefaultSettings/SettingToggle';
 import { isParameterPrecision } from 'features/parameters/types/parameterSchemas';
 import { useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
@@ -42,9 +43,12 @@ export function DefaultVaePrecision(props: UseControllerProps<DefaultSettingsFor
 
   return (
     <FormControl flexDir="column" gap={1} alignItems="flex-start">
-      <InformationalPopover feature="paramVAEPrecision">
-        <FormLabel>{t('modelManager.vaePrecision')}</FormLabel>
-      </InformationalPopover>
+      <Flex justifyContent="space-between" w="full">
+        <InformationalPopover feature="paramVAEPrecision">
+          <FormLabel>{t('modelManager.vaePrecision')}</FormLabel>
+        </InformationalPopover>
+        <SettingToggle control={props.control} name="vaePrecision" />
+      </Flex>
       <Combobox isDisabled={isDisabled} value={value} options={options} onChange={onChange} />
     </FormControl>
   );

@@ -16,7 +16,6 @@ import { DefaultScheduler } from './DefaultScheduler';
 import { DefaultSteps } from './DefaultSteps';
 import { DefaultVae } from './DefaultVae';
 import { DefaultVaePrecision } from './DefaultVaePrecision';
-import { SettingToggle } from './SettingToggle';
 
 export interface FormField<T> {
   value: T;
@@ -96,7 +95,7 @@ export const DefaultSettingsForm = ({
 
   return (
     <>
-      <Flex gap="2" justifyContent="space-between" w="full" mb={5}>
+      <Flex gap="4" justifyContent="space-between" w="full" pb={4}>
         <Heading fontSize="md">{t('modelManager.defaultSettings')}</Heading>
         <Button
           size="sm"
@@ -114,31 +113,25 @@ export const DefaultSettingsForm = ({
       <Flex flexDir="column" gap={8}>
         <Flex gap={8}>
           <Flex gap={4} w="full">
-            <SettingToggle control={control} name="vae" />
             <DefaultVae control={control} name="vae" />
           </Flex>
           <Flex gap={4} w="full">
-            <SettingToggle control={control} name="vaePrecision" />
             <DefaultVaePrecision control={control} name="vaePrecision" />
           </Flex>
         </Flex>
         <Flex gap={8}>
           <Flex gap={4} w="full">
-            <SettingToggle control={control} name="scheduler" />
             <DefaultScheduler control={control} name="scheduler" />
           </Flex>
           <Flex gap={4} w="full">
-            <SettingToggle control={control} name="steps" />
             <DefaultSteps control={control} name="steps" />
           </Flex>
         </Flex>
         <Flex gap={8}>
           <Flex gap={4} w="full">
-            <SettingToggle control={control} name="cfgScale" />
             <DefaultCfgScale control={control} name="cfgScale" />
           </Flex>
           <Flex gap={4} w="full">
-            <SettingToggle control={control} name="cfgRescaleMultiplier" />
             <DefaultCfgRescaleMultiplier control={control} name="cfgRescaleMultiplier" />
           </Flex>
         </Flex>
