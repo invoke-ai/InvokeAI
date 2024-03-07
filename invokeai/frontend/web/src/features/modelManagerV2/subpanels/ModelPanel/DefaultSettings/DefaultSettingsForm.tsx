@@ -43,7 +43,7 @@ export const DefaultSettingsForm = ({
 
   const [updateModel, { isLoading }] = useUpdateModelMutation();
 
-  const { handleSubmit, control, formState } = useForm<DefaultSettingsFormData>({
+  const { handleSubmit, control, formState, reset } = useForm<DefaultSettingsFormData>({
     defaultValues: defaultSettingsDefaults,
   });
 
@@ -76,6 +76,7 @@ export const DefaultSettingsForm = ({
               })
             )
           );
+          reset(data);
         })
         .catch((error) => {
           if (error) {
@@ -90,7 +91,7 @@ export const DefaultSettingsForm = ({
           }
         });
     },
-    [selectedModelKey, dispatch, updateModel, t]
+    [selectedModelKey, dispatch, reset, updateModel, t]
   );
 
   return (
