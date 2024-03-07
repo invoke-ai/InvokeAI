@@ -48,7 +48,7 @@ export const ModelEdit = ({ form }: Props) => {
         <Flex w="full" justifyContent="space-between" gap={4} alignItems="center">
           <FormControl flexDir="column" alignItems="flex-start" gap={1} isInvalid={Boolean(form.formState.errors.name)}>
             <FormLabel>{t('modelManager.modelName')}</FormLabel>
-            <Input {...form.register('name', stringFieldOptions)} size="lg" />
+            <Input {...form.register('name', stringFieldOptions)} size="md" />
 
             {form.formState.errors.name?.message && (
               <FormErrorMessage>{form.formState.errors.name?.message}</FormErrorMessage>
@@ -60,7 +60,7 @@ export const ModelEdit = ({ form }: Props) => {
           <Flex gap="4" alignItems="center">
             <FormControl flexDir="column" alignItems="flex-start" gap={1}>
               <FormLabel>{t('modelManager.description')}</FormLabel>
-              <Textarea fontSize="md" {...form.register('description')} />
+              <Textarea {...form.register('description')} minH={32} />
             </FormControl>
           </Flex>
           <Heading as="h3" fontSize="md" mt="4">
