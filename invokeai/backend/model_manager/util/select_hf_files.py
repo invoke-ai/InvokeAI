@@ -51,7 +51,15 @@ def filter_files(
             (
                 "learned_embeds.bin",
                 "ip_adapter.bin",
-                "lora_weights.safetensors",
+                # jennifer added a bunch of these, probably will break something
+                ".safetensors",
+                ".bin",
+                ".onnx",
+                ".xml",
+                ".pth",
+                ".pt",
+                ".ckpt",
+                ".msgpack",
                 "weights.pb",
                 "onnx_data",
             )
@@ -71,7 +79,8 @@ def filter_files(
         paths = [x for x in paths if x.parent == Path(subfolder)]
 
     # _filter_by_variant uniquifies the paths and returns a set
-    return sorted(_filter_by_variant(paths, variant))
+    # jennifer removed the filter since it removed models, probably will break something but i dont understand why it removes valid models :|
+    return sorted(paths)
 
 
 @dataclass

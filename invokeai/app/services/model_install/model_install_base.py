@@ -20,6 +20,7 @@ from invokeai.app.services.model_records import ModelRecordServiceBase
 from invokeai.backend.model_manager import AnyModelConfig, ModelRepoVariant
 from invokeai.backend.model_manager.config import ModelSourceType
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
+from invokeai.backend.model_manager.metadata.metadata_base import RemoteModelFile
 
 
 class InstallStatus(str, Enum):
@@ -403,6 +404,19 @@ class ModelInstallServiceBase(ABC):
         3. fp16
         4. None (usually returns fp32 model)
 
+        """
+
+    @abstractmethod
+    def get_hugging_face_models(
+        self,
+        source: str,
+    ) -> List[AnyHttpUrl]:
+        """Get the available models in a HuggingFace repo.
+
+        :param source: HuggingFace repo string
+
+        This will get the urls for the available models in the indicated,
+        repo, and return them as a list of AnyHttpUrl strings.
         """
 
     @abstractmethod
