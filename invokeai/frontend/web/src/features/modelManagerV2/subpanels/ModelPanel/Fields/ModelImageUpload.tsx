@@ -100,9 +100,9 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
           src={image}
           objectFit="cover"
           objectPosition="50% 50%"
-          height="100px"
-          width="100px"
-          minWidth="100px"
+          height={108}
+          width={108}
+          minWidth={108}
           borderRadius="base"
         />
         <IconButton
@@ -125,8 +125,8 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
       <Tooltip label={t('modelManager.uploadImage')}>
         <Flex
           as={Button}
-          w={100}
-          h={100}
+          w={108}
+          h={108}
           opacity={0.3}
           borderRadius="base"
           alignItems="center"

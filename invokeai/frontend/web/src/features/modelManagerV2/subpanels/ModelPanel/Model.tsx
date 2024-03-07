@@ -1,4 +1,4 @@
-import { Flex, Heading, Text } from '@invoke-ai/ui-library';
+import { Flex, Heading, Spacer, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import { ModelConvertButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelConvertButton';
@@ -29,14 +29,13 @@ export const Model = () => {
       <Flex alignItems="flex-start" gap={4}>
         <ModelImageUpload model_key={selectedModelKey} model_image={data.cover_image} />
         <Flex flexDir="column" gap={1} flexGrow={1}>
-          <Flex gap={2} position="relative">
+          <Flex gap={2}>
             <Heading as="h2" fontSize="lg" w="full">
               {data.name}
             </Heading>
-            <Flex position="absolute" gap={2} right={0} top={0}>
-              <ModelEditButton />
-              <ModelConvertButton modelKey={selectedModelKey} />
-            </Flex>
+            <Spacer />
+            <ModelEditButton />
+            <ModelConvertButton modelKey={selectedModelKey} />
           </Flex>
           {data.source && (
             <Text variant="subtext">
