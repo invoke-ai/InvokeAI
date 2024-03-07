@@ -6,7 +6,7 @@ type Props = {
   format: AnyModelConfig['format'];
 };
 
-const MODEL_FORMAT_NAME_MAP = {
+const FORMAT_NAME_MAP: Record<AnyModelConfig['format'], string> = {
   diffusers: 'diffusers',
   lycoris: 'lycoris',
   checkpoint: 'checkpoint',
@@ -15,10 +15,19 @@ const MODEL_FORMAT_NAME_MAP = {
   embedding_folder: 'embedding',
 };
 
+const FORMAT_COLOR_MAP: Record<AnyModelConfig['format'], string> = {
+  diffusers: 'base',
+  lycoris: 'base',
+  checkpoint: 'orange',
+  invokeai: 'base',
+  embedding_file: 'base',
+  embedding_folder: 'base',
+};
+
 const ModelFormatBadge = ({ format }: Props) => {
   return (
-    <Badge flexGrow={0} colorScheme="base" variant="subtle">
-      {MODEL_FORMAT_NAME_MAP[format]}
+    <Badge flexGrow={0} colorScheme={FORMAT_COLOR_MAP[format]} variant="subtle">
+      {FORMAT_NAME_MAP[format]}
     </Badge>
   );
 };
