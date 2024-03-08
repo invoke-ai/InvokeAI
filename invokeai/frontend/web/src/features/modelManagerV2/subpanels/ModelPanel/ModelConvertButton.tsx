@@ -66,6 +66,10 @@ export const ModelConvertButton = (props: ModelConvertProps) => {
       });
   }, [data, isLoading, dispatch, t, convertModel]);
 
+  if (data?.format !== 'checkpoint') {
+    return;
+  }
+
   return (
     <>
       <Button
