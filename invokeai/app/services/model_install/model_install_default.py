@@ -309,7 +309,9 @@ class ModelInstallService(ModelInstallServiceBase):
                             stanza["version"] == "3.0.0"
                         ), f"This script works on version 3.0.0 yaml files, but your configuration points to a {stanza['version']} version"
                     except AssertionError:
-                        self._logger.warn(f"Skipping entry with path {stanza.get('path', '')} with outdated metadata version")
+                        self._logger.warn(
+                            f"Skipping entry with path {stanza.get('path', '')} with outdated metadata version"
+                        )
                         continue
                     continue
 
