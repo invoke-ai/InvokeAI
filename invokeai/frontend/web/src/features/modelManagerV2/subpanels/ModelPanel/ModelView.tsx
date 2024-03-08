@@ -60,7 +60,7 @@ export const ModelView = () => {
           )}
         </Flex>
       </Box>
-      {data.type === 'main' && (
+      {data.type === 'main' && data.base !== 'sdxl-refiner' && (
         <Box layerStyle="second" borderRadius="base" p={4}>
           <MainModelDefaultSettings />
         </Box>
