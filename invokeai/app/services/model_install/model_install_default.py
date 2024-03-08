@@ -186,7 +186,6 @@ class ModelInstallService(ModelInstallServiceBase):
         access_token: Optional[str] = None,
         inplace: Optional[bool] = False,
     ) -> ModelInstallJob:
-        print(f"starting import for model {source}")
         variants = "|".join(ModelRepoVariant.__members__.values())
         hf_repoid_re = f"^([^/:]+/[^/:]+)(?::({variants})?(?::/?([^:]+))?)?$"
         source_obj: Optional[StringLikeSource] = None
