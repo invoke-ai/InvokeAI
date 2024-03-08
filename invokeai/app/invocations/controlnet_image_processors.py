@@ -31,6 +31,7 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     OutputField,
+    UIType,
     WithBoard,
     WithMetadata,
 )
@@ -90,7 +91,9 @@ class ControlNetInvocation(BaseInvocation):
     """Collects ControlNet info to pass to other nodes"""
 
     image: ImageField = InputField(description="The control image")
-    control_model: ModelField = InputField(description=FieldDescriptions.controlnet_model, input=Input.Direct)
+    control_model: ModelField = InputField(
+        description=FieldDescriptions.controlnet_model, input=Input.Direct, ui_type=UIType.ControlNetModel
+    )
     control_weight: Union[float, List[float]] = InputField(
         default=1.0, ge=-1, le=2, description="The weight given to the ControlNet"
     )

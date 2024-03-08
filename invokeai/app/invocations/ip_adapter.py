@@ -10,7 +10,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
 from invokeai.app.invocations.model import ModelField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
@@ -55,7 +55,11 @@ class IPAdapterInvocation(BaseInvocation):
     # Inputs
     image: Union[ImageField, List[ImageField]] = InputField(description="The IP-Adapter image prompt(s).")
     ip_adapter_model: ModelField = InputField(
-        description="The IP-Adapter model.", title="IP-Adapter Model", input=Input.Direct, ui_order=-1
+        description="The IP-Adapter model.",
+        title="IP-Adapter Model",
+        input=Input.Direct,
+        ui_order=-1,
+        ui_type=UIType.IPAdapterModel,
     )
 
     weight: Union[float, List[float]] = InputField(
