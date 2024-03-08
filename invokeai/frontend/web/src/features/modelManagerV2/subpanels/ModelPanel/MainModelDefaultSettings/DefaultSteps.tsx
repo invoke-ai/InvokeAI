@@ -1,7 +1,7 @@
 import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/DefaultSettings/SettingToggle';
+import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/SettingToggle';
 import { useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
@@ -9,24 +9,24 @@ import { useTranslation } from 'react-i18next';
 
 import type { DefaultSettingsFormData } from './DefaultSettingsForm';
 
-type DefaultCfgRescaleMultiplierType = DefaultSettingsFormData['cfgRescaleMultiplier'];
+type DefaultSteps = DefaultSettingsFormData['steps'];
 
-export function DefaultCfgRescaleMultiplier(props: UseControllerProps<DefaultSettingsFormData>) {
+export function DefaultSteps(props: UseControllerProps<DefaultSettingsFormData>) {
   const { field } = useController(props);
 
-  const sliderMin = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.sliderMin);
-  const sliderMax = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.sliderMax);
-  const numberInputMin = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.numberInputMin);
-  const numberInputMax = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.numberInputMax);
-  const coarseStep = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.coarseStep);
-  const fineStep = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.fineStep);
+  const sliderMin = useAppSelector((s) => s.config.sd.steps.sliderMin);
+  const sliderMax = useAppSelector((s) => s.config.sd.steps.sliderMax);
+  const numberInputMin = useAppSelector((s) => s.config.sd.steps.numberInputMin);
+  const numberInputMax = useAppSelector((s) => s.config.sd.steps.numberInputMax);
+  const coarseStep = useAppSelector((s) => s.config.sd.steps.coarseStep);
+  const fineStep = useAppSelector((s) => s.config.sd.steps.fineStep);
   const { t } = useTranslation();
   const marks = useMemo(() => [sliderMin, Math.floor(sliderMax / 2), sliderMax], [sliderMax, sliderMin]);
 
   const onChange = useCallback(
     (v: number) => {
       const updatedValue = {
-        ...(field.value as DefaultCfgRescaleMultiplierType),
+        ...(field.value as DefaultSteps),
         value: v,
       };
       field.onChange(updatedValue);
@@ -35,20 +35,20 @@ export function DefaultCfgRescaleMultiplier(props: UseControllerProps<DefaultSet
   );
 
   const value = useMemo(() => {
-    return (field.value as DefaultCfgRescaleMultiplierType).value;
+    return (field.value as DefaultSteps).value;
   }, [field.value]);
 
   const isDisabled = useMemo(() => {
-    return !(field.value as DefaultCfgRescaleMultiplierType).isEnabled;
+    return !(field.value as DefaultSteps).isEnabled;
   }, [field.value]);
 
   return (
     <FormControl flexDir="column" gap={2} alignItems="flex-start">
       <Flex justifyContent="space-between" w="full">
-        <InformationalPopover feature="paramCFGRescaleMultiplier">
-          <FormLabel>{t('parameters.cfgRescaleMultiplier')}</FormLabel>
+        <InformationalPopover feature="paramSteps">
+          <FormLabel>{t('parameters.steps')}</FormLabel>
         </InformationalPopover>
-        <SettingToggle control={props.control} name="cfgRescaleMultiplier" />
+        <SettingToggle control={props.control} name="steps" />
       </Flex>
 
       <Flex w="full" gap={4}>
