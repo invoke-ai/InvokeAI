@@ -1,4 +1,5 @@
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import { isControlAdapterProcessorType } from 'features/controlAdapters/store/types';
 import {
   initialControlNet,
   initialIPAdapter,
@@ -253,8 +254,9 @@ const parseControlNet: MetadataParseFunc<ControlNetConfigMetadata> = async (meta
     .catch(null)
     .parse(getProperty(metadataItem, 'resize_mode'));
 
-  const processorType = 'none';
-  const processorNode = CONTROLNET_PROCESSORS.none.default;
+  const defaultPreprocessor = controlNetModel.default_settings?.preprocessor;
+  const processorType = isControlAdapterProcessorType(defaultPreprocessor) ? defaultPreprocessor : 'none';
+  const processorNode = CONTROLNET_PROCESSORS[processorType].default;
 
   const controlNet: ControlNetConfigMetadata = {
     type: 'controlnet',
@@ -305,8 +307,9 @@ const parseT2IAdapter: MetadataParseFunc<T2IAdapterConfigMetadata> = async (meta
     .catch(null)
     .parse(getProperty(metadataItem, 'resize_mode'));
 
-  const processorType = 'none';
-  const processorNode = CONTROLNET_PROCESSORS.none.default;
+  const defaultPreprocessor = t2iAdapterModel.default_settings?.preprocessor;
+  const processorType = isControlAdapterProcessorType(defaultPreprocessor) ? defaultPreprocessor : 'none';
+  const processorNode = CONTROLNET_PROCESSORS[processorType].default;
 
   const t2iAdapter: T2IAdapterConfigMetadata = {
     type: 't2i_adapter',

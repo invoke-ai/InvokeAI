@@ -47,6 +47,25 @@ export type ControlAdapterProcessorNode =
  * Any ControlNet processor type
  */
 export type ControlAdapterProcessorType = NonNullable<ControlAdapterProcessorNode['type'] | 'none'>;
+export const zControlAdapterProcessorType = z.enum([
+  'canny_image_processor',
+  'color_map_image_processor',
+  'content_shuffle_image_processor',
+  'depth_anything_image_processor',
+  'hed_image_processor',
+  'lineart_anime_image_processor',
+  'lineart_image_processor',
+  'mediapipe_face_processor',
+  'midas_depth_image_processor',
+  'mlsd_image_processor',
+  'normalbae_image_processor',
+  'dw_openpose_image_processor',
+  'pidi_image_processor',
+  'zoe_depth_image_processor',
+  'none',
+]);
+export const isControlAdapterProcessorType = (v: unknown): v is ControlAdapterProcessorType =>
+  zControlAdapterProcessorType.safeParse(v).success;
 
 /**
  * The Canny processor node, with parameters flagged as required
