@@ -304,9 +304,13 @@ class ModelInstallService(ModelInstallServiceBase):
 
             for model_key, stanza in yaml.items():
                 if model_key == "__metadata__":
-                    assert (
-                        stanza["version"] == "3.0.0"
-                    ), f"This script works on version 3.0.0 yaml files, but your configuration points to a {stanza['version']} version"
+                    try:
+                        assert (
+                            stanza["version"] == "3.0.0"
+                        ), f"This script works on version 3.0.0 yaml files, but your configuration points to a {stanza['version']} version"
+                    except AssertionError:
+                        self._logger.warn(f"Skipping entry with path {stanza.get('path', '')} with outdated metadata version")
+                        continue
                     continue
 
                 _, _, model_name = str(model_key).split("/")
