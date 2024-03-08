@@ -22,12 +22,12 @@ from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
-from invokeai.backend.ip_adapter.unet_patcher import UNetPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     IPAdapterConditioningInfo,
     TextConditioningData,
 )
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
+from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import UNetAttentionPatcher
 from invokeai.backend.util.attention import auto_detect_slice_size
 from invokeai.backend.util.devices import normalize_device
 
@@ -412,7 +412,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         elif ip_adapter_data is not None:
             # TODO(ryand): Should we raise an exception if both custom attention and IP-Adapter attention are active?
             # As it is now, the IP-Adapter will silently be skipped.
-            ip_adapter_unet_patcher = UNetPatcher([ipa.ip_adapter_model for ipa in ip_adapter_data])
+            ip_adapter_unet_patcher = UNetAttentionPatcher([ipa.ip_adapter_model for ipa in ip_adapter_data])
             attn_ctx = ip_adapter_unet_patcher.apply_ip_adapter_attention(self.invokeai_diffuser.model)
             self.use_ip_adapter = True
         else:
@@ -476,7 +476,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         control_data: List[ControlNetData] = None,
         ip_adapter_data: Optional[list[IPAdapterData]] = None,
         t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
-        ip_adapter_unet_patcher: Optional[UNetPatcher] = None,
+        ip_adapter_unet_patcher: Optional[UNetAttentionPatcher] = None,
     ):
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
