@@ -8,6 +8,10 @@ from .cross_attention_control import Arguments
 
 @dataclass
 class ExtraConditioningInfo:
+    """Extra conditioning information produced by Compel.
+    This is used for prompt-to-prompt cross-attention control (a.k.a. `.swap()` in Compel).
+    """
+
     tokens_count_including_eos_bos: int
     cross_attention_control_args: Optional[Arguments] = None
 
@@ -18,6 +22,8 @@ class ExtraConditioningInfo:
 
 @dataclass
 class BasicConditioningInfo:
+    """SD 1/2 text conditioning information produced by Compel."""
+
     embeds: torch.Tensor
     extra_conditioning: Optional[ExtraConditioningInfo]
 
@@ -33,6 +39,8 @@ class ConditioningFieldData:
 
 @dataclass
 class SDXLConditioningInfo(BasicConditioningInfo):
+    """SDXL text conditioning information produced by Compel."""
+
     pooled_embeds: torch.Tensor
     add_time_ids: torch.Tensor
 
@@ -58,14 +66,11 @@ class IPAdapterConditioningInfo:
 class TextConditioningData:
     unconditioned_embeddings: BasicConditioningInfo
     text_embeddings: BasicConditioningInfo
-    """
-    Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
-    `guidance_scale` is defined as `w` of equation 2. of [Imagen Paper](https://arxiv.org/pdf/2205.11487.pdf).
-    Guidance scale is enabled by setting `guidance_scale > 1`. Higher guidance scale encourages to generate
-    images that are closely linked to the text `prompt`, usually at the expense of lower image quality.
-    """
+    # Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
+    # `guidance_scale` is defined as `w` of equation 2. of [Imagen Paper](https://arxiv.org/pdf/2205.11487.pdf).
+    # Guidance scale is enabled by setting `guidance_scale > 1`. Higher guidance scale encourages to generate
+    # images that are closely linked to the text `prompt`, usually at the expense of lower image quality.
     guidance_scale: Union[float, List[float]]
-    """ for models trained using zero-terminal SNR ("ztsnr"), it's suggested to use guidance_rescale_multiplier of 0.7 .
-     ref [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/pdf/2305.08891.pdf)
-    """
+    # For models trained using zero-terminal SNR ("ztsnr"), it's suggested to use guidance_rescale_multiplier of 0.7.
+    # See [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/pdf/2305.08891.pdf).
     guidance_rescale_multiplier: float = 0
