@@ -197,6 +197,7 @@ class Categories(object):
     Paths: JsonDict = {"category": "Paths"}
     Logging: JsonDict = {"category": "Logging"}
     Development: JsonDict = {"category": "Development"}
+    CLIArgs: JsonDict = {"category": "CLIArgs"}
     ModelInstall: JsonDict = {"category": "Model Install"}
     ModelCache: JsonDict = {"category": "Model Cache"}
     Device: JsonDict = {"category": "Device"}
@@ -274,7 +275,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     profiles_dir        : Path = Field(default=Path('profiles'), description="Directory for graph profiles", json_schema_extra=Categories.Development)
     skip_model_hash     : bool = Field(default=False, description="Skip model hashing, instead assigning a UUID to models. Useful when using a memory db to reduce startup time.", json_schema_extra=Categories.Development)
 
-    version             : bool = Field(default=False, description="Show InvokeAI version and exit", json_schema_extra=Categories.Other)
+    version             : bool = Field(default=False, description="Show InvokeAI version and exit", json_schema_extra=Categories.CLIArgs)
 
     # CACHE
     ram                 : float = Field(default=DEFAULT_RAM_CACHE, gt=0, description="Maximum memory amount used by model cache for rapid switching (floating point number, GB)", json_schema_extra=Categories.ModelCache, )
