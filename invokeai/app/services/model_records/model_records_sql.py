@@ -242,6 +242,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         base_model: Optional[BaseModelType] = None,
         model_type: Optional[ModelType] = None,
         model_format: Optional[ModelFormat] = None,
+        order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default,
     ) -> List[AnyModelConfig]:
         """
         Return models matching name, base and/or type.
@@ -250,10 +251,21 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         :param base_model: Filter by base model (optional)
         :param model_type: Filter by type of model (optional)
         :param model_format: Filter by model format (e.g. "diffusers") (optional)
+        :param order_by: Result order
 
         If none of the optional filters are passed, will return all
         models in the database.
         """
+
+        assert isinstance(order_by, ModelRecordOrderBy)
+        ordering = {
+            ModelRecordOrderBy.Default: "type, base, name, format",
+            ModelRecordOrderBy.Type: "type",
+            ModelRecordOrderBy.Base: "base",
+            ModelRecordOrderBy.Name: "name",
+            ModelRecordOrderBy.Format: "format",
+        }
+
         where_clause: list[str] = []
         bindings: list[str] = []
         if model_name:
@@ -272,8 +284,10 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         with self._db.lock:
             self._cursor.execute(
                 f"""--sql
-                SELECT config, strftime('%s',updated_at) FROM models
-                {where};
+                SELECT config, strftime('%s',updated_at)
+                FROM models
+                {where}
+                ORDER BY {ordering[order_by]} -- using ? to bind doesn't work here for some reason;
                 """,
                 tuple(bindings),
             )
@@ -319,7 +333,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         """Return a paginated summary listing of each model in the database."""
         assert isinstance(order_by, ModelRecordOrderBy)
         ordering = {
-            ModelRecordOrderBy.Default: "type, base, format, name",
+            ModelRecordOrderBy.Default: "type, base, name, format",
             ModelRecordOrderBy.Type: "type",
             ModelRecordOrderBy.Base: "base",
             ModelRecordOrderBy.Name: "name",
