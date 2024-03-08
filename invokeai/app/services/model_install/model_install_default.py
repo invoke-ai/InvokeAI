@@ -321,7 +321,8 @@ class ModelInstallService(ModelInstallServiceBase):
                     model_path = self._app_config.models_path / model_path
                 model_path = model_path.resolve()
                 description = stanza.get("description", "")
-                model_info = {"name": model_name, "description": description}
+                config_path =stanza.get("config_path", "")
+                model_info = {"name": model_name, "description": description, "config_path": config_path}
 
                 try:
                     id = self.register_path(model_path=model_path, config=model_info)
@@ -587,9 +588,8 @@ class ModelInstallService(ModelInstallServiceBase):
 
         # add 'main' specific fields
         if isinstance(info, CheckpointConfigBase):
-            # make config relative to our root
             legacy_conf = (self.app_config.root_dir / self.app_config.legacy_conf_dir / info.config_path).resolve()
-            info.config_path = legacy_conf.relative_to(self.app_config.root_dir).as_posix()
+            info.config_path = legacy_conf.as_posix()
         self.record_store.add_model(info)
         return info.key
 
