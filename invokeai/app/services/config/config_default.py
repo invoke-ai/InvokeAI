@@ -260,8 +260,12 @@ class InvokeAIAppConfig(InvokeAISettings):
         profile_prefix: **Development**: An optional prefix for profile output files.
         profiles_dir: **Development**: Path to profiles output directory.
         skip_model_hash: **Development**: Skip model hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models.
-        version: **Other**: CLI arg - show InvokeAI version and exit.
-        civitai_api_key: **Other**: API key for CivitAI.
+        version: **CLIArgs**: CLI arg - show InvokeAI version and exit.
+        remote_api_tokens: **Model Install**: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.
+          Example:
+            remote_api_tokens:
+              - url_regex: "https://example.com/.*"
+                token: "my-secret-token"
         ram: **Model Cache**: Maximum memory amount used by memory model cache for rapid switching (GB).
         vram: **Model Cache**: Amount of VRAM reserved for model storage (GB)
         convert_cache: **Model Cache**: Maximum size of on-disk converted models cache (GB)
@@ -362,7 +366,11 @@ class InvokeAIAppConfig(InvokeAISettings):
     node_cache_size     : int = Field(default=512, description="How many cached nodes to keep in memory.", json_schema_extra=Categories.Nodes)
 
     # MODEL IMPORT
-    remote_api_tokens   : Optional[list[URLRegexToken]] = Field(default=None, description="List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.", json_schema_extra=Categories.ModelInstall)
+    remote_api_tokens   : Optional[list[URLRegexToken]] = Field(default=None, description="""List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.
+          Example:
+            remote_api_tokens:
+              - url_regex: \"https://example.com/.*\"
+                token: \"my-secret-token\"""", json_schema_extra=Categories.ModelInstall)
 
     # TODO(psyche): Can we just remove these then?
     # DEPRECATED FIELDS - STILL HERE IN ORDER TO OBTAN VALUES FROM PRE-3.1 CONFIG FILES
@@ -584,7 +592,8 @@ class InvokeAIAppConfig(InvokeAISettings):
             "Paths",
             "Logging",
             "Development",
-            "Other",
+            "CLIArgs",
+            "Model Install",
             "Model Cache",
             "Device",
             "Generation",
