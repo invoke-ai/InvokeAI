@@ -224,7 +224,61 @@ class URLRegexToken(BaseModel):
 
 
 class InvokeAIAppConfig(InvokeAISettings):
-    """Configuration object for InvokeAI App."""
+    """Invoke App Configuration
+
+    Attributes:
+
+        host: **Web Server**: IP address to bind to. Use `0.0.0.0` to serve to your local network.
+        port: **Web Server**: Port to bind to.
+        allow_origins: **Web Server**: Allowed CORS origins.
+        allow_credentials: **Web Server**: Allow CORS credentials.
+        allow_methods: **Web Server**: Methods allowed for CORS.
+        allow_headers: **Web Server**: Headers allowed for CORS.
+        ssl_certfile: **Web Server**: SSL certificate file for HTTPS.
+        ssl_keyfile: **Web Server**: SSL key file for HTTPS.
+        esrgan: **Features**: Enables or disables the upscaling code.
+        internet_available: **Features**: If true, attempt to download models on the fly; otherwise only use local models.
+        log_tokenization: **Features**: Enable logging of parsed prompt tokens.
+        patchmatch: **Features**: Enable patchmatch inpaint code.
+        ignore_missing_core_models: **Features**: Ignore missing core models on startup. If `True`, the app will attempt to download missing models on startup.
+        root: **Paths**: The InvokeAI runtime root directory.
+        autoimport_dir: **Paths**: Path to a directory of models files to be imported on startup.
+        models_dir: **Paths**: Path to the models directory.
+        convert_cache_dir: **Paths**: Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.
+        legacy_conf_dir: **Paths**: Path to directory of legacy checkpoint config files.
+        db_dir: **Paths**: Path to InvokeAI databases directory.
+        outdir: **Paths**: Path to directory for outputs.
+        use_memory_db: **Paths**: Use in-memory database. Useful for development.
+        custom_nodes_dir: **Paths**: Path to directory for custom nodes.
+        from_file: **Paths**: Take command input from the indicated file (command-line client only).
+        log_handlers: **Logging**: Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".
+        log_format: **Logging**: Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style.
+        log_level: **Logging**: Emit logging messages at this level or higher.
+        log_sql: **Logging**: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.
+        dev_reload: **Development**: Automatically reload when Python sources are changed. Does not reload node definitions.
+        profile_graphs: **Development**: Enable graph profiling using `cProfile`.
+        profile_prefix: **Development**: An optional prefix for profile output files.
+        profiles_dir: **Development**: Path to profiles output directory.
+        skip_model_hash: **Development**: Skip model hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models.
+        version: **Other**: CLI arg - show InvokeAI version and exit.
+        civitai_api_key: **Other**: API key for CivitAI.
+        ram: **Model Cache**: Maximum memory amount used by memory model cache for rapid switching (GB).
+        vram: **Model Cache**: Amount of VRAM reserved for model storage (GB)
+        convert_cache: **Model Cache**: Maximum size of on-disk converted models cache (GB)
+        lazy_offload: **Model Cache**: Keep models in VRAM until their space is needed.
+        log_memory_usage: **Model Cache**: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
+        device: **Device**: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.
+        precision: **Device**: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.
+        sequential_guidance: **Generation**: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
+        attention_type: **Generation**: Attention type.
+        attention_slice_size: **Generation**: Slice size, valid when attention_type=="sliced".
+        force_tiled_decode: **Generation**: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
+        png_compress_level: **Generation**: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
+        max_queue_size: **Queue**: Maximum number of items in the session queue.
+        allow_nodes: **Nodes**: List of nodes to allow. Omit to allow all.
+        deny_nodes: **Nodes**: List of nodes to deny. Omit to deny none.
+        node_cache_size: **Nodes**: How many cached nodes to keep in memory.
+    """
 
     singleton_config: ClassVar[Optional[InvokeAIAppConfig]] = None
     singleton_init: ClassVar[Optional[Dict[str, Any]]] = None
