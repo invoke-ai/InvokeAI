@@ -174,6 +174,7 @@ import re
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Literal, Optional
 
+import yaml
 from omegaconf import DictConfig, OmegaConf
 from pydantic import BaseModel, Field, field_validator
 from pydantic.config import JsonDict
@@ -262,10 +263,10 @@ class InvokeAIAppConfig(InvokeAISettings):
         skip_model_hash: **Development**: Skip model hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models.
         version: **CLIArgs**: CLI arg - show InvokeAI version and exit.
         remote_api_tokens: **Model Install**: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.
-          Example:
-            remote_api_tokens:
-              - url_regex: "https://example.com/.*"
-                token: "my-secret-token"
+            Examples:
+              remote_api_tokens:
+                token: my-secret-token
+                url_regex: https://example.com/.*
         ram: **Model Cache**: Maximum memory amount used by memory model cache for rapid switching (GB).
         vram: **Model Cache**: Amount of VRAM reserved for model storage (GB)
         convert_cache: **Model Cache**: Maximum size of on-disk converted models cache (GB)
@@ -366,11 +367,12 @@ class InvokeAIAppConfig(InvokeAISettings):
     node_cache_size     : int = Field(default=512, description="How many cached nodes to keep in memory.", json_schema_extra=Categories.Nodes)
 
     # MODEL IMPORT
-    remote_api_tokens   : Optional[list[URLRegexToken]] = Field(default=None, description="""List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.
-          Example:
-            remote_api_tokens:
-              - url_regex: \"https://example.com/.*\"
-                token: \"my-secret-token\"""", json_schema_extra=Categories.ModelInstall)
+    remote_api_tokens   : Optional[list[URLRegexToken]] = Field(
+        default=None,
+        description="List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.",
+        examples=[URLRegexToken(url_regex="https://example.com/.*", token="my-secret-token")],
+        json_schema_extra=Categories.ModelInstall
+    )
 
     # TODO(psyche): Can we just remove these then?
     # DEPRECATED FIELDS - STILL HERE IN ORDER TO OBTAN VALUES FROM PRE-3.1 CONFIG FILES
@@ -585,6 +587,17 @@ class InvokeAIAppConfig(InvokeAISettings):
             if not field_descriptions.get(category):
                 field_descriptions[category] = []
             field_descriptions[category].append(f"        {k}: **{category}**: {v.description}")
+            if v.examples:
+                for example in v.examples:
+                    white_space = " " * 12
+                    field_descriptions[category].append(f"{white_space}Examples:")
+                    field_descriptions[category].append(f"{white_space}  {k}:")
+                    if isinstance(example, BaseModel):
+                        property_white_space = " " * 16
+                        example = example.model_dump(exclude_defaults=True, exclude_none=True, by_alias=True)
+                        # Mabye this would be easier to do with ruamel.yaml
+                        yaml_str = yaml.dump(example).replace("\n", f"\n{property_white_space}").strip()
+                        field_descriptions[category].append(f"{property_white_space}{yaml_str}")
 
         for c in [
             "Web Server",
