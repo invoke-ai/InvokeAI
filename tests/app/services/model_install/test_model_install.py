@@ -173,9 +173,7 @@ def test_inplace_install(
     assert Path(job.config_out.path) == embedding_file
 
 
-def test_delete_install(
-    mm2_installer: ModelInstallServiceBase, embedding_file: Path
-) -> None:
+def test_delete_install(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
     store = mm2_installer.record_store
     key = mm2_installer.install_path(embedding_file)
     model_record = store.get_model(key)
