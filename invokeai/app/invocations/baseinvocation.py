@@ -183,7 +183,7 @@ class BaseInvocation(ABC, BaseModel):
         """Gets a pydantc TypeAdapter for the union of all invocation types."""
         if not cls._typeadapter:
             InvocationsUnion = TypeAliasType(
-                "InvocationsUnion", Annotated[Union[tuple(cls._invocation_classes)], Field(discriminator="type")]
+                "InvocationsUnion", Annotated[Union[tuple(cls.get_invocations())], Field(discriminator="type")]
             )
             cls._typeadapter = TypeAdapter(InvocationsUnion)
         return cls._typeadapter
