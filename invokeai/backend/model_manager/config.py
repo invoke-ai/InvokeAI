@@ -22,7 +22,7 @@ Validation errors will raise an InvalidModelConfigException error.
 
 import time
 from enum import Enum
-from typing import Literal, Optional, Type, Union
+from typing import Literal, Optional, Type, TypeAlias, Union
 
 import torch
 from diffusers.models.modeling_utils import ModelMixin
@@ -387,6 +387,7 @@ AnyModelConfig = Annotated[
 ]
 
 AnyModelConfigValidator = TypeAdapter(AnyModelConfig)
+AnyDefaultSettings: TypeAlias = Union[MainModelDefaultSettings, ControlAdapterDefaultSettings]
 
 
 class ModelConfigFactory(object):
