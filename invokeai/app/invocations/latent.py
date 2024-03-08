@@ -381,8 +381,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
         uc = negative_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
 
         conditioning_data = TextConditioningData(
-            unconditioned_embeddings=uc,
-            text_embeddings=c,
+            uncond_text=uc,
+            cond_text=c,
+            uncond_regions=None,
+            cond_regions=None,
             guidance_scale=self.cfg_scale,
             guidance_rescale_multiplier=self.cfg_rescale_multiplier,
         )

@@ -12,7 +12,6 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ExtraConditioningInfo,
     IPAdapterConditioningInfo,
-    SDXLConditioningInfo,
     TextConditioningData,
 )
 
@@ -91,7 +90,7 @@ class InvokeAIDiffuserComponent:
         timestep: torch.Tensor,
         step_index: int,
         total_step_count: int,
-        conditioning_data,
+        conditioning_data: TextConditioningData,
     ):
         down_block_res_samples, mid_block_res_sample = None, None
 
@@ -124,28 +123,28 @@ class InvokeAIDiffuserComponent:
                 added_cond_kwargs = None
 
                 if cfg_injection:  # only applying ControlNet to conditional instead of in unconditioned
-                    if type(conditioning_data.text_embeddings) is SDXLConditioningInfo:
+                    if conditioning_data.is_sdxl():
                         added_cond_kwargs = {
-                            "text_embeds": conditioning_data.text_embeddings.pooled_embeds,
-                            "time_ids": conditioning_data.text_embeddings.add_time_ids,
+                            "text_embeds": conditioning_data.cond_text.pooled_embeds,
+                            "time_ids": conditioning_data.cond_text.add_time_ids,
                         }
-                    encoder_hidden_states = conditioning_data.text_embeddings.embeds
+                    encoder_hidden_states = conditioning_data.cond_text.embeds
                     encoder_attention_mask = None
                 else:
-                    if type(conditioning_data.text_embeddings) is SDXLConditioningInfo:
+                    if conditioning_data.is_sdxl():
                         added_cond_kwargs = {
                             "text_embeds": torch.cat(
                                 [
                                     # TODO: how to pad? just by zeros? or even truncate?
-                                    conditioning_data.unconditioned_embeddings.pooled_embeds,
-                                    conditioning_data.text_embeddings.pooled_embeds,
+                                    conditioning_data.uncond_text.pooled_embeds,
+                                    conditioning_data.cond_text.pooled_embeds,
                                 ],
                                 dim=0,
                             ),
                             "time_ids": torch.cat(
                                 [
-                                    conditioning_data.unconditioned_embeddings.add_time_ids,
-                                    conditioning_data.text_embeddings.add_time_ids,
+                                    conditioning_data.uncond_text.add_time_ids,
+                                    conditioning_data.cond_text.add_time_ids,
                                 ],
                                 dim=0,
                             ),
@@ -154,8 +153,8 @@ class InvokeAIDiffuserComponent:
                         encoder_hidden_states,
                         encoder_attention_mask,
                     ) = self._concat_conditionings_for_batch(
-                        conditioning_data.unconditioned_embeddings.embeds,
-                        conditioning_data.text_embeddings.embeds,
+                        conditioning_data.uncond_text.embeds,
+                        conditioning_data.cond_text.embeds,
                     )
                 if isinstance(control_datum.weight, list):
                     # if controlnet has multiple weights, use the weight for the current step
@@ -325,27 +324,27 @@ class InvokeAIDiffuserComponent:
             }
 
         added_cond_kwargs = None
-        if type(conditioning_data.text_embeddings) is SDXLConditioningInfo:
+        if conditioning_data.is_sdxl():
             added_cond_kwargs = {
                 "text_embeds": torch.cat(
                     [
                         # TODO: how to pad? just by zeros? or even truncate?
-                        conditioning_data.unconditioned_embeddings.pooled_embeds,
-                        conditioning_data.text_embeddings.pooled_embeds,
+                        conditioning_data.uncond_text.pooled_embeds,
+                        conditioning_data.cond_text.pooled_embeds,
                     ],
                     dim=0,
                 ),
                 "time_ids": torch.cat(
                     [
-                        conditioning_data.unconditioned_embeddings.add_time_ids,
-                        conditioning_data.text_embeddings.add_time_ids,
+                        conditioning_data.uncond_text.add_time_ids,
+                        conditioning_data.cond_text.add_time_ids,
                     ],
                     dim=0,
                 ),
             }
 
         both_conditionings, encoder_attention_mask = self._concat_conditionings_for_batch(
-            conditioning_data.unconditioned_embeddings.embeds, conditioning_data.text_embeddings.embeds
+            conditioning_data.uncond_text.embeds, conditioning_data.cond_text.embeds
         )
         both_results = self.model_forward_callback(
             x_twice,
@@ -432,18 +431,17 @@ class InvokeAIDiffuserComponent:
 
         # Prepare SDXL conditioning kwargs for the unconditioned pass.
         added_cond_kwargs = None
-        is_sdxl = type(conditioning_data.text_embeddings) is SDXLConditioningInfo
-        if is_sdxl:
+        if conditioning_data.is_sdxl():
             added_cond_kwargs = {
-                "text_embeds": conditioning_data.unconditioned_embeddings.pooled_embeds,
-                "time_ids": conditioning_data.unconditioned_embeddings.add_time_ids,
+                "text_embeds": conditioning_data.uncond_text.pooled_embeds,
+                "time_ids": conditioning_data.uncond_text.add_time_ids,
             }
 
         # Run unconditioned UNet denoising (i.e. negative prompt).
         unconditioned_next_x = self.model_forward_callback(
             x,
             sigma,
-            conditioning_data.unconditioned_embeddings.embeds,
+            conditioning_data.uncond_text.embeds,
             cross_attention_kwargs=cross_attention_kwargs,
             down_block_additional_residuals=uncond_down_block,
             mid_block_additional_residual=uncond_mid_block,
@@ -474,17 +472,17 @@ class InvokeAIDiffuserComponent:
 
         # Prepare SDXL conditioning kwargs for the conditioned pass.
         added_cond_kwargs = None
-        if is_sdxl:
+        if conditioning_data.is_sdxl():
             added_cond_kwargs = {
-                "text_embeds": conditioning_data.text_embeddings.pooled_embeds,
-                "time_ids": conditioning_data.text_embeddings.add_time_ids,
+                "text_embeds": conditioning_data.cond_text.pooled_embeds,
+                "time_ids": conditioning_data.cond_text.add_time_ids,
             }
 
         # Run conditioned UNet denoising (i.e. positive prompt).
         conditioned_next_x = self.model_forward_callback(
             x,
             sigma,
-            conditioning_data.text_embeddings.embeds,
+            conditioning_data.cond_text.embeds,
             cross_attention_kwargs=cross_attention_kwargs,
             down_block_additional_residuals=cond_down_block,
             mid_block_additional_residual=cond_mid_block,
