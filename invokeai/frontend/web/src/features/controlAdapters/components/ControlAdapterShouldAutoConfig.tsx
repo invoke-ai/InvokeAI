@@ -1,6 +1,7 @@
 import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
+import { useControlAdapterModel } from 'features/controlAdapters/hooks/useControlAdapterModel';
 import { useControlAdapterShouldAutoConfig } from 'features/controlAdapters/hooks/useControlAdapterShouldAutoConfig';
 import { controlAdapterAutoConfigToggled } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isNil } from 'lodash-es';
@@ -14,12 +15,13 @@ type Props = {
 const ControlAdapterShouldAutoConfig = ({ id }: Props) => {
   const isEnabled = useControlAdapterIsEnabled(id);
   const shouldAutoConfig = useControlAdapterShouldAutoConfig(id);
+  const { modelConfig } = useControlAdapterModel(id);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
   const handleShouldAutoConfigChanged = useCallback(() => {
-    dispatch(controlAdapterAutoConfigToggled({ id }));
-  }, [id, dispatch]);
+    dispatch(controlAdapterAutoConfigToggled({ id, modelConfig }));
+  }, [id, dispatch, modelConfig]);
 
   if (isNil(shouldAutoConfig)) {
     return null;

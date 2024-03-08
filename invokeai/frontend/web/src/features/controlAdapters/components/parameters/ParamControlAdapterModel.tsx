@@ -6,7 +6,6 @@ import { useControlAdapterModel } from 'features/controlAdapters/hooks/useContro
 import { useControlAdapterModelQuery } from 'features/controlAdapters/hooks/useControlAdapterModelQuery';
 import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
 import { controlAdapterModelChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { getModelKeyAndBase } from 'features/metadata/util/modelFetchingHelpers';
 import { memo, useCallback, useMemo } from 'react';
 import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 
@@ -17,21 +16,21 @@ type ParamControlAdapterModelProps = {
 const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   const isEnabled = useControlAdapterIsEnabled(id);
   const controlAdapterType = useControlAdapterType(id);
-  const model = useControlAdapterModel(id);
+  const { modelConfig } = useControlAdapterModel(id);
   const dispatch = useAppDispatch();
   const currentBaseModel = useAppSelector((s) => s.generation.model?.base);
 
   const { data, isLoading } = useControlAdapterModelQuery(controlAdapterType);
 
   const _onChange = useCallback(
-    (model: ControlNetModelConfig | IPAdapterModelConfig | T2IAdapterModelConfig | null) => {
-      if (!model) {
+    (modelConfig: ControlNetModelConfig | IPAdapterModelConfig | T2IAdapterModelConfig | null) => {
+      if (!modelConfig) {
         return;
       }
       dispatch(
         controlAdapterModelChanged({
           id,
-          model: getModelKeyAndBase(model),
+          modelConfig,
         })
       );
     },
@@ -39,8 +38,8 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   );
 
   const selectedModel = useMemo(
-    () => (model && controlAdapterType ? { ...model, model_type: controlAdapterType } : null),
-    [controlAdapterType, model]
+    () => (modelConfig && controlAdapterType ? { ...modelConfig, model_type: controlAdapterType } : null),
+    [controlAdapterType, modelConfig]
   );
 
   const { items, selectedItem, onChange, placeholder } = useModelCustomSelect({
