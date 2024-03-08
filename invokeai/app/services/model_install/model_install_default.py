@@ -344,7 +344,7 @@ class ModelInstallService(ModelInstallServiceBase):
         """Unregister the model. Delete its files only if they are within our models directory."""
         model = self.record_store.get_model(key)
         models_dir = self.app_config.models_path
-        model_path = models_dir / model.path
+        model_path = Path(model.path)
         if model_path.is_relative_to(models_dir):
             self.unconditionally_delete(key)
         else:
@@ -352,11 +352,11 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def unconditionally_delete(self, key: str) -> None:  # noqa D102
         model = self.record_store.get_model(key)
-        path = self.app_config.models_path / model.path
-        if path.is_dir():
-            rmtree(path)
+        model_path = Path(model.path)
+        if model_path.is_dir():
+            rmtree(model_path)
         else:
-            path.unlink()
+            model_path.unlink()
         self.unregister(key)
 
     def download_and_cache(
