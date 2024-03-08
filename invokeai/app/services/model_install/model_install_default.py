@@ -493,7 +493,7 @@ class ModelInstallService(ModelInstallServiceBase):
             self._logger.info(f"Scanning {self._app_config.models_path} for new and orphaned models")
             for cur_base_model in BaseModelType:
                 for cur_model_type in ModelType:
-                    models_dir = Path(cur_base_model.value, cur_model_type.value)
+                    models_dir = self._app_config.models_path / Path(cur_base_model.value, cur_model_type.value)
                     installed.update(self.scan_directory(models_dir))
             self._logger.info(f"{len(installed)} new models registered; {len(defunct_models)} unregistered")
 
@@ -518,7 +518,7 @@ class ModelInstallService(ModelInstallServiceBase):
         new_path = models_dir / model.base.value / model.type.value / model.name
         self._logger.info(f"Moving {model.name} to {new_path}.")
         new_path = self._move_model(old_path, new_path)
-        model.path = new_path.relative_to(models_dir).as_posix()
+        model.path = new_path.as_posix()
         self.record_store.update_model(key, ModelRecordChanges(path=model.path))
         return model
 
@@ -580,9 +580,6 @@ class ModelInstallService(ModelInstallServiceBase):
             config["hash"] = uuid_string()
 
         info = info or ModelProbe.probe(model_path, config)
-
-        if not model_path.is_absolute():
-            model_path = (self._app_config.models_path / model_path)
 
         model_path = model_path.resolve()
 
