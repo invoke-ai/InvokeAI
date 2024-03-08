@@ -312,7 +312,7 @@ class MainDiffusersConfig(DiffusersConfigBase, MainConfigBase):
         return Tag(f"{ModelType.Main.value}.{ModelFormat.Diffusers.value}")
 
 
-class IPAdapterConfig(ModelConfigBase, ControlAdapterConfigBase):
+class IPAdapterConfig(ModelConfigBase):
     """Model config for IP Adaptor format models."""
 
     type: Literal[ModelType.IPAdapter] = ModelType.IPAdapter
