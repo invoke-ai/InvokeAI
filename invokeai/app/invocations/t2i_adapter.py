@@ -9,7 +9,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation_output,
 )
 from invokeai.app.invocations.controlnet_image_processors import CONTROLNET_RESIZE_VALUES
-from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, OutputField
+from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, OutputField, UIType
 from invokeai.app.invocations.model import ModelField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -57,6 +57,7 @@ class T2IAdapterInvocation(BaseInvocation):
         title="T2I-Adapter Model",
         input=Input.Direct,
         ui_order=-1,
+        ui_type=UIType.T2IAdapterModel,
     )
     weight: Union[float, list[float]] = InputField(
         default=1, ge=0, description="The weight given to the T2I-Adapter", title="Weight"

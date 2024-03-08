@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.model_manager.config import SubModelType
@@ -84,7 +84,7 @@ class ModelLoaderOutput(UNetOutput, CLIPOutput, VAEOutput):
 class MainModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
 
-    model: ModelField = InputField(description=FieldDescriptions.main_model, input=Input.Direct)
+    model: ModelField = InputField(description=FieldDescriptions.main_model, input=Input.Direct, ui_type=UIType.MainModel)
     # TODO: precision?
 
     def invoke(self, context: InvocationContext) -> ModelLoaderOutput:
@@ -117,7 +117,7 @@ class LoRALoaderOutput(BaseInvocationOutput):
 class LoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
-    lora: ModelField = InputField(description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA")
+    lora: ModelField = InputField(description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA", ui_type=UIType.LoRAModel)
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
     unet: Optional[UNetField] = InputField(
         default=None,
@@ -186,7 +186,7 @@ class SDXLLoRALoaderOutput(BaseInvocationOutput):
 class SDXLLoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
-    lora: ModelField = InputField(description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA")
+    lora: ModelField = InputField(description=FieldDescriptions.lora_model, input=Input.Direct, title="LoRA", ui_type=UIType.LoRAModel)
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
     unet: Optional[UNetField] = InputField(
         default=None,
@@ -262,6 +262,7 @@ class VAELoaderInvocation(BaseInvocation):
         description=FieldDescriptions.vae_model,
         input=Input.Direct,
         title="VAE",
+        ui_type=UIType.VAEModel
     )
 
     def invoke(self, context: InvocationContext) -> VAEOutput:

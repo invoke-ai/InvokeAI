@@ -39,13 +39,15 @@ class UIType(str, Enum, metaclass=MetaEnum):
     """
 
     # region Model Field Types
+    MainModel = "MainModelField"
     SDXLMainModel = "SDXLMainModelField"
     SDXLRefinerModel = "SDXLRefinerModelField"
     ONNXModel = "ONNXModelField"
-    VaeModel = "VAEModelField"
+    VAEModel = "VAEModelField"
     LoRAModel = "LoRAModelField"
     ControlNetModel = "ControlNetModelField"
     IPAdapterModel = "IPAdapterModelField"
+    T2IAdapterModel = "T2IAdapterModelField"
     # endregion
 
     # region Misc Field Types
@@ -86,7 +88,6 @@ class UIType(str, Enum, metaclass=MetaEnum):
     IntegerPolymorphic = "DEPRECATED_IntegerPolymorphic"
     LatentsPolymorphic = "DEPRECATED_LatentsPolymorphic"
     StringPolymorphic = "DEPRECATED_StringPolymorphic"
-    MainModel = "DEPRECATED_MainModel"
     UNet = "DEPRECATED_UNet"
     Vae = "DEPRECATED_Vae"
     CLIP = "DEPRECATED_CLIP"
