@@ -170,11 +170,12 @@ two configs are kept in separate sections of the config file:
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Literal, Optional
 
 from omegaconf import DictConfig, OmegaConf
-from pydantic import Field
+from pydantic import BaseModel, Field, field_validator
 from pydantic.config import JsonDict
 from pydantic_settings import SettingsConfigDict
 
@@ -203,6 +204,21 @@ class Categories(object):
     Queue: JsonDict = {"category": "Queue"}
     Nodes: JsonDict = {"category": "Nodes"}
     MemoryPerformance: JsonDict = {"category": "Memory/Performance"}
+
+
+class URLRegexToken(BaseModel):
+    url_regex: str = Field(description="Regular expression to match against the URL")
+    token: str = Field(description="Token to use when the URL matches the regex")
+
+    @field_validator("url_regex")
+    @classmethod
+    def validate_url_regex(cls, v: str) -> str:
+        """Validate that the value is a valid regex."""
+        try:
+            re.compile(v)
+        except re.error as e:
+            raise ValueError(f"Invalid regex: {e}")
+        return v
 
 
 class InvokeAIAppConfig(InvokeAISettings):
@@ -288,7 +304,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     node_cache_size     : int = Field(default=512, description="How many cached nodes to keep in memory", json_schema_extra=Categories.Nodes)
 
     # MODEL IMPORT
-    remote_repo_api_key : Optional[str] = Field(default=os.environ.get("INVOKEAI_REMOTE_REPO_API_KEY"), description="API key used when downloading remote repositories", json_schema_extra=Categories.Other)
+    remote_api_tokens   : Optional[list[URLRegexToken]] = Field(default=None, description="List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.", json_schema_extra=Categories.Other)
 
     # DEPRECATED FIELDS - STILL HERE IN ORDER TO OBTAN VALUES FROM PRE-3.1 CONFIG FILES
     always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", json_schema_extra=Categories.MemoryPerformance)
