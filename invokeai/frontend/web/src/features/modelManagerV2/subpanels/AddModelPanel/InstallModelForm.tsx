@@ -1,4 +1,4 @@
-import { Button, Checkbox, Flex, FormControl, FormLabel, Input, Tooltip } from '@invoke-ai/ui-library';
+import { Button, Checkbox, Flex, FormControl, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
@@ -64,28 +64,36 @@ export const InstallModelForm = () => {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
-      <Flex gap={2} alignItems="flex-end" justifyContent="space-between">
-        <FormControl>
-          <Flex direction="column" w="full">
+      <Flex flexDir="column" gap={4}>
+        <Flex gap={2} alignItems="flex-end" justifyContent="space-between">
+          <FormControl orientation="vertical">
             <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
             <Input {...register('location')} />
+          </FormControl>
+          <Button
+            onClick={handleSubmit(onSubmit)}
+            isDisabled={!formState.isDirty}
+            isLoading={isLoading}
+            type="submit"
+            size="sm"
+            mb={1}
+          >
+            {t('modelManager.addModel')}
+          </Button>
+        </Flex>
+
+        <FormControl>
+          <Flex flexDir="column" gap={2}>
+            <Flex gap={4}>
+              <Checkbox {...register('inplace')} />
+              <FormLabel>
+                {t('modelManager.inplaceInstall')} ({t('modelManager.localOnly')})
+              </FormLabel>
+            </Flex>
+            <FormHelperText>{t('modelManager.inplaceInstallDesc')}</FormHelperText>
           </Flex>
         </FormControl>
-        <Button onClick={handleSubmit(onSubmit)} isDisabled={!formState.isDirty} isLoading={isLoading} type="submit">
-          {t('modelManager.addModel')}
-        </Button>
       </Flex>
-
-      <FormControl flexDir="column" gap="1" alignItems="flex-start" mt={3}>
-        <Tooltip label={t('modelManager.inplaceInstallTooltip')}>
-          <Flex gap={3}>
-            <Checkbox {...register('inplace')} />
-            <FormLabel>
-              {t('modelManager.inplaceInstall')} ({t('modelManager.localOnly')})
-            </FormLabel>
-          </Flex>
-        </Tooltip>
-      </FormControl>
     </form>
   );
 };
