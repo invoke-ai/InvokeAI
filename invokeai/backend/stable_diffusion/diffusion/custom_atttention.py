@@ -88,13 +88,12 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
         # End unmodified block from AttnProcessor2_0.
 
         # Handle regional prompt attention masks.
-        if regional_prompt_data is not None:
+        if regional_prompt_data is not None and is_cross_attention:
             assert percent_through is not None
             _, query_seq_len, _ = hidden_states.shape
-            if is_cross_attention:
-                prompt_region_attention_mask = regional_prompt_data.get_cross_attn_mask(
-                    query_seq_len=query_seq_len, key_seq_len=sequence_length
-                )
+            prompt_region_attention_mask = regional_prompt_data.get_cross_attn_mask(
+                query_seq_len=query_seq_len, key_seq_len=sequence_length
+            )
 
             if attention_mask is None:
                 attention_mask = prompt_region_attention_mask
