@@ -321,7 +321,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     model_path = self._app_config.models_path / model_path
                 model_path = model_path.resolve()
                 description = stanza.get("description", "")
-                config_path =stanza.get("config", "")
+                config_path = stanza.get("config", "")
                 model_info = {"name": model_name, "description": description, "config_path": config_path}
 
                 try:
