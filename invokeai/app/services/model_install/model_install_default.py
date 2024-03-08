@@ -197,9 +197,16 @@ class ModelInstallService(ModelInstallServiceBase):
                 access_token=access_token,
             )
         elif re.match(r"^https?://[^/]+", source):
+            # Pull the token from config if it exists and matches the URL
+            _token = access_token
+            if _token is None:
+                for pair in self.app_config.remote_api_tokens or []:
+                    if re.search(pair.url_regex, source):
+                        _token = pair.token
+                        break
             source_obj = URLModelSource(
                 url=AnyHttpUrl(source),
-                access_token=self.app_config.remote_repo_api_key,
+                access_token=_token,
             )
         else:
             raise ValueError(f"Unsupported model source: '{source}'")
