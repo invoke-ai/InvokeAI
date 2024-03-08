@@ -297,8 +297,11 @@ class ModelInstallService(ModelInstallServiceBase):
             yaml = self._get_yaml()
         except OSError:
             return
+
         if len(db_models) == 0 and len(yaml.items()) != 0:
-            self._logger.info("No models in DB, yaml items need to be migrated")
+            self._logger.info(
+                f"Starting one-time migration of {len(yaml.items())} models in yaml file to DB. This may take a few minutes."
+            )
 
             for model_key, stanza in yaml.items():
                 if model_key == "__metadata__":
@@ -312,11 +315,12 @@ class ModelInstallService(ModelInstallServiceBase):
                 if not model_path.is_absolute():
                     model_path = self._app_config.models_path / model_path
                 model_path = model_path.resolve()
-                description = stanza["description"]
+                description = stanza.get("description", "")
                 model_info = {"name": model_name, "description": description}
 
                 try:
-                    self.register_path(model_path=model_path, config=model_info)
+                    id = self.register_path(model_path=model_path, config=model_info)
+                    self._logger.info(f"Registered {model_name} with id {id}")
                 except Exception as e:
                     self._logger.warning(f"Model at {model_path} could not be loaded into database: {e}")
 
