@@ -1,6 +1,7 @@
 import { Box, Flex, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
+import { ControlNetOrT2IAdapterDefaultSettings } from 'features/modelManagerV2/subpanels/ModelPanel/ControlNetOrT2IAdapterDefaultSettings/ControlNetOrT2IAdapterDefaultSettings';
 import { TriggerPhrases } from 'features/modelManagerV2/subpanels/ModelPanel/TriggerPhrases';
 import { useTranslation } from 'react-i18next';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
@@ -62,6 +63,11 @@ export const ModelView = () => {
       {data.type === 'main' && (
         <Box layerStyle="second" borderRadius="base" p={4}>
           <MainModelDefaultSettings />
+        </Box>
+      )}
+      {(data.type === 'controlnet' || data.type === 't2i_adapter') && (
+        <Box layerStyle="second" borderRadius="base" p={4}>
+          <ControlNetOrT2IAdapterDefaultSettings />
         </Box>
       )}
       {(data.type === 'main' || data.type === 'lora') && (

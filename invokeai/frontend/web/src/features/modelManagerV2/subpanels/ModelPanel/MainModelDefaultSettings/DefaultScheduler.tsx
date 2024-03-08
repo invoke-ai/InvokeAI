@@ -1,7 +1,7 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/SettingToggle';
+import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/SettingToggle';
 import { SCHEDULER_OPTIONS } from 'features/parameters/types/constants';
 import { isParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import { useCallback, useMemo } from 'react';
@@ -9,11 +9,11 @@ import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
-import type { DefaultSettingsFormData } from './DefaultSettingsForm';
+import type { MainModelDefaultSettingsFormData } from './MainModelDefaultSettings';
 
-type DefaultSchedulerType = DefaultSettingsFormData['scheduler'];
+type DefaultSchedulerType = MainModelDefaultSettingsFormData['scheduler'];
 
-export function DefaultScheduler(props: UseControllerProps<DefaultSettingsFormData>) {
+export function DefaultScheduler(props: UseControllerProps<MainModelDefaultSettingsFormData>) {
   const { t } = useTranslation();
   const { field } = useController(props);
 

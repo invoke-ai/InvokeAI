@@ -1,17 +1,17 @@
 import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/SettingToggle';
+import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/SettingToggle';
 import { useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
-import type { DefaultSettingsFormData } from './DefaultSettingsForm';
+import type { MainModelDefaultSettingsFormData } from './MainModelDefaultSettings';
 
-type DefaultCfgType = DefaultSettingsFormData['cfgScale'];
+type DefaultCfgType = MainModelDefaultSettingsFormData['cfgScale'];
 
-export function DefaultCfgScale(props: UseControllerProps<DefaultSettingsFormData>) {
+export function DefaultCfgScale(props: UseControllerProps<MainModelDefaultSettingsFormData>) {
   const { field } = useController(props);
 
   const sliderMin = useAppSelector((s) => s.config.sd.guidance.sliderMin);
