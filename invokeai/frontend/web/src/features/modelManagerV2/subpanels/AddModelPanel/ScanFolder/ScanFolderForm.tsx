@@ -1,4 +1,6 @@
 import { Button, Flex, FormControl, FormErrorMessage, FormLabel, Input } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { setScanPath } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import type { ChangeEventHandler } from 'react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,7 +9,8 @@ import { useLazyScanFolderQuery } from 'services/api/endpoints/models';
 import { ScanModelsResults } from './ScanFolderResults';
 
 export const ScanModelsForm = () => {
-  const [scanPath, setScanPath] = useState('');
+  const scanPath = useAppSelector((state) => state.modelmanagerV2.scanPath);
+  const dispatch = useAppDispatch();
   const [errorMessage, setErrorMessage] = useState('');
   const { t } = useTranslation();
 
@@ -21,10 +24,13 @@ export const ScanModelsForm = () => {
     });
   }, [_scanFolder, scanPath]);
 
-  const handleSetScanPath: ChangeEventHandler<HTMLInputElement> = useCallback((e) => {
-    setScanPath(e.target.value);
-    setErrorMessage('');
-  }, []);
+  const handleSetScanPath: ChangeEventHandler<HTMLInputElement> = useCallback(
+    (e) => {
+      dispatch(setScanPath(e.target.value));
+      setErrorMessage('');
+    },
+    [dispatch]
+  );
 
   return (
     <Flex flexDir="column" height="100%">
@@ -36,7 +42,11 @@ export const ScanModelsForm = () => {
               <Input value={scanPath} onChange={handleSetScanPath} />
             </Flex>
 
-            <Button onClick={scanFolder} isLoading={isLoading} isDisabled={scanPath.length === 0}>
+            <Button
+              onClick={scanFolder}
+              isLoading={isLoading}
+              isDisabled={scanPath === undefined || scanPath.length === 0}
+            >
               {t('modelManager.scanFolder')}
             </Button>
           </Flex>
