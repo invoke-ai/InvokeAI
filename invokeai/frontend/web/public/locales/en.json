@@ -116,6 +116,7 @@
         "imagePrompt": "Image Prompt",
         "imageFailedToLoad": "Unable to Load Image",
         "img2img": "Image To Image",
+        "initializingInvokeAI": "Initializing Invoke AI ...",
         "inpaint": "inpaint",
         "input": "Input",
         "installed": "Installed",
