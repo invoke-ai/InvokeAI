@@ -197,7 +197,7 @@ class Categories(object):
     Paths: JsonDict = {"category": "Paths"}
     Logging: JsonDict = {"category": "Logging"}
     Development: JsonDict = {"category": "Development"}
-    Other: JsonDict = {"category": "Other"}
+    ModelInstall: JsonDict = {"category": "Model Install"}
     ModelCache: JsonDict = {"category": "Model Cache"}
     Device: JsonDict = {"category": "Device"}
     Generation: JsonDict = {"category": "Generation"}
@@ -304,7 +304,7 @@ class InvokeAIAppConfig(InvokeAISettings):
     node_cache_size     : int = Field(default=512, description="How many cached nodes to keep in memory", json_schema_extra=Categories.Nodes)
 
     # MODEL IMPORT
-    remote_api_tokens   : Optional[list[URLRegexToken]] = Field(default=None, description="List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.", json_schema_extra=Categories.Other)
+    remote_api_tokens   : Optional[list[URLRegexToken]] = Field(default=None, description="List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.", json_schema_extra=Categories.ModelInstall)
 
     # DEPRECATED FIELDS - STILL HERE IN ORDER TO OBTAN VALUES FROM PRE-3.1 CONFIG FILES
     always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", json_schema_extra=Categories.MemoryPerformance)
