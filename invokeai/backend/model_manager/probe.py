@@ -346,23 +346,25 @@ class ControlAdapterProbe(ProbeBase):
         "mlsd": "mlsd_image_processor",
         "depth": "depth_anything_image_processor",
         "bae": "normalbae_image_processor",
-        "normal_bae": "normalbae_image_processor",
+        "normal": "normalbae_image_processor",
         "sketch": "pidi_image_processor",
         "scribble": "lineart_image_processor",
         "lineart": "lineart_image_processor",
         "lineart_anime": "lineart_anime_image_processor",
         "softedge": "hed_image_processor",
         "shuffle": "content_shuffle_image_processor",
-        "openpose": "dw_openpose_image_processor",
+        "pose": "dw_openpose_image_processor",
         "mediapipe": "mediapipe_face_processor",
         "pidi": "pidi_image_processor",
         "zoe": "zoe_depth_image_processor",
         "color": "color_map_image_processor",
     }
 
-    def get_default_settings(self, model_name: str) -> Optional[ControlAdapterDefaultSettings]:
-        if model_name in self.MODEL_NAME_TO_PREPROCESSOR:
-            return ControlAdapterDefaultSettings(preprocessor=self.MODEL_NAME_TO_PREPROCESSOR[model_name])
+    @classmethod
+    def get_default_settings(cls, model_name: str) -> Optional[ControlAdapterDefaultSettings]:
+        for k, v in cls.MODEL_NAME_TO_PREPROCESSOR.items():
+            if k in model_name:
+                return ControlAdapterDefaultSettings(preprocessor=v)
         return None
 
 
