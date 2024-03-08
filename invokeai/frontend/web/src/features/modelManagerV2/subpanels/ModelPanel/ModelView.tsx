@@ -5,7 +5,7 @@ import { TriggerPhrases } from 'features/modelManagerV2/subpanels/ModelPanel/Tri
 import { useTranslation } from 'react-i18next';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
 
-import { DefaultSettings } from './DefaultSettings';
+import { MainModelDefaultSettings } from './MainModelDefaultSettings/MainModelDefaultSettings';
 import { ModelAttrView } from './ModelAttrView';
 
 export const ModelView = () => {
@@ -61,7 +61,7 @@ export const ModelView = () => {
       </Box>
       {data.type === 'main' && (
         <Box layerStyle="second" borderRadius="base" p={4}>
-          <DefaultSettings />
+          <MainModelDefaultSettings />
         </Box>
       )}
       {(data.type === 'main' || data.type === 'lora') && (

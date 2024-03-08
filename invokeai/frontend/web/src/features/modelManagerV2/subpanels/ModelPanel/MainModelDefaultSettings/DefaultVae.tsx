@@ -3,7 +3,7 @@ import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/DefaultSettings/SettingToggle';
+import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/SettingToggle';
 import { map } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';

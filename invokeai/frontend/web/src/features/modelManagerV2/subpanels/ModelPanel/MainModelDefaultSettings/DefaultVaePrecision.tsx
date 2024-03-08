@@ -1,7 +1,7 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/DefaultSettings/SettingToggle';
+import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/SettingToggle';
 import { isParameterPrecision } from 'features/parameters/types/parameterSchemas';
 import { useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';

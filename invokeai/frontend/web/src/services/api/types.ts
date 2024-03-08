@@ -89,6 +89,12 @@ export const isControlAdapterModelConfig = (
   return isControlNetModelConfig(config) || isT2IAdapterModelConfig(config) || isIPAdapterModelConfig(config);
 };
 
+export const isControlNetOrT2IAdapterModelConfig = (
+  config: AnyModelConfig
+): config is ControlNetModelConfig | T2IAdapterModelConfig => {
+  return isControlNetModelConfig(config) || isT2IAdapterModelConfig(config);
+};
+
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base !== 'sdxl-refiner';
 };
