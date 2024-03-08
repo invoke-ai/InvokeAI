@@ -72,7 +72,7 @@ export const InstallModelForm = () => {
           </FormControl>
           <Button
             onClick={handleSubmit(onSubmit)}
-            isDisabled={!formState.isDirty}
+            isDisabled={!formState.dirtyFields.location}
             isLoading={isLoading}
             type="submit"
             size="sm"
