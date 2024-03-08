@@ -131,7 +131,7 @@ class ModelSourceType(str, Enum):
     HFRepoID = "hf_repo_id"
 
 
-class ModelDefaultSettings(BaseModel):
+class MainModelDefaultSettings(BaseModel):
     vae: str | None
     vae_precision: str | None
     scheduler: SCHEDULER_NAME_VALUES | None
@@ -155,9 +155,6 @@ class ModelConfigBase(BaseModel):
     source_type: ModelSourceType = Field(description="The type of source")
     source_api_response: Optional[str] = Field(
         description="The original API response from the source, as stringified JSON.", default=None
-    )
-    default_settings: Optional[ModelDefaultSettings] = Field(
-        description="Default settings for this model", default=None
     )
     cover_image: Optional[str] = Field(description="Url for image to preview model", default=None)
 
@@ -279,6 +276,9 @@ class TextualInversionFolderConfig(ModelConfigBase):
 class MainConfigBase(ModelConfigBase):
     type: Literal[ModelType.Main] = ModelType.Main
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
+    default_settings: Optional[MainModelDefaultSettings] = Field(
+        description="Default settings for this model", default=None
+    )
 
 
 class MainCheckpointConfig(CheckpointConfigBase, MainConfigBase):

@@ -18,7 +18,7 @@ from invokeai.backend.model_manager import (
     ModelFormat,
     ModelType,
 )
-from invokeai.backend.model_manager.config import ModelDefaultSettings, ModelVariantType, SchedulerPredictionType
+from invokeai.backend.model_manager.config import MainModelDefaultSettings, ModelVariantType, SchedulerPredictionType
 
 
 class DuplicateModelException(Exception):
@@ -68,7 +68,7 @@ class ModelRecordChanges(BaseModelExcludeNull):
     description: Optional[str] = Field(description="Model description", default=None)
     base: Optional[BaseModelType] = Field(description="The base model.", default=None)
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
-    default_settings: Optional[ModelDefaultSettings] = Field(
+    default_settings: Optional[MainModelDefaultSettings] = Field(
         description="Default settings for this model", default=None
     )
 
