@@ -684,7 +684,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         if self.denoise_mask.masked_latents_name is not None:
             masked_latents = context.tensors.load(self.denoise_mask.masked_latents_name)
         else:
-            masked_latents = None
+            masked_latents = torch.where(mask < 0.5, 0.0, latents)
 
         return 1 - mask, masked_latents, self.denoise_mask.gradient
 
