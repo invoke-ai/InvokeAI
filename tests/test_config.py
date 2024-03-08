@@ -18,9 +18,10 @@ init1 = OmegaConf.create(
 InvokeAI:
   Features:
     always_use_cpu: false
-  Memory/Performance:
-    max_cache_size: 5
-    tiled_decode: false
+  Model Cache:
+    convert_cache: 5
+  Generation:
+    force_tiled_decode: false
 """
 )
 
@@ -29,9 +30,10 @@ init2 = OmegaConf.create(
 InvokeAI:
   Features:
     always_use_cpu: true
-  Memory/Performance:
-    max_cache_size: 2
-    tiled_decode: true
+  Model Cache:
+    convert_cache: 2
+  Generation:
+    force_tiled_decode: true
 """
 )
 
@@ -60,15 +62,15 @@ def test_use_init(patch_rootdir):
     conf1 = InvokeAIAppConfig.get_config()
     assert conf1
     conf1.parse_args(conf=init1, argv=[])
-    assert not conf1.tiled_decode
-    assert conf1.max_cache_size == 5
+    assert not conf1.force_tiled_decode
+    assert conf1.convert_cache == 5
     assert not conf1.always_use_cpu
 
     conf2 = InvokeAIAppConfig.get_config()
     assert conf2
     conf2.parse_args(conf=init2, argv=[])
-    assert conf2.tiled_decode
-    assert conf2.max_cache_size == 2
+    assert conf2.force_tiled_decode
+    assert conf2.convert_cache == 2
     assert not hasattr(conf2, "invalid_attribute")
 
 
