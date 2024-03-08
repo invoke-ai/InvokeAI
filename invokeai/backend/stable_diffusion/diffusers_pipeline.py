@@ -23,7 +23,10 @@ from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.ip_adapter.unet_patcher import UNetPatcher
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData, IPAdapterConditioningInfo
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    IPAdapterConditioningInfo,
+    TextConditioningData,
+)
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from invokeai.backend.util.attention import auto_detect_slice_size
 from invokeai.backend.util.devices import normalize_device
@@ -297,7 +300,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         latents: torch.Tensor,
         num_inference_steps: int,
         scheduler_step_kwargs: dict[str, Any],
-        conditioning_data: ConditioningData,
+        conditioning_data: TextConditioningData,
         *,
         noise: Optional[torch.Tensor],
         timesteps: torch.Tensor,
@@ -383,7 +386,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         self,
         latents: torch.Tensor,
         timesteps,
-        conditioning_data: ConditioningData,
+        conditioning_data: TextConditioningData,
         scheduler_step_kwargs: dict[str, Any],
         *,
         additional_guidance: List[Callable] = None,
@@ -468,7 +471,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         self,
         t: torch.Tensor,
         latents: torch.Tensor,
-        conditioning_data: ConditioningData,
+        conditioning_data: TextConditioningData,
         step_index: int,
         total_step_count: int,
         scheduler_step_kwargs: dict[str, Any],

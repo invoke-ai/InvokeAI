@@ -57,7 +57,10 @@ from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import BaseModelType, LoadedModel
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData, IPAdapterConditioningInfo
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    IPAdapterConditioningInfo,
+    TextConditioningData,
+)
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 from ...backend.stable_diffusion.diffusers_pipeline import (
@@ -370,14 +373,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
         self,
         context: InvocationContext,
         unet: UNet2DConditionModel,
-    ) -> ConditioningData:
+    ) -> TextConditioningData:
         positive_cond_data = context.conditioning.load(self.positive_conditioning.conditioning_name)
         c = positive_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
 
         negative_cond_data = context.conditioning.load(self.negative_conditioning.conditioning_name)
         uc = negative_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
 
-        conditioning_data = ConditioningData(
+        conditioning_data = TextConditioningData(
             unconditioned_embeddings=uc,
             text_embeddings=c,
             guidance_scale=self.cfg_scale,

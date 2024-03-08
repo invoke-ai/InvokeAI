@@ -55,7 +55,7 @@ class IPAdapterConditioningInfo:
 
 
 @dataclass
-class ConditioningData:
+class TextConditioningData:
     unconditioned_embeddings: BasicConditioningInfo
     text_embeddings: BasicConditioningInfo
     """
