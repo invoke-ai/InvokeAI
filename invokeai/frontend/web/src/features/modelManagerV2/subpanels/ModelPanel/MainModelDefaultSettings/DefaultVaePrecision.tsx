@@ -1,23 +1,23 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/SettingToggle';
+import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/SettingToggle';
 import { isParameterPrecision } from 'features/parameters/types/parameterSchemas';
 import { useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
-import type { DefaultSettingsFormData } from './DefaultSettingsForm';
+import type { MainModelDefaultSettingsFormData } from './MainModelDefaultSettings';
 
 const options = [
   { label: 'FP16', value: 'fp16' },
   { label: 'FP32', value: 'fp32' },
 ];
 
-type DefaultVaePrecisionType = DefaultSettingsFormData['vaePrecision'];
+type DefaultVaePrecisionType = MainModelDefaultSettingsFormData['vaePrecision'];
 
-export function DefaultVaePrecision(props: UseControllerProps<DefaultSettingsFormData>) {
+export function DefaultVaePrecision(props: UseControllerProps<MainModelDefaultSettingsFormData>) {
   const { t } = useTranslation();
   const { field } = useController(props);
 

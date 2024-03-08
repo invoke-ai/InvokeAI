@@ -4,9 +4,9 @@ import { useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 
-import type { DefaultSettingsFormData, FormField } from './DefaultSettingsForm';
+import type { FormField } from './MainModelDefaultSettings/MainModelDefaultSettings';
 
-export function SettingToggle<T>(props: UseControllerProps<DefaultSettingsFormData>) {
+export function SettingToggle<T, F extends Record<string, FormField<T>>>(props: UseControllerProps<F>) {
   const { field } = useController(props);
 
   const value = useMemo(() => {
