@@ -404,22 +404,35 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if timesteps.shape[0] == 0:
             return latents
 
-        ip_adapter_unet_patcher = None
         extra_conditioning_info = conditioning_data.cond_text.extra_conditioning
-        if extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control:
+        use_cross_attention_control = (
+            extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control
+        )
+        use_ip_adapter = ip_adapter_data is not None
+        use_regional_prompting = (
+            conditioning_data.cond_regions is not None or conditioning_data.uncond_regions is not None
+        )
+        if use_cross_attention_control and use_ip_adapter:
+            raise ValueError(
+                "Prompt-to-prompt cross-attention control (`.swap()`) and IP-Adapter cannot be used simultaneously."
+            )
+        if use_cross_attention_control and use_regional_prompting:
+            raise ValueError(
+                "Prompt-to-prompt cross-attention control (`.swap()`) and regional prompting cannot be used simultaneously."
+            )
+
+        unet_attention_patcher = None
+        self.use_ip_adapter = use_ip_adapter
+        attn_ctx = nullcontext()
+        if use_cross_attention_control:
             attn_ctx = self.invokeai_diffuser.custom_attention_context(
                 self.invokeai_diffuser.model,
                 extra_conditioning_info=extra_conditioning_info,
             )
-            self.use_ip_adapter = False
-        elif ip_adapter_data is not None:
-            # TODO(ryand): Should we raise an exception if both custom attention and IP-Adapter attention are active?
-            # As it is now, the IP-Adapter will silently be skipped.
-            ip_adapter_unet_patcher = UNetAttentionPatcher([ipa.ip_adapter_model for ipa in ip_adapter_data])
-            attn_ctx = ip_adapter_unet_patcher.apply_ip_adapter_attention(self.invokeai_diffuser.model)
-            self.use_ip_adapter = True
-        else:
-            attn_ctx = nullcontext()
+        if use_ip_adapter or use_regional_prompting:
+            ip_adapters = [ipa.ip_adapter_model for ipa in ip_adapter_data] if use_ip_adapter else None
+            unet_attention_patcher = UNetAttentionPatcher(ip_adapters)
+            attn_ctx = unet_attention_patcher.apply_ip_adapter_attention(self.invokeai_diffuser.model)
 
         with attn_ctx:
             if callback is not None:
@@ -447,7 +460,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     control_data=control_data,
                     ip_adapter_data=ip_adapter_data,
                     t2i_adapter_data=t2i_adapter_data,
-                    ip_adapter_unet_patcher=ip_adapter_unet_patcher,
+                    unet_attention_patcher=unet_attention_patcher,
                 )
                 latents = step_output.prev_sample
                 predicted_original = getattr(step_output, "pred_original_sample", None)
@@ -479,7 +492,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         control_data: List[ControlNetData] = None,
         ip_adapter_data: Optional[list[IPAdapterData]] = None,
         t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
-        ip_adapter_unet_patcher: Optional[UNetAttentionPatcher] = None,
+        unet_attention_patcher: Optional[UNetAttentionPatcher] = None,
     ):
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
@@ -506,10 +519,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 )
                 if step_index >= first_adapter_step and step_index <= last_adapter_step:
                     # Only apply this IP-Adapter if the current step is within the IP-Adapter's begin/end step range.
-                    ip_adapter_unet_patcher.set_scale(i, weight)
+                    unet_attention_patcher.set_scale(i, weight)
                 else:
                     # Otherwise, set the IP-Adapter's scale to 0, so it has no effect.
-                    ip_adapter_unet_patcher.set_scale(i, 0.0)
+                    unet_attention_patcher.set_scale(i, 0.0)
 
         # Handle ControlNet(s)
         down_block_additional_residuals = None
