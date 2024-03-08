@@ -140,6 +140,11 @@ class MainModelDefaultSettings(BaseModel):
     cfg_rescale_multiplier: float | None
 
 
+class ControlAdapterDefaultSettings(BaseModel):
+    # This could be narrowed to controlnet processor nodes, but they change. Leaving this a string is safer.
+    preprocessor: str | None
+
+
 class ModelConfigBase(BaseModel):
     """Base class for model configuration information."""
 
@@ -229,7 +234,13 @@ class VAEDiffusersConfig(ModelConfigBase):
         return Tag(f"{ModelType.VAE.value}.{ModelFormat.Diffusers.value}")
 
 
-class ControlNetDiffusersConfig(DiffusersConfigBase):
+class ControlAdapterConfigBase(BaseModel):
+    default_settings: Optional[ControlAdapterDefaultSettings] = Field(
+        description="Default settings for this model", default=None
+    )
+
+
+class ControlNetDiffusersConfig(DiffusersConfigBase, ControlAdapterConfigBase):
     """Model config for ControlNet models (diffusers version)."""
 
     type: Literal[ModelType.ControlNet] = ModelType.ControlNet
@@ -240,7 +251,7 @@ class ControlNetDiffusersConfig(DiffusersConfigBase):
         return Tag(f"{ModelType.ControlNet.value}.{ModelFormat.Diffusers.value}")
 
 
-class ControlNetCheckpointConfig(CheckpointConfigBase):
+class ControlNetCheckpointConfig(CheckpointConfigBase, ControlAdapterConfigBase):
     """Model config for ControlNet models (diffusers version)."""
 
     type: Literal[ModelType.ControlNet] = ModelType.ControlNet
@@ -301,7 +312,7 @@ class MainDiffusersConfig(DiffusersConfigBase, MainConfigBase):
         return Tag(f"{ModelType.Main.value}.{ModelFormat.Diffusers.value}")
 
 
-class IPAdapterConfig(ModelConfigBase):
+class IPAdapterConfig(ModelConfigBase, ControlAdapterConfigBase):
     """Model config for IP Adaptor format models."""
 
     type: Literal[ModelType.IPAdapter] = ModelType.IPAdapter
@@ -324,7 +335,7 @@ class CLIPVisionDiffusersConfig(ModelConfigBase):
         return Tag(f"{ModelType.CLIPVision.value}.{ModelFormat.Diffusers.value}")
 
 
-class T2IAdapterConfig(ModelConfigBase):
+class T2IAdapterConfig(ModelConfigBase, ControlAdapterConfigBase):
     """Model config for T2I."""
 
     type: Literal[ModelType.T2IAdapter] = ModelType.T2IAdapter
