@@ -1,10 +1,9 @@
-import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
-import { isControlAdapterProcessorType } from 'features/controlAdapters/store/types';
 import {
   initialControlNet,
   initialIPAdapter,
   initialT2IAdapter,
 } from 'features/controlAdapters/util/buildControlAdapter';
+import { buildControlAdapterProcessor } from 'features/controlAdapters/util/buildControlAdapterProcessor';
 import type { LoRA } from 'features/lora/store/loraSlice';
 import { defaultLoRAConfig } from 'features/lora/store/loraSlice';
 import type {
@@ -254,9 +253,7 @@ const parseControlNet: MetadataParseFunc<ControlNetConfigMetadata> = async (meta
     .catch(null)
     .parse(getProperty(metadataItem, 'resize_mode'));
 
-  const defaultPreprocessor = controlNetModel.default_settings?.preprocessor;
-  const processorType = isControlAdapterProcessorType(defaultPreprocessor) ? defaultPreprocessor : 'none';
-  const processorNode = CONTROLNET_PROCESSORS[processorType].default;
+  const { processorType, processorNode } = buildControlAdapterProcessor(controlNetModel);
 
   const controlNet: ControlNetConfigMetadata = {
     type: 'controlnet',
@@ -307,9 +304,7 @@ const parseT2IAdapter: MetadataParseFunc<T2IAdapterConfigMetadata> = async (meta
     .catch(null)
     .parse(getProperty(metadataItem, 'resize_mode'));
 
-  const defaultPreprocessor = t2iAdapterModel.default_settings?.preprocessor;
-  const processorType = isControlAdapterProcessorType(defaultPreprocessor) ? defaultPreprocessor : 'none';
-  const processorNode = CONTROLNET_PROCESSORS[processorType].default;
+  const { processorType, processorNode } = buildControlAdapterProcessor(t2iAdapterModel);
 
   const t2iAdapter: T2IAdapterConfigMetadata = {
     type: 't2i_adapter',
