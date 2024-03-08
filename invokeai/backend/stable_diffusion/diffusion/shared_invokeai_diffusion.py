@@ -10,10 +10,10 @@ from typing_extensions import TypeAlias
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
-    ConditioningData,
     ExtraConditioningInfo,
     IPAdapterConditioningInfo,
     SDXLConditioningInfo,
+    TextConditioningData,
 )
 
 from .cross_attention_control import (
@@ -199,7 +199,7 @@ class InvokeAIDiffuserComponent:
         self,
         sample: torch.Tensor,
         timestep: torch.Tensor,
-        conditioning_data: ConditioningData,
+        conditioning_data: TextConditioningData,
         ip_adapter_conditioning: Optional[list[IPAdapterConditioningInfo]],
         step_index: int,
         total_step_count: int,
@@ -300,7 +300,7 @@ class InvokeAIDiffuserComponent:
         self,
         x,
         sigma,
-        conditioning_data: ConditioningData,
+        conditioning_data: TextConditioningData,
         ip_adapter_conditioning: Optional[list[IPAdapterConditioningInfo]],
         down_block_additional_residuals: Optional[torch.Tensor] = None,  # for ControlNet
         mid_block_additional_residual: Optional[torch.Tensor] = None,  # for ControlNet
@@ -365,7 +365,7 @@ class InvokeAIDiffuserComponent:
         self,
         x: torch.Tensor,
         sigma,
-        conditioning_data: ConditioningData,
+        conditioning_data: TextConditioningData,
         ip_adapter_conditioning: Optional[list[IPAdapterConditioningInfo]],
         cross_attention_control_types_to_do: list[CrossAttentionType],
         down_block_additional_residuals: Optional[torch.Tensor] = None,  # for ControlNet
