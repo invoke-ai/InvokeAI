@@ -498,6 +498,52 @@ class InvokeAIAppConfig(InvokeAISettings):
         """Choose the runtime root directory when not specified on command line or init file."""
         return _find_root()
 
+    @staticmethod
+    def generate_docstrings() -> str:
+        """Helper function for mkdocs. Generates a docstring for the InvokeAIAppConfig class.
+
+        You shouldn't run this manually. Instead, run `scripts/update-config-docstring.py` to update the docstring.
+        A makefile target is also available: `make update-config-docstring`.
+
+        See that script for more information about why this is necessary.
+        """
+        docstring = '    """Invoke App Configuration\n\n'
+        docstring += "    Attributes:\n"
+
+        field_descriptions: dict[str, list[str]] = {}
+
+        for k, v in InvokeAIAppConfig.model_fields.items():
+            if not isinstance(v.json_schema_extra, dict):
+                # Should never happen
+                continue
+
+            category = v.json_schema_extra.get("category", None)
+            if not isinstance(category, str) or category == "Deprecated":
+                continue
+            if not field_descriptions.get(category):
+                field_descriptions[category] = []
+            field_descriptions[category].append(f"        {k}: **{category}**: {v.description}")
+
+        for c in [
+            "Web Server",
+            "Features",
+            "Paths",
+            "Logging",
+            "Development",
+            "Other",
+            "Model Cache",
+            "Device",
+            "Generation",
+            "Queue",
+            "Nodes",
+        ]:
+            docstring += "\n"
+            docstring += "\n".join(field_descriptions[c])
+
+        docstring += '\n    """'
+
+        return docstring
+
 
 def get_invokeai_config(**kwargs: Any) -> InvokeAIAppConfig:
     """Legacy function which returns InvokeAIAppConfig.get_config()."""
