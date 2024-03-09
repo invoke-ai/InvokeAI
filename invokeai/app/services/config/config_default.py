@@ -174,7 +174,6 @@ import re
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Literal, Optional
 
-import yaml
 from omegaconf import DictConfig, OmegaConf
 from pydantic import BaseModel, Field, field_validator
 from pydantic.config import JsonDict
@@ -228,7 +227,6 @@ class InvokeAIAppConfig(InvokeAISettings):
     """Invoke App Configuration
 
     Attributes:
-
         host: **Web Server**: IP address to bind to. Use `0.0.0.0` to serve to your local network.
         port: **Web Server**: Port to bind to.
         allow_origins: **Web Server**: Allowed CORS origins.
@@ -249,24 +247,20 @@ class InvokeAIAppConfig(InvokeAISettings):
         legacy_conf_dir: **Paths**: Path to directory of legacy checkpoint config files.
         db_dir: **Paths**: Path to InvokeAI databases directory.
         outdir: **Paths**: Path to directory for outputs.
-        use_memory_db: **Paths**: Use in-memory database. Useful for development.
         custom_nodes_dir: **Paths**: Path to directory for custom nodes.
         from_file: **Paths**: Take command input from the indicated file (command-line client only).
         log_handlers: **Logging**: Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".
         log_format: **Logging**: Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style.
         log_level: **Logging**: Emit logging messages at this level or higher.
         log_sql: **Logging**: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.
+        use_memory_db: **Development**: Use in-memory database. Useful for development.
         dev_reload: **Development**: Automatically reload when Python sources are changed. Does not reload node definitions.
         profile_graphs: **Development**: Enable graph profiling using `cProfile`.
         profile_prefix: **Development**: An optional prefix for profile output files.
         profiles_dir: **Development**: Path to profiles output directory.
-        skip_model_hash: **Development**: Skip model hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models.
         version: **CLIArgs**: CLI arg - show InvokeAI version and exit.
+        skip_model_hash: **Model Install**: Skip model hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models.
         remote_api_tokens: **Model Install**: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.
-            Examples:
-              remote_api_tokens:
-                token: my-secret-token
-                url_regex: https://example.com/.*
         ram: **Model Cache**: Maximum memory amount used by memory model cache for rapid switching (GB).
         vram: **Model Cache**: Amount of VRAM reserved for model storage (GB)
         convert_cache: **Model Cache**: Maximum size of on-disk converted models cache (GB)
@@ -318,7 +312,6 @@ class InvokeAIAppConfig(InvokeAISettings):
     legacy_conf_dir     : Path = Field(default=Path('configs/stable-diffusion'), description='Path to directory of legacy checkpoint config files.', json_schema_extra=Categories.Paths)
     db_dir              : Path = Field(default=Path('databases'), description='Path to InvokeAI databases directory.', json_schema_extra=Categories.Paths)
     outdir              : Path = Field(default=Path('outputs'), description='Path to directory for outputs.', json_schema_extra=Categories.Paths)
-    use_memory_db       : bool = Field(default=False, description='Use in-memory database. Useful for development.', json_schema_extra=Categories.Paths)
     custom_nodes_dir    : Path = Field(default=Path('nodes'), description='Path to directory for custom nodes.', json_schema_extra=Categories.Paths)
     # TODO(psyche): This is not used anywhere.
     from_file           : Optional[Path] = Field(default=None, description='Take command input from the indicated file (command-line client only).', json_schema_extra=Categories.Paths)
