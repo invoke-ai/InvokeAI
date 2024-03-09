@@ -513,10 +513,17 @@ class ModelInstallService(ModelInstallServiceBase):
         old_path = Path(model.path)
         models_dir = self.app_config.models_path
 
-        if not old_path.is_relative_to(models_dir):
+        try:
+            old_path.relative_to(models_dir)
             return model
+        except ValueError:
+            pass
 
         new_path = models_dir / model.base.value / model.type.value / model.name
+
+        if old_path == new_path:
+            return model
+
         self._logger.info(f"Moving {model.name} to {new_path}.")
         new_path = self._move_model(old_path, new_path)
         model.path = new_path.as_posix()
