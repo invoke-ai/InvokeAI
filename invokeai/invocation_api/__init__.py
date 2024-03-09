@@ -36,7 +36,7 @@ from invokeai.app.invocations.model import (
     CLIPField,
     CLIPOutput,
     LoRALoaderOutput,
-    ModelField,
+    ModelIdentifierField,
     ModelLoaderOutput,
     SDXLLoRALoaderOutput,
     UNetField,
@@ -114,7 +114,7 @@ __all__ = [
     "MetadataItemOutput",
     "MetadataOutput",
     # invokeai.app.invocations.model
-    "ModelField",
+    "ModelIdentifierField",
     "UNetField",
     "CLIPField",
     "VAEField",

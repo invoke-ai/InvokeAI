@@ -22,7 +22,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation
-    from invokeai.app.invocations.model import ModelField
+    from invokeai.app.invocations.model import ModelIdentifierField
     from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 
 """
@@ -300,7 +300,7 @@ class ConditioningInterface(InvocationContextInterface):
 
 
 class ModelsInterface(InvocationContextInterface):
-    def exists(self, identifier: Union[str, "ModelField"]) -> bool:
+    def exists(self, identifier: Union[str, "ModelIdentifierField"]) -> bool:
         """Checks if a model exists.
 
         Args:
@@ -314,7 +314,9 @@ class ModelsInterface(InvocationContextInterface):
 
         return self._services.model_manager.store.exists(identifier.key)
 
-    def load(self, identifier: Union[str, "ModelField"], submodel_type: Optional[SubModelType] = None) -> LoadedModel:
+    def load(
+        self, identifier: Union[str, "ModelIdentifierField"], submodel_type: Optional[SubModelType] = None
+    ) -> LoadedModel:
         """Loads a model.
 
         Args:
@@ -361,7 +363,7 @@ class ModelsInterface(InvocationContextInterface):
 
         return self._services.model_manager.load.load_model(configs[0], submodel_type, self._data)
 
-    def get_config(self, identifier: Union[str, "ModelField"]) -> AnyModelConfig:
+    def get_config(self, identifier: Union[str, "ModelIdentifierField"]) -> AnyModelConfig:
         """Gets a model's config.
 
         Args:

@@ -76,7 +76,7 @@ from .baseinvocation import (
     invocation_output,
 )
 from .controlnet_image_processors import ControlField
-from .model import ModelField, UNetField, VAEField
+from .model import ModelIdentifierField, UNetField, VAEField
 
 if choose_torch_device() == torch.device("mps"):
     from torch import mps
@@ -245,7 +245,7 @@ class CreateGradientMaskInvocation(BaseInvocation):
 
 def get_scheduler(
     context: InvocationContext,
-    scheduler_info: ModelField,
+    scheduler_info: ModelIdentifierField,
     scheduler_name: str,
     seed: int,
 ) -> Scheduler:
