@@ -3,6 +3,8 @@
 # values from the command line or config file.
 import sys
 
+from invokeai.app.invocations.model import ModelIdentifierField
+from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.version.invokeai_version import __version__
 
 from .services.config import InvokeAIAppConfig
@@ -156,17 +158,19 @@ def custom_openapi() -> dict[str, Any]:
         openapi_schema["components"]["schemas"][schema_key] = output_schema
         openapi_schema["components"]["schemas"][schema_key]["class"] = "output"
 
-    # Add Node Editor UI helper schemas
-    ui_config_schemas = models_json_schema(
+    # Some models don't end up in the schemas as standalone definitions
+    additional_schemas = models_json_schema(
         [
             (UIConfigBase, "serialization"),
             (InputFieldJSONSchemaExtra, "serialization"),
             (OutputFieldJSONSchemaExtra, "serialization"),
+            (ModelIdentifierField, "serialization"),
+            (ProgressImage, "serialization"),
         ],
         ref_template="#/components/schemas/{model}",
     )
-    for schema_key, ui_config_schema in ui_config_schemas[1]["$defs"].items():
-        openapi_schema["components"]["schemas"][schema_key] = ui_config_schema
+    for schema_key, schema_json in additional_schemas[1]["$defs"].items():
+        openapi_schema["components"]["schemas"][schema_key] = schema_json
 
     # Add a reference to the output type to additionalProperties of the invoker schema
     for invoker in all_invocations:
