@@ -162,6 +162,38 @@ Following the table are additional explanations for certain settings.
         members: false
 <!-- prettier-ignore-end -->
 
+### Model Marketplace API Keys
+
+Some model marketplaces require an API key to download models. You can provide a URL pattern and appropriate token in your `invokeai.yaml` file to provide that API key.
+
+The pattern can be any valid regex (you may need to surround the pattern with quotes):
+
+```yaml
+InvokeAI:
+  Model Install:
+    remote_api_tokens:
+      # Any URL containing `models.com` will automatically use `your_models_com_token`
+      - url_regex: models.com
+        token: your_models_com_token
+      # Any URL matching this contrived regex will use `some_other_token`
+      - url_regex: '^[a-z]{3}whatever.*\.com$'
+        token: some_other_token
+```
+
+The provided token will be added as a `Bearer` token to the network requests to download the model files. As far as we know, this works for all model marketplaces that require authorization.
+
+### Model Hashing
+
+Models are hashed during installation with the `BLAKE3` algorithm, providing a stable identifier for models across all platforms.
+
+Model hashing is a one-time operation, but it may take a couple minutes to hash a large model collection. You may opt out of model hashing and instead have a random UUID assigned instead:
+
+```yaml
+InvokeAI:
+  Model Install:
+    skip_model_hash: true
+```
+
 ### Paths
 
 These options set the paths of various directories and files used by
