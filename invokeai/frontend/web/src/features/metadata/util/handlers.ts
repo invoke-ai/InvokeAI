@@ -13,13 +13,13 @@ import type {
 } from 'features/metadata/types';
 import { fetchModelConfig } from 'features/metadata/util/modelFetchingHelpers';
 import { validators } from 'features/metadata/util/validators';
-import type { ModelIdentifierWithBase } from 'features/nodes/types/common';
+import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { t } from 'i18next';
 
 import { parsers } from './parsers';
 import { recallers } from './recallers';
 
-const renderModelConfigValue: MetadataRenderValueFunc<ModelIdentifierWithBase> = async (value) => {
+const renderModelConfigValue: MetadataRenderValueFunc<ModelIdentifierField> = async (value) => {
   try {
     const modelConfig = await fetchModelConfig(value.key);
     return `${modelConfig.name} (${modelConfig.base.toUpperCase()})`;

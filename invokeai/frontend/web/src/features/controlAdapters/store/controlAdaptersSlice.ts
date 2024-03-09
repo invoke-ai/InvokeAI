@@ -4,6 +4,7 @@ import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { buildControlAdapter } from 'features/controlAdapters/util/buildControlAdapter';
 import { buildControlAdapterProcessor } from 'features/controlAdapters/util/buildControlAdapterProcessor';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import { cloneDeep, merge, uniq } from 'lodash-es';
 import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { socketInvocationError } from 'services/events/actions';
@@ -197,7 +198,7 @@ export const controlAdaptersSlice = createSlice({
         return;
       }
 
-      const model = { key: modelConfig.key, base: modelConfig.base };
+      const model = zModelIdentifierField.parse(modelConfig);
 
       if (!isControlNetOrT2IAdapter(cn)) {
         caAdapter.updateOne(state, { id, changes: { model } });

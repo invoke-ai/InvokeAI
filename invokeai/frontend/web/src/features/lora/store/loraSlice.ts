@@ -1,7 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { getModelKeyAndBase } from 'features/metadata/util/modelFetchingHelpers';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
 import type { LoRAModelConfig } from 'services/api/types';
 
@@ -31,7 +31,7 @@ export const loraSlice = createSlice({
   initialState: initialLoraState,
   reducers: {
     loraAdded: (state, action: PayloadAction<LoRAModelConfig>) => {
-      const model = getModelKeyAndBase(action.payload);
+      const model = zModelIdentifierField.parse(action.payload);
       state.loras[model.key] = { ...defaultLoRAConfig, model };
     },
     loraRecalled: (state, action: PayloadAction<LoRA>) => {

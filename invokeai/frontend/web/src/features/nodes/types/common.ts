@@ -55,6 +55,17 @@ export type SchedulerField = z.infer<typeof zSchedulerField>;
 
 // #region Model-related schemas
 const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
+const zModelType = z.enum([
+  'main',
+  'vae',
+  'lora',
+  'controlnet',
+  't2i_adapter',
+  'ip_adapter',
+  'embedding',
+  'onnx',
+  'clip_vision',
+]);
 const zSubModelType = z.enum([
   'unet',
   'text_encoder',
@@ -67,26 +78,25 @@ const zSubModelType = z.enum([
   'scheduler',
   'safety_checker',
 ]);
-
-const zModelIdentifier = z.object({
+export const zModelIdentifierField = z.object({
   key: z.string().min(1),
+  hash: z.string().min(1),
+  name: z.string().min(1),
+  base: zBaseModel,
+  type: zModelType,
   submodel_type: zSubModelType.nullish(),
 });
-export const isModelIdentifier = (field: unknown): field is ModelIdentifier =>
-  zModelIdentifier.safeParse(field).success;
+export const isModelIdentifier = (field: unknown): field is ModelIdentifierField =>
+  zModelIdentifierField.safeParse(field).success;
 export const isModelIdentifierV2 = (field: unknown): field is ModelIdentifierV2 =>
   zModelIdentifierV2.safeParse(field).success;
-const zModelFieldBase = zModelIdentifier;
-export const zModelIdentifierWithBase = zModelIdentifier.extend({ base: zBaseModel });
-export type BaseModel = z.infer<typeof zBaseModel>;
-type ModelIdentifier = z.infer<typeof zModelIdentifier>;
-export type ModelIdentifierWithBase = z.infer<typeof zModelIdentifierWithBase>;
+export type ModelIdentifierField = z.infer<typeof zModelIdentifierField>;
 // #endregion
 
 // #region Control Adapters
 export const zControlField = z.object({
   image: zImageField,
-  control_model: zModelFieldBase,
+  control_model: zModelIdentifierField,
   control_weight: z.union([z.number(), z.array(z.number())]).optional(),
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),
@@ -97,7 +107,7 @@ export type ControlField = z.infer<typeof zControlField>;
 
 export const zIPAdapterField = z.object({
   image: zImageField,
-  ip_adapter_model: zModelFieldBase,
+  ip_adapter_model: zModelIdentifierField,
   weight: z.number(),
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),
@@ -106,7 +116,7 @@ export type IPAdapterField = z.infer<typeof zIPAdapterField>;
 
 export const zT2IAdapterField = z.object({
   image: zImageField,
-  t2i_adapter_model: zModelFieldBase,
+  t2i_adapter_model: zModelIdentifierField,
   weight: z.union([z.number(), z.array(z.number())]).optional(),
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),
