@@ -3,7 +3,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
-import { getModelKeyAndBase } from 'features/metadata/util/modelFetchingHelpers';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import { refinerModelChanged, selectSdxlSlice } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -26,7 +26,7 @@ const ParamSDXLRefinerModelSelect = () => {
         dispatch(refinerModelChanged(null));
         return;
       }
-      dispatch(refinerModelChanged(getModelKeyAndBase(model)));
+      dispatch(refinerModelChanged(zModelIdentifierField.parse(model)));
     },
     [dispatch]
   );

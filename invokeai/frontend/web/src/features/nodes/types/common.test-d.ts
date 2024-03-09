@@ -1,5 +1,4 @@
 import type {
-  BaseModel,
   BoardField,
   Classification,
   ColorField,
@@ -7,6 +6,7 @@ import type {
   ImageField,
   ImageOutput,
   IPAdapterField,
+  ModelIdentifierField,
   ProgressImage,
   SchedulerField,
   T2IAdapterField,
@@ -33,10 +33,9 @@ describe('Common types', () => {
   test('T2IAdapterField', () => assert<Equals<T2IAdapterField, S['T2IAdapterField']>>());
 
   // Model component types
-  test('BaseModel', () => assert<Equals<BaseModel, S['BaseModelType']>>());
+  test('ModelIdentifier', () => assert<Equals<ModelIdentifierField, S['ModelIdentifierField']>>());
 
   // Misc types
-  // @ts-expect-error TODO(psyche): There is no `ProgressImage` in the server types yet
   test('ProgressImage', () => assert<Equals<ProgressImage, S['ProgressImage']>>());
   test('ImageOutput', () => assert<Equals<ImageOutput, S['ImageOutput']>>());
   test('Classification', () => assert<Equals<Classification, S['Classification']>>());
