@@ -572,7 +572,7 @@ class InvokeAIAppConfig(InvokeAISettings):
         See that script for more information about why this is necessary.
         """
         docstring = '    """Invoke App Configuration\n\n'
-        docstring += "    Attributes:\n"
+        docstring += "    Attributes:"
 
         field_descriptions: dict[str, list[str]] = {}
 
@@ -587,17 +587,6 @@ class InvokeAIAppConfig(InvokeAISettings):
             if not field_descriptions.get(category):
                 field_descriptions[category] = []
             field_descriptions[category].append(f"        {k}: **{category}**: {v.description}")
-            if v.examples:
-                for example in v.examples:
-                    white_space = " " * 12
-                    field_descriptions[category].append(f"{white_space}Examples:")
-                    field_descriptions[category].append(f"{white_space}  {k}:")
-                    if isinstance(example, BaseModel):
-                        property_white_space = " " * 16
-                        example = example.model_dump(exclude_defaults=True, exclude_none=True, by_alias=True)
-                        # Mabye this would be easier to do with ruamel.yaml
-                        yaml_str = yaml.dump(example).replace("\n", f"\n{property_white_space}").strip()
-                        field_descriptions[category].append(f"{property_white_space}{yaml_str}")
 
         for c in [
             "Web Server",
