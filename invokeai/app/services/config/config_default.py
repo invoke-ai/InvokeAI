@@ -331,11 +331,11 @@ class InvokeAIAppConfig(InvokeAISettings):
     log_sql             : bool = Field(default=False, description="Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.", json_schema_extra=Categories.Logging)
 
     # Development
+    use_memory_db       : bool = Field(default=False, description='Use in-memory database. Useful for development.', json_schema_extra=Categories.Development)
     dev_reload          : bool = Field(default=False, description="Automatically reload when Python sources are changed. Does not reload node definitions.", json_schema_extra=Categories.Development)
     profile_graphs      : bool = Field(default=False, description="Enable graph profiling using `cProfile`.", json_schema_extra=Categories.Development)
     profile_prefix      : Optional[str] = Field(default=None, description="An optional prefix for profile output files.", json_schema_extra=Categories.Development)
     profiles_dir        : Path = Field(default=Path('profiles'), description="Path to profiles output directory.", json_schema_extra=Categories.Development)
-    skip_model_hash     : bool = Field(default=False, description="Skip model hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models.", json_schema_extra=Categories.Development)
 
     version             : bool = Field(default=False, description="CLI arg - show InvokeAI version and exit.", json_schema_extra=Categories.CLIArgs)
 
@@ -366,11 +366,11 @@ class InvokeAIAppConfig(InvokeAISettings):
     deny_nodes          : Optional[List[str]] = Field(default=None, description="List of nodes to deny. Omit to deny none.", json_schema_extra=Categories.Nodes)
     node_cache_size     : int = Field(default=512, description="How many cached nodes to keep in memory.", json_schema_extra=Categories.Nodes)
 
-    # MODEL IMPORT
+    # MODEL INSTALL
+    skip_model_hash     : bool = Field(default=False, description="Skip model hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models.", json_schema_extra=Categories.ModelInstall)
     remote_api_tokens   : Optional[list[URLRegexToken]] = Field(
         default=None,
         description="List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.",
-        examples=[URLRegexToken(url_regex="https://example.com/.*", token="my-secret-token")],
         json_schema_extra=Categories.ModelInstall
     )
 
