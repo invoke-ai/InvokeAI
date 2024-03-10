@@ -62,13 +62,10 @@ class ModelSearch:
         """Create a new ModelSearch object.
 
         Args:
-            stats: SearchStats object to hold statistics about the search
-            logger: Logger object to use for logging
             on_search_started: callback to be invoked when the search starts
             on_model_found: callback to be invoked when a model is found. The callback should return True if the model
                 should be included in the results.
             on_search_completed: callback to be invoked when the search is completed
-            config: configuration object
         """
         self.stats = SearchStats()
         self.logger = InvokeAILogger.get_logger()
@@ -102,6 +99,7 @@ class ModelSearch:
         return self.models_found
 
     def _walk_directory(self, path: Union[Path, str], max_depth: int = 20) -> None:
+        """Recursively walk the directory tree, looking for models."""
         absolute_path = Path(path)
         if (
             len(absolute_path.parts) - len(self._directory.parts) > max_depth
