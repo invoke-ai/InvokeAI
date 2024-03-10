@@ -4,19 +4,19 @@ Abstract base class and implementation for recursive directory search for models
 
 Example usage:
 ```
-  from invokeai.backend.model_manager import ModelSearch, ModelProbe
+    from invokeai.backend.model_manager import ModelSearch, ModelProbe
 
-  def find_main_models(model: Path) -> bool:
-    info = ModelProbe.probe(model)
-    if info.model_type == 'main' and info.base_type == 'sd-1':
-        return True
-    else:
-        return False
+    def find_main_models(model: Path) -> bool:
+        info = ModelProbe.probe(model)
+        if info.model_type == 'main' and info.base_type == 'sd-1':
+            return True
+        else:
+            return False
 
-  search = ModelSearch(on_model_found=report_it)
-  found = search.search('/tmp/models')
-  print(found)   #  list of matching model paths
-  print(search.stats)  #  search stats
+    search = ModelSearch(on_model_found=report_it)
+    found = search.search('/tmp/models')
+    print(found)   #  list of matching model paths
+    print(search.stats)  #  search stats
 ```
 """
 
