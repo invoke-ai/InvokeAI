@@ -9,7 +9,7 @@ from invokeai.app.services.events.events_common import (
     BatchEnqueuedEvent,
     FastAPIEvent,
     QueueClearedEvent,
-    QueueEvent,
+    QueueEventBase,
     QueueItemStatusChangedEvent,
     SessionCanceledEvent,
     register_events,
@@ -332,7 +332,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
     def _poll_now(self) -> None:
         self._poll_now_event.set()
 
-    async def _on_queue_event(self, event: FastAPIEvent[QueueEvent]) -> None:
+    async def _on_queue_event(self, event: FastAPIEvent[QueueEventBase]) -> None:
         _event_name, payload = event
         if (
             isinstance(payload, SessionCanceledEvent)
