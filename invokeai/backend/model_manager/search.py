@@ -23,7 +23,7 @@ Example usage:
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional, Set, Union
+from typing import Callable, Optional
 
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -57,7 +57,7 @@ class ModelSearch:
         self,
         on_search_started: Optional[Callable[[Path], None]] = None,
         on_model_found: Optional[Callable[[Path], bool]] = None,
-        on_search_completed: Optional[Callable[[Set[Path]], None]] = None,
+        on_search_completed: Optional[Callable[[set[Path]], None]] = None,
     ) -> None:
         """Create a new ModelSearch object.
 
@@ -89,7 +89,7 @@ class ModelSearch:
         if self.on_search_completed is not None:
             self.on_search_completed(self.models_found)
 
-    def search(self, directory: Union[Path, str]) -> Set[Path]:
+    def search(self, directory: Path) -> set[Path]:
         self._directory = Path(directory)
         self._directory = self._directory.resolve()
         self.stats = SearchStats()  # zero out
@@ -98,7 +98,7 @@ class ModelSearch:
         self.search_completed()
         return self.models_found
 
-    def _walk_directory(self, path: Union[Path, str], max_depth: int = 20) -> None:
+    def _walk_directory(self, path: Path, max_depth: int = 20) -> None:
         """Recursively walk the directory tree, looking for models."""
         absolute_path = Path(path)
         if (
