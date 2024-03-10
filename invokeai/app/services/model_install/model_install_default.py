@@ -520,7 +520,7 @@ class ModelInstallService(ModelInstallServiceBase):
         except ValueError:
             pass
 
-        new_path = models_dir / model.base.value / model.type.value / model.name
+        new_path = models_dir / model.base.value / model.type.value / old_path.name
 
         if old_path == new_path:
             return model
