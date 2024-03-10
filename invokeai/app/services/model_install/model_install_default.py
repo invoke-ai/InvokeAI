@@ -329,7 +329,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         # Rename `models.yaml` to `models.yaml.bak` to prevent re-migration
         yaml_path = self._app_config.model_conf_path
-        yaml_path.rename(yaml_path.with_suffix(".bak"))
+        yaml_path.rename(yaml_path.with_suffix(".yaml.bak"))
 
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
         self._cached_model_paths = {Path(x.path).absolute() for x in self.record_store.all_models()}
