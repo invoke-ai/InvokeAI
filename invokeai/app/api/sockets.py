@@ -10,14 +10,14 @@ from invokeai.app.services.events.events_common import (
     BatchEnqueuedEvent,
     BulkDownloadCompleteEvent,
     BulkDownloadErrorEvent,
-    BulkDownloadEvent,
+    BulkDownloadEventBase,
     BulkDownloadStartedEvent,
     FastAPIEvent,
     InvocationCompleteEvent,
     InvocationDenoiseProgressEvent,
     InvocationErrorEvent,
     InvocationStartedEvent,
-    ModelEvent,
+    ModelEventBase,
     ModelInstallCancelledEvent,
     ModelInstallCompleteEvent,
     ModelInstallDownloadProgressEvent,
@@ -26,7 +26,7 @@ from invokeai.app.services.events.events_common import (
     ModelLoadCompleteEvent,
     ModelLoadStartedEvent,
     QueueClearedEvent,
-    QueueEvent,
+    QueueEventBase,
     QueueItemStatusChangedEvent,
     SessionCanceledEvent,
     SessionCompleteEvent,
@@ -106,14 +106,14 @@ class SocketIO:
     async def _handle_unsub_bulk_download(self, sid: str, data: Any) -> None:
         await self._sio.leave_room(sid, BulkDownloadSubscriptionEvent(**data).bulk_download_id)
 
-    async def _handle_queue_event(self, event: FastAPIEvent[QueueEvent]):
+    async def _handle_queue_event(self, event: FastAPIEvent[QueueEventBase]):
         event_name, payload = event
         await self._sio.emit(event=event_name, data=payload.model_dump(), room=payload.queue_id)
 
-    async def _handle_model_event(self, event: FastAPIEvent[ModelEvent]) -> None:
+    async def _handle_model_event(self, event: FastAPIEvent[ModelEventBase]) -> None:
         event_name, payload = event
         await self._sio.emit(event=event_name, data=payload.model_dump())
 
-    async def _handle_bulk_image_download_event(self, event: FastAPIEvent[BulkDownloadEvent]) -> None:
+    async def _handle_bulk_image_download_event(self, event: FastAPIEvent[BulkDownloadEventBase]) -> None:
         event_name, payload = event
         await self._sio.emit(event=event_name, data=payload.model_dump(), room=payload.bulk_download_id)

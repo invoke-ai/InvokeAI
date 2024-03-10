@@ -4,7 +4,6 @@
 from typing import TYPE_CHECKING, Optional
 
 from invokeai.app.services.events.events_common import (
-    BaseEvent,
     BatchEnqueuedEvent,
     BulkDownloadCompleteEvent,
     BulkDownloadErrorEvent,
@@ -14,6 +13,7 @@ from invokeai.app.services.events.events_common import (
     DownloadErrorEvent,
     DownloadProgressEvent,
     DownloadStartedEvent,
+    EventBase,
     InvocationCompleteEvent,
     InvocationDenoiseProgressEvent,
     InvocationErrorEvent,
@@ -35,7 +35,7 @@ from invokeai.app.services.events.events_common import (
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
-    from invokeai.app.services.events.events_common import BaseEvent
+    from invokeai.app.services.events.events_common import EventBase
     from invokeai.app.services.model_install.model_install_common import ModelInstallJob
     from invokeai.app.services.session_processor.session_processor_common import ProgressImage
     from invokeai.app.services.session_queue.session_queue_common import (
@@ -50,7 +50,7 @@ if TYPE_CHECKING:
 class EventServiceBase:
     """Basic event bus, to have an empty stand-in when not needed"""
 
-    def dispatch(self, event: "BaseEvent") -> None:
+    def dispatch(self, event: "EventBase") -> None:
         pass
 
     # region: Invocation
