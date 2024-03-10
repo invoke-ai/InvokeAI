@@ -97,7 +97,7 @@ class IPAdapterInvocation(BaseInvocation):
             ip_adapter=IPAdapterField(
                 image=self.image,
                 ip_adapter_model=self.ip_adapter_model,
-                image_encoder_model=ModelIdentifierField(key=image_encoder_models[0].key),
+                image_encoder_model=ModelIdentifierField.from_config(image_encoder_models[0]),
                 weight=self.weight,
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,
