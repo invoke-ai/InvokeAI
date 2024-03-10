@@ -116,4 +116,4 @@ class SocketIO:
 
     async def _handle_bulk_image_download_event(self, event: FastAPIEvent[BulkDownloadEvent]) -> None:
         event_name, payload = event
-        await self._sio.emit(event=event_name, data=payload.model_dump())
+        await self._sio.emit(event=event_name, data=payload.model_dump(), room=payload.bulk_download_id)
