@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
-from invokeai.backend.model_manager.config import BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelType, SubModelType
 
 from .baseinvocation import (
     BaseInvocation,
@@ -25,6 +25,19 @@ class ModelIdentifierField(BaseModel):
     submodel_type: Optional[SubModelType] = Field(
         description="The submodel to load, if this is a main model", default=None
     )
+
+    @classmethod
+    def from_config(
+        cls, config: "AnyModelConfig", submodel_type: Optional[SubModelType] = None
+    ) -> "ModelIdentifierField":
+        return cls(
+            key=config.key,
+            hash=config.hash,
+            name=config.name,
+            base=config.base,
+            type=config.type,
+            submodel_type=submodel_type,
+        )
 
 
 class LoRAField(BaseModel):
