@@ -19,8 +19,9 @@ export type ModelInstallErrorEvent = S['ModelInstallErrorEvent'];
 export type ModelInstallStartedEvent = S['ModelInstallStartedEvent'];
 export type ModelInstallCancelledEvent = S['ModelInstallCancelledEvent'];
 
+type SessionStartedEvent = S['SessionStartedEvent'];
 export type SessionCompleteEvent = S['SessionCompleteEvent'];
-export type SessionCanceledEvent = S['SessionCanceledEvent'];
+type SessionCanceledEvent = S['SessionCanceledEvent'];
 
 export type QueueItemStatusChangedEvent = S['QueueItemStatusChangedEvent'];
 
@@ -31,18 +32,20 @@ export type BulkDownloadFailedEvent = S['BulkDownloadErrorEvent'];
 type ClientEmitSubscribeQueue = {
   queue_id: string;
 };
-export type ClientEmitUnsubscribeQueue = ClientEmitSubscribeQueue;
-export type ClientEmitSubscribeBulkDownload = {
+type ClientEmitUnsubscribeQueue = ClientEmitSubscribeQueue;
+type ClientEmitSubscribeBulkDownload = {
   bulk_download_id: string;
 };
-export type ClientEmitUnsubscribeBulkDownload = ClientEmitSubscribeBulkDownload;
+type ClientEmitUnsubscribeBulkDownload = ClientEmitSubscribeBulkDownload;
 
 export type ServerToClientEvents = {
   invocation_denoise_progress: (payload: InvocationDenoiseProgressEvent) => void;
   invocation_complete: (payload: InvocationCompleteEvent) => void;
   invocation_error: (payload: InvocationErrorEvent) => void;
   invocation_started: (payload: InvocationStartedEvent) => void;
+  session_started: (payload: SessionStartedEvent) => void;
   session_complete: (payload: SessionCompleteEvent) => void;
+  session_canceled: (payload: SessionCanceledEvent) => void;
   model_load_started: (payload: ModelLoadStartedEvent) => void;
   model_install_started: (payload: ModelInstallStartedEvent) => void;
   model_install_download_progress: (payload: ModelInstallDownloadProgressEvent) => void;
