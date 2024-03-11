@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import pydoc
-from typing import Union
 
 
 class PagingArgumentParser(argparse.ArgumentParser):
@@ -24,18 +23,3 @@ class PagingArgumentParser(argparse.ArgumentParser):
     def print_help(self, file=None) -> None:
         text = self.format_help()
         pydoc.pager(text)
-
-
-def int_or_float_or_str(value: str) -> Union[int, float, str]:
-    """
-    Workaround for argparse type checking.
-    """
-    try:
-        return int(value)
-    except Exception as e:  # noqa F841
-        pass
-    try:
-        return float(value)
-    except Exception as e:  # noqa F841
-        pass
-    return str(value)
