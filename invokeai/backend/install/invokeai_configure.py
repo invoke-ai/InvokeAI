@@ -29,15 +29,13 @@ from diffusers import ModelMixin
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from huggingface_hub import HfFolder
 from huggingface_hub import login as hf_hub_login
-from pydantic import ValidationError
 from tqdm import tqdm
 from transformers import AutoFeatureExtractor
 
 import invokeai.configs as configs
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.config.config_default import get_config, load_config_from_file
+from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.install.install_helper import InstallHelper, InstallSelections
-from invokeai.backend.install.legacy_arg_parsing import legacy_parser
 from invokeai.backend.model_manager import ModelType
 from invokeai.backend.util import choose_precision, choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger
@@ -758,62 +756,13 @@ def write_default_options(program_opts: Namespace, initfile: Path) -> None:
     write_opts(opt, initfile)
 
 
-# -------------------------------------
-# Here we bring in
-# the legacy Args object in order to parse
-# the old init file and write out the new
-# yaml format.
-def migrate_init_file(legacy_format: Path) -> None:
-    old = legacy_parser.parse_args([f"@{str(legacy_format)}"])
-    new_config = get_config()
-
-    for attr in InvokeAIAppConfig.model_fields.keys():
-        if hasattr(old, attr):
-            try:
-                setattr(new_config, attr, getattr(old, attr))
-            except ValidationError as e:
-                print(f"* Ignoring incompatible value for field {attr}:\n  {str(e)}")
-
-    # a few places where the field names have changed and we have to
-    # manually add in the new names/values
-    # TODO(psyche): This is going to fail, these attrs don't exist on the new config...
-    new_config.xformers_enabled = old.xformers
-    new_config.conf_path = old.conf
-    new_config.set_root(legacy_format.parent.resolve())
-    new_config.write_file(exclude_defaults=True)
-
-    legacy_format.replace(legacy_format.parent / "invokeai.init.orig")
-
-
-# -------------------------------------
-def migrate_models(root: Path) -> None:
-    from invokeai.backend.install.migrate_to_3 import do_migrate
-
-    do_migrate(root, root)
-
-
-def migrate_if_needed(opt: Namespace, root: Path) -> bool:
+def is_v2_install(root: Path) -> bool:
     # We check for to see if the runtime directory is correctly initialized.
     old_init_file = root / "invokeai.init"
     new_init_file = root / "invokeai.yaml"
     old_hub = root / "models/hub"
-    migration_needed = (old_init_file.exists() and not new_init_file.exists()) and old_hub.exists()
-
-    if migration_needed:
-        if opt.yes_to_all or yes_or_no(
-            f"{str(config.root_path)} appears to be a 2.3 format root directory. Convert to version 3.0?"
-        ):
-            logger.info("** Migrating invokeai.init to invokeai.yaml")
-            migrate_init_file(old_init_file)
-            new_config = load_config_from_file(new_init_file)
-            config.update_config(new_config)
-
-            if old_hub.exists():
-                migrate_models(config.root_path)
-        else:
-            print("Cannot continue without conversion. Aborting.")
-
-    return migration_needed
+    is_v2 = (old_init_file.exists() and not new_init_file.exists()) and old_hub.exists()
+    return is_v2
 
 
 # -------------------------------------
@@ -886,9 +835,9 @@ def main() -> None:
         copy(new_init_file, backup_init_file)
 
     try:
-        # if we do a root migration/upgrade, then we are keeping previous
-        # configuration and we are done.
-        if migrate_if_needed(opt, config.root_path):
+        # v2.3 -> v4.0.0 upgrade is no longer supported
+        if is_v2_install(config.root_path):
+            logger.error("Migration from v2.3 to v4.0.0 is no longer supported. Please install a fresh copy.")
             sys.exit(0)
 
         # run this unconditionally in case new directories need to be added
