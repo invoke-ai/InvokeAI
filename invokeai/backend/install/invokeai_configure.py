@@ -17,7 +17,7 @@ import warnings
 from argparse import Namespace
 from enum import Enum
 from pathlib import Path
-from shutil import get_terminal_size
+from shutil import get_terminal_size, copy, move, rmtree
 from typing import Any, Optional, Set, Tuple, Type, get_args, get_type_hints
 from urllib import request
 
@@ -929,6 +929,10 @@ def main() -> None:
 
     errors = set()
     FORCE_FULL_PRECISION = opt.full_precision  # FIXME global
+    new_init_file = config.root_path / "invokeai.yaml"
+    backup_init_file = new_init_file.with_suffix(".bak")
+    if new_init_file.exists():
+        copy(new_init_file, new_init_file.with_suffix(".bak"))
 
     try:
         # if we do a root migration/upgrade, then we are keeping previous
@@ -943,7 +947,6 @@ def main() -> None:
         install_helper = InstallHelper(config, logger)
 
         models_to_download = default_user_selections(opt, install_helper)
-        new_init_file = config.root_path / "invokeai.yaml"
 
         if opt.yes_to_all:
             write_default_options(opt, new_init_file)
@@ -975,8 +978,17 @@ def main() -> None:
             input("Press any key to continue...")
     except WindowTooSmallException as e:
         logger.error(str(e))
+        if backup_init_file.exists():
+            move(backup_init_file, new_init_file)
     except KeyboardInterrupt:
         print("\nGoodbye! Come back soon.")
+        if backup_init_file.exists():
+            move(backup_init_file, new_init_file)
+    except Exception:
+        print("An error occurred during installation.")
+        if backup_init_file.exists():
+            move(backup_init_file, new_init_file)
+        print(traceback.format_exc(), file=sys.stderr)
 
 
 # -------------------------------------
