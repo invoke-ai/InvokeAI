@@ -17,7 +17,7 @@ import warnings
 from argparse import Namespace
 from enum import Enum
 from pathlib import Path
-from shutil import get_terminal_size, copy, move, rmtree
+from shutil import copy, get_terminal_size, move
 from typing import Any, Optional, Set, Tuple, Type, get_args, get_type_hints
 from urllib import request
 
