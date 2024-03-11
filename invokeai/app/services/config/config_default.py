@@ -383,7 +383,7 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
         config.write_file(exclude_defaults=True)
         return config
     else:
-        # This is a v4 config file, attempt to load it
+        # Attempt to load as a v4 config file
         try:
             # Meta is not included in the model fields, so we need to validate it separately
             config_meta = ConfigMeta.model_validate(loaded_config_dict.pop("meta"))
