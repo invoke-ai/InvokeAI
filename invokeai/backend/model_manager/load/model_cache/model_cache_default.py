@@ -19,7 +19,6 @@ context. Use like this:
 """
 
 import gc
-import logging
 import math
 import sys
 import time
@@ -92,8 +91,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         self._execution_device: torch.device = execution_device
         self._storage_device: torch.device = storage_device
         self._logger = logger or InvokeAILogger.get_logger(self.__class__.__name__)
-        self._log_memory_usage = log_memory_usage or self._logger.level == logging.DEBUG
-        # used for stats collection
+        self._log_memory_usage = log_memory_usage
         self._stats: Optional[CacheStats] = None
 
         self._cached_models: Dict[str, CacheRecord[AnyModel]] = {}
