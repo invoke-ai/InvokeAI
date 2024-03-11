@@ -195,27 +195,33 @@ class InvokeAIAppConfig(BaseSettings):
             if new_value != current_value:
                 setattr(self, field_name, new_value)
 
-    def write_file(self, exclude_defaults: bool) -> None:
-        """Write the current configuration to the `invokeai.yaml` file. This will overwrite the existing file.
+    def write_file(self, dest_path: Path) -> None:
+        """Write the current configuration to file. This will overwrite the existing file.
 
         A `meta` stanza is added to the top of the file, containing metadata about the config file. This is not stored in the config object.
 
         Args:
-            exclude_defaults: If `True`, only include settings that were explicitly set. If `False`, include all settings, including defaults.
+            dest_path: Path to write the config to.
         """
-        with open(self.init_file_path, "w") as file:
+        with open(dest_path, "w") as file:
             meta_dict = {"meta": ConfigMeta().model_dump()}
-            config_dict = self.model_dump(mode="json", exclude_unset=True, exclude_defaults=exclude_defaults)
+            config_dict = self.model_dump(mode="json", exclude_unset=True, exclude_defaults=True)
             file.write("# Internal metadata\n")
             file.write(yaml.dump(meta_dict, sort_keys=False))
             file.write("\n")
             file.write("# User settings\n")
             file.write(yaml.dump(config_dict, sort_keys=False))
 
-    def set_root(self, root: Path) -> None:
-        """Set the runtime root directory. This is typically set using a CLI arg."""
-        assert isinstance(root, Path)
-        self._root = root
+    def merge_from_file(self, source_path: Optional[Path] = None) -> None:
+        """Read the config from the `invokeai.yaml` file, migrating it if necessary and merging it into the singleton config.
+
+        This function will write to the `invokeai.yaml` file if the config is migrated.
+
+        Args:
+            source_path: Path to the config file. If not provided, the default path is used.
+        """
+        config_from_file = load_and_migrate_config(source_path or self.init_file_path)
+        self.update_config(config_from_file)
 
     def parse_args(self) -> None:
         """Parse the CLI args and set the runtime root directory."""
@@ -223,10 +229,10 @@ class InvokeAIAppConfig(BaseSettings):
         if root := getattr(opt, "root", None):
             self.set_root(Path(root))
 
-    def read_config(self) -> None:
-        """Read the config from the `invokeai.yaml` file, merging it into the singleton config."""
-        config_from_file = load_and_migrate_config(self.init_file_path)
-        self.update_config(config_from_file)
+    def set_root(self, root: Path) -> None:
+        """Set the runtime root directory. This is typically set using a CLI arg."""
+        assert isinstance(root, Path)
+        self._root = root
 
     def _resolve(self, partial_path: Path) -> Path:
         return (self.root_path / partial_path).resolve()
@@ -330,14 +336,6 @@ def generate_config_docstrings() -> str:
     return docstring
 
 
-def load_config_from_file(config_path: Path) -> InvokeAIAppConfig:
-    """Parse a config file into an InvokeAIAppConfig object. The file should be in YAML format."""
-    assert config_path.suffix == ".yaml"
-    with open(config_path) as file:
-        loaded_config = InvokeAIAppConfig.model_validate(yaml.safe_load(file))
-        return loaded_config
-
-
 def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
     """Migrate a v3 config dictionary to the latest version.
 
@@ -383,7 +381,7 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
             raise RuntimeError(f"Failed to load and migrate v3 config file {config_path}: {e}") from e
         config_path.rename(config_path.with_suffix(".yaml.bak"))
         # By excluding defaults, we ensure that the new config file only contains the settings that were explicitly set
-        config.write_file(exclude_defaults=True)
+        config.write_file(config_path)
         return config
     else:
         # Attempt to load as a v4 config file
