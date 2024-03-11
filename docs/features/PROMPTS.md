@@ -108,40 +108,6 @@ Can be used with .and():
 Each will give you different results - try them out and see what you prefer!
 
 
-
-### Cross-Attention Control ('prompt2prompt')
-
-Sometimes an image you generate is almost right, and you just want to change one
-detail without affecting the rest. You could use a photo editor and inpainting
-to overpaint the area, but that's a pain. Here's where `prompt2prompt` comes in
-handy.
-
-Generate an image with a given prompt, record the seed of the image, and then
-use the `prompt2prompt` syntax to substitute words in the original prompt for
-words in a new prompt. This works for `img2img` as well.
-
-For example, consider the prompt `a cat.swap(dog) playing with a ball in the forest`. Normally, because the words interact with each other when doing a stable diffusion image generation, these two prompts would generate different compositions:
-  - `a cat playing with a ball in the forest`
-  - `a dog playing with a ball in the forest`
-
-| `a cat playing with a ball in the forest` | `a dog playing with a ball in the forest` |
-| --- | --- |
-| img | img |
-
-
-      - For multiple word swaps, use parentheses: `a (fluffy cat).swap(barking dog) playing with a ball in the forest`.
-      - To swap a comma, use quotes: `a ("fluffy, grey cat").swap("big, barking dog") playing with a ball in the forest`.
-- Supports options `t_start` and `t_end` (each 0-1) loosely corresponding to (bloc97's)[(https://github.com/bloc97/CrossAttentionControl)] `prompt_edit_tokens_start/_end` but with the math swapped to make it easier to
-  intuitively understand. `t_start` and `t_end` are used to control on which steps cross-attention control should run. With the default values `t_start=0` and `t_end=1`, cross-attention control is active on every step of image generation. Other values can be used to turn cross-attention control off for part of the image generation process.
-    - For example, if doing a diffusion with 10 steps for the prompt is `a cat.swap(dog, t_start=0.3, t_end=1.0) playing with a ball in the forest`, the first 3 steps will be run as `a cat playing with a ball in the forest`, while the last 7 steps will run as `a dog playing with a ball in the forest`, but the pixels that represent `dog` will be locked to the pixels that would have represented `cat` if the `cat` prompt had been used instead.
-    - Conversely, for `a cat.swap(dog, t_start=0, t_end=0.7) playing with a ball in the forest`, the first 7 steps will run as `a dog playing with a ball in the forest` with the pixels that represent `dog` locked to the same pixels that would have represented `cat` if the `cat` prompt was being used instead. The final 3 steps will just run `a cat playing with a ball in the forest`.
-    > For img2img, the step sequence does not start at 0 but instead at `(1.0-strength)` - so if the img2img `strength` is `0.7`, `t_start` and `t_end` must both be greater than `0.3` (`1.0-0.7`) to have any effect.
-
-Prompt2prompt `.swap()` is not compatible with xformers, which will be temporarily disabled when doing a `.swap()` - so you should expect to use more VRAM and run slower that with xformers enabled.
-
-The `prompt2prompt` code is based off
-[bloc97's colab](https://github.com/bloc97/CrossAttentionControl).
-
 ### Escaping parentheses and speech marks 
 
 If the model you are using has parentheses () or speech marks "" as part of its
