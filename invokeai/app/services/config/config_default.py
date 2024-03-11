@@ -190,7 +190,10 @@ class InvokeAIAppConfig(BaseSettings):
             new_config = config
 
         for field_name in new_config.model_fields_set:
-            setattr(self, field_name, getattr(new_config, field_name))
+            new_value = getattr(new_config, field_name)
+            current_value = getattr(self, field_name)
+            if new_value != current_value:
+                setattr(self, field_name, new_value)
 
     def write_file(self, exclude_defaults: bool) -> None:
         """Write the current configuration to the `invokeai.yaml` file. This will overwrite the existing file.
