@@ -75,8 +75,6 @@ export const InstallModelForm = () => {
             isDisabled={!formState.dirtyFields.location}
             isLoading={isLoading}
             type="submit"
-            size="sm"
-            mb={1}
           >
             {t('modelManager.addModel')}
           </Button>
