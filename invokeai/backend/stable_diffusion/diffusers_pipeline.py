@@ -21,7 +21,7 @@ from diffusers.utils.outputs import BaseOutput
 from pydantic import Field
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.ip_adapter.unet_patcher import UNetPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData
@@ -251,7 +251,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """
         if xformers is available, use it, otherwise use sliced attention.
         """
-        config = InvokeAIAppConfig.get_config()
+        config = get_config()
         if config.attention_type == "xformers":
             self.enable_xformers_memory_efficient_attention()
             return

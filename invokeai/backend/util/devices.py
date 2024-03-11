@@ -7,11 +7,12 @@ import torch
 from torch import autocast
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import get_config
 
 CPU_DEVICE = torch.device("cpu")
 CUDA_DEVICE = torch.device("cuda")
 MPS_DEVICE = torch.device("mps")
-config = InvokeAIAppConfig.get_config()
+config = get_config()
 
 
 def choose_torch_device() -> torch.device:

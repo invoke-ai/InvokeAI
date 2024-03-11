@@ -3,9 +3,9 @@ import sys
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
-from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import get_config
 
-custom_nodes_path = Path(InvokeAIAppConfig.get_config().custom_nodes_path.resolve())
+custom_nodes_path = Path(get_config().custom_nodes_path.resolve())
 custom_nodes_path.mkdir(parents=True, exist_ok=True)
 
 custom_nodes_init_path = str(custom_nodes_path / "__init__.py")

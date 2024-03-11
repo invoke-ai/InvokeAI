@@ -279,9 +279,9 @@ class ModelInstallService(ModelInstallServiceBase):
     def sync_to_config(self) -> None:
         """Synchronize models on disk to those in the config record store database."""
         self._scan_models_directory()
-        if autoimport := self._app_config.autoimport_dir:
+        if self._app_config.autoimport_path:
             self._logger.info("Scanning autoimport directory for new models")
-            installed = self.scan_directory(self._app_config.root_path / autoimport)
+            installed = self.scan_directory(self._app_config.autoimport_path)
             self._logger.info(f"{len(installed)} new models registered")
         self._logger.info("Model installer (re)initialized")
 
@@ -365,7 +365,7 @@ class ModelInstallService(ModelInstallServiceBase):
     ) -> Path:
         """Download the model file located at source to the models cache and return its Path."""
         model_hash = sha256(str(source).encode("utf-8")).hexdigest()[0:32]
-        model_path = self._app_config.models_convert_cache_path / model_hash
+        model_path = self._app_config.convert_cache_path / model_hash
 
         # We expect the cache directory to contain one and only one downloaded file.
         # We don't know the file's name in advance, as it is set by the download
@@ -591,7 +591,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         # add 'main' specific fields
         if isinstance(info, CheckpointConfigBase):
-            legacy_conf = (self.app_config.root_dir / self.app_config.legacy_conf_dir / info.config_path).resolve()
+            legacy_conf = (self.app_config.legacy_conf_path / info.config_path).resolve()
             info.config_path = legacy_conf.as_posix()
         self.record_store.add_model(info)
         return info.key

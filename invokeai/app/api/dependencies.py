@@ -65,7 +65,7 @@ class ApiDependencies:
         logger.info(f"InvokeAI version {__version__}")
         logger.info(f"Root directory = {str(config.root_path)}")
 
-        output_folder = config.output_path
+        output_folder = config.outputs_path
         if output_folder is None:
             raise ValueError("Output folder is not set")
 
