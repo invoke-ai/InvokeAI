@@ -14,9 +14,9 @@ def main():
     # Change working directory to the repo root
     os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-    from invokeai.app.services.config.config_default import InvokeAIAppConfig
+    from invokeai.app.services.config.config_default import generate_config_docstrings
 
-    docstring = InvokeAIAppConfig.generate_docstrings()
+    docstring = generate_config_docstrings()
 
     # Replace the docstring in the file
     with open("invokeai/app/services/config/config_default.py", "r") as f:
