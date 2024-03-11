@@ -92,11 +92,8 @@ def diffusers_dir(mm2_model_files: Path) -> Path:
 
 @pytest.fixture
 def mm2_app_config(mm2_root_dir: Path) -> InvokeAIAppConfig:
-    app_config = InvokeAIAppConfig(
-        root=mm2_root_dir,
-        models_dir=mm2_root_dir / "models",
-        log_level="info",
-    )
+    app_config = InvokeAIAppConfig(models_dir=mm2_root_dir / "models", log_level="info")
+    app_config.set_root(mm2_root_dir)
     return app_config
 
 
@@ -116,10 +113,10 @@ def mm2_download_queue(mm2_session: Session, request: FixtureRequest) -> Downloa
 def mm2_loader(mm2_app_config: InvokeAIAppConfig, mm2_record_store: ModelRecordServiceBase) -> ModelLoadServiceBase:
     ram_cache = ModelCache(
         logger=InvokeAILogger.get_logger(),
-        max_cache_size=mm2_app_config.ram_cache_size,
-        max_vram_cache_size=mm2_app_config.vram_cache_size,
+        max_cache_size=mm2_app_config.ram,
+        max_vram_cache_size=mm2_app_config.vram,
     )
-    convert_cache = ModelConvertCache(mm2_app_config.models_convert_cache_path)
+    convert_cache = ModelConvertCache(mm2_app_config.convert_cache_path)
     return ModelLoadService(
         app_config=mm2_app_config,
         ram_cache=ram_cache,
