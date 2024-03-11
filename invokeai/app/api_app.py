@@ -4,6 +4,8 @@
 from invokeai.app.services.config.config_default import get_config
 
 app_config = get_config()
+app_config.parse_args()
+app_config.read_config()
 
 if True:  # hack to make flake8 happy with imports coming after setting up the config
     import asyncio

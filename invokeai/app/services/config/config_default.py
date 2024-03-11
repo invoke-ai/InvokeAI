@@ -211,7 +211,19 @@ class InvokeAIAppConfig(BaseSettings):
 
     def set_root(self, root: Path) -> None:
         """Set the runtime root directory. This is typically set using a CLI arg."""
+        assert isinstance(root, Path)
         self._root = root
+
+    def parse_args(self) -> None:
+        """Parse the CLI args and set the runtime root directory."""
+        opt = app_arg_parser.parse_args()
+        if root := getattr(opt, "root", None):
+            self.set_root(Path(root))
+
+    def read_config(self) -> None:
+        """Read the config from the `invokeai.yaml` file, merging it into the singleton config."""
+        config_from_file = load_and_migrate_config(self.init_file_path)
+        self.update_config(config_from_file)
 
     def _resolve(self, partial_path: Path) -> Path:
         return (self.root_path / partial_path).resolve()
@@ -385,22 +397,5 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
 
 @lru_cache(maxsize=1)
 def get_config() -> InvokeAIAppConfig:
-    """Return the global singleton app config.
-
-    On first call, CLI args are parsed and the config file is read and merged in to the singleton config.
-
-    On subsequent calls, the singleton config is returned.
-    """
-    # Singleton app config
-    config = InvokeAIAppConfig()
-    # User may have specified a `root` as a CLI arg
-    opt = app_arg_parser.parse_args()
-    if root := getattr(opt, "root", None):
-        config.set_root(Path(root))
-    else:
-        config.set_root(config.find_root())
-
-    # Load the config file and merge it in to the app config
-    config_from_file = load_and_migrate_config(config.init_file_path)
-    config.update_config(config_from_file)
-    return config
+    """Return the global singleton app config"""
+    return InvokeAIAppConfig()
