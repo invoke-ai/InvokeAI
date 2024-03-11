@@ -39,7 +39,7 @@ export const ScanModelsForm = () => {
           <Flex gap={2} alignItems="flex-end" justifyContent="space-between">
             <Flex direction="column" w="full">
               <FormLabel>{t('common.folder')}</FormLabel>
-              <Input value={scanPath} onChange={handleSetScanPath} />
+              <Input placeholder={t('modelManager.scanPlaceholder')} value={scanPath} onChange={handleSetScanPath} />
             </Flex>
 
             <Button

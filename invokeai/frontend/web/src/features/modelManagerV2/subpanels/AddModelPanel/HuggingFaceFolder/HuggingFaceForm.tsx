@@ -19,34 +19,37 @@ export const HuggingFaceForm = () => {
   const [_getHuggingFaceModels, { isLoading, data }] = useLazyGetHuggingFaceModelsQuery();
   const [installModel] = useInstallModelMutation();
 
-  const handleInstallModel = useCallback((source: string) => {
-    installModel({ source })
-      .unwrap()
-      .then((_) => {
-        dispatch(
-          addToast(
-            makeToast({
-              title: t('toast.modelAddedSimple'),
-              status: 'success',
-            })
-          )
-        );
-      })
-      .catch((error) => {
-        if (error) {
+  const handleInstallModel = useCallback(
+    (source: string) => {
+      installModel({ source })
+        .unwrap()
+        .then((_) => {
           dispatch(
             addToast(
               makeToast({
-                title: `${error.data.detail} `,
-                status: 'error',
+                title: t('toast.modelAddedSimple'),
+                status: 'success',
               })
             )
           );
-        }
-      });
-  }, [installModel, dispatch, t]);
+        })
+        .catch((error) => {
+          if (error) {
+            dispatch(
+              addToast(
+                makeToast({
+                  title: `${error.data.detail} `,
+                  status: 'error',
+                })
+              )
+            );
+          }
+        });
+    },
+    [installModel, dispatch, t]
+  );
 
-  const scanFolder = useCallback(async () => {
+  const getModels = useCallback(async () => {
     _getHuggingFaceModels(huggingFaceRepo)
       .then((response) => {
         if (response.data?.some((result) => result.endsWith('model_index.json'))) {
@@ -64,7 +67,7 @@ export const HuggingFaceForm = () => {
           setErrorMessage(error.data.detail);
         }
       });
-  }, [_getHuggingFaceModels, huggingFaceRepo]);
+  }, [_getHuggingFaceModels, handleInstallModel, huggingFaceRepo]);
 
   const handleSetHuggingFaceRepo: ChangeEventHandler<HTMLInputElement> = useCallback((e) => {
     setHuggingFaceRepo(e.target.value);
@@ -78,10 +81,14 @@ export const HuggingFaceForm = () => {
           <Flex gap={2} alignItems="flex-end" justifyContent="space-between">
             <Flex direction="column" w="full">
               <FormLabel>{t('modelManager.huggingFaceRepoID')}</FormLabel>
-              <Input value={huggingFaceRepo} onChange={handleSetHuggingFaceRepo} />
+              <Input
+                placeholder={t('modelManager.huggingFacePlaceholder')}
+                value={huggingFaceRepo}
+                onChange={handleSetHuggingFaceRepo}
+              />
             </Flex>
 
-            <Button onClick={scanFolder} isLoading={isLoading} isDisabled={huggingFaceRepo.length === 0}>
+            <Button onClick={getModels} isLoading={isLoading} isDisabled={huggingFaceRepo.length === 0}>
               {t('modelManager.addModel')}
             </Button>
           </Flex>
