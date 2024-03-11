@@ -51,21 +51,20 @@ export const HuggingFaceForm = () => {
 
   const getModels = useCallback(async () => {
     _getHuggingFaceModels(huggingFaceRepo)
+      .unwrap()
       .then((response) => {
-        if (response.data?.some((result) => result.endsWith('model_index.json'))) {
+        if (response.some((result: string) => result.endsWith('model_index.json'))) {
           handleInstallModel(huggingFaceRepo);
           setDisplayResults(false);
-        } else if (response.data?.length === 1 && response.data[0]) {
-          handleInstallModel(response.data[0]);
+        } else if (response.length === 1 && response[0]) {
+          handleInstallModel(response[0]);
           setDisplayResults(false);
         } else {
           setDisplayResults(true);
         }
       })
       .catch((error) => {
-        if (error) {
-          setErrorMessage(error.data.detail);
-        }
+        setErrorMessage(error.data.detail || '');
       });
   }, [_getHuggingFaceModels, handleInstallModel, huggingFaceRepo]);
 

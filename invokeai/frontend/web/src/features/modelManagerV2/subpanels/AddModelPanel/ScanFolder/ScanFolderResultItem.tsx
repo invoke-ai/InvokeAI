@@ -4,7 +4,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IoAdd } from 'react-icons/io5';
+import { PiPlusBold } from 'react-icons/pi';
 import type { ScanFolderResponse } from 'services/api/endpoints/models';
 import { useInstallModelMutation } from 'services/api/endpoints/models';
 
@@ -55,7 +55,7 @@ export const ScanModelResultItem = ({ result }: Props) => {
           <Badge>{t('common.installed')}</Badge>
         ) : (
           <Tooltip label={t('modelManager.quickAdd')}>
-            <IconButton aria-label={t('modelManager.quickAdd')} icon={<IoAdd />} onClick={handleQuickAdd} />
+            <IconButton aria-label={t('modelManager.quickAdd')} icon={<PiPlusBold />} onClick={handleQuickAdd} />
           </Tooltip>
         )}
       </Box>

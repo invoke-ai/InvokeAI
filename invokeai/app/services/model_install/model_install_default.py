@@ -239,7 +239,11 @@ class ModelInstallService(ModelInstallServiceBase):
         if not access_token:
             self._logger.info("No HuggingFace access token present; some models may not be downloadable.")
 
-        metadata = HuggingFaceMetadataFetch(self._session).from_id(source)
+        try:
+            metadata = HuggingFaceMetadataFetch(self._session).from_id(source)
+        except:
+            raise ValueError("No HuggingFace repository found")
+
         assert isinstance(metadata, ModelMetadataWithFiles)
         urls: List[AnyHttpUrl] = []
 

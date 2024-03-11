@@ -17,11 +17,13 @@ export const ScanModelsForm = () => {
   const [_scanFolder, { isLoading, data }] = useLazyScanFolderQuery();
 
   const scanFolder = useCallback(async () => {
-    _scanFolder({ scan_path: scanPath }).catch((error) => {
-      if (error) {
-        setErrorMessage(error.data.detail);
-      }
-    });
+    _scanFolder({ scan_path: scanPath })
+      .unwrap()
+      .catch((error) => {
+        if (error) {
+          setErrorMessage(error.data.detail);
+        }
+      });
   }, [_scanFolder, scanPath]);
 
   const handleSetScanPath: ChangeEventHandler<HTMLInputElement> = useCallback(
