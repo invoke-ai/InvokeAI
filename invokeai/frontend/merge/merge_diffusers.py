@@ -424,9 +424,7 @@ def get_model_merger(record_store: ModelRecordServiceBase) -> ModelMerger:
 def main():
     args = _parse_args()
     if args.root_dir:
-        config.parse_args(["--root", str(args.root_dir)])
-    else:
-        config.parse_args([])
+        config.set_root(Path(args.root_dir))
 
     try:
         if args.front_end:

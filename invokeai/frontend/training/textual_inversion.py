@@ -426,7 +426,7 @@ def main() -> None:
 
     # change root if needed
     if args.root_dir:
-        config.root = args.root_dir
+        config.set_root(args.root_dir)
 
     try:
         if args.front_end:
