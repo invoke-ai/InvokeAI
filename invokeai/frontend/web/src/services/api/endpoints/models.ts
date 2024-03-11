@@ -71,6 +71,9 @@ export type ScanFolderResponse =
   paths['/api/v2/models/scan_folder']['get']['responses']['200']['content']['application/json'];
 type ScanFolderArg = operations['scan_for_models']['parameters']['query'];
 
+type GetHuggingFaceModelsResponse =
+  paths['/api/v2/models/hugging_face']['get']['responses']['200']['content']['application/json'];
+
 type GetByAttrsArg = operations['get_model_records_by_attrs']['parameters']['query'];
 
 const mainModelsAdapter = createEntityAdapter<MainModelConfig, string>({
@@ -258,7 +261,7 @@ export const modelsApi = api.injectEndpoints({
         };
       },
     }),
-    getHuggingFaceModels: build.query<string[], string>({
+    getHuggingFaceModels: build.query<GetHuggingFaceModelsResponse, string>({
       query: (hugging_face_repo) => {
         return {
           url: buildModelsUrl(`hugging_face?hugging_face_repo=${hugging_face_repo}`),
