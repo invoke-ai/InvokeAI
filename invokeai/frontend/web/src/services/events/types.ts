@@ -69,6 +69,12 @@ export type ModelInstallErrorEvent = {
   id: number;
 };
 
+export type ModelInstallCancelledEvent = {
+  source: string;
+  timestamp: number;
+  id: number;
+};
+
 /**
  * A `generator_progress` socket.io event.
  *
@@ -264,6 +270,7 @@ export type ServerToClientEvents = {
   model_install_downloading: (payload: ModelInstallDownloadingEvent) => void;
   model_install_completed: (payload: ModelInstallCompletedEvent) => void;
   model_install_error: (payload: ModelInstallErrorEvent) => void;
+  model_install_canceled: (payload: ModelInstallCancelledEvent) => void;
   session_retrieval_error: (payload: SessionRetrievalErrorEvent) => void;
   invocation_retrieval_error: (payload: InvocationRetrievalErrorEvent) => void;
   queue_item_status_changed: (payload: QueueItemStatusChangedEvent) => void;
