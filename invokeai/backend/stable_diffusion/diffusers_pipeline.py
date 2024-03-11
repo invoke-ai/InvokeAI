@@ -275,7 +275,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # the remainder if this code is called when attention_type=='auto'
         if self.unet.device.type == "cuda":
-            if is_xformers_available() and not config.disable_xformers:
+            if is_xformers_available():
                 self.enable_xformers_memory_efficient_attention()
                 return
             elif hasattr(torch.nn.functional, "scaled_dot_product_attention"):
