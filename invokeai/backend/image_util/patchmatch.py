@@ -8,9 +8,9 @@ be suppressed or deferred
 import numpy as np
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import get_config
 
-config = InvokeAIAppConfig.get_config()
+config = get_config()
 
 
 class PatchMatch:
