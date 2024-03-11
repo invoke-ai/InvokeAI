@@ -434,15 +434,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
         cur_text_embedding_len = 0
         processed_masks = []
         embedding_ranges = []
-        extra_conditioning = None
 
         for prompt_idx, text_embedding_info in enumerate(text_conditionings):
             mask = masks[prompt_idx]
-            if (
-                text_embedding_info.extra_conditioning is not None
-                and text_embedding_info.extra_conditioning.wants_cross_attention_control
-            ):
-                extra_conditioning = text_embedding_info.extra_conditioning
 
             if is_sdxl:
                 # We choose a random SDXLConditioningInfo's pooled_embeds and add_time_ids here, with a preference for
@@ -483,23 +477,11 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 ranges=embedding_ranges,
             )
 
-        if extra_conditioning is not None and len(text_conditionings) > 1:
-            raise ValueError(
-                "Prompt-to-prompt cross-attention control (a.k.a. `swap()`) is not supported when using multiple "
-                "prompts."
-            )
-
         if is_sdxl:
             return SDXLConditioningInfo(
-                embeds=text_embedding,
-                extra_conditioning=extra_conditioning,
-                pooled_embeds=pooled_embedding,
-                add_time_ids=add_time_ids,
+                embeds=text_embedding, pooled_embeds=pooled_embedding, add_time_ids=add_time_ids
             ), regions
-        return BasicConditioningInfo(
-            embeds=text_embedding,
-            extra_conditioning=extra_conditioning,
-        ), regions
+        return BasicConditioningInfo(embeds=text_embedding), regions
 
     def get_conditioning_data(
         self,
