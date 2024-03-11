@@ -4,7 +4,6 @@ wraps the safety_checker model. It respects the global "nsfw_checker"
 configuration variable, that allows the checker to be supressed.
 """
 
-
 import numpy as np
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from PIL import Image

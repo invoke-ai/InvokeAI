@@ -9,6 +9,4 @@ root_help = r"""Sets a root directory for the app. If omitted, the app will sear
 
 app_arg_parser = ArgumentParser(description="Invoke Studio", formatter_class=RawTextHelpFormatter)
 app_arg_parser.add_argument("--root", type=str, help=root_help)
-app_arg_parser.add_argument(
-    "--version", action="version", version=__version__, help="Displays the version and exits."
-)
+app_arg_parser.add_argument("--version", action="version", version=__version__, help="Displays the version and exits.")

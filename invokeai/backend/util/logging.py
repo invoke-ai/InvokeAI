@@ -339,9 +339,7 @@ class InvokeAILogger(object):  # noqa D102
     loggers: Dict[str, logging.Logger] = {}
 
     @classmethod
-    def get_logger(
-        cls, name: str = "InvokeAI", config: InvokeAIAppConfig = get_config()
-    ) -> logging.Logger:  # noqa D102
+    def get_logger(cls, name: str = "InvokeAI", config: InvokeAIAppConfig = get_config()) -> logging.Logger:  # noqa D102
         if name in cls.loggers:
             return cls.loggers[name]
 
