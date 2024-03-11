@@ -16,9 +16,7 @@ config = InvokeAIAppConfig.get_config()
 
 def choose_torch_device() -> torch.device:
     """Convenience routine for guessing which GPU device to run model on"""
-    if config.use_cpu:  # legacy setting - force CPU
-        return CPU_DEVICE
-    elif config.device == "auto":
+    if config.device == "auto":
         if torch.cuda.is_available():
             return torch.device("cuda")
         if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
