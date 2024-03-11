@@ -932,7 +932,7 @@ def main() -> None:
     new_init_file = config.root_path / "invokeai.yaml"
     backup_init_file = new_init_file.with_suffix(".bak")
     if new_init_file.exists():
-        copy(new_init_file, new_init_file.with_suffix(".bak"))
+        copy(new_init_file, backup_init_file)
 
     try:
         # if we do a root migration/upgrade, then we are keeping previous
