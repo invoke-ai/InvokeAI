@@ -68,7 +68,7 @@ export const InstallModelForm = () => {
         <Flex gap={2} alignItems="flex-end" justifyContent="space-between">
           <FormControl orientation="vertical">
             <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
-            <Input {...register('location')} />
+            <Input placeholder={t('modelManager.simpleModelPlaceholder')} {...register('location')} />
           </FormControl>
           <Button
             onClick={handleSubmit(onSubmit)}
