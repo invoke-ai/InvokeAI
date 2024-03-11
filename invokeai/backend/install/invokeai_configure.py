@@ -29,13 +29,13 @@ from diffusers import ModelMixin
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from huggingface_hub import HfFolder
 from huggingface_hub import login as hf_hub_login
-from omegaconf import DictConfig, OmegaConf
-from pydantic.error_wrappers import ValidationError
+from pydantic import ValidationError
 from tqdm import tqdm
 from transformers import AutoFeatureExtractor
 
 import invokeai.configs as configs
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import get_config, load_config_from_file
 from invokeai.backend.install.install_helper import InstallHelper, InstallSelections
 from invokeai.backend.install.legacy_arg_parsing import legacy_parser
 from invokeai.backend.model_manager import ModelType
@@ -66,11 +66,7 @@ def get_literal_fields(field: str) -> Tuple[Any]:
 
 # --------------------------globals-----------------------
 
-config = InvokeAIAppConfig.get_config()
-
-Model_dir = "models"
-Default_config_file = config.model_conf_path
-SD_Configs = config.legacy_conf_path
+config = get_config()
 
 PRECISION_CHOICES = get_literal_fields("precision")
 DEVICE_CHOICES = get_literal_fields("device")
@@ -195,7 +191,7 @@ def hf_download_from_pretrained(model_class: Type[ModelMixin], model_name: str, 
 
 
 # ---------------------------------------------
-def download_with_progress_bar(model_url: str, model_dest: str, label: str = "the"):
+def download_with_progress_bar(model_url: str, model_dest: str | Path, label: str = "the"):
     try:
         logger.info(f"Installing {label} model file {model_url}...")
         if not os.path.exists(model_dest):
@@ -292,7 +288,7 @@ class editOptsForm(CyclingForm, npyscreen.FormMultiPage):
 
     def create(self):
         program_opts = self.parentApp.program_opts
-        old_opts = self.parentApp.invokeai_opts
+        old_opts: InvokeAIAppConfig = self.parentApp.invokeai_opts
         first_time = not (config.root_path / "invokeai.yaml").exists()
         access_token = HfFolder.get_token()
         window_width, window_height = get_terminal_size()
@@ -466,7 +462,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         self.nextrely -= 1
         self.ram = self.add_widget_intelligent(
             npyscreen.Slider,
-            value=clip(old_opts.ram_cache_size, range=(3.0, MAX_RAM), step=0.5),
+            value=clip(old_opts.ram, range=(3.0, MAX_RAM), step=0.5),
             out_of=round(MAX_RAM),
             lowest=0.0,
             step=0.5,
@@ -486,7 +482,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             self.nextrely -= 1
             self.vram = self.add_widget_intelligent(
                 npyscreen.Slider,
-                value=clip(old_opts.vram_cache_size, range=(0, MAX_VRAM), step=0.25),
+                value=clip(old_opts.vram, range=(0, MAX_VRAM), step=0.25),
                 out_of=round(MAX_VRAM * 2) / 2,
                 lowest=0.0,
                 relx=8,
@@ -521,7 +517,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         self.autoimport_dirs["autoimport_dir"] = self.add_widget_intelligent(
             FileBox,
             name="Optional folder to scan for new checkpoints, ControlNets, LoRAs and TI models",
-            value=str(config.root_path / config.autoimport_dir) if config.autoimport_dir else "",
+            value=str(config.autoimport_path) if config.autoimport_dir else "",
             select_dir=True,
             must_exist=False,
             use_two_lines=False,
@@ -669,7 +665,7 @@ def default_ramcache() -> float:
 
 
 def default_startup_options(init_file: Path) -> InvokeAIAppConfig:
-    opts = InvokeAIAppConfig.get_config()
+    opts = get_config()
     opts.ram = default_ramcache()
     opts.precision = "float32" if FORCE_FULL_PRECISION else choose_precision(torch.device(choose_torch_device()))
     return opts
@@ -717,7 +713,7 @@ def run_console_ui(
 ) -> Tuple[Optional[Namespace], Optional[InstallSelections]]:
     first_time = not (config.root_path / "invokeai.yaml").exists()
     invokeai_opts = default_startup_options(initfile) if first_time else config
-    invokeai_opts.root = program_opts.root
+    invokeai_opts.set_root(program_opts.root)
 
     if not set_min_terminal_size(MIN_COLS, MIN_LINES):
         raise WindowTooSmallException(
@@ -738,15 +734,14 @@ def write_opts(opts: InvokeAIAppConfig, init_file: Path) -> None:
     Update the invokeai.yaml file with values from current settings.
     """
     # this will load current settings
-    new_config = InvokeAIAppConfig.get_config()
-    new_config.root = config.root
+    new_config = get_config()
+    new_config.set_root(config.root_path)
 
     for key, value in vars(opts).items():
         if hasattr(new_config, key):
             setattr(new_config, key, value)
 
-    with open(init_file, "w", encoding="utf-8") as file:
-        file.write(new_config.to_yaml())
+    new_config.write_file(exclude_defaults=True)
 
     if hasattr(opts, "hf_token") and opts.hf_token:
         HfLogin(opts.hf_token)
@@ -770,24 +765,22 @@ def write_default_options(program_opts: Namespace, initfile: Path) -> None:
 # yaml format.
 def migrate_init_file(legacy_format: Path) -> None:
     old = legacy_parser.parse_args([f"@{str(legacy_format)}"])
-    new = InvokeAIAppConfig.get_config()
+    new_config = get_config()
 
     for attr in InvokeAIAppConfig.model_fields.keys():
         if hasattr(old, attr):
             try:
-                setattr(new, attr, getattr(old, attr))
+                setattr(new_config, attr, getattr(old, attr))
             except ValidationError as e:
                 print(f"* Ignoring incompatible value for field {attr}:\n  {str(e)}")
 
     # a few places where the field names have changed and we have to
     # manually add in the new names/values
-    new.xformers_enabled = old.xformers
-    new.conf_path = old.conf
-    new.root = legacy_format.parent.resolve()
-
-    invokeai_yaml = legacy_format.parent / "invokeai.yaml"
-    with open(invokeai_yaml, "w", encoding="utf-8") as outfile:
-        outfile.write(new.to_yaml())
+    # TODO(psyche): This is going to fail, these attrs don't exist on the new config...
+    new_config.xformers_enabled = old.xformers
+    new_config.conf_path = old.conf
+    new_config.set_root(legacy_format.parent.resolve())
+    new_config.write_file(exclude_defaults=True)
 
     legacy_format.replace(legacy_format.parent / "invokeai.init.orig")
 
@@ -812,9 +805,8 @@ def migrate_if_needed(opt: Namespace, root: Path) -> bool:
         ):
             logger.info("** Migrating invokeai.init to invokeai.yaml")
             migrate_init_file(old_init_file)
-            omegaconf = OmegaConf.load(new_init_file)
-            assert isinstance(omegaconf, DictConfig)
-            config.parse_args(argv=[], conf=omegaconf)
+            new_config = load_config_from_file(new_init_file)
+            config.update_config(new_config)
 
             if old_hub.exists():
                 migrate_models(config.root_path)
@@ -878,12 +870,12 @@ def main() -> None:
         help="path to root of install directory",
     )
     opt = parser.parse_args()
-    invoke_args = []
+    invoke_args: dict[str, Any] = {}
     if opt.root:
-        invoke_args.extend(["--root", opt.root])
+        invoke_args["root"] = opt.root
     if opt.full_precision:
-        invoke_args.extend(["--precision", "float32"])
-    config.parse_args(invoke_args)
+        invoke_args["precision"] = "float32"
+    config.update_config(invoke_args)
     logger = InvokeAILogger().get_logger(config=config)
 
     errors = set()
