@@ -159,7 +159,6 @@ Following the table are additional explanations for certain settings.
 ::: invokeai.app.services.config.config_default.InvokeAIAppConfig
     options:
         heading_level: 3
-        members: false
 <!-- prettier-ignore-end -->
 
 ### Model Marketplace API Keys
