@@ -1,19 +1,9 @@
 # parse_args() must be called before any other imports. if it is not called first, consumers of the config
 # which are imported/used before parse_args() is called will get the default config values instead of the
 # values from the command line or config file.
-import sys
+from invokeai.app.services.config.config_default import get_config
 
-from invokeai.app.invocations.model import ModelIdentifierField
-from invokeai.app.services.session_processor.session_processor_common import ProgressImage
-from invokeai.version.invokeai_version import __version__
-
-from .services.config import InvokeAIAppConfig
-
-app_config = InvokeAIAppConfig.get_config()
-app_config.parse_args()
-if app_config.version:
-    print(f"InvokeAI version {__version__}")
-    sys.exit(0)
+app_config = get_config()
 
 if True:  # hack to make flake8 happy with imports coming after setting up the config
     import asyncio
@@ -41,6 +31,8 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
     import invokeai.frontend.web as web_dir
     from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
+    from invokeai.app.invocations.model import ModelIdentifierField
+    from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 
     from ..backend.util.logging import InvokeAILogger
     from .api.dependencies import ApiDependencies
@@ -66,8 +58,6 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
 
 
-app_config = InvokeAIAppConfig.get_config()
-app_config.parse_args()
 logger = InvokeAILogger.get_logger(config=app_config)
 # fix for windows mimetypes registry entries being borked
 # see https://github.com/invoke-ai/InvokeAI/discussions/3684#discussioncomment-6391352
