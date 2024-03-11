@@ -15,10 +15,10 @@ import os
 import sys
 from argparse import ArgumentParser
 from pathlib import Path
-from pydantic import BaseModel
 from typing import Any, ClassVar, Dict, List, Literal, Optional, Union, get_args, get_origin, get_type_hints
 
-from omegaconf import DictConfig, ListConfig, OmegaConf, DictKeyType
+from omegaconf import DictConfig, DictKeyType, ListConfig, OmegaConf
+from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from invokeai.app.services.config.config_common import PagingArgumentParser, int_or_float_or_str
