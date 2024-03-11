@@ -104,12 +104,12 @@ def test_write_config_to_file():
     with TemporaryDirectory() as tmpdir:
         temp_config_path = Path(tmpdir) / "invokeai.yaml"
         config = InvokeAIAppConfig(host="192.168.1.1", port=8080)
-        config.set_root(Path(tmpdir))
-        config.write_file(exclude_defaults=False)
-
+        config.write_file(temp_config_path)
         # Load the file and check contents
         with open(temp_config_path, "r") as file:
             content = file.read()
+            # This is a default value, so it should not be in the file
+            assert "pil_compress_level" not in content
             assert "host: 192.168.1.1" in content
             assert "port: 8080" in content
 
@@ -179,7 +179,7 @@ def test_deny_nodes(patch_rootdir):
     )
     # must parse config before importing Graph, so its nodes union uses the config
     conf = get_config()
-    conf.read_config(conf=allow_deny_nodes_conf, argv=[])
+    conf.merge_from_file(conf=allow_deny_nodes_conf, argv=[])
     from invokeai.app.services.shared.graph import Graph
 
     # confirm graph validation fails when using denied node
