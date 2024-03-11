@@ -858,7 +858,7 @@
         "settings": "Settings",
         "showExisting": "Show Existing",
         "sigmoid": "Sigmoid",
-        "simpleModelPlaceholder": "URL or path to a local file",
+        "simpleModelPlaceholder": "URL or path to a local file or diffusers folder",
         "simpleModelDesc": "Provide a path to a local Diffusers model, local checkpoint / safetensors model a HuggingFace Repo ID, or a checkpoint/diffusers model URL.",
         "source": "Source",
         "statusConverting": "Converting",

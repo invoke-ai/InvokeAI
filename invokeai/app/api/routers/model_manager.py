@@ -261,11 +261,16 @@ async def get_hugging_face_models(
     hugging_face_repo: str = Query(description="Hugging face repo to search for models", default=None),
 ) -> List[AnyHttpUrl]:
     get_hugging_face_models = ApiDependencies.invoker.services.model_manager.install.get_hugging_face_models
-    get_hugging_face_models(hugging_face_repo)
 
-    result = get_hugging_face_models(
-        source=hugging_face_repo,
-    )
+    try:
+        result = get_hugging_face_models(
+            source=hugging_face_repo,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{e}",
+        )
 
     return result
 
