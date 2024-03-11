@@ -17,7 +17,8 @@ class MigrateCallback(Protocol):
     See :class:`Migration` for an example.
     """
 
-    def __call__(self, cursor: sqlite3.Cursor) -> None: ...
+    def __call__(self, cursor: sqlite3.Cursor) -> None:
+        ...
 
 
 class MigrationError(RuntimeError):
