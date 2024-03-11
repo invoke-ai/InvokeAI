@@ -40,6 +40,7 @@ from transformers import CLIPTextModel, CLIPTokenizer
 
 # invokeai stuff
 from invokeai.app.services.config import InvokeAIAppConfig, PagingArgumentParser
+from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.install.install_helper import initialize_record_store
 from invokeai.backend.model_manager import BaseModelType, ModelType
 
@@ -77,7 +78,7 @@ def save_progress(text_encoder, placeholder_token_id, accelerator, placeholder_t
 
 
 def parse_args() -> Namespace:
-    config = InvokeAIAppConfig.get_config()
+    config = get_config()
     parser = PagingArgumentParser(description="Textual inversion training")
     general_group = parser.add_argument_group("General")
     model_group = parser.add_argument_group("Models and Paths")
@@ -98,7 +99,7 @@ def parse_args() -> Namespace:
         "--root_dir",
         "--root",
         type=Path,
-        default=config.root,
+        default=config.root_path,
         help="Path to the invokeai runtime directory",
     )
     general_group.add_argument(
@@ -113,7 +114,7 @@ def parse_args() -> Namespace:
     general_group.add_argument(
         "--output_dir",
         type=Path,
-        default=f"{config.root}/text-inversion-model",
+        default=f"{config.root_path}/text-inversion-model",
         help="The output directory where the model predictions and checkpoints will be written.",
     )
     model_group.add_argument(
@@ -549,7 +550,7 @@ def do_textual_inversion_training(
 
     # setting up things the way invokeai expects them
     if not os.path.isabs(output_dir):
-        output_dir = os.path.join(config.root, output_dir)
+        output_dir = config.root_path / output_dir
 
     logging_dir = output_dir / logging_dir
 
