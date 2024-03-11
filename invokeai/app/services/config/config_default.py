@@ -93,7 +93,7 @@ class InvokeAIAppConfig(BaseSettings):
         attention_type: Attention type.
         attention_slice_size: Slice size, valid when attention_type=="sliced".
         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
-        png_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
+        pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
         max_queue_size: Maximum number of items in the session queue.
         allow_nodes: List of nodes to allow. Omit to allow all.
         deny_nodes: List of nodes to deny. Omit to deny none.
@@ -160,7 +160,7 @@ class InvokeAIAppConfig(BaseSettings):
     attention_type:      ATTENTION_TYPE = Field(default="auto",             description="Attention type.")
     attention_slice_size: ATTENTION_SLICE_SIZE = Field(default="auto",      description='Slice size, valid when attention_type=="sliced".')
     force_tiled_decode:            bool = Field(default=False,              description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).")
-    png_compress_level:             int = Field(default=1,                  description="The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.")
+    pil_compress_level:             int = Field(default=1,                  description="The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.")
     max_queue_size:                 int = Field(default=10000, gt=0,        description="Maximum number of items in the session queue.")
 
     # NODES
