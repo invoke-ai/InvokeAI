@@ -513,7 +513,6 @@ def list_models(installer: ModelInstallServiceBase, model_type: ModelType):
 def select_and_download_models(opt: Namespace) -> None:
     """Prompt user for install/delete selections and execute."""
     precision = "float32" if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
-    # unsure how to avoid a typing complaint in the next line: config.precision is an enumerated Literal
     config.precision = precision
     install_helper = InstallHelper(config, logger)
     installer = install_helper.installer

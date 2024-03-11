@@ -20,7 +20,7 @@ from npyscreen import widget
 from omegaconf import OmegaConf
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.install.install_helper import initialize_installer
 from invokeai.backend.model_manager import ModelType
 from invokeai.backend.training import do_textual_inversion_training, parse_args
@@ -422,8 +422,7 @@ def main() -> None:
     global config
 
     args: Namespace = parse_args()
-    config = InvokeAIAppConfig.get_config()
-    config.parse_args([])
+    config = get_config()
 
     # change root if needed
     if args.root_dir:

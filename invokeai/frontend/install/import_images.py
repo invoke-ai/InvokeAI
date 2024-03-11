@@ -25,10 +25,10 @@ from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.shortcuts import message_dialog
 
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import get_config
 from invokeai.app.util.misc import uuid_string
 
-app_config = InvokeAIAppConfig.get_config()
+app_config = get_config()
 
 bindings = KeyBindings()
 
