@@ -75,7 +75,6 @@ from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineInterme
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     ConditioningFieldData,
-    ExtraConditioningInfo,
     SDXLConditioningInfo,
 )
 from invokeai.backend.util.devices import CPU_DEVICE, CUDA_DEVICE, MPS_DEVICE, choose_precision, choose_torch_device
@@ -149,7 +148,6 @@ __all__ = [
     # invokeai.backend.stable_diffusion.diffusion.conditioning_data
     "BasicConditioningInfo",
     "ConditioningFieldData",
-    "ExtraConditioningInfo",
     "SDXLConditioningInfo",
     # invokeai.backend.stable_diffusion.diffusers_pipeline
     "PipelineIntermediateState",

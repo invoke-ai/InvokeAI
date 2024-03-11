@@ -1,29 +1,19 @@
 from __future__ import annotations
 
 import math
-from contextlib import contextmanager
 from typing import Any, Callable, Optional, Union
 
 import torch
-from diffusers import UNet2DConditionModel
 from typing_extensions import TypeAlias
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
-    ExtraConditioningInfo,
     IPAdapterConditioningInfo,
     Range,
     TextConditioningData,
     TextConditioningRegions,
 )
 from invokeai.backend.stable_diffusion.diffusion.regional_prompt_data import RegionalPromptData
-
-from .cross_attention_control import (
-    CrossAttentionType,
-    CrossAttnControlContext,
-    SwapCrossAttnContext,
-    setup_cross_attention_control_attention_processors,
-)
 
 ModelForwardCallback: TypeAlias = Union[
     # x, t, conditioning, Optional[cross-attention kwargs]
@@ -61,30 +51,7 @@ class InvokeAIDiffuserComponent:
         self.conditioning = None
         self.model = model
         self.model_forward_callback = model_forward_callback
-        self.cross_attention_control_context = None
         self.sequential_guidance = config.sequential_guidance
-
-    @contextmanager
-    def custom_attention_context(
-        self,
-        unet: UNet2DConditionModel,
-        extra_conditioning_info: Optional[ExtraConditioningInfo],
-    ):
-        old_attn_processors = unet.attn_processors
-
-        try:
-            self.cross_attention_control_context = CrossAttnControlContext(
-                arguments=extra_conditioning_info.cross_attention_control_args,
-            )
-            setup_cross_attention_control_attention_processors(
-                unet,
-                self.cross_attention_control_context,
-            )
-
-            yield None
-        finally:
-            self.cross_attention_control_context = None
-            unet.set_attn_processor(old_attn_processors)
 
     def do_controlnet_step(
         self,
@@ -210,16 +177,8 @@ class InvokeAIDiffuserComponent:
         down_intrablock_additional_residuals: Optional[torch.Tensor] = None,  # for T2I-Adapter
     ):
         percent_through = step_index / total_step_count
-        cross_attention_control_types_to_do = []
-        if self.cross_attention_control_context is not None:
-            cross_attention_control_types_to_do = (
-                self.cross_attention_control_context.get_active_cross_attention_control_types_for_step(percent_through)
-            )
-        wants_cross_attention_control = len(cross_attention_control_types_to_do) > 0
 
-        if wants_cross_attention_control or self.sequential_guidance:
-            # If wants_cross_attention_control is True, we force the sequential mode to be used, because cross-attention
-            # control is currently only supported in sequential mode.
+        if self.sequential_guidance:
             (
                 unconditioned_next_x,
                 conditioned_next_x,
@@ -229,7 +188,6 @@ class InvokeAIDiffuserComponent:
                 conditioning_data=conditioning_data,
                 ip_adapter_conditioning=ip_adapter_conditioning,
                 percent_through=percent_through,
-                cross_attention_control_types_to_do=cross_attention_control_types_to_do,
                 down_block_additional_residuals=down_block_additional_residuals,
                 mid_block_additional_residual=mid_block_additional_residual,
                 down_intrablock_additional_residuals=down_intrablock_additional_residuals,
@@ -394,7 +352,6 @@ class InvokeAIDiffuserComponent:
         conditioning_data: TextConditioningData,
         ip_adapter_conditioning: Optional[list[IPAdapterConditioningInfo]],
         percent_through: float,
-        cross_attention_control_types_to_do: list[CrossAttentionType],
         down_block_additional_residuals: Optional[torch.Tensor] = None,  # for ControlNet
         mid_block_additional_residual: Optional[torch.Tensor] = None,  # for ControlNet
         down_intrablock_additional_residuals: Optional[torch.Tensor] = None,  # for T2I-Adapter
@@ -424,19 +381,6 @@ class InvokeAIDiffuserComponent:
         if mid_block_additional_residual is not None:
             uncond_mid_block, cond_mid_block = mid_block_additional_residual.chunk(2)
 
-        # If cross-attention control is enabled, prepare the SwapCrossAttnContext.
-        cross_attn_processor_context = None
-        if self.cross_attention_control_context is not None:
-            # Note that the SwapCrossAttnContext is initialized with an empty list of cross_attention_types_to_do.
-            # This list is empty because cross-attention control is not applied in the unconditioned pass. This field
-            # will be populated before the conditioned pass.
-            cross_attn_processor_context = SwapCrossAttnContext(
-                modified_text_embeddings=self.cross_attention_control_context.arguments.edited_conditioning,
-                index_map=self.cross_attention_control_context.cross_attention_index_map,
-                mask=self.cross_attention_control_context.cross_attention_mask,
-                cross_attention_types_to_do=[],
-            )
-
         #####################
         # Unconditioned pass
         #####################
@@ -450,10 +394,6 @@ class InvokeAIDiffuserComponent:
                 torch.unsqueeze(ipa_conditioning.uncond_image_prompt_embeds, dim=0)
                 for ipa_conditioning in ip_adapter_conditioning
             ]
-
-        # Prepare cross-attention control kwargs for the unconditioned pass.
-        if cross_attn_processor_context is not None:
-            cross_attention_kwargs["swap_cross_attn_context"] = cross_attn_processor_context
 
         # Prepare SDXL conditioning kwargs for the unconditioned pass.
         added_cond_kwargs = None
@@ -495,11 +435,6 @@ class InvokeAIDiffuserComponent:
                 torch.unsqueeze(ipa_conditioning.cond_image_prompt_embeds, dim=0)
                 for ipa_conditioning in ip_adapter_conditioning
             ]
-
-        # Prepare cross-attention control kwargs for the conditioned pass.
-        if cross_attn_processor_context is not None:
-            cross_attn_processor_context.cross_attention_types_to_do = cross_attention_control_types_to_do
-            cross_attention_kwargs["swap_cross_attn_context"] = cross_attn_processor_context
 
         # Prepare SDXL conditioning kwargs for the conditioned pass.
         added_cond_kwargs = None

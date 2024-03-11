@@ -22,7 +22,6 @@ from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     ConditioningFieldData,
-    ExtraConditioningInfo,
     SDXLConditioningInfo,
 )
 from invokeai.backend.util.devices import torch_dtype
@@ -109,23 +108,11 @@ class CompelInvocation(BaseInvocation):
             if context.config.get().log_tokenization:
                 log_tokenization_for_conjunction(conjunction, tokenizer)
 
-            c, options = compel.build_conditioning_tensor_for_conjunction(conjunction)
-
-            ec = ExtraConditioningInfo(
-                tokens_count_including_eos_bos=get_max_token_count(tokenizer, conjunction),
-                cross_attention_control_args=options.get("cross_attention_control", None),
-            )
+            c, _options = compel.build_conditioning_tensor_for_conjunction(conjunction)
 
         c = c.detach().to("cpu")
 
-        conditioning_data = ConditioningFieldData(
-            conditionings=[
-                BasicConditioningInfo(
-                    embeds=c,
-                    extra_conditioning=ec,
-                )
-            ]
-        )
+        conditioning_data = ConditioningFieldData(conditionings=[BasicConditioningInfo(embeds=c)])
 
         conditioning_name = context.conditioning.save(conditioning_data)
         return ConditioningOutput(
@@ -147,7 +134,7 @@ class SDXLPromptInvocationBase:
         get_pooled: bool,
         lora_prefix: str,
         zero_on_empty: bool,
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[ExtraConditioningInfo]]:
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         tokenizer_info = context.models.load(clip_field.tokenizer)
         tokenizer_model = tokenizer_info.model
         assert isinstance(tokenizer_model, CLIPTokenizer)
@@ -174,7 +161,7 @@ class SDXLPromptInvocationBase:
                 )
             else:
                 c_pooled = None
-            return c, c_pooled, None
+            return c, c_pooled
 
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
             for lora in clip_field.loras:
@@ -219,16 +206,11 @@ class SDXLPromptInvocationBase:
                 log_tokenization_for_conjunction(conjunction, tokenizer)
 
             # TODO: ask for optimizations? to not run text_encoder twice
-            c, options = compel.build_conditioning_tensor_for_conjunction(conjunction)
+            c, _options = compel.build_conditioning_tensor_for_conjunction(conjunction)
             if get_pooled:
                 c_pooled = compel.conditioning_provider.get_pooled_embeddings([prompt])
             else:
                 c_pooled = None
-
-            ec = ExtraConditioningInfo(
-                tokens_count_including_eos_bos=get_max_token_count(tokenizer, conjunction),
-                cross_attention_control_args=options.get("cross_attention_control", None),
-            )
 
         del tokenizer
         del text_encoder
@@ -239,7 +221,7 @@ class SDXLPromptInvocationBase:
         if c_pooled is not None:
             c_pooled = c_pooled.detach().to("cpu")
 
-        return c, c_pooled, ec
+        return c, c_pooled
 
 
 @invocation(
@@ -276,17 +258,13 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        c1, c1_pooled, ec1 = self.run_clip_compel(
-            context, self.clip, self.prompt, False, "lora_te1_", zero_on_empty=True
-        )
+        c1, c1_pooled = self.run_clip_compel(context, self.clip, self.prompt, False, "lora_te1_", zero_on_empty=True)
         if self.style.strip() == "":
-            c2, c2_pooled, ec2 = self.run_clip_compel(
+            c2, c2_pooled = self.run_clip_compel(
                 context, self.clip2, self.prompt, True, "lora_te2_", zero_on_empty=True
             )
         else:
-            c2, c2_pooled, ec2 = self.run_clip_compel(
-                context, self.clip2, self.style, True, "lora_te2_", zero_on_empty=True
-            )
+            c2, c2_pooled = self.run_clip_compel(context, self.clip2, self.style, True, "lora_te2_", zero_on_empty=True)
 
         original_size = (self.original_height, self.original_width)
         crop_coords = (self.crop_top, self.crop_left)
@@ -325,10 +303,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
         conditioning_data = ConditioningFieldData(
             conditionings=[
                 SDXLConditioningInfo(
-                    embeds=torch.cat([c1, c2], dim=-1),
-                    pooled_embeds=c2_pooled,
-                    add_time_ids=add_time_ids,
-                    extra_conditioning=ec1,
+                    embeds=torch.cat([c1, c2], dim=-1), pooled_embeds=c2_pooled, add_time_ids=add_time_ids
                 )
             ]
         )
@@ -368,7 +343,7 @@ class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
         # TODO: if there will appear lora for refiner - write proper prefix
-        c2, c2_pooled, ec2 = self.run_clip_compel(context, self.clip2, self.style, True, "<NONE>", zero_on_empty=False)
+        c2, c2_pooled = self.run_clip_compel(context, self.clip2, self.style, True, "<NONE>", zero_on_empty=False)
 
         original_size = (self.original_height, self.original_width)
         crop_coords = (self.crop_top, self.crop_left)
@@ -377,14 +352,7 @@ class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase
 
         assert c2_pooled is not None
         conditioning_data = ConditioningFieldData(
-            conditionings=[
-                SDXLConditioningInfo(
-                    embeds=c2,
-                    pooled_embeds=c2_pooled,
-                    add_time_ids=add_time_ids,
-                    extra_conditioning=ec2,  # or None
-                )
-            ]
+            conditionings=[SDXLConditioningInfo(embeds=c2, pooled_embeds=c2_pooled, add_time_ids=add_time_ids)]
         )
 
         conditioning_name = context.conditioning.save(conditioning_data)
