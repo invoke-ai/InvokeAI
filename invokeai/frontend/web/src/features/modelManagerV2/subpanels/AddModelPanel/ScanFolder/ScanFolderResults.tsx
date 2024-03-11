@@ -87,7 +87,7 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
             {t('modelManager.scanResults')}
           </Heading>
           <Flex alignItems="center" gap="4">
-            <Button onClick={handleAddAll} isDisabled={filteredResults.length === 0}>
+            <Button size="sm" onClick={handleAddAll} isDisabled={filteredResults.length === 0}>
               {t('modelManager.addAll')}
             </Button>
             <InputGroup maxW="300px" size="xs">

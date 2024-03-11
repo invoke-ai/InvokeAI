@@ -13,7 +13,7 @@ import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableCon
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import type { ChangeEventHandler } from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 import { useInstallModelMutation } from 'services/api/endpoints/models';
@@ -31,6 +31,13 @@ export const HuggingFaceResults = ({ results }: HuggingFaceResultsProps) => {
 
   const [installModel] = useInstallModelMutation();
 
+  const filteredResults = useMemo(() => {
+    return results.filter((result) => {
+      const modelName = result.split('/').slice(-1)[0];
+      return modelName?.toLowerCase().includes(searchTerm.toLowerCase());
+    });
+  }, [results, searchTerm]);
+
   const handleSearch: ChangeEventHandler<HTMLInputElement> = useCallback((e) => {
     setSearchTerm(e.target.value.trim());
   }, []);
@@ -40,7 +47,7 @@ export const HuggingFaceResults = ({ results }: HuggingFaceResultsProps) => {
   }, []);
 
   const handleAddAll = useCallback(() => {
-    for (const result of results) {
+    for (const result of filteredResults) {
       installModel({ source: result })
         .unwrap()
         .then((_) => {
@@ -66,7 +73,7 @@ export const HuggingFaceResults = ({ results }: HuggingFaceResultsProps) => {
           }
         });
     }
-  }, [results, installModel, dispatch, t]);
+  }, [filteredResults, installModel, dispatch, t]);
 
   return (
     <>
@@ -77,7 +84,7 @@ export const HuggingFaceResults = ({ results }: HuggingFaceResultsProps) => {
             {t('modelManager.availableModels')}
           </Heading>
           <Flex alignItems="center" gap="4">
-            <Button onClick={handleAddAll} isDisabled={results.length === 0}>
+            <Button size="sm" onClick={handleAddAll} isDisabled={results.length === 0}>
               {t('modelManager.addAll')}
             </Button>
             <InputGroup maxW="300px" size="xs">
@@ -106,7 +113,7 @@ export const HuggingFaceResults = ({ results }: HuggingFaceResultsProps) => {
         <Flex height="100%" layerStyle="third" borderRadius="base" p={4} mt={4} mb={4}>
           <ScrollableContent>
             <Flex flexDir="column" gap={3}>
-              {results.map((result) => (
+              {filteredResults.map((result) => (
                 <HuggingFaceResultItem key={result} result={result} />
               ))}
             </Flex>
