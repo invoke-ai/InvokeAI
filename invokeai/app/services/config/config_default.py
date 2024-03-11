@@ -206,22 +206,30 @@ class InvokeAIAppConfig(BaseSettings):
         with open(dest_path, "w") as file:
             meta_dict = {"meta": ConfigMeta().model_dump()}
             config_dict = self.model_dump(mode="json", exclude_unset=True, exclude_defaults=True)
-            file.write("# Internal metadata\n")
+            file.write("# Internal metadata - do not edit:\n")
             file.write(yaml.dump(meta_dict, sort_keys=False))
             file.write("\n")
-            file.write("# User settings\n")
-            file.write(yaml.dump(config_dict, sort_keys=False))
+            file.write("# Put user settings here:\n")
+            if len(config_dict) > 0:
+                file.write(yaml.dump(config_dict, sort_keys=False))
 
     def merge_from_file(self, source_path: Optional[Path] = None) -> None:
         """Read the config from the `invokeai.yaml` file, migrating it if necessary and merging it into the singleton config.
 
         This function will write to the `invokeai.yaml` file if the config is migrated.
 
+        If there is no `invokeai.yaml` file, one will be written.
+
         Args:
             source_path: Path to the config file. If not provided, the default path is used.
         """
-        config_from_file = load_and_migrate_config(source_path or self.init_file_path)
-        self.update_config(config_from_file)
+        path = source_path or self.init_file_path
+
+        if not path.exists():
+            self.write_file(path)
+        else:
+            config_from_file = load_and_migrate_config(path)
+            self.update_config(config_from_file)
 
     def parse_args(self) -> None:
         """Parse the CLI args and set the runtime root directory."""
