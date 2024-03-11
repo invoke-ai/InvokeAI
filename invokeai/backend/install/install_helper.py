@@ -149,7 +149,7 @@ class InstallHelper(object):
         """
         # previously-installed models
         for model in self._installer.record_store.all_models():
-            info = UnifiedModelInfo.parse_obj(model.dict())
+            info = UnifiedModelInfo.model_validate(model.model_dump())
             info.installed = True
             model_key = f"{model.base.value}/{model.type.value}/{model.name}"
             self.all_models[model_key] = info
@@ -183,7 +183,7 @@ class InstallHelper(object):
 
         # previously-installed models
         for model in self._installer.record_store.all_models():
-            info = UnifiedModelInfo.parse_obj(model.dict())
+            info = UnifiedModelInfo.model_validate(model.model_dump())
             info.installed = True
             model_key = f"{model.base.value}/{model.type.value}/{model.name}"
             self.all_models[model_key] = info
