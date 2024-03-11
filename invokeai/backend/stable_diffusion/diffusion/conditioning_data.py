@@ -3,29 +3,12 @@ from typing import List, Optional, Union
 
 import torch
 
-from .cross_attention_control import Arguments
-
-
-@dataclass
-class ExtraConditioningInfo:
-    """Extra conditioning information produced by Compel.
-    This is used for prompt-to-prompt cross-attention control (a.k.a. `.swap()` in Compel).
-    """
-
-    tokens_count_including_eos_bos: int
-    cross_attention_control_args: Optional[Arguments] = None
-
-    @property
-    def wants_cross_attention_control(self):
-        return self.cross_attention_control_args is not None
-
 
 @dataclass
 class BasicConditioningInfo:
     """SD 1/2 text conditioning information produced by Compel."""
 
     embeds: torch.Tensor
-    extra_conditioning: Optional[ExtraConditioningInfo]
 
     def to(self, device, dtype=None):
         self.embeds = self.embeds.to(device=device, dtype=dtype)

@@ -417,31 +417,13 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if timesteps.shape[0] == 0:
             return latents
 
-        extra_conditioning_info = conditioning_data.cond_text.extra_conditioning
-        use_cross_attention_control = (
-            extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control
-        )
         use_ip_adapter = ip_adapter_data is not None
         use_regional_prompting = (
             conditioning_data.cond_regions is not None or conditioning_data.uncond_regions is not None
         )
-        if use_cross_attention_control and use_ip_adapter:
-            raise ValueError(
-                "Prompt-to-prompt cross-attention control (`.swap()`) and IP-Adapter cannot be used simultaneously."
-            )
-        if use_cross_attention_control and use_regional_prompting:
-            raise ValueError(
-                "Prompt-to-prompt cross-attention control (`.swap()`) and regional prompting cannot be used simultaneously."
-            )
-
         unet_attention_patcher = None
         self.use_ip_adapter = use_ip_adapter
         attn_ctx = nullcontext()
-        if use_cross_attention_control:
-            attn_ctx = self.invokeai_diffuser.custom_attention_context(
-                self.invokeai_diffuser.model,
-                extra_conditioning_info=extra_conditioning_info,
-            )
         if use_ip_adapter or use_regional_prompting:
             ip_adapters = [ipa.ip_adapter_model for ipa in ip_adapter_data] if use_ip_adapter else None
             unet_attention_patcher = UNetAttentionPatcher(ip_adapters)

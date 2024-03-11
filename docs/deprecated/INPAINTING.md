@@ -203,16 +203,10 @@ There are a few caveats to be aware of:
 3. While the `--hires` option works fine with the inpainting model, some special
    features, such as `--embiggen` are disabled.
 
-4. Prompt weighting (`banana++ sushi`) and merging work well with the inpainting
-   model, but prompt swapping
-   (`a ("fluffy cat").swap("smiling dog") eating a hotdog`) will not have any
-   effect due to the way the model is set up. You may use text masking (with
-   `-tm thing-to-mask`) as an effective replacement.
-
-5. The model tends to oversharpen image if you use high step or CFG values. If
+4. The model tends to oversharpen image if you use high step or CFG values. If
    you need to do large steps, use the standard model.
 
-6. The `--strength` (`-f`) option has no effect on the inpainting model due to
+5. The `--strength` (`-f`) option has no effect on the inpainting model due to
    its fundamental differences with the standard model. It will always take the
    full number of steps you specify.
 
