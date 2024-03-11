@@ -28,7 +28,7 @@ class PatchMatch:
     def _load_patch_match(self):
         if self.tried_load:
             return
-        if config.try_patchmatch:
+        if config.patchmatch:
             from patchmatch import patch_match as pm
 
             if pm.patchmatch_available:
