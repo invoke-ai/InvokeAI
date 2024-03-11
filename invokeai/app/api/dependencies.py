@@ -64,7 +64,6 @@ class ApiDependencies:
     def initialize(config: InvokeAIAppConfig, event_handler_id: int, logger: Logger = logger) -> None:
         logger.info(f"InvokeAI version {__version__}")
         logger.info(f"Root directory = {str(config.root_path)}")
-        logger.debug(f"Internet connectivity is {config.internet_available}")
 
         output_folder = config.output_path
         if output_folder is None:
