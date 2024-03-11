@@ -137,8 +137,8 @@ def test_set_and_resolve_paths():
     with TemporaryDirectory() as tmpdir:
         config = InvokeAIAppConfig()
         config.set_root(Path(tmpdir))
-        assert config.models_path == Path(tmpdir) / "models"
-        assert config.db_path == Path(tmpdir) / "databases" / "invokeai.db"
+        assert config.models_path == Path(tmpdir).resolve() / "models"
+        assert config.db_path == Path(tmpdir).resolve() / "databases" / "invokeai.db"
 
 
 def test_singleton_behavior():
