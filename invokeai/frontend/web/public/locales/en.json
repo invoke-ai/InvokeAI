@@ -1409,7 +1409,7 @@
         "maskSentControlnetAssets": "Mask Sent to ControlNet & Assets",
         "metadataLoadFailed": "Failed to load metadata",
         "modelAdded": "Model Added: {{modelName}}",
-        "modelAddedSimple": "Model Added",
+        "modelAddedSimple": "Model Added to Queue",
         "modelAddFailed": "Model Add Failed",
         "modelImportCanceled": "Model Import Canceled",
         "modelImportRemoved": "Model Import Removed",
