@@ -349,9 +349,15 @@ def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
     parsed_config_dict: dict[str, Any] = {}
     for _category_name, category_dict in config_dict["InvokeAI"].items():
         for k, v in category_dict.items():
+            # `outdir` was renamed to `outputs_dir` in v4
             if k == "outdir":
-                # `outdir` was renamed to `outputs_dir`
                 parsed_config_dict["outputs_dir"] = v
+            # `max_cache_size` was renamed to `ram` some time in v3, but both names were used
+            if k == "max_cache_size" and "ram" not in category_dict:
+                parsed_config_dict["ram"] = v
+            # `max_vram_cache_size` was renamed to `vram` some time in v3, but both names were used
+            if k == "max_vram_cache_size" and "vram" not in category_dict:
+                parsed_config_dict["vram"] = v
             elif k in InvokeAIAppConfig.model_fields:
                 # skip unknown fields
                 parsed_config_dict[k] = v
