@@ -152,7 +152,7 @@ class InvokeAISettings(BaseSettings):
     @classmethod
     def _excluded(cls) -> List[str]:
         # internal fields that shouldn't be exposed as command line options
-        return ["type", "initconf"]
+        return ["type", "initconf", "remote_api_tokens"]
 
     @classmethod
     def _excluded_from_yaml(cls) -> List[str]:
