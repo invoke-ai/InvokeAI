@@ -21,7 +21,6 @@ import { useInstallModelMutation } from 'services/api/endpoints/models';
 import { HuggingFaceResultItem } from './HuggingFaceResultItem';
 
 type HuggingFaceResultsProps = {
-  // results: HuggingFaceFolderResponse;
   results: string[];
 };
 

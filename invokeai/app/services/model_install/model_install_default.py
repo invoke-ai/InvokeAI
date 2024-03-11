@@ -241,12 +241,16 @@ class ModelInstallService(ModelInstallServiceBase):
 
         metadata = HuggingFaceMetadataFetch(self._session).from_id(source)
         assert isinstance(metadata, ModelMetadataWithFiles)
-        remote_files = metadata.download_urls(
-            session=self._session,
-        )
+        urls: List[AnyHttpUrl] = []
 
-        # return array of remote_files.url
-        return [x.url for x in remote_files]
+        for file in metadata.files:
+            if str(file.url).endswith(
+                (".safetensors", ".bin", ".onnx", ".xml", ".pth", ".pt", ".ckpt", ".msgpack", "model_index.json")
+            ):
+                urls.append(file.url)
+
+        self._logger.info(f"here are the metadata files {metadata.files}")
+        return urls
 
     def list_jobs(self) -> List[ModelInstallJob]:  # noqa D102
         return self._install_jobs
