@@ -2,6 +2,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { api } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import {
+  socketModelInstallCancelled,
   socketModelInstallCompleted,
   socketModelInstallDownloading,
   socketModelInstallError,
@@ -57,6 +58,23 @@ export const addModelInstallEventListener = (startAppListening: AppStartListenin
             modelImport.status = 'error';
             modelImport.error_reason = error_type;
             modelImport.error = error;
+          }
+          return draft;
+        })
+      );
+    },
+  });
+
+  startAppListening({
+    actionCreator: socketModelInstallCancelled,
+    effect: (action, { dispatch }) => {
+      const { id } = action.payload.data;
+
+      dispatch(
+        modelsApi.util.updateQueryData('listModelInstalls', undefined, (draft) => {
+          const modelImport = draft.find((m) => m.id === id);
+          if (modelImport) {
+            modelImport.status = 'cancelled';
           }
           return draft;
         })

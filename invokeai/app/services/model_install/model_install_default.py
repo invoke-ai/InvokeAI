@@ -892,7 +892,7 @@ class ModelInstallService(ModelInstallServiceBase):
     def _signal_job_cancelled(self, job: ModelInstallJob) -> None:
         self._logger.info(f"{job.source}: model installation was cancelled")
         if self._event_bus:
-            self._event_bus.emit_model_install_cancelled(str(job.source))
+            self._event_bus.emit_model_install_cancelled(str(job.source), id=job.id)
 
     @staticmethod
     def get_fetcher_from_url(url: str):

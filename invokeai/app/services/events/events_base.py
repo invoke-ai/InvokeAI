@@ -405,7 +405,7 @@ class EventServiceBase:
             payload={"source": source, "total_bytes": total_bytes, "key": key, "id": id},
         )
 
-    def emit_model_install_cancelled(self, source: str) -> None:
+    def emit_model_install_cancelled(self, source: str, id: int) -> None:
         """
         Emit when an install job is cancelled.
 
@@ -413,7 +413,7 @@ class EventServiceBase:
         """
         self.__emit_model_event(
             event_name="model_install_cancelled",
-            payload={"source": source},
+            payload={"source": source, "id": id},
         )
 
     def emit_model_install_error(self, source: str, error_type: str, error: str, id: int) -> None:
