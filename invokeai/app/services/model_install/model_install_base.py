@@ -20,7 +20,6 @@ from invokeai.app.services.model_records import ModelRecordServiceBase
 from invokeai.backend.model_manager import AnyModelConfig, ModelRepoVariant
 from invokeai.backend.model_manager.config import ModelSourceType
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
-from invokeai.backend.model_manager.metadata.metadata_base import RemoteModelFile
 
 
 class InstallStatus(str, Enum):

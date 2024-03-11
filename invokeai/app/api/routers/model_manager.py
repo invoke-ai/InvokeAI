@@ -29,7 +29,6 @@ from invokeai.backend.model_manager.config import (
     ModelType,
     SubModelType,
 )
-from invokeai.backend.model_manager.metadata.metadata_base import RemoteModelFile
 from invokeai.backend.model_manager.search import ModelSearch
 
 from ..dependencies import ApiDependencies

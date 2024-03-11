@@ -38,7 +38,7 @@ from invokeai.backend.model_manager.metadata import (
     ModelMetadataWithFiles,
     RemoteModelFile,
 )
-from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata
+from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata, UnknownMetadataException
 from invokeai.backend.model_manager.probe import ModelProbe
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util import Chdir, InvokeAILogger
@@ -241,7 +241,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         try:
             metadata = HuggingFaceMetadataFetch(self._session).from_id(source)
-        except:
+        except UnknownMetadataException:
             raise ValueError("No HuggingFace repository found")
 
         assert isinstance(metadata, ModelMetadataWithFiles)
