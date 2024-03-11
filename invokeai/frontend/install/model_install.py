@@ -22,8 +22,9 @@ import npyscreen
 import torch
 from npyscreen import widget
 
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import get_config
 from invokeai.app.services.model_install import ModelInstallServiceBase
+from invokeai.backend.install.check_root import validate_root_structure
 from invokeai.backend.install.install_helper import InstallHelper, InstallSelections, UnifiedModelInfo
 from invokeai.backend.model_manager import ModelType
 from invokeai.backend.util import choose_precision, choose_torch_device
@@ -41,8 +42,8 @@ from invokeai.frontend.install.widgets import (
 )
 
 warnings.filterwarnings("ignore", category=UserWarning)  # noqa: E402
-config = InvokeAIAppConfig.get_config()
-logger = InvokeAILogger.get_logger("ModelInstallService")
+config = get_config()
+logger = InvokeAILogger.get_logger("ModelInstallService", config=config)
 # logger.setLevel("WARNING")
 # logger.setLevel('DEBUG')
 
@@ -600,15 +601,17 @@ def main() -> None:
     )
     opt = parser.parse_args()
 
-    invoke_args = []
+    invoke_args: dict[str, Any] = {}
     if opt.root:
-        invoke_args.extend(["--root", opt.root])
+        invoke_args["root"] = opt.root
     if opt.full_precision:
-        invoke_args.extend(["--precision", "float32"])
-    config.parse_args(invoke_args)
+        invoke_args["precision"] = "float32"
+    config.update_config(invoke_args)
     logger = InvokeAILogger().get_logger(config=config)
 
-    if not config.models_path.exists():
+    try:
+        validate_root_structure(config)
+    except AssertionError:
         logger.info("Your InvokeAI root directory is not set up. Calling invokeai-configure.")
         sys.argv = ["invokeai_configure", "--yes", "--skip-sd-weights"]
         from invokeai.frontend.install.invokeai_configure import invokeai_configure
