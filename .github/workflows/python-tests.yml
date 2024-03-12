@@ -1,7 +1,7 @@
 # Runs python tests on a matrix of python versions and platforms.
 #
 # Checks for changes to python files before running the tests.
-# When manually triggered or called from another workflow, always runs the tests.
+# If always_run is true, always runs the tests.
 
 name: 'python tests'
 
@@ -16,7 +16,19 @@ on:
       - 'synchronize'
   merge_group:
   workflow_dispatch:
+    inputs:
+      always_run:
+        description: 'Always run the tests'
+        required: true
+        type: boolean
+        default: true
   workflow_call:
+    inputs:
+      always_run:
+        description: 'Always run the tests'
+        required: true
+        type: boolean
+        default: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -63,7 +75,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: check for changed python files
-        if: ${{ github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' }}
+        if: ${{ inputs.always_run != true }}
         id: changed-files
         uses: tj-actions/changed-files@v42
         with:
@@ -75,7 +87,7 @@ jobs:
               - 'tests/**'
 
       - name: setup python
-        if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' }}
+        if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -83,12 +95,12 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: install dependencies
-        if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' }}
+        if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
         env:
           PIP_EXTRA_INDEX_URL: ${{ matrix.extra-index-url }}
         run: >
           pip3 install --editable=".[test]"
 
       - name: run pytest
-        if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' }}
+        if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
         run: pytest

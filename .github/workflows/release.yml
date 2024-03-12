@@ -30,15 +30,23 @@ jobs:
 
   frontend-checks:
     uses: ./.github/workflows/frontend-checks.yml
+    with:
+      always_run: true
 
   frontend-tests:
     uses: ./.github/workflows/frontend-tests.yml
+    with:
+      always_run: true
 
   python-checks:
     uses: ./.github/workflows/python-checks.yml
+    with:
+      always_run: true
 
   python-tests:
     uses: ./.github/workflows/python-tests.yml
+    with:
+      always_run: true
 
   build:
     uses: ./.github/workflows/build-installer.yml
