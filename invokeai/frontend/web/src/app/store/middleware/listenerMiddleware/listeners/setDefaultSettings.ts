@@ -1,19 +1,23 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { setDefaultSettings } from 'features/parameters/store/actions';
 import {
+  heightChanged,
   setCfgRescaleMultiplier,
   setCfgScale,
   setScheduler,
   setSteps,
   vaePrecisionChanged,
   vaeSelected,
+  widthChanged,
 } from 'features/parameters/store/generationSlice';
 import {
   isParameterCFGRescaleMultiplier,
   isParameterCFGScale,
+  isParameterHeight,
   isParameterPrecision,
   isParameterScheduler,
   isParameterSteps,
+  isParameterWidth,
   zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { addToast } from 'features/system/store/systemSlice';
@@ -42,7 +46,7 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
       }
 
       if (isNonRefinerMainModelConfig(modelConfig) && modelConfig.default_settings) {
-        const { vae, vae_precision, cfg_scale, cfg_rescale_multiplier, steps, scheduler } =
+        const { vae, vae_precision, cfg_scale, cfg_rescale_multiplier, steps, scheduler, width, height } =
           modelConfig.default_settings;
 
         if (vae) {
@@ -90,6 +94,18 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
         if (scheduler) {
           if (isParameterScheduler(scheduler)) {
             dispatch(setScheduler(scheduler));
+          }
+        }
+
+        if (width) {
+          if (isParameterWidth(width)) {
+            dispatch(widthChanged(width));
+          }
+        }
+
+        if (height) {
+          if (isParameterHeight(height)) {
+            dispatch(heightChanged(height));
           }
         }
 

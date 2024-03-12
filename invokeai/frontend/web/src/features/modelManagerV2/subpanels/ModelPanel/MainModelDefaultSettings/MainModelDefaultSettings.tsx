@@ -1,6 +1,8 @@
 import { Button, Flex, Heading, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useMainModelDefaultSettings } from 'features/modelManagerV2/hooks/useMainModelDefaultSettings';
+import { DefaultHeight } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/DefaultHeight';
+import { DefaultWidth } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/DefaultWidth';
 import type { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
@@ -25,11 +27,13 @@ export interface FormField<T> {
 
 export type MainModelDefaultSettingsFormData = {
   vae: FormField<string>;
-  vaePrecision: FormField<string>;
+  vaePrecision: FormField<'fp16' | 'fp32'>;
   scheduler: FormField<ParameterScheduler>;
   steps: FormField<number>;
   cfgScale: FormField<number>;
   cfgRescaleMultiplier: FormField<number>;
+  width: FormField<number>;
+  height: FormField<number>;
 };
 
 export const MainModelDefaultSettings = () => {
@@ -37,8 +41,11 @@ export const MainModelDefaultSettings = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
-  const { defaultSettingsDefaults, isLoading: isLoadingDefaultSettings } =
-    useMainModelDefaultSettings(selectedModelKey);
+  const {
+    defaultSettingsDefaults,
+    isLoading: isLoadingDefaultSettings,
+    optimalDimension,
+  } = useMainModelDefaultSettings(selectedModelKey);
 
   const [updateModel, { isLoading: isLoadingUpdateModel }] = useUpdateModelMutation();
 
@@ -59,6 +66,8 @@ export const MainModelDefaultSettings = () => {
         cfg_rescale_multiplier: data.cfgRescaleMultiplier.isEnabled ? data.cfgRescaleMultiplier.value : null,
         steps: data.steps.isEnabled ? data.steps.value : null,
         scheduler: data.scheduler.isEnabled ? data.scheduler.value : null,
+        width: data.width.isEnabled ? data.width.value : null,
+        height: data.height.isEnabled ? data.height.value : null,
       };
 
       updateModel({
@@ -137,6 +146,14 @@ export const MainModelDefaultSettings = () => {
           </Flex>
           <Flex gap={4} w="full">
             <DefaultCfgRescaleMultiplier control={control} name="cfgRescaleMultiplier" />
+          </Flex>
+        </Flex>
+        <Flex gap={8}>
+          <Flex gap={4} w="full">
+            <DefaultWidth control={control} optimalDimension={optimalDimension} />
+          </Flex>
+          <Flex gap={4} w="full">
+            <DefaultHeight control={control} optimalDimension={optimalDimension} />
           </Flex>
         </Flex>
       </Flex>
