@@ -88,7 +88,7 @@ Please check in before you invest your time on anything besides a trivial fix, i
 
 If a feature request or issue doesn't already exist for the thing you want to work on, please create one.
 
-Ping `@psychedelicious` on [discord] in the `#frontend-dev` channel or in the feature request / issue you want to work on - we're happy chat.
+Ping `@psychedelicious` on [discord] in the `#frontend-dev` channel or in the feature request / issue you want to work on - we're happy to chat.
 
 ### Code conventions
 
