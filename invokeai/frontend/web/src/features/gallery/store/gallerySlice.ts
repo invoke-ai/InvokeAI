@@ -15,6 +15,7 @@ const initialGalleryState: GalleryState = {
   autoAssignBoardOnClick: true,
   autoAddBoardId: 'none',
   galleryImageMinimumWidth: 90,
+  alwaysShowImageSizeBadge: false,
   selectedBoardId: 'none',
   galleryView: 'images',
   boardSearchText: '',
@@ -71,6 +72,9 @@ export const gallerySlice = createSlice({
         state.limit += IMAGE_LIMIT;
       }
     },
+    alwaysShowImageSizeBadgeChanged: (state, action: PayloadAction<boolean>) => {
+      state.alwaysShowImageSizeBadge = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addMatcher(isAnyBoardDeleted, (state, action) => {
@@ -107,6 +111,7 @@ export const {
   selectionChanged,
   boardSearchTextChanged,
   moreImagesLoaded,
+  alwaysShowImageSizeBadgeChanged,
 } = gallerySlice.actions;
 
 const isAnyBoardDeleted = isAnyOf(

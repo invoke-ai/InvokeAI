@@ -398,6 +398,7 @@
     },
     "gallery": {
         "allImagesLoaded": "All Images Loaded",
+        "alwaysShowImageSizeBadge": "Always Show Image Size Badge",
         "assets": "Assets",
         "autoAssignBoardOnClick": "Auto-Assign Board on Click",
         "autoSwitchNewImages": "Auto-Switch to New Images",
