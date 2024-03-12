@@ -20,10 +20,11 @@ Invoke's UI is made possible by many contributors and open-source libraries. Tha
 - `dev`: run the frontend in dev mode, enabling hot reloading
 - `build`: run all checks (madge, eslint, prettier, tsc) and then build the frontend
 - `typegen`: generate types from the OpenAPI schema (see [Type generation])
-- `lint:madge`: check frontend for circular dependencies
-- `lint:eslint`: check frontend for code quality
-- `lint:prettier`: check frontend for code formatting
-- `lint:tsc`: check frontend for type issues
+- `lint:dpdm`: check circular dependencies
+- `lint:eslint`: check code quality
+- `lint:prettier`: check code formatting
+- `lint:tsc`: check type issues
+- `lint:knip`: check for unused exports or objects (failures here are just suggestions, not hard fails)
 - `lint`: run all checks concurrently
 - `fix`: run `eslint` and `prettier`, fixing fixable issues
 
