@@ -837,14 +837,14 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         latents = context.tensors.load(self.latents.latents_name)
 
         vae_info = context.models.load(self.vae.vae)
-        assert isinstance(vae_info.model, (UNet2DConditionModel, AutoencoderKL))
+        assert isinstance(vae_info.model, (UNet2DConditionModel, AutoencoderKL, AutoencoderTiny))
         with set_seamless(vae_info.model, self.vae.seamless_axes), vae_info as vae:
             assert isinstance(vae, torch.nn.Module)
             latents = latents.to(vae.device)
             if self.fp32:
                 vae.to(dtype=torch.float32)
 
-                use_torch_2_0_or_xformers = isinstance(
+                use_torch_2_0_or_xformers = hasattr(vae.decoder, "mid_block") and isinstance(
                     vae.decoder.mid_block.attentions[0].processor,
                     (
                         AttnProcessor2_0,
@@ -1018,7 +1018,7 @@ class ImageToLatentsInvocation(BaseInvocation):
             if upcast:
                 vae.to(dtype=torch.float32)
 
-                use_torch_2_0_or_xformers = isinstance(
+                use_torch_2_0_or_xformers = hasattr(vae.decoder, "mid_block") and isinstance(
                     vae.decoder.mid_block.attentions[0].processor,
                     (
                         AttnProcessor2_0,
