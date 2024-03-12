@@ -58,6 +58,8 @@ jobs:
     environment:
       name: testpypi
       url: https://test.pypi.org/p/invokeai
+    permissions:
+      id-token: write
     steps:
       - name: download distribution from build job
         uses: actions/download-artifact@v4
@@ -85,6 +87,8 @@ jobs:
     environment:
       name: pypi
       url: https://pypi.org/p/invokeai
+    permissions:
+      id-token: write
     steps:
       - name: download distribution from build job
         uses: actions/download-artifact@v4

@@ -15,6 +15,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
+  alwaysShowImageSizeBadgeChanged,
   autoAssignBoardOnClickChanged,
   setGalleryImageMinimumWidth,
   shouldAutoSwitchChanged,
@@ -36,6 +37,7 @@ const GallerySettingsPopover = () => {
   const galleryImageMinimumWidth = useAppSelector((s) => s.gallery.galleryImageMinimumWidth);
   const shouldAutoSwitch = useAppSelector((s) => s.gallery.shouldAutoSwitch);
   const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
+  const alwaysShowImageSizeBadge = useAppSelector((s) => s.gallery.alwaysShowImageSizeBadge);
 
   const handleChangeGalleryImageMinimumWidth = useCallback(
     (v: number) => {
@@ -53,6 +55,11 @@ const GallerySettingsPopover = () => {
 
   const handleChangeAutoAssignBoardOnClick = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => dispatch(autoAssignBoardOnClickChanged(e.target.checked)),
+    [dispatch]
+  );
+
+  const handleChangeAlwaysShowImageSizeBadgeChanged = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => dispatch(alwaysShowImageSizeBadgeChanged(e.target.checked)),
     [dispatch]
   );
 
@@ -87,6 +94,10 @@ const GallerySettingsPopover = () => {
               <FormControl>
                 <FormLabel>{t('gallery.autoAssignBoardOnClick')}</FormLabel>
                 <Checkbox isChecked={autoAssignBoardOnClick} onChange={handleChangeAutoAssignBoardOnClick} />
+              </FormControl>
+              <FormControl>
+                <FormLabel>{t('gallery.alwaysShowImageSizeBadge')}</FormLabel>
+                <Checkbox isChecked={alwaysShowImageSizeBadge} onChange={handleChangeAlwaysShowImageSizeBadgeChanged} />
               </FormControl>
             </FormControlGroup>
             <BoardAutoAddSelect />
