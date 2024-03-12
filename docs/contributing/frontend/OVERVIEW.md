@@ -126,7 +126,7 @@ Please use the [conventional commits] spec for the web UI, with a scope of "ui":
 [Weblate]: https://hosted.weblate.org/engage/invokeai/
 [openapi-typescript]: https://github.com/drwpow/openapi-typescript
 [Type generation]: #type-generation
-[schema.ts]: ../src/services/api/schema.ts
+[schema.ts]: https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/src/services/api/schema.ts
 [conventional commits]: https://www.conventionalcommits.org/en/v1.0.0/
-[Workflows - Design and Implementation]: ./docs/WORKFLOWS_DESIGN_IMPLEMENTATION.md
-[State Management]: ./docs/STATE_MGMT.md
+[Workflows - Design and Implementation]: ./WORKFLOWS.md
+[State Management]: ./STATE_MGMT.md
