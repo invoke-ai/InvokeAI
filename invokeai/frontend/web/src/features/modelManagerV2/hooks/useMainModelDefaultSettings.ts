@@ -1,6 +1,7 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { isNil } from 'lodash-es';
 import { useMemo } from 'react';
@@ -8,7 +9,7 @@ import { useGetModelConfigWithTypeGuard } from 'services/api/hooks/useGetModelCo
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 
 const initialStatesSelector = createMemoizedSelector(selectConfigSlice, (config) => {
-  const { steps, guidance, scheduler, cfgRescaleMultiplier, vaePrecision } = config.sd;
+  const { steps, guidance, scheduler, cfgRescaleMultiplier, vaePrecision, width, height } = config.sd;
 
   return {
     initialSteps: steps.initial,
@@ -16,14 +17,23 @@ const initialStatesSelector = createMemoizedSelector(selectConfigSlice, (config)
     initialScheduler: scheduler,
     initialCfgRescaleMultiplier: cfgRescaleMultiplier.initial,
     initialVaePrecision: vaePrecision,
+    initialWidth: width.initial,
+    initialHeight: height.initial,
   };
 });
 
 export const useMainModelDefaultSettings = (modelKey?: string | null) => {
   const { modelConfig, isLoading } = useGetModelConfigWithTypeGuard(modelKey ?? skipToken, isNonRefinerMainModelConfig);
 
-  const { initialSteps, initialCfg, initialScheduler, initialCfgRescaleMultiplier, initialVaePrecision } =
-    useAppSelector(initialStatesSelector);
+  const {
+    initialSteps,
+    initialCfg,
+    initialScheduler,
+    initialCfgRescaleMultiplier,
+    initialVaePrecision,
+    initialWidth,
+    initialHeight,
+  } = useAppSelector(initialStatesSelector);
 
   const defaultSettingsDefaults = useMemo(() => {
     return {
@@ -51,15 +61,25 @@ export const useMainModelDefaultSettings = (modelKey?: string | null) => {
         isEnabled: !isNil(modelConfig?.default_settings?.cfg_rescale_multiplier),
         value: modelConfig?.default_settings?.cfg_rescale_multiplier || initialCfgRescaleMultiplier,
       },
+      width: {
+        isEnabled: !isNil(modelConfig?.default_settings?.width),
+        value: modelConfig?.default_settings?.width || initialWidth,
+      },
+      height: {
+        isEnabled: !isNil(modelConfig?.default_settings?.height),
+        value: modelConfig?.default_settings?.height || initialHeight,
+      },
     };
   }, [
-    modelConfig?.default_settings,
+    modelConfig,
+    initialVaePrecision,
+    initialScheduler,
     initialSteps,
     initialCfg,
-    initialScheduler,
     initialCfgRescaleMultiplier,
-    initialVaePrecision,
+    initialWidth,
+    initialHeight,
   ]);
 
-  return { defaultSettingsDefaults, isLoading };
+  return { defaultSettingsDefaults, isLoading, optimalDimension: getOptimalDimension(modelConfig) };
 };
