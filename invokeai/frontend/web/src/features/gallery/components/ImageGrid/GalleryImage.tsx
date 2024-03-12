@@ -44,6 +44,7 @@ const GalleryImage = (props: HoverableImageProps) => {
   const shift = useShiftModifier();
   const { t } = useTranslation();
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
+  const alwaysShowImageSizeBadge = useAppSelector((s) => s.gallery.alwaysShowImageSizeBadge);
   const { handleClick, isSelected, areMultiplesSelected } = useMultiselect(imageDTO);
 
   const customStarUi = useStore($customStarUI);
@@ -155,7 +156,7 @@ const GalleryImage = (props: HoverableImageProps) => {
           onMouseOut={handleMouseOut}
         >
           <>
-            {isHovered && (
+            {(isHovered || alwaysShowImageSizeBadge) && (
               <Text
                 position="absolute"
                 background="base.900"
