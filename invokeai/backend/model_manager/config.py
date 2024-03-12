@@ -143,6 +143,8 @@ class MainModelDefaultSettings(BaseModel):
     cfg_rescale_multiplier: float | None = Field(
         default=None, ge=0, lt=1, description="Default CFG Rescale Multiplier for this model"
     )
+    width: int | None = Field(default=None, multiple_of=8, ge=64, description="Default width for this model")
+    height: int | None = Field(default=None, multiple_of=8, ge=64, description="Default height for this model")
 
 
 class ControlAdapterDefaultSettings(BaseModel):
