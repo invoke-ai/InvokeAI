@@ -844,7 +844,6 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             if self.fp32:
                 vae.to(dtype=torch.float32)
 
-                # AutoencoderTiny doesn't contain a mid_block property or appear to accept attn processors
                 use_torch_2_0_or_xformers = hasattr(vae.decoder, "mid_block") and isinstance(
                     vae.decoder.mid_block.attentions[0].processor,
                     (
@@ -1019,7 +1018,7 @@ class ImageToLatentsInvocation(BaseInvocation):
             if upcast:
                 vae.to(dtype=torch.float32)
 
-                use_torch_2_0_or_xformers = isinstance(
+                use_torch_2_0_or_xformers = hasattr(vae.decoder, "mid_block") and isinstance(
                     vae.decoder.mid_block.attentions[0].processor,
                     (
                         AttnProcessor2_0,
