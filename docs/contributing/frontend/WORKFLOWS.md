@@ -117,13 +117,13 @@ Stateless fields do not store their value in the node, so their field instances 
 
 "Custom" fields will always be treated as stateless fields.
 
-##### Collection and Polymorphic Fields
+##### Collection and Scalar Fields
 
-Field types have a name and two flags which may identify it as a **collection** or **polymorphic** field.
+Field types have a name and two flags which may identify it as a **collection** or **collection or scalar** field.
 
-If a field is annotated in python as a list, its field type is parsed and flagged as a collection type (e.g. `list[int]`).
+If a field is annotated in python as a list, its field type is parsed and flagged as a **collection** type (e.g. `list[int]`).
 
-If it is annotated as a union of a type and list, the type will be flagged as a polymorphic type (e.g. `Union[int, list[int]]`). Fields may not be unions of different types (e.g. `Union[int, list[str]]` and `Union[int, str]` are not allowed).
+If it is annotated as a union of a type and list, the type will be flagged as a **collection or scalar** type (e.g. `Union[int, list[int]]`). Fields may not be unions of different types (e.g. `Union[int, list[str]]` and `Union[int, str]` are not allowed).
 
 ## Implementation
 
