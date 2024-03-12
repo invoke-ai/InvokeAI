@@ -3,7 +3,11 @@ from pathlib import Path
 import pytest
 
 from invokeai.backend.model_manager import BaseModelType, ModelRepoVariant
-from invokeai.backend.model_manager.probe import ControlAdapterProbe, VaeFolderProbe
+from invokeai.backend.model_manager.probe import (
+    VaeFolderProbe,
+    get_default_settings_controlnet_t2i_adapter,
+    get_default_settings_main,
+)
 
 
 @pytest.mark.parametrize(
@@ -31,14 +35,20 @@ def test_repo_variant(datadir: Path):
 
 
 def test_controlnet_t2i_default_settings():
-    should_be_canny = ControlAdapterProbe.get_default_settings("some_canny_model")
-    assert should_be_canny and should_be_canny.preprocessor == "canny_image_processor"
+    assert get_default_settings_controlnet_t2i_adapter("some_canny_model").preprocessor == "canny_image_processor"
+    assert (
+        get_default_settings_controlnet_t2i_adapter("some_depth_model").preprocessor == "depth_anything_image_processor"
+    )
+    assert get_default_settings_controlnet_t2i_adapter("some_pose_model").preprocessor == "dw_openpose_image_processor"
+    assert get_default_settings_controlnet_t2i_adapter("i like turtles") is None
 
-    should_be_depth_anything = ControlAdapterProbe.get_default_settings("some_depth_model")
-    assert should_be_depth_anything and should_be_depth_anything.preprocessor == "depth_anything_image_processor"
 
-    should_be_dw_openpose = ControlAdapterProbe.get_default_settings("some_pose_model")
-    assert should_be_dw_openpose and should_be_dw_openpose.preprocessor == "dw_openpose_image_processor"
-
-    should_be_none = ControlAdapterProbe.get_default_settings("i like turtles")
-    assert should_be_none is None
+def test_default_settings_main():
+    assert get_default_settings_main(BaseModelType.StableDiffusion1).width == 512
+    assert get_default_settings_main(BaseModelType.StableDiffusion1).height == 512
+    assert get_default_settings_main(BaseModelType.StableDiffusion2).width == 512
+    assert get_default_settings_main(BaseModelType.StableDiffusion2).height == 512
+    assert get_default_settings_main(BaseModelType.StableDiffusionXL).width == 1024
+    assert get_default_settings_main(BaseModelType.StableDiffusionXL).height == 1024
+    assert get_default_settings_main(BaseModelType.StableDiffusionXLRefiner) is None
+    assert get_default_settings_main(BaseModelType.Any) is None
