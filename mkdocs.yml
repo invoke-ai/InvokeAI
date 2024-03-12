@@ -178,6 +178,10 @@ nav:
           - Frontend Documentation: 'contributing/contribution_guides/contributingToFrontend.md'
           - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
           - Testing: 'contributing/TESTS.md'
+          - Frontend:
+              - Overview: 'contributing/frontend/OVERVIEW.md'
+              - State Management: 'contributing/frontend/STATE_MGMT.md'
+              - Workflows: 'contributing/frontend/WORKFLOWS.md'
       - Documentation: 'contributing/contribution_guides/documentation.md'
       - Nodes: 'contributing/INVOCATIONS.md'
       - Model Manager: 'contributing/MODEL_MANAGER.md'
