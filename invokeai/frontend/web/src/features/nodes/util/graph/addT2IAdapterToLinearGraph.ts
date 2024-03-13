@@ -18,7 +18,13 @@ export const addT2IAdaptersToLinearGraph = async (
   baseNodeId: string
 ): Promise<void> => {
   const validT2IAdapters = selectValidT2IAdapters(state.controlAdapters).filter(
-    (ca) => ca.model?.base === state.generation.model?.base
+    ({ model, processedControlImage, processorType, controlImage, isEnabled }) => {
+      const hasModel = Boolean(model);
+      const doesBaseMatch = model?.base === state.generation.model?.base;
+      const hasControlImage = (processedControlImage && processorType !== 'none') || controlImage;
+
+      return isEnabled && hasModel && doesBaseMatch && hasControlImage;
+    }
   );
 
   if (validT2IAdapters.length) {
@@ -77,7 +83,7 @@ export const addT2IAdaptersToLinearGraph = async (
           image_name: controlImage,
         };
       } else {
-        // Skip ControlNets without an unprocessed image - should never happen if everything is working correctly
+        // Skip CAs without an unprocessed image - should never happen, we already filtered the list of valid CAs
         return;
       }
 
