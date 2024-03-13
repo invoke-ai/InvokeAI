@@ -141,9 +141,6 @@ export type ImageWatermarkInvocation = S['ImageWatermarkInvocation'];
 export type SeamlessModeInvocation = S['SeamlessModeInvocation'];
 export type CoreMetadataInvocation = S['CoreMetadataInvocation'];
 
-// Metadata fields
-export type ModelMetadataField = S['ModelMetadataField'];
-
 // ControlNet Nodes
 export type ControlNetInvocation = S['ControlNetInvocation'];
 export type T2IAdapterInvocation = S['T2IAdapterInvocation'];

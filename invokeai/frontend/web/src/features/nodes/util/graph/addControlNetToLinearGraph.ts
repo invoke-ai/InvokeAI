@@ -1,16 +1,14 @@
 import type { RootState } from 'app/store/store';
 import { selectValidControlNets } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import type {
   CollectInvocation,
   ControlNetInvocation,
   CoreMetadataInvocation,
   NonNullableGraph,
 } from 'services/api/types';
-import { isControlNetModelConfig } from 'services/api/types';
 
 import { CONTROL_NET_COLLECT } from './constants';
-import { getModelMetadataField, upsertMetadata } from './metadata';
+import { upsertMetadata } from './metadata';
 
 export const addControlNetToLinearGraph = async (
   state: RootState,
@@ -26,10 +24,6 @@ export const addControlNetToLinearGraph = async (
       return isEnabled && hasModel && doesBaseMatch && hasControlImage;
     }
   );
-
-  // const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
-  //   | MetadataAccumulatorInvocation
-  //   | undefined;
 
   const controlNetMetadata: CoreMetadataInvocation['controlnets'] = [];
 
@@ -95,10 +89,8 @@ export const addControlNetToLinearGraph = async (
 
       graph.nodes[controlNetNode.id] = controlNetNode as ControlNetInvocation;
 
-      const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isControlNetModelConfig);
-
       controlNetMetadata.push({
-        control_model: getModelMetadataField(modelConfig),
+        control_model: model,
         control_weight: weight,
         control_mode: controlMode,
         begin_step_percent: beginStepPct,
