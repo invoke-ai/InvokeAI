@@ -49,7 +49,7 @@ export const addControlNetToLinearGraph = async (
       },
     });
 
-    validControlNets.forEach(async (controlNet) => {
+    for (const controlNet of validControlNets) {
       if (!controlNet.model) {
         return;
       }
@@ -114,7 +114,7 @@ export const addControlNetToLinearGraph = async (
           field: 'item',
         },
       });
-    });
+    }
     upsertMetadata(graph, { controlnets: controlNetMetadata });
   }
 };

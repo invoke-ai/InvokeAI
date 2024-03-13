@@ -45,7 +45,7 @@ export const addT2IAdaptersToLinearGraph = async (
 
     const t2iAdapterMetadata: CoreMetadataInvocation['t2iAdapters'] = [];
 
-    validT2IAdapters.forEach(async (t2iAdapter) => {
+    for (const t2iAdapter of validT2IAdapters) {
       if (!t2iAdapter.model) {
         return;
       }
@@ -107,7 +107,7 @@ export const addT2IAdaptersToLinearGraph = async (
           field: 'item',
         },
       });
-    });
+    }
 
     upsertMetadata(graph, { t2iAdapters: t2iAdapterMetadata });
   }

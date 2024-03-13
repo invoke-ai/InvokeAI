@@ -42,7 +42,7 @@ export const addIPAdapterToLinearGraph = async (
 
     const ipAdapterMetdata: CoreMetadataInvocation['ipAdapters'] = [];
 
-    validIPAdapters.forEach(async (ipAdapter) => {
+    for (const ipAdapter of validIPAdapters) {
       if (!ipAdapter.model) {
         return;
       }
@@ -84,7 +84,7 @@ export const addIPAdapterToLinearGraph = async (
           field: 'item',
         },
       });
-    });
+    }
 
     upsertMetadata(graph, { ipAdapters: ipAdapterMetdata });
   }
