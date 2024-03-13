@@ -90,8 +90,8 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
                 )
             )
 
-        # diffusers models have a `model_index.json` file
-        is_diffusers = any(str(f.url).endswith("model_index.json") for f in files)
+        # diffusers models have a `model_index.json` or `config.json` file
+        is_diffusers = any(str(f.url).endswith(("model_index.json", "config.json")) for f in files)
 
         # These URLs will be exposed to the user - I think these are the only file types we fully support
         ckpt_urls = (
