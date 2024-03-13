@@ -18,9 +18,6 @@ export const addSocketConnectedEventListener = (startAppListening: AppStartListe
     effect: async (action, { dispatch, getState, cancelActiveListeners, delay }) => {
       log.debug('Connected');
 
-      // query TIs so they are ready if user opens trigger phrases
-      dispatch(modelsApi.endpoints.getTextualInversionModels.initiate());
-
       /**
        * The rest of this listener has recovery logic for when the socket disconnects and reconnects.
        *
@@ -33,6 +30,12 @@ export const addSocketConnectedEventListener = (startAppListening: AppStartListe
 
       // Bail on the recovery logic if this is the first connection - we don't need to recover anything
       if ($isFirstConnection.get()) {
+        // The TI models are used in a component that is not always rendered, so when users open the prompt triggers
+        // box has a delay while it does the initial fetch. We need to both pre-fetch the data and maintain an RTK
+        // Query subscription to it, so the cache doesn't clear itself when the user closes the prompt triggers box.
+        // So, we explicitly do not unsubscribe from this query!
+        dispatch(modelsApi.endpoints.getTextualInversionModels.initiate());
+
         $isFirstConnection.set(false);
         return;
       }
