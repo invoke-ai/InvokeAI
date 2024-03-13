@@ -9,31 +9,27 @@ import { ScanModelsForm } from './AddModelPanel/ScanFolder/ScanFolderForm';
 export const InstallModels = () => {
   const { t } = useTranslation();
   return (
-    <Flex layerStyle="first" p={3} borderRadius="base" w="full" h="full" flexDir="column" gap={2}>
-      <Box w="full" p={2}>
-        <Heading fontSize="xl">{t('modelManager.addModel')}</Heading>
-      </Box>
-      <Box layerStyle="second" borderRadius="base" w="full" h="50%" overflow="hidden">
-        <Tabs variant="collapse" height="100%">
-          <TabList>
-            <Tab>{t('common.simple')}</Tab>
-            <Tab>{t('modelManager.huggingFace')}</Tab>
-            <Tab>{t('modelManager.scan')}</Tab>
-          </TabList>
-          <TabPanels p={3} height="100%">
-            <TabPanel>
-              <InstallModelForm />
-            </TabPanel>
-            <TabPanel height="100%">
-              <HuggingFaceForm />
-            </TabPanel>
-            <TabPanel height="100%">
-              <ScanModelsForm />
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-      </Box>
-      <Box layerStyle="second" borderRadius="base" w="full" h="50%">
+    <Flex layerStyle="first" borderRadius="base" w="full" h="full" flexDir="column" gap={4}>
+      <Heading fontSize="xl">{t('modelManager.addModel')}</Heading>
+      <Tabs variant="collapse" height="50%" display="flex" flexDir="column">
+        <TabList>
+          <Tab>{t('common.simple')}</Tab>
+          <Tab>{t('modelManager.huggingFace')}</Tab>
+          <Tab>{t('modelManager.scan')}</Tab>
+        </TabList>
+        <TabPanels p={3} height="100%">
+          <TabPanel>
+            <InstallModelForm />
+          </TabPanel>
+          <TabPanel height="100%">
+            <HuggingFaceForm />
+          </TabPanel>
+          <TabPanel height="100%">
+            <ScanModelsForm />
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
+      <Box layerStyle="second" borderRadius="base" h="50%">
         <ModelInstallQueue />
       </Box>
     </Flex>

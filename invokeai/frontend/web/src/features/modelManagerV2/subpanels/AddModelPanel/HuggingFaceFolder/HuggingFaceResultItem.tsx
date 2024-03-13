@@ -1,4 +1,4 @@
-import { Box, Flex, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
@@ -16,7 +16,7 @@ export const HuggingFaceResultItem = ({ result }: Props) => {
 
   const [installModel] = useInstallModelMutation();
 
-  const handleQuickAdd = useCallback(() => {
+  const handleInstall = useCallback(() => {
     installModel({ source: result })
       .unwrap()
       .then((_) => {
@@ -44,16 +44,14 @@ export const HuggingFaceResultItem = ({ result }: Props) => {
   }, [installModel, result, dispatch, t]);
 
   return (
-    <Flex justifyContent="space-between" w="100%">
+    <Flex alignItems="center" justifyContent="space-between" w="100%" gap={4}>
       <Flex fontSize="sm" flexDir="column">
         <Text fontWeight="semibold">{result.split('/').slice(-1)[0]}</Text>
-        <Text variant="subtext">{result}</Text>
+        <Text variant="subtext" noOfLines={1} wordBreak="break-all">
+          {result}
+        </Text>
       </Flex>
-      <Box>
-        <Tooltip label={t('modelManager.quickAdd')}>
-          <IconButton aria-label={t('modelManager.quickAdd')} icon={<PiPlusBold />} onClick={handleQuickAdd} />
-        </Tooltip>
-      </Box>
+      <IconButton aria-label={t('modelManager.install')} icon={<PiPlusBold />} onClick={handleInstall} size="sm" />
     </Flex>
   );
 };

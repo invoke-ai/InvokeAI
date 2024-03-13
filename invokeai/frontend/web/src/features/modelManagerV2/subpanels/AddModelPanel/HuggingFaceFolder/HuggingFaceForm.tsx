@@ -1,4 +1,4 @@
-import { Button, Flex, FormControl, FormErrorMessage, FormLabel, Input } from '@invoke-ai/ui-library';
+import { Button, Flex, FormControl, FormErrorMessage, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
@@ -74,8 +74,8 @@ export const HuggingFaceForm = () => {
   }, []);
 
   return (
-    <Flex flexDir="column" height="100%">
-      <FormControl isInvalid={!!errorMessage.length} w="full" orientation="vertical">
+    <Flex flexDir="column" height="100%" gap={3}>
+      <FormControl isInvalid={!!errorMessage.length} w="full" orientation="vertical" flexShrink={0}>
         <FormLabel>{t('modelManager.huggingFaceRepoID')}</FormLabel>
         <Flex gap={3} alignItems="center" w="full">
           <Input
@@ -90,9 +90,10 @@ export const HuggingFaceForm = () => {
             size="sm"
             flexShrink={0}
           >
-            {t('modelManager.addModel')}
+            {t('modelManager.installRepo')}
           </Button>
         </Flex>
+        <FormHelperText>{t('modelManager.huggingFaceHelper')}</FormHelperText>
         {!!errorMessage.length && <FormErrorMessage>{errorMessage}</FormErrorMessage>}
       </FormControl>
       {data && data.urls && displayResults && <HuggingFaceResults results={data.urls} />}
