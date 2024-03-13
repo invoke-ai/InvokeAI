@@ -37,20 +37,11 @@ const PER_PAGE = 10;
 const zOrderBy = z.enum(['opened_at', 'created_at', 'updated_at', 'name']);
 type OrderBy = z.infer<typeof zOrderBy>;
 const isOrderBy = (v: unknown): v is OrderBy => zOrderBy.safeParse(v).success;
-const ORDER_BY_OPTIONS: ComboboxOption[] = [
-  { value: 'opened_at', label: 'Opened' },
-  { value: 'created_at', label: 'Created' },
-  { value: 'updated_at', label: 'Updated' },
-  { value: 'name', label: 'Name' },
-];
 
 const zDirection = z.enum(['ASC', 'DESC']);
 type Direction = z.infer<typeof zDirection>;
 const isDirection = (v: unknown): v is Direction => zDirection.safeParse(v).success;
-const DIRECTION_OPTIONS: ComboboxOption[] = [
-  { value: 'ASC', label: 'Ascending' },
-  { value: 'DESC', label: 'Descending' },
-];
+
 
 const WorkflowLibraryList = () => {
   const { t } = useTranslation();
@@ -59,6 +50,22 @@ const WorkflowLibraryList = () => {
   const [page, setPage] = useState(0);
   const [query, setQuery] = useState('');
   const projectId = useStore($projectId);
+
+  const ORDER_BY_OPTIONS: ComboboxOption[] = useMemo(() => [
+    { value: 'opened_at', label: t('workflows.opened') },
+    { value: 'created_at', label: t('workflows.created') },
+    { value: 'updated_at', label: t('workflows.updated') },
+    { value: 'name', label: t('workflows.name') },
+  ],
+  [t]
+  );
+
+  const DIRECTION_OPTIONS: ComboboxOption[] = useMemo(() => [
+    { value: 'ASC', label: t('workflows.ascending') },
+    { value: 'DESC', label: t('workflows.descending') },
+  ],
+  [t]
+  );
 
   const orderByOptions = useMemo(() => {
     return projectId ? ORDER_BY_OPTIONS.filter((option) => option.value !== 'opened_at') : ORDER_BY_OPTIONS;
