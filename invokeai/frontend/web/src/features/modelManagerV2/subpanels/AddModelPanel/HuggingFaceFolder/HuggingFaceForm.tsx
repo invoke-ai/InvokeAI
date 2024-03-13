@@ -53,11 +53,11 @@ export const HuggingFaceForm = () => {
     _getHuggingFaceModels(huggingFaceRepo)
       .unwrap()
       .then((response) => {
-        if (response.some((result: string) => result.endsWith('model_index.json'))) {
+        if (response.is_diffusers) {
           handleInstallModel(huggingFaceRepo);
           setDisplayResults(false);
-        } else if (response.length === 1 && response[0]) {
-          handleInstallModel(response[0]);
+        } else if (response.urls?.length === 1 && response.urls[0]) {
+          handleInstallModel(response.urls[0]);
           setDisplayResults(false);
         } else {
           setDisplayResults(true);
@@ -75,26 +75,27 @@ export const HuggingFaceForm = () => {
 
   return (
     <Flex flexDir="column" height="100%">
-      <FormControl isInvalid={!!errorMessage.length} w="full">
-        <Flex flexDir="column" w="full">
-          <Flex gap={2} alignItems="flex-end" justifyContent="space-between">
-            <Flex direction="column" w="full">
-              <FormLabel>{t('modelManager.huggingFaceRepoID')}</FormLabel>
-              <Input
-                placeholder={t('modelManager.huggingFacePlaceholder')}
-                value={huggingFaceRepo}
-                onChange={handleSetHuggingFaceRepo}
-              />
-            </Flex>
-
-            <Button onClick={getModels} isLoading={isLoading} isDisabled={huggingFaceRepo.length === 0}>
-              {t('modelManager.addModel')}
-            </Button>
-          </Flex>
-          {!!errorMessage.length && <FormErrorMessage>{errorMessage}</FormErrorMessage>}
+      <FormControl isInvalid={!!errorMessage.length} w="full" orientation="vertical">
+        <FormLabel>{t('modelManager.huggingFaceRepoID')}</FormLabel>
+        <Flex gap={3} alignItems="center" w="full">
+          <Input
+            placeholder={t('modelManager.huggingFacePlaceholder')}
+            value={huggingFaceRepo}
+            onChange={handleSetHuggingFaceRepo}
+          />
+          <Button
+            onClick={getModels}
+            isLoading={isLoading}
+            isDisabled={huggingFaceRepo.length === 0}
+            size="sm"
+            flexShrink={0}
+          >
+            {t('modelManager.addModel')}
+          </Button>
         </Flex>
+        {!!errorMessage.length && <FormErrorMessage>{errorMessage}</FormErrorMessage>}
       </FormControl>
-      {data && displayResults && <HuggingFaceResults results={data} />}
+      {data && data.urls && displayResults && <HuggingFaceResults results={data.urls} />}
     </Flex>
   );
 };

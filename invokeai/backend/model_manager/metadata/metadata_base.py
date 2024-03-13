@@ -84,6 +84,10 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
     type: Literal["huggingface"] = "huggingface"
     id: str = Field(description="The HF model id")
     api_response: Optional[str] = Field(description="Response from the HF API as stringified JSON", default=None)
+    is_diffusers: bool = Field(description="Whether the metadata is for a Diffusers format model", default=False)
+    ckpt_urls: Optional[List[AnyHttpUrl]] = Field(
+        description="URLs for all checkpoint format models in the metadata", default=None
+    )
 
     def download_urls(
         self,

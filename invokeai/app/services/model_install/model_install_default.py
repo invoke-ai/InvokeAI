@@ -38,7 +38,7 @@ from invokeai.backend.model_manager.metadata import (
     ModelMetadataWithFiles,
     RemoteModelFile,
 )
-from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata, UnknownMetadataException
+from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata
 from invokeai.backend.model_manager.probe import ModelProbe
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util import Chdir, InvokeAILogger
@@ -232,29 +232,6 @@ class ModelInstallService(ModelInstallServiceBase):
 
         self._install_jobs.append(install_job)
         return install_job
-
-    def get_hugging_face_models(self, source: str) -> List[AnyHttpUrl]:
-        # Add user's cached access token to HuggingFace requests
-        access_token = HfFolder.get_token()
-        if not access_token:
-            self._logger.info("No HuggingFace access token present; some models may not be downloadable.")
-
-        try:
-            metadata = HuggingFaceMetadataFetch(self._session).from_id(source)
-        except UnknownMetadataException:
-            raise ValueError("No HuggingFace repository found")
-
-        assert isinstance(metadata, ModelMetadataWithFiles)
-        urls: List[AnyHttpUrl] = []
-
-        for file in metadata.files:
-            if str(file.url).endswith(
-                (".safetensors", ".bin", ".onnx", ".xml", ".pth", ".pt", ".ckpt", ".msgpack", "model_index.json")
-            ):
-                urls.append(file.url)
-
-        self._logger.info(f"here are the metadata files {metadata.files}")
-        return urls
 
     def list_jobs(self) -> List[ModelInstallJob]:  # noqa D102
         return self._install_jobs

@@ -29,6 +29,8 @@ from invokeai.backend.model_manager.config import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
+from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
 from invokeai.backend.model_manager.search import ModelSearch
 
 from ..dependencies import ApiDependencies
@@ -246,6 +248,11 @@ async def scan_for_models(
     return scan_results
 
 
+class HuggingFaceModels(BaseModel):
+    urls: List[AnyHttpUrl] | None = Field(description="URLs for all checkpoint format models in the metadata")
+    is_diffusers: bool = Field(description="Whether the metadata is for a Diffusers format model")
+
+
 @model_manager_router.get(
     "/hugging_face",
     operation_id="get_hugging_face_models",
@@ -254,24 +261,25 @@ async def scan_for_models(
         400: {"description": "Invalid hugging face repo"},
     },
     status_code=200,
-    response_model=List[AnyHttpUrl],
+    response_model=HuggingFaceModels,
 )
 async def get_hugging_face_models(
     hugging_face_repo: str = Query(description="Hugging face repo to search for models", default=None),
-) -> List[AnyHttpUrl]:
-    get_hugging_face_models = ApiDependencies.invoker.services.model_manager.install.get_hugging_face_models
-
+) -> HuggingFaceModels:
     try:
-        result = get_hugging_face_models(
-            source=hugging_face_repo,
-        )
-    except ValueError as e:
+        metadata = HuggingFaceMetadataFetch().from_id(hugging_face_repo)
+    except UnknownMetadataException:
         raise HTTPException(
             status_code=400,
-            detail=f"{e}",
+            detail="No HuggingFace repository found",
         )
 
-    return result
+    assert isinstance(metadata, ModelMetadataWithFiles)
+
+    return HuggingFaceModels(
+        urls=metadata.ckpt_urls,
+        is_diffusers=metadata.is_diffusers,
+    )
 
 
 @model_manager_router.patch(
