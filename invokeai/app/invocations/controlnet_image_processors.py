@@ -31,9 +31,11 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     OutputField,
+    UIType,
     WithBoard,
     WithMetadata,
 )
+from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -51,15 +53,9 @@ CONTROLNET_RESIZE_VALUES = Literal[
 ]
 
 
-class ControlNetModelField(BaseModel):
-    """ControlNet model field"""
-
-    key: str = Field(description="Model config record key for the ControlNet model")
-
-
 class ControlField(BaseModel):
     image: ImageField = Field(description="The control image")
-    control_model: ControlNetModelField = Field(description="The ControlNet model to use")
+    control_model: ModelIdentifierField = Field(description="The ControlNet model to use")
     control_weight: Union[float, List[float]] = Field(default=1, description="The weight given to the ControlNet")
     begin_step_percent: float = Field(
         default=0, ge=0, le=1, description="When the ControlNet is first applied (% of total steps)"
@@ -95,7 +91,9 @@ class ControlNetInvocation(BaseInvocation):
     """Collects ControlNet info to pass to other nodes"""
 
     image: ImageField = InputField(description="The control image")
-    control_model: ControlNetModelField = InputField(description=FieldDescriptions.controlnet_model, input=Input.Direct)
+    control_model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.controlnet_model, input=Input.Direct, ui_type=UIType.ControlNetModel
+    )
     control_weight: Union[float, List[float]] = InputField(
         default=1.0, ge=-1, le=2, description="The weight given to the ControlNet"
     )

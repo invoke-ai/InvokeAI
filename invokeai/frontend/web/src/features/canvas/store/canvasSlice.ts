@@ -65,6 +65,7 @@ const initialCanvasState: CanvasState = {
   shouldAutoSave: false,
   shouldCropToBoundingBoxOnSave: false,
   shouldDarkenOutsideBoundingBox: false,
+  shouldInvertBrushSizeScrollDirection: false,
   shouldLockBoundingBox: false,
   shouldPreserveMaskedArea: false,
   shouldRestrictStrokesToBox: true,
@@ -220,6 +221,9 @@ export const canvasSlice = createSlice({
     setShouldDarkenOutsideBoundingBox: (state, action: PayloadAction<boolean>) => {
       state.shouldDarkenOutsideBoundingBox = action.payload;
     },
+    setShouldInvertBrushSizeScrollDirection: (state, action: PayloadAction<boolean>) => {
+      state.shouldInvertBrushSizeScrollDirection = action.payload;
+    },
     clearCanvasHistory: (state) => {
       state.pastLayerStates = [];
       state.futureLayerStates = [];
@@ -287,6 +291,31 @@ export const canvasSlice = createSlice({
       state.shouldShowStagingOutline = true;
       state.shouldShowStagingImage = true;
       state.batchIds = [];
+    },
+    discardStagedImage: (state) => {
+      const { images, selectedImageIndex } = state.layerState.stagingArea;
+      state.pastLayerStates.push(cloneDeep(state.layerState));
+
+      if (state.pastLayerStates.length > MAX_HISTORY) {
+        state.pastLayerStates.shift();
+      }
+
+      if (!images.length) {
+        return;
+      }
+
+      images.splice(selectedImageIndex, 1);
+
+      if (selectedImageIndex >= images.length) {
+        state.layerState.stagingArea.selectedImageIndex = images.length - 1;
+      }
+
+      if (!images.length) {
+        state.shouldShowStagingImage = false;
+        state.shouldShowStagingOutline = false;
+      }
+
+      state.futureLayerStates = [];
     },
     addFillRect: (state) => {
       const { boundingBoxCoordinates, boundingBoxDimensions, brushColor } = state;
@@ -655,6 +684,7 @@ export const {
   commitColorPickerColor,
   commitStagingAreaImage,
   discardStagedImages,
+  discardStagedImage,
   nextStagingAreaImage,
   prevStagingAreaImage,
   redo,
@@ -674,6 +704,7 @@ export const {
   setShouldAutoSave,
   setShouldCropToBoundingBoxOnSave,
   setShouldDarkenOutsideBoundingBox,
+  setShouldInvertBrushSizeScrollDirection,
   setShouldPreserveMaskedArea,
   setShouldShowBoundingBox,
   setShouldShowCanvasDebugInfo,

@@ -1,11 +1,11 @@
-import type { ModelIdentifierWithBase } from 'features/nodes/types/common';
+import type { ModelIdentifierField } from 'features/nodes/types/common';
 
 /**
  * Gets the optimal dimension for a givel model, based on the model's base_model
  * @param model The model identifier
  * @returns The optimal dimension for the model
  */
-export const getOptimalDimension = (model?: ModelIdentifierWithBase | null): number =>
+export const getOptimalDimension = (model?: ModelIdentifierField | null): number =>
   model?.base === 'sdxl' ? 1024 : 512;
 
 const MIN_AREA_FACTOR = 0.8;

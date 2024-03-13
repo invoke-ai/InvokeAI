@@ -4,121 +4,75 @@ Abstract base class and implementation for recursive directory search for models
 
 Example usage:
 ```
-  from invokeai.backend.model_manager import ModelSearch, ModelProbe
+    from invokeai.backend.model_manager import ModelSearch, ModelProbe
 
-  def find_main_models(model: Path) -> bool:
-    info = ModelProbe.probe(model)
-    if info.model_type == 'main' and info.base_type == 'sd-1':
-        return True
-    else:
-        return False
+    def find_main_models(model: Path) -> bool:
+        info = ModelProbe.probe(model)
+        if info.model_type == 'main' and info.base_type == 'sd-1':
+            return True
+        else:
+            return False
 
-  search = ModelSearch(on_model_found=report_it)
-  found = search.search('/tmp/models')
-  print(found)   #  list of matching model paths
-  print(search.stats)  #  search stats
+    search = ModelSearch(on_model_found=report_it)
+    found = search.search('/tmp/models')
+    print(found)   #  list of matching model paths
+    print(search.stats)  #  search stats
 ```
 """
 
 import os
-from abc import ABC, abstractmethod
-from logging import Logger
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional, Set, Union
+from typing import Callable, Optional
 
-from pydantic import BaseModel, Field
-
-from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.util.logging import InvokeAILogger
 
-default_logger: Logger = InvokeAILogger.get_logger()
 
+@dataclass
+class SearchStats:
+    """Statistics about the search.
 
-class SearchStats(BaseModel):
-    items_scanned: int = 0
-    models_found: int = 0
-    models_filtered: int = 0
-
-
-class ModelSearchBase(ABC, BaseModel):
+    Attributes:
+        items_scanned: number of items scanned
+        models_found: number of models found
+        models_filtered: number of models that passed the filter
     """
-    Abstract directory traversal model search class
+
+    items_scanned = 0
+    models_found = 0
+    models_filtered = 0
+
+
+class ModelSearch:
+    """Searches a directory tree for models, using a callback to filter the results.
 
     Usage:
-       search = ModelSearchBase(
-            on_search_started = search_started_callback,
-            on_search_completed = search_completed_callback,
-            on_model_found = model_found_callback,
-       )
-       models_found = search.search('/path/to/directory')
+        search = ModelSearch()
+        search.model_found = lambda path : 'anime' in path.as_posix()
+        found = search.list_models(['/tmp/models1','/tmp/models2'])
+        # returns all models that have 'anime' in the path
     """
 
-    # fmt: off
-    on_search_started   : Optional[Callable[[Path], None]]      = Field(default=None, description="Called just before the search starts.")  # noqa E221
-    on_model_found      : Optional[Callable[[Path], bool]]      = Field(default=None, description="Called when a model is found.")          # noqa E221
-    on_search_completed : Optional[Callable[[Set[Path]], None]] = Field(default=None, description="Called when search is complete.")        # noqa E221
-    stats               : SearchStats                           = Field(default_factory=SearchStats, description="Summary statistics after search")  # noqa E221
-    logger              : Logger                                = Field(default=default_logger, description="Logger instance.")     # noqa E221
-    # fmt: on
+    def __init__(
+        self,
+        on_search_started: Optional[Callable[[Path], None]] = None,
+        on_model_found: Optional[Callable[[Path], bool]] = None,
+        on_search_completed: Optional[Callable[[set[Path]], None]] = None,
+    ) -> None:
+        """Create a new ModelSearch object.
 
-    class Config:
-        arbitrary_types_allowed = True
-
-    @abstractmethod
-    def search_started(self) -> None:
+        Args:
+            on_search_started: callback to be invoked when the search starts
+            on_model_found: callback to be invoked when a model is found. The callback should return True if the model
+                should be included in the results.
+            on_search_completed: callback to be invoked when the search is completed
         """
-        Called before the scan starts.
-
-        Passes the root search directory to the Callable `on_search_started`.
-        """
-        pass
-
-    @abstractmethod
-    def model_found(self, model: Path) -> None:
-        """
-        Called when a model is found during search.
-
-        :param model: Model to process - could be a directory or checkpoint.
-
-        Passes the model's Path to the Callable `on_model_found`.
-        This Callable receives the path to the model and returns a boolean
-        to indicate whether the model should be returned in the search
-        results.
-        """
-        pass
-
-    @abstractmethod
-    def search_completed(self) -> None:
-        """
-        Called before the scan starts.
-
-        Passes the Set of found model Paths to the Callable `on_search_completed`.
-        """
-        pass
-
-    @abstractmethod
-    def search(self, directory: Union[Path, str]) -> Set[Path]:
-        """
-        Recursively search for models in `directory` and return a set of model paths.
-
-        If provided, the `on_search_started`, `on_model_found` and `on_search_completed`
-        Callables will be invoked during the search.
-        """
-        pass
-
-
-class ModelSearch(ModelSearchBase):
-    """
-    Implementation of ModelSearch with callbacks.
-    Usage:
-       search = ModelSearch()
-       search.model_found = lambda path : 'anime' in path.as_posix()
-       found = search.list_models(['/tmp/models1','/tmp/models2'])
-       # returns all models that have 'anime' in the path
-    """
-
-    models_found: Set[Path] = Field(default_factory=set)
-    config: InvokeAIAppConfig = InvokeAIAppConfig.get_config()
+        self.stats = SearchStats()
+        self.logger = InvokeAILogger.get_logger()
+        self.on_search_started = on_search_started
+        self.on_model_found = on_model_found
+        self.on_search_completed = on_search_completed
+        self.models_found: set[Path] = set()
 
     def search_started(self) -> None:
         self.models_found = set()
@@ -135,17 +89,17 @@ class ModelSearch(ModelSearchBase):
         if self.on_search_completed is not None:
             self.on_search_completed(self.models_found)
 
-    def search(self, directory: Union[Path, str]) -> Set[Path]:
+    def search(self, directory: Path) -> set[Path]:
         self._directory = Path(directory)
-        if not self._directory.is_absolute():
-            self._directory = self.config.models_path / self._directory
+        self._directory = self._directory.resolve()
         self.stats = SearchStats()  # zero out
         self.search_started()  # This will initialize _models_found to empty
         self._walk_directory(self._directory)
         self.search_completed()
         return self.models_found
 
-    def _walk_directory(self, path: Union[Path, str], max_depth: int = 20) -> None:
+    def _walk_directory(self, path: Path, max_depth: int = 20) -> None:
+        """Recursively walk the directory tree, looking for models."""
         absolute_path = Path(path)
         if (
             len(absolute_path.parts) - len(self._directory.parts) > max_depth

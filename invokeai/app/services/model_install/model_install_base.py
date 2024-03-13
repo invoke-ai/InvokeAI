@@ -18,9 +18,8 @@ from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import ModelRecordServiceBase
 from invokeai.backend.model_manager import AnyModelConfig, ModelRepoVariant
+from invokeai.backend.model_manager.config import ModelSourceType
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
-
-from ..model_metadata import ModelMetadataStoreBase
 
 
 class InstallStatus(str, Enum):
@@ -92,21 +91,6 @@ class LocalModelSource(StringLikeSource):
         return Path(self.path).as_posix()
 
 
-class CivitaiModelSource(StringLikeSource):
-    """A Civitai version id, with optional variant and access token."""
-
-    version_id: int
-    variant: Optional[ModelRepoVariant] = None
-    access_token: Optional[str] = None
-    type: Literal["civitai"] = "civitai"
-
-    def __str__(self) -> str:
-        """Return string version of repoid when string rep needed."""
-        base: str = str(self.version_id)
-        base += f" ({self.variant})" if self.variant else ""
-        return base
-
-
 class HFModelSource(StringLikeSource):
     """
     A HuggingFace repo_id with optional variant, sub-folder and access token.
@@ -147,9 +131,13 @@ class URLModelSource(StringLikeSource):
         return str(self.url)
 
 
-ModelSource = Annotated[
-    Union[LocalModelSource, HFModelSource, CivitaiModelSource, URLModelSource], Field(discriminator="type")
-]
+ModelSource = Annotated[Union[LocalModelSource, HFModelSource, URLModelSource], Field(discriminator="type")]
+
+MODEL_SOURCE_TO_TYPE_MAP = {
+    URLModelSource: ModelSourceType.Url,
+    HFModelSource: ModelSourceType.HFRepoID,
+    LocalModelSource: ModelSourceType.Path,
+}
 
 
 class ModelInstallJob(BaseModel):
@@ -260,7 +248,6 @@ class ModelInstallServiceBase(ABC):
         app_config: InvokeAIAppConfig,
         record_store: ModelRecordServiceBase,
         download_queue: DownloadQueueServiceBase,
-        metadata_store: ModelMetadataStoreBase,
         event_bus: Optional["EventServiceBase"] = None,
     ):
         """
@@ -347,6 +334,7 @@ class ModelInstallServiceBase(ABC):
         source: str,
         config: Optional[Dict[str, Any]] = None,
         access_token: Optional[str] = None,
+        inplace: Optional[bool] = False,
     ) -> ModelInstallJob:
         r"""Install the indicated model using heuristics to interpret user intentions.
 
@@ -392,7 +380,7 @@ class ModelInstallServiceBase(ABC):
          will override corresponding autoassigned probe fields in the
          model's config record. Use it to override
          `name`, `description`, `base_type`, `model_type`, `format`,
-         `prediction_type`, `image_size`, and/or `ztsnr_training`.
+         `prediction_type`, and/or `image_size`.
 
         This will download the model located at `source`,
         probe it, and install it into the models directory.

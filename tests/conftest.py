@@ -44,6 +44,7 @@ def mock_services() -> InvocationServices:
         images=ImageService(),
         invocation_cache=MemoryInvocationCache(max_cache_size=0),
         logger=logging,  # type: ignore
+        model_images=None,  # type: ignore
         model_manager=None,  # type: ignore
         download_queue=None,  # type: ignore
         names=None,  # type: ignore

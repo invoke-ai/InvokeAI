@@ -25,8 +25,8 @@ from ..services.invocation_cache.invocation_cache_memory import MemoryInvocation
 from ..services.invocation_services import InvocationServices
 from ..services.invocation_stats.invocation_stats_default import InvocationStatsService
 from ..services.invoker import Invoker
+from ..services.model_images.model_images_default import ModelImageFileStorageDisk
 from ..services.model_manager.model_manager_default import ModelManagerService
-from ..services.model_metadata import ModelMetadataStoreSQL
 from ..services.model_records import ModelRecordServiceSQL
 from ..services.names.names_default import SimpleNameService
 from ..services.session_processor.session_processor_default import DefaultSessionProcessor
@@ -72,6 +72,8 @@ class ApiDependencies:
 
         image_files = DiskImageFileStorage(f"{output_folder}/images")
 
+        model_images_folder = config.models_path
+
         db = init_db(config=config, logger=logger, image_files=image_files)
 
         configuration = config
@@ -93,10 +95,10 @@ class ApiDependencies:
             ObjectSerializerDisk[ConditioningFieldData](output_folder / "conditioning", ephemeral=True)
         )
         download_queue_service = DownloadQueueService(event_bus=events)
-        model_metadata_service = ModelMetadataStoreSQL(db=db)
+        model_images_service = ModelImageFileStorageDisk(model_images_folder / "model_images")
         model_manager = ModelManagerService.build_model_manager(
             app_config=configuration,
-            model_record_service=ModelRecordServiceSQL(db=db, metadata_store=model_metadata_service),
+            model_record_service=ModelRecordServiceSQL(db=db),
             download_queue=download_queue_service,
             events=events,
         )
@@ -120,6 +122,7 @@ class ApiDependencies:
             images=images,
             invocation_cache=invocation_cache,
             logger=logger,
+            model_images=model_images_service,
             model_manager=model_manager,
             download_queue=download_queue_service,
             names=names,

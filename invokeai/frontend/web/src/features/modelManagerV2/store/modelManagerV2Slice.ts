@@ -8,6 +8,7 @@ type ModelManagerState = {
   selectedModelMode: 'edit' | 'view';
   searchTerm: string;
   filteredModelType: string | null;
+  scanPath: string | undefined;
 };
 
 const initialModelManagerState: ModelManagerState = {
@@ -16,6 +17,7 @@ const initialModelManagerState: ModelManagerState = {
   selectedModelMode: 'view',
   filteredModelType: null,
   searchTerm: '',
+  scanPath: undefined,
 };
 
 export const modelManagerV2Slice = createSlice({
@@ -36,10 +38,13 @@ export const modelManagerV2Slice = createSlice({
     setFilteredModelType: (state, action: PayloadAction<string | null>) => {
       state.filteredModelType = action.payload;
     },
+    setScanPath: (state, action: PayloadAction<string | undefined>) => {
+      state.scanPath = action.payload;
+    },
   },
 });
 
-export const { setSelectedModelKey, setSearchTerm, setFilteredModelType, setSelectedModelMode } =
+export const { setSelectedModelKey, setSearchTerm, setFilteredModelType, setSelectedModelMode, setScanPath } =
   modelManagerV2Slice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -54,5 +59,5 @@ export const modelManagerV2PersistConfig: PersistConfig<ModelManagerState> = {
   name: modelManagerV2Slice.name,
   initialState: initialModelManagerState,
   migrate: migrateModelManagerState,
-  persistDenylist: [],
+  persistDenylist: ['selectedModelKey', 'selectedModelMode', 'filteredModelType', 'searchTerm'],
 };

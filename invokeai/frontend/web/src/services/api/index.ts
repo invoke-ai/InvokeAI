@@ -28,7 +28,7 @@ export const tagTypes = [
   'InvocationCacheStatus',
   'Model',
   'ModelConfig',
-  'ModelImports',
+  'ModelInstalls',
   'T2IAdapterModel',
   'MainModel',
   'VaeModel',

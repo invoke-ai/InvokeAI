@@ -16,7 +16,6 @@ import type {
   ParameterScheduler,
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
-import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
@@ -210,25 +209,11 @@ export const generationSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(configChanged, (state, action) => {
-      const defaultModel = action.payload.sd?.defaultModel;
-
-      if (defaultModel && !state.model) {
-        const [base_model, model_type, model_name] = defaultModel.split('/');
-
-        const result = zParameterModel.safeParse({
-          model_name,
-          base_model,
-          model_type,
-        });
-
-        if (result.success) {
-          state.model = result.data;
-
-          const optimalDimension = getOptimalDimension(result.data);
-
-          state.width = optimalDimension;
-          state.height = optimalDimension;
-        }
+      if (action.payload.sd?.scheduler) {
+        state.scheduler = action.payload.sd.scheduler;
+      }
+      if (action.payload.sd?.vaePrecision) {
+        state.vaePrecision = action.payload.sd.vaePrecision;
       }
     });
 

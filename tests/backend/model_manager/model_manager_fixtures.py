@@ -18,12 +18,17 @@ from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.model_install import ModelInstallService, ModelInstallServiceBase
 from invokeai.app.services.model_load import ModelLoadService, ModelLoadServiceBase
 from invokeai.app.services.model_manager import ModelManagerService, ModelManagerServiceBase
-from invokeai.app.services.model_metadata import ModelMetadataStoreBase, ModelMetadataStoreSQL
 from invokeai.app.services.model_records import ModelRecordServiceBase, ModelRecordServiceSQL
 from invokeai.backend.model_manager.config import (
     BaseModelType,
+    LoRADiffusersConfig,
+    MainCheckpointConfig,
+    MainDiffusersConfig,
     ModelFormat,
+    ModelSourceType,
     ModelType,
+    ModelVariantType,
+    VAEDiffusersConfig,
 )
 from invokeai.backend.model_manager.load import ModelCache, ModelConvertCache
 from invokeai.backend.util.logging import InvokeAILogger
@@ -108,11 +113,6 @@ def mm2_download_queue(mm2_session: Session, request: FixtureRequest) -> Downloa
 
 
 @pytest.fixture
-def mm2_metadata_store(mm2_record_store: ModelRecordServiceSQL) -> ModelMetadataStoreBase:
-    return mm2_record_store.metadata_store
-
-
-@pytest.fixture
 def mm2_loader(mm2_app_config: InvokeAIAppConfig, mm2_record_store: ModelRecordServiceBase) -> ModelLoadServiceBase:
     ram_cache = ModelCache(
         logger=InvokeAILogger.get_logger(),
@@ -137,7 +137,7 @@ def mm2_installer(
     logger = InvokeAILogger.get_logger()
     db = create_mock_sqlite_database(mm2_app_config, logger)
     events = DummyEventService()
-    store = ModelRecordServiceSQL(db, ModelMetadataStoreSQL(db))
+    store = ModelRecordServiceSQL(db)
 
     installer = ModelInstallService(
         app_config=mm2_app_config,
@@ -160,61 +160,71 @@ def mm2_installer(
 def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBase:
     logger = InvokeAILogger.get_logger(config=mm2_app_config)
     db = create_mock_sqlite_database(mm2_app_config, logger)
-    store = ModelRecordServiceSQL(db, ModelMetadataStoreSQL(db))
+    store = ModelRecordServiceSQL(db)
     # add five simple config records to the database
-    raw1 = {
-        "path": "/tmp/foo1",
-        "format": ModelFormat("diffusers"),
-        "name": "test2",
-        "base": BaseModelType("sd-2"),
-        "type": ModelType("vae"),
-        "original_hash": "111222333444",
-        "source": "stabilityai/sdxl-vae",
-    }
-    raw2 = {
-        "path": "/tmp/foo2.ckpt",
-        "name": "model1",
-        "format": ModelFormat("checkpoint"),
-        "base": BaseModelType("sd-1"),
-        "type": "main",
-        "config": "/tmp/foo.yaml",
-        "variant": "normal",
-        "original_hash": "111222333444",
-        "source": "https://civitai.com/models/206883/split",
-    }
-    raw3 = {
-        "path": "/tmp/foo3",
-        "format": ModelFormat("diffusers"),
-        "name": "test3",
-        "base": BaseModelType("sdxl"),
-        "type": ModelType("main"),
-        "original_hash": "111222333444",
-        "source": "author3/model3",
-        "description": "This is test 3",
-    }
-    raw4 = {
-        "path": "/tmp/foo4",
-        "format": ModelFormat("diffusers"),
-        "name": "test4",
-        "base": BaseModelType("sdxl"),
-        "type": ModelType("lora"),
-        "original_hash": "111222333444",
-        "source": "author4/model4",
-    }
-    raw5 = {
-        "path": "/tmp/foo5",
-        "format": ModelFormat("diffusers"),
-        "name": "test5",
-        "base": BaseModelType("sd-1"),
-        "type": ModelType("lora"),
-        "original_hash": "111222333444",
-        "source": "author4/model5",
-    }
-    store.add_model("test_config_1", raw1)
-    store.add_model("test_config_2", raw2)
-    store.add_model("test_config_3", raw3)
-    store.add_model("test_config_4", raw4)
-    store.add_model("test_config_5", raw5)
+    config1 = VAEDiffusersConfig(
+        key="test_config_1",
+        path="/tmp/foo1",
+        format=ModelFormat.Diffusers,
+        name="test2",
+        base=BaseModelType.StableDiffusion2,
+        type=ModelType.VAE,
+        hash="111222333444",
+        source="stabilityai/sdxl-vae",
+        source_type=ModelSourceType.HFRepoID,
+    )
+    config2 = MainCheckpointConfig(
+        key="test_config_2",
+        path="/tmp/foo2.ckpt",
+        name="model1",
+        format=ModelFormat.Checkpoint,
+        base=BaseModelType.StableDiffusion1,
+        type=ModelType.Main,
+        config_path="/tmp/foo.yaml",
+        variant=ModelVariantType.Normal,
+        hash="111222333444",
+        source="https://civitai.com/models/206883/split",
+        source_type=ModelSourceType.Url,
+    )
+    config3 = MainDiffusersConfig(
+        key="test_config_3",
+        path="/tmp/foo3",
+        format=ModelFormat.Diffusers,
+        name="test3",
+        base=BaseModelType.StableDiffusionXL,
+        type=ModelType.Main,
+        hash="111222333444",
+        source="author3/model3",
+        description="This is test 3",
+        source_type=ModelSourceType.HFRepoID,
+    )
+    config4 = LoRADiffusersConfig(
+        key="test_config_4",
+        path="/tmp/foo4",
+        format=ModelFormat.Diffusers,
+        name="test4",
+        base=BaseModelType.StableDiffusionXL,
+        type=ModelType.LoRA,
+        hash="111222333444",
+        source="author4/model4",
+        source_type=ModelSourceType.HFRepoID,
+    )
+    config5 = LoRADiffusersConfig(
+        key="test_config_5",
+        path="/tmp/foo5",
+        format=ModelFormat.Diffusers,
+        name="test5",
+        base=BaseModelType.StableDiffusion1,
+        type=ModelType.LoRA,
+        hash="111222333444",
+        source="author4/model5",
+        source_type=ModelSourceType.HFRepoID,
+    )
+    store.add_model(config1)
+    store.add_model(config2)
+    store.add_model(config3)
+    store.add_model(config4)
+    store.add_model(config5)
     return store
 
 

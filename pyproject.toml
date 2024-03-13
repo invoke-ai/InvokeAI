@@ -51,16 +51,17 @@ dependencies = [
   "torchmetrics==0.11.4",
   "torchsde==0.2.6",
   "torchvision==0.17.1",
-  "transformers==4.37.2",
+  "transformers==4.38.2",
+
 
   # Core application dependencies, pinned for reproducible builds.
-  "fastapi-events==0.10.1",
-  "fastapi==0.109.2",
-  "huggingface-hub==0.20.3",
-  "pydantic-settings==2.1.0",
-  "pydantic==2.6.1",
+  "fastapi-events==0.11.0",
+  "fastapi==0.110.0",
+  "huggingface-hub==0.21.3",
+  "pydantic-settings==2.2.1",
+  "pydantic==2.6.3",
   "python-socketio==5.11.1",
-  "uvicorn[standard]==0.27.1",
+  "uvicorn[standard]==0.28.0",
 
   # Auxiliary dependencies, pinned only if necessary.
   "albumentations",
@@ -105,10 +106,10 @@ dependencies = [
 "onnx-directml" = ["onnxruntime-directml"]
 "dist" = ["pip-tools", "pipdeptree", "twine"]
 "docs" = [
-  "mkdocs-material",
+  "mkdocs-material>=9.5.13",
   "mkdocs-git-revision-date-localized-plugin",
   "mkdocs-redirects",
-  "mkdocstrings[python]",
+  "mkdocstrings[python]>=0.24.1",
 ]
 "dev" = ["jurigged", "pudb", "snakeviz", "gprof2dot"]
 "test" = [
@@ -187,7 +188,7 @@ version = { attr = "invokeai.version.__version__" }
 
 #=== Begin: PyTest and Coverage
 [tool.pytest.ini_options]
-addopts = "--cov-report term --cov-report html --cov-report xml --strict-markers --timeout 60 -m \"not slow\""
+addopts = "--cov-report term --cov-report html --cov-report xml --strict-markers -m \"not slow\""
 markers = [
   "slow: Marks tests as slow. Disabled by default. To run all tests, use -m \"\". To run only slow tests, use -m \"slow\".",
   "timeout: Marks the timeout override."

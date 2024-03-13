@@ -22,7 +22,7 @@ def generate_ti_list(
     for trigger in extract_ti_triggers_from_prompt(prompt):
         name_or_key = trigger[1:-1]
         try:
-            loaded_model = context.models.load(key=name_or_key)
+            loaded_model = context.models.load(name_or_key)
             model = loaded_model.model
             assert isinstance(model, TextualInversionModelRaw)
             assert loaded_model.config.base == base

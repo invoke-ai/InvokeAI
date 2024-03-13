@@ -6,20 +6,24 @@ Abstract base class for storing and retrieving model configuration records.
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import List, Optional, Set, Union
 
 from pydantic import BaseModel, Field
 
 from invokeai.app.services.shared.pagination import PaginatedResults
+from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 from invokeai.backend.model_manager import (
     AnyModelConfig,
     BaseModelType,
     ModelFormat,
     ModelType,
 )
-from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
-
-from ..model_metadata import ModelMetadataStoreBase
+from invokeai.backend.model_manager.config import (
+    ControlAdapterDefaultSettings,
+    MainModelDefaultSettings,
+    ModelVariantType,
+    SchedulerPredictionType,
+)
 
 
 class DuplicateModelException(Exception):
@@ -60,11 +64,34 @@ class ModelSummary(BaseModel):
     tags: Set[str] = Field(description="tags associated with model")
 
 
+class ModelRecordChanges(BaseModelExcludeNull):
+    """A set of changes to apply to a model."""
+
+    # Changes applicable to all models
+    name: Optional[str] = Field(description="Name of the model.", default=None)
+    path: Optional[str] = Field(description="Path to the model.", default=None)
+    description: Optional[str] = Field(description="Model description", default=None)
+    base: Optional[BaseModelType] = Field(description="The base model.", default=None)
+    trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
+    default_settings: Optional[MainModelDefaultSettings | ControlAdapterDefaultSettings] = Field(
+        description="Default settings for this model", default=None
+    )
+
+    # Checkpoint-specific changes
+    # TODO(MM2): Should we expose these? Feels footgun-y...
+    variant: Optional[ModelVariantType] = Field(description="The variant of the model.", default=None)
+    prediction_type: Optional[SchedulerPredictionType] = Field(
+        description="The prediction type of the model.", default=None
+    )
+    upcast_attention: Optional[bool] = Field(description="Whether to upcast attention.", default=None)
+    config_path: Optional[str] = Field(description="Path to config file for model", default=None)
+
+
 class ModelRecordServiceBase(ABC):
     """Abstract base class for storage and retrieval of model configs."""
 
     @abstractmethod
-    def add_model(self, key: str, config: Union[Dict[str, Any], AnyModelConfig]) -> AnyModelConfig:
+    def add_model(self, config: AnyModelConfig) -> AnyModelConfig:
         """
         Add a model to the database.
 
@@ -88,13 +115,12 @@ class ModelRecordServiceBase(ABC):
         pass
 
     @abstractmethod
-    def update_model(self, key: str, config: Union[Dict[str, Any], AnyModelConfig]) -> AnyModelConfig:
+    def update_model(self, key: str, changes: ModelRecordChanges) -> AnyModelConfig:
         """
         Update the model, returning the updated version.
 
-        :param key: Unique key for the model to be updated
-        :param config: Model configuration record. Either a dict with the
-         required fields, or a ModelConfigBase instance.
+        :param key: Unique key for the model to be updated.
+        :param changes: A set of changes to apply to this model. Changes are validated before being written.
         """
         pass
 
@@ -109,38 +135,15 @@ class ModelRecordServiceBase(ABC):
         """
         pass
 
-    @property
     @abstractmethod
-    def metadata_store(self) -> ModelMetadataStoreBase:
-        """Return a ModelMetadataStore initialized on the same database."""
-        pass
-
-    @abstractmethod
-    def get_metadata(self, key: str) -> Optional[AnyModelRepoMetadata]:
+    def get_model_by_hash(self, hash: str) -> AnyModelConfig:
         """
-        Retrieve metadata (if any) from when model was downloaded from a repo.
+        Retrieve the configuration for the indicated model.
 
-        :param key: Model key
+        :param hash: Hash of model config to be fetched.
+
+        Exceptions: UnknownModelException
         """
-        pass
-
-    @abstractmethod
-    def list_all_metadata(self) -> List[Tuple[str, AnyModelRepoMetadata]]:
-        """List metadata for all models that have it."""
-        pass
-
-    @abstractmethod
-    def search_by_metadata_tag(self, tags: Set[str]) -> List[AnyModelConfig]:
-        """
-        Search model metadata for ones with all listed tags and return their corresponding configs.
-
-        :param tags: Set of tags to search for. All tags must be present.
-        """
-        pass
-
-    @abstractmethod
-    def list_tags(self) -> Set[str]:
-        """Return a unique set of all the model tags in the metadata database."""
         pass
 
     @abstractmethod
@@ -217,21 +220,3 @@ class ModelRecordServiceBase(ABC):
                 f"More than one model matched the search criteria: base_model='{base_model}', model_type='{model_type}', model_name='{model_name}'."
             )
         return model_configs[0]
-
-    def rename_model(
-        self,
-        key: str,
-        new_name: str,
-    ) -> AnyModelConfig:
-        """
-        Rename the indicated model. Just a special case of update_model().
-
-        In some implementations, renaming the model may involve changing where
-        it is stored on the filesystem. So this is broken out.
-
-        :param key: Model key
-        :param new_name: New name for model
-        """
-        config = self.get_model(key)
-        config.name = new_name
-        return self.update_model(key, config)

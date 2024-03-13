@@ -1,7 +1,7 @@
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Union
 
 from PIL.Image import Image
 from torch import Tensor
@@ -13,15 +13,16 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
+from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.model_manager.load.load_base import LoadedModel
-from invokeai.backend.model_manager.metadata.metadata_base import AnyModelRepoMetadata
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation
+    from invokeai.app.invocations.model import ModelIdentifierField
     from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 
 """
@@ -299,22 +300,27 @@ class ConditioningInterface(InvocationContextInterface):
 
 
 class ModelsInterface(InvocationContextInterface):
-    def exists(self, key: str) -> bool:
+    def exists(self, identifier: Union[str, "ModelIdentifierField"]) -> bool:
         """Checks if a model exists.
 
         Args:
-            key: The key of the model.
+            identifier: The key or ModelField representing the model.
 
         Returns:
             True if the model exists, False if not.
         """
-        return self._services.model_manager.store.exists(key)
+        if isinstance(identifier, str):
+            return self._services.model_manager.store.exists(identifier)
 
-    def load(self, key: str, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
+        return self._services.model_manager.store.exists(identifier.key)
+
+    def load(
+        self, identifier: Union[str, "ModelIdentifierField"], submodel_type: Optional[SubModelType] = None
+    ) -> LoadedModel:
         """Loads a model.
 
         Args:
-            key: The key of the model.
+            identifier: The key or ModelField representing the model.
             submodel_type: The submodel of the model to get.
 
         Returns:
@@ -324,9 +330,13 @@ class ModelsInterface(InvocationContextInterface):
         # The model manager emits events as it loads the model. It needs the context data to build
         # the event payloads.
 
-        return self._services.model_manager.load_model_by_key(
-            key=key, submodel_type=submodel_type, context_data=self._data
-        )
+        if isinstance(identifier, str):
+            model = self._services.model_manager.store.get_model(identifier)
+            return self._services.model_manager.load.load_model(model, submodel_type, self._data)
+        else:
+            _submodel_type = submodel_type or identifier.submodel_type
+            model = self._services.model_manager.store.get_model(identifier.key)
+            return self._services.model_manager.load.load_model(model, _submodel_type, self._data)
 
     def load_by_attrs(
         self, name: str, base: BaseModelType, type: ModelType, submodel_type: Optional[SubModelType] = None
@@ -343,35 +353,29 @@ class ModelsInterface(InvocationContextInterface):
         Returns:
             An object representing the loaded model.
         """
-        return self._services.model_manager.load_model_by_attr(
-            model_name=name,
-            base_model=base,
-            model_type=type,
-            submodel=submodel_type,
-            context_data=self._data,
-        )
 
-    def get_config(self, key: str) -> AnyModelConfig:
+        configs = self._services.model_manager.store.search_by_attr(model_name=name, base_model=base, model_type=type)
+        if len(configs) == 0:
+            raise UnknownModelException(f"No model found with name {name}, base {base}, and type {type}")
+
+        if len(configs) > 1:
+            raise ValueError(f"More than one model found with name {name}, base {base}, and type {type}")
+
+        return self._services.model_manager.load.load_model(configs[0], submodel_type, self._data)
+
+    def get_config(self, identifier: Union[str, "ModelIdentifierField"]) -> AnyModelConfig:
         """Gets a model's config.
 
         Args:
-            key: The key of the model.
+            identifier: The key or ModelField representing the model.
 
         Returns:
             The model's config.
         """
-        return self._services.model_manager.store.get_model(key=key)
+        if isinstance(identifier, str):
+            return self._services.model_manager.store.get_model(identifier)
 
-    def get_metadata(self, key: str) -> Optional[AnyModelRepoMetadata]:
-        """Gets a model's metadata, if it has any.
-
-        Args:
-            key: The key of the model.
-
-        Returns:
-            The model's metadata, if it has any.
-        """
-        return self._services.model_manager.store.get_metadata(key=key)
+        return self._services.model_manager.store.get_model(identifier.key)
 
     def search_by_path(self, path: Path) -> list[AnyModelConfig]:
         """Searches for models by path.

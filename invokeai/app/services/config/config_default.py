@@ -170,11 +170,12 @@ two configs are kept in separate sections of the config file:
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Literal, Optional
 
 from omegaconf import DictConfig, OmegaConf
-from pydantic import Field
+from pydantic import BaseModel, Field, field_validator
 from pydantic.config import JsonDict
 from pydantic_settings import SettingsConfigDict
 
@@ -196,17 +197,87 @@ class Categories(object):
     Paths: JsonDict = {"category": "Paths"}
     Logging: JsonDict = {"category": "Logging"}
     Development: JsonDict = {"category": "Development"}
-    Other: JsonDict = {"category": "Other"}
+    CLIArgs: JsonDict = {"category": "CLIArgs"}
+    ModelInstall: JsonDict = {"category": "Model Install"}
     ModelCache: JsonDict = {"category": "Model Cache"}
     Device: JsonDict = {"category": "Device"}
     Generation: JsonDict = {"category": "Generation"}
     Queue: JsonDict = {"category": "Queue"}
     Nodes: JsonDict = {"category": "Nodes"}
     MemoryPerformance: JsonDict = {"category": "Memory/Performance"}
+    Deprecated: JsonDict = {"category": "Deprecated"}
+
+
+class URLRegexToken(BaseModel):
+    url_regex: str = Field(description="Regular expression to match against the URL")
+    token: str = Field(description="Token to use when the URL matches the regex")
+
+    @field_validator("url_regex")
+    @classmethod
+    def validate_url_regex(cls, v: str) -> str:
+        """Validate that the value is a valid regex."""
+        try:
+            re.compile(v)
+        except re.error as e:
+            raise ValueError(f"Invalid regex: {e}")
+        return v
 
 
 class InvokeAIAppConfig(InvokeAISettings):
-    """Configuration object for InvokeAI App."""
+    """Invoke App Configuration
+
+    Attributes:
+        host: **Web Server**: IP address to bind to. Use `0.0.0.0` to serve to your local network.
+        port: **Web Server**: Port to bind to.
+        allow_origins: **Web Server**: Allowed CORS origins.
+        allow_credentials: **Web Server**: Allow CORS credentials.
+        allow_methods: **Web Server**: Methods allowed for CORS.
+        allow_headers: **Web Server**: Headers allowed for CORS.
+        ssl_certfile: **Web Server**: SSL certificate file for HTTPS.
+        ssl_keyfile: **Web Server**: SSL key file for HTTPS.
+        esrgan: **Features**: Enables or disables the upscaling code.
+        internet_available: **Features**: If true, attempt to download models on the fly; otherwise only use local models.
+        log_tokenization: **Features**: Enable logging of parsed prompt tokens.
+        patchmatch: **Features**: Enable patchmatch inpaint code.
+        ignore_missing_core_models: **Features**: Ignore missing core models on startup. If `True`, the app will attempt to download missing models on startup.
+        root: **Paths**: The InvokeAI runtime root directory.
+        autoimport_dir: **Paths**: Path to a directory of models files to be imported on startup.
+        models_dir: **Paths**: Path to the models directory.
+        convert_cache_dir: **Paths**: Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.
+        legacy_conf_dir: **Paths**: Path to directory of legacy checkpoint config files.
+        db_dir: **Paths**: Path to InvokeAI databases directory.
+        outdir: **Paths**: Path to directory for outputs.
+        custom_nodes_dir: **Paths**: Path to directory for custom nodes.
+        from_file: **Paths**: Take command input from the indicated file (command-line client only).
+        log_handlers: **Logging**: Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".
+        log_format: **Logging**: Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style.
+        log_level: **Logging**: Emit logging messages at this level or higher.
+        log_sql: **Logging**: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.
+        use_memory_db: **Development**: Use in-memory database. Useful for development.
+        dev_reload: **Development**: Automatically reload when Python sources are changed. Does not reload node definitions.
+        profile_graphs: **Development**: Enable graph profiling using `cProfile`.
+        profile_prefix: **Development**: An optional prefix for profile output files.
+        profiles_dir: **Development**: Path to profiles output directory.
+        version: **CLIArgs**: CLI arg - show InvokeAI version and exit.
+        skip_model_hash: **Model Install**: Skip model hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models.
+        remote_api_tokens: **Model Install**: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.
+        ram: **Model Cache**: Maximum memory amount used by memory model cache for rapid switching (GB).
+        vram: **Model Cache**: Amount of VRAM reserved for model storage (GB)
+        convert_cache: **Model Cache**: Maximum size of on-disk converted models cache (GB)
+        lazy_offload: **Model Cache**: Keep models in VRAM until their space is needed.
+        log_memory_usage: **Model Cache**: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
+        device: **Device**: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.
+        precision: **Device**: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.
+        sequential_guidance: **Generation**: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
+        attention_type: **Generation**: Attention type.
+        attention_slice_size: **Generation**: Slice size, valid when attention_type=="sliced".
+        force_tiled_decode: **Generation**: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
+        png_compress_level: **Generation**: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
+        max_queue_size: **Queue**: Maximum number of items in the session queue.
+        allow_nodes: **Nodes**: List of nodes to allow. Omit to allow all.
+        deny_nodes: **Nodes**: List of nodes to deny. Omit to deny none.
+        node_cache_size: **Nodes**: How many cached nodes to keep in memory.
+    """
 
     singleton_config: ClassVar[Optional[InvokeAIAppConfig]] = None
     singleton_init: ClassVar[Optional[Dict[str, Any]]] = None
@@ -215,90 +286,98 @@ class InvokeAIAppConfig(InvokeAISettings):
     type: Literal["InvokeAI"] = "InvokeAI"
 
     # WEB
-    host                : str = Field(default="127.0.0.1", description="IP address to bind to", json_schema_extra=Categories.WebServer)
-    port                : int = Field(default=9090, description="Port to bind to", json_schema_extra=Categories.WebServer)
-    allow_origins       : List[str] = Field(default=[], description="Allowed CORS origins", json_schema_extra=Categories.WebServer)
-    allow_credentials   : bool = Field(default=True, description="Allow CORS credentials", json_schema_extra=Categories.WebServer)
-    allow_methods       : List[str] = Field(default=["*"], description="Methods allowed for CORS", json_schema_extra=Categories.WebServer)
-    allow_headers       : List[str] = Field(default=["*"], description="Headers allowed for CORS", json_schema_extra=Categories.WebServer)
+    host                : str = Field(default="127.0.0.1", description="IP address to bind to. Use `0.0.0.0` to serve to your local network.", json_schema_extra=Categories.WebServer)
+    port                : int = Field(default=9090, description="Port to bind to.", json_schema_extra=Categories.WebServer)
+    allow_origins       : List[str] = Field(default=[], description="Allowed CORS origins.", json_schema_extra=Categories.WebServer)
+    allow_credentials   : bool = Field(default=True, description="Allow CORS credentials.", json_schema_extra=Categories.WebServer)
+    allow_methods       : List[str] = Field(default=["*"], description="Methods allowed for CORS.", json_schema_extra=Categories.WebServer)
+    allow_headers       : List[str] = Field(default=["*"], description="Headers allowed for CORS.", json_schema_extra=Categories.WebServer)
     # SSL options correspond to https://www.uvicorn.org/settings/#https
-    ssl_certfile        : Optional[Path] = Field(default=None, description="SSL certificate file (for HTTPS)", json_schema_extra=Categories.WebServer)
-    ssl_keyfile         : Optional[Path] = Field(default=None, description="SSL key file", json_schema_extra=Categories.WebServer)
+    ssl_certfile        : Optional[Path] = Field(default=None, description="SSL certificate file for HTTPS.", json_schema_extra=Categories.WebServer)
+    ssl_keyfile         : Optional[Path] = Field(default=None, description="SSL key file for HTTPS.", json_schema_extra=Categories.WebServer)
 
     # FEATURES
-    esrgan              : bool = Field(default=True, description="Enable/disable upscaling code", json_schema_extra=Categories.Features)
-    internet_available  : bool = Field(default=True, description="If true, attempt to download models on the fly; otherwise only use local models", json_schema_extra=Categories.Features)
+    esrgan              : bool = Field(default=True, description="Enables or disables the upscaling code.", json_schema_extra=Categories.Features)
+    # TODO(psyche): This is not used anywhere.
+    internet_available  : bool = Field(default=True, description="If true, attempt to download models on the fly; otherwise only use local models.", json_schema_extra=Categories.Features)
     log_tokenization    : bool = Field(default=False, description="Enable logging of parsed prompt tokens.", json_schema_extra=Categories.Features)
-    patchmatch          : bool = Field(default=True, description="Enable/disable patchmatch inpaint code", json_schema_extra=Categories.Features)
-    ignore_missing_core_models : bool = Field(default=False, description='Ignore missing models in models/core/convert', json_schema_extra=Categories.Features)
+    patchmatch          : bool = Field(default=True, description="Enable patchmatch inpaint code.", json_schema_extra=Categories.Features)
+    ignore_missing_core_models : bool = Field(default=False, description='Ignore missing core models on startup. If `True`, the app will attempt to download missing models on startup.', json_schema_extra=Categories.Features)
 
     # PATHS
-    root                : Optional[Path] = Field(default=None, description='InvokeAI runtime root directory', json_schema_extra=Categories.Paths)
+    root                : Optional[Path] = Field(default=None, description='The InvokeAI runtime root directory.', json_schema_extra=Categories.Paths)
     autoimport_dir      : Path = Field(default=Path('autoimport'), description='Path to a directory of models files to be imported on startup.', json_schema_extra=Categories.Paths)
-    models_dir          : Path = Field(default=Path('models'), description='Path to the models directory', json_schema_extra=Categories.Paths)
-    convert_cache_dir   : Path = Field(default=Path('models/.cache'), description='Path to the converted models cache directory', json_schema_extra=Categories.Paths)
-    legacy_conf_dir     : Path = Field(default=Path('configs/stable-diffusion'), description='Path to directory of legacy checkpoint config files', json_schema_extra=Categories.Paths)
-    db_dir              : Path = Field(default=Path('databases'), description='Path to InvokeAI databases directory', json_schema_extra=Categories.Paths)
-    outdir              : Path = Field(default=Path('outputs'), description='Default folder for output images', json_schema_extra=Categories.Paths)
-    use_memory_db       : bool = Field(default=False, description='Use in-memory database for storing image metadata', json_schema_extra=Categories.Paths)
-    custom_nodes_dir    : Path = Field(default=Path('nodes'), description='Path to directory for custom nodes', json_schema_extra=Categories.Paths)
-    from_file           : Optional[Path] = Field(default=None, description='Take command input from the indicated file (command-line client only)', json_schema_extra=Categories.Paths)
+    models_dir          : Path = Field(default=Path('models'), description='Path to the models directory.', json_schema_extra=Categories.Paths)
+    convert_cache_dir   : Path = Field(default=Path('models/.cache'), description='Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.', json_schema_extra=Categories.Paths)
+    legacy_conf_dir     : Path = Field(default=Path('configs/stable-diffusion'), description='Path to directory of legacy checkpoint config files.', json_schema_extra=Categories.Paths)
+    db_dir              : Path = Field(default=Path('databases'), description='Path to InvokeAI databases directory.', json_schema_extra=Categories.Paths)
+    outdir              : Path = Field(default=Path('outputs'), description='Path to directory for outputs.', json_schema_extra=Categories.Paths)
+    custom_nodes_dir    : Path = Field(default=Path('nodes'), description='Path to directory for custom nodes.', json_schema_extra=Categories.Paths)
+    # TODO(psyche): This is not used anywhere.
+    from_file           : Optional[Path] = Field(default=None, description='Take command input from the indicated file (command-line client only).', json_schema_extra=Categories.Paths)
 
     # LOGGING
-    log_handlers        : List[str] = Field(default=["console"], description='Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>"', json_schema_extra=Categories.Logging)
+    log_handlers        : List[str] = Field(default=["console"], description='Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".', json_schema_extra=Categories.Logging)
     # note - would be better to read the log_format values from logging.py, but this creates circular dependencies issues
-    log_format          : Literal['plain', 'color', 'syslog', 'legacy'] = Field(default="color", description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style', json_schema_extra=Categories.Logging)
-    log_level           : Literal["debug", "info", "warning", "error", "critical"] = Field(default="info", description="Emit logging messages at this level or  higher", json_schema_extra=Categories.Logging)
-    log_sql             : bool = Field(default=False, description="Log SQL queries", json_schema_extra=Categories.Logging)
+    log_format          : Literal['plain', 'color', 'syslog', 'legacy'] = Field(default="color", description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style.', json_schema_extra=Categories.Logging)
+    log_level           : Literal["debug", "info", "warning", "error", "critical"] = Field(default="info", description="Emit logging messages at this level or higher.", json_schema_extra=Categories.Logging)
+    log_sql             : bool = Field(default=False, description="Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.", json_schema_extra=Categories.Logging)
 
     # Development
-    dev_reload          : bool = Field(default=False, description="Automatically reload when Python sources are changed.", json_schema_extra=Categories.Development)
-    profile_graphs      : bool = Field(default=False, description="Enable graph profiling", json_schema_extra=Categories.Development)
+    use_memory_db       : bool = Field(default=False, description='Use in-memory database. Useful for development.', json_schema_extra=Categories.Development)
+    dev_reload          : bool = Field(default=False, description="Automatically reload when Python sources are changed. Does not reload node definitions.", json_schema_extra=Categories.Development)
+    profile_graphs      : bool = Field(default=False, description="Enable graph profiling using `cProfile`.", json_schema_extra=Categories.Development)
     profile_prefix      : Optional[str] = Field(default=None, description="An optional prefix for profile output files.", json_schema_extra=Categories.Development)
-    profiles_dir        : Path = Field(default=Path('profiles'), description="Directory for graph profiles", json_schema_extra=Categories.Development)
+    profiles_dir        : Path = Field(default=Path('profiles'), description="Path to profiles output directory.", json_schema_extra=Categories.Development)
 
-    version             : bool = Field(default=False, description="Show InvokeAI version and exit", json_schema_extra=Categories.Other)
+    version             : bool = Field(default=False, description="CLI arg - show InvokeAI version and exit.", json_schema_extra=Categories.CLIArgs)
 
     # CACHE
-    ram                 : float = Field(default=DEFAULT_RAM_CACHE, gt=0, description="Maximum memory amount used by model cache for rapid switching (floating point number, GB)", json_schema_extra=Categories.ModelCache, )
-    vram                : float = Field(default=DEFAULT_VRAM_CACHE, ge=0, description="Amount of VRAM reserved for model storage (floating point number, GB)", json_schema_extra=Categories.ModelCache, )
+    ram                 : float = Field(default=DEFAULT_RAM_CACHE, gt=0, description="Maximum memory amount used by memory model cache for rapid switching (GB).", json_schema_extra=Categories.ModelCache, )
+    vram                : float = Field(default=DEFAULT_VRAM_CACHE, ge=0, description="Amount of VRAM reserved for model storage (GB)", json_schema_extra=Categories.ModelCache, )
     convert_cache       : float = Field(default=DEFAULT_CONVERT_CACHE, ge=0, description="Maximum size of on-disk converted models cache (GB)", json_schema_extra=Categories.ModelCache)
 
-    lazy_offload        : bool = Field(default=True, description="Keep models in VRAM until their space is needed", json_schema_extra=Categories.ModelCache, )
+    lazy_offload        : bool = Field(default=True, description="Keep models in VRAM until their space is needed.", json_schema_extra=Categories.ModelCache, )
     log_memory_usage    : bool = Field(default=False, description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.", json_schema_extra=Categories.ModelCache)
 
     # DEVICE
-    device              : Literal["auto", "cpu", "cuda", "cuda:1", "mps"] = Field(default="auto", description="Generation device", json_schema_extra=Categories.Device)
-    precision           : Literal["auto", "float16", "bfloat16", "float32", "autocast"] = Field(default="auto", description="Floating point precision", json_schema_extra=Categories.Device)
+    device              : Literal["auto", "cpu", "cuda", "cuda:1", "mps"] = Field(default="auto", description="Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.", json_schema_extra=Categories.Device)
+    precision           : Literal["auto", "float16", "bfloat16", "float32", "autocast"] = Field(default="auto", description="Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.", json_schema_extra=Categories.Device)
 
     # GENERATION
-    sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements", json_schema_extra=Categories.Generation)
-    attention_type      : Literal["auto", "normal", "xformers", "sliced", "torch-sdp"] = Field(default="auto", description="Attention type", json_schema_extra=Categories.Generation)
-    attention_slice_size: Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8] = Field(default="auto", description='Slice size, valid when attention_type=="sliced"', json_schema_extra=Categories.Generation)
-    force_tiled_decode  : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", json_schema_extra=Categories.Generation)
-    png_compress_level  : int = Field(default=1, description="The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = fastest, largest filesize, 9 = slowest, smallest filesize", json_schema_extra=Categories.Generation)
+    sequential_guidance : bool = Field(default=False, description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.", json_schema_extra=Categories.Generation)
+    attention_type      : Literal["auto", "normal", "xformers", "sliced", "torch-sdp"] = Field(default="auto", description="Attention type.", json_schema_extra=Categories.Generation)
+    attention_slice_size: Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8] = Field(default="auto", description='Slice size, valid when attention_type=="sliced".', json_schema_extra=Categories.Generation)
+    force_tiled_decode  : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).", json_schema_extra=Categories.Generation)
+    png_compress_level  : int = Field(default=1, description="The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.", json_schema_extra=Categories.Generation)
 
     # QUEUE
-    max_queue_size      : int = Field(default=10000, gt=0, description="Maximum number of items in the session queue", json_schema_extra=Categories.Queue)
+    max_queue_size      : int = Field(default=10000, gt=0, description="Maximum number of items in the session queue.", json_schema_extra=Categories.Queue)
 
     # NODES
     allow_nodes         : Optional[List[str]] = Field(default=None, description="List of nodes to allow. Omit to allow all.", json_schema_extra=Categories.Nodes)
     deny_nodes          : Optional[List[str]] = Field(default=None, description="List of nodes to deny. Omit to deny none.", json_schema_extra=Categories.Nodes)
-    node_cache_size     : int = Field(default=512, description="How many cached nodes to keep in memory", json_schema_extra=Categories.Nodes)
+    node_cache_size     : int = Field(default=512, description="How many cached nodes to keep in memory.", json_schema_extra=Categories.Nodes)
 
-    # MODEL IMPORT
-    civitai_api_key       : Optional[str] = Field(default=os.environ.get("CIVITAI_API_KEY"), description="API key for CivitAI", json_schema_extra=Categories.Other)
+    # MODEL INSTALL
+    skip_model_hash     : bool = Field(default=False, description="Skip model hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models.", json_schema_extra=Categories.ModelInstall)
+    remote_api_tokens   : Optional[list[URLRegexToken]] = Field(
+        default=None,
+        description="List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.",
+        json_schema_extra=Categories.ModelInstall
+    )
 
+    # TODO(psyche): Can we just remove these then?
     # DEPRECATED FIELDS - STILL HERE IN ORDER TO OBTAN VALUES FROM PRE-3.1 CONFIG FILES
-    always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", json_schema_extra=Categories.MemoryPerformance)
-    max_cache_size      : Optional[float] = Field(default=None, gt=0, description="Maximum memory amount used by model cache for rapid switching", json_schema_extra=Categories.MemoryPerformance)
-    max_vram_cache_size : Optional[float] = Field(default=None, ge=0, description="Amount of VRAM reserved for model storage", json_schema_extra=Categories.MemoryPerformance)
-    xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", json_schema_extra=Categories.MemoryPerformance)
-    tiled_decode        : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", json_schema_extra=Categories.MemoryPerformance)
-    lora_dir            : Optional[Path] = Field(default=None, description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', json_schema_extra=Categories.Paths)
-    embedding_dir       : Optional[Path] = Field(default=None, description='Path to a directory of Textual Inversion embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
-    controlnet_dir      : Optional[Path] = Field(default=None, description='Path to a directory of ControlNet embeddings to be imported on startup.', json_schema_extra=Categories.Paths)
-    conf_path           : Path = Field(default=Path('configs/models.yaml'), description='Path to models definition file', json_schema_extra=Categories.Paths)
+    always_use_cpu      : bool = Field(default=False, description="If true, use the CPU for rendering even if a GPU is available.", json_schema_extra=Categories.Deprecated)
+    max_cache_size      : Optional[float] = Field(default=None, gt=0, description="Maximum memory amount used by model cache for rapid switching", json_schema_extra=Categories.Deprecated)
+    max_vram_cache_size : Optional[float] = Field(default=None, ge=0, description="Amount of VRAM reserved for model storage", json_schema_extra=Categories.Deprecated)
+    xformers_enabled    : bool = Field(default=True, description="Enable/disable memory-efficient attention", json_schema_extra=Categories.Deprecated)
+    tiled_decode        : bool = Field(default=False, description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty)", json_schema_extra=Categories.Deprecated)
+    lora_dir            : Optional[Path] = Field(default=None, description='Path to a directory of LoRA/LyCORIS models to be imported on startup.', json_schema_extra=Categories.Deprecated)
+    embedding_dir       : Optional[Path] = Field(default=None, description='Path to a directory of Textual Inversion embeddings to be imported on startup.', json_schema_extra=Categories.Deprecated)
+    controlnet_dir      : Optional[Path] = Field(default=None, description='Path to a directory of ControlNet embeddings to be imported on startup.', json_schema_extra=Categories.Deprecated)
+    conf_path           : Path = Field(default=Path('configs/models.yaml'), description='Path to models definition file', json_schema_extra=Categories.Deprecated)
 
     # this is not referred to in the source code and can be removed entirely
     #free_gpu_mem        : Optional[bool] = Field(default=None, description="If true, purge model from GPU after each generation.", json_schema_extra=Categories.MemoryPerformance)
@@ -475,6 +554,53 @@ class InvokeAIAppConfig(InvokeAISettings):
     def find_root() -> Path:
         """Choose the runtime root directory when not specified on command line or init file."""
         return _find_root()
+
+    @staticmethod
+    def generate_docstrings() -> str:
+        """Helper function for mkdocs. Generates a docstring for the InvokeAIAppConfig class.
+
+        You shouldn't run this manually. Instead, run `scripts/update-config-docstring.py` to update the docstring.
+        A makefile target is also available: `make update-config-docstring`.
+
+        See that script for more information about why this is necessary.
+        """
+        docstring = '    """Invoke App Configuration\n\n'
+        docstring += "    Attributes:"
+
+        field_descriptions: dict[str, list[str]] = {}
+
+        for k, v in InvokeAIAppConfig.model_fields.items():
+            if not isinstance(v.json_schema_extra, dict):
+                # Should never happen
+                continue
+
+            category = v.json_schema_extra.get("category", None)
+            if not isinstance(category, str) or category == "Deprecated":
+                continue
+            if not field_descriptions.get(category):
+                field_descriptions[category] = []
+            field_descriptions[category].append(f"        {k}: **{category}**: {v.description}")
+
+        for c in [
+            "Web Server",
+            "Features",
+            "Paths",
+            "Logging",
+            "Development",
+            "CLIArgs",
+            "Model Install",
+            "Model Cache",
+            "Device",
+            "Generation",
+            "Queue",
+            "Nodes",
+        ]:
+            docstring += "\n"
+            docstring += "\n".join(field_descriptions[c])
+
+        docstring += '\n    """'
+
+        return docstring
 
 
 def get_invokeai_config(**kwargs: Any) -> InvokeAIAppConfig:

@@ -150,6 +150,7 @@ nav:
       - Overview: 'features/index.md'
       - New to InvokeAI?: 'help/gettingStartedWithAI.md'
       - Configuration: 'features/CONFIGURATION.md'
+      - Database: 'features/DATABASE.md'
       - Control Adapters: 'features/CONTROLNET.md'
       - Image-to-Image: 'features/IMG2IMG.md'
       - Controlling Logging: 'features/LOGGING.md'

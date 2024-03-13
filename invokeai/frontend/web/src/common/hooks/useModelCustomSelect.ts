@@ -1,7 +1,7 @@
 import type { Item } from '@invoke-ai/ui-library';
 import type { EntityState } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
-import type { ModelIdentifierWithBase } from 'features/nodes/types/common';
+import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
 import { filter } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
@@ -11,7 +11,7 @@ import type { AnyModelConfig } from 'services/api/types';
 type UseModelCustomSelectArg<T extends AnyModelConfig> = {
   data: EntityState<T, string> | undefined;
   isLoading: boolean;
-  selectedModel?: ModelIdentifierWithBase | null;
+  selectedModel?: ModelIdentifierField | null;
   onChange: (value: T | null) => void;
   modelFilter?: (model: T) => boolean;
   isModelDisabled?: (model: T) => boolean;

@@ -1,9 +1,10 @@
-import { Box, Button, Flex, Heading } from '@invoke-ai/ui-library';
+import { Button, Flex, Heading, Spacer } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { SyncModelsIconButton } from 'features/modelManagerV2/components/SyncModels/SyncModelsIconButton';
+import { SyncModelsButton } from 'features/modelManagerV2/components/SyncModels/SyncModelsButton';
 import { setSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiPlusBold } from 'react-icons/pi';
 
 import ModelList from './ModelManagerPanel/ModelList';
 import { ModelListNavigation } from './ModelManagerPanel/ModelListNavigation';
@@ -16,20 +17,19 @@ export const ModelManager = () => {
   }, [dispatch]);
 
   return (
-    <Box layerStyle="first" p={3} borderRadius="base" w="50%" h="full">
-      <Flex w="full" p={3} justifyContent="space-between" alignItems="center">
-        <Flex gap={2}>
-          <Heading fontSize="xl">{t('common.modelManager')}</Heading>
-          <SyncModelsIconButton />
-        </Flex>
-        <Button colorScheme="invokeYellow" onClick={handleClickAddModel}>
+    <Flex flexDir="column" layerStyle="first" p={4} gap={4} borderRadius="base" w="50%" h="full">
+      <Flex w="full" gap={4} justifyContent="space-between" alignItems="center">
+        <Heading fontSize="xl">{t('common.modelManager')}</Heading>
+        <Spacer />
+        <SyncModelsButton size="sm" />
+        <Button size="sm" colorScheme="invokeYellow" leftIcon={<PiPlusBold />} onClick={handleClickAddModel}>
           {t('modelManager.addModels')}
         </Button>
       </Flex>
-      <Box layerStyle="second" p={3} borderRadius="base" w="full" h="full">
+      <Flex flexDir="column" layerStyle="second" p={4} gap={4} borderRadius="base" w="full" h="full">
         <ModelListNavigation />
         <ModelList />
-      </Box>
-    </Box>
+      </Flex>
+    </Flex>
   );
 };

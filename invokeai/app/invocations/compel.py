@@ -20,7 +20,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
 from invokeai.backend.util.devices import torch_dtype
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
-from .model import ClipField
+from .model import CLIPField
 
 # unconditioned: Optional[torch.Tensor]
 
@@ -46,7 +46,7 @@ class CompelInvocation(BaseInvocation):
         description=FieldDescriptions.compel_prompt,
         ui_component=UIComponent.Textarea,
     )
-    clip: ClipField = InputField(
+    clip: CLIPField = InputField(
         title="CLIP",
         description=FieldDescriptions.clip,
         input=Input.Connection,
@@ -54,16 +54,16 @@ class CompelInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        tokenizer_info = context.models.load(**self.clip.tokenizer.model_dump())
+        tokenizer_info = context.models.load(self.clip.tokenizer)
         tokenizer_model = tokenizer_info.model
         assert isinstance(tokenizer_model, CLIPTokenizer)
-        text_encoder_info = context.models.load(**self.clip.text_encoder.model_dump())
+        text_encoder_info = context.models.load(self.clip.text_encoder)
         text_encoder_model = text_encoder_info.model
         assert isinstance(text_encoder_model, CLIPTextModel)
 
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
             for lora in self.clip.loras:
-                lora_info = context.models.load(**lora.model_dump(exclude={"weight"}))
+                lora_info = context.models.load(lora.lora)
                 assert isinstance(lora_info.model, LoRAModelRaw)
                 yield (lora_info.model, lora.weight)
                 del lora_info
@@ -127,16 +127,16 @@ class SDXLPromptInvocationBase:
     def run_clip_compel(
         self,
         context: InvocationContext,
-        clip_field: ClipField,
+        clip_field: CLIPField,
         prompt: str,
         get_pooled: bool,
         lora_prefix: str,
         zero_on_empty: bool,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[ExtraConditioningInfo]]:
-        tokenizer_info = context.models.load(**clip_field.tokenizer.model_dump())
+        tokenizer_info = context.models.load(clip_field.tokenizer)
         tokenizer_model = tokenizer_info.model
         assert isinstance(tokenizer_model, CLIPTokenizer)
-        text_encoder_info = context.models.load(**clip_field.text_encoder.model_dump())
+        text_encoder_info = context.models.load(clip_field.text_encoder)
         text_encoder_model = text_encoder_info.model
         assert isinstance(text_encoder_model, (CLIPTextModel, CLIPTextModelWithProjection))
 
@@ -163,7 +163,7 @@ class SDXLPromptInvocationBase:
 
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
             for lora in clip_field.loras:
-                lora_info = context.models.load(**lora.model_dump(exclude={"weight"}))
+                lora_info = context.models.load(lora.lora)
                 lora_model = lora_info.model
                 assert isinstance(lora_model, LoRAModelRaw)
                 yield (lora_model, lora.weight)
@@ -253,8 +253,8 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     crop_left: int = InputField(default=0, description="")
     target_width: int = InputField(default=1024, description="")
     target_height: int = InputField(default=1024, description="")
-    clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 1")
-    clip2: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 2")
+    clip: CLIPField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 1")
+    clip2: CLIPField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 2")
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
@@ -340,7 +340,7 @@ class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase
     crop_top: int = InputField(default=0, description="")
     crop_left: int = InputField(default=0, description="")
     aesthetic_score: float = InputField(default=6.0, description=FieldDescriptions.sdxl_aesthetic)
-    clip2: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
+    clip2: CLIPField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
@@ -370,10 +370,10 @@ class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase
 
 
 @invocation_output("clip_skip_output")
-class ClipSkipInvocationOutput(BaseInvocationOutput):
-    """Clip skip node output"""
+class CLIPSkipInvocationOutput(BaseInvocationOutput):
+    """CLIP skip node output"""
 
-    clip: Optional[ClipField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
+    clip: Optional[CLIPField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
 
 
 @invocation(
@@ -383,15 +383,15 @@ class ClipSkipInvocationOutput(BaseInvocationOutput):
     category="conditioning",
     version="1.0.0",
 )
-class ClipSkipInvocation(BaseInvocation):
+class CLIPSkipInvocation(BaseInvocation):
     """Skip layers in clip text_encoder model."""
 
-    clip: ClipField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP")
+    clip: CLIPField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP")
     skipped_layers: int = InputField(default=0, ge=0, description=FieldDescriptions.skipped_layers)
 
-    def invoke(self, context: InvocationContext) -> ClipSkipInvocationOutput:
+    def invoke(self, context: InvocationContext) -> CLIPSkipInvocationOutput:
         self.clip.skipped_layers += self.skipped_layers
-        return ClipSkipInvocationOutput(
+        return CLIPSkipInvocationOutput(
             clip=self.clip,
         )
 

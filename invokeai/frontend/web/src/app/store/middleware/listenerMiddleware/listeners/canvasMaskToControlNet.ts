@@ -48,7 +48,7 @@ export const addCanvasMaskToControlNetListener = (startAppListening: AppStartLis
             type: 'image/png',
           }),
           image_category: 'mask',
-          is_intermediate: false,
+          is_intermediate: true,
           board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
           crop_visible: false,
           postUploadAction: {

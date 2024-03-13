@@ -114,7 +114,9 @@
         "checkpoint": "Checkpoint",
         "safetensors": "Safetensors",
         "ai": "ia",
-        "file": "File"
+        "file": "File",
+        "toResolve": "Da risolvere",
+        "add": "Aggiungi"
     },
     "gallery": {
         "generations": "Generazioni",
@@ -142,8 +144,6 @@
         "copy": "Copia",
         "download": "Scarica",
         "setCurrentImage": "Imposta come immagine corrente",
-        "preparingDownload": "Preparazione del download",
-        "preparingDownloadFailed": "Problema durante la preparazione del download",
         "downloadSelection": "Scarica gli elementi selezionati",
         "noImageSelected": "Nessuna immagine selezionata",
         "deleteSelection": "Elimina la selezione",
@@ -154,7 +154,12 @@
         "starImage": "Immagine preferita",
         "dropToUpload": "$t(gallery.drop) per aggiornare",
         "problemDeletingImagesDesc": "Impossibile eliminare una o più immagini",
-        "problemDeletingImages": "Problema durante l'eliminazione delle immagini"
+        "problemDeletingImages": "Problema durante l'eliminazione delle immagini",
+        "bulkDownloadRequested": "Preparazione del download",
+        "bulkDownloadRequestedDesc": "La tua richiesta di download è in preparazione. L'operazione potrebbe richiedere alcuni istanti.",
+        "bulkDownloadRequestFailed": "Problema durante la preparazione del download",
+        "bulkDownloadStarting": "Avvio scaricamento",
+        "bulkDownloadFailed": "Scaricamento fallito"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tasti di scelta rapida",
@@ -506,12 +511,12 @@
         "modelSyncFailed": "Sincronizzazione modello non riuscita",
         "settings": "Impostazioni",
         "syncModels": "Sincronizza Modelli",
-        "syncModelsDesc": "Se i tuoi modelli non sono sincronizzati con il back-end, puoi aggiornarli utilizzando questa opzione. Questo è generalmente utile nei casi in cui aggiorni manualmente il tuo file models.yaml o aggiungi modelli alla cartella principale di InvokeAI dopo l'avvio dell'applicazione.",
+        "syncModelsDesc": "Se i tuoi modelli non sono sincronizzati con il back-end, puoi aggiornarli utilizzando questa opzione. Questo è generalmente utile nei casi in cui aggiungi modelli alla cartella principale di InvokeAI dopo l'avvio dell'applicazione.",
         "loraModels": "LoRA",
         "oliveModels": "Olive",
         "onnxModels": "ONNX",
         "noModels": "Nessun modello trovato",
-        "predictionType": "Tipo di previsione (per modelli Stable Diffusion 2.x ed alcuni modelli Stable Diffusion 1.x)",
+        "predictionType": "Tipo di previsione",
         "quickAdd": "Aggiunta rapida",
         "simpleModelDesc": "Fornire un percorso a un modello diffusori locale, un modello checkpoint/safetensor locale, un ID repository HuggingFace o un URL del modello checkpoint/diffusori.",
         "advanced": "Avanzate",
@@ -522,7 +527,34 @@
         "vaePrecision": "Precisione VAE",
         "noModelSelected": "Nessun modello selezionato",
         "conversionNotSupported": "Conversione non supportata",
-        "configFile": "File di configurazione"
+        "configFile": "File di configurazione",
+        "modelName": "Nome del modello",
+        "modelSettings": "Impostazioni del modello",
+        "advancedImportInfo": "La scheda opzioni avanzate consente la configurazione manuale delle impostazioni del modello principale. Utilizza questa scheda solo se sei sicuro di conoscere il tipo di modello e la configurazione corretti per il modello selezionato.",
+        "addAll": "Aggiungi tutto",
+        "addModels": "Aggiungi modelli",
+        "cancel": "Annulla",
+        "edit": "Modifica",
+        "imageEncoderModelId": "ID modello codificatore di immagini",
+        "importQueue": "Coda di importazione",
+        "modelMetadata": "Metadati del modello",
+        "path": "Percorso",
+        "prune": "Elimina",
+        "pruneTooltip": "Elimina dalla coda le importazioni completate",
+        "removeFromQueue": "Rimuovi dalla coda",
+        "repoVariant": "Variante del repository",
+        "scan": "Scansiona",
+        "scanFolder": "Scansione cartella",
+        "scanResults": "Risultati della scansione",
+        "source": "Sorgente",
+        "upcastAttention": "Eleva l'attenzione",
+        "ztsnrTraining": "Addestramento ZTSNR",
+        "typePhraseHere": "Digita la frase qui",
+        "defaultSettingsSaved": "Impostazioni predefinite salvate",
+        "defaultSettings": "Impostazioni predefinite",
+        "metadata": "Metadati",
+        "useDefaultSettings": "Usa le impostazioni predefinite",
+        "triggerPhrases": "Frasi trigger"
     },
     "parameters": {
         "images": "Immagini",
@@ -604,13 +636,11 @@
         "clipSkip": "CLIP Skip",
         "aspectRatio": "Proporzioni",
         "maskAdjustmentsHeader": "Regolazioni della maschera",
-        "maskBlur": "Sfocatura",
-        "maskBlurMethod": "Metodo di sfocatura",
+        "maskBlur": "Sfocatura maschera",
+        "maskBlurMethod": "Metodo sfocatura maschera",
         "seamLowThreshold": "Basso",
         "seamHighThreshold": "Alto",
         "coherencePassHeader": "Passaggio di coerenza",
-        "coherenceSteps": "Passi",
-        "coherenceStrength": "Forza",
         "compositingSettingsHeader": "Impostazioni di composizione",
         "patchmatchDownScaleSize": "Ridimensiona",
         "coherenceMode": "Modalità",
@@ -664,7 +694,8 @@
         "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (potrebbe essere troppo grande)",
         "boxBlur": "Box",
         "gaussianBlur": "Gaussian",
-        "remixImage": "Remixa l'immagine"
+        "remixImage": "Remixa l'immagine",
+        "coherenceEdgeSize": "Dimensione bordo"
     },
     "settings": {
         "models": "Modelli",
@@ -747,8 +778,8 @@
         "canceled": "Elaborazione annullata",
         "problemCopyingImageLink": "Impossibile copiare il collegamento dell'immagine",
         "uploadFailedInvalidUploadDesc": "Deve essere una singola immagine PNG o JPEG",
-        "parameterSet": "Parametro impostato",
-        "parameterNotSet": "Parametro non impostato",
+        "parameterSet": "{{parameter}} impostato",
+        "parameterNotSet": "{{parameter}} non impostato",
         "nodesLoadedFailed": "Impossibile caricare i nodi",
         "nodesSaved": "Nodi salvati",
         "nodesLoaded": "Nodi caricati",
@@ -801,7 +832,10 @@
         "problemRetrievingWorkflow": "Problema nel recupero del flusso di lavoro",
         "resetInitialImage": "Reimposta l'immagine iniziale",
         "uploadInitialImage": "Carica l'immagine iniziale",
-        "problemDownloadingImage": "Impossibile scaricare l'immagine"
+        "problemDownloadingImage": "Impossibile scaricare l'immagine",
+        "prunedQueue": "Coda ripulita",
+        "modelImportCanceled": "Importazione del modello annullata",
+        "modelImportRemoved": "Importazione del modello rimossa"
     },
     "tooltip": {
         "feature": {
@@ -879,7 +913,10 @@
         "antialiasing": "Anti aliasing",
         "showResultsOn": "Mostra i risultati (attivato)",
         "showResultsOff": "Mostra i risultati (disattivato)",
-        "saveMask": "Salva $t(unifiedCanvas.mask)"
+        "saveMask": "Salva $t(unifiedCanvas.mask)",
+        "coherenceModeGaussianBlur": "Sfocatura Gaussiana",
+        "coherenceModeBoxBlur": "Sfocatura Box",
+        "coherenceModeStaged": "Maschera espansa"
     },
     "accessibility": {
         "modelSelect": "Seleziona modello",
@@ -1348,7 +1385,8 @@
         "allLoRAsAdded": "Tutti i LoRA aggiunti",
         "defaultVAE": "VAE predefinito",
         "incompatibleBaseModel": "Modello base incompatibile",
-        "loraAlreadyAdded": "LoRA già aggiunto"
+        "loraAlreadyAdded": "LoRA già aggiunto",
+        "concepts": "Concetti"
     },
     "invocationCache": {
         "disable": "Disabilita",
@@ -1400,19 +1438,6 @@
                 "Regola la maschera."
             ]
         },
-        "compositingCoherenceSteps": {
-            "heading": "Passi",
-            "paragraphs": [
-                "Numero di passi utilizzati nel Passaggio di Coerenza.",
-                "Simile ai passi di generazione."
-            ]
-        },
-        "compositingBlur": {
-            "heading": "Sfocatura",
-            "paragraphs": [
-                "Il raggio di sfocatura della maschera."
-            ]
-        },
         "compositingCoherenceMode": {
             "heading": "Modalità",
             "paragraphs": [
@@ -1429,13 +1454,6 @@
             "heading": "Passaggio di Coerenza",
             "paragraphs": [
                 "Un secondo ciclo di riduzione del rumore aiuta a comporre l'immagine Inpaint/Outpaint."
-            ]
-        },
-        "compositingStrength": {
-            "heading": "Forza",
-            "paragraphs": [
-                "Quantità di rumore aggiunta per il Passaggio di Coerenza.",
-                "Simile alla forza di riduzione del rumore."
             ]
         },
         "paramNegativeConditioning": {
@@ -1721,6 +1739,25 @@
             "paragraphs": [
                 "Valuta le generazioni in modo che siano più simili alle immagini con un punteggio estetico elevato, in base ai dati di addestramento."
             ]
+        },
+        "compositingCoherenceMinDenoise": {
+            "heading": "Livello minimo di riduzione del rumore",
+            "paragraphs": [
+                "Intensità minima di riduzione rumore per la modalità di Coerenza",
+                "L'intensità minima di riduzione del rumore per la regione di coerenza durante l'inpainting o l'outpainting"
+            ]
+        },
+        "compositingMaskBlur": {
+            "paragraphs": [
+                "Il raggio di sfocatura della maschera."
+            ],
+            "heading": "Sfocatura maschera"
+        },
+        "compositingCoherenceEdgeSize": {
+            "heading": "Dimensione del bordo",
+            "paragraphs": [
+                "La dimensione del bordo del passaggio di coerenza."
+            ]
         }
     },
     "sdxl": {
@@ -1769,7 +1806,12 @@
         "scheduler": "Campionatore",
         "recallParameters": "Richiama i parametri",
         "noRecallParameters": "Nessun parametro da richiamare trovato",
-        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)"
+        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
+        "allPrompts": "Tutti i prompt",
+        "imageDimensions": "Dimensioni dell'immagine",
+        "parameterSet": "Parametro {{parameter}} impostato",
+        "parsingFailed": "Analisi non riuscita",
+        "recallParameter": "Richiama {{label}}"
     },
     "hrf": {
         "enableHrf": "Abilita Correzione Alta Risoluzione",
@@ -1841,5 +1883,11 @@
         "image": {
             "title": "Immagine"
         }
+    },
+    "prompt": {
+        "compatibleEmbeddings": "Incorporamenti compatibili",
+        "addPromptTrigger": "Aggiungi parola chiave nel prompt",
+        "noPromptTriggers": "Nessuna parola chiave disponibile",
+        "noMatchingTriggers": "Nessuna parola chiave corrispondente"
     }
 }

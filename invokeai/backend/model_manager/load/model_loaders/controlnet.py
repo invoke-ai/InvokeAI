@@ -3,8 +3,8 @@
 
 from pathlib import Path
 
-import safetensors
 import torch
+from safetensors.torch import load_file as safetensors_load_file
 
 from invokeai.backend.model_manager import (
     AnyModelConfig,
@@ -12,6 +12,7 @@ from invokeai.backend.model_manager import (
     ModelFormat,
     ModelType,
 )
+from invokeai.backend.model_manager.config import CheckpointConfigBase
 from invokeai.backend.model_manager.convert_ckpt_to_diffusers import convert_controlnet_to_diffusers
 
 from .. import ModelLoaderRegistry
@@ -20,15 +21,15 @@ from .generic_diffusers import GenericDiffusersLoader
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.ControlNet, format=ModelFormat.Diffusers)
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)
-class ControlnetLoader(GenericDiffusersLoader):
+class ControlNetLoader(GenericDiffusersLoader):
     """Class to load ControlNet models."""
 
     def _needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool:
-        if config.format != ModelFormat.Checkpoint:
+        if not isinstance(config, CheckpointConfigBase):
             return False
         elif (
             dest_path.exists()
-            and (dest_path / "config.json").stat().st_mtime >= (config.last_modified or 0.0)
+            and (dest_path / "config.json").stat().st_mtime >= (config.converted_at or 0.0)
             and (dest_path / "config.json").stat().st_mtime >= model_path.stat().st_mtime
         ):
             return False
@@ -37,13 +38,13 @@ class ControlnetLoader(GenericDiffusersLoader):
 
     def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Path) -> Path:
         if config.base not in {BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2}:
-            raise Exception(f"Vae conversion not supported for model type: {config.base}")
+            raise Exception(f"ControlNet conversion not supported for model type: {config.base}")
         else:
-            assert hasattr(config, "config")
-            config_file = config.config
+            assert isinstance(config, CheckpointConfigBase)
+            config_file = config.config_path
 
         if model_path.suffix == ".safetensors":
-            checkpoint = safetensors.torch.load_file(model_path, device="cpu")
+            checkpoint = safetensors_load_file(model_path, device="cpu")
         else:
             checkpoint = torch.load(model_path, map_location="cpu")
 

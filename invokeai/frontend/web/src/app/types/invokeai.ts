@@ -1,4 +1,5 @@
 import type { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import type { ParameterPrecision, ParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import type { InvokeTabName } from 'features/ui/store/tabMap';
 import type { O } from 'ts-toolbelt';
 
@@ -82,6 +83,8 @@ export type AppConfig = {
     guidance: NumericalParameterConfig;
     cfgRescaleMultiplier: NumericalParameterConfig;
     img2imgStrength: NumericalParameterConfig;
+    scheduler?: ParameterScheduler;
+    vaePrecision?: ParameterPrecision;
     // Canvas
     boundingBoxHeight: NumericalParameterConfig; // initial value comes from model
     boundingBoxWidth: NumericalParameterConfig; // initial value comes from model

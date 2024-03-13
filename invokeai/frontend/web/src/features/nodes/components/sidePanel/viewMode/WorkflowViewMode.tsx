@@ -7,6 +7,7 @@ import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
 import { t } from 'i18next';
 import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 
+import { EmptyState } from './EmptyState';
 import WorkflowField from './WorkflowField';
 
 const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
@@ -30,7 +31,7 @@ export const WorkflowViewMode = () => {
               <WorkflowField key={`${nodeId}.${fieldName}`} nodeId={nodeId} fieldName={fieldName} />
             ))
           ) : (
-            <IAINoContentFallback label={t('nodes.noFieldsLinearview')} icon={null} />
+            <EmptyState />
           )}
         </Flex>
       </ScrollableContent>

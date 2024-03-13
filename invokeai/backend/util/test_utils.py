@@ -42,9 +42,10 @@ def install_and_load_model(
     # If the requested model is already installed, return its LoadedModel
     with contextlib.suppress(UnknownModelException):
         # TODO: Replace with wrapper call
-        loaded_model: LoadedModel = model_manager.load_model_by_attr(
+        configs = model_manager.store.search_by_attr(
             model_name=model_name, base_model=base_model, model_type=model_type
         )
+        loaded_model: LoadedModel = model_manager.load.load_model(configs[0])
         return loaded_model
 
     # Install the requested model.
@@ -53,7 +54,7 @@ def install_and_load_model(
     assert job.complete
 
     try:
-        loaded_model = model_manager.load_model_by_config(job.config_out)
+        loaded_model = model_manager.load.load_model(job.config_out)
         return loaded_model
     except UnknownModelException as e:
         raise Exception(

@@ -173,8 +173,8 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
                   w="full"
                   maxW="full"
                   borderBottomRadius="base"
-                  bg={isSelected ? 'invokeBlue.500' : 'base.600'}
-                  color={isSelected ? 'base.50' : 'base.100'}
+                  bg={isSelected ? 'invokeBlue.400' : 'base.600'}
+                  color={isSelected ? 'base.800' : 'base.100'}
                   lineHeight="short"
                   fontSize="xs"
                 >
@@ -193,6 +193,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
                       overflow="hidden"
                       textOverflow="ellipsis"
                       noOfLines={1}
+                      color="inherit"
                     />
                     <EditableInput sx={editableInputStyles} />
                   </Editable>

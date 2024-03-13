@@ -1,18 +1,22 @@
 import type { RootState } from 'app/store/store';
 import { selectValidT2IAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { omit } from 'lodash-es';
-import type {
-  CollectInvocation,
-  CoreMetadataInvocation,
-  NonNullableGraph,
-  T2IAdapterField,
-  T2IAdapterInvocation,
+import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import {
+  type CollectInvocation,
+  type CoreMetadataInvocation,
+  isT2IAdapterModelConfig,
+  type NonNullableGraph,
+  type T2IAdapterInvocation,
 } from 'services/api/types';
 
 import { T2I_ADAPTER_COLLECT } from './constants';
-import { upsertMetadata } from './metadata';
+import { getModelMetadataField, upsertMetadata } from './metadata';
 
-export const addT2IAdaptersToLinearGraph = (state: RootState, graph: NonNullableGraph, baseNodeId: string): void => {
+export const addT2IAdaptersToLinearGraph = async (
+  state: RootState,
+  graph: NonNullableGraph,
+  baseNodeId: string
+): Promise<void> => {
   const validT2IAdapters = selectValidT2IAdapters(state.controlAdapters).filter(
     (ca) => ca.model?.base === state.generation.model?.base
   );
@@ -33,9 +37,9 @@ export const addT2IAdaptersToLinearGraph = (state: RootState, graph: NonNullable
       },
     });
 
-    const t2iAdapterMetdata: CoreMetadataInvocation['t2iAdapters'] = [];
+    const t2iAdapterMetadata: CoreMetadataInvocation['t2iAdapters'] = [];
 
-    validT2IAdapters.forEach((t2iAdapter) => {
+    validT2IAdapters.forEach(async (t2iAdapter) => {
       if (!t2iAdapter.model) {
         return;
       }
@@ -77,9 +81,18 @@ export const addT2IAdaptersToLinearGraph = (state: RootState, graph: NonNullable
         return;
       }
 
-      graph.nodes[t2iAdapterNode.id] = t2iAdapterNode as T2IAdapterInvocation;
+      graph.nodes[t2iAdapterNode.id] = t2iAdapterNode;
 
-      t2iAdapterMetdata.push(omit(t2iAdapterNode, ['id', 'type', 'is_intermediate']) as T2IAdapterField);
+      const modelConfig = await fetchModelConfigWithTypeGuard(t2iAdapter.model.key, isT2IAdapterModelConfig);
+
+      t2iAdapterMetadata.push({
+        begin_step_percent: beginStepPct,
+        end_step_percent: endStepPct,
+        resize_mode: resizeMode,
+        t2i_adapter_model: getModelMetadataField(modelConfig),
+        weight: weight,
+        image: t2iAdapterNode.image,
+      });
 
       graph.edges.push({
         source: { node_id: t2iAdapterNode.id, field: 't2i_adapter' },
@@ -90,6 +103,6 @@ export const addT2IAdaptersToLinearGraph = (state: RootState, graph: NonNullable
       });
     });
 
-    upsertMetadata(graph, { t2iAdapters: t2iAdapterMetdata });
+    upsertMetadata(graph, { t2iAdapters: t2iAdapterMetadata });
   }
 };

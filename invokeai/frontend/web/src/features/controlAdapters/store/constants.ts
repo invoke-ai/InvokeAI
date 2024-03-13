@@ -253,23 +253,3 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
     },
   },
 };
-
-export const CONTROLNET_MODEL_DEFAULT_PROCESSORS: {
-  [key: string]: ControlAdapterProcessorType;
-} = {
-  canny: 'canny_image_processor',
-  mlsd: 'mlsd_image_processor',
-  depth: 'depth_anything_image_processor',
-  bae: 'normalbae_image_processor',
-  sketch: 'pidi_image_processor',
-  scribble: 'lineart_image_processor',
-  lineart: 'lineart_image_processor',
-  lineart_anime: 'lineart_anime_image_processor',
-  softedge: 'hed_image_processor',
-  shuffle: 'content_shuffle_image_processor',
-  openpose: 'dw_openpose_image_processor',
-  mediapipe: 'mediapipe_face_processor',
-  pidi: 'pidi_image_processor',
-  zoe: 'zoe_depth_image_processor',
-  color: 'color_map_image_processor',
-};

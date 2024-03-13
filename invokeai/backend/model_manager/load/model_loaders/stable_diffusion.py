@@ -4,7 +4,8 @@
 from pathlib import Path
 from typing import Optional
 
-from diffusers import StableDiffusionInpaintPipeline, StableDiffusionPipeline
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_inpaint import StableDiffusionInpaintPipeline
 
 from invokeai.backend.model_manager import (
     AnyModel,
@@ -16,7 +17,7 @@ from invokeai.backend.model_manager import (
     ModelVariantType,
     SubModelType,
 )
-from invokeai.backend.model_manager.config import MainCheckpointConfig
+from invokeai.backend.model_manager.config import CheckpointConfigBase, MainCheckpointConfig
 from invokeai.backend.model_manager.convert_ckpt_to_diffusers import convert_ckpt_to_diffusers
 
 from .. import ModelLoaderRegistry
@@ -54,11 +55,11 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         return result
 
     def _needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool:
-        if config.format != ModelFormat.Checkpoint:
+        if not isinstance(config, CheckpointConfigBase):
             return False
         elif (
             dest_path.exists()
-            and (dest_path / "model_index.json").stat().st_mtime >= (config.last_modified or 0.0)
+            and (dest_path / "model_index.json").stat().st_mtime >= (config.converted_at or 0.0)
             and (dest_path / "model_index.json").stat().st_mtime >= model_path.stat().st_mtime
         ):
             return False
@@ -73,7 +74,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             StableDiffusionInpaintPipeline if variant == ModelVariantType.Inpaint else StableDiffusionPipeline
         )
 
-        config_file = config.config
+        config_file = config.config_path
 
         self._logger.info(f"Converting {model_path} to diffusers format")
         convert_ckpt_to_diffusers(

@@ -2,6 +2,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { api } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import {
+  socketModelInstallCancelled,
   socketModelInstallCompleted,
   socketModelInstallDownloading,
   socketModelInstallError,
@@ -14,7 +15,7 @@ export const addModelInstallEventListener = (startAppListening: AppStartListenin
       const { bytes, total_bytes, id } = action.payload.data;
 
       dispatch(
-        modelsApi.util.updateQueryData('getModelImports', undefined, (draft) => {
+        modelsApi.util.updateQueryData('listModelInstalls', undefined, (draft) => {
           const modelImport = draft.find((m) => m.id === id);
           if (modelImport) {
             modelImport.bytes = bytes;
@@ -33,7 +34,7 @@ export const addModelInstallEventListener = (startAppListening: AppStartListenin
       const { id } = action.payload.data;
 
       dispatch(
-        modelsApi.util.updateQueryData('getModelImports', undefined, (draft) => {
+        modelsApi.util.updateQueryData('listModelInstalls', undefined, (draft) => {
           const modelImport = draft.find((m) => m.id === id);
           if (modelImport) {
             modelImport.status = 'completed';
@@ -41,7 +42,7 @@ export const addModelInstallEventListener = (startAppListening: AppStartListenin
           return draft;
         })
       );
-      dispatch(api.util.invalidateTags([{ type: 'ModelConfig' }]));
+      dispatch(api.util.invalidateTags(['Model']));
     },
   });
 
@@ -51,12 +52,29 @@ export const addModelInstallEventListener = (startAppListening: AppStartListenin
       const { id, error, error_type } = action.payload.data;
 
       dispatch(
-        modelsApi.util.updateQueryData('getModelImports', undefined, (draft) => {
+        modelsApi.util.updateQueryData('listModelInstalls', undefined, (draft) => {
           const modelImport = draft.find((m) => m.id === id);
           if (modelImport) {
             modelImport.status = 'error';
             modelImport.error_reason = error_type;
             modelImport.error = error;
+          }
+          return draft;
+        })
+      );
+    },
+  });
+
+  startAppListening({
+    actionCreator: socketModelInstallCancelled,
+    effect: (action, { dispatch }) => {
+      const { id } = action.payload.data;
+
+      dispatch(
+        modelsApi.util.updateQueryData('listModelInstalls', undefined, (draft) => {
+          const modelImport = draft.find((m) => m.id === id);
+          if (modelImport) {
+            modelImport.status = 'cancelled';
           }
           return draft;
         })

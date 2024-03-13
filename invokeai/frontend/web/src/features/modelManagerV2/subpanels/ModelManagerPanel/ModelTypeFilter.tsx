@@ -5,7 +5,7 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IoFilter } from 'react-icons/io5';
 
-export const MODEL_TYPE_LABELS: { [key: string]: string } = {
+const MODEL_TYPE_LABELS: { [key: string]: string } = {
   main: 'Main',
   lora: 'LoRA',
   embedding: 'Textual Inversion',
@@ -34,7 +34,7 @@ export const ModelTypeFilter = () => {
 
   return (
     <Menu>
-      <MenuButton as={Button} leftIcon={<IoFilter />}>
+      <MenuButton as={Button} size="sm" leftIcon={<IoFilter />}>
         {filteredModelType ? MODEL_TYPE_LABELS[filteredModelType] : t('modelManager.allModels')}
       </MenuButton>
       <MenuList>

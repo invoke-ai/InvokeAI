@@ -1,6 +1,7 @@
 import { Flex, Spinner, Text } from '@invoke-ai/ui-library';
 import type { EntityState } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { forEach } from 'lodash-es';
 import { memo } from 'react';
 import { ALL_BASE_MODELS } from 'services/api/constants';
@@ -73,8 +74,8 @@ const ModelList = () => {
   });
 
   return (
-    <Flex flexDirection="column" p={4}>
-      <Flex flexDirection="column" maxHeight={window.innerHeight - 130} overflow="scroll">
+    <ScrollableContent>
+      <Flex flexDirection="column" w="full" h="full" gap={4}>
         {/* Main Model List */}
         {isLoadingMainModels && <FetchingModelsLoader loadingMessage="Loading Main..." />}
         {!isLoadingMainModels && filteredMainModels.length > 0 && (
@@ -118,7 +119,7 @@ const ModelList = () => {
           <ModelListWrapper title="T2I Adapters" modelList={filteredT2iAdapterModels} key="t2i-adapters" />
         )}
       </Flex>
-    </Flex>
+    </ScrollableContent>
   );
 };
 
@@ -148,7 +149,7 @@ const modelsFilter = <T extends AnyModelConfig>(
 
 const FetchingModelsLoader = memo(({ loadingMessage }: { loadingMessage?: string }) => {
   return (
-    <Flex flexDirection="column" gap={4} borderRadius={4} p={4} bg="base.800">
+    <Flex flexDirection="column" gap={4} borderRadius="base" p={4} bg="base.800">
       <Flex justifyContent="center" alignItems="center" flexDirection="column" p={4} gap={8}>
         <Spinner />
         <Text variant="subtext">{loadingMessage ? loadingMessage : 'Fetching...'}</Text>

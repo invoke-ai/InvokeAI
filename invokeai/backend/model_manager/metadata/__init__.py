@@ -8,26 +8,20 @@ from invokeai.backend.model_manager.metadata import(
    CommercialUsage,
    LicenseRestrictions,
    HuggingFaceMetadata,
-   CivitaiMetadata,
 )
 
-from invokeai.backend.model_manager.metadata.fetch import CivitaiMetadataFetch
+from invokeai.backend.model_manager.metadata.fetch import HuggingFaceMetadataFetch
 
-data = CivitaiMetadataFetch().from_url("https://civitai.com/models/206883/split")
-assert isinstance(data, CivitaiMetadata)
-if data.allow_commercial_use:
-   print("Commercial use of this model is allowed")
+data = HuggingFaceMetadataFetch().from_id("<REPO_ID>")
+assert isinstance(data, HuggingFaceMetadata)
 """
 
-from .fetch import CivitaiMetadataFetch, HuggingFaceMetadataFetch, ModelMetadataFetchBase
+from .fetch import HuggingFaceMetadataFetch, ModelMetadataFetchBase
 from .metadata_base import (
     AnyModelRepoMetadata,
     AnyModelRepoMetadataValidator,
     BaseMetadata,
-    CivitaiMetadata,
-    CommercialUsage,
     HuggingFaceMetadata,
-    LicenseRestrictions,
     ModelMetadataWithFiles,
     RemoteModelFile,
     UnknownMetadataException,
@@ -36,12 +30,8 @@ from .metadata_base import (
 __all__ = [
     "AnyModelRepoMetadata",
     "AnyModelRepoMetadataValidator",
-    "CivitaiMetadata",
-    "CivitaiMetadataFetch",
-    "CommercialUsage",
     "HuggingFaceMetadata",
     "HuggingFaceMetadataFetch",
-    "LicenseRestrictions",
     "ModelMetadataFetchBase",
     "BaseMetadata",
     "ModelMetadataWithFiles",

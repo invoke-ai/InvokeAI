@@ -1,6 +1,7 @@
 import type { RootState } from 'app/store/store';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import { filter, size } from 'lodash-es';
-import type { CoreMetadataInvocation, NonNullableGraph, SDXLLoraLoaderInvocation } from 'services/api/types';
+import type { CoreMetadataInvocation, NonNullableGraph, SDXLLoRALoaderInvocation } from 'services/api/types';
 
 import {
   LORA_LOADER,
@@ -12,12 +13,12 @@ import {
 } from './constants';
 import { upsertMetadata } from './metadata';
 
-export const addSDXLLoRAsToGraph = (
+export const addSDXLLoRAsToGraph = async (
   state: RootState,
   graph: NonNullableGraph,
   baseNodeId: string,
   modelLoaderNodeId: string = SDXL_MODEL_LOADER
-): void => {
+): Promise<void> => {
   /**
    * LoRA nodes get the UNet and CLIP models from the main model loader and apply the LoRA to them.
    * They then output the UNet and CLIP models references on to either the next LoRA in the chain,
@@ -55,20 +56,20 @@ export const addSDXLLoRAsToGraph = (
   let lastLoraNodeId = '';
   let currentLoraIndex = 0;
 
-  enabledLoRAs.forEach((lora) => {
+  enabledLoRAs.forEach(async (lora) => {
     const { weight } = lora;
-    const { key } = lora.model;
-    const currentLoraNodeId = `${LORA_LOADER}_${key}`;
+    const currentLoraNodeId = `${LORA_LOADER}_${lora.model.key}`;
+    const parsedModel = zModelIdentifierField.parse(lora.model);
 
-    const loraLoaderNode: SDXLLoraLoaderInvocation = {
+    const loraLoaderNode: SDXLLoRALoaderInvocation = {
       type: 'sdxl_lora_loader',
       id: currentLoraNodeId,
       is_intermediate: true,
-      lora: { key },
+      lora: parsedModel,
       weight,
     };
 
-    loraMetadata.push({ model: { key }, weight });
+    loraMetadata.push({ model: parsedModel, weight });
 
     // add to graph
     graph.nodes[currentLoraNodeId] = loraLoaderNode;

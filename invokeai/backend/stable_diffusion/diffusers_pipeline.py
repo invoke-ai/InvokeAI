@@ -455,15 +455,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     ip_adapter_unet_patcher=ip_adapter_unet_patcher,
                 )
                 latents = step_output.prev_sample
-
-                latents = self.invokeai_diffuser.do_latent_postprocessing(
-                    postprocessing_settings=conditioning_data.postprocessing_settings,
-                    latents=latents,
-                    sigma=batched_t,
-                    step_index=i,
-                    total_step_count=len(timesteps),
-                )
-
                 predicted_original = getattr(step_output, "pred_original_sample", None)
 
                 if callback is not None:

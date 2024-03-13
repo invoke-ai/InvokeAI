@@ -2,9 +2,9 @@ import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox } from '@invoke-ai/ui-library';
 import { typedMemo } from 'common/util/typedMemo';
 import { useCallback, useMemo } from 'react';
-import type { UseControllerProps } from 'react-hook-form';
+import type { Control } from 'react-hook-form';
 import { useController } from 'react-hook-form';
-import type { AnyModelConfig } from 'services/api/types';
+import type { UpdateModelArg } from 'services/api/endpoints/models';
 
 const options: ComboboxOption[] = [
   { value: 'normal', label: 'Normal' },
@@ -12,8 +12,12 @@ const options: ComboboxOption[] = [
   { value: 'depth', label: 'Depth' },
 ];
 
-const ModelVariantSelect = <T extends AnyModelConfig>(props: UseControllerProps<T>) => {
-  const { field } = useController(props);
+type Props = {
+  control: Control<UpdateModelArg['body']>;
+};
+
+const ModelVariantSelect = ({ control }: Props) => {
+  const { field } = useController({ control, name: 'variant' });
   const value = useMemo(() => options.find((o) => o.value === field.value), [field.value]);
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {

@@ -12,6 +12,7 @@ from tempfile import mkdtemp
 from typing import Any, Dict, List, Optional, Set, Union
 
 from huggingface_hub import HfFolder
+from omegaconf import DictConfig, OmegaConf
 from pydantic.networks import AnyHttpUrl
 from requests import Session
 
@@ -20,28 +21,31 @@ from invokeai.app.services.download import DownloadJob, DownloadQueueServiceBase
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase
+from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
+    CheckpointConfigBase,
     InvalidModelConfigException,
     ModelRepoVariant,
+    ModelSourceType,
     ModelType,
 )
 from invokeai.backend.model_manager.metadata import (
     AnyModelRepoMetadata,
-    CivitaiMetadataFetch,
     HuggingFaceMetadataFetch,
     ModelMetadataWithFiles,
     RemoteModelFile,
 )
+from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata
 from invokeai.backend.model_manager.probe import ModelProbe
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util import Chdir, InvokeAILogger
 from invokeai.backend.util.devices import choose_precision, choose_torch_device
 
 from .model_install_base import (
-    CivitaiModelSource,
+    MODEL_SOURCE_TO_TYPE_MAP,
     HFModelSource,
     InstallStatus,
     LocalModelSource,
@@ -90,7 +94,6 @@ class ModelInstallService(ModelInstallServiceBase):
         self._running = False
         self._session = session
         self._next_job_id = 0
-        self._metadata_store = record_store.metadata_store  # for convenience
 
     @property
     def app_config(self) -> InvokeAIAppConfig:  # noqa D102
@@ -113,6 +116,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 raise Exception("Attempt to start the installer service twice")
             self._start_installer_thread()
             self._remove_dangling_install_dirs()
+            self._migrate_yaml()
             self.sync_to_config()
 
     def stop(self, invoker: Optional[Invoker] = None) -> None:
@@ -139,6 +143,7 @@ class ModelInstallService(ModelInstallServiceBase):
         config = config or {}
         if not config.get("source"):
             config["source"] = model_path.resolve().as_posix()
+        config["source_type"] = ModelSourceType.Path
         return self._register(model_path, config)
 
     def install_path(
@@ -148,11 +153,11 @@ class ModelInstallService(ModelInstallServiceBase):
     ) -> str:  # noqa D102
         model_path = Path(model_path)
         config = config or {}
-        if not config.get("source"):
-            config["source"] = model_path.resolve().as_posix()
-        config["key"] = config.get("key", uuid_string())
 
-        info: AnyModelConfig = self._probe_model(Path(model_path), config)
+        if self._app_config.skip_model_hash:
+            config["hash"] = uuid_string()
+
+        info: AnyModelConfig = ModelProbe.probe(Path(model_path), config)
 
         if preferred_name := config.get("name"):
             preferred_name = Path(preferred_name).with_suffix(model_path.suffix)
@@ -178,13 +183,14 @@ class ModelInstallService(ModelInstallServiceBase):
         source: str,
         config: Optional[Dict[str, Any]] = None,
         access_token: Optional[str] = None,
+        inplace: Optional[bool] = False,
     ) -> ModelInstallJob:
         variants = "|".join(ModelRepoVariant.__members__.values())
         hf_repoid_re = f"^([^/:]+/[^/:]+)(?::({variants})?(?::/?([^:]+))?)?$"
         source_obj: Optional[StringLikeSource] = None
 
         if Path(source).exists():  # A local file or directory
-            source_obj = LocalModelSource(path=Path(source))
+            source_obj = LocalModelSource(path=Path(source), inplace=inplace)
         elif match := re.match(hf_repoid_re, source):
             source_obj = HFModelSource(
                 repo_id=match.group(1),
@@ -193,9 +199,16 @@ class ModelInstallService(ModelInstallServiceBase):
                 access_token=access_token,
             )
         elif re.match(r"^https?://[^/]+", source):
+            # Pull the token from config if it exists and matches the URL
+            _token = access_token
+            if _token is None:
+                for pair in self.app_config.remote_api_tokens or []:
+                    if re.search(pair.url_regex, source):
+                        _token = pair.token
+                        break
             source_obj = URLModelSource(
                 url=AnyHttpUrl(source),
-                access_token=access_token,
+                access_token=_token,
             )
         else:
             raise ValueError(f"Unsupported model source: '{source}'")
@@ -210,8 +223,6 @@ class ModelInstallService(ModelInstallServiceBase):
         if isinstance(source, LocalModelSource):
             install_job = self._import_local_model(source, config)
             self._install_queue.put(install_job)  # synchronously install
-        elif isinstance(source, CivitaiModelSource):
-            install_job = self._import_from_civitai(source, config)
         elif isinstance(source, HFModelSource):
             install_job = self._import_from_hf(source, config)
         elif isinstance(source, URLModelSource):
@@ -278,10 +289,52 @@ class ModelInstallService(ModelInstallServiceBase):
             self._logger.info(f"{len(installed)} new models registered")
         self._logger.info("Model installer (re)initialized")
 
+    def _migrate_yaml(self) -> None:
+        db_models = self.record_store.all_models()
+        try:
+            yaml = self._get_yaml()
+        except OSError:
+            return
+
+        yaml_metadata = yaml.pop("__metadata__")
+        yaml_version = yaml_metadata.get("version")
+
+        if yaml_version != "3.0.0":
+            raise ValueError(
+                f"Attempted migration of unsupported `models.yaml` v{yaml_version}. Only v3.0.0 is supported. Exiting."
+            )
+
+        self._logger.info(
+            f"Starting one-time migration of {len(yaml.items())} models from `models.yaml` to database. This may take a few minutes."
+        )
+
+        if len(db_models) == 0 and len(yaml.items()) != 0:
+            for model_key, stanza in yaml.items():
+                _, _, model_name = str(model_key).split("/")
+                model_path = Path(stanza["path"])
+                if not model_path.is_absolute():
+                    model_path = self._app_config.models_path / model_path
+                model_path = model_path.resolve()
+
+                config: dict[str, Any] = {}
+                config["name"] = model_name
+                config["description"] = stanza.get("description")
+                config["config_path"] = stanza.get("config")
+
+                try:
+                    id = self.register_path(model_path=model_path, config=config)
+                    self._logger.info(f"Migrated {model_name} with id {id}")
+                except Exception as e:
+                    self._logger.warning(f"Model at {model_path} could not be migrated: {e}")
+
+        # Rename `models.yaml` to `models.yaml.bak` to prevent re-migration
+        yaml_path = self._app_config.model_conf_path
+        yaml_path.rename(yaml_path.with_suffix(".yaml.bak"))
+
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
         self._cached_model_paths = {Path(x.path).absolute() for x in self.record_store.all_models()}
         callback = self._scan_install if install else self._scan_register
-        search = ModelSearch(on_model_found=callback, config=self._app_config)
+        search = ModelSearch(on_model_found=callback)
         self._models_installed.clear()
         search.search(scan_dir)
         return list(self._models_installed)
@@ -293,7 +346,7 @@ class ModelInstallService(ModelInstallServiceBase):
         """Unregister the model. Delete its files only if they are within our models directory."""
         model = self.record_store.get_model(key)
         models_dir = self.app_config.models_path
-        model_path = models_dir / model.path
+        model_path = Path(model.path)
         if model_path.is_relative_to(models_dir):
             self.unconditionally_delete(key)
         else:
@@ -301,11 +354,11 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def unconditionally_delete(self, key: str) -> None:  # noqa D102
         model = self.record_store.get_model(key)
-        path = self.app_config.models_path / model.path
-        if path.is_dir():
-            rmtree(path)
+        model_path = Path(model.path)
+        if model_path.is_dir():
+            rmtree(model_path)
         else:
-            path.unlink()
+            model_path.unlink()
         self.unregister(key)
 
     def download_and_cache(
@@ -373,15 +426,16 @@ class ModelInstallService(ModelInstallServiceBase):
                     job.bytes = job.total_bytes
                     self._signal_job_running(job)
                     job.config_in["source"] = str(job.source)
+                    job.config_in["source_type"] = MODEL_SOURCE_TO_TYPE_MAP[job.source.__class__]
+                    # enter the metadata, if there is any
+                    if isinstance(job.source_metadata, (HuggingFaceMetadata)):
+                        job.config_in["source_api_response"] = job.source_metadata.api_response
+
                     if job.inplace:
                         key = self.register_path(job.local_path, job.config_in)
                     else:
                         key = self.install_path(job.local_path, job.config_in)
                     job.config_out = self.record_store.get_model(key)
-
-                    # enter the metadata, if there is any
-                    if job.source_metadata:
-                        self._metadata_store.add_metadata(key, job.source_metadata)
                     self._signal_job_completed(job)
 
             except InvalidModelConfigException as excp:
@@ -441,7 +495,7 @@ class ModelInstallService(ModelInstallServiceBase):
             self._logger.info(f"Scanning {self._app_config.models_path} for new and orphaned models")
             for cur_base_model in BaseModelType:
                 for cur_model_type in ModelType:
-                    models_dir = Path(cur_base_model.value, cur_model_type.value)
+                    models_dir = self._app_config.models_path / Path(cur_base_model.value, cur_model_type.value)
                     installed.update(self.scan_directory(models_dir))
             self._logger.info(f"{len(installed)} new models registered; {len(defunct_models)} unregistered")
 
@@ -460,14 +514,21 @@ class ModelInstallService(ModelInstallServiceBase):
         old_path = Path(model.path)
         models_dir = self.app_config.models_path
 
-        if not old_path.is_relative_to(models_dir):
+        try:
+            old_path.relative_to(models_dir)
+            return model
+        except ValueError:
+            pass
+
+        new_path = models_dir / model.base.value / model.type.value / old_path.name
+
+        if old_path == new_path:
             return model
 
-        new_path = models_dir / model.base.value / model.type.value / model.name
         self._logger.info(f"Moving {model.name} to {new_path}.")
         new_path = self._move_model(old_path, new_path)
-        model.path = new_path.relative_to(models_dir).as_posix()
-        self.record_store.update_model(key, model)
+        model.path = new_path.as_posix()
+        self.record_store.update_model(key, ModelRecordChanges(path=model.path))
         return model
 
     def _scan_register(self, model: Path) -> bool:
@@ -519,37 +580,25 @@ class ModelInstallService(ModelInstallServiceBase):
         move(old_path, new_path)
         return new_path
 
-    def _probe_model(self, model_path: Path, config: Optional[Dict[str, Any]] = None) -> AnyModelConfig:
-        info: AnyModelConfig = ModelProbe.probe(Path(model_path))
-        if config:  # used to override probe fields
-            for key, value in config.items():
-                setattr(info, key, value)
-        return info
-
     def _register(
         self, model_path: Path, config: Optional[Dict[str, Any]] = None, info: Optional[AnyModelConfig] = None
     ) -> str:
-        # Note that we may be passed a pre-populated AnyModelConfig object,
-        # in which case the key field should have been populated by the caller (e.g. in `install_path`).
-        config["key"] = config.get("key", uuid_string())
+        config = config or {}
+
+        if self._app_config.skip_model_hash:
+            config["hash"] = uuid_string()
+
         info = info or ModelProbe.probe(model_path, config)
-        override_key: Optional[str] = config.get("key") if config else None
 
-        assert info.original_hash  # always assigned by probe()
-        info.key = override_key or info.original_hash
-
-        model_path = model_path.absolute()
-        if model_path.is_relative_to(self.app_config.models_path):
-            model_path = model_path.relative_to(self.app_config.models_path)
+        model_path = model_path.resolve()
 
         info.path = model_path.as_posix()
 
         # add 'main' specific fields
-        if hasattr(info, "config"):
-            # make config relative to our root
-            legacy_conf = (self.app_config.root_dir / self.app_config.legacy_conf_dir / info.config).resolve()
-            info.config = legacy_conf.relative_to(self.app_config.root_dir).as_posix()
-        self.record_store.add_model(info.key, info)
+        if isinstance(info, CheckpointConfigBase):
+            legacy_conf = (self.app_config.root_dir / self.app_config.legacy_conf_dir / info.config_path).resolve()
+            info.config_path = legacy_conf.as_posix()
+        self.record_store.add_model(info)
         return info.key
 
     def _next_id(self) -> int:
@@ -557,6 +606,16 @@ class ModelInstallService(ModelInstallServiceBase):
             id = self._next_job_id
             self._next_job_id += 1
         return id
+
+    # --------------------------------------------------------------------------------------------
+    # Internal functions that manage the old yaml config
+    # --------------------------------------------------------------------------------------------
+    def _get_yaml(self) -> DictConfig:
+        """Fetch the models.yaml DictConfig for this installation."""
+        yaml_path = self._app_config.model_conf_path
+        omegaconf = OmegaConf.load(yaml_path)
+        assert isinstance(omegaconf, DictConfig)
+        return omegaconf
 
     @staticmethod
     def _guess_variant() -> Optional[ModelRepoVariant]:
@@ -570,16 +629,8 @@ class ModelInstallService(ModelInstallServiceBase):
             source=source,
             config_in=config or {},
             local_path=Path(source.path),
-            inplace=source.inplace,
+            inplace=source.inplace or False,
         )
-
-    def _import_from_civitai(self, source: CivitaiModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
-        if not source.access_token:
-            self._logger.info("No Civitai access token provided; some models may not be downloadable.")
-        metadata = CivitaiMetadataFetch(self._session).from_id(str(source.version_id))
-        assert isinstance(metadata, ModelMetadataWithFiles)
-        remote_files = metadata.download_urls(session=self._session)
-        return self._import_remote_model(source=source, config=config, metadata=metadata, remote_files=remote_files)
 
     def _import_from_hf(self, source: HFModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
         # Add user's cached access token to HuggingFace requests
@@ -603,16 +654,16 @@ class ModelInstallService(ModelInstallServiceBase):
         )
 
     def _import_from_url(self, source: URLModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:
-        # URLs from Civitai or HuggingFace will be handled specially
-        url_patterns = {
-            r"^https?://civitai.com/": CivitaiMetadataFetch,
-            r"^https?://huggingface.co/[^/]+/[^/]+$": HuggingFaceMetadataFetch,
-        }
+        # URLs from HuggingFace will be handled specially
         metadata = None
-        for pattern, fetcher in url_patterns.items():
-            if re.match(pattern, str(source.url), re.IGNORECASE):
-                metadata = fetcher(self._session).from_url(source.url)
-                break
+        fetcher = None
+        try:
+            fetcher = self.get_fetcher_from_url(str(source.url))
+        except ValueError:
+            pass
+        kwargs: dict[str, Any] = {"session": self._session}
+        if fetcher is not None:
+            metadata = fetcher(**kwargs).from_url(source.url)
         self._logger.debug(f"metadata={metadata}")
         if metadata and isinstance(metadata, ModelMetadataWithFiles):
             remote_files = metadata.download_urls(session=self._session)
@@ -627,7 +678,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _import_remote_model(
         self,
-        source: ModelSource,
+        source: HFModelSource | URLModelSource,
         remote_files: List[RemoteModelFile],
         metadata: Optional[AnyModelRepoMetadata],
         config: Optional[Dict[str, Any]],
@@ -655,7 +706,7 @@ class ModelInstallService(ModelInstallServiceBase):
         # In the event that there is a subfolder specified in the source,
         # we need to remove it from the destination path in order to avoid
         # creating unwanted subfolders
-        if hasattr(source, "subfolder") and source.subfolder:
+        if isinstance(source, HFModelSource) and source.subfolder:
             root = Path(remote_files[0].path.parts[0])
             subfolder = root / source.subfolder
         else:
@@ -841,4 +892,10 @@ class ModelInstallService(ModelInstallServiceBase):
     def _signal_job_cancelled(self, job: ModelInstallJob) -> None:
         self._logger.info(f"{job.source}: model installation was cancelled")
         if self._event_bus:
-            self._event_bus.emit_model_install_cancelled(str(job.source))
+            self._event_bus.emit_model_install_cancelled(str(job.source), id=job.id)
+
+    @staticmethod
+    def get_fetcher_from_url(url: str):
+        if re.match(r"^https?://huggingface.co/[^/]+/[^/]+$", url.lower()):
+            return HuggingFaceMetadataFetch
+        raise ValueError(f"Unsupported model source: '{url}'")

@@ -2,12 +2,11 @@
 # which are imported/used before parse_args() is called will get the default config values instead of the
 # values from the command line or config file.
 import sys
-from contextlib import asynccontextmanager
 
-from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
+from invokeai.app.invocations.model import ModelIdentifierField
+from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.version.invokeai_version import __version__
 
-from .invocations.fields import InputFieldJSONSchemaExtra, OutputFieldJSONSchemaExtra
 from .services.config import InvokeAIAppConfig
 
 app_config = InvokeAIAppConfig.get_config()
@@ -20,6 +19,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     import asyncio
     import mimetypes
     import socket
+    from contextlib import asynccontextmanager
     from inspect import signature
     from pathlib import Path
     from typing import Any
@@ -40,6 +40,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     # noinspection PyUnresolvedReferences
     import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
     import invokeai.frontend.web as web_dir
+    from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 
     from ..backend.util.logging import InvokeAILogger
     from .api.dependencies import ApiDependencies
@@ -59,6 +60,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         BaseInvocation,
         UIConfigBase,
     )
+    from .invocations.fields import InputFieldJSONSchemaExtra, OutputFieldJSONSchemaExtra
 
     if is_mps_available():
         import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
@@ -156,17 +158,19 @@ def custom_openapi() -> dict[str, Any]:
         openapi_schema["components"]["schemas"][schema_key] = output_schema
         openapi_schema["components"]["schemas"][schema_key]["class"] = "output"
 
-    # Add Node Editor UI helper schemas
-    ui_config_schemas = models_json_schema(
+    # Some models don't end up in the schemas as standalone definitions
+    additional_schemas = models_json_schema(
         [
             (UIConfigBase, "serialization"),
             (InputFieldJSONSchemaExtra, "serialization"),
             (OutputFieldJSONSchemaExtra, "serialization"),
+            (ModelIdentifierField, "serialization"),
+            (ProgressImage, "serialization"),
         ],
         ref_template="#/components/schemas/{model}",
     )
-    for schema_key, ui_config_schema in ui_config_schemas[1]["$defs"].items():
-        openapi_schema["components"]["schemas"][schema_key] = ui_config_schema
+    for schema_key, schema_json in additional_schemas[1]["$defs"].items():
+        openapi_schema["components"]["schemas"][schema_key] = schema_json
 
     # Add a reference to the output type to additionalProperties of the invoker schema
     for invoker in all_invocations:

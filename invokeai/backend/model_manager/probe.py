@@ -8,15 +8,18 @@ import torch
 from picklescan.scanner import scan_file_path
 
 import invokeai.backend.util.logging as logger
+from invokeai.app.util.misc import uuid_string
 from invokeai.backend.util.util import SilenceWarnings
 
 from .config import (
     AnyModelConfig,
     BaseModelType,
+    ControlAdapterDefaultSettings,
     InvalidModelConfigException,
     ModelConfigFactory,
     ModelFormat,
     ModelRepoVariant,
+    ModelSourceType,
     ModelType,
     ModelVariantType,
     SchedulerPredictionType,
@@ -95,8 +98,8 @@ class ModelProbe(object):
         "StableDiffusionXLImg2ImgPipeline": ModelType.Main,
         "StableDiffusionXLInpaintPipeline": ModelType.Main,
         "LatentConsistencyModelPipeline": ModelType.Main,
-        "AutoencoderKL": ModelType.Vae,
-        "AutoencoderTiny": ModelType.Vae,
+        "AutoencoderKL": ModelType.VAE,
+        "AutoencoderTiny": ModelType.VAE,
         "ControlNetModel": ModelType.ControlNet,
         "CLIPVisionModelWithProjection": ModelType.CLIPVision,
         "T2IAdapter": ModelType.T2IAdapter,
@@ -107,14 +110,6 @@ class ModelProbe(object):
         cls, format: Literal["diffusers", "checkpoint", "onnx"], model_type: ModelType, probe_class: type[ProbeBase]
     ) -> None:
         cls.PROBES[format][model_type] = probe_class
-
-    @classmethod
-    def heuristic_probe(
-        cls,
-        model_path: Path,
-        fields: Optional[Dict[str, Any]] = None,
-    ) -> AnyModelConfig:
-        return cls.probe(model_path, fields)
 
     @classmethod
     def probe(
@@ -134,22 +129,26 @@ class ModelProbe(object):
         if fields is None:
             fields = {}
 
+        model_path = model_path.resolve()
+
         format_type = ModelFormat.Diffusers if model_path.is_dir() else ModelFormat.Checkpoint
         model_info = None
         model_type = None
-        if format_type == "diffusers":
+        if format_type is ModelFormat.Diffusers:
             model_type = cls.get_model_type_from_folder(model_path)
         else:
             model_type = cls.get_model_type_from_checkpoint(model_path)
-        format_type = ModelFormat.Onnx if model_type == ModelType.ONNX else format_type
+        format_type = ModelFormat.ONNX if model_type == ModelType.ONNX else format_type
 
         probe_class = cls.PROBES[format_type].get(model_type)
         if not probe_class:
             raise InvalidModelConfigException(f"Unhandled combination of {format_type} and {model_type}")
 
-        hash = ModelHash().hash(model_path)
         probe = probe_class(model_path)
 
+        fields["source_type"] = fields.get("source_type") or ModelSourceType.Path
+        fields["source"] = fields.get("source") or model_path.as_posix()
+        fields["key"] = fields.get("key", uuid_string())
         fields["path"] = model_path.as_posix()
         fields["type"] = fields.get("type") or model_type
         fields["base"] = fields.get("base") or probe.get_base_type()
@@ -161,15 +160,23 @@ class ModelProbe(object):
             fields.get("description") or f"{fields['base'].value} {fields['type'].value} model {fields['name']}"
         )
         fields["format"] = fields.get("format") or probe.get_format()
-        fields["original_hash"] = fields.get("original_hash") or hash
-        fields["current_hash"] = fields.get("current_hash") or hash
+        fields["hash"] = fields.get("hash") or ModelHash().hash(model_path)
 
-        if format_type == ModelFormat.Diffusers and hasattr(probe, "get_repo_variant"):
+        fields["default_settings"] = (
+            fields.get("default_settings") or probe.get_default_settings(fields["name"])
+            if isinstance(probe, ControlAdapterProbe)
+            else None
+        )
+
+        if format_type == ModelFormat.Diffusers and isinstance(probe, FolderProbeBase):
             fields["repo_variant"] = fields.get("repo_variant") or probe.get_repo_variant()
 
         # additional fields needed for main and controlnet models
-        if fields["type"] in [ModelType.Main, ModelType.ControlNet] and fields["format"] == ModelFormat.Checkpoint:
-            fields["config"] = cls._get_checkpoint_config_path(
+        if (
+            fields["type"] in [ModelType.Main, ModelType.ControlNet, ModelType.VAE]
+            and fields["format"] is ModelFormat.Checkpoint
+        ):
+            fields["config_path"] = cls._get_checkpoint_config_path(
                 model_path,
                 model_type=fields["type"],
                 base_type=fields["base"],
@@ -179,7 +186,7 @@ class ModelProbe(object):
 
         # additional fields needed for main non-checkpoint models
         elif fields["type"] == ModelType.Main and fields["format"] in [
-            ModelFormat.Onnx,
+            ModelFormat.ONNX,
             ModelFormat.Olive,
             ModelFormat.Diffusers,
         ]:
@@ -213,11 +220,11 @@ class ModelProbe(object):
             if any(key.startswith(v) for v in {"cond_stage_model.", "first_stage_model.", "model.diffusion_model."}):
                 return ModelType.Main
             elif any(key.startswith(v) for v in {"encoder.conv_in", "decoder.conv_in"}):
-                return ModelType.Vae
+                return ModelType.VAE
             elif any(key.startswith(v) for v in {"lora_te_", "lora_unet_"}):
-                return ModelType.Lora
+                return ModelType.LoRA
             elif any(key.endswith(v) for v in {"to_k_lora.up.weight", "to_q_lora.down.weight"}):
-                return ModelType.Lora
+                return ModelType.LoRA
             elif any(key.startswith(v) for v in {"control_model", "input_blocks"}):
                 return ModelType.ControlNet
             elif key in {"emb_params", "string_to_param"}:
@@ -239,7 +246,7 @@ class ModelProbe(object):
             if (folder_path / f"learned_embeds.{suffix}").exists():
                 return ModelType.TextualInversion
             if (folder_path / f"pytorch_lora_weights.{suffix}").exists():
-                return ModelType.Lora
+                return ModelType.LoRA
         if (folder_path / "unet/model.onnx").exists():
             return ModelType.ONNX
         if (folder_path / "image_encoder.txt").exists():
@@ -285,13 +292,21 @@ class ModelProbe(object):
         if possible_conf.exists():
             return possible_conf.absolute()
 
-        if model_type == ModelType.Main:
+        if model_type is ModelType.Main:
             config_file = LEGACY_CONFIGS[base_type][variant_type]
             if isinstance(config_file, dict):  # need another tier for sd-2.x models
                 config_file = config_file[prediction_type]
-        elif model_type == ModelType.ControlNet:
+        elif model_type is ModelType.ControlNet:
             config_file = (
-                "../controlnet/cldm_v15.yaml" if base_type == BaseModelType("sd-1") else "../controlnet/cldm_v21.yaml"
+                "../controlnet/cldm_v15.yaml"
+                if base_type is BaseModelType.StableDiffusion1
+                else "../controlnet/cldm_v21.yaml"
+            )
+        elif model_type is ModelType.VAE:
+            config_file = (
+                "../stable-diffusion/v1-inference.yaml"
+                if base_type is BaseModelType.StableDiffusion1
+                else "../stable-diffusion/v2-inference.yaml"
             )
         else:
             raise InvalidModelConfigException(
@@ -321,6 +336,38 @@ class ModelProbe(object):
         scan_result = scan_file_path(checkpoint)
         if scan_result.infected_files != 0:
             raise Exception("The model {model_name} is potentially infected by malware. Aborting import.")
+
+
+class ControlAdapterProbe(ProbeBase):
+    """Adds `get_default_settings` for ControlNet and T2IAdapter probes"""
+
+    # TODO(psyche): It would be nice to get these from the invocations, but that creates circular dependencies.
+    # "canny": CannyImageProcessorInvocation.get_type()
+    MODEL_NAME_TO_PREPROCESSOR = {
+        "canny": "canny_image_processor",
+        "mlsd": "mlsd_image_processor",
+        "depth": "depth_anything_image_processor",
+        "bae": "normalbae_image_processor",
+        "normal": "normalbae_image_processor",
+        "sketch": "pidi_image_processor",
+        "scribble": "lineart_image_processor",
+        "lineart": "lineart_image_processor",
+        "lineart_anime": "lineart_anime_image_processor",
+        "softedge": "hed_image_processor",
+        "shuffle": "content_shuffle_image_processor",
+        "pose": "dw_openpose_image_processor",
+        "mediapipe": "mediapipe_face_processor",
+        "pidi": "pidi_image_processor",
+        "zoe": "zoe_depth_image_processor",
+        "color": "color_map_image_processor",
+    }
+
+    @classmethod
+    def get_default_settings(cls, model_name: str) -> Optional[ControlAdapterDefaultSettings]:
+        for k, v in cls.MODEL_NAME_TO_PREPROCESSOR.items():
+            if k in model_name:
+                return ControlAdapterDefaultSettings(preprocessor=v)
+        return None
 
 
 # ##################################################3
@@ -446,7 +493,7 @@ class TextualInversionCheckpointProbe(CheckpointProbeBase):
             raise InvalidModelConfigException(f"{self.model_path}: Could not determine base type")
 
 
-class ControlNetCheckpointProbe(CheckpointProbeBase):
+class ControlNetCheckpointProbe(CheckpointProbeBase, ControlAdapterProbe):
     """Class for probing controlnets."""
 
     def get_base_type(self) -> BaseModelType:
@@ -474,7 +521,7 @@ class CLIPVisionCheckpointProbe(CheckpointProbeBase):
         raise NotImplementedError()
 
 
-class T2IAdapterCheckpointProbe(CheckpointProbeBase):
+class T2IAdapterCheckpointProbe(CheckpointProbeBase, ControlAdapterProbe):
     def get_base_type(self) -> BaseModelType:
         raise NotImplementedError()
 
@@ -497,12 +544,12 @@ class FolderProbeBase(ProbeBase):
             if ".fp16" in x.suffixes:
                 return ModelRepoVariant.FP16
             if "openvino_model" in x.name:
-                return ModelRepoVariant.OPENVINO
+                return ModelRepoVariant.OpenVINO
             if "flax_model" in x.name:
-                return ModelRepoVariant.FLAX
+                return ModelRepoVariant.Flax
             if x.suffix == ".onnx":
                 return ModelRepoVariant.ONNX
-        return ModelRepoVariant.DEFAULT
+        return ModelRepoVariant.Default
 
 
 class PipelineFolderProbe(FolderProbeBase):
@@ -612,7 +659,7 @@ class ONNXFolderProbe(PipelineFolderProbe):
         return ModelVariantType.Normal
 
 
-class ControlNetFolderProbe(FolderProbeBase):
+class ControlNetFolderProbe(FolderProbeBase, ControlAdapterProbe):
     def get_base_type(self) -> BaseModelType:
         config_file = self.model_path / "config.json"
         if not config_file.exists():
@@ -686,7 +733,7 @@ class CLIPVisionFolderProbe(FolderProbeBase):
         return BaseModelType.Any
 
 
-class T2IAdapterFolderProbe(FolderProbeBase):
+class T2IAdapterFolderProbe(FolderProbeBase, ControlAdapterProbe):
     def get_base_type(self) -> BaseModelType:
         config_file = self.model_path / "config.json"
         if not config_file.exists():
@@ -708,8 +755,8 @@ class T2IAdapterFolderProbe(FolderProbeBase):
 
 ############## register probe classes ######
 ModelProbe.register_probe("diffusers", ModelType.Main, PipelineFolderProbe)
-ModelProbe.register_probe("diffusers", ModelType.Vae, VaeFolderProbe)
-ModelProbe.register_probe("diffusers", ModelType.Lora, LoRAFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.VAE, VaeFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.LoRA, LoRAFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.TextualInversion, TextualInversionFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.ControlNet, ControlNetFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.IPAdapter, IPAdapterFolderProbe)
@@ -717,8 +764,8 @@ ModelProbe.register_probe("diffusers", ModelType.CLIPVision, CLIPVisionFolderPro
 ModelProbe.register_probe("diffusers", ModelType.T2IAdapter, T2IAdapterFolderProbe)
 
 ModelProbe.register_probe("checkpoint", ModelType.Main, PipelineCheckpointProbe)
-ModelProbe.register_probe("checkpoint", ModelType.Vae, VaeCheckpointProbe)
-ModelProbe.register_probe("checkpoint", ModelType.Lora, LoRACheckpointProbe)
+ModelProbe.register_probe("checkpoint", ModelType.VAE, VaeCheckpointProbe)
+ModelProbe.register_probe("checkpoint", ModelType.LoRA, LoRACheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.TextualInversion, TextualInversionCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.ControlNet, ControlNetCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.IPAdapter, IPAdapterCheckpointProbe)

@@ -38,21 +38,19 @@ export type OffsetPaginatedResults_ImageDTO_ = S['OffsetPaginatedResults_ImageDT
 export type ModelType = S['ModelType'];
 export type SubModelType = S['SubModelType'];
 export type BaseModelType = S['BaseModelType'];
-export type ControlField = S['ControlField'];
 
 // Model Configs
 
 // TODO(MM2): Can we make key required in the pydantic model?
-export type LoRAModelConfig = S['LoRAConfig'];
+export type LoRAModelConfig = S['LoRADiffusersConfig'] | S['LoRALyCORISConfig'];
 // TODO(MM2): Can we rename this from Vae -> VAE
-export type VAEModelConfig = S['VaeCheckpointConfig'] | S['VaeDiffusersConfig'];
+export type VAEModelConfig = S['VAECheckpointConfig'] | S['VAEDiffusersConfig'];
 export type ControlNetModelConfig = S['ControlNetDiffusersConfig'] | S['ControlNetCheckpointConfig'];
 export type IPAdapterModelConfig = S['IPAdapterConfig'];
-// TODO(MM2): Can we rename this to T2IAdapterConfig
-export type T2IAdapterModelConfig = S['T2IConfig'];
-export type TextualInversionModelConfig = S['TextualInversionConfig'];
-export type DiffusersModelConfig = S['MainDiffusersConfig'];
-export type CheckpointModelConfig = S['MainCheckpointConfig'];
+export type T2IAdapterModelConfig = S['T2IAdapterConfig'];
+export type TextualInversionModelConfig = S['TextualInversionFileConfig'] | S['TextualInversionFolderConfig'];
+type DiffusersModelConfig = S['MainDiffusersConfig'];
+type CheckpointModelConfig = S['MainCheckpointConfig'];
 type CLIPVisionDiffusersConfig = S['CLIPVisionDiffusersConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
@@ -83,6 +81,18 @@ export const isIPAdapterModelConfig = (config: AnyModelConfig): config is IPAdap
 
 export const isT2IAdapterModelConfig = (config: AnyModelConfig): config is T2IAdapterModelConfig => {
   return config.type === 't2i_adapter';
+};
+
+export const isControlAdapterModelConfig = (
+  config: AnyModelConfig
+): config is ControlNetModelConfig | T2IAdapterModelConfig | IPAdapterModelConfig => {
+  return isControlNetModelConfig(config) || isT2IAdapterModelConfig(config) || isIPAdapterModelConfig(config);
+};
+
+export const isControlNetOrT2IAdapterModelConfig = (
+  config: AnyModelConfig
+): config is ControlNetModelConfig | T2IAdapterModelConfig => {
+  return isControlNetModelConfig(config) || isT2IAdapterModelConfig(config);
 };
 
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
@@ -121,17 +131,18 @@ export type CreateGradientMaskInvocation = S['CreateGradientMaskInvocation'];
 export type CanvasPasteBackInvocation = S['CanvasPasteBackInvocation'];
 export type NoiseInvocation = S['NoiseInvocation'];
 export type DenoiseLatentsInvocation = S['DenoiseLatentsInvocation'];
-export type SDXLLoraLoaderInvocation = S['SDXLLoraLoaderInvocation'];
+export type SDXLLoRALoaderInvocation = S['SDXLLoRALoaderInvocation'];
 export type ImageToLatentsInvocation = S['ImageToLatentsInvocation'];
 export type LatentsToImageInvocation = S['LatentsToImageInvocation'];
-export type LoraLoaderInvocation = S['LoraLoaderInvocation'];
+export type LoRALoaderInvocation = S['LoRALoaderInvocation'];
 export type ESRGANInvocation = S['ESRGANInvocation'];
 export type ImageNSFWBlurInvocation = S['ImageNSFWBlurInvocation'];
 export type ImageWatermarkInvocation = S['ImageWatermarkInvocation'];
 export type SeamlessModeInvocation = S['SeamlessModeInvocation'];
 export type CoreMetadataInvocation = S['CoreMetadataInvocation'];
-export type IPAdapterMetadataField = S['IPAdapterMetadataField'];
-export type T2IAdapterField = S['T2IAdapterField'];
+
+// Metadata fields
+export type ModelMetadataField = S['ModelMetadataField'];
 
 // ControlNet Nodes
 export type ControlNetInvocation = S['ControlNetInvocation'];

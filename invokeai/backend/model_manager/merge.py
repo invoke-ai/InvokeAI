@@ -16,6 +16,7 @@ from diffusers import AutoPipelineForText2Image
 from diffusers.utils import logging as dlogging
 
 from invokeai.app.services.model_install import ModelInstallServiceBase
+from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.backend.util.devices import choose_torch_device, torch_dtype
 
 from . import (
@@ -117,7 +118,6 @@ class ModelMerger(object):
         config = self._installer.app_config
         store = self._installer.record_store
         base_models: Set[BaseModelType] = set()
-        vae = None
         variant = None if self._installer.app_config.full_precision else "fp16"
 
         assert (
@@ -133,10 +133,6 @@ class ModelMerger(object):
             assert info.variant == ModelVariantType(
                 "normal"
             ), f"{info.name} ({info.key}) is a {info.variant} model, which cannot currently be merged"
-
-            # pick up the first model's vae
-            if key == model_keys[0]:
-                vae = info.vae
 
             # tally base models used
             base_models.add(info.base)
@@ -163,12 +159,10 @@ class ModelMerger(object):
 
         # update model's config
         model_config = self._installer.record_store.get_model(key)
-        model_config.update(
-            {
-                "name": merged_model_name,
-                "description": f"Merge of models {', '.join(model_names)}",
-                "vae": vae,
-            }
+        model_config.name = merged_model_name
+        model_config.description = f"Merge of models {', '.join(model_names)}"
+
+        self._installer.record_store.update_model(
+            key, ModelRecordChanges(name=model_config.name, description=model_config.description)
         )
-        self._installer.record_store.update_model(key, model_config)
         return model_config

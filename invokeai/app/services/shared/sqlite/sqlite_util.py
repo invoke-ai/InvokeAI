@@ -9,6 +9,7 @@ from invokeai.app.services.shared.sqlite_migrator.migrations.migration_3 import 
 from invokeai.app.services.shared.sqlite_migrator.migrations.migration_4 import build_migration_4
 from invokeai.app.services.shared.sqlite_migrator.migrations.migration_5 import build_migration_5
 from invokeai.app.services.shared.sqlite_migrator.migrations.migration_6 import build_migration_6
+from invokeai.app.services.shared.sqlite_migrator.migrations.migration_7 import build_migration_7
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import SqliteMigrator
 
 
@@ -35,6 +36,7 @@ def init_db(config: InvokeAIAppConfig, logger: Logger, image_files: ImageFileSto
     migrator.register_migration(build_migration_4())
     migrator.register_migration(build_migration_5())
     migrator.register_migration(build_migration_6())
+    migrator.register_migration(build_migration_7())
     migrator.run_migrations()
 
     return db

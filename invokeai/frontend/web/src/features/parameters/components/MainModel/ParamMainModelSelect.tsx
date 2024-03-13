@@ -3,6 +3,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useModelCustomSelect } from 'common/hooks/useModelCustomSelect';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import { modelSelected } from 'features/parameters/store/actions';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
@@ -24,7 +25,11 @@ const ParamMainModelSelect = () => {
       if (!model) {
         return;
       }
-      dispatch(modelSelected({ key: model.key, base: model.base }));
+      try {
+        dispatch(modelSelected(zModelIdentifierField.parse(model)));
+      } catch {
+        // no-op
+      }
     },
     [dispatch]
   );

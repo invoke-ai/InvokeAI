@@ -104,7 +104,7 @@ def sdxl_base_files() -> List[Path]:
             ],
         ),
         (
-            ModelRepoVariant.DEFAULT,
+            ModelRepoVariant.Default,
             [
                 "model_index.json",
                 "scheduler/scheduler_config.json",
@@ -129,7 +129,7 @@ def sdxl_base_files() -> List[Path]:
             ],
         ),
         (
-            ModelRepoVariant.OPENVINO,
+            ModelRepoVariant.OpenVINO,
             [
                 "model_index.json",
                 "scheduler/scheduler_config.json",
@@ -211,7 +211,7 @@ def sdxl_base_files() -> List[Path]:
             ],
         ),
         (
-            ModelRepoVariant.FLAX,
+            ModelRepoVariant.Flax,
             [
                 "model_index.json",
                 "scheduler/scheduler_config.json",
@@ -235,7 +235,94 @@ def sdxl_base_files() -> List[Path]:
         ),
     ],
 )
-def test_select(sdxl_base_files: List[Path], variant: ModelRepoVariant, expected_list: List[Path]) -> None:
+def test_select(sdxl_base_files: List[Path], variant: ModelRepoVariant, expected_list: List[str]) -> None:
     print(f"testing variant {variant}")
     filtered_files = filter_files(sdxl_base_files, variant)
     assert set(filtered_files) == {Path(x) for x in expected_list}
+
+
+@pytest.fixture
+def sd15_test_files() -> list[Path]:
+    return [
+        Path(f)
+        for f in [
+            "feature_extractor/preprocessor_config.json",
+            "safety_checker/config.json",
+            "safety_checker/model.fp16.safetensors",
+            "safety_checker/model.safetensors",
+            "safety_checker/pytorch_model.bin",
+            "safety_checker/pytorch_model.fp16.bin",
+            "scheduler/scheduler_config.json",
+            "text_encoder/config.json",
+            "text_encoder/model.fp16.safetensors",
+            "text_encoder/model.safetensors",
+            "text_encoder/pytorch_model.bin",
+            "text_encoder/pytorch_model.fp16.bin",
+            "tokenizer/merges.txt",
+            "tokenizer/special_tokens_map.json",
+            "tokenizer/tokenizer_config.json",
+            "tokenizer/vocab.json",
+            "unet/config.json",
+            "unet/diffusion_pytorch_model.bin",
+            "unet/diffusion_pytorch_model.fp16.bin",
+            "unet/diffusion_pytorch_model.fp16.safetensors",
+            "unet/diffusion_pytorch_model.non_ema.bin",
+            "unet/diffusion_pytorch_model.non_ema.safetensors",
+            "unet/diffusion_pytorch_model.safetensors",
+            "vae/config.json",
+            "vae/diffusion_pytorch_model.bin",
+            "vae/diffusion_pytorch_model.fp16.bin",
+            "vae/diffusion_pytorch_model.fp16.safetensors",
+            "vae/diffusion_pytorch_model.safetensors",
+        ]
+    ]
+
+
+@pytest.mark.parametrize(
+    "variant,expected_files",
+    [
+        (
+            ModelRepoVariant.FP16,
+            [
+                "feature_extractor/preprocessor_config.json",
+                "safety_checker/config.json",
+                "safety_checker/model.fp16.safetensors",
+                "scheduler/scheduler_config.json",
+                "text_encoder/config.json",
+                "text_encoder/model.fp16.safetensors",
+                "tokenizer/merges.txt",
+                "tokenizer/special_tokens_map.json",
+                "tokenizer/tokenizer_config.json",
+                "tokenizer/vocab.json",
+                "unet/config.json",
+                "unet/diffusion_pytorch_model.fp16.safetensors",
+                "vae/config.json",
+                "vae/diffusion_pytorch_model.fp16.safetensors",
+            ],
+        ),
+        (
+            ModelRepoVariant.FP32,
+            [
+                "feature_extractor/preprocessor_config.json",
+                "safety_checker/config.json",
+                "safety_checker/model.safetensors",
+                "scheduler/scheduler_config.json",
+                "text_encoder/config.json",
+                "text_encoder/model.safetensors",
+                "tokenizer/merges.txt",
+                "tokenizer/special_tokens_map.json",
+                "tokenizer/tokenizer_config.json",
+                "tokenizer/vocab.json",
+                "unet/config.json",
+                "unet/diffusion_pytorch_model.safetensors",
+                "vae/config.json",
+                "vae/diffusion_pytorch_model.safetensors",
+            ],
+        ),
+    ],
+)
+def test_select_multiple_weights(
+    sd15_test_files: list[Path], variant: ModelRepoVariant, expected_files: list[str]
+) -> None:
+    filtered_files = filter_files(sd15_test_files, variant)
+    assert set(filtered_files) == {Path(f) for f in expected_files}

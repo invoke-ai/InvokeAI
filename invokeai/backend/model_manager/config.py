@@ -22,12 +22,15 @@ Validation errors will raise an InvalidModelConfigException error.
 
 import time
 from enum import Enum
-from typing import Literal, Optional, Type, Union
+from typing import Literal, Optional, Type, TypeAlias, Union
 
 import torch
-from diffusers import ModelMixin
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from diffusers.models.modeling_utils import ModelMixin
+from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, TypeAdapter
 from typing_extensions import Annotated, Any, Dict
+
+from invokeai.app.invocations.constants import SCHEDULER_NAME_VALUES
+from invokeai.app.util.misc import uuid_string
 
 from ..raw_model import RawModel
 
@@ -56,8 +59,8 @@ class ModelType(str, Enum):
 
     ONNX = "onnx"
     Main = "main"
-    Vae = "vae"
-    Lora = "lora"
+    VAE = "vae"
+    LoRA = "lora"
     ControlNet = "controlnet"  # used by model_probe
     TextualInversion = "embedding"
     IPAdapter = "ip_adapter"
@@ -73,9 +76,9 @@ class SubModelType(str, Enum):
     TextEncoder2 = "text_encoder_2"
     Tokenizer = "tokenizer"
     Tokenizer2 = "tokenizer_2"
-    Vae = "vae"
-    VaeDecoder = "vae_decoder"
-    VaeEncoder = "vae_encoder"
+    VAE = "vae"
+    VAEDecoder = "vae_decoder"
+    VAEEncoder = "vae_encoder"
     Scheduler = "scheduler"
     SafetyChecker = "safety_checker"
 
@@ -93,8 +96,8 @@ class ModelFormat(str, Enum):
 
     Diffusers = "diffusers"
     Checkpoint = "checkpoint"
-    Lycoris = "lycoris"
-    Onnx = "onnx"
+    LyCORIS = "lycoris"
+    ONNX = "onnx"
     Olive = "olive"
     EmbeddingFile = "embedding_file"
     EmbeddingFolder = "embedding_folder"
@@ -112,127 +115,201 @@ class SchedulerPredictionType(str, Enum):
 class ModelRepoVariant(str, Enum):
     """Various hugging face variants on the diffusers format."""
 
-    DEFAULT = ""  # model files without "fp16" or other qualifier - empty str
+    Default = ""  # model files without "fp16" or other qualifier - empty str
     FP16 = "fp16"
     FP32 = "fp32"
     ONNX = "onnx"
-    OPENVINO = "openvino"
-    FLAX = "flax"
+    OpenVINO = "openvino"
+    Flax = "flax"
+
+
+class ModelSourceType(str, Enum):
+    """Model source type."""
+
+    Path = "path"
+    Url = "url"
+    HFRepoID = "hf_repo_id"
+
+
+class MainModelDefaultSettings(BaseModel):
+    vae: str | None
+    vae_precision: str | None
+    scheduler: SCHEDULER_NAME_VALUES | None
+    steps: int | None
+    cfg_scale: float | None
+    cfg_rescale_multiplier: float | None
+
+
+class ControlAdapterDefaultSettings(BaseModel):
+    # This could be narrowed to controlnet processor nodes, but they change. Leaving this a string is safer.
+    preprocessor: str | None
 
 
 class ModelConfigBase(BaseModel):
     """Base class for model configuration information."""
 
-    path: str = Field(description="filesystem path to the model file or directory")
-    name: str = Field(description="model name")
-    base: BaseModelType = Field(description="base model")
-    type: ModelType = Field(description="type of the model")
-    format: ModelFormat = Field(description="model format")
-    key: str = Field(description="unique key for model", default="<NOKEY>")
-    original_hash: Optional[str] = Field(
-        description="original fasthash of model contents", default=None
-    )  # this is assigned at install time and will not change
-    current_hash: Optional[str] = Field(
-        description="current fasthash of model contents", default=None
-    )  # if model is converted or otherwise modified, this will hold updated hash
-    description: Optional[str] = Field(description="human readable description of the model", default=None)
-    source: Optional[str] = Field(description="model original source (path, URL or repo_id)", default=None)
-    last_modified: Optional[float] = Field(description="timestamp for modification time", default_factory=time.time)
+    key: str = Field(description="A unique key for this model.", default_factory=uuid_string)
+    hash: str = Field(description="The hash of the model file(s).")
+    path: str = Field(
+        description="Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+    )
+    name: str = Field(description="Name of the model.")
+    base: BaseModelType = Field(description="The base model.")
+    description: Optional[str] = Field(description="Model description", default=None)
+    source: str = Field(description="The original source of the model (path, URL or repo_id).")
+    source_type: ModelSourceType = Field(description="The type of source")
+    source_api_response: Optional[str] = Field(
+        description="The original API response from the source, as stringified JSON.", default=None
+    )
+    cover_image: Optional[str] = Field(description="Url for image to preview model", default=None)
 
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseModel]) -> None:
-        schema["required"].extend(
-            ["key", "base", "type", "format", "original_hash", "current_hash", "source", "last_modified"]
-        )
+        schema["required"].extend(["key", "type", "format"])
 
-    model_config = ConfigDict(
-        use_enum_values=False,
-        validate_assignment=True,
-        json_schema_extra=json_schema_extra,
-    )
-
-    def update(self, attributes: Dict[str, Any]) -> None:
-        """Update the object with fields in dict."""
-        for key, value in attributes.items():
-            setattr(self, key, value)  # may raise a validation error
+    model_config = ConfigDict(validate_assignment=True, json_schema_extra=json_schema_extra)
 
 
-class _CheckpointConfig(ModelConfigBase):
+class CheckpointConfigBase(ModelConfigBase):
     """Model config for checkpoint-style models."""
 
     format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
-    config: str = Field(description="path to the checkpoint model config file")
+    config_path: str = Field(description="path to the checkpoint model config file")
+    converted_at: Optional[float] = Field(
+        description="When this model was last converted to diffusers", default_factory=time.time
+    )
 
 
-class _DiffusersConfig(ModelConfigBase):
+class DiffusersConfigBase(ModelConfigBase):
     """Model config for diffusers-style models."""
 
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
-    repo_variant: Optional[ModelRepoVariant] = ModelRepoVariant.DEFAULT
+    repo_variant: Optional[ModelRepoVariant] = ModelRepoVariant.Default
 
 
-class LoRAConfig(ModelConfigBase):
+class LoRAConfigBase(ModelConfigBase):
+    type: Literal[ModelType.LoRA] = ModelType.LoRA
+    trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
+
+
+class LoRALyCORISConfig(LoRAConfigBase):
     """Model config for LoRA/Lycoris models."""
 
-    type: Literal[ModelType.Lora] = ModelType.Lora
-    format: Literal[ModelFormat.Lycoris, ModelFormat.Diffusers]
+    format: Literal[ModelFormat.LyCORIS] = ModelFormat.LyCORIS
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.LoRA.value}.{ModelFormat.LyCORIS.value}")
 
 
-class VaeCheckpointConfig(ModelConfigBase):
+class LoRADiffusersConfig(LoRAConfigBase):
+    """Model config for LoRA/Diffusers models."""
+
+    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.LoRA.value}.{ModelFormat.Diffusers.value}")
+
+
+class VAECheckpointConfig(CheckpointConfigBase):
     """Model config for standalone VAE models."""
 
-    type: Literal[ModelType.Vae] = ModelType.Vae
+    type: Literal[ModelType.VAE] = ModelType.VAE
     format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
 
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.VAE.value}.{ModelFormat.Checkpoint.value}")
 
-class VaeDiffusersConfig(ModelConfigBase):
+
+class VAEDiffusersConfig(ModelConfigBase):
     """Model config for standalone VAE models (diffusers version)."""
 
-    type: Literal[ModelType.Vae] = ModelType.Vae
+    type: Literal[ModelType.VAE] = ModelType.VAE
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.VAE.value}.{ModelFormat.Diffusers.value}")
 
-class ControlNetDiffusersConfig(_DiffusersConfig):
+
+class ControlAdapterConfigBase(BaseModel):
+    default_settings: Optional[ControlAdapterDefaultSettings] = Field(
+        description="Default settings for this model", default=None
+    )
+
+
+class ControlNetDiffusersConfig(DiffusersConfigBase, ControlAdapterConfigBase):
     """Model config for ControlNet models (diffusers version)."""
 
     type: Literal[ModelType.ControlNet] = ModelType.ControlNet
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.ControlNet.value}.{ModelFormat.Diffusers.value}")
 
-class ControlNetCheckpointConfig(_CheckpointConfig):
+
+class ControlNetCheckpointConfig(CheckpointConfigBase, ControlAdapterConfigBase):
     """Model config for ControlNet models (diffusers version)."""
 
     type: Literal[ModelType.ControlNet] = ModelType.ControlNet
     format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
 
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.ControlNet.value}.{ModelFormat.Checkpoint.value}")
 
-class TextualInversionConfig(ModelConfigBase):
+
+class TextualInversionFileConfig(ModelConfigBase):
     """Model config for textual inversion embeddings."""
 
     type: Literal[ModelType.TextualInversion] = ModelType.TextualInversion
-    format: Literal[ModelFormat.EmbeddingFile, ModelFormat.EmbeddingFolder]
+    format: Literal[ModelFormat.EmbeddingFile] = ModelFormat.EmbeddingFile
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.TextualInversion.value}.{ModelFormat.EmbeddingFile.value}")
 
 
-class _MainConfig(ModelConfigBase):
-    """Model config for main models."""
+class TextualInversionFolderConfig(ModelConfigBase):
+    """Model config for textual inversion embeddings."""
 
-    vae: Optional[str] = Field(default=None)
+    type: Literal[ModelType.TextualInversion] = ModelType.TextualInversion
+    format: Literal[ModelFormat.EmbeddingFolder] = ModelFormat.EmbeddingFolder
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.TextualInversion.value}.{ModelFormat.EmbeddingFolder.value}")
+
+
+class MainConfigBase(ModelConfigBase):
+    type: Literal[ModelType.Main] = ModelType.Main
+    trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
+    default_settings: Optional[MainModelDefaultSettings] = Field(
+        description="Default settings for this model", default=None
+    )
+
+
+class MainCheckpointConfig(CheckpointConfigBase, MainConfigBase):
+    """Model config for main checkpoint models."""
+
     variant: ModelVariantType = ModelVariantType.Normal
     prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon
     upcast_attention: bool = False
-    ztsnr_training: bool = False
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.Main.value}.{ModelFormat.Checkpoint.value}")
 
 
-class MainCheckpointConfig(_CheckpointConfig, _MainConfig):
-    """Model config for main checkpoint models."""
-
-    type: Literal[ModelType.Main] = ModelType.Main
-
-
-class MainDiffusersConfig(_DiffusersConfig, _MainConfig):
+class MainDiffusersConfig(DiffusersConfigBase, MainConfigBase):
     """Model config for main diffusers models."""
 
-    type: Literal[ModelType.Main] = ModelType.Main
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.Main.value}.{ModelFormat.Diffusers.value}")
 
 
 class IPAdapterConfig(ModelConfigBase):
@@ -242,63 +319,75 @@ class IPAdapterConfig(ModelConfigBase):
     image_encoder_model_id: str
     format: Literal[ModelFormat.InvokeAI]
 
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.IPAdapter.value}.{ModelFormat.InvokeAI.value}")
+
 
 class CLIPVisionDiffusersConfig(ModelConfigBase):
-    """Model config for ClipVision."""
+    """Model config for CLIPVision."""
 
     type: Literal[ModelType.CLIPVision] = ModelType.CLIPVision
     format: Literal[ModelFormat.Diffusers]
 
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.CLIPVision.value}.{ModelFormat.Diffusers.value}")
 
-class T2IConfig(ModelConfigBase):
+
+class T2IAdapterConfig(ModelConfigBase, ControlAdapterConfigBase):
     """Model config for T2I."""
 
     type: Literal[ModelType.T2IAdapter] = ModelType.T2IAdapter
     format: Literal[ModelFormat.Diffusers]
 
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.T2IAdapter.value}.{ModelFormat.Diffusers.value}")
 
-_ControlNetConfig = Annotated[
-    Union[ControlNetDiffusersConfig, ControlNetCheckpointConfig],
-    Field(discriminator="format"),
-]
-_VaeConfig = Annotated[Union[VaeDiffusersConfig, VaeCheckpointConfig], Field(discriminator="format")]
-_MainModelConfig = Annotated[Union[MainDiffusersConfig, MainCheckpointConfig], Field(discriminator="format")]
 
-AnyModelConfig = Union[
-    _MainModelConfig,
-    _VaeConfig,
-    _ControlNetConfig,
-    # ModelConfigBase,
-    LoRAConfig,
-    TextualInversionConfig,
-    IPAdapterConfig,
-    CLIPVisionDiffusersConfig,
-    T2IConfig,
+def get_model_discriminator_value(v: Any) -> str:
+    """
+    Computes the discriminator value for a model config.
+    https://docs.pydantic.dev/latest/concepts/unions/#discriminated-unions-with-callable-discriminator
+    """
+    format_ = None
+    type_ = None
+    if isinstance(v, dict):
+        format_ = v.get("format")
+        if isinstance(format_, Enum):
+            format_ = format_.value
+        type_ = v.get("type")
+        if isinstance(type_, Enum):
+            type_ = type_.value
+    else:
+        format_ = v.format.value
+        type_ = v.type.value
+    v = f"{type_}.{format_}"
+    return v
+
+
+AnyModelConfig = Annotated[
+    Union[
+        Annotated[MainDiffusersConfig, MainDiffusersConfig.get_tag()],
+        Annotated[MainCheckpointConfig, MainCheckpointConfig.get_tag()],
+        Annotated[VAEDiffusersConfig, VAEDiffusersConfig.get_tag()],
+        Annotated[VAECheckpointConfig, VAECheckpointConfig.get_tag()],
+        Annotated[ControlNetDiffusersConfig, ControlNetDiffusersConfig.get_tag()],
+        Annotated[ControlNetCheckpointConfig, ControlNetCheckpointConfig.get_tag()],
+        Annotated[LoRALyCORISConfig, LoRALyCORISConfig.get_tag()],
+        Annotated[LoRADiffusersConfig, LoRADiffusersConfig.get_tag()],
+        Annotated[TextualInversionFileConfig, TextualInversionFileConfig.get_tag()],
+        Annotated[TextualInversionFolderConfig, TextualInversionFolderConfig.get_tag()],
+        Annotated[IPAdapterConfig, IPAdapterConfig.get_tag()],
+        Annotated[T2IAdapterConfig, T2IAdapterConfig.get_tag()],
+        Annotated[CLIPVisionDiffusersConfig, CLIPVisionDiffusersConfig.get_tag()],
+    ],
+    Discriminator(get_model_discriminator_value),
 ]
 
 AnyModelConfigValidator = TypeAdapter(AnyModelConfig)
-
-
-# IMPLEMENTATION NOTE:
-# The preferred alternative to the above is a discriminated Union as shown
-# below. However, it breaks FastAPI when used as the input Body parameter in a route.
-# This is a known issue. Please see:
-#   https://github.com/tiangolo/fastapi/discussions/9761 and
-#   https://github.com/tiangolo/fastapi/discussions/9287
-# AnyModelConfig = Annotated[
-#     Union[
-#         _MainModelConfig,
-#         _ONNXConfig,
-#         _VaeConfig,
-#         _ControlNetConfig,
-#         LoRAConfig,
-#         TextualInversionConfig,
-#         IPAdapterConfig,
-#         CLIPVisionDiffusersConfig,
-#         T2IConfig,
-#     ],
-#     Field(discriminator="type"),
-# ]
+AnyDefaultSettings: TypeAlias = Union[MainModelDefaultSettings, ControlAdapterDefaultSettings]
 
 
 class ModelConfigFactory(object):
@@ -332,6 +421,6 @@ class ModelConfigFactory(object):
         assert model is not None
         if key:
             model.key = key
-        if timestamp:
-            model.last_modified = timestamp
+        if isinstance(model, CheckpointConfigBase) and timestamp is not None:
+            model.converted_at = timestamp
         return model  # type: ignore

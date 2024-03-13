@@ -1,6 +1,6 @@
 import { NUMPY_RAND_MAX } from 'app/constants';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
-import { zModelIdentifierWithBase, zSchedulerField } from 'features/nodes/types/common';
+import { zModelIdentifierField, zSchedulerField } from 'features/nodes/types/common';
 import { z } from 'zod';
 
 /**
@@ -92,37 +92,37 @@ export const isParameterHeight = (val: unknown): val is ParameterHeight => zPara
 // #endregion
 
 // #region Model
-export const zParameterModel = zModelIdentifierWithBase;
+export const zParameterModel = zModelIdentifierField;
 export type ParameterModel = z.infer<typeof zParameterModel>;
 // #endregion
 
 // #region SDXL Refiner Model
-const zParameterSDXLRefinerModel = zModelIdentifierWithBase;
+const zParameterSDXLRefinerModel = zModelIdentifierField;
 export type ParameterSDXLRefinerModel = z.infer<typeof zParameterSDXLRefinerModel>;
 // #endregion
 
 // #region VAE Model
-export const zParameterVAEModel = zModelIdentifierWithBase;
+export const zParameterVAEModel = zModelIdentifierField;
 export type ParameterVAEModel = z.infer<typeof zParameterVAEModel>;
 // #endregion
 
 // #region LoRA Model
-const zParameterLoRAModel = zModelIdentifierWithBase;
+const zParameterLoRAModel = zModelIdentifierField;
 export type ParameterLoRAModel = z.infer<typeof zParameterLoRAModel>;
 // #endregion
 
 // #region ControlNet Model
-const zParameterControlNetModel = zModelIdentifierWithBase;
+const zParameterControlNetModel = zModelIdentifierField;
 export type ParameterControlNetModel = z.infer<typeof zParameterControlNetModel>;
 // #endregion
 
 // #region IP Adapter Model
-const zParameterIPAdapterModel = zModelIdentifierWithBase;
+const zParameterIPAdapterModel = zModelIdentifierField;
 export type ParameterIPAdapterModel = z.infer<typeof zParameterIPAdapterModel>;
 // #endregion
 
 // #region T2I Adapter Model
-const zParameterT2IAdapterModel = zModelIdentifierWithBase;
+const zParameterT2IAdapterModel = zModelIdentifierField;
 export type ParameterT2IAdapterModel = z.infer<typeof zParameterT2IAdapterModel>;
 // #endregion
 

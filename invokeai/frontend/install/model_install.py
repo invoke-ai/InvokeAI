@@ -144,7 +144,7 @@ class addModelsForm(CyclingForm, npyscreen.FormMultiPage):
 
         self.nextrely = top_of_table
         self.lora_models = self.add_model_widgets(
-            model_type=ModelType.Lora,
+            model_type=ModelType.LoRA,
             window_width=window_width,
         )
         bottom_of_table = max(bottom_of_table, self.nextrely)

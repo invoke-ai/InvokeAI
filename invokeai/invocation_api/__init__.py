@@ -33,19 +33,15 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.latent import SchedulerOutput
 from invokeai.app.invocations.metadata import MetadataItemField, MetadataItemOutput, MetadataOutput
 from invokeai.app.invocations.model import (
-    ClipField,
+    CLIPField,
     CLIPOutput,
-    LoraInfo,
-    LoraLoaderOutput,
-    LoRAModelField,
-    MainModelField,
-    ModelInfo,
+    LoRALoaderOutput,
+    ModelIdentifierField,
     ModelLoaderOutput,
-    SDXLLoraLoaderOutput,
+    SDXLLoRALoaderOutput,
     UNetField,
     UNetOutput,
-    VaeField,
-    VAEModelField,
+    VAEField,
     VAEOutput,
 )
 from invokeai.app.invocations.primitives import (
@@ -73,8 +69,8 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
-from invokeai.backend.model_management.model_manager import LoadedModelInfo
-from invokeai.backend.model_management.models.base import BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager.config import BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
@@ -118,20 +114,16 @@ __all__ = [
     "MetadataItemOutput",
     "MetadataOutput",
     # invokeai.app.invocations.model
-    "ModelInfo",
-    "LoraInfo",
+    "ModelIdentifierField",
     "UNetField",
-    "ClipField",
-    "VaeField",
-    "MainModelField",
-    "LoRAModelField",
-    "VAEModelField",
+    "CLIPField",
+    "VAEField",
     "UNetOutput",
     "VAEOutput",
     "CLIPOutput",
     "ModelLoaderOutput",
-    "LoraLoaderOutput",
-    "SDXLLoraLoaderOutput",
+    "LoRALoaderOutput",
+    "SDXLLoRALoaderOutput",
     # invokeai.app.invocations.primitives
     "BooleanCollectionOutput",
     "BooleanOutput",
@@ -166,7 +158,7 @@ __all__ = [
     # invokeai.app.services.config.config_default
     "InvokeAIAppConfig",
     # invokeai.backend.model_management.model_manager
-    "LoadedModelInfo",
+    "LoadedModel",
     # invokeai.backend.model_management.models.base
     "BaseModelType",
     "ModelType",

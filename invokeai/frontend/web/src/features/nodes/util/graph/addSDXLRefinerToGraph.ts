@@ -1,9 +1,11 @@
 import type { RootState } from 'app/store/store';
-import type {
-  CreateDenoiseMaskInvocation,
-  ImageDTO,
-  NonNullableGraph,
-  SeamlessModeInvocation,
+import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import {
+  type CreateDenoiseMaskInvocation,
+  type ImageDTO,
+  isRefinerMainModelModelConfig,
+  type NonNullableGraph,
+  type SeamlessModeInvocation,
 } from 'services/api/types';
 
 import {
@@ -25,16 +27,16 @@ import {
   SDXL_REFINER_SEAMLESS,
 } from './constants';
 import { getSDXLStylePrompts } from './graphBuilderUtils';
-import { upsertMetadata } from './metadata';
+import { getModelMetadataField, upsertMetadata } from './metadata';
 
-export const addSDXLRefinerToGraph = (
+export const addSDXLRefinerToGraph = async (
   state: RootState,
   graph: NonNullableGraph,
   baseNodeId: string,
   modelLoaderNodeId?: string,
   canvasInitImage?: ImageDTO,
   canvasMaskImage?: ImageDTO
-): void => {
+): Promise<void> => {
   const {
     refinerModel,
     refinerPositiveAestheticScore,
@@ -55,9 +57,10 @@ export const addSDXLRefinerToGraph = (
   const fp32 = vaePrecision === 'fp32';
 
   const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);
+  const modelConfig = await fetchModelConfigWithTypeGuard(refinerModel.key, isRefinerMainModelModelConfig);
 
   upsertMetadata(graph, {
-    refiner_model: refinerModel,
+    refiner_model: getModelMetadataField(modelConfig),
     refiner_positive_aesthetic_score: refinerPositiveAestheticScore,
     refiner_negative_aesthetic_score: refinerNegativeAestheticScore,
     refiner_cfg_scale: refinerCFGScale,

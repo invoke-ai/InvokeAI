@@ -6,7 +6,7 @@ const AutoAddIcon = () => {
   const { t } = useTranslation();
   return (
     <Flex position="absolute" insetInlineEnd={0} top={0} p={1}>
-      <Badge variant="solid" bg="invokeBlue.500">
+      <Badge variant="solid" bg="invokeBlue.400">
         {t('common.auto')}
       </Badge>
     </Flex>
