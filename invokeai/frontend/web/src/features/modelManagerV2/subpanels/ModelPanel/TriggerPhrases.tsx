@@ -90,7 +90,7 @@ export const TriggerPhrases = () => {
                 size="sm"
                 type="submit"
                 onClick={addTriggerPhrase}
-                isDisabled={Boolean(errors.length)}
+                isDisabled={!phrase || Boolean(errors.length)}
                 isLoading={isLoading}
               >
                 {t('common.add')}
