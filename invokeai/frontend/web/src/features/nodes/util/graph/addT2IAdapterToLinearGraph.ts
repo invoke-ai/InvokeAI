@@ -1,16 +1,14 @@
 import type { RootState } from 'app/store/store';
 import { selectValidT2IAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import {
-  type CollectInvocation,
-  type CoreMetadataInvocation,
-  isT2IAdapterModelConfig,
-  type NonNullableGraph,
-  type T2IAdapterInvocation,
+import type {
+  CollectInvocation,
+  CoreMetadataInvocation,
+  NonNullableGraph,
+  T2IAdapterInvocation,
 } from 'services/api/types';
 
 import { T2I_ADAPTER_COLLECT } from './constants';
-import { getModelMetadataField, upsertMetadata } from './metadata';
+import { upsertMetadata } from './metadata';
 
 export const addT2IAdaptersToLinearGraph = async (
   state: RootState,
@@ -89,13 +87,11 @@ export const addT2IAdaptersToLinearGraph = async (
 
       graph.nodes[t2iAdapterNode.id] = t2iAdapterNode;
 
-      const modelConfig = await fetchModelConfigWithTypeGuard(t2iAdapter.model.key, isT2IAdapterModelConfig);
-
       t2iAdapterMetadata.push({
         begin_step_percent: beginStepPct,
         end_step_percent: endStepPct,
         resize_mode: resizeMode,
-        t2i_adapter_model: getModelMetadataField(modelConfig),
+        t2i_adapter_model: t2iAdapter.model,
         weight: weight,
         image: t2iAdapterNode.image,
       });
