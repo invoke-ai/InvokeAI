@@ -18,7 +18,6 @@ const ParamMainModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const selectedModel = useAppSelector(selectModel);
-  console.log({ selectedModel });
   const { data, isLoading } = useGetMainModelsQuery(NON_REFINER_BASE_MODELS);
 
   const _onChange = useCallback(
