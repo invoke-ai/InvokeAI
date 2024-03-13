@@ -17,9 +17,12 @@ export const addIPAdapterToLinearGraph = async (
   graph: NonNullableGraph,
   baseNodeId: string
 ): Promise<void> => {
-  const validIPAdapters = selectValidIPAdapters(state.controlAdapters).filter(
-    (ca) => ca.model?.base === state.generation.model?.base
-  );
+  const validIPAdapters = selectValidIPAdapters(state.controlAdapters).filter(({ model, controlImage, isEnabled }) => {
+    const hasModel = Boolean(model);
+    const doesBaseMatch = model?.base === state.generation.model?.base;
+    const hasControlImage = controlImage;
+    return isEnabled && hasModel && doesBaseMatch && hasControlImage;
+  });
 
   if (validIPAdapters.length) {
     // Even though denoise_latents' ip adapter input is collection or scalar, keep it simple and always use a collect
