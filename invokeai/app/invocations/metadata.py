@@ -20,8 +20,8 @@ from invokeai.app.invocations.fields import (
     OutputField,
     UIType,
 )
+from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.config import BaseModelType, ModelType
 
 from ...version import __version__
 
@@ -31,20 +31,10 @@ class MetadataItemField(BaseModel):
     value: Any = Field(description=FieldDescriptions.metadata_item_value)
 
 
-class ModelMetadataField(BaseModel):
-    """Model Metadata Field"""
-
-    key: str
-    hash: str
-    name: str
-    base: BaseModelType
-    type: ModelType
-
-
 class LoRAMetadataField(BaseModel):
     """LoRA Metadata Field"""
 
-    model: ModelMetadataField = Field(description=FieldDescriptions.lora_model)
+    model: ModelIdentifierField = Field(description=FieldDescriptions.lora_model)
     weight: float = Field(description=FieldDescriptions.lora_weight)
 
 
@@ -52,7 +42,7 @@ class IPAdapterMetadataField(BaseModel):
     """IP Adapter Field, minus the CLIP Vision Encoder model"""
 
     image: ImageField = Field(description="The IP-Adapter image prompt.")
-    ip_adapter_model: ModelMetadataField = Field(
+    ip_adapter_model: ModelIdentifierField = Field(
         description="The IP-Adapter model.",
     )
     weight: Union[float, list[float]] = Field(
@@ -64,7 +54,7 @@ class IPAdapterMetadataField(BaseModel):
 
 class T2IAdapterMetadataField(BaseModel):
     image: ImageField = Field(description="The T2I-Adapter image prompt.")
-    t2i_adapter_model: ModelMetadataField = Field(description="The T2I-Adapter model to use.")
+    t2i_adapter_model: ModelIdentifierField = Field(description="The T2I-Adapter model to use.")
     weight: Union[float, list[float]] = Field(default=1, description="The weight given to the T2I-Adapter")
     begin_step_percent: float = Field(
         default=0, ge=0, le=1, description="When the T2I-Adapter is first applied (% of total steps)"
@@ -77,7 +67,7 @@ class T2IAdapterMetadataField(BaseModel):
 
 class ControlNetMetadataField(BaseModel):
     image: ImageField = Field(description="The control image")
-    control_model: ModelMetadataField = Field(description="The ControlNet model to use")
+    control_model: ModelIdentifierField = Field(description="The ControlNet model to use")
     control_weight: Union[float, list[float]] = Field(default=1, description="The weight given to the ControlNet")
     begin_step_percent: float = Field(
         default=0, ge=0, le=1, description="When the ControlNet is first applied (% of total steps)"
@@ -178,7 +168,7 @@ class CoreMetadataInvocation(BaseInvocation):
         default=None,
         description="The number of skipped CLIP layers",
     )
-    model: Optional[ModelMetadataField] = InputField(default=None, description="The main model used for inference")
+    model: Optional[ModelIdentifierField] = InputField(default=None, description="The main model used for inference")
     controlnets: Optional[list[ControlNetMetadataField]] = InputField(
         default=None, description="The ControlNets used for inference"
     )
@@ -197,7 +187,7 @@ class CoreMetadataInvocation(BaseInvocation):
         default=None,
         description="The name of the initial image",
     )
-    vae: Optional[ModelMetadataField] = InputField(
+    vae: Optional[ModelIdentifierField] = InputField(
         default=None,
         description="The VAE used for decoding, if the main model's default was not used",
     )
@@ -228,7 +218,7 @@ class CoreMetadataInvocation(BaseInvocation):
     )
 
     # SDXL Refiner
-    refiner_model: Optional[ModelMetadataField] = InputField(
+    refiner_model: Optional[ModelIdentifierField] = InputField(
         default=None,
         description="The SDXL Refiner model used",
     )
