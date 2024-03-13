@@ -261,7 +261,7 @@ class InvokeAIAppConfig(InvokeAISettings):
         profile_prefix: **Development**: An optional prefix for profile output files.
         profiles_dir: **Development**: Path to profiles output directory.
         version: **CLIArgs**: CLI arg - show InvokeAI version and exit.
-        skip_model_hash: **Model Install**: Skip model hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models.
+        hashing_algorithm: **Model Install**: Model hashing algorthim for model installs. 'blake3' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'none' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.
         remote_api_tokens: **Model Install**: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.
         ram: **Model Cache**: Maximum memory amount used by memory model cache for rapid switching (GB).
         vram: **Model Cache**: Amount of VRAM reserved for model storage (GB)
