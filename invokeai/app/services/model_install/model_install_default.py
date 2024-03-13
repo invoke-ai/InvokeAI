@@ -22,7 +22,6 @@ from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
-from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
@@ -154,10 +153,7 @@ class ModelInstallService(ModelInstallServiceBase):
         model_path = Path(model_path)
         config = config or {}
 
-        if self._app_config.skip_model_hash:
-            config["hash"] = uuid_string()
-
-        info: AnyModelConfig = ModelProbe.probe(Path(model_path), config)
+        info: AnyModelConfig = ModelProbe.probe(Path(model_path), config, hash_algo=self._app_config.hashing_algorithm)
 
         if preferred_name := config.get("name"):
             preferred_name = Path(preferred_name).with_suffix(model_path.suffix)
@@ -585,10 +581,7 @@ class ModelInstallService(ModelInstallServiceBase):
     ) -> str:
         config = config or {}
 
-        if self._app_config.skip_model_hash:
-            config["hash"] = uuid_string()
-
-        info = info or ModelProbe.probe(model_path, config)
+        info = info or ModelProbe.probe(model_path, config, hash_algo=self._app_config.hashing_algorithm)
 
         model_path = model_path.resolve()
 

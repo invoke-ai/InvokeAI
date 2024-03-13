@@ -9,6 +9,7 @@ from picklescan.scanner import scan_file_path
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.util.misc import uuid_string
+from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
 from invokeai.backend.util.util import SilenceWarnings
 
 from .config import (
@@ -24,7 +25,6 @@ from .config import (
     ModelVariantType,
     SchedulerPredictionType,
 )
-from .hash import ModelHash
 from .util.model_util import lora_token_vector_length, read_checkpoint_meta
 
 CkptType = Dict[str, Any]
@@ -113,9 +113,7 @@ class ModelProbe(object):
 
     @classmethod
     def probe(
-        cls,
-        model_path: Path,
-        fields: Optional[Dict[str, Any]] = None,
+        cls, model_path: Path, fields: Optional[Dict[str, Any]] = None, hash_algo: HASHING_ALGORITHMS = "blake3"
     ) -> AnyModelConfig:
         """
         Probe the model at model_path and return its configuration record.
@@ -160,7 +158,7 @@ class ModelProbe(object):
             fields.get("description") or f"{fields['base'].value} {fields['type'].value} model {fields['name']}"
         )
         fields["format"] = fields.get("format") or probe.get_format()
-        fields["hash"] = fields.get("hash") or ModelHash().hash(model_path)
+        fields["hash"] = fields.get("hash") or ModelHash(algorithm=hash_algo).hash(model_path)
 
         fields["default_settings"] = (
             fields.get("default_settings") or probe.get_default_settings(fields["name"])
