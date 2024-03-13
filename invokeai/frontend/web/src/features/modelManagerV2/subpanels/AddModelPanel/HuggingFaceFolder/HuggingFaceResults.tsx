@@ -80,9 +80,7 @@ export const HuggingFaceResults = ({ results }: HuggingFaceResultsProps) => {
       <Divider />
       <Flex flexDir="column" gap={3} height="100%">
         <Flex justifyContent="space-between" alignItems="center">
-          <Heading size="sm">
-            {t('modelManager.availableModels')}
-          </Heading>
+          <Heading size="sm">{t('modelManager.availableModels')}</Heading>
           <Flex alignItems="center" gap={3}>
             <Button size="sm" onClick={handleAddAll} isDisabled={results.length === 0} flexShrink={0}>
               {t('modelManager.installAll')}
