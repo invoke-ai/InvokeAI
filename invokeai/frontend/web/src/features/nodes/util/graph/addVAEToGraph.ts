@@ -1,7 +1,5 @@
 import type { RootState } from 'app/store/store';
-import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import type { ModelMetadataField, NonNullableGraph } from 'services/api/types';
-import { isVAEModelConfig } from 'services/api/types';
+import type { NonNullableGraph } from 'services/api/types';
 
 import {
   CANVAS_IMAGE_TO_IMAGE_GRAPH,
@@ -25,7 +23,7 @@ import {
   TEXT_TO_IMAGE_GRAPH,
   VAE_LOADER,
 } from './constants';
-import { getModelMetadataField, upsertMetadata } from './metadata';
+import { upsertMetadata } from './metadata';
 
 export const addVAEToGraph = async (
   state: RootState,
@@ -151,8 +149,6 @@ export const addVAEToGraph = async (
   }
 
   if (vae) {
-    const modelConfig = await fetchModelConfigWithTypeGuard(vae.key, isVAEModelConfig);
-    const vaeMetadata: ModelMetadataField = getModelMetadataField(modelConfig);
-    upsertMetadata(graph, { vae: vaeMetadata });
+    upsertMetadata(graph, { vae });
   }
 };
