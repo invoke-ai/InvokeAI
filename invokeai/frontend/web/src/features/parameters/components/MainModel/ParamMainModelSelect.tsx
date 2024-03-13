@@ -18,6 +18,7 @@ const ParamMainModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const selectedModel = useAppSelector(selectModel);
+  console.log({ selectedModel });
   const { data, isLoading } = useGetMainModelsQuery(NON_REFINER_BASE_MODELS);
 
   const _onChange = useCallback(
@@ -46,7 +47,13 @@ const ParamMainModelSelect = () => {
       <InformationalPopover feature="paramModel">
         <FormLabel>{t('modelManager.model')}</FormLabel>
       </InformationalPopover>
-      <CustomSelect selectedItem={selectedItem} placeholder={placeholder} items={items} onChange={onChange} />
+      <CustomSelect
+        key={items.length}
+        selectedItem={selectedItem}
+        placeholder={placeholder}
+        items={items}
+        onChange={onChange}
+      />
     </FormControl>
   );
 };
