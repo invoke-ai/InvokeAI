@@ -1,4 +1,4 @@
-import { Badge, Tooltip } from '@invoke-ai/ui-library';
+import { Badge } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ModelInstallStatus } from 'services/api/types';
@@ -13,13 +13,7 @@ const STATUSES = {
   cancelled: { colorScheme: 'orange', translationKey: 'queue.canceled' },
 };
 
-const ModelInstallQueueBadge = ({
-  status,
-  errorReason,
-}: {
-  status?: ModelInstallStatus;
-  errorReason?: string | null;
-}) => {
+const ModelInstallQueueBadge = ({ status }: { status?: ModelInstallStatus }) => {
   const { t } = useTranslation();
 
   if (!status || !Object.keys(STATUSES).includes(status)) {
@@ -27,9 +21,9 @@ const ModelInstallQueueBadge = ({
   }
 
   return (
-    <Tooltip label={errorReason}>
-      <Badge colorScheme={STATUSES[status].colorScheme}>{t(STATUSES[status].translationKey)}</Badge>
-    </Tooltip>
+    <Badge textAlign="center" w="134px" colorScheme={STATUSES[status].colorScheme}>
+      {t(STATUSES[status].translationKey)}
+    </Badge>
   );
 };
 export default memo(ModelInstallQueueBadge);

@@ -1,4 +1,4 @@
-import { Button, Flex, FormControl, FormErrorMessage, FormLabel, Input } from '@invoke-ai/ui-library';
+import { Button, Flex, FormControl, FormErrorMessage, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { setScanPath } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import type { ChangeEventHandler } from 'react';
@@ -35,8 +35,8 @@ export const ScanModelsForm = () => {
   );
 
   return (
-    <Flex flexDir="column" height="100%">
-      <FormControl isInvalid={!!errorMessage.length} w="full" orientation="vertical">
+    <Flex flexDir="column" height="100%" gap={3}>
+      <FormControl isInvalid={!!errorMessage.length} w="full" orientation="vertical" flexShrink={0}>
         <FormLabel>{t('common.folder')}</FormLabel>
         <Flex gap={3} alignItems="center" w="full">
           <Input placeholder={t('modelManager.scanPlaceholder')} value={scanPath} onChange={handleSetScanPath} />
@@ -50,6 +50,7 @@ export const ScanModelsForm = () => {
             {t('modelManager.scanFolder')}
           </Button>
         </Flex>
+        <FormHelperText>{t('modelManager.scanFolderHelper')}</FormHelperText>
         {!!errorMessage.length && <FormErrorMessage>{errorMessage}</FormErrorMessage>}
       </FormControl>
       {data && <ScanModelsResults results={data} />}
