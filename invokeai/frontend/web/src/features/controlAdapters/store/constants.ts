@@ -93,7 +93,6 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
       type: 'depth_anything_image_processor',
       model_size: 'small',
       resolution: 512,
-      offload: false,
     },
   },
   hed_image_processor: {
