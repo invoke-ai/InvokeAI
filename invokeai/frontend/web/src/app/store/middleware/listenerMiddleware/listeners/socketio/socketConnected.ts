@@ -4,6 +4,7 @@ import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { isEqual } from 'lodash-es';
 import { atom } from 'nanostores';
 import { api } from 'services/api';
+import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi, selectQueueStatus } from 'services/api/endpoints/queue';
 import { socketConnected } from 'services/events/actions';
 
@@ -16,6 +17,9 @@ export const addSocketConnectedEventListener = (startAppListening: AppStartListe
     actionCreator: socketConnected,
     effect: async (action, { dispatch, getState, cancelActiveListeners, delay }) => {
       log.debug('Connected');
+
+      // query TIs so they are ready if user opens trigger phrases
+      dispatch(modelsApi.endpoints.getTextualInversionModels.initiate());
 
       /**
        * The rest of this listener has recovery logic for when the socket disconnects and reconnects.
