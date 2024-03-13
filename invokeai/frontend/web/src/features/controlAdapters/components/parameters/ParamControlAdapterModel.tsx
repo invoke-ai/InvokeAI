@@ -52,7 +52,13 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
 
   return (
     <FormControl isDisabled={!items.length || !isEnabled} isInvalid={!selectedItem || !items.length}>
-      <CustomSelect selectedItem={selectedItem} placeholder={placeholder} items={items} onChange={onChange} />
+      <CustomSelect
+        key={items.length}
+        selectedItem={selectedItem}
+        placeholder={placeholder}
+        items={items}
+        onChange={onChange}
+      />
     </FormControl>
   );
 };
