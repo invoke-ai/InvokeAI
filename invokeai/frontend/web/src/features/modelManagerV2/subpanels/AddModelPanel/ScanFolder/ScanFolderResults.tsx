@@ -80,7 +80,7 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
 
   return (
     <>
-      <Divider mt={4} />
+      <Divider mt={6} />
       <Flex flexDir="column" gap={2} mt={4} height="100%">
         <Flex justifyContent="space-between" alignItems="center">
           <Heading fontSize="md" as="h4">

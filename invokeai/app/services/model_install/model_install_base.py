@@ -406,19 +406,6 @@ class ModelInstallServiceBase(ABC):
         """
 
     @abstractmethod
-    def get_hugging_face_models(
-        self,
-        source: str,
-    ) -> List[AnyHttpUrl]:
-        """Get the available models in a HuggingFace repo.
-
-        :param source: HuggingFace repo string
-
-        This will get the urls for the available models in the indicated,
-        repo, and return them as a list of AnyHttpUrl strings.
-        """
-
-    @abstractmethod
     def get_job_by_source(self, source: ModelSource) -> List[ModelInstallJob]:
         """Return the ModelInstallJob(s) corresponding to the provided source."""
 
