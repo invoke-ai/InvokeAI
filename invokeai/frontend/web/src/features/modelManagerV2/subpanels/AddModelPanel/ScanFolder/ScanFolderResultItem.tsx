@@ -1,4 +1,4 @@
-import { Badge, Box, Flex, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Badge, Box, Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
@@ -45,7 +45,7 @@ export const ScanModelResultItem = ({ result }: Props) => {
   }, [installModel, result, dispatch, t]);
 
   return (
-    <Flex justifyContent="space-between">
+    <Flex alignItems="center" justifyContent="space-between" w="100%" gap={3}>
       <Flex fontSize="sm" flexDir="column">
         <Text fontWeight="semibold">{result.path.split('\\').slice(-1)[0]}</Text>
         <Text variant="subtext">{result.path}</Text>
@@ -54,9 +54,7 @@ export const ScanModelResultItem = ({ result }: Props) => {
         {result.is_installed ? (
           <Badge>{t('common.installed')}</Badge>
         ) : (
-          <Tooltip label={t('modelManager.quickAdd')}>
-            <IconButton aria-label={t('modelManager.quickAdd')} icon={<PiPlusBold />} onClick={handleQuickAdd} />
-          </Tooltip>
+          <IconButton aria-label={t('modelManager.install')} icon={<PiPlusBold />} onClick={handleQuickAdd} size="sm" />
         )}
       </Box>
     </Flex>

@@ -87,7 +87,7 @@ export const HuggingFaceResults = ({ results }: HuggingFaceResultsProps) => {
             <Button size="sm" onClick={handleAddAll} isDisabled={results.length === 0} flexShrink={0}>
               {t('modelManager.installAll')}
             </Button>
-            <InputGroup maxW="300px" size="xs">
+            <InputGroup w={64} size="xs">
               <Input
                 placeholder={t('modelManager.search')}
                 value={searchTerm}
@@ -110,7 +110,7 @@ export const HuggingFaceResults = ({ results }: HuggingFaceResultsProps) => {
             </InputGroup>
           </Flex>
         </Flex>
-        <Flex height="100%" layerStyle="third" borderRadius="base" p={4}>
+        <Flex height="100%" layerStyle="third" borderRadius="base" p={3}>
           <ScrollableContent>
             <Flex flexDir="column" gap={3}>
               {filteredResults.map((result) => (

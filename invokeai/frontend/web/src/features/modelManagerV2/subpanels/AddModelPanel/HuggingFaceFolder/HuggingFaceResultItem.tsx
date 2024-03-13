@@ -44,7 +44,7 @@ export const HuggingFaceResultItem = ({ result }: Props) => {
   }, [installModel, result, dispatch, t]);
 
   return (
-    <Flex alignItems="center" justifyContent="space-between" w="100%" gap={4}>
+    <Flex alignItems="center" justifyContent="space-between" w="100%" gap={3}>
       <Flex fontSize="sm" flexDir="column">
         <Text fontWeight="semibold">{result.split('/').slice(-1)[0]}</Text>
         <Text variant="subtext" noOfLines={1} wordBreak="break-all">

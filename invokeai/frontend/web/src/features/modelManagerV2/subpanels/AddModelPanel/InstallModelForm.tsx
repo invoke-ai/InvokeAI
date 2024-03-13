@@ -67,17 +67,21 @@ export const InstallModelForm = () => {
       <Flex flexDir="column" gap={4}>
         <Flex gap={2} alignItems="flex-end" justifyContent="space-between">
           <FormControl orientation="vertical">
-            <FormLabel>{t('modelManager.modelLocation')}</FormLabel>
-            <Input placeholder={t('modelManager.simpleModelPlaceholder')} {...register('location')} />
+            <FormLabel>{t('modelManager.urlOrLocalPath')}</FormLabel>
+            <Flex alignItems="center" gap={3} w="full">
+              <Input placeholder={t('modelManager.simpleModelPlaceholder')} {...register('location')} />
+              <Button
+                onClick={handleSubmit(onSubmit)}
+                isDisabled={!formState.dirtyFields.location}
+                isLoading={isLoading}
+                type="submit"
+                size="sm"
+              >
+                {t('modelManager.install')}
+              </Button>
+            </Flex>
+            <FormHelperText>{t('modelManager.urlOrLocalPathHelper')}</FormHelperText>
           </FormControl>
-          <Button
-            onClick={handleSubmit(onSubmit)}
-            isDisabled={!formState.dirtyFields.location}
-            isLoading={isLoading}
-            type="submit"
-          >
-            {t('modelManager.addModel')}
-          </Button>
         </Flex>
 
         <FormControl>

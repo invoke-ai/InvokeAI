@@ -13,9 +13,9 @@ export const InstallModels = () => {
       <Heading fontSize="xl">{t('modelManager.addModel')}</Heading>
       <Tabs variant="collapse" height="50%" display="flex" flexDir="column">
         <TabList>
-          <Tab>{t('common.simple')}</Tab>
+          <Tab>{t('modelManager.urlOrLocalPath')}</Tab>
           <Tab>{t('modelManager.huggingFace')}</Tab>
-          <Tab>{t('modelManager.scan')}</Tab>
+          <Tab>{t('modelManager.scanFolder')}</Tab>
         </TabList>
         <TabPanels p={3} height="100%">
           <TabPanel>
