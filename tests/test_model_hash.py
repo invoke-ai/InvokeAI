@@ -6,9 +6,9 @@ from typing import Iterable
 import pytest
 from blake3 import blake3
 
-from invokeai.backend.model_manager.hash import ALGORITHM, MODEL_FILE_EXTENSIONS, ModelHash
+from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, MODEL_FILE_EXTENSIONS, ModelHash
 
-test_cases: list[tuple[ALGORITHM, str]] = [
+test_cases: list[tuple[HASHING_ALGORITHMS, str]] = [
     ("md5", "a0cd925fc063f98dbf029eee315060c3"),
     ("sha1", "9e362940e5603fdc60566ea100a288ba2fe48b8c"),
     ("sha256", "6dbdb6a147ad4d808455652bf5a10120161678395f6bfbd21eb6fe4e731aceeb"),
@@ -21,7 +21,7 @@ test_cases: list[tuple[ALGORITHM, str]] = [
 
 
 @pytest.mark.parametrize("algorithm,expected_hash", test_cases)
-def test_model_hash_hashes_file(tmp_path: Path, algorithm: ALGORITHM, expected_hash: str):
+def test_model_hash_hashes_file(tmp_path: Path, algorithm: HASHING_ALGORITHMS, expected_hash: str):
     file = Path(tmp_path / "test")
     file.write_text("model data")
     md5 = ModelHash(algorithm).hash(file)
@@ -29,7 +29,7 @@ def test_model_hash_hashes_file(tmp_path: Path, algorithm: ALGORITHM, expected_h
 
 
 @pytest.mark.parametrize("algorithm", ["md5", "sha1", "sha256", "sha512", "blake3"])
-def test_model_hash_hashes_dir(tmp_path: Path, algorithm: ALGORITHM):
+def test_model_hash_hashes_dir(tmp_path: Path, algorithm: HASHING_ALGORITHMS):
     model_hash = ModelHash(algorithm)
     files = [Path(tmp_path, f"{i}.bin") for i in range(5)]
 
@@ -45,6 +45,24 @@ def test_model_hash_hashes_dir(tmp_path: Path, algorithm: ALGORITHM):
         composite_hasher.update(h.encode("utf-8"))
 
     assert md5 == composite_hasher.hexdigest()
+
+
+def test_model_hash_blake3_matches_blake3_single(tmp_path: Path):
+    model_hash = ModelHash("blake3")
+    model_hash_simple = ModelHash("blake3_single")
+
+    file = tmp_path / "test.bin"
+    file.write_text("model data")
+
+    assert model_hash.hash(file) == model_hash_simple.hash(file)
+
+
+def test_model_hash_random_algorithm(tmp_path: Path):
+    model_hash = ModelHash("random")
+    file = tmp_path / "test.bin"
+    file.write_text("model data")
+
+    assert model_hash.hash(file) != model_hash.hash(file)
 
 
 def test_model_hash_raises_error_on_invalid_algorithm():
