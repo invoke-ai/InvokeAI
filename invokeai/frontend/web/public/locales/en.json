@@ -1635,7 +1635,7 @@
             "heading": "Aspect",
             "paragraphs": [
                 "Aspect ratio of the generated image. Changing the ratio will update the Width and Height accordingly.",
-                "“Optimize” will set the Width and Height to optimal dimensions for the chosen model."
+                "\"Optimize\" will set the Width and Height to optimal dimensions for the chosen model."
             ]
         },
         "paramCFGScale": {
@@ -1693,7 +1693,7 @@
             "heading": "Seed",
             "paragraphs": [
                 "Controls the starting noise used for generation.",
-                "Disable the “Random” option to produce identical results with the same generation settings."
+                "Disable the \"Random\" option to produce identical results with the same generation settings."
             ]
         },
         "paramSteps": {
@@ -1779,8 +1779,8 @@
         "scaleBeforeProcessing": {
             "heading": "Scale Before Processing",
             "paragraphs": [
-                "“Auto” scales the selected area to the size best suited for the model before the image generation process.",
-                "“Manual” allows you to choose the width and height the selected area will be scaled to before the image generation process."
+                "\"Auto\" scales the selected area to the size best suited for the model before the image generation process.",
+                "\"Manual\" allows you to choose the width and height the selected area will be scaled to before the image generation process."
             ]
         },
         "seamlessTilingXAxis": {
