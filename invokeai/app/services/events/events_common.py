@@ -275,7 +275,7 @@ class SessionCanceledEvent(SessionEvent):
 
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
-class QueueItemStatusChangedEvent(QueueItemEvent):
+class QueueItemStatusChangedEvent(SessionEvent):
     """Emitted when a queue item's status changes"""
 
     __event_name__ = "queue_item_status_changed"
@@ -299,6 +299,7 @@ class QueueItemStatusChangedEvent(QueueItemEvent):
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
+            session_id=queue_item.session_id,
             status=queue_item.status,
             error_type=queue_item.error_type,
             error_message=queue_item.error_message,

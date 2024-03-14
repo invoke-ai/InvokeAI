@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { socketModelLoadCompleted, socketModelLoadStarted } from 'services/events/actions';
+import { socketModelLoadComplete, socketModelLoadStarted } from 'services/events/actions';
 
 const log = logger('socketio');
 
@@ -8,10 +8,11 @@ export const addModelLoadEventListener = (startAppListening: AppStartListening) 
   startAppListening({
     actionCreator: socketModelLoadStarted,
     effect: (action) => {
-      const { model_config, submodel_type } = action.payload.data;
-      const { name, base, type } = model_config;
+      const { config, submodel_type } = action.payload.data;
+      const { name, base, type } = config;
 
       const extras: string[] = [base, type];
+
       if (submodel_type) {
         extras.push(submodel_type);
       }
@@ -23,16 +24,15 @@ export const addModelLoadEventListener = (startAppListening: AppStartListening) 
   });
 
   startAppListening({
-    actionCreator: socketModelLoadCompleted,
+    actionCreator: socketModelLoadComplete,
     effect: (action) => {
-      const { model_config, submodel_type } = action.payload.data;
-      const { name, base, type } = model_config;
+      const { config, submodel_type } = action.payload.data;
+      const { name, base, type } = config;
 
       const extras: string[] = [base, type];
       if (submodel_type) {
         extras.push(submodel_type);
       }
-
       const message = `Model load complete: ${name} (${extras.join(', ')})`;
 
       log.debug(action.payload, message);
