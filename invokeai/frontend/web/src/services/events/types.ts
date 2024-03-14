@@ -1,5 +1,5 @@
 import type { components } from 'services/api/schema';
-import type { BaseModelType, Graph, GraphExecutionState, ModelType, SubModelType } from 'services/api/types';
+import type { AnyModelConfig, Graph, GraphExecutionState, SubModelType } from 'services/api/types';
 
 /**
  * A progress image, we get one for each step in the generation
@@ -25,10 +25,8 @@ export type ModelLoadStartedEvent = {
   queue_item_id: number;
   queue_batch_id: string;
   graph_execution_state_id: string;
-  model_name: string;
-  base_model: BaseModelType;
-  model_type: ModelType;
-  submodel: SubModelType;
+  model_config: AnyModelConfig;
+  submodel_type?: SubModelType | null;
 };
 
 export type ModelLoadCompletedEvent = {
@@ -36,13 +34,8 @@ export type ModelLoadCompletedEvent = {
   queue_item_id: number;
   queue_batch_id: string;
   graph_execution_state_id: string;
-  model_name: string;
-  base_model: BaseModelType;
-  model_type: ModelType;
-  submodel: SubModelType;
-  hash?: string;
-  location: string;
-  precision: string;
+  model_config: AnyModelConfig;
+  submodel_type?: SubModelType | null;
 };
 
 export type ModelInstallDownloadingEvent = {
