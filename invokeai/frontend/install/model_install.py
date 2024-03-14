@@ -610,7 +610,7 @@ def main() -> None:
 
     if not config.models_path.exists():
         logger.info("Your InvokeAI root directory is not set up. Calling invokeai-configure.")
-        sys.argv = ['invokeai_configure','--yes', '--skip-sd-weights']
+        sys.argv = ["invokeai_configure", "--yes", "--skip-sd-weights"]
         from invokeai.frontend.install.invokeai_configure import invokeai_configure
 
         invokeai_configure()
