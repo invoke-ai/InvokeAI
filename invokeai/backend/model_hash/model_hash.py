@@ -62,7 +62,6 @@ class ModelHash:
     def __init__(
         self, algorithm: HASHING_ALGORITHMS = "blake3", file_filter: Optional[Callable[[str], bool]] = None
     ) -> None:
-        # The extra type annotation here is necessary for pyright to understand that algorithm is a Literal type
         self.algorithm: HASHING_ALGORITHMS = algorithm
         if algorithm == "blake3":
             self._hash_file = self._blake3
