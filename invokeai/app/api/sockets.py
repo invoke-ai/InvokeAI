@@ -108,12 +108,12 @@ class SocketIO:
 
     async def _handle_queue_event(self, event: FastAPIEvent[QueueEventBase]):
         event_name, payload = event
-        await self._sio.emit(event=event_name, data=payload.model_dump(), room=payload.queue_id)
+        await self._sio.emit(event=event_name, data=payload.model_dump(mode="json"), room=payload.queue_id)
 
     async def _handle_model_event(self, event: FastAPIEvent[ModelEventBase]) -> None:
         event_name, payload = event
-        await self._sio.emit(event=event_name, data=payload.model_dump())
+        await self._sio.emit(event=event_name, data=payload.model_dump(mode="json"))
 
     async def _handle_bulk_image_download_event(self, event: FastAPIEvent[BulkDownloadEventBase]) -> None:
         event_name, payload = event
-        await self._sio.emit(event=event_name, data=payload.model_dump(), room=payload.bulk_download_id)
+        await self._sio.emit(event=event_name, data=payload.model_dump(mode="json"), room=payload.bulk_download_id)
