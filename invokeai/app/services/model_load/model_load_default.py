@@ -68,6 +68,7 @@ class ModelLoadService(ModelLoadServiceBase):
             self._emit_load_event(
                 context_data=context_data,
                 model_config=model_config,
+                submodel_type=submodel_type,
             )
 
         implementation, model_config, submodel_type = self._registry.get_implementation(model_config, submodel_type)  # type: ignore
@@ -82,6 +83,7 @@ class ModelLoadService(ModelLoadServiceBase):
             self._emit_load_event(
                 context_data=context_data,
                 model_config=model_config,
+                submodel_type=submodel_type,
                 loaded=True,
             )
         return loaded_model
@@ -91,6 +93,7 @@ class ModelLoadService(ModelLoadServiceBase):
         context_data: InvocationContextData,
         model_config: AnyModelConfig,
         loaded: Optional[bool] = False,
+        submodel_type: Optional[SubModelType] = None,
     ) -> None:
         if not self._invoker:
             return
@@ -102,6 +105,7 @@ class ModelLoadService(ModelLoadServiceBase):
                 queue_batch_id=context_data.queue_item.batch_id,
                 graph_execution_state_id=context_data.queue_item.session_id,
                 model_config=model_config,
+                submodel_type=submodel_type,
             )
         else:
             self._invoker.services.events.emit_model_load_completed(
@@ -110,4 +114,5 @@ class ModelLoadService(ModelLoadServiceBase):
                 queue_batch_id=context_data.queue_item.batch_id,
                 graph_execution_state_id=context_data.queue_item.session_id,
                 model_config=model_config,
+                submodel_type=submodel_type,
             )

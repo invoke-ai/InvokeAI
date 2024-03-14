@@ -12,6 +12,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
 )
 from invokeai.app.util.misc import get_timestamp
 from invokeai.backend.model_manager import AnyModelConfig
+from invokeai.backend.model_manager.config import SubModelType
 
 
 class EventServiceBase:
@@ -180,6 +181,7 @@ class EventServiceBase:
         queue_batch_id: str,
         graph_execution_state_id: str,
         model_config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
     ) -> None:
         """Emitted when a model is requested"""
         self.__emit_queue_event(
@@ -190,6 +192,7 @@ class EventServiceBase:
                 "queue_batch_id": queue_batch_id,
                 "graph_execution_state_id": graph_execution_state_id,
                 "model_config": model_config.model_dump(mode="json"),
+                "submodel_type": submodel_type,
             },
         )
 
@@ -200,6 +203,7 @@ class EventServiceBase:
         queue_batch_id: str,
         graph_execution_state_id: str,
         model_config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
     ) -> None:
         """Emitted when a model is correctly loaded (returns model info)"""
         self.__emit_queue_event(
@@ -210,6 +214,7 @@ class EventServiceBase:
                 "queue_batch_id": queue_batch_id,
                 "graph_execution_state_id": graph_execution_state_id,
                 "model_config": model_config.model_dump(mode="json"),
+                "submodel_type": submodel_type,
             },
         )
 
