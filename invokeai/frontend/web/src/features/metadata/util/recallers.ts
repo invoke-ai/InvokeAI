@@ -1,8 +1,13 @@
 import { getStore } from 'app/store/nanostores/store';
-import { controlAdapterRecalled } from 'features/controlAdapters/store/controlAdaptersSlice';
+import {
+  controlAdapterRecalled,
+  controlNetsReset,
+  ipAdaptersReset,
+  t2iAdaptersReset,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import type { LoRA } from 'features/lora/store/loraSlice';
-import { loraRecalled } from 'features/lora/store/loraSlice';
+import { loraRecalled, lorasReset } from 'features/lora/store/loraSlice';
 import type {
   ControlNetConfigMetadata,
   IPAdapterConfigMetadata,
@@ -166,7 +171,11 @@ const recallLoRA: MetadataRecallFunc<LoRA> = (lora) => {
 };
 
 const recallAllLoRAs: MetadataRecallFunc<LoRA[]> = (loras) => {
+  if (!loras.length) {
+    return;
+  }
   const { dispatch } = getStore();
+  dispatch(lorasReset());
   loras.forEach((lora) => {
     dispatch(loraRecalled(lora));
   });
@@ -177,7 +186,11 @@ const recallControlNet: MetadataRecallFunc<ControlNetConfigMetadata> = (controlN
 };
 
 const recallControlNets: MetadataRecallFunc<ControlNetConfigMetadata[]> = (controlNets) => {
+  if (!controlNets.length) {
+    return;
+  }
   const { dispatch } = getStore();
+  dispatch(controlNetsReset());
   controlNets.forEach((controlNet) => {
     dispatch(controlAdapterRecalled(controlNet));
   });
@@ -188,7 +201,11 @@ const recallT2IAdapter: MetadataRecallFunc<T2IAdapterConfigMetadata> = (t2iAdapt
 };
 
 const recallT2IAdapters: MetadataRecallFunc<T2IAdapterConfigMetadata[]> = (t2iAdapters) => {
+  if (!t2iAdapters.length) {
+    return;
+  }
   const { dispatch } = getStore();
+  dispatch(t2iAdaptersReset());
   t2iAdapters.forEach((t2iAdapter) => {
     dispatch(controlAdapterRecalled(t2iAdapter));
   });
@@ -199,7 +216,11 @@ const recallIPAdapter: MetadataRecallFunc<IPAdapterConfigMetadata> = (ipAdapter)
 };
 
 const recallIPAdapters: MetadataRecallFunc<IPAdapterConfigMetadata[]> = (ipAdapters) => {
+  if (!ipAdapters.length) {
+    return;
+  }
   const { dispatch } = getStore();
+  dispatch(ipAdaptersReset());
   ipAdapters.forEach((ipAdapter) => {
     dispatch(controlAdapterRecalled(ipAdapter));
   });

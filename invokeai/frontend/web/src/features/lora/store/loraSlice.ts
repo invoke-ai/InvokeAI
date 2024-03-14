@@ -3,6 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
+import { cloneDeep } from 'lodash-es';
 import type { LoRAModelConfig } from 'services/api/types';
 
 export type LoRA = {
@@ -57,10 +58,12 @@ export const loraSlice = createSlice({
       }
       lora.isEnabled = isEnabled;
     },
+    lorasReset: () => cloneDeep(initialLoraState),
   },
 });
 
-export const { loraAdded, loraRemoved, loraWeightChanged, loraIsEnabledChanged, loraRecalled } = loraSlice.actions;
+export const { loraAdded, loraRemoved, loraWeightChanged, loraIsEnabledChanged, loraRecalled, lorasReset } =
+  loraSlice.actions;
 
 export const selectLoraSlice = (state: RootState) => state.lora;
 
