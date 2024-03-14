@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from diffusers.models.attention_processor import Attention, AttnProcessor2_0
 
 from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionProcessorWeights
+from invokeai.backend.stable_diffusion.diffusion.regional_ip_data import RegionalIPData
 from invokeai.backend.stable_diffusion.diffusion.regional_prompt_data import RegionalPromptData
 
 
@@ -54,15 +55,13 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
         regional_prompt_data: Optional[RegionalPromptData] = None,
         percent_through: Optional[torch.FloatTensor] = None,
         # For IP-Adapter:
-        ip_adapter_image_prompt_embeds: Optional[list[torch.Tensor]] = None,
+        regional_ip_data: Optional[RegionalIPData] = None,
     ) -> torch.FloatTensor:
         """Apply attention.
         Args:
             regional_prompt_data: The regional prompt data for the current batch. If not None, this will be used to
                 apply regional prompt masking.
-            ip_adapter_image_prompt_embeds: The IP-Adapter image prompt embeddings for the current batch.
-                ip_adapter_image_prompt_embeds[i] contains the image prompt embeddings for the i'th IP-Adapter. Each
-                tensor has shape (batch_size, num_ip_images, seq_len, ip_embedding_len).
+            regional_ip_data: The IP-Adapter data for the current batch.
         """
         # If true, we are doing cross-attention, if false we are doing self-attention.
         is_cross_attention = encoder_hidden_states is not None
@@ -141,9 +140,9 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
         # Apply IP-Adapter conditioning.
         if is_cross_attention and self._is_ip_adapter_enabled():
             if self._is_ip_adapter_enabled():
-                assert ip_adapter_image_prompt_embeds is not None
+                assert regional_ip_data is not None
                 for ipa_embed, ipa_weights, scale in zip(
-                    ip_adapter_image_prompt_embeds, self._ip_adapter_weights, self._ip_adapter_scales, strict=True
+                    regional_ip_data.image_prompt_embeds, self._ip_adapter_weights, regional_ip_data.scales, strict=True
                 ):
                     # The batch dimensions should match.
                     assert ipa_embed.shape[0] == encoder_hidden_states.shape[0]
@@ -178,8 +177,8 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
 
                     hidden_states = hidden_states + scale * ip_hidden_states
             else:
-                # If IP-Adapter is not enabled, then ip_adapter_image_prompt_embeds should not be passed in.
-                assert ip_adapter_image_prompt_embeds is None
+                # If IP-Adapter is not enabled, then regional_ip_data should not be passed in.
+                assert regional_ip_data is None
 
         # Start unmodified block from AttnProcessor2_0.
         # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv

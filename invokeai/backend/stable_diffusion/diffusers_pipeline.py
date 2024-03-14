@@ -21,9 +21,8 @@ from pydantic import Field
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from invokeai.app.services.config.config_default import get_config
-from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
-    IPAdapterConditioningInfo,
+    IPAdapterData,
     TextConditioningData,
 )
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
@@ -150,17 +149,6 @@ class ControlNetData:
     end_step_percent: float = Field(default=1.0)
     control_mode: str = Field(default="balanced")
     resize_mode: str = Field(default="just_resize")
-
-
-@dataclass
-class IPAdapterData:
-    ip_adapter_model: IPAdapter
-    ip_adapter_conditioning: IPAdapterConditioningInfo
-
-    # Either a single weight applied to all steps, or a list of weights for each step.
-    weight: Union[float, List[float]] = Field(default=1.0)
-    begin_step_percent: float = Field(default=0.0)
-    end_step_percent: float = Field(default=1.0)
 
 
 @dataclass
@@ -439,7 +427,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     control_data=control_data,
                     ip_adapter_data=ip_adapter_data,
                     t2i_adapter_data=t2i_adapter_data,
-                    unet_attention_patcher=unet_attention_patcher,
                 )
                 latents = step_output.prev_sample
                 predicted_original = getattr(step_output, "pred_original_sample", None)
@@ -471,7 +458,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         control_data: List[ControlNetData] = None,
         ip_adapter_data: Optional[list[IPAdapterData]] = None,
         t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
-        unet_attention_patcher: Optional[UNetAttentionPatcher] = None,
     ):
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
@@ -485,23 +471,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         # TODO: should this scaling happen here or inside self._unet_forward?
         #     i.e. before or after passing it to InvokeAIDiffuserComponent
         latent_model_input = self.scheduler.scale_model_input(latents, timestep)
-
-        # handle IP-Adapter
-        if self.use_ip_adapter and ip_adapter_data is not None:  # somewhat redundant but logic is clearer
-            for i, single_ip_adapter_data in enumerate(ip_adapter_data):
-                first_adapter_step = math.floor(single_ip_adapter_data.begin_step_percent * total_step_count)
-                last_adapter_step = math.ceil(single_ip_adapter_data.end_step_percent * total_step_count)
-                weight = (
-                    single_ip_adapter_data.weight[step_index]
-                    if isinstance(single_ip_adapter_data.weight, List)
-                    else single_ip_adapter_data.weight
-                )
-                if step_index >= first_adapter_step and step_index <= last_adapter_step:
-                    # Only apply this IP-Adapter if the current step is within the IP-Adapter's begin/end step range.
-                    unet_attention_patcher.set_scale(i, weight)
-                else:
-                    # Otherwise, set the IP-Adapter's scale to 0, so it has no effect.
-                    unet_attention_patcher.set_scale(i, 0.0)
 
         # Handle ControlNet(s)
         down_block_additional_residuals = None
@@ -545,17 +514,13 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
             down_intrablock_additional_residuals = accum_adapter_state
 
-        ip_adapter_conditioning = None
-        if ip_adapter_data is not None:
-            ip_adapter_conditioning = [ipa.ip_adapter_conditioning for ipa in ip_adapter_data]
-
         uc_noise_pred, c_noise_pred = self.invokeai_diffuser.do_unet_step(
             sample=latent_model_input,
             timestep=t,  # TODO: debug how handled batched and non batched timesteps
             step_index=step_index,
             total_step_count=total_step_count,
             conditioning_data=conditioning_data,
-            ip_adapter_conditioning=ip_adapter_conditioning,
+            ip_adapter_data=ip_adapter_data,
             down_block_additional_residuals=down_block_additional_residuals,  # for ControlNet
             mid_block_additional_residual=mid_block_additional_residual,  # for ControlNet
             down_intrablock_additional_residuals=down_intrablock_additional_residuals,  # for T2I-Adapter
