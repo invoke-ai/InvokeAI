@@ -8,8 +8,7 @@ import type {
   SDXLRefinerModelFieldInputTemplate,
 } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
-import { REFINER_BASE_MODELS } from 'services/api/constants';
-import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import { useRefinerModels } from 'services/api/hooks/modelsByType';
 import type { MainModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
@@ -19,7 +18,7 @@ type Props = FieldComponentProps<SDXLRefinerModelFieldInputInstance, SDXLRefiner
 const RefinerModelFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
-  const { data, isLoading } = useGetMainModelsQuery(REFINER_BASE_MODELS);
+  const [modelConfigs, { isLoading }] = useRefinerModels();
   const _onChange = useCallback(
     (value: MainModelConfig | null) => {
       if (!value) {
@@ -36,7 +35,7 @@ const RefinerModelFieldInputComponent = (props: Props) => {
     [dispatch, field.name, nodeId]
   );
   const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
-    modelEntities: data,
+    modelConfigs,
     onChange: _onChange,
     isLoading,
     selectedModel: field.value,

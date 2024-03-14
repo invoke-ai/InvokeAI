@@ -1,13 +1,16 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig } from 'app/store/store';
+import type { ModelType } from 'services/api/types';
+
+export type FilterableModelType = Exclude<ModelType, 'onnx' | 'clip_vision'>;
 
 type ModelManagerState = {
   _version: 1;
   selectedModelKey: string | null;
   selectedModelMode: 'edit' | 'view';
   searchTerm: string;
-  filteredModelType: string | null;
+  filteredModelType: FilterableModelType | null;
   scanPath: string | undefined;
 };
 
@@ -35,7 +38,7 @@ export const modelManagerV2Slice = createSlice({
       state.searchTerm = action.payload;
     },
 
-    setFilteredModelType: (state, action: PayloadAction<string | null>) => {
+    setFilteredModelType: (state, action: PayloadAction<FilterableModelType | null>) => {
       state.filteredModelType = action.payload;
     },
     setScanPath: (state, action: PayloadAction<string | undefined>) => {

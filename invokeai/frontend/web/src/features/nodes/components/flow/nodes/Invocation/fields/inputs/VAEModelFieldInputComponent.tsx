@@ -5,7 +5,7 @@ import { SyncModelsIconButton } from 'features/modelManagerV2/components/SyncMod
 import { fieldVaeModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type { VAEModelFieldInputInstance, VAEModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
-import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
+import { useVAEModels } from 'services/api/hooks/modelsByType';
 import type { VAEModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
@@ -15,7 +15,7 @@ type Props = FieldComponentProps<VAEModelFieldInputInstance, VAEModelFieldInputT
 const VAEModelFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
-  const { data, isLoading } = useGetVaeModelsQuery();
+  const [modelConfigs, { isLoading }] = useVAEModels();
   const _onChange = useCallback(
     (value: VAEModelConfig | null) => {
       if (!value) {
@@ -32,7 +32,7 @@ const VAEModelFieldInputComponent = (props: Props) => {
     [dispatch, field.name, nodeId]
   );
   const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
-    modelEntities: data,
+    modelConfigs,
     onChange: _onChange,
     selectedModel: field.value,
     isLoading,

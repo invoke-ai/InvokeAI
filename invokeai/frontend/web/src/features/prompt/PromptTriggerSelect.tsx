@@ -11,13 +11,8 @@ import { t } from 'i18next';
 import { flatten, map } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  loraModelsAdapterSelectors,
-  textualInversionModelsAdapterSelectors,
-  useGetLoRAModelsQuery,
-  useGetModelConfigQuery,
-  useGetTextualInversionModelsQuery,
-} from 'services/api/endpoints/models';
+import { useGetModelConfigQuery } from 'services/api/endpoints/models';
+import { useEmbeddingModels, useLoRAModels } from 'services/api/hooks/modelsByType';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 
 const noOptionsMessage = () => t('prompt.noMatchingTriggers');
@@ -33,8 +28,8 @@ export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSel
   const { data: mainModelConfig, isLoading: isLoadingMainModelConfig } = useGetModelConfigQuery(
     mainModel?.key ?? skipToken
   );
-  const { data: loraModels, isLoading: isLoadingLoRAs } = useGetLoRAModelsQuery();
-  const { data: tiModels, isLoading: isLoadingTIs } = useGetTextualInversionModelsQuery();
+  const [loraModels, { isLoading: isLoadingLoRAs }] = useLoRAModels();
+  const [tiModels, { isLoading: isLoadingTIs }] = useEmbeddingModels();
 
   const _onChange = useCallback<ComboboxOnChange>(
     (v) => {
@@ -52,8 +47,7 @@ export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSel
     const _options: GroupBase<ComboboxOption>[] = [];
 
     if (tiModels) {
-      const embeddingOptions = textualInversionModelsAdapterSelectors
-        .selectAll(tiModels)
+      const embeddingOptions = tiModels
         .filter((ti) => ti.base === mainModelConfig?.base)
         .map((model) => ({ label: model.name, value: `<${model.name}>` }));
 
@@ -66,8 +60,7 @@ export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSel
     }
 
     if (loraModels) {
-      const triggerPhraseOptions = loraModelsAdapterSelectors
-        .selectAll(loraModels)
+      const triggerPhraseOptions = loraModels
         .filter((lora) => map(addedLoRAs, (l) => l.model.key).includes(lora.key))
         .map((lora) => {
           if (lora.trigger_phrases) {
