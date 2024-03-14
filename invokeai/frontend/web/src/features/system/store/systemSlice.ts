@@ -1,7 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { calculateStepPercentage } from 'features/system/util/calculateStepPercentage';
 import type { LogLevelName } from 'roarr';
 import {
   socketConnected,
@@ -10,7 +9,7 @@ import {
   socketGraphExecutionStateComplete,
   socketInvocationComplete,
   socketInvocationStarted,
-  socketModelLoadCompleted,
+  socketModelLoadComplete,
   socketModelLoadStarted,
   socketQueueItemStatusChanged,
 } from 'services/events/actions';
@@ -98,14 +97,7 @@ export const systemSlice = createSlice({
      * Generator Progress
      */
     builder.addCase(socketGeneratorProgress, (state, action) => {
-      const {
-        step,
-        total_steps,
-        order,
-        progress_image,
-        graph_execution_state_id: session_id,
-        queue_batch_id: batch_id,
-      } = action.payload.data;
+      const { step, total_steps, progress_image, session_id, batch_id } = action.payload.data;
 
       if (state.cancellations.includes(session_id)) {
         // Do not update the progress if this session has been cancelled. This prevents a race condition where we get a
@@ -116,8 +108,7 @@ export const systemSlice = createSlice({
       state.denoiseProgress = {
         step,
         total_steps,
-        order,
-        percentage: calculateStepPercentage(step, total_steps, order),
+        percentage: step / total_steps,
         progress_image,
         session_id,
         batch_id,
@@ -146,15 +137,15 @@ export const systemSlice = createSlice({
       state.status = 'LOADING_MODEL';
     });
 
-    builder.addCase(socketModelLoadCompleted, (state) => {
+    builder.addCase(socketModelLoadComplete, (state) => {
       state.status = 'CONNECTED';
     });
 
     builder.addCase(socketQueueItemStatusChanged, (state, action) => {
-      if (['completed', 'canceled', 'failed'].includes(action.payload.data.queue_item.status)) {
+      if (['completed', 'canceled', 'failed'].includes(action.payload.data.status)) {
         state.status = 'CONNECTED';
         state.denoiseProgress = null;
-        state.cancellations.push(action.payload.data.queue_item.session_id);
+        state.cancellations.push(action.payload.data.session_id);
       }
     });
   },
