@@ -30,6 +30,8 @@ class EventBase(BaseModel):
     A timestamp is automatically added to the event when it is created.
     """
 
+    __event_name__ = "event_base"
+
     timestamp: int = Field(description="The timestamp of the event", default_factory=get_timestamp)
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
