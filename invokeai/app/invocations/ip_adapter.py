@@ -1,11 +1,23 @@
 from builtins import float
-from typing import List, Literal, Union
+from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from typing_extensions import Self
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
+from invokeai.app.invocations.baseinvocation import (
+    BaseInvocation,
+    BaseInvocationOutput,
+    invocation,
+    invocation_output,
+)
+from invokeai.app.invocations.fields import (
+    FieldDescriptions,
+    Input,
+    InputField,
+    OutputField,
+    TensorField,
+    UIType,
+)
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
@@ -30,6 +42,11 @@ class IPAdapterField(BaseModel):
     end_step_percent: float = Field(
         default=1, ge=0, le=1, description="When the IP-Adapter is last applied (% of total steps)"
     )
+    mask: Optional[TensorField] = Field(
+        default=None,
+        description="The bool mask associated with this IP-Adapter. Excluded regions should be set to False, included "
+        "regions should be set to True.",
+    )
 
     @field_validator("weight")
     @classmethod
@@ -52,7 +69,7 @@ class IPAdapterOutput(BaseInvocationOutput):
 CLIP_VISION_MODEL_MAP = {"ViT-H": "ip_adapter_sd_image_encoder", "ViT-G": "ip_adapter_sdxl_image_encoder"}
 
 
-@invocation("ip_adapter", title="IP-Adapter", tags=["ip_adapter", "control"], category="ip_adapter", version="1.2.2")
+@invocation("ip_adapter", title="IP-Adapter", tags=["ip_adapter", "control"], category="ip_adapter", version="1.3.0")
 class IPAdapterInvocation(BaseInvocation):
     """Collects IP-Adapter info to pass to other nodes."""
 
@@ -78,6 +95,9 @@ class IPAdapterInvocation(BaseInvocation):
     )
     end_step_percent: float = InputField(
         default=1, ge=0, le=1, description="When the IP-Adapter is last applied (% of total steps)"
+    )
+    mask: Optional[TensorField] = InputField(
+        default=None, description="A mask defining the region that this IP-Adapter applies to."
     )
 
     @field_validator("weight")
@@ -112,6 +132,7 @@ class IPAdapterInvocation(BaseInvocation):
                 weight=self.weight,
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,
+                mask=self.mask,
             ),
         )
 

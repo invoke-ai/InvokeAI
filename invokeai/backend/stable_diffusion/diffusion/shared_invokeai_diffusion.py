@@ -286,7 +286,10 @@ class InvokeAIDiffuserComponent:
                 for ipa_conditioning in ip_adapter_conditioning
             ]
             scales = [ipa.scale_for_step(step_index, total_step_count) for ipa in ip_adapter_data]
-            regional_ip_data = RegionalIPData(image_prompt_embeds=image_prompt_embeds, scales=scales)
+            ip_masks = [ipa.mask for ipa in ip_adapter_data]
+            regional_ip_data = RegionalIPData(
+                image_prompt_embeds=image_prompt_embeds, scales=scales, masks=ip_masks, dtype=x.dtype, device=x.device
+            )
             cross_attention_kwargs["regional_ip_data"] = regional_ip_data
 
         added_cond_kwargs = None
@@ -404,7 +407,10 @@ class InvokeAIDiffuserComponent:
             ]
 
             scales = [ipa.scale_for_step(step_index, total_step_count) for ipa in ip_adapter_data]
-            regional_ip_data = RegionalIPData(image_prompt_embeds=image_prompt_embeds, scales=scales)
+            ip_masks = [ipa.mask for ipa in ip_adapter_data]
+            regional_ip_data = RegionalIPData(
+                image_prompt_embeds=image_prompt_embeds, scales=scales, masks=ip_masks, dtype=x.dtype, device=x.device
+            )
             cross_attention_kwargs["regional_ip_data"] = regional_ip_data
 
         # Prepare SDXL conditioning kwargs for the unconditioned pass.
@@ -449,7 +455,10 @@ class InvokeAIDiffuserComponent:
             ]
 
             scales = [ipa.scale_for_step(step_index, total_step_count) for ipa in ip_adapter_data]
-            regional_ip_data = RegionalIPData(image_prompt_embeds=image_prompt_embeds, scales=scales)
+            ip_masks = [ipa.mask for ipa in ip_adapter_data]
+            regional_ip_data = RegionalIPData(
+                image_prompt_embeds=image_prompt_embeds, scales=scales, masks=ip_masks, dtype=x.dtype, device=x.device
+            )
             cross_attention_kwargs["regional_ip_data"] = regional_ip_data
 
         # Prepare SDXL conditioning kwargs for the conditioned pass.

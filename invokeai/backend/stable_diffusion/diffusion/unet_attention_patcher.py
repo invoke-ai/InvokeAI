@@ -12,10 +12,6 @@ class UNetAttentionPatcher:
 
     def __init__(self, ip_adapters: Optional[list[IPAdapter]]):
         self._ip_adapters = ip_adapters
-        self._ip_adapter_scales = None
-
-        if self._ip_adapters is not None:
-            self._ip_adapter_scales = [1.0] * len(self._ip_adapters)
 
     def _prepare_attention_processors(self, unet: UNet2DConditionModel):
         """Prepare a dict of attention processors that can be injected into a unet, and load the IP-Adapter attention
@@ -32,7 +28,6 @@ class UNetAttentionPatcher:
                 # Collect the weights from each IP Adapter for the idx'th attention processor.
                 attn_procs[name] = CustomAttnProcessor2_0(
                     [ip_adapter.attn_weights.get_attention_processor_weights(idx) for ip_adapter in self._ip_adapters],
-                    self._ip_adapter_scales,
                 )
         return attn_procs
 

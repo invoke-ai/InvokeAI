@@ -21,7 +21,6 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
     def __init__(
         self,
         ip_adapter_weights: Optional[list[IPAttentionProcessorWeights]] = None,
-        ip_adapter_scales: Optional[list[float]] = None,
     ):
         """Initialize a CustomAttnProcessor2_0.
         Note: Arguments that are the same for all attention layers are passed to __call__(). Arguments that are
@@ -29,17 +28,9 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
         Args:
             ip_adapter_weights: The IP-Adapter attention weights. ip_adapter_weights[i] contains the attention weights
                 for the i'th IP-Adapter.
-            ip_adapter_scales: The IP-Adapter attention scales. ip_adapter_scales[i] contains the attention scale for
-                the i'th IP-Adapter.
         """
         super().__init__()
-
         self._ip_adapter_weights = ip_adapter_weights
-        self._ip_adapter_scales = ip_adapter_scales
-
-        assert (self._ip_adapter_weights is None) == (self._ip_adapter_scales is None)
-        if self._ip_adapter_weights is not None:
-            assert len(ip_adapter_weights) == len(ip_adapter_scales)
 
     def _is_ip_adapter_enabled(self) -> bool:
         return self._ip_adapter_weights is not None
@@ -84,10 +75,10 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
         # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         # End unmodified block from AttnProcessor2_0.
 
+        _, query_seq_len, _ = hidden_states.shape
         # Handle regional prompt attention masks.
         if regional_prompt_data is not None and is_cross_attention:
             assert percent_through is not None
-            _, query_seq_len, _ = hidden_states.shape
             prompt_region_attention_mask = regional_prompt_data.get_cross_attn_mask(
                 query_seq_len=query_seq_len, key_seq_len=sequence_length
             )
@@ -141,9 +132,18 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
         if is_cross_attention and self._is_ip_adapter_enabled():
             if self._is_ip_adapter_enabled():
                 assert regional_ip_data is not None
-                for ipa_embed, ipa_weights, scale in zip(
-                    regional_ip_data.image_prompt_embeds, self._ip_adapter_weights, regional_ip_data.scales, strict=True
-                ):
+                ip_masks = regional_ip_data.get_masks(query_seq_len=query_seq_len)
+                assert (
+                    len(regional_ip_data.image_prompt_embeds)
+                    == len(self._ip_adapter_weights)
+                    == len(regional_ip_data.scales)
+                    == ip_masks.shape[1]
+                )
+                for ipa_index, ipa_embed in enumerate(regional_ip_data.image_prompt_embeds):
+                    ipa_weights = self._ip_adapter_weights[ipa_index]
+                    ipa_scale = regional_ip_data.scales[ipa_index]
+                    ip_mask = ip_masks[0, ipa_index, ...]
+
                     # The batch dimensions should match.
                     assert ipa_embed.shape[0] == encoder_hidden_states.shape[0]
                     # The token_len dimensions should match.
@@ -175,7 +175,7 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
 
                     # Expected ip_hidden_states shape: (batch_size, query_seq_len, num_heads * head_dim)
 
-                    hidden_states = hidden_states + scale * ip_hidden_states
+                    hidden_states = hidden_states + ipa_scale * ip_hidden_states * ip_mask
             else:
                 # If IP-Adapter is not enabled, then regional_ip_data should not be passed in.
                 assert regional_ip_data is None
