@@ -106,9 +106,7 @@ class BulkDownloadService(BulkDownloadBase):
         if self._invoker:
             assert bulk_download_id is not None
             self._invoker.services.events.emit_bulk_download_started(
-                bulk_download_id=bulk_download_id,
-                bulk_download_item_id=bulk_download_item_id,
-                bulk_download_item_name=bulk_download_item_name,
+                bulk_download_id, bulk_download_item_id, bulk_download_item_name
             )
 
     def _signal_job_completed(
@@ -118,10 +116,8 @@ class BulkDownloadService(BulkDownloadBase):
         if self._invoker:
             assert bulk_download_id is not None
             assert bulk_download_item_name is not None
-            self._invoker.services.events.emit_bulk_download_completed(
-                bulk_download_id=bulk_download_id,
-                bulk_download_item_id=bulk_download_item_id,
-                bulk_download_item_name=bulk_download_item_name,
+            self._invoker.services.events.emit_bulk_download_complete(
+                bulk_download_id, bulk_download_item_id, bulk_download_item_name
             )
 
     def _signal_job_failed(
@@ -131,11 +127,8 @@ class BulkDownloadService(BulkDownloadBase):
         if self._invoker:
             assert bulk_download_id is not None
             assert exception is not None
-            self._invoker.services.events.emit_bulk_download_failed(
-                bulk_download_id=bulk_download_id,
-                bulk_download_item_id=bulk_download_item_id,
-                bulk_download_item_name=bulk_download_item_name,
-                error=str(exception),
+            self._invoker.services.events.emit_bulk_download_error(
+                bulk_download_id, bulk_download_item_id, bulk_download_item_name, str(exception)
             )
 
     def stop(self, *args, **kwargs):

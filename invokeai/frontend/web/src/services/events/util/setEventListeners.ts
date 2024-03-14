@@ -5,8 +5,8 @@ import type { AppDispatch } from 'app/store/store';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import {
-  socketBulkDownloadCompleted,
-  socketBulkDownloadFailed,
+  socketBulkDownloadComplete,
+  socketBulkDownloadError,
   socketBulkDownloadStarted,
   socketConnected,
   socketDisconnected,
@@ -14,15 +14,15 @@ import {
   socketGraphExecutionStateComplete,
   socketInvocationComplete,
   socketInvocationError,
-  socketInvocationRetrievalError,
   socketInvocationStarted,
-  socketModelInstallCompleted,
-  socketModelInstallDownloading,
+  socketModelInstallCancelled,
+  socketModelInstallComplete,
+  socketModelInstallDownloadProgress,
   socketModelInstallError,
-  socketModelLoadCompleted,
+  socketModelInstallStarted,
+  socketModelLoadComplete,
   socketModelLoadStarted,
   socketQueueItemStatusChanged,
-  socketSessionRetrievalError,
 } from 'services/events/actions';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
@@ -65,131 +65,55 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
     }
   });
 
-  /**
-   * Disconnect
-   */
   socket.on('disconnect', () => {
     dispatch(socketDisconnected());
   });
-
-  /**
-   * Invocation started
-   */
   socket.on('invocation_started', (data) => {
     dispatch(socketInvocationStarted({ data }));
   });
 
-  /**
-   * Generator progress
-   */
-  socket.on('generator_progress', (data) => {
+  socket.on('invocation_denoise_progress', (data) => {
     dispatch(socketGeneratorProgress({ data }));
   });
 
-  /**
-   * Invocation error
-   */
   socket.on('invocation_error', (data) => {
     dispatch(socketInvocationError({ data }));
   });
 
-  /**
-   * Invocation complete
-   */
   socket.on('invocation_complete', (data) => {
-    dispatch(
-      socketInvocationComplete({
-        data,
-      })
-    );
+    dispatch(socketInvocationComplete({ data }));
   });
 
-  /**
-   * Graph complete
-   */
-  socket.on('graph_execution_state_complete', (data) => {
-    dispatch(
-      socketGraphExecutionStateComplete({
-        data,
-      })
-    );
+  socket.on('session_complete', (data) => {
+    dispatch(socketGraphExecutionStateComplete({ data }));
   });
 
-  /**
-   * Model load started
-   */
   socket.on('model_load_started', (data) => {
-    dispatch(
-      socketModelLoadStarted({
-        data,
-      })
-    );
+    dispatch(socketModelLoadStarted({ data }));
   });
 
-  /**
-   * Model load completed
-   */
-  socket.on('model_load_completed', (data) => {
-    dispatch(
-      socketModelLoadCompleted({
-        data,
-      })
-    );
+  socket.on('model_load_complete', (data) => {
+    dispatch(socketModelLoadComplete({ data }));
   });
 
-  /**
-   * Model Install Downloading
-   */
-  socket.on('model_install_downloading', (data) => {
-    dispatch(
-      socketModelInstallDownloading({
-        data,
-      })
-    );
+  socket.on('model_install_started', (data) => {
+    dispatch(socketModelInstallStarted({ data }));
   });
 
-  /**
-   * Model Install Completed
-   */
-  socket.on('model_install_completed', (data) => {
-    dispatch(
-      socketModelInstallCompleted({
-        data,
-      })
-    );
+  socket.on('model_install_download_progress', (data) => {
+    dispatch(socketModelInstallDownloadProgress({ data }));
   });
 
-  /**
-   * Model Install Error
-   */
+  socket.on('model_install_complete', (data) => {
+    dispatch(socketModelInstallComplete({ data }));
+  });
+
   socket.on('model_install_error', (data) => {
-    dispatch(
-      socketModelInstallError({
-        data,
-      })
-    );
+    dispatch(socketModelInstallError({ data }));
   });
 
-  /**
-   * Session retrieval error
-   */
-  socket.on('session_retrieval_error', (data) => {
-    dispatch(
-      socketSessionRetrievalError({
-        data,
-      })
-    );
-  });
-
-  /**
-   * Invocation retrieval error
-   */
-  socket.on('invocation_retrieval_error', (data) => {
-    dispatch(
-      socketInvocationRetrievalError({
-        data,
-      })
-    );
+  socket.on('model_install_cancelled', (data) => {
+    dispatch(socketModelInstallCancelled({ data }));
   });
 
   socket.on('queue_item_status_changed', (data) => {
@@ -200,11 +124,11 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
     dispatch(socketBulkDownloadStarted({ data }));
   });
 
-  socket.on('bulk_download_completed', (data) => {
-    dispatch(socketBulkDownloadCompleted({ data }));
+  socket.on('bulk_download_complete', (data) => {
+    dispatch(socketBulkDownloadComplete({ data }));
   });
 
-  socket.on('bulk_download_failed', (data) => {
-    dispatch(socketBulkDownloadFailed({ data }));
+  socket.on('bulk_download_error', (data) => {
+    dispatch(socketBulkDownloadError({ data }));
   });
 };

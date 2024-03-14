@@ -139,7 +139,7 @@ type TooltipLabelProps = {
 
 const TooltipLabel = ({ name, source, installJob }: TooltipLabelProps) => {
   const progressString = useMemo(() => {
-    if (installJob.status === 'downloading' || installJob.bytes === undefined || installJob.total_bytes === undefined) {
+    if (installJob.status !== 'downloading' || installJob.bytes === undefined || installJob.total_bytes === undefined) {
       return '';
     }
     return `${formatBytes(installJob.bytes)} / ${formatBytes(installJob.total_bytes)}`;

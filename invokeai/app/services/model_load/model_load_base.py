@@ -4,7 +4,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from invokeai.app.services.shared.invocation_context import InvocationContextData
 from invokeai.backend.model_manager import AnyModel, AnyModelConfig, SubModelType
 from invokeai.backend.model_manager.load import LoadedModel
 from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
@@ -15,18 +14,12 @@ class ModelLoadServiceBase(ABC):
     """Wrapper around AnyModelLoader."""
 
     @abstractmethod
-    def load_model(
-        self,
-        model_config: AnyModelConfig,
-        submodel_type: Optional[SubModelType] = None,
-        context_data: Optional[InvocationContextData] = None,
-    ) -> LoadedModel:
+    def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
         """
         Given a model's configuration, load it and return the LoadedModel object.
 
         :param model_config: Model configuration record (as returned by ModelRecordBase.get_model())
         :param submodel: For main (pipeline models), the submodel to fetch.
-        :param context_data: Invocation context data used for event reporting
         """
 
     @property

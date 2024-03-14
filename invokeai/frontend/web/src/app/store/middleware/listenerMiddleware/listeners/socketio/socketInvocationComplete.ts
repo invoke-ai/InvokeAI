@@ -21,12 +21,11 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
     actionCreator: socketInvocationComplete,
     effect: async (action, { dispatch, getState }) => {
       const { data } = action.payload;
-      log.debug({ data: parseify(data) }, `Invocation complete (${action.payload.data.node.type})`);
+      log.debug({ data: parseify(data) }, `Invocation complete (${data.invocation_type})`);
 
-      const { result, node, queue_batch_id } = data;
       // This complete event has an associated image output
-      if (isImageOutput(result) && !nodeTypeDenylist.includes(node.type)) {
-        const { image_name } = result.image;
+      if (isImageOutput(data.result) && !nodeTypeDenylist.includes(data.invocation_type)) {
+        const { image_name } = data.result.image;
         const { canvas, gallery } = getState();
 
         // This populates the `getImageDTO` cache
@@ -40,7 +39,7 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
         imageDTORequest.unsubscribe();
 
         // Add canvas images to the staging area
-        if (canvas.batchIds.includes(queue_batch_id) && data.source_node_id === CANVAS_OUTPUT) {
+        if (canvas.batchIds.includes(data.batch_id) && data.invocation_source_id === CANVAS_OUTPUT) {
           dispatch(addImageToStagingArea(imageDTO));
         }
 

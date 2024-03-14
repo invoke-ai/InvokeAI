@@ -8,7 +8,7 @@ export const addInvocationErrorEventListener = (startAppListening: AppStartListe
   startAppListening({
     actionCreator: socketInvocationError,
     effect: (action) => {
-      log.error(action.payload, `Invocation error (${action.payload.data.node.type})`);
+      log.error(action.payload, `Invocation error (${action.payload.data.invocation_type})`);
     },
   });
 };

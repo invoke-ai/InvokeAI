@@ -8,14 +8,13 @@ import time
 import traceback
 from pathlib import Path
 from queue import Empty, PriorityQueue
-from typing import Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 import requests
 from pydantic.networks import AnyHttpUrl
 from requests import HTTPError
 from tqdm import tqdm
 
-from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -30,6 +29,9 @@ from .download_base import (
     UnknownJobIDException,
 )
 
+if TYPE_CHECKING:
+    from invokeai.app.services.events.events_base import EventServiceBase
+
 # Maximum number of bytes to download during each call to requests.iter_content()
 DOWNLOAD_CHUNK_SIZE = 100000
 
@@ -40,7 +42,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
     def __init__(
         self,
         max_parallel_dl: int = 5,
-        event_bus: Optional[EventServiceBase] = None,
+        event_bus: Optional["EventServiceBase"] = None,
         requests_session: Optional[requests.sessions.Session] = None,
     ):
         """

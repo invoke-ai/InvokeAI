@@ -2,6 +2,9 @@
 # which are imported/used before parse_args() is called will get the default config values instead of the
 # values from the command line or config file.
 import sys
+from typing import cast
+
+from pydantic import BaseModel
 
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
@@ -33,6 +36,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     from fastapi.responses import HTMLResponse
     from fastapi_events.handlers.local import local_handler
     from fastapi_events.middleware import EventHandlerASGIMiddleware
+    from fastapi_events.registry.payload_schema import registry as fastapi_events_registry
     from pydantic.json_schema import models_json_schema
     from torch.backends.mps import is_available as is_mps_available
 
@@ -182,23 +186,16 @@ def custom_openapi() -> dict[str, Any]:
         invoker_schema["output"] = outputs_ref
         invoker_schema["class"] = "invocation"
 
-    # This code no longer seems to be necessary?
-    # Leave it here just in case
-    #
-    # from invokeai.backend.model_manager import get_model_config_formats
-    # formats = get_model_config_formats()
-    # for model_config_name, enum_set in formats.items():
-
-    #     if model_config_name in openapi_schema["components"]["schemas"]:
-    #         # print(f"Config with name {name} already defined")
-    #         continue
-
-    #     openapi_schema["components"]["schemas"][model_config_name] = {
-    #         "title": model_config_name,
-    #         "description": "An enumeration.",
-    #         "type": "string",
-    #         "enum": [v.value for v in enum_set],
-    #     }
+    # Add all pydantic event schemas registered with fastapi-events
+    for payload in fastapi_events_registry.data.values():
+        json_schema = cast(BaseModel, payload).model_json_schema(
+            mode="serialization", ref_template="#/components/schemas/{model}"
+        )
+        if "$defs" in json_schema:
+            for schema_key, schema in json_schema["$defs"].items():
+                openapi_schema["components"]["schemas"][schema_key] = schema
+            del json_schema["$defs"]
+        openapi_schema["components"]["schemas"][payload.__name__] = json_schema
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema

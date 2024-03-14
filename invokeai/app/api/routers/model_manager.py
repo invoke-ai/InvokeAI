@@ -15,7 +15,7 @@ from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
-from invokeai.app.services.model_install import ModelInstallJob
+from invokeai.app.services.model_install.model_install_common import ModelInstallJob
 from invokeai.app.services.model_records import (
     InvalidModelException,
     UnknownModelException,

@@ -8,7 +8,7 @@ export const addInvocationStartedEventListener = (startAppListening: AppStartLis
   startAppListening({
     actionCreator: socketInvocationStarted,
     effect: (action) => {
-      log.debug(action.payload, `Invocation started (${action.payload.data.node.type})`);
+      log.debug(action.payload, `Invocation started (${action.payload.data.invocation_type})`);
     },
   });
 };

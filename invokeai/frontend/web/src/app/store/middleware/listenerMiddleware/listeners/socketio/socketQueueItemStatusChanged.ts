@@ -10,16 +10,23 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
     actionCreator: socketQueueItemStatusChanged,
     effect: async (action, { dispatch }) => {
       // we've got new status for the queue item, batch and queue
-      const { queue_item, batch_status, queue_status } = action.payload.data;
+      const { item_id, status, started_at, updated_at, error, completed_at, created_at, batch_status, queue_status } =
+        action.payload.data;
 
-      log.debug(action.payload, `Queue item ${queue_item.item_id} status updated: ${queue_item.status}`);
+      log.debug(action.payload, `Queue item ${item_id} status updated: ${status}`);
 
       // Update this specific queue item in the list of queue items (this is the queue item DTO, without the session)
       dispatch(
         queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
           queueItemsAdapter.updateOne(draft, {
-            id: String(queue_item.item_id),
-            changes: queue_item,
+            id: String(item_id),
+            changes: {
+              status,
+              started_at,
+              updated_at: updated_at ?? undefined,
+              error,
+              completed_at: completed_at ?? undefined,
+            },
           });
         })
       );
@@ -41,11 +48,18 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
 
       // Update the queue item status (this is the full queue item, including the session)
       dispatch(
-        queueApi.util.updateQueryData('getQueueItem', queue_item.item_id, (draft) => {
+        queueApi.util.updateQueryData('getQueueItem', item_id, (draft) => {
           if (!draft) {
             return;
           }
-          Object.assign(draft, queue_item);
+          Object.assign(draft, {
+            status,
+            started_at,
+            updated_at,
+            error,
+            completed_at,
+            created_at,
+          });
         })
       );
 

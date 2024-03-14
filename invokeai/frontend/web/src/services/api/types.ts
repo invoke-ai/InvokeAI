@@ -36,7 +36,6 @@ export type OffsetPaginatedResults_ImageDTO_ = S['OffsetPaginatedResults_ImageDT
 
 // Models
 export type ModelType = S['ModelType'];
-export type SubModelType = S['SubModelType'];
 export type BaseModelType = S['BaseModelType'];
 
 // Model Configs
