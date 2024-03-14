@@ -1,28 +1,11 @@
-import type { EntityAdapter, EntityState, ThunkDispatch, UnknownAction } from '@reduxjs/toolkit';
+import type { EntityState } from '@reduxjs/toolkit';
 import { createEntityAdapter } from '@reduxjs/toolkit';
 import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
 import queryString from 'query-string';
-import {
-  ALL_BASE_MODELS,
-  NON_REFINER_BASE_MODELS,
-  NON_SDXL_MAIN_MODELS,
-  REFINER_BASE_MODELS,
-  SDXL_MAIN_MODELS,
-} from 'services/api/constants';
 import type { operations, paths } from 'services/api/schema';
-import type {
-  AnyModelConfig,
-  BaseModelType,
-  ControlNetModelConfig,
-  IPAdapterModelConfig,
-  LoRAModelConfig,
-  MainModelConfig,
-  T2IAdapterModelConfig,
-  TextualInversionModelConfig,
-  VAEModelConfig,
-} from 'services/api/types';
+import type { AnyModelConfig } from 'services/api/types';
 
-import type { ApiTagDescription, tagTypes } from '..';
+import type { ApiTagDescription } from '..';
 import { api, buildV2Url, LIST_TAG } from '..';
 
 export type UpdateModelArg = {
@@ -40,8 +23,9 @@ type UpdateModelImageResponse =
   paths['/api/v2/models/i/{key}/image']['patch']['responses']['200']['content']['application/json'];
 
 type GetModelConfigResponse = paths['/api/v2/models/i/{key}']['get']['responses']['200']['content']['application/json'];
-
-type ListModelsArg = NonNullable<paths['/api/v2/models/']['get']['parameters']['query']>;
+type GetModelConfigsResponse = NonNullable<
+  paths['/api/v2/models/']['get']['responses']['200']['content']['application/json']
+>;
 
 type DeleteModelArg = {
   key: string;
@@ -76,72 +60,11 @@ type GetHuggingFaceModelsResponse =
 
 type GetByAttrsArg = operations['get_model_records_by_attrs']['parameters']['query'];
 
-const mainModelsAdapter = createEntityAdapter<MainModelConfig, string>({
+const modelConfigsAdapter = createEntityAdapter<AnyModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
-export const mainModelsAdapterSelectors = mainModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-const loraModelsAdapter = createEntityAdapter<LoRAModelConfig, string>({
-  selectId: (entity) => entity.key,
-  sortComparer: (a, b) => a.name.localeCompare(b.name),
-});
-export const loraModelsAdapterSelectors = loraModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-const controlNetModelsAdapter = createEntityAdapter<ControlNetModelConfig, string>({
-  selectId: (entity) => entity.key,
-  sortComparer: (a, b) => a.name.localeCompare(b.name),
-});
-export const controlNetModelsAdapterSelectors = controlNetModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-const ipAdapterModelsAdapter = createEntityAdapter<IPAdapterModelConfig, string>({
-  selectId: (entity) => entity.key,
-  sortComparer: (a, b) => a.name.localeCompare(b.name),
-});
-export const ipAdapterModelsAdapterSelectors = ipAdapterModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-const t2iAdapterModelsAdapter = createEntityAdapter<T2IAdapterModelConfig, string>({
-  selectId: (entity) => entity.key,
-  sortComparer: (a, b) => a.name.localeCompare(b.name),
-});
-export const t2iAdapterModelsAdapterSelectors = t2iAdapterModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-const textualInversionModelsAdapter = createEntityAdapter<TextualInversionModelConfig, string>({
-  selectId: (entity) => entity.key,
-  sortComparer: (a, b) => a.name.localeCompare(b.name),
-});
-export const textualInversionModelsAdapterSelectors = textualInversionModelsAdapter.getSelectors(
-  undefined,
-  getSelectorsOptions
-);
-const vaeModelsAdapter = createEntityAdapter<VAEModelConfig, string>({
-  selectId: (entity) => entity.key,
-  sortComparer: (a, b) => a.name.localeCompare(b.name),
-});
-export const vaeModelsAdapterSelectors = vaeModelsAdapter.getSelectors(undefined, getSelectorsOptions);
-
-const anyModelConfigAdapter = createEntityAdapter<AnyModelConfig, string>({
-  selectId: (entity) => entity.key,
-  sortComparer: (a, b) => a.name.localeCompare(b.name),
-});
-const anyModelConfigAdapterSelectors = anyModelConfigAdapter.getSelectors(undefined, getSelectorsOptions);
-
-const buildProvidesTags =
-  <TEntity extends AnyModelConfig>(tagType: (typeof tagTypes)[number]) =>
-  (result: EntityState<TEntity, string> | undefined) => {
-    const tags: ApiTagDescription[] = [{ type: tagType, id: LIST_TAG }, 'Model'];
-    if (result) {
-      tags.push(
-        ...result.ids.map((id) => ({
-          type: tagType,
-          id,
-        }))
-      );
-    }
-
-    return tags;
-  };
-
-const buildTransformResponse =
-  <T extends AnyModelConfig>(adapter: EntityAdapter<T, string>) =>
-  (response: { models: T[] }) => {
-    return adapter.setAll(adapter.getInitialState(), response.models);
-  };
+export const modelConfigsAdapterSelectors = modelConfigsAdapter.getSelectors(undefined, getSelectorsOptions);
 
 /**
  * Builds an endpoint URL for the models router
@@ -162,9 +85,27 @@ export const modelsApi = api.injectEndpoints({
         };
       },
       onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
-        queryFulfilled.then(({ data }) => {
-          upsertSingleModelConfig(data, dispatch);
-        });
+        try {
+          const { data } = await queryFulfilled;
+
+          // Update the individual model query caches
+          dispatch(modelsApi.util.upsertQueryData('getModelConfig', data.key, data));
+
+          const { base, name, type } = data;
+          dispatch(modelsApi.util.upsertQueryData('getModelConfigByAttrs', { base, name, type }, data));
+
+          // Update the list query cache
+          dispatch(
+            modelsApi.util.updateQueryData('getModelConfigs', undefined, (draft) => {
+              modelConfigsAdapter.updateOne(draft, {
+                id: data.key,
+                changes: data,
+              });
+            })
+          );
+        } catch {
+          // no-op
+        }
       },
     }),
     updateModelImage: build.mutation<UpdateModelImageResponse, UpdateModelImageArg>({
@@ -294,80 +235,27 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['ModelInstalls'],
     }),
-    getMainModels: build.query<EntityState<MainModelConfig, string>, BaseModelType[]>({
-      query: (base_models) => {
-        const params: ListModelsArg = {
-          model_type: 'main',
-          base_models,
-        };
-        const query = queryString.stringify(params, { arrayFormat: 'none' });
-        return buildModelsUrl(`?${query}`);
+    getModelConfigs: build.query<EntityState<AnyModelConfig, string>, void>({
+      query: () => ({ url: buildModelsUrl() }),
+      providesTags: (result) => {
+        const tags: ApiTagDescription[] = [{ type: 'ModelConfig', id: LIST_TAG }];
+        if (result) {
+          const modelTags = result.ids.map((id) => ({ type: 'ModelConfig', id }) as const);
+          tags.push(...modelTags);
+        }
+        return tags;
       },
-      providesTags: buildProvidesTags<MainModelConfig>('MainModel'),
-      transformResponse: buildTransformResponse<MainModelConfig>(mainModelsAdapter),
+      keepUnusedDataFor: 60 * 60 * 1000 * 24, // 1 day (infinite)
+      transformResponse: (response: GetModelConfigsResponse) => {
+        return modelConfigsAdapter.setAll(modelConfigsAdapter.getInitialState(), response.models);
+      },
       onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
         queryFulfilled.then(({ data }) => {
-          upsertModelConfigs(data, dispatch);
-        });
-      },
-    }),
-    getLoRAModels: build.query<EntityState<LoRAModelConfig, string>, void>({
-      query: () => ({ url: buildModelsUrl(), params: { model_type: 'lora' } }),
-      providesTags: buildProvidesTags<LoRAModelConfig>('LoRAModel'),
-      transformResponse: buildTransformResponse<LoRAModelConfig>(loraModelsAdapter),
-      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
-        queryFulfilled.then(({ data }) => {
-          upsertModelConfigs(data, dispatch);
-        });
-      },
-    }),
-    getControlNetModels: build.query<EntityState<ControlNetModelConfig, string>, void>({
-      query: () => ({ url: buildModelsUrl(), params: { model_type: 'controlnet' } }),
-      providesTags: buildProvidesTags<ControlNetModelConfig>('ControlNetModel'),
-      transformResponse: buildTransformResponse<ControlNetModelConfig>(controlNetModelsAdapter),
-      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
-        queryFulfilled.then(({ data }) => {
-          upsertModelConfigs(data, dispatch);
-        });
-      },
-    }),
-    getIPAdapterModels: build.query<EntityState<IPAdapterModelConfig, string>, void>({
-      query: () => ({ url: buildModelsUrl(), params: { model_type: 'ip_adapter' } }),
-      providesTags: buildProvidesTags<IPAdapterModelConfig>('IPAdapterModel'),
-      transformResponse: buildTransformResponse<IPAdapterModelConfig>(ipAdapterModelsAdapter),
-      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
-        queryFulfilled.then(({ data }) => {
-          upsertModelConfigs(data, dispatch);
-        });
-      },
-    }),
-    getT2IAdapterModels: build.query<EntityState<T2IAdapterModelConfig, string>, void>({
-      query: () => ({ url: buildModelsUrl(), params: { model_type: 't2i_adapter' } }),
-      providesTags: buildProvidesTags<T2IAdapterModelConfig>('T2IAdapterModel'),
-      transformResponse: buildTransformResponse<T2IAdapterModelConfig>(t2iAdapterModelsAdapter),
-      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
-        queryFulfilled.then(({ data }) => {
-          upsertModelConfigs(data, dispatch);
-        });
-      },
-    }),
-    getVaeModels: build.query<EntityState<VAEModelConfig, string>, void>({
-      query: () => ({ url: buildModelsUrl(), params: { model_type: 'vae' } }),
-      providesTags: buildProvidesTags<VAEModelConfig>('VaeModel'),
-      transformResponse: buildTransformResponse<VAEModelConfig>(vaeModelsAdapter),
-      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
-        queryFulfilled.then(({ data }) => {
-          upsertModelConfigs(data, dispatch);
-        });
-      },
-    }),
-    getTextualInversionModels: build.query<EntityState<TextualInversionModelConfig, string>, void>({
-      query: () => ({ url: buildModelsUrl(), params: { model_type: 'embedding' } }),
-      providesTags: buildProvidesTags<TextualInversionModelConfig>('TextualInversionModel'),
-      transformResponse: buildTransformResponse<TextualInversionModelConfig>(textualInversionModelsAdapter),
-      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
-        queryFulfilled.then(({ data }) => {
-          upsertModelConfigs(data, dispatch);
+          modelConfigsAdapterSelectors.selectAll(data).forEach((modelConfig) => {
+            dispatch(modelsApi.util.upsertQueryData('getModelConfig', modelConfig.key, modelConfig));
+            const { base, name, type } = modelConfig;
+            dispatch(modelsApi.util.upsertQueryData('getModelConfigByAttrs', { base, name, type }, modelConfig));
+          });
         });
       },
     }),
@@ -375,14 +263,8 @@ export const modelsApi = api.injectEndpoints({
 });
 
 export const {
+  useGetModelConfigsQuery,
   useGetModelConfigQuery,
-  useGetMainModelsQuery,
-  useGetControlNetModelsQuery,
-  useGetIPAdapterModelsQuery,
-  useGetT2IAdapterModelsQuery,
-  useGetLoRAModelsQuery,
-  useGetTextualInversionModelsQuery,
-  useGetVaeModelsQuery,
   useDeleteModelsMutation,
   useDeleteModelImageMutation,
   useUpdateModelMutation,
@@ -396,127 +278,3 @@ export const {
   useCancelModelInstallMutation,
   usePruneCompletedModelInstallsMutation,
 } = modelsApi;
-
-const upsertModelConfigs = (
-  modelConfigs: EntityState<AnyModelConfig, string>,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  dispatch: ThunkDispatch<any, any, UnknownAction>
-) => {
-  /**
-   * Once a list of models of a specific type is received, fetching any of those models individually is a waste of a
-   * network request. This function takes the received list of models and upserts them into the individual query caches
-   * for each model type.
-   */
-
-  // Iterate over all the models and upsert them into the individual query caches for each model type.
-  anyModelConfigAdapterSelectors.selectAll(modelConfigs).forEach((modelConfig) => {
-    dispatch(modelsApi.util.upsertQueryData('getModelConfig', modelConfig.key, modelConfig));
-    const { base, name, type } = modelConfig;
-    dispatch(modelsApi.util.upsertQueryData('getModelConfigByAttrs', { base, name, type }, modelConfig));
-  });
-};
-
-const upsertSingleModelConfig = (
-  modelConfig: AnyModelConfig,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  dispatch: ThunkDispatch<any, any, UnknownAction>
-) => {
-  /**
-   * When a model is updated, the individual query caches for each model type need to be updated, as well as the list
-   * query caches of models of that type.
-   */
-
-  // Update the individual model query caches.
-  dispatch(modelsApi.util.upsertQueryData('getModelConfig', modelConfig.key, modelConfig));
-  const { base, name, type } = modelConfig;
-  dispatch(modelsApi.util.upsertQueryData('getModelConfigByAttrs', { base, name, type }, modelConfig));
-
-  // Update the list query caches for each model type.
-  if (modelConfig.type === 'main') {
-    [ALL_BASE_MODELS, NON_REFINER_BASE_MODELS, SDXL_MAIN_MODELS, NON_SDXL_MAIN_MODELS, REFINER_BASE_MODELS].forEach(
-      (queryArg) => {
-        dispatch(
-          modelsApi.util.updateQueryData('getMainModels', queryArg, (draft) => {
-            mainModelsAdapter.updateOne(draft, {
-              id: modelConfig.key,
-              changes: modelConfig,
-            });
-          })
-        );
-      }
-    );
-    return;
-  }
-
-  if (modelConfig.type === 'controlnet') {
-    dispatch(
-      modelsApi.util.updateQueryData('getControlNetModels', undefined, (draft) => {
-        controlNetModelsAdapter.updateOne(draft, {
-          id: modelConfig.key,
-          changes: modelConfig,
-        });
-      })
-    );
-    return;
-  }
-
-  if (modelConfig.type === 'embedding') {
-    dispatch(
-      modelsApi.util.updateQueryData('getTextualInversionModels', undefined, (draft) => {
-        textualInversionModelsAdapter.updateOne(draft, {
-          id: modelConfig.key,
-          changes: modelConfig,
-        });
-      })
-    );
-    return;
-  }
-
-  if (modelConfig.type === 'ip_adapter') {
-    dispatch(
-      modelsApi.util.updateQueryData('getIPAdapterModels', undefined, (draft) => {
-        ipAdapterModelsAdapter.updateOne(draft, {
-          id: modelConfig.key,
-          changes: modelConfig,
-        });
-      })
-    );
-    return;
-  }
-
-  if (modelConfig.type === 'lora') {
-    dispatch(
-      modelsApi.util.updateQueryData('getLoRAModels', undefined, (draft) => {
-        loraModelsAdapter.updateOne(draft, {
-          id: modelConfig.key,
-          changes: modelConfig,
-        });
-      })
-    );
-    return;
-  }
-
-  if (modelConfig.type === 't2i_adapter') {
-    dispatch(
-      modelsApi.util.updateQueryData('getT2IAdapterModels', undefined, (draft) => {
-        t2iAdapterModelsAdapter.updateOne(draft, {
-          id: modelConfig.key,
-          changes: modelConfig,
-        });
-      })
-    );
-    return;
-  }
-
-  if (modelConfig.type === 'vae') {
-    dispatch(
-      modelsApi.util.updateQueryData('getVaeModels', undefined, (draft) => {
-        vaeModelsAdapter.updateOne(draft, {
-          id: modelConfig.key,
-          changes: modelConfig,
-        });
-      })
-    );
-    return;
-  }
-};
