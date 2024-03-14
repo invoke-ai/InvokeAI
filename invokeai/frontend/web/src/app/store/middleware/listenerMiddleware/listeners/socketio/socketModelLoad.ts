@@ -33,6 +33,7 @@ export const addModelLoadEventListener = (startAppListening: AppStartListening) 
       if (submodel_type) {
         extras.push(submodel_type);
       }
+
       const message = `Model load complete: ${name} (${extras.join(', ')})`;
 
       log.debug(action.payload, message);
