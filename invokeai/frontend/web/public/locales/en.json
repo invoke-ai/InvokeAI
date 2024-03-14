@@ -103,7 +103,7 @@
         "learnMore": "Learn More",
         "modelManager": "Model Manager",
         "nodeEditor": "Node Editor",
-        "nodes": "Workflow Editor",
+        "nodes": "Workflows",
         "notInstalled": "Not $t(common.installed)",
         "openInNewTab": "Open in New Tab",
         "orderBy": "Order By",
