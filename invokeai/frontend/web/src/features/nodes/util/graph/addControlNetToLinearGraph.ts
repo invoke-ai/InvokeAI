@@ -1,11 +1,15 @@
 import type { RootState } from 'app/store/store';
 import { selectValidControlNets } from 'features/controlAdapters/store/controlAdaptersSlice';
+import type { ControlAdapterProcessorType, ControlNetConfig } from 'features/controlAdapters/store/types';
+import type { ImageField } from 'features/nodes/types/common';
 import type {
   CollectInvocation,
   ControlNetInvocation,
   CoreMetadataInvocation,
   NonNullableGraph,
+  S,
 } from 'services/api/types';
+import { assert } from 'tsafe';
 
 import { CONTROL_NET_COLLECT } from './constants';
 import { upsertMetadata } from './metadata';
@@ -70,34 +74,12 @@ export const addControlNetToLinearGraph = async (
         resize_mode: resizeMode,
         control_model: model,
         control_weight: weight,
+        image: buildControlImage(controlImage, processedControlImage, processorType),
       };
 
-      if (processedControlImage && processorType !== 'none') {
-        // We've already processed the image in the app, so we can just use the processed image
-        controlNetNode.image = {
-          image_name: processedControlImage,
-        };
-      } else if (controlImage) {
-        // The control image is preprocessed
-        controlNetNode.image = {
-          image_name: controlImage,
-        };
-      } else {
-        // Skip CAs without an unprocessed image - should never happen, we already filtered the list of valid CAs
-        return;
-      }
+      graph.nodes[controlNetNode.id] = controlNetNode;
 
-      graph.nodes[controlNetNode.id] = controlNetNode as ControlNetInvocation;
-
-      controlNetMetadata.push({
-        control_model: model,
-        control_weight: weight,
-        control_mode: controlMode,
-        begin_step_percent: beginStepPct,
-        end_step_percent: endStepPct,
-        resize_mode: resizeMode,
-        image: controlNetNode.image,
-      });
+      controlNetMetadata.push(buildControlNetMetadata(controlNet));
 
       graph.edges.push({
         source: { node_id: controlNetNode.id, field: 'control' },
@@ -109,4 +91,63 @@ export const addControlNetToLinearGraph = async (
     }
     upsertMetadata(graph, { controlnets: controlNetMetadata });
   }
+};
+
+const buildControlImage = (
+  controlImage: string | null,
+  processedControlImage: string | null,
+  processorType: ControlAdapterProcessorType
+): ImageField => {
+  let image: ImageField | null = null;
+  if (processedControlImage && processorType !== 'none') {
+    // We've already processed the image in the app, so we can just use the processed image
+    image = {
+      image_name: processedControlImage,
+    };
+  } else if (controlImage) {
+    // The control image is preprocessed
+    image = {
+      image_name: controlImage,
+    };
+  }
+  assert(image, 'ControlNet image is required');
+  return image;
+};
+
+const buildControlNetMetadata = (controlNet: ControlNetConfig): S['ControlNetMetadataField'] => {
+  const {
+    controlImage,
+    processedControlImage,
+    beginStepPct,
+    endStepPct,
+    controlMode,
+    resizeMode,
+    model,
+    processorType,
+    weight,
+  } = controlNet;
+
+  assert(model, 'ControlNet model is required');
+
+  const processed_image =
+    processedControlImage && processorType !== 'none'
+      ? {
+          image_name: processedControlImage,
+        }
+      : null;
+
+  assert(controlImage, 'ControlNet image is required');
+
+  return {
+    control_model: model,
+    control_weight: weight,
+    control_mode: controlMode,
+    begin_step_percent: beginStepPct,
+    end_step_percent: endStepPct,
+    resize_mode: resizeMode,
+    image: {
+      image_name: controlImage,
+    },
+    processed_image,
+  };
 };

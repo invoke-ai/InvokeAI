@@ -1,11 +1,15 @@
 import type { RootState } from 'app/store/store';
 import { selectValidIPAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
+import type { IPAdapterConfig } from 'features/controlAdapters/store/types';
+import type { ImageField } from 'features/nodes/types/common';
 import type {
   CollectInvocation,
   CoreMetadataInvocation,
   IPAdapterInvocation,
   NonNullableGraph,
+  S,
 } from 'services/api/types';
+import { assert } from 'tsafe';
 
 import { IP_ADAPTER_COLLECT } from './constants';
 import { upsertMetadata } from './metadata';
@@ -44,7 +48,10 @@ export const addIPAdapterToLinearGraph = async (
       if (!ipAdapter.model) {
         return;
       }
-      const { id, weight, model, beginStepPct, endStepPct } = ipAdapter;
+      const { id, weight, model, beginStepPct, endStepPct, controlImage } = ipAdapter;
+
+      assert(controlImage, 'IP Adapter image is required');
+
       const ipAdapterNode: IPAdapterInvocation = {
         id: `ip_adapter_${id}`,
         type: 'ip_adapter',
@@ -53,25 +60,14 @@ export const addIPAdapterToLinearGraph = async (
         ip_adapter_model: model,
         begin_step_percent: beginStepPct,
         end_step_percent: endStepPct,
+        image: {
+          image_name: controlImage,
+        },
       };
-
-      if (ipAdapter.controlImage) {
-        ipAdapterNode.image = {
-          image_name: ipAdapter.controlImage,
-        };
-      } else {
-        return;
-      }
 
       graph.nodes[ipAdapterNode.id] = ipAdapterNode;
 
-      ipAdapterMetdata.push({
-        weight: weight,
-        ip_adapter_model: model,
-        begin_step_percent: beginStepPct,
-        end_step_percent: endStepPct,
-        image: ipAdapterNode.image,
-      });
+      ipAdapterMetdata.push(buildIPAdapterMetadata(ipAdapter));
 
       graph.edges.push({
         source: { node_id: ipAdapterNode.id, field: 'ip_adapter' },
@@ -84,4 +80,28 @@ export const addIPAdapterToLinearGraph = async (
 
     upsertMetadata(graph, { ipAdapters: ipAdapterMetdata });
   }
+};
+
+const buildIPAdapterMetadata = (ipAdapter: IPAdapterConfig): S['IPAdapterMetadataField'] => {
+  const { controlImage, beginStepPct, endStepPct, model, weight } = ipAdapter;
+
+  assert(model, 'IP Adapter model is required');
+
+  let image: ImageField | null = null;
+
+  if (controlImage) {
+    image = {
+      image_name: controlImage,
+    };
+  }
+
+  assert(image, 'IP Adapter image is required');
+
+  return {
+    ip_adapter_model: model,
+    weight,
+    begin_step_percent: beginStepPct,
+    end_step_percent: endStepPct,
+    image,
+  };
 };
