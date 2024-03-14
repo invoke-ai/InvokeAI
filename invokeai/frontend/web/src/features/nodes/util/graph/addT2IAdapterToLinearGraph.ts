@@ -1,11 +1,15 @@
 import type { RootState } from 'app/store/store';
 import { selectValidT2IAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
+import type { ControlAdapterProcessorType, T2IAdapterConfig } from 'features/controlAdapters/store/types';
+import type { ImageField } from 'features/nodes/types/common';
 import type {
   CollectInvocation,
   CoreMetadataInvocation,
   NonNullableGraph,
+  S,
   T2IAdapterInvocation,
 } from 'services/api/types';
+import { assert } from 'tsafe';
 
 import { T2I_ADAPTER_COLLECT } from './constants';
 import { upsertMetadata } from './metadata';
@@ -68,33 +72,12 @@ export const addT2IAdaptersToLinearGraph = async (
         resize_mode: resizeMode,
         t2i_adapter_model: model,
         weight: weight,
+        image: buildControlImage(controlImage, processedControlImage, processorType),
       };
-
-      if (processedControlImage && processorType !== 'none') {
-        // We've already processed the image in the app, so we can just use the processed image
-        t2iAdapterNode.image = {
-          image_name: processedControlImage,
-        };
-      } else if (controlImage) {
-        // The control image is preprocessed
-        t2iAdapterNode.image = {
-          image_name: controlImage,
-        };
-      } else {
-        // Skip CAs without an unprocessed image - should never happen, we already filtered the list of valid CAs
-        return;
-      }
 
       graph.nodes[t2iAdapterNode.id] = t2iAdapterNode;
 
-      t2iAdapterMetadata.push({
-        begin_step_percent: beginStepPct,
-        end_step_percent: endStepPct,
-        resize_mode: resizeMode,
-        t2i_adapter_model: t2iAdapter.model,
-        weight: weight,
-        image: t2iAdapterNode.image,
-      });
+      t2iAdapterMetadata.push(buildT2IAdapterMetadata(t2iAdapter));
 
       graph.edges.push({
         source: { node_id: t2iAdapterNode.id, field: 't2i_adapter' },
@@ -107,4 +90,53 @@ export const addT2IAdaptersToLinearGraph = async (
 
     upsertMetadata(graph, { t2iAdapters: t2iAdapterMetadata });
   }
+};
+
+const buildControlImage = (
+  controlImage: string | null,
+  processedControlImage: string | null,
+  processorType: ControlAdapterProcessorType
+): ImageField => {
+  let image: ImageField | null = null;
+  if (processedControlImage && processorType !== 'none') {
+    // We've already processed the image in the app, so we can just use the processed image
+    image = {
+      image_name: processedControlImage,
+    };
+  } else if (controlImage) {
+    // The control image is preprocessed
+    image = {
+      image_name: controlImage,
+    };
+  }
+  assert(image, 'T2I Adapter image is required');
+  return image;
+};
+
+const buildT2IAdapterMetadata = (t2iAdapter: T2IAdapterConfig): S['T2IAdapterMetadataField'] => {
+  const { controlImage, processedControlImage, beginStepPct, endStepPct, resizeMode, model, processorType, weight } =
+    t2iAdapter;
+
+  assert(model, 'T2I Adapter model is required');
+
+  const processed_image =
+    processedControlImage && processorType !== 'none'
+      ? {
+          image_name: processedControlImage,
+        }
+      : null;
+
+  assert(controlImage, 'T2I Adapter image is required');
+
+  return {
+    t2i_adapter_model: model,
+    weight,
+    begin_step_percent: beginStepPct,
+    end_step_percent: endStepPct,
+    resize_mode: resizeMode,
+    image: {
+      image_name: controlImage,
+    },
+    processed_image,
+  };
 };
