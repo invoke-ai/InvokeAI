@@ -1,122 +1,105 @@
 import { Flex, Spinner, Text } from '@invoke-ai/ui-library';
-import type { EntityState } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { forEach } from 'lodash-es';
-import { memo } from 'react';
-import { ALL_BASE_MODELS } from 'services/api/constants';
+import { memo, useMemo } from 'react';
 import {
-  useGetControlNetModelsQuery,
-  useGetIPAdapterModelsQuery,
-  useGetLoRAModelsQuery,
-  useGetMainModelsQuery,
-  useGetT2IAdapterModelsQuery,
-  useGetTextualInversionModelsQuery,
-  useGetVaeModelsQuery,
-} from 'services/api/endpoints/models';
-import type { AnyModelConfig } from 'services/api/types';
+  useControlNetModels,
+  useEmbeddingModels,
+  useIPAdapterModels,
+  useLoRAModels,
+  useMainModels,
+  useT2IAdapterModels,
+  useVAEModels,
+} from 'services/api/hooks/modelsByType';
+import type { AnyModelConfig, ModelType } from 'services/api/types';
 
 import { ModelListWrapper } from './ModelListWrapper';
 
 const ModelList = () => {
   const { searchTerm, filteredModelType } = useAppSelector((s) => s.modelmanagerV2);
 
-  const { filteredMainModels, isLoadingMainModels } = useGetMainModelsQuery(ALL_BASE_MODELS, {
-    selectFromResult: ({ data, isLoading }) => ({
-      filteredMainModels: modelsFilter(data, searchTerm, filteredModelType),
-      isLoadingMainModels: isLoading,
-    }),
-  });
-
-  const { filteredLoraModels, isLoadingLoraModels } = useGetLoRAModelsQuery(undefined, {
-    selectFromResult: ({ data, isLoading }) => ({
-      filteredLoraModels: modelsFilter(data, searchTerm, filteredModelType),
-      isLoadingLoraModels: isLoading,
-    }),
-  });
-
-  const { filteredTextualInversionModels, isLoadingTextualInversionModels } = useGetTextualInversionModelsQuery(
-    undefined,
-    {
-      selectFromResult: ({ data, isLoading }) => ({
-        filteredTextualInversionModels: modelsFilter(data, searchTerm, filteredModelType),
-        isLoadingTextualInversionModels: isLoading,
-      }),
-    }
+  const [mainModels, { isLoading: isLoadingMainModels }] = useMainModels();
+  const filteredMainModels = useMemo(
+    () => modelsFilter(mainModels, searchTerm, filteredModelType),
+    [mainModels, searchTerm, filteredModelType]
   );
 
-  const { filteredControlnetModels, isLoadingControlnetModels } = useGetControlNetModelsQuery(undefined, {
-    selectFromResult: ({ data, isLoading }) => ({
-      filteredControlnetModels: modelsFilter(data, searchTerm, filteredModelType),
-      isLoadingControlnetModels: isLoading,
-    }),
-  });
+  const [loraModels, { isLoading: isLoadingLoRAModels }] = useLoRAModels();
+  const filteredLoRAModels = useMemo(
+    () => modelsFilter(loraModels, searchTerm, filteredModelType),
+    [loraModels, searchTerm, filteredModelType]
+  );
 
-  const { filteredT2iAdapterModels, isLoadingT2IAdapterModels } = useGetT2IAdapterModelsQuery(undefined, {
-    selectFromResult: ({ data, isLoading }) => ({
-      filteredT2iAdapterModels: modelsFilter(data, searchTerm, filteredModelType),
-      isLoadingT2IAdapterModels: isLoading,
-    }),
-  });
+  const [embeddingModels, { isLoading: isLoadingEmbeddingModels }] = useEmbeddingModels();
+  const filteredEmbeddingModels = useMemo(
+    () => modelsFilter(embeddingModels, searchTerm, filteredModelType),
+    [embeddingModels, searchTerm, filteredModelType]
+  );
 
-  const { filteredIpAdapterModels, isLoadingIpAdapterModels } = useGetIPAdapterModelsQuery(undefined, {
-    selectFromResult: ({ data, isLoading }) => ({
-      filteredIpAdapterModels: modelsFilter(data, searchTerm, filteredModelType),
-      isLoadingIpAdapterModels: isLoading,
-    }),
-  });
+  const [controlNetModels, { isLoading: isLoadingControlNetModels }] = useControlNetModels();
+  const filteredControlNetModels = useMemo(
+    () => modelsFilter(controlNetModels, searchTerm, filteredModelType),
+    [controlNetModels, searchTerm, filteredModelType]
+  );
 
-  const { filteredVaeModels, isLoadingVaeModels } = useGetVaeModelsQuery(undefined, {
-    selectFromResult: ({ data, isLoading }) => ({
-      filteredVaeModels: modelsFilter(data, searchTerm, filteredModelType),
-      isLoadingVaeModels: isLoading,
-    }),
-  });
+  const [t2iAdapterModels, { isLoading: isLoadingT2IAdapterModels }] = useT2IAdapterModels();
+  const filteredT2IAdapterModels = useMemo(
+    () => modelsFilter(t2iAdapterModels, searchTerm, filteredModelType),
+    [t2iAdapterModels, searchTerm, filteredModelType]
+  );
+
+  const [ipAdapterModels, { isLoading: isLoadingIPAdapterModels }] = useIPAdapterModels();
+  const filteredIPAdapterModels = useMemo(
+    () => modelsFilter(ipAdapterModels, searchTerm, filteredModelType),
+    [ipAdapterModels, searchTerm, filteredModelType]
+  );
+
+  const [vaeModels, { isLoading: isLoadingVAEModels }] = useVAEModels();
+  const filteredVAEModels = useMemo(
+    () => modelsFilter(vaeModels, searchTerm, filteredModelType),
+    [vaeModels, searchTerm, filteredModelType]
+  );
 
   return (
     <ScrollableContent>
       <Flex flexDirection="column" w="full" h="full" gap={4}>
         {/* Main Model List */}
-        {isLoadingMainModels && <FetchingModelsLoader loadingMessage="Loading Main..." />}
+        {isLoadingMainModels && <FetchingModelsLoader loadingMessage="Loading Main Models..." />}
         {!isLoadingMainModels && filteredMainModels.length > 0 && (
           <ModelListWrapper title="Main" modelList={filteredMainModels} key="main" />
         )}
         {/* LoRAs List */}
-        {isLoadingLoraModels && <FetchingModelsLoader loadingMessage="Loading LoRAs..." />}
-        {!isLoadingLoraModels && filteredLoraModels.length > 0 && (
-          <ModelListWrapper title="LoRAs" modelList={filteredLoraModels} key="loras" />
+        {isLoadingLoRAModels && <FetchingModelsLoader loadingMessage="Loading LoRAs..." />}
+        {!isLoadingLoRAModels && filteredLoRAModels.length > 0 && (
+          <ModelListWrapper title="LoRA" modelList={filteredLoRAModels} key="loras" />
         )}
 
         {/* TI List */}
-        {isLoadingTextualInversionModels && <FetchingModelsLoader loadingMessage="Loading Textual Inversions..." />}
-        {!isLoadingTextualInversionModels && filteredTextualInversionModels.length > 0 && (
-          <ModelListWrapper
-            title="Textual Inversions"
-            modelList={filteredTextualInversionModels}
-            key="textual-inversions"
-          />
+        {isLoadingEmbeddingModels && <FetchingModelsLoader loadingMessage="Loading Embeddings..." />}
+        {!isLoadingEmbeddingModels && filteredEmbeddingModels.length > 0 && (
+          <ModelListWrapper title="Embedding" modelList={filteredEmbeddingModels} key="textual-inversions" />
         )}
 
         {/* VAE List */}
-        {isLoadingVaeModels && <FetchingModelsLoader loadingMessage="Loading VAEs..." />}
-        {!isLoadingVaeModels && filteredVaeModels.length > 0 && (
-          <ModelListWrapper title="VAEs" modelList={filteredVaeModels} key="vae" />
+        {isLoadingVAEModels && <FetchingModelsLoader loadingMessage="Loading VAEs..." />}
+        {!isLoadingVAEModels && filteredVAEModels.length > 0 && (
+          <ModelListWrapper title="VAE" modelList={filteredVAEModels} key="vae" />
         )}
 
         {/* Controlnet List */}
-        {isLoadingControlnetModels && <FetchingModelsLoader loadingMessage="Loading Controlnets..." />}
-        {!isLoadingControlnetModels && filteredControlnetModels.length > 0 && (
-          <ModelListWrapper title="Controlnets" modelList={filteredControlnetModels} key="controlnets" />
+        {isLoadingControlNetModels && <FetchingModelsLoader loadingMessage="Loading ControlNets..." />}
+        {!isLoadingControlNetModels && filteredControlNetModels.length > 0 && (
+          <ModelListWrapper title="ControlNet" modelList={filteredControlNetModels} key="controlnets" />
         )}
         {/* IP Adapter List */}
-        {isLoadingIpAdapterModels && <FetchingModelsLoader loadingMessage="Loading IP Adapters..." />}
-        {!isLoadingIpAdapterModels && filteredIpAdapterModels.length > 0 && (
-          <ModelListWrapper title="IP Adapters" modelList={filteredIpAdapterModels} key="ip-adapters" />
+        {isLoadingIPAdapterModels && <FetchingModelsLoader loadingMessage="Loading IP Adapters..." />}
+        {!isLoadingIPAdapterModels && filteredIPAdapterModels.length > 0 && (
+          <ModelListWrapper title="IP Adapter" modelList={filteredIPAdapterModels} key="ip-adapters" />
         )}
         {/* T2I Adapters List */}
         {isLoadingT2IAdapterModels && <FetchingModelsLoader loadingMessage="Loading T2I Adapters..." />}
-        {!isLoadingT2IAdapterModels && filteredT2iAdapterModels.length > 0 && (
-          <ModelListWrapper title="T2I Adapters" modelList={filteredT2iAdapterModels} key="t2i-adapters" />
+        {!isLoadingT2IAdapterModels && filteredT2IAdapterModels.length > 0 && (
+          <ModelListWrapper title="T2I Adapter" modelList={filteredT2IAdapterModels} key="t2i-adapters" />
         )}
       </Flex>
     </ScrollableContent>
@@ -126,25 +109,16 @@ const ModelList = () => {
 export default memo(ModelList);
 
 const modelsFilter = <T extends AnyModelConfig>(
-  data: EntityState<T, string> | undefined,
+  data: T[],
   nameFilter: string,
-  filteredModelType: string | null
+  filteredModelType: ModelType | null
 ): T[] => {
-  const filteredModels: T[] = [];
-
-  forEach(data?.entities, (model) => {
-    if (!model) {
-      return;
-    }
-
+  return data.filter((model) => {
     const matchesFilter = model.name.toLowerCase().includes(nameFilter.toLowerCase());
     const matchesType = filteredModelType ? model.type === filteredModelType : true;
 
-    if (matchesFilter && matchesType) {
-      filteredModels.push(model);
-    }
+    return matchesFilter && matchesType;
   });
-  return filteredModels;
 };
 
 const FetchingModelsLoader = memo(({ loadingMessage }: { loadingMessage?: string }) => {

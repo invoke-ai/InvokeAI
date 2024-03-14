@@ -90,8 +90,8 @@ class DepthAnythingDetector:
         np_image = np_image[:, :, ::-1] / 255.0
 
         image_height, image_width = np_image.shape[:2]
-        np_image = transform({"image": image})["image"]
-        tensor_image = torch.from_numpy(image).unsqueeze(0).to(choose_torch_device())
+        np_image = transform({"image": np_image})["image"]
+        tensor_image = torch.from_numpy(np_image).unsqueeze(0).to(choose_torch_device())
 
         with torch.no_grad():
             depth = self.model(tensor_image)

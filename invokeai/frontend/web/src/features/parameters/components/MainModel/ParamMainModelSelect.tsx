@@ -8,8 +8,7 @@ import { modelSelected } from 'features/parameters/store/actions';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
-import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import { useMainModels } from 'services/api/hooks/modelsByType';
 import type { MainModelConfig } from 'services/api/types';
 
 const selectModel = createMemoizedSelector(selectGenerationSlice, (generation) => generation.model);
@@ -18,7 +17,7 @@ const ParamMainModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const selectedModel = useAppSelector(selectModel);
-  const { data, isLoading } = useGetMainModelsQuery(NON_REFINER_BASE_MODELS);
+  const [modelConfigs, { isLoading }] = useMainModels();
 
   const _onChange = useCallback(
     (model: MainModelConfig | null) => {
@@ -35,7 +34,7 @@ const ParamMainModelSelect = () => {
   );
 
   const { items, selectedItem, onChange, placeholder } = useModelCustomSelect({
-    data,
+    modelConfigs,
     isLoading,
     selectedModel,
     onChange: _onChange,

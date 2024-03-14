@@ -7,14 +7,14 @@ import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { loraAdded, selectLoraSlice } from 'features/lora/store/loraSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
+import { useLoRAModels } from 'services/api/hooks/modelsByType';
 import type { LoRAModelConfig } from 'services/api/types';
 
 const selectAddedLoRAs = createMemoizedSelector(selectLoraSlice, (lora) => lora.loras);
 
 const LoRASelect = () => {
   const dispatch = useAppDispatch();
-  const { data, isLoading } = useGetLoRAModelsQuery();
+  const [modelConfigs, { isLoading }] = useLoRAModels();
   const { t } = useTranslation();
   const addedLoRAs = useAppSelector(selectAddedLoRAs);
   const currentBaseModel = useAppSelector((s) => s.generation.model?.base);
@@ -37,7 +37,7 @@ const LoRASelect = () => {
   );
 
   const { options, onChange } = useGroupedModelCombobox({
-    modelEntities: data,
+    modelConfigs,
     getIsDisabled,
     onChange: _onChange,
   });

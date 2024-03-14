@@ -48,7 +48,7 @@ export type VAEModelConfig = S['VAECheckpointConfig'] | S['VAEDiffusersConfig'];
 export type ControlNetModelConfig = S['ControlNetDiffusersConfig'] | S['ControlNetCheckpointConfig'];
 export type IPAdapterModelConfig = S['IPAdapterConfig'];
 export type T2IAdapterModelConfig = S['T2IAdapterConfig'];
-export type TextualInversionModelConfig = S['TextualInversionFileConfig'] | S['TextualInversionFolderConfig'];
+type TextualInversionModelConfig = S['TextualInversionFileConfig'] | S['TextualInversionFolderConfig'];
 type DiffusersModelConfig = S['MainDiffusersConfig'];
 type CheckpointModelConfig = S['MainCheckpointConfig'];
 type CLIPVisionDiffusersConfig = S['CLIPVisionDiffusersConfig'];
@@ -101,6 +101,18 @@ export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is M
 
 export const isRefinerMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'sdxl-refiner';
+};
+
+export const isSDXLMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'sdxl';
+};
+
+export const isNonSDXLMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && (config.base === 'sd-1' || config.base === 'sd-2');
+};
+
+export const isTIModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'embedding';
 };
 
 export type ModelInstallJob = S['ModelInstallJob'];
@@ -200,10 +212,3 @@ export type PostUploadAction =
   | CanvasInitialImageAction
   | ToastAction
   | AddToBatchAction;
-
-type TypeGuard<T> = {
-  (input: unknown): input is T;
-};
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type TypeGuardFor<T extends TypeGuard<any>> = T extends TypeGuard<infer U> ? U : never;

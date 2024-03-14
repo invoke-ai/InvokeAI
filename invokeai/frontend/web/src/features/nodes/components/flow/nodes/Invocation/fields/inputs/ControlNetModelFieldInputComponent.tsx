@@ -4,7 +4,7 @@ import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldControlNetModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type { ControlNetModelFieldInputInstance, ControlNetModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
-import { useGetControlNetModelsQuery } from 'services/api/endpoints/models';
+import { useControlNetModels } from 'services/api/hooks/modelsByType';
 import type { ControlNetModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
@@ -14,7 +14,7 @@ type Props = FieldComponentProps<ControlNetModelFieldInputInstance, ControlNetMo
 const ControlNetModelFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
-  const { data, isLoading } = useGetControlNetModelsQuery();
+  const [modelConfigs, { isLoading }] = useControlNetModels();
 
   const _onChange = useCallback(
     (value: ControlNetModelConfig | null) => {
@@ -33,7 +33,7 @@ const ControlNetModelFieldInputComponent = (props: Props) => {
   );
 
   const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
-    modelEntities: data,
+    modelConfigs,
     onChange: _onChange,
     selectedModel: field.value,
     isLoading,

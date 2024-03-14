@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useModelCustomSelect } from 'common/hooks/useModelCustomSelect';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterModel } from 'features/controlAdapters/hooks/useControlAdapterModel';
-import { useControlAdapterModelQuery } from 'features/controlAdapters/hooks/useControlAdapterModelQuery';
+import { useControlAdapterModels } from 'features/controlAdapters/hooks/useControlAdapterModels';
 import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
 import { controlAdapterModelChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -20,7 +20,7 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   const dispatch = useAppDispatch();
   const currentBaseModel = useAppSelector((s) => s.generation.model?.base);
 
-  const { data, isLoading } = useControlAdapterModelQuery(controlAdapterType);
+  const [modelConfigs, { isLoading }] = useControlAdapterModels(controlAdapterType);
 
   const _onChange = useCallback(
     (modelConfig: ControlNetModelConfig | IPAdapterModelConfig | T2IAdapterModelConfig | null) => {
@@ -43,7 +43,7 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   );
 
   const { items, selectedItem, onChange, placeholder } = useModelCustomSelect({
-    data,
+    modelConfigs,
     isLoading,
     selectedModel,
     onChange: _onChange,

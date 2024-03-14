@@ -7,8 +7,7 @@ import { zModelIdentifierField } from 'features/nodes/types/common';
 import { refinerModelChanged, selectSdxlSlice } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { REFINER_BASE_MODELS } from 'services/api/constants';
-import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import { useRefinerModels } from 'services/api/hooks/modelsByType';
 import type { MainModelConfig } from 'services/api/types';
 
 const selectModel = createMemoizedSelector(selectSdxlSlice, (sdxl) => sdxl.refinerModel);
@@ -19,7 +18,7 @@ const ParamSDXLRefinerModelSelect = () => {
   const dispatch = useAppDispatch();
   const model = useAppSelector(selectModel);
   const { t } = useTranslation();
-  const { data, isLoading } = useGetMainModelsQuery(REFINER_BASE_MODELS);
+  const [modelConfigs, { isLoading }] = useRefinerModels();
   const _onChange = useCallback(
     (model: MainModelConfig | null) => {
       if (!model) {
@@ -31,7 +30,7 @@ const ParamSDXLRefinerModelSelect = () => {
     [dispatch]
   );
   const { options, value, onChange, placeholder, noOptionsMessage } = useModelCombobox({
-    modelEntities: data,
+    modelConfigs,
     onChange: _onChange,
     selectedModel: model,
     isLoading,

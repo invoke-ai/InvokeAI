@@ -1,10 +1,10 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import type { AppDispatch, RootState } from 'app/store/store';
+import type { JSONObject } from 'common/types';
 import {
   controlAdapterModelCleared,
-  selectAllControlNets,
-  selectAllIPAdapters,
-  selectAllT2IAdapters,
+  selectControlAdapterAll,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { loraRemoved } from 'features/lora/store/loraSlice';
 import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
@@ -12,212 +12,162 @@ import { heightChanged, modelChanged, vaeSelected, widthChanged } from 'features
 import { zParameterModel, zParameterVAEModel } from 'features/parameters/types/parameterSchemas';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
-import { forEach, some } from 'lodash-es';
-import { mainModelsAdapterSelectors, modelsApi, vaeModelsAdapterSelectors } from 'services/api/endpoints/models';
-import type { TypeGuardFor } from 'services/api/types';
+import { forEach } from 'lodash-es';
+import type { Logger } from 'roarr';
+import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
+import type { AnyModelConfig } from 'services/api/types';
+import { isNonRefinerMainModelConfig, isRefinerMainModelModelConfig, isVAEModelConfig } from 'services/api/types';
 
 export const addModelsLoadedListener = (startAppListening: AppStartListening) => {
   startAppListening({
-    predicate: (action): action is TypeGuardFor<typeof modelsApi.endpoints.getMainModels.matchFulfilled> =>
-      modelsApi.endpoints.getMainModels.matchFulfilled(action) &&
-      !action.meta.arg.originalArgs.includes('sdxl-refiner'),
+    predicate: modelsApi.endpoints.getModelConfigs.matchFulfilled,
     effect: async (action, { getState, dispatch }) => {
       // models loaded, we need to ensure the selected model is available and if not, select the first one
       const log = logger('models');
-      log.info({ models: action.payload.entities }, `Main models loaded (${action.payload.ids.length})`);
+      log.info({ models: action.payload.entities }, `Models loaded (${action.payload.ids.length})`);
 
       const state = getState();
 
-      const currentModel = state.generation.model;
-      const models = mainModelsAdapterSelectors.selectAll(action.payload);
+      const models = modelConfigsAdapterSelectors.selectAll(action.payload);
 
-      if (models.length === 0) {
-        // No models loaded at all
-        dispatch(modelChanged(null));
-        return;
-      }
-
-      const isCurrentModelAvailable = currentModel ? models.some((m) => m.key === currentModel.key) : false;
-
-      if (isCurrentModelAvailable) {
-        return;
-      }
-
-      const defaultModel = state.config.sd.defaultModel;
-      const defaultModelInList = defaultModel ? models.find((m) => m.key === defaultModel) : false;
-
-      if (defaultModelInList) {
-        const result = zParameterModel.safeParse(defaultModelInList);
-        if (result.success) {
-          dispatch(modelChanged(defaultModelInList, currentModel));
-
-          const optimalDimension = getOptimalDimension(defaultModelInList);
-          if (getIsSizeOptimal(state.generation.width, state.generation.height, optimalDimension)) {
-            return;
-          }
-          const { width, height } = calculateNewSize(
-            state.generation.aspectRatio.value,
-            optimalDimension * optimalDimension
-          );
-
-          dispatch(widthChanged(width));
-          dispatch(heightChanged(height));
-          return;
-        }
-      }
-
-      const result = zParameterModel.safeParse(models[0]);
-
-      if (!result.success) {
-        log.error({ error: result.error.format() }, 'Failed to parse main model');
-        return;
-      }
-
-      dispatch(modelChanged(result.data, currentModel));
+      handleMainModels(models, state, dispatch, log);
+      handleRefinerModels(models, state, dispatch, log);
+      handleVAEModels(models, state, dispatch, log);
+      handleLoRAModels(models, state, dispatch, log);
+      handleControlAdapterModels(models, state, dispatch, log);
     },
   });
-  startAppListening({
-    predicate: (action): action is TypeGuardFor<typeof modelsApi.endpoints.getMainModels.matchFulfilled> =>
-      modelsApi.endpoints.getMainModels.matchFulfilled(action) && action.meta.arg.originalArgs.includes('sdxl-refiner'),
-    effect: async (action, { getState, dispatch }) => {
-      // models loaded, we need to ensure the selected model is available and if not, select the first one
-      const log = logger('models');
-      log.info({ models: action.payload.entities }, `SDXL Refiner models loaded (${action.payload.ids.length})`);
+};
 
-      const currentModel = getState().sdxl.refinerModel;
-      const models = mainModelsAdapterSelectors.selectAll(action.payload);
+type ModelHandler = (
+  models: AnyModelConfig[],
+  state: RootState,
+  dispatch: AppDispatch,
+  log: Logger<JSONObject>
+) => undefined;
 
-      if (models.length === 0) {
-        // No models loaded at all
-        dispatch(refinerModelChanged(null));
+const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
+  const currentModel = state.generation.model;
+  const mainModels = models.filter(isNonRefinerMainModelConfig);
+  if (mainModels.length === 0) {
+    // No models loaded at all
+    dispatch(modelChanged(null));
+    return;
+  }
+
+  const isCurrentMainModelAvailable = currentModel ? models.some((m) => m.key === currentModel.key) : false;
+
+  if (isCurrentMainModelAvailable) {
+    return;
+  }
+
+  const defaultModel = state.config.sd.defaultModel;
+  const defaultModelInList = defaultModel ? models.find((m) => m.key === defaultModel) : false;
+
+  if (defaultModelInList) {
+    const result = zParameterModel.safeParse(defaultModelInList);
+    if (result.success) {
+      dispatch(modelChanged(defaultModelInList, currentModel));
+
+      const optimalDimension = getOptimalDimension(defaultModelInList);
+      if (getIsSizeOptimal(state.generation.width, state.generation.height, optimalDimension)) {
         return;
       }
+      const { width, height } = calculateNewSize(
+        state.generation.aspectRatio.value,
+        optimalDimension * optimalDimension
+      );
 
-      const isCurrentModelAvailable = currentModel ? models.some((m) => m.key === currentModel.key) : false;
+      dispatch(widthChanged(width));
+      dispatch(heightChanged(height));
+      return;
+    }
+  }
 
-      if (!isCurrentModelAvailable) {
-        dispatch(refinerModelChanged(null));
-        return;
-      }
-    },
+  const result = zParameterModel.safeParse(models[0]);
+
+  if (!result.success) {
+    log.error({ error: result.error.format() }, 'Failed to parse main model');
+    return;
+  }
+
+  dispatch(modelChanged(result.data, currentModel));
+};
+
+const handleRefinerModels: ModelHandler = (models, state, dispatch, _log) => {
+  const currentRefinerModel = state.sdxl.refinerModel;
+  const refinerModels = models.filter(isRefinerMainModelModelConfig);
+  if (models.length === 0) {
+    // No models loaded at all
+    dispatch(refinerModelChanged(null));
+    return;
+  }
+
+  const isCurrentRefinerModelAvailable = currentRefinerModel
+    ? refinerModels.some((m) => m.key === currentRefinerModel.key)
+    : false;
+
+  if (!isCurrentRefinerModelAvailable) {
+    dispatch(refinerModelChanged(null));
+    return;
+  }
+};
+
+const handleVAEModels: ModelHandler = (models, state, dispatch, log) => {
+  const currentVae = state.generation.vae;
+
+  if (currentVae === null) {
+    // null is a valid VAE! it means "use the default with the main model"
+    return;
+  }
+  const vaeModels = models.filter(isVAEModelConfig);
+
+  const isCurrentVAEAvailable = vaeModels.some((m) => m.key === currentVae.key);
+
+  if (isCurrentVAEAvailable) {
+    return;
+  }
+
+  const firstModel = vaeModels[0];
+
+  if (!firstModel) {
+    // No custom VAEs loaded at all; use the default
+    dispatch(vaeSelected(null));
+    return;
+  }
+
+  const result = zParameterVAEModel.safeParse(firstModel);
+
+  if (!result.success) {
+    log.error({ error: result.error.format() }, 'Failed to parse VAE model');
+    return;
+  }
+
+  dispatch(vaeSelected(result.data));
+};
+
+const handleLoRAModels: ModelHandler = (models, state, dispatch, _log) => {
+  const loras = state.lora.loras;
+
+  forEach(loras, (lora, id) => {
+    const isLoRAAvailable = models.some((m) => m.key === lora.model.key);
+
+    if (isLoRAAvailable) {
+      return;
+    }
+
+    dispatch(loraRemoved(id));
   });
-  startAppListening({
-    matcher: modelsApi.endpoints.getVaeModels.matchFulfilled,
-    effect: async (action, { getState, dispatch }) => {
-      // VAEs loaded, need to reset the VAE is it's no longer available
-      const log = logger('models');
-      log.info({ models: action.payload.entities }, `VAEs loaded (${action.payload.ids.length})`);
+};
 
-      const currentVae = getState().generation.vae;
+const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
+  selectControlAdapterAll(state.controlAdapters).forEach((ca) => {
+    const isModelAvailable = models.some((m) => m.key === ca.model?.key);
 
-      if (currentVae === null) {
-        // null is a valid VAE! it means "use the default with the main model"
-        return;
-      }
+    if (isModelAvailable) {
+      return;
+    }
 
-      const isCurrentVAEAvailable = some(action.payload.entities, (m) => m?.key === currentVae?.key);
-
-      if (isCurrentVAEAvailable) {
-        return;
-      }
-
-      const firstModel = vaeModelsAdapterSelectors.selectAll(action.payload)[0];
-
-      if (!firstModel) {
-        // No custom VAEs loaded at all; use the default
-        dispatch(vaeSelected(null));
-        return;
-      }
-
-      const result = zParameterVAEModel.safeParse(firstModel);
-
-      if (!result.success) {
-        log.error({ error: result.error.format() }, 'Failed to parse VAE model');
-        return;
-      }
-
-      dispatch(vaeSelected(result.data));
-    },
-  });
-  startAppListening({
-    matcher: modelsApi.endpoints.getLoRAModels.matchFulfilled,
-    effect: async (action, { getState, dispatch }) => {
-      // LoRA models loaded - need to remove missing LoRAs from state
-      const log = logger('models');
-      log.info({ models: action.payload.entities }, `LoRAs loaded (${action.payload.ids.length})`);
-
-      const loras = getState().lora.loras;
-
-      forEach(loras, (lora, id) => {
-        const isLoRAAvailable = some(action.payload.entities, (m) => m?.key === lora?.model.key);
-
-        if (isLoRAAvailable) {
-          return;
-        }
-
-        dispatch(loraRemoved(id));
-      });
-    },
-  });
-  startAppListening({
-    matcher: modelsApi.endpoints.getControlNetModels.matchFulfilled,
-    effect: async (action, { getState, dispatch }) => {
-      // ControlNet models loaded - need to remove missing ControlNets from state
-      const log = logger('models');
-      log.info({ models: action.payload.entities }, `ControlNet models loaded (${action.payload.ids.length})`);
-
-      selectAllControlNets(getState().controlAdapters).forEach((ca) => {
-        const isModelAvailable = some(action.payload.entities, (m) => m?.key === ca?.model?.key);
-
-        if (isModelAvailable) {
-          return;
-        }
-
-        dispatch(controlAdapterModelCleared({ id: ca.id }));
-      });
-    },
-  });
-  startAppListening({
-    matcher: modelsApi.endpoints.getT2IAdapterModels.matchFulfilled,
-    effect: async (action, { getState, dispatch }) => {
-      // ControlNet models loaded - need to remove missing ControlNets from state
-      const log = logger('models');
-      log.info({ models: action.payload.entities }, `T2I Adapter models loaded (${action.payload.ids.length})`);
-
-      selectAllT2IAdapters(getState().controlAdapters).forEach((ca) => {
-        const isModelAvailable = some(action.payload.entities, (m) => m?.key === ca?.model?.key);
-
-        if (isModelAvailable) {
-          return;
-        }
-
-        dispatch(controlAdapterModelCleared({ id: ca.id }));
-      });
-    },
-  });
-  startAppListening({
-    matcher: modelsApi.endpoints.getIPAdapterModels.matchFulfilled,
-    effect: async (action, { getState, dispatch }) => {
-      // ControlNet models loaded - need to remove missing ControlNets from state
-      const log = logger('models');
-      log.info({ models: action.payload.entities }, `IP Adapter models loaded (${action.payload.ids.length})`);
-
-      selectAllIPAdapters(getState().controlAdapters).forEach((ca) => {
-        const isModelAvailable = some(action.payload.entities, (m) => m?.key === ca?.model?.key);
-
-        if (isModelAvailable) {
-          return;
-        }
-
-        dispatch(controlAdapterModelCleared({ id: ca.id }));
-      });
-    },
-  });
-  startAppListening({
-    matcher: modelsApi.endpoints.getTextualInversionModels.matchFulfilled,
-    effect: async (action) => {
-      const log = logger('models');
-      log.info({ models: action.payload.entities }, `Embeddings loaded (${action.payload.ids.length})`);
-    },
+    dispatch(controlAdapterModelCleared({ id: ca.id }));
   });
 };
