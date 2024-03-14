@@ -56,6 +56,7 @@ from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_sea
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     IPAdapterConditioningInfo,
+    IPAdapterData,
     Range,
     SDXLConditioningInfo,
     TextConditioningData,
@@ -66,7 +67,6 @@ from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 from ...backend.stable_diffusion.diffusers_pipeline import (
     ControlNetData,
-    IPAdapterData,
     StableDiffusionGeneratorPipeline,
     T2IAdapterData,
     image_resized_to_grid_as_tensor,
