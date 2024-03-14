@@ -23,7 +23,7 @@ class IPAdapterField(BaseModel):
     image: Union[ImageField, List[ImageField]] = Field(description="The IP-Adapter image prompt(s).")
     ip_adapter_model: ModelIdentifierField = Field(description="The IP-Adapter model to use.")
     image_encoder_model: ModelIdentifierField = Field(description="The name of the CLIP image encoder model.")
-    weight: Union[float, List[float]] = Field(default=1, description="The weight given to the ControlNet")
+    weight: Union[float, List[float]] = Field(default=1, description="The weight given to the IP-Adapter.")
     begin_step_percent: float = Field(
         default=0, ge=0, le=1, description="When the IP-Adapter is first applied (% of total steps)"
     )
