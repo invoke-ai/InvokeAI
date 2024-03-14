@@ -58,7 +58,10 @@ class ModelLoadService(ModelLoadServiceBase):
         :param submodel: For main (pipeline models), the submodel to fetch.
         """
 
-        self._invoker.services.events.emit_model_load_started(model_config, submodel_type)
+        # We don't have an invoker during testing
+        # TODO(psyche): Mock this method on the invoker in the tests
+        if hasattr(self, "_invoker"):
+            self._invoker.services.events.emit_model_load_started(model_config, submodel_type)
 
         implementation, model_config, submodel_type = self._registry.get_implementation(model_config, submodel_type)  # type: ignore
         loaded_model: LoadedModel = implementation(
@@ -68,6 +71,7 @@ class ModelLoadService(ModelLoadServiceBase):
             convert_cache=self._convert_cache,
         ).load_model(model_config, submodel_type)
 
-        self._invoker.services.events.emit_model_load_started(model_config, submodel_type)
+        if hasattr(self, "_invoker"):
+            self._invoker.services.events.emit_model_load_started(model_config, submodel_type)
 
         return loaded_model
