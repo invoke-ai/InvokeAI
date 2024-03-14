@@ -184,15 +184,25 @@ The provided token will be added as a `Bearer` token to the network requests to 
 
 ### Model Hashing
 
-Models are hashed during installation with the `BLAKE3` algorithm, providing a stable identifier for models across all platforms.
+Models are hashed during installation, providing a stable identifier for models across all platforms. The default algorithm is `blake3`, with a multi-threaded implementation.
 
-Model hashing is a one-time operation, but it may take a couple minutes to hash a large model collection. You may opt out of model hashing and instead have a random UUID assigned instead:
+If your models are stored on a spinning hard drive, we suggest using `blake3_single`, the single-threaded implementation. The hashes are the same, but it's much faster on spinning disks.
 
 ```yaml
 InvokeAI:
   Model Install:
-    skip_model_hash: true
+    hashing_algorithm: blake3_single
 ```
+
+Model hashing is a one-time operation, but it may take a couple minutes to hash a large model collection. You may opt out of model hashing entirely by setting the algorithm to `random`.
+
+```yaml
+InvokeAI:
+  Model Install:
+    hashing_algorithm: random
+```
+
+Most common algorithms are supported, like `md5`, `sha256`, and `sha512`. These are typically much, much slower than `blake3`.
 
 ### Paths
 
