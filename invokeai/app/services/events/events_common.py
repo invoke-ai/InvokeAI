@@ -93,7 +93,7 @@ class InvocationEventBase(SessionEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class InvocationStartedEvent(InvocationEventBase):
-    """Emitted when an invocation is started"""
+    """Event model for invocation_started"""
 
     __event_name__ = "invocation_started"
 
@@ -112,7 +112,7 @@ class InvocationStartedEvent(InvocationEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class InvocationDenoiseProgressEvent(InvocationEventBase):
-    """Emitted at each step during denoising of an invocation."""
+    """Event model for invocation_denoise_progress"""
 
     __event_name__ = "invocation_denoise_progress"
 
@@ -145,7 +145,7 @@ class InvocationDenoiseProgressEvent(InvocationEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class InvocationCompleteEvent(InvocationEventBase):
-    """Emitted when an invocation is complete"""
+    """Event model for invocation_complete"""
 
     __event_name__ = "invocation_complete"
 
@@ -169,7 +169,7 @@ class InvocationCompleteEvent(InvocationEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class InvocationErrorEvent(InvocationEventBase):
-    """Emitted when an invocation encounters an error"""
+    """Event model for invocation_error"""
 
     __event_name__ = "invocation_error"
 
@@ -195,7 +195,7 @@ class InvocationErrorEvent(InvocationEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class SessionStartedEvent(SessionEventBase):
-    """Emitted when a session has started"""
+    """Event model for session_started"""
 
     __event_name__ = "session_started"
 
@@ -211,7 +211,7 @@ class SessionStartedEvent(SessionEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class SessionCompleteEvent(SessionEventBase):
-    """Emitted when a session has completed all invocations"""
+    """Event model for session_complete"""
 
     __event_name__ = "session_complete"
 
@@ -227,7 +227,7 @@ class SessionCompleteEvent(SessionEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class SessionCanceledEvent(SessionEventBase):
-    """Emitted when a session is canceled"""
+    """Event model for session_canceled"""
 
     __event_name__ = "session_canceled"
 
@@ -243,7 +243,7 @@ class SessionCanceledEvent(SessionEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class QueueItemStatusChangedEvent(QueueItemEventBase):
-    """Emitted when a queue item's status changes"""
+    """Event model for queue_item_status_changed"""
 
     __event_name__ = "queue_item_status_changed"
 
@@ -277,7 +277,7 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class BatchEnqueuedEvent(QueueEventBase):
-    """Emitted when a batch is enqueued"""
+    """Event model for batch_enqueued"""
 
     __event_name__ = "batch_enqueued"
 
@@ -301,7 +301,7 @@ class BatchEnqueuedEvent(QueueEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class QueueClearedEvent(QueueEventBase):
-    """Emitted when a queue is cleared"""
+    """Event model for queue_cleared"""
 
     __event_name__ = "queue_cleared"
 
@@ -318,7 +318,7 @@ class DownloadEventBase(EventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class DownloadStartedEvent(DownloadEventBase):
-    """Emitted when a download is started"""
+    """Event model for download_started"""
 
     __event_name__ = "download_started"
 
@@ -331,7 +331,7 @@ class DownloadStartedEvent(DownloadEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class DownloadProgressEvent(DownloadEventBase):
-    """Emitted at intervals during a download"""
+    """Event model for download_progress"""
 
     __event_name__ = "download_progress"
 
@@ -346,7 +346,7 @@ class DownloadProgressEvent(DownloadEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class DownloadCompleteEvent(DownloadEventBase):
-    """Emitted when a download is completed"""
+    """Event model for download_complete"""
 
     __event_name__ = "download_complete"
 
@@ -360,7 +360,7 @@ class DownloadCompleteEvent(DownloadEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class DownloadCancelledEvent(DownloadEventBase):
-    """Emitted when a download is cancelled"""
+    """Event model for download_cancelled"""
 
     __event_name__ = "download_cancelled"
 
@@ -371,7 +371,7 @@ class DownloadCancelledEvent(DownloadEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class DownloadErrorEvent(DownloadEventBase):
-    """Emitted when a download encounters an error"""
+    """Event model for download_error"""
 
     __event_name__ = "download_error"
 
@@ -389,7 +389,7 @@ class ModelEventBase(EventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class ModelLoadStartedEvent(ModelEventBase):
-    """Emitted when a model is requested"""
+    """Event model for model_load_started"""
 
     __event_name__ = "model_load_started"
 
@@ -403,7 +403,7 @@ class ModelLoadStartedEvent(ModelEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class ModelLoadCompleteEvent(ModelEventBase):
-    """Emitted when a model is requested"""
+    """Event model for model_load_complete"""
 
     __event_name__ = "model_load_complete"
 
@@ -417,7 +417,7 @@ class ModelLoadCompleteEvent(ModelEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class ModelInstallDownloadProgressEvent(ModelEventBase):
-    """Emitted at intervals while the install job is in progress (remote models only)."""
+    """Event model for model_install_download_progress"""
 
     __event_name__ = "model_install_download_progress"
 
@@ -467,7 +467,7 @@ class ModelInstallDownloadsCompleteEvent(ModelEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class ModelInstallStartedEvent(ModelEventBase):
-    """Emitted once when an install job becomes active."""
+    """Event model for model_install_started"""
 
     __event_name__ = "model_install_started"
 
@@ -481,7 +481,7 @@ class ModelInstallStartedEvent(ModelEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class ModelInstallCompleteEvent(ModelEventBase):
-    """Emitted when an install job is completed successfully."""
+    """Event model for model_install_complete"""
 
     __event_name__ = "model_install_complete"
 
@@ -498,7 +498,7 @@ class ModelInstallCompleteEvent(ModelEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class ModelInstallCancelledEvent(ModelEventBase):
-    """Emitted when an install job is cancelled."""
+    """Event model for model_install_cancelled"""
 
     __event_name__ = "model_install_cancelled"
 
@@ -512,7 +512,7 @@ class ModelInstallCancelledEvent(ModelEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class ModelInstallErrorEvent(ModelEventBase):
-    """Emitted when an install job encounters an exception."""
+    """Event model for model_install_error"""
 
     __event_name__ = "model_install_error"
 
@@ -538,7 +538,7 @@ class BulkDownloadEventBase(EventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class BulkDownloadStartedEvent(BulkDownloadEventBase):
-    """Emitted when a bulk image download is started"""
+    """Event model for bulk_download_started"""
 
     __event_name__ = "bulk_download_started"
 
@@ -555,7 +555,7 @@ class BulkDownloadStartedEvent(BulkDownloadEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class BulkDownloadCompleteEvent(BulkDownloadEventBase):
-    """Emitted when a bulk image download is started"""
+    """Event model for bulk_download_complete"""
 
     __event_name__ = "bulk_download_complete"
 
@@ -572,7 +572,7 @@ class BulkDownloadCompleteEvent(BulkDownloadEventBase):
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
 class BulkDownloadErrorEvent(BulkDownloadEventBase):
-    """Emitted when a bulk image download is started"""
+    """Event model for bulk_download_error"""
 
     __event_name__ = "bulk_download_error"
 
