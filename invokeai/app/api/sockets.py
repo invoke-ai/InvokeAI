@@ -1,66 +1,119 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+from typing import Any
+
 from fastapi import FastAPI
-from fastapi_events.handlers.local import local_handler
-from fastapi_events.typing import Event
+from pydantic import BaseModel
 from socketio import ASGIApp, AsyncServer
 
-from ..services.events.events_base import EventServiceBase
+from invokeai.app.services.events.events_common import (
+    BatchEnqueuedEvent,
+    BulkDownloadCompleteEvent,
+    BulkDownloadErrorEvent,
+    BulkDownloadEvent,
+    BulkDownloadStartedEvent,
+    FastAPIEvent,
+    InvocationCompleteEvent,
+    InvocationDenoiseProgressEvent,
+    InvocationErrorEvent,
+    InvocationStartedEvent,
+    ModelEvent,
+    ModelInstallCancelledEvent,
+    ModelInstallCompleteEvent,
+    ModelInstallDownloadProgressEvent,
+    ModelInstallErrorEvent,
+    ModelInstallStartedEvent,
+    ModelLoadCompleteEvent,
+    ModelLoadStartedEvent,
+    QueueClearedEvent,
+    QueueEvent,
+    QueueItemStatusChangedEvent,
+    SessionCanceledEvent,
+    SessionCompleteEvent,
+    SessionStartedEvent,
+    register_events,
+)
+
+
+class QueueSubscriptionEvent(BaseModel):
+    queue_id: str
+
+
+class BulkDownloadSubscriptionEvent(BaseModel):
+    bulk_download_id: str
 
 
 class SocketIO:
-    __sio: AsyncServer
-    __app: ASGIApp
+    _sub_queue = "subscribe_queue"
+    _unsub_queue = "unsubscribe_queue"
 
-    __sub_queue: str = "subscribe_queue"
-    __unsub_queue: str = "unsubscribe_queue"
-
-    __sub_bulk_download: str = "subscribe_bulk_download"
-    __unsub_bulk_download: str = "unsubscribe_bulk_download"
+    _sub_bulk_download = "subscribe_bulk_download"
+    _unsub_bulk_download = "unsubscribe_bulk_download"
 
     def __init__(self, app: FastAPI):
-        self.__sio = AsyncServer(async_mode="asgi", cors_allowed_origins="*")
-        self.__app = ASGIApp(socketio_server=self.__sio, socketio_path="/ws/socket.io")
-        app.mount("/ws", self.__app)
+        self._sio = AsyncServer(async_mode="asgi", cors_allowed_origins="*")
+        self._app = ASGIApp(socketio_server=self._sio, socketio_path="/ws/socket.io")
+        app.mount("/ws", self._app)
 
-        self.__sio.on(self.__sub_queue, handler=self._handle_sub_queue)
-        self.__sio.on(self.__unsub_queue, handler=self._handle_unsub_queue)
-        local_handler.register(event_name=EventServiceBase.queue_event, _func=self._handle_queue_event)
-        local_handler.register(event_name=EventServiceBase.model_event, _func=self._handle_model_event)
+        self._sio.on(self._sub_queue, handler=self._handle_sub_queue)
+        self._sio.on(self._unsub_queue, handler=self._handle_unsub_queue)
+        self._sio.on(self._sub_bulk_download, handler=self._handle_sub_bulk_download)
+        self._sio.on(self._unsub_bulk_download, handler=self._handle_unsub_bulk_download)
 
-        self.__sio.on(self.__sub_bulk_download, handler=self._handle_sub_bulk_download)
-        self.__sio.on(self.__unsub_bulk_download, handler=self._handle_unsub_bulk_download)
-        local_handler.register(event_name=EventServiceBase.bulk_download_event, _func=self._handle_bulk_download_event)
-
-    async def _handle_queue_event(self, event: Event):
-        await self.__sio.emit(
-            event=event[1]["event"],
-            data=event[1]["data"],
-            room=event[1]["data"]["queue_id"],
+        register_events(
+            {
+                InvocationStartedEvent,
+                InvocationDenoiseProgressEvent,
+                InvocationCompleteEvent,
+                InvocationErrorEvent,
+                SessionStartedEvent,
+                SessionCompleteEvent,
+                SessionCanceledEvent,
+                QueueItemStatusChangedEvent,
+                BatchEnqueuedEvent,
+                QueueClearedEvent,
+            },
+            self._handle_queue_event,
         )
 
-    async def _handle_sub_queue(self, sid, data, *args, **kwargs) -> None:
-        if "queue_id" in data:
-            await self.__sio.enter_room(sid, data["queue_id"])
-
-    async def _handle_unsub_queue(self, sid, data, *args, **kwargs) -> None:
-        if "queue_id" in data:
-            await self.__sio.leave_room(sid, data["queue_id"])
-
-    async def _handle_model_event(self, event: Event) -> None:
-        await self.__sio.emit(event=event[1]["event"], data=event[1]["data"])
-
-    async def _handle_bulk_download_event(self, event: Event):
-        await self.__sio.emit(
-            event=event[1]["event"],
-            data=event[1]["data"],
-            room=event[1]["data"]["bulk_download_id"],
+        register_events(
+            {
+                ModelLoadStartedEvent,
+                ModelLoadCompleteEvent,
+                ModelInstallDownloadProgressEvent,
+                ModelInstallStartedEvent,
+                ModelInstallCompleteEvent,
+                ModelInstallCancelledEvent,
+                ModelInstallErrorEvent,
+            },
+            self._handle_model_event,
         )
 
-    async def _handle_sub_bulk_download(self, sid, data, *args, **kwargs):
-        if "bulk_download_id" in data:
-            await self.__sio.enter_room(sid, data["bulk_download_id"])
+        register_events(
+            {BulkDownloadStartedEvent, BulkDownloadCompleteEvent, BulkDownloadErrorEvent},
+            self._handle_bulk_image_download_event,
+        )
 
-    async def _handle_unsub_bulk_download(self, sid, data, *args, **kwargs):
-        if "bulk_download_id" in data:
-            await self.__sio.leave_room(sid, data["bulk_download_id"])
+    async def _handle_sub_queue(self, sid: str, data: Any) -> None:
+        await self._sio.enter_room(sid, QueueSubscriptionEvent(**data).queue_id)
+
+    async def _handle_unsub_queue(self, sid: str, data: Any) -> None:
+        await self._sio.leave_room(sid, QueueSubscriptionEvent(**data).queue_id)
+
+    async def _handle_sub_bulk_download(self, sid: str, data: Any) -> None:
+        await self._sio.enter_room(sid, BulkDownloadSubscriptionEvent(**data).bulk_download_id)
+
+    async def _handle_unsub_bulk_download(self, sid: str, data: Any) -> None:
+        await self._sio.leave_room(sid, BulkDownloadSubscriptionEvent(**data).bulk_download_id)
+
+    async def _handle_queue_event(self, event: FastAPIEvent[QueueEvent]):
+        event_name, payload = event
+        await self._sio.emit(event=event_name, data=payload.model_dump(), room=payload.queue_id)
+
+    async def _handle_model_event(self, event: FastAPIEvent[ModelEvent]) -> None:
+        event_name, payload = event
+        await self._sio.emit(event=event_name, data=payload.model_dump())
+
+    async def _handle_bulk_image_download_event(self, event: FastAPIEvent[BulkDownloadEvent]) -> None:
+        event_name, payload = event
+        await self._sio.emit(event=event_name, data=payload.model_dump())

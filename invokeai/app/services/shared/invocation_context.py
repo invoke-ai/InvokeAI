@@ -353,11 +353,11 @@ class ModelsInterface(InvocationContextInterface):
 
         if isinstance(identifier, str):
             model = self._services.model_manager.store.get_model(identifier)
-            return self._services.model_manager.load.load_model(model, submodel_type, self._data)
+            return self._services.model_manager.load.load_model(model, submodel_type)
         else:
             _submodel_type = submodel_type or identifier.submodel_type
             model = self._services.model_manager.store.get_model(identifier.key)
-            return self._services.model_manager.load.load_model(model, _submodel_type, self._data)
+            return self._services.model_manager.load.load_model(model, _submodel_type)
 
     def load_by_attrs(
         self, name: str, base: BaseModelType, type: ModelType, submodel_type: Optional[SubModelType] = None
@@ -382,7 +382,7 @@ class ModelsInterface(InvocationContextInterface):
         if len(configs) > 1:
             raise ValueError(f"More than one model found with name {name}, base {base}, and type {type}")
 
-        return self._services.model_manager.load.load_model(configs[0], submodel_type, self._data)
+        return self._services.model_manager.load.load_model(configs[0], submodel_type)
 
     def get_config(self, identifier: Union[str, "ModelIdentifierField"]) -> AnyModelConfig:
         """Gets a model's config.

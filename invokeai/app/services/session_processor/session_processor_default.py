@@ -4,11 +4,15 @@ from threading import BoundedSemaphore, Thread
 from threading import Event as ThreadEvent
 from typing import Optional
 
-from fastapi_events.handlers.local import local_handler
-from fastapi_events.typing import Event as FastAPIEvent
-
 from invokeai.app.invocations.baseinvocation import BaseInvocation
-from invokeai.app.services.events.events_base import EventServiceBase
+from invokeai.app.services.events.events_common import (
+    BatchEnqueuedEvent,
+    FastAPIEvent,
+    QueueClearedEvent,
+    QueueEvent,
+    SessionCanceledEvent,
+    register_events,
+)
 from invokeai.app.services.invocation_stats.invocation_stats_common import GESStatsNotFoundError
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
@@ -31,8 +35,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self._poll_now_event = ThreadEvent()
         self._cancel_event = ThreadEvent()
 
-        local_handler.register(event_name=EventServiceBase.queue_event, _func=self._on_queue_event)
-
         self._thread_limit = thread_limit
         self._thread_semaphore = BoundedSemaphore(thread_limit)
         self._polling_interval = polling_interval
@@ -48,6 +50,8 @@ class DefaultSessionProcessor(SessionProcessorBase):
             if self._invoker.services.configuration.profile_graphs
             else None
         )
+
+        register_events({SessionCanceledEvent, QueueClearedEvent, BatchEnqueuedEvent}, self._on_queue_event)
 
         self._thread = Thread(
             name="session_processor",
@@ -67,24 +71,23 @@ class DefaultSessionProcessor(SessionProcessorBase):
     def _poll_now(self) -> None:
         self._poll_now_event.set()
 
-    async def _on_queue_event(self, event: FastAPIEvent) -> None:
-        event_name = event[1]["event"]
-
+    async def _on_queue_event(self, event: FastAPIEvent[QueueEvent]) -> None:
+        _event_name, payload = event
         if (
-            event_name == "session_canceled"
+            isinstance(payload, SessionCanceledEvent)
             and self._queue_item
-            and self._queue_item.item_id == event[1]["data"]["queue_item_id"]
+            and self._queue_item.item_id == payload.item_id
         ):
             self._cancel_event.set()
             self._poll_now()
         elif (
-            event_name == "queue_cleared"
+            isinstance(payload, QueueClearedEvent)
             and self._queue_item
-            and self._queue_item.queue_id == event[1]["data"]["queue_id"]
+            and self._queue_item.queue_id == payload.queue_id
         ):
             self._cancel_event.set()
             self._poll_now()
-        elif event_name == "batch_enqueued":
+        elif isinstance(payload, BatchEnqueuedEvent):
             self._poll_now()
         elif event_name == "queue_item_status_changed" and event[1]["data"]["queue_item"]["status"] in [
             "completed",
@@ -139,6 +142,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         poll_now_event.wait(self._polling_interval)
                         continue
 
+                    self._invoker.services.events.emit_session_started(self._queue_item)
                     self._invoker.services.logger.debug(f"Executing queue item {self._queue_item.item_id}")
                     cancel_event.clear()
 
@@ -154,15 +158,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         # get the source node id to provide to clients (the prepared node id is not as useful)
                         source_invocation_id = self._queue_item.session.prepared_source_mapping[self._invocation.id]
 
-                        # Send starting event
-                        self._invoker.services.events.emit_invocation_started(
-                            queue_batch_id=self._queue_item.batch_id,
-                            queue_item_id=self._queue_item.item_id,
-                            queue_id=self._queue_item.queue_id,
-                            graph_execution_state_id=self._queue_item.session_id,
-                            node=self._invocation.model_dump(),
-                            source_node_id=source_invocation_id,
-                        )
+                        self._invoker.services.events.emit_invocation_started(self._queue_item, self._invocation)
 
                         # Innermost processor try block; any unhandled exception is an invocation error & will fail the graph
                         try:
@@ -189,15 +185,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
                                 # Save outputs and history
                                 self._queue_item.session.complete(self._invocation.id, outputs)
 
-                                # Send complete event
+                                # Dispatch invocation complete event
                                 self._invoker.services.events.emit_invocation_complete(
-                                    queue_batch_id=self._queue_item.batch_id,
-                                    queue_item_id=self._queue_item.item_id,
-                                    queue_id=self._queue_item.queue_id,
-                                    graph_execution_state_id=self._queue_item.session.id,
-                                    node=self._invocation.model_dump(),
-                                    source_node_id=source_invocation_id,
-                                    result=outputs.model_dump(),
+                                    self._queue_item, self._invocation, outputs
                                 )
 
                         except KeyboardInterrupt:
@@ -229,12 +219,8 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
                             # Send error event
                             self._invoker.services.events.emit_invocation_error(
-                                queue_batch_id=self._queue_item.session_id,
-                                queue_item_id=self._queue_item.item_id,
-                                queue_id=self._queue_item.queue_id,
-                                graph_execution_state_id=self._queue_item.session.id,
-                                node=self._invocation.model_dump(),
-                                source_node_id=source_invocation_id,
+                                queue_item=self._queue_item,
+                                invocation=self._invocation,
                                 error_type=e.__class__.__name__,
                                 error=error,
                                 user_id=None,
@@ -245,12 +231,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         # The session is complete if the all invocations are complete or there was an error
                         if self._queue_item.session.is_complete() or cancel_event.is_set():
                             # Send complete event
-                            self._invoker.services.events.emit_graph_execution_complete(
-                                queue_batch_id=self._queue_item.batch_id,
-                                queue_item_id=self._queue_item.item_id,
-                                queue_id=self._queue_item.queue_id,
-                                graph_execution_state_id=self._queue_item.session.id,
-                            )
+                            self._invoker.services.events.emit_session_complete(self._queue_item)
                             # If we are profiling, stop the profiler and dump the profile & stats
                             if self._profiler:
                                 profile_path = self._profiler.stop()

@@ -17,7 +17,7 @@ from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
 from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
-from invokeai.app.services.model_install import ModelInstallJob
+from invokeai.app.services.model_install.model_install_common import ModelInstallJob
 from invokeai.app.services.model_records import (
     DuplicateModelException,
     InvalidModelException,
