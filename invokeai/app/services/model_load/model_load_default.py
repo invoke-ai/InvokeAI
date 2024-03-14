@@ -5,7 +5,6 @@ from typing import Optional, Type
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.shared.invocation_context import InvocationContextData
 from invokeai.backend.model_manager import AnyModel, AnyModelConfig, SubModelType
 from invokeai.backend.model_manager.load import (
     LoadedModel,
@@ -51,25 +50,15 @@ class ModelLoadService(ModelLoadServiceBase):
         """Return the checkpoint convert cache used by this loader."""
         return self._convert_cache
 
-    def load_model(
-        self,
-        model_config: AnyModelConfig,
-        submodel_type: Optional[SubModelType] = None,
-        context_data: Optional[InvocationContextData] = None,
-    ) -> LoadedModel:
+    def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
         """
         Given a model's configuration, load it and return the LoadedModel object.
 
         :param model_config: Model configuration record (as returned by ModelRecordBase.get_model())
         :param submodel: For main (pipeline models), the submodel to fetch.
-        :param context: Invocation context used for event reporting
         """
-        if context_data:
-            self._emit_load_event(
-                context_data=context_data,
-                model_config=model_config,
-                submodel_type=submodel_type,
-            )
+
+        self._invoker.services.events.emit_model_load_started(model_config, submodel_type)
 
         implementation, model_config, submodel_type = self._registry.get_implementation(model_config, submodel_type)  # type: ignore
         loaded_model: LoadedModel = implementation(
@@ -79,40 +68,6 @@ class ModelLoadService(ModelLoadServiceBase):
             convert_cache=self._convert_cache,
         ).load_model(model_config, submodel_type)
 
-        if context_data:
-            self._emit_load_event(
-                context_data=context_data,
-                model_config=model_config,
-                submodel_type=submodel_type,
-                loaded=True,
-            )
+        self._invoker.services.events.emit_model_load_started(model_config, submodel_type)
+
         return loaded_model
-
-    def _emit_load_event(
-        self,
-        context_data: InvocationContextData,
-        model_config: AnyModelConfig,
-        loaded: Optional[bool] = False,
-        submodel_type: Optional[SubModelType] = None,
-    ) -> None:
-        if not self._invoker:
-            return
-
-        if not loaded:
-            self._invoker.services.events.emit_model_load_started(
-                queue_id=context_data.queue_item.queue_id,
-                queue_item_id=context_data.queue_item.item_id,
-                queue_batch_id=context_data.queue_item.batch_id,
-                graph_execution_state_id=context_data.queue_item.session_id,
-                model_config=model_config,
-                submodel_type=submodel_type,
-            )
-        else:
-            self._invoker.services.events.emit_model_load_completed(
-                queue_id=context_data.queue_item.queue_id,
-                queue_item_id=context_data.queue_item.item_id,
-                queue_batch_id=context_data.queue_item.batch_id,
-                graph_execution_state_id=context_data.queue_item.session_id,
-                model_config=model_config,
-                submodel_type=submodel_type,
-            )

@@ -113,15 +113,10 @@ def stable_diffusion_step_callback(
 
     dataURL = image_to_dataURL(image, image_format="JPEG")
 
-    events.emit_generator_progress(
-        queue_id=context_data.queue_item.queue_id,
-        queue_item_id=context_data.queue_item.item_id,
-        queue_batch_id=context_data.queue_item.batch_id,
-        graph_execution_state_id=context_data.queue_item.session_id,
-        node_id=context_data.invocation.id,
-        source_node_id=context_data.source_invocation_id,
-        progress_image=ProgressImage(width=width, height=height, dataURL=dataURL),
-        step=intermediate_state.step,
-        order=intermediate_state.order,
-        total_steps=intermediate_state.total_steps,
+    events.emit_invocation_denoise_progress(
+        context_data.queue_item,
+        context_data.invocation,
+        intermediate_state.step,
+        intermediate_state.total_steps * intermediate_state.order,
+        ProgressImage(dataURL=dataURL, width=width, height=height),
     )
