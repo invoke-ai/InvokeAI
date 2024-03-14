@@ -8,13 +8,15 @@ export const addModelLoadEventListener = (startAppListening: AppStartListening) 
   startAppListening({
     actionCreator: socketModelLoadStarted,
     effect: (action) => {
-      const { base_model, model_name, model_type, submodel } = action.payload.data;
+      const { model_config, submodel_type } = action.payload.data;
+      const { name, base, type } = model_config;
 
-      let message = `Model load started: ${base_model}/${model_type}/${model_name}`;
-
-      if (submodel) {
-        message = message.concat(`/${submodel}`);
+      const extras: string[] = [base, type];
+      if (submodel_type) {
+        extras.push(submodel_type);
       }
+
+      const message = `Model load started: ${name} (${extras.join(', ')})`;
 
       log.debug(action.payload, message);
     },
@@ -23,13 +25,15 @@ export const addModelLoadEventListener = (startAppListening: AppStartListening) 
   startAppListening({
     actionCreator: socketModelLoadCompleted,
     effect: (action) => {
-      const { base_model, model_name, model_type, submodel } = action.payload.data;
+      const { model_config, submodel_type } = action.payload.data;
+      const { name, base, type } = model_config;
 
-      let message = `Model load complete: ${base_model}/${model_type}/${model_name}`;
-
-      if (submodel) {
-        message = message.concat(`/${submodel}`);
+      const extras: string[] = [base, type];
+      if (submodel_type) {
+        extras.push(submodel_type);
       }
+
+      const message = `Model load complete: ${name} (${extras.join(', ')})`;
 
       log.debug(action.payload, message);
     },
