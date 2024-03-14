@@ -1,8 +1,7 @@
 import type { UseToastOptions } from '@invoke-ai/ui-library';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice, isAnyOf } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { calculateStepPercentage } from 'features/system/util/calculateStepPercentage';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
 import { startCase } from 'lodash-es';
@@ -14,12 +13,10 @@ import {
   socketGraphExecutionStateComplete,
   socketInvocationComplete,
   socketInvocationError,
-  socketInvocationRetrievalError,
   socketInvocationStarted,
-  socketModelLoadCompleted,
+  socketModelLoadComplete,
   socketModelLoadStarted,
   socketQueueItemStatusChanged,
-  socketSessionRetrievalError,
 } from 'services/events/actions';
 
 import type { Language, SystemState } from './types';
@@ -110,20 +107,12 @@ export const systemSlice = createSlice({
      * Generator Progress
      */
     builder.addCase(socketGeneratorProgress, (state, action) => {
-      const {
-        step,
-        total_steps,
-        order,
-        progress_image,
-        graph_execution_state_id: session_id,
-        queue_batch_id: batch_id,
-      } = action.payload.data;
+      const { step, total_steps, progress_image, session_id, batch_id } = action.payload.data;
 
       state.denoiseProgress = {
         step,
         total_steps,
-        order,
-        percentage: calculateStepPercentage(step, total_steps, order),
+        percentage: step / total_steps,
         progress_image,
         session_id,
         batch_id,
@@ -152,12 +141,12 @@ export const systemSlice = createSlice({
       state.status = 'LOADING_MODEL';
     });
 
-    builder.addCase(socketModelLoadCompleted, (state) => {
+    builder.addCase(socketModelLoadComplete, (state) => {
       state.status = 'CONNECTED';
     });
 
     builder.addCase(socketQueueItemStatusChanged, (state, action) => {
-      if (['completed', 'canceled', 'failed'].includes(action.payload.data.queue_item.status)) {
+      if (['completed', 'canceled', 'failed'].includes(action.payload.data.status)) {
         state.status = 'CONNECTED';
         state.denoiseProgress = null;
       }
@@ -168,7 +157,7 @@ export const systemSlice = createSlice({
     /**
      * Any server error
      */
-    builder.addMatcher(isAnyServerError, (state, action) => {
+    builder.addCase(socketInvocationError, (state, action) => {
       state.toastQueue.push(
         makeToast({
           title: t('toast.serverError'),
@@ -193,8 +182,6 @@ export const {
   shouldUseWatermarkerChanged,
   setShouldEnableInformationalPopovers,
 } = systemSlice.actions;
-
-const isAnyServerError = isAnyOf(socketInvocationError, socketSessionRetrievalError, socketInvocationRetrievalError);
 
 export const selectSystemSlice = (state: RootState) => state.system;
 
