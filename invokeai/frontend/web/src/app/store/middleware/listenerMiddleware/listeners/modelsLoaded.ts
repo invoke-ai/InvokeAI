@@ -55,14 +55,13 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
     return;
   }
 
-  const isCurrentMainModelAvailable = currentModel ? models.some((m) => m.key === currentModel.key) : false;
-
+  const isCurrentMainModelAvailable = currentModel ? mainModels.some((m) => m.key === currentModel.key) : false;
   if (isCurrentMainModelAvailable) {
     return;
   }
 
   const defaultModel = state.config.sd.defaultModel;
-  const defaultModelInList = defaultModel ? models.find((m) => m.key === defaultModel) : false;
+  const defaultModelInList = defaultModel ? mainModels.find((m) => m.key === defaultModel) : false;
 
   if (defaultModelInList) {
     const result = zParameterModel.safeParse(defaultModelInList);
@@ -84,7 +83,7 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
     }
   }
 
-  const result = zParameterModel.safeParse(models[0]);
+  const result = zParameterModel.safeParse(mainModels[0]);
 
   if (!result.success) {
     log.error({ error: result.error.format() }, 'Failed to parse main model');
