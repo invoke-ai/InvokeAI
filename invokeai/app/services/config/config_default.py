@@ -1,3 +1,6 @@
+# TODO(psyche): pydantic-settings supports YAML settings sources. If we can figure out a way to integrate the YAML
+# migration logic, we could use that for simpler config loading.
+
 from __future__ import annotations
 
 import os
