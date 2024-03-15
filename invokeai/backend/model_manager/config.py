@@ -32,7 +32,7 @@ from typing_extensions import Annotated, Any, Dict
 from invokeai.app.invocations.constants import SCHEDULER_NAME_VALUES
 from invokeai.app.util.misc import uuid_string
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
-from invokeai.backend.lora import LoRAModelRaw
+from invokeai.backend.lora_model_raw import LoRAModelRaw
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
 from invokeai.backend.textual_inversion import TextualInversionModelRaw
 
