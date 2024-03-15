@@ -44,6 +44,7 @@ dependencies = [
   "onnx==1.15.0",
   "onnxruntime==1.16.3",
   "opencv-python==4.9.0.80",
+  "peft==0.9.0",
   "pytorch-lightning==2.1.3",
   "safetensors==0.4.2",
   "timm==0.6.13",               # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
@@ -73,7 +74,7 @@ dependencies = [
   "easing-functions",
   "einops",
   "facexlib",
-  "matplotlib",       # needed for plotting of Penner easing functions
+  "matplotlib",                            # needed for plotting of Penner easing functions
   "npyscreen",
   "omegaconf",
   "picklescan",
