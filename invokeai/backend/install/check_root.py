@@ -7,6 +7,7 @@ import sys
 from invokeai.app.services.config import InvokeAIAppConfig
 
 
+# TODO(psyche): Should this also check for things like ESRGAN models, database, etc?
 def validate_root_structure(config: InvokeAIAppConfig) -> None:
     assert config.db_path.parent.exists(), f"{config.db_path.parent} not found"
     assert config.models_path.exists(), f"{config.models_path} not found"
