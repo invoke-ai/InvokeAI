@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
-from invokeai.frontend.cli.app_arg_parser import app_arg_parser
+from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
 INIT_FILE = Path("invokeai.yaml")
 DB_FILE = Path("invokeai.db")
@@ -218,24 +218,12 @@ class InvokeAIAppConfig(BaseSettings):
 
         This function will write to the `invokeai.yaml` file if the config is migrated.
 
-        If there is no `invokeai.yaml` file, one will be written.
-
         Args:
             source_path: Path to the config file. If not provided, the default path is used.
         """
         path = source_path or self.init_file_path
-
-        if not path.exists():
-            self.write_file(path)
-        else:
-            config_from_file = load_and_migrate_config(path)
-            self.update_config(config_from_file)
-
-    def parse_args(self) -> None:
-        """Parse the CLI args and set the runtime root directory."""
-        opt = app_arg_parser.parse_args()
-        if root := getattr(opt, "root", None):
-            self.set_root(Path(root))
+        config_from_file = load_and_migrate_config(path)
+        self.update_config(config_from_file)
 
     def set_root(self, root: Path) -> None:
         """Set the runtime root directory. This is typically set using a CLI arg."""
@@ -412,5 +400,29 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
 
 @lru_cache(maxsize=1)
 def get_config() -> InvokeAIAppConfig:
-    """Return the global singleton app config"""
-    return InvokeAIAppConfig()
+    """Return the global singleton app config.
+
+    When called, this function will parse the CLI args and merge in config from the `invokeai.yaml` config file.
+    """
+    config = InvokeAIAppConfig()
+
+    args = InvokeAIArgs.args
+
+    if root := getattr(args, "root", None):
+        config.set_root(Path(root))
+
+    # TODO(psyche): This shouldn't be wrapped in a try/catch. The configuration script imports a number of classes
+    # from throughout the app, which in turn call get_config(). At that time, there may not be a config file to
+    # read from, and this raises.
+    #
+    # Once we move all* model installation to the web app, the configure script will not be reaching into the main app
+    # and we can make this an unhandled error, which feels correct.
+    #
+    # *all user-facing models. Core model installation will still be handled by the configure/install script.
+
+    try:
+        config.merge_from_file()
+    except FileNotFoundError:
+        pass
+
+    return config
