@@ -175,6 +175,11 @@ class InvokeAIAppConfig(BaseSettings):
     hashing_algorithm: HASHING_ALGORITHMS = Field(default="blake3",         description="Model hashing algorthim for model installs. 'blake3' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.")
     remote_api_tokens: Optional[list[URLRegexTokenPair]] = Field(default=None, description="List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.")
 
+    # HIDDEN FIELDS
+    # v4 (MM2) doesn't use `models.yaml` files, but users were able to set paths in the v3 config. When we migrate a
+    # v3 config, we need to save the path to the models.yaml. This is only used during migration.
+    legacy_models_yaml_path: Optional[Path] = Field(default=None, description="The `conf_path` setting from a v3 `invokeai.yaml` file. Only present this app session migrated a config file, and it had `conf_test` on it.", exclude=True)
+
     # fmt: on
 
     model_config = SettingsConfigDict(env_prefix="INVOKEAI_", env_ignore_empty=True)
@@ -349,7 +354,7 @@ def generate_config_docstrings() -> str:
 
 
 def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
-    """Migrate a v3 config dictionary to the latest version.
+    """Migrate a v3 config dictionary to a current config object.
 
     Args:
         config_dict: A dictionary of settings from a v3 config file.
@@ -370,10 +375,14 @@ def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
             # `max_vram_cache_size` was renamed to `vram` some time in v3, but both names were used
             if k == "max_vram_cache_size" and "vram" not in category_dict:
                 parsed_config_dict["vram"] = v
+            if k == "conf_path":
+                parsed_config_dict["legacy_models_yaml_path"] = v
             elif k in InvokeAIAppConfig.model_fields:
                 # skip unknown fields
                 parsed_config_dict[k] = v
-    return InvokeAIAppConfig.model_validate(parsed_config_dict)
+    config = InvokeAIAppConfig.model_validate(parsed_config_dict)
+
+    return config
 
 
 def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
