@@ -1,4 +1,5 @@
-from invokeai.app.services.config.config_default import InvokeAIAppConfig, generate_config_docstrings
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from scripts.update_config_docstring import generate_config_docstrings
 
 
 def test_app_config_docstrings_are_current():
