@@ -135,7 +135,7 @@ dependencies = [
 # "invokeai" = "invokeai.frontend.legacy_launch_invokeai:main"
 
 # new shortcut to launch web interface
-"invokeai-web" = "invokeai.app.api_app:invoke_api"
+"invokeai-web" = "invokeai.app.run_app:run_app"
 
 # full commands
 "invokeai-configure" = "invokeai.frontend.install.invokeai_configure:invokeai_configure"
@@ -146,7 +146,6 @@ dependencies = [
 "invokeai-migrate3" = "invokeai.backend.install.migrate_to_3:main"
 "invokeai-update" = "invokeai.frontend.install.invokeai_update:main"
 "invokeai-metadata" = "invokeai.backend.image_util.invoke_metadata:main"
-"invokeai-node-web" = "invokeai.app.api_app:invoke_api"
 "invokeai-import-images" = "invokeai.frontend.install.import_images:main"
 "invokeai-db-maintenance" = "invokeai.backend.util.db_maintenance:main"
 
