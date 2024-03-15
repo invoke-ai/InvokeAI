@@ -7,7 +7,7 @@ import os
 import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Literal, Optional, get_args, get_type_hints
+from typing import Any, Literal, Optional
 
 import yaml
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
@@ -319,38 +319,6 @@ class InvokeAIAppConfig(BaseSettings):
         else:
             root = Path("~/invokeai").expanduser().resolve()
         return root
-
-
-def generate_config_docstrings() -> str:
-    """Helper function for mkdocs. Generates a docstring for the InvokeAIAppConfig class.
-
-    You shouldn't run this manually. Instead, run `scripts/update-config-docstring.py` to update the docstring.
-    A makefile target is also available: `make update-config-docstring`.
-
-    See that script for more information about why this is necessary.
-    """
-    docstring = '    """Invoke\'s global app configuration.\n\n'
-    docstring += "    Typically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.\n\n"
-    docstring += "    Attributes:\n"
-
-    field_descriptions: list[str] = []
-    type_hints = get_type_hints(InvokeAIAppConfig)
-
-    for k, v in InvokeAIAppConfig.model_fields.items():
-        if v.exclude:
-            continue
-        field_type = type_hints.get(k)
-        extra = ""
-        if getattr(field_type, "__origin__", None) is Literal:
-            # Get options for literals - the docs generator can't pull these out
-            options = [f"`{str(x)}`" for x in get_args(field_type)]
-            extra = f"<br>Valid values: {', '.join(options)}"
-        field_descriptions.append(f"        {k}: {v.description}{extra}")
-
-    docstring += "\n".join(field_descriptions)
-    docstring += '\n    """'
-
-    return docstring
 
 
 def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
