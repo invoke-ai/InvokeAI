@@ -34,6 +34,7 @@ from transformers import AutoFeatureExtractor
 
 import invokeai.configs as model_configs
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.install.install_helper import InstallHelper, InstallSelections
 from invokeai.backend.model_manager import ModelType
 from invokeai.backend.util import choose_precision, choose_torch_device
@@ -63,8 +64,7 @@ def get_literal_fields(field: str) -> Tuple[Any]:
 
 # --------------------------globals-----------------------
 
-# Start from a fresh config object - we will read the user's config from file later, and update it with their choices
-config = InvokeAIAppConfig()
+config = get_config()
 
 PRECISION_CHOICES = get_literal_fields("precision")
 DEVICE_CHOICES = get_literal_fields("device")

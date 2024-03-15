@@ -292,45 +292,46 @@ class ModelInstallService(ModelInstallServiceBase):
             self._app_config.legacy_models_yaml_path or self._app_config.root_path / "configs" / "models.yaml"
         )
 
-        if not legacy_models_yaml_path.exists():
-            # No yaml to migrate
-            return
+        if legacy_models_yaml_path.exists():
+            legacy_models_yaml = yaml.safe_load(legacy_models_yaml_path.read_text())
 
-        legacy_models_yaml = yaml.safe_load(legacy_models_yaml_path.read_text())
+            yaml_metadata = legacy_models_yaml.pop("__metadata__")
+            yaml_version = yaml_metadata.get("version")
 
-        yaml_metadata = legacy_models_yaml.pop("__metadata__")
-        yaml_version = yaml_metadata.get("version")
+            if yaml_version != "3.0.0":
+                raise ValueError(
+                    f"Attempted migration of unsupported `models.yaml` v{yaml_version}. Only v3.0.0 is supported. Exiting."
+                )
 
-        if yaml_version != "3.0.0":
-            raise ValueError(
-                f"Attempted migration of unsupported `models.yaml` v{yaml_version}. Only v3.0.0 is supported. Exiting."
+            self._logger.info(
+                f"Starting one-time migration of {len(legacy_models_yaml.items())} models from {str(legacy_models_yaml_path)}. This may take a few minutes."
             )
 
-        self._logger.info(
-            f"Starting one-time migration of {len(legacy_models_yaml.items())} models from {str(legacy_models_yaml_path)}. This may take a few minutes."
-        )
+            if len(db_models) == 0 and len(legacy_models_yaml.items()) != 0:
+                for model_key, stanza in legacy_models_yaml.items():
+                    _, _, model_name = str(model_key).split("/")
+                    model_path = Path(stanza["path"])
+                    if not model_path.is_absolute():
+                        model_path = self._app_config.models_path / model_path
+                    model_path = model_path.resolve()
 
-        if len(db_models) == 0 and len(legacy_models_yaml.items()) != 0:
-            for model_key, stanza in legacy_models_yaml.items():
-                _, _, model_name = str(model_key).split("/")
-                model_path = Path(stanza["path"])
-                if not model_path.is_absolute():
-                    model_path = self._app_config.models_path / model_path
-                model_path = model_path.resolve()
+                    config: dict[str, Any] = {}
+                    config["name"] = model_name
+                    config["description"] = stanza.get("description")
+                    config["config_path"] = stanza.get("config")
 
-                config: dict[str, Any] = {}
-                config["name"] = model_name
-                config["description"] = stanza.get("description")
-                config["config_path"] = stanza.get("config")
+                    try:
+                        id = self.register_path(model_path=model_path, config=config)
+                        self._logger.info(f"Migrated {model_name} with id {id}")
+                    except Exception as e:
+                        self._logger.warning(f"Model at {model_path} could not be migrated: {e}")
 
-                try:
-                    id = self.register_path(model_path=model_path, config=config)
-                    self._logger.info(f"Migrated {model_name} with id {id}")
-                except Exception as e:
-                    self._logger.warning(f"Model at {model_path} could not be migrated: {e}")
+            # Rename `models.yaml` to `models.yaml.bak` to prevent re-migration
+            legacy_models_yaml_path.rename(legacy_models_yaml_path.with_suffix(".yaml.bak"))
 
-        # Rename `models.yaml` to `models.yaml.bak` to prevent re-migration
-        legacy_models_yaml_path.rename(legacy_models_yaml_path.with_suffix(".yaml.bak"))
+        # Remove `legacy_models_yaml_path` from the config file - we are done with it either way
+        self._app_config.legacy_models_yaml_path = None
+        self._app_config.write_file(self._app_config.init_file_path)
 
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
         self._cached_model_paths = {Path(x.path).resolve() for x in self.record_store.all_models()}

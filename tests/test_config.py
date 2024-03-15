@@ -9,16 +9,14 @@ from pydantic import ValidationError
 from invokeai.app.services.config.config_default import InvokeAIAppConfig, get_config, load_and_migrate_config
 
 v4_config = """
-meta:
-  schema_version: 4
+schema_version: 4
 
 host: "192.168.1.1"
 port: 8080
 """
 
 invalid_v5_config = """
-meta:
-  schema_version: 5
+schema_version: 5
 
 host: "192.168.1.1"
 port: 8080
@@ -42,6 +40,12 @@ InvokeAI:
   Model Cache:
     max_cache_size: 100
     max_vram_cache_size: 50
+"""
+
+v3_config_with_bad_values = """
+InvokeAI:
+  Web Server:
+    port: "ice cream"
 """
 
 invalid_config = """
@@ -86,6 +90,29 @@ def test_migrate_v3_config_from_file(tmp_path: Path):
     assert config.legacy_models_yaml_path == Path("/custom/models.yaml")
     # This should be stripped out
     assert not hasattr(config, "esrgan")
+
+
+def test_migrate_v3_backup(tmp_path: Path):
+    """Test the backup of the config file."""
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text(v3_config)
+
+    load_and_migrate_config(temp_config_file)
+    assert temp_config_file.with_suffix(".yaml.bak").exists()
+    assert temp_config_file.with_suffix(".yaml.bak").read_text() == v3_config
+
+
+def test_failed_migrate_backup(tmp_path: Path):
+    """Test the failed migration of the config file."""
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text(v3_config_with_bad_values)
+
+    with pytest.raises(RuntimeError):
+        load_and_migrate_config(temp_config_file)
+    assert temp_config_file.with_suffix(".yaml.bak").exists()
+    assert temp_config_file.with_suffix(".yaml.bak").read_text() == v3_config_with_bad_values
+    assert temp_config_file.exists()
+    assert temp_config_file.read_text() == v3_config_with_bad_values
 
 
 def test_bails_on_invalid_config(tmp_path: Path):
