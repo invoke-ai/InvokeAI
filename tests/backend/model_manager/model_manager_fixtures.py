@@ -38,6 +38,7 @@ from tests.backend.model_manager.model_metadata.metadata_examples import (
     RepoHFMetadata1,
     RepoHFMetadata1_nofp16,
     RepoHFModelJson1,
+    HFTestLoraMetadata,
 )
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
@@ -295,6 +296,23 @@ def mm2_session(embedding_file: Path, diffusers_dir: Path) -> Session:
         TestAdapter(
             RepoHFMetadata1,
             headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(RepoHFMetadata1)},
+        ),
+    )
+    
+    with open(embedding_file, "rb") as f:
+        data = f.read()  # file is small - just 15K
+    sess.mount(
+        "https://huggingface.co/api/models/InvokeAI-test/textual_inversion_tests?blobs=True",
+        TestAdapter(
+            HFTestLoraMetadata,
+            headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(HFTestLoraMetadata)},
+        ),
+    )
+    sess.mount(
+        "https://huggingface.co/InvokeAI-test/textual_inversion_tests/resolve/main/learned_embeds-steps-1000.safetensors",
+        TestAdapter(
+            data,
+            headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(data)},
         ),
     )
     for root, _, files in os.walk(diffusers_dir):
