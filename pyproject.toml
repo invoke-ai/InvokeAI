@@ -37,13 +37,14 @@ dependencies = [
   "clip_anytorch==2.5.2",       # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel==2.0.2",
   "controlnet-aux==0.0.7",
-  "diffusers[torch]==0.26.3",
+  "diffusers[torch]==0.27.0",
   "invisible-watermark==0.2.0", # needed to install SDXL base and refiner using their repo_ids
   "mediapipe==0.10.7",          # needed for "mediapipeface" controlnet model
   "numpy==1.26.4",              # >1.24.0 is needed to use the 'strict' argument to np.testing.assert_array_equal()
   "onnx==1.15.0",
   "onnxruntime==1.16.3",
   "opencv-python==4.9.0.80",
+  "peft==0.9.0",
   "pytorch-lightning==2.1.3",
   "safetensors==0.4.2",
   "timm==0.6.13",               # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
@@ -190,7 +191,7 @@ version = { attr = "invokeai.version.__version__" }
 addopts = "--cov-report term --cov-report html --cov-report xml --strict-markers -m \"not slow\""
 markers = [
   "slow: Marks tests as slow. Disabled by default. To run all tests, use -m \"\". To run only slow tests, use -m \"slow\".",
-  "timeout: Marks the timeout override."
+  "timeout: Marks the timeout override.",
 ]
 [tool.coverage.run]
 branch = true
