@@ -3,6 +3,8 @@ from typing import Literal, get_args, get_type_hints
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 
+_excluded = {"schema_version", "legacy_models_yaml_path"}
+
 
 def generate_config_docstrings() -> str:
     """Helper function for mkdocs. Generates a docstring for the InvokeAIAppConfig class.
@@ -20,7 +22,7 @@ def generate_config_docstrings() -> str:
     type_hints = get_type_hints(InvokeAIAppConfig)
 
     for k, v in InvokeAIAppConfig.model_fields.items():
-        if v.exclude:
+        if v.exclude or k in _excluded:
             continue
         field_type = type_hints.get(k)
         extra = ""

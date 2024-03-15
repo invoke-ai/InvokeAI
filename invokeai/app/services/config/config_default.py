@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal, Optional
@@ -44,12 +45,6 @@ class URLRegexTokenPair(BaseModel):
         except re.error as e:
             raise ValueError(f"Invalid regex: {e}")
         return v
-
-
-class ConfigMeta(BaseModel):
-    """Metadata for the config file. This is not stored in the config object."""
-
-    schema_version: int = CONFIG_SCHEMA_VERSION
 
 
 class InvokeAIAppConfig(BaseSettings):
@@ -108,6 +103,10 @@ class InvokeAIAppConfig(BaseSettings):
     _root: Optional[Path] = PrivateAttr(default=None)
 
     # fmt: off
+
+    # INTERNAL
+    schema_version:                 int = Field(default=CONFIG_SCHEMA_VERSION, description="Schema version of the config file. This is not a user-configurable setting.")
+    legacy_models_yaml_path: Optional[Path] = Field(default=None,           description="Path to the legacy models.yaml file. This is not a user-configurable setting.")
 
     # WEB
     host:                           str = Field(default="127.0.0.1",        description="IP address to bind to. Use `0.0.0.0` to serve to your local network.")
@@ -175,11 +174,6 @@ class InvokeAIAppConfig(BaseSettings):
     hashing_algorithm: HASHING_ALGORITHMS = Field(default="blake3",         description="Model hashing algorthim for model installs. 'blake3' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.")
     remote_api_tokens: Optional[list[URLRegexTokenPair]] = Field(default=None, description="List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.")
 
-    # HIDDEN FIELDS
-    # v4 (MM2) doesn't use `models.yaml` files, but users were able to set paths in the v3 config. When we migrate a
-    # v3 config, we need to save the path to the models.yaml. This is only used during migration.
-    legacy_models_yaml_path: Optional[Path] = Field(default=None, description="The `conf_path` setting from a v3 `invokeai.yaml` file. Only present this app session migrated a config file, and it had `conf_test` on it.", exclude=True)
-
     # fmt: on
 
     model_config = SettingsConfigDict(env_prefix="INVOKEAI_", env_ignore_empty=True)
@@ -217,8 +211,20 @@ class InvokeAIAppConfig(BaseSettings):
             dest_path: Path to write the config to.
         """
         with open(dest_path, "w") as file:
-            meta_dict = {"meta": ConfigMeta().model_dump()}
-            config_dict = self.model_dump(mode="json", exclude_unset=True, exclude_defaults=True)
+            # Meta fields should be written in a separate stanza
+            meta_dict = self.model_dump(mode="json", include={"schema_version"})
+            # Only include the legacy_models_yaml_path if it's set
+            if self.legacy_models_yaml_path:
+                meta_dict.update(self.model_dump(mode="json", include={"legacy_models_yaml_path"}))
+
+            # User settings
+            config_dict = self.model_dump(
+                mode="json",
+                exclude_unset=True,
+                exclude_defaults=True,
+                exclude={"schema_version", "legacy_models_yaml_path"},
+            )
+
             file.write("# Internal metadata - do not edit:\n")
             file.write(yaml.dump(meta_dict, sort_keys=False))
             file.write("\n")
@@ -370,11 +376,12 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
 
     if "InvokeAI" in loaded_config_dict:
         # This is a v3 config file, attempt to migrate it
+        shutil.copy(config_path, config_path.with_suffix(".yaml.bak"))
         try:
             config = migrate_v3_config_dict(loaded_config_dict)
         except Exception as e:
+            shutil.copy(config_path.with_suffix(".yaml.bak"), config_path)
             raise RuntimeError(f"Failed to load and migrate v3 config file {config_path}: {e}") from e
-        config_path.rename(config_path.with_suffix(".yaml.bak"))
         # By excluding defaults, we ensure that the new config file only contains the settings that were explicitly set
         config.write_file(config_path)
         return config
@@ -382,11 +389,11 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
         # Attempt to load as a v4 config file
         try:
             # Meta is not included in the model fields, so we need to validate it separately
-            config_meta = ConfigMeta.model_validate(loaded_config_dict.pop("meta"))
+            config = InvokeAIAppConfig.model_validate(loaded_config_dict)
             assert (
-                config_meta.schema_version == CONFIG_SCHEMA_VERSION
-            ), f"Invalid schema version, expected {CONFIG_SCHEMA_VERSION}: {config_meta.schema_version}"
-            return InvokeAIAppConfig.model_validate(loaded_config_dict)
+                config.schema_version == CONFIG_SCHEMA_VERSION
+            ), f"Invalid schema version, expected {CONFIG_SCHEMA_VERSION}: {config.schema_version}"
+            return config
         except Exception as e:
             raise RuntimeError(f"Failed to load config file {config_path}: {e}") from e
 
