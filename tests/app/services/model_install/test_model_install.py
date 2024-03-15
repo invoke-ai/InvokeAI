@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 from pydantic.networks import Url
+from time import sleep
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.events.events_base import EventServiceBase
@@ -20,7 +21,7 @@ from invokeai.app.services.model_install import (
     URLModelSource,
 )
 from invokeai.app.services.model_records import UnknownModelException
-from invokeai.backend.model_manager.config import BaseModelType, ModelFormat, ModelType
+from invokeai.backend.model_manager.config import BaseModelType, ModelFormat, ModelType, InvalidModelConfigException
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 
 OS = platform.uname().system
@@ -53,7 +54,7 @@ def test_registration_meta(mm2_installer: ModelInstallServiceBase, embedding_fil
 
 def test_registration_meta_override_fail(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
     key = None
-    with pytest.raises(ValidationError):
+    with pytest.raises((ValidationError, InvalidModelConfigException)):
         key = mm2_installer.register_path(embedding_file, {"name": "banana_sushi", "type": ModelType("lora")})
     assert key is None
 
@@ -263,3 +264,36 @@ def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: In
     assert job.error
     assert "NOT FOUND" in job.error
     assert job.error_traceback.startswith("Traceback")
+
+
+@pytest.mark.parametrize(
+    "model_params",
+    [
+        # SDXL, Lora
+        {
+            "repo_id": "InvokeAI-test/textual_inversion_tests::learned_embeds-steps-1000.safetensors",
+            "name": "test_lora",
+            "type": 'embedding',
+        },
+        # SDXL, Lora - incorrect type
+        {
+            "repo_id": "InvokeAI-test/textual_inversion_tests::learned_embeds-steps-1000.safetensors",
+            "name": "test_lora",
+            "type": 'lora',
+        },
+    ],
+)
+def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, model_params: Dict[str, str]):
+    """Test whether or not type is respected on configs when passed to heuristic import."""
+    config: Dict[str, Any] = {
+        "type": model_params["type"],
+    }
+    try:
+        assert("repo_id" in model_params)
+        install_job = mm2_installer.heuristic_import(source=model_params["repo_id"], config=config)
+
+        while not install_job.in_terminal_state:
+            sleep(.01)
+        assert(install_job.config_out if model_params["type"] == "embedding" else not install_job.config_out)
+    except InvalidModelConfigException:
+        assert model_params["type"] != "embedding"
