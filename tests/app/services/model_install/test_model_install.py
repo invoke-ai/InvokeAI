@@ -5,11 +5,12 @@ Test the model installer
 import platform
 import uuid
 from pathlib import Path
+from time import sleep
+from typing import Any, Dict
 
 import pytest
 from pydantic import ValidationError
 from pydantic.networks import Url
-from time import sleep
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.events.events_base import EventServiceBase
@@ -21,7 +22,7 @@ from invokeai.app.services.model_install import (
     URLModelSource,
 )
 from invokeai.app.services.model_records import UnknownModelException
-from invokeai.backend.model_manager.config import BaseModelType, ModelFormat, ModelType, InvalidModelConfigException
+from invokeai.backend.model_manager.config import BaseModelType, InvalidModelConfigException, ModelFormat, ModelType
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 
 OS = platform.uname().system
@@ -273,13 +274,13 @@ def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: In
         {
             "repo_id": "InvokeAI-test/textual_inversion_tests::learned_embeds-steps-1000.safetensors",
             "name": "test_lora",
-            "type": 'embedding',
+            "type": "embedding",
         },
         # SDXL, Lora - incorrect type
         {
             "repo_id": "InvokeAI-test/textual_inversion_tests::learned_embeds-steps-1000.safetensors",
             "name": "test_lora",
-            "type": 'lora',
+            "type": "lora",
         },
     ],
 )
@@ -289,11 +290,11 @@ def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, mode
         "type": model_params["type"],
     }
     try:
-        assert("repo_id" in model_params)
+        assert "repo_id" in model_params
         install_job = mm2_installer.heuristic_import(source=model_params["repo_id"], config=config)
 
         while not install_job.in_terminal_state:
-            sleep(.01)
-        assert(install_job.config_out if model_params["type"] == "embedding" else not install_job.config_out)
+            sleep(0.01)
+        assert install_job.config_out if model_params["type"] == "embedding" else not install_job.config_out
     except InvalidModelConfigException:
         assert model_params["type"] != "embedding"
