@@ -8,7 +8,15 @@ title: Configuration
 
 Runtime settings, including the location of files and
 directories, memory usage, and performance, are managed via the
-`invokeai.yaml` config file.
+`invokeai.yaml` config file or environment variables. A subset
+of settings may be set via commandline arguments.
+
+Settings sources are used in this order:
+
+- CLI args
+- Environment variables
+- `invokeai.yaml` settings
+- Fallback: defaults
 
 The most commonly changed settings are also accessible
 graphically via the `invokeai-configure` script.
@@ -38,18 +46,10 @@ meta:
   schema_version: 4
 
 # Put user settings here:
-host: 0.0.0.0
-models_dir: /external_drive/invokeai/models
-ram: 24
-precision: float16
+host: 0.0.0.0 # serve the app on your local network
+models_dir: D:\invokeai\models # store models on an external drive
+precision: float16 # always use fp16 precision
 ```
-
-In this example, we've changed a few settings:
-
-- `host: 0.0.0.0`: allow other machines on the network to connect
-- `models_dir: /external_drive/invokeai/models`: store model files here
-- `ram: 24`: set the model RAM cache to a max of 24GB
-- `precision: float16`: use more efficient FP16 precision
 
 The settings in this file will override the defaults. You only need
 to change this file if the default for a particular setting doesn't
@@ -62,25 +62,19 @@ You can fix a broken `invokeai.yaml` by deleting it and running the
 configuration script again -- option [6] in the launcher, "Re-run the
 configure script".
 
-<!-- TODO(psyche): support env vars?
-#### Reading Environment Variables
+### Environment Variables
 
-Next InvokeAI looks for defined environment variables in the format
-`INVOKEAI_<setting_name>`, for example `INVOKEAI_port`. Environment
-variable values take precedence over configuration file variables. On
-a Macintosh system, for example, you could change the port that the
-web server listens on by setting the environment variable this way:
+All settings may be set via environment variables by prefixing `INVOKEAI_`
+to the variable name. For example, `INVOKEAI_HOST` would set the `host`
+setting.
 
-```
-export INVOKEAI_port=8000
-invokeai-web
+For non-primitive values, pass a JSON-encoded string:
+
+```sh
+export INVOKEAI_REMOTE_API_TOKENS='[{"url_regex":"modelmarketplace", "token": "12345"}]'
 ```
 
-Please check out these
-[Macintosh](https://phoenixnap.com/kb/set-environment-variable-mac)
-and
-[Windows](https://phoenixnap.com/kb/windows-set-environment-variable)
-guides for setting temporary and permanent environment variables. -->
+We suggest using `invokeai.yaml`, as it is more user-friendly.
 
 ### CLI Args
 
@@ -113,15 +107,13 @@ Some model marketplaces require an API key to download models. You can provide a
 The pattern can be any valid regex (you may need to surround the pattern with quotes):
 
 ```yaml
-InvokeAI:
-  Model Install:
-    remote_api_tokens:
-      # Any URL containing `models.com` will automatically use `your_models_com_token`
-      - url_regex: models.com
-        token: your_models_com_token
-      # Any URL matching this contrived regex will use `some_other_token`
-      - url_regex: '^[a-z]{3}whatever.*\.com$'
-        token: some_other_token
+remote_api_tokens:
+  # Any URL containing `models.com` will automatically use `your_models_com_token`
+  - url_regex: models.com
+    token: your_models_com_token
+  # Any URL matching this contrived regex will use `some_other_token`
+  - url_regex: '^[a-z]{3}whatever.*\.com$'
+    token: some_other_token
 ```
 
 The provided token will be added as a `Bearer` token to the network requests to download the model files. As far as we know, this works for all model marketplaces that require authorization.
@@ -133,22 +125,18 @@ Models are hashed during installation, providing a stable identifier for models 
 If your models are stored on a spinning hard drive, we suggest using `blake3_single`, the single-threaded implementation. The hashes are the same, but it's much faster on spinning disks.
 
 ```yaml
-InvokeAI:
-  Model Install:
-    hashing_algorithm: blake3_single
+hashing_algorithm: blake3_single
 ```
 
 Model hashing is a one-time operation, but it may take a couple minutes to hash a large model collection. You may opt out of model hashing entirely by setting the algorithm to `random`.
 
 ```yaml
-InvokeAI:
-  Model Install:
-    hashing_algorithm: random
+hashing_algorithm: random
 ```
 
 Most common algorithms are supported, like `md5`, `sha256`, and `sha512`. These are typically much, much slower than `blake3`.
 
-#### Paths
+#### Path Settings
 
 These options set the paths of various directories and files used by
 InvokeAI. Relative paths are interpreted relative to the root directory, so
@@ -164,11 +152,11 @@ way you wish.
 
 Several different log handler destinations are available, and multiple destinations are supported by providing a list:
 
-```
-  log_handlers:
-     - console
-     - syslog=localhost
-     - file=/var/log/invokeai.log
+```yaml
+log_handlers:
+  - console
+  - syslog=localhost
+  - file=/var/log/invokeai.log
 ```
 
 - `console` is the default. It prints log messages to the command-line window from which InvokeAI was launched.
