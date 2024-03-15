@@ -31,12 +31,13 @@ from typing_extensions import Annotated, Any, Dict
 
 from invokeai.app.invocations.constants import SCHEDULER_NAME_VALUES
 from invokeai.app.util.misc import uuid_string
-
-from ..raw_model import RawModel
+from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
+from invokeai.backend.lora import LoRAModelRaw
+from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
+from invokeai.backend.textual_inversion import TextualInversionModelRaw
 
 # ModelMixin is the base class for all diffusers and transformers models
-# RawModel is the InvokeAI wrapper class for ip_adapters, loras, textual_inversion and onnx runtime
-AnyModel = Union[ModelMixin, RawModel, torch.nn.Module]
+AnyModel = Union[ModelMixin, torch.nn.Module, IPAdapter, LoRAModelRaw, TextualInversionModelRaw, IAIOnnxRuntimeModel]
 
 
 class InvalidModelConfigException(Exception):
