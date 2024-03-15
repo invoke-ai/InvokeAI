@@ -132,12 +132,13 @@ class ModelProbe(object):
 
         format_type = ModelFormat.Diffusers if model_path.is_dir() else ModelFormat.Checkpoint
         model_info = None
-        model_type = None
-        if format_type is ModelFormat.Diffusers:
-            model_type = cls.get_model_type_from_folder(model_path)
-        else:
-            model_type = cls.get_model_type_from_checkpoint(model_path)
-        format_type = ModelFormat.ONNX if model_type == ModelType.ONNX else format_type
+        model_type = fields['type'] if 'type' in fields else None
+        if not model_type:
+            if format_type is ModelFormat.Diffusers:
+                model_type = cls.get_model_type_from_folder(model_path)
+            else:
+                model_type = cls.get_model_type_from_checkpoint(model_path)
+            format_type = ModelFormat.ONNX if model_type == ModelType.ONNX else format_type
 
         probe_class = cls.PROBES[format_type].get(model_type)
         if not probe_class:
