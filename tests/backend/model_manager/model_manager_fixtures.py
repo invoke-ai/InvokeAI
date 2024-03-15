@@ -33,12 +33,12 @@ from invokeai.backend.model_manager.config import (
 from invokeai.backend.model_manager.load import ModelCache, ModelConvertCache
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_metadata.metadata_examples import (
+    HFTestLoraMetadata,
     RepoCivitaiModelMetadata1,
     RepoCivitaiVersionMetadata1,
     RepoHFMetadata1,
     RepoHFMetadata1_nofp16,
     RepoHFModelJson1,
-    HFTestLoraMetadata,
 )
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
@@ -301,7 +301,7 @@ def mm2_session(embedding_file: Path, diffusers_dir: Path) -> Session:
             headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(RepoHFMetadata1)},
         ),
     )
-    
+
     with open(embedding_file, "rb") as f:
         data = f.read()  # file is small - just 15K
     sess.mount(
