@@ -28,7 +28,8 @@ from typing import Dict, List, Optional
 
 import torch
 
-from invokeai.backend.model_manager import AnyModel, SubModelType
+from invokeai.backend.model_manager import SubModelType
+from invokeai.backend.model_manager.any_model_type import AnyModel
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
 from invokeai.backend.util.devices import choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger

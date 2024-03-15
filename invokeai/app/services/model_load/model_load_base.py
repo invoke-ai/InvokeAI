@@ -5,7 +5,8 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from invokeai.app.services.shared.invocation_context import InvocationContextData
-from invokeai.backend.model_manager import AnyModel, AnyModelConfig, SubModelType
+from invokeai.backend.model_manager import AnyModelConfig, SubModelType
+from invokeai.backend.model_manager.any_model_type import AnyModel
 from invokeai.backend.model_manager.load import LoadedModel
 from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase

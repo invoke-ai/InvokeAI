@@ -5,13 +5,13 @@ from pathlib import Path
 from typing import Optional
 
 from invokeai.backend.model_manager import (
-    AnyModel,
     AnyModelConfig,
     BaseModelType,
     ModelFormat,
     ModelType,
     SubModelType,
 )
+from invokeai.backend.model_manager.any_model_type import AnyModel
 from invokeai.backend.textual_inversion import TextualInversionModelRaw
 
 from .. import ModelLoader, ModelLoaderRegistry

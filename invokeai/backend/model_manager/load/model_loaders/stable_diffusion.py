@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Optional
 
 from invokeai.backend.model_manager import (
-    AnyModel,
     AnyModelConfig,
     BaseModelType,
     ModelFormat,
@@ -13,6 +12,7 @@ from invokeai.backend.model_manager import (
     SchedulerPredictionType,
     SubModelType,
 )
+from invokeai.backend.model_manager.any_model_type import AnyModel
 from invokeai.backend.model_manager.config import (
     CheckpointConfigBase,
     DiffusersConfigBase,

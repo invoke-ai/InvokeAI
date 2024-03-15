@@ -4,7 +4,7 @@ Base class and implementation of a class that moves models in and out of VRAM.
 
 import torch
 
-from invokeai.backend.model_manager import AnyModel
+from invokeai.backend.model_manager.any_model_type import AnyModel
 
 from .model_cache_base import CacheRecord, ModelCacheBase, ModelLockerBase
 

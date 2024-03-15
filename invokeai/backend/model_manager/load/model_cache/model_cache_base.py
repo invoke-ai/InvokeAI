@@ -14,7 +14,8 @@ from typing import Dict, Generic, Optional, TypeVar
 
 import torch
 
-from invokeai.backend.model_manager.config import AnyModel, SubModelType
+from invokeai.backend.model_manager.any_model_type import AnyModel
+from invokeai.backend.model_manager.config import SubModelType
 
 
 class ModelLockerBase(ABC):

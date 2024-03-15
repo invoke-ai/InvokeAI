@@ -5,12 +5,12 @@ from pathlib import Path
 from typing import Optional
 
 from invokeai.backend.model_manager import (
-    AnyModel,
     AnyModelConfig,
     BaseModelType,
     ModelFormat,
     ModelType,
 )
+from invokeai.backend.model_manager.any_model_type import AnyModel
 from invokeai.backend.model_manager.config import CheckpointConfigBase
 from invokeai.backend.model_manager.convert_ckpt_to_diffusers import convert_controlnet_to_diffusers
 

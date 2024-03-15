@@ -11,8 +11,6 @@ from typing_extensions import Self
 
 from invokeai.backend.model_manager import BaseModelType
 
-from .raw_model import RawModel
-
 
 class LoRALayerBase:
     # rank: Optional[int]
@@ -368,15 +366,13 @@ class IA3Layer(LoRALayerBase):
 AnyLoRALayer = Union[LoRALayer, LoHALayer, LoKRLayer, FullLayer, IA3Layer]
 
 
-class LoRAModelRaw(RawModel):  # (torch.nn.Module):
-    _name: str
-    layers: Dict[str, AnyLoRALayer]
-
+class LoRAModelRaw(torch.nn.Module):
     def __init__(
         self,
         name: str,
         layers: Dict[str, AnyLoRALayer],
     ):
+        super().__init__()
         self._name = name
         self.layers = layers
 

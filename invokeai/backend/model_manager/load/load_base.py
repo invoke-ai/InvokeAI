@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Any, Optional
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.backend.model_manager.any_model_type import AnyModel
 from invokeai.backend.model_manager.config import (
-    AnyModel,
     AnyModelConfig,
     SubModelType,
 )

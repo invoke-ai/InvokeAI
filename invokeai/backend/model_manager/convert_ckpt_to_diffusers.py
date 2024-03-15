@@ -15,7 +15,7 @@ from diffusers.pipelines.stable_diffusion.convert_from_ckpt import (
 )
 from omegaconf import DictConfig
 
-from . import AnyModel
+from invokeai.backend.model_manager.any_model_type import AnyModel
 
 
 def convert_ldm_vae_to_diffusers(

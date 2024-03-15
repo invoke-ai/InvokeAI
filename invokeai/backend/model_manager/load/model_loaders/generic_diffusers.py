@@ -9,7 +9,6 @@ from diffusers.configuration_utils import ConfigMixin
 from diffusers.models.modeling_utils import ModelMixin
 
 from invokeai.backend.model_manager import (
-    AnyModel,
     AnyModelConfig,
     BaseModelType,
     InvalidModelConfigException,
@@ -17,6 +16,7 @@ from invokeai.backend.model_manager import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.model_manager.any_model_type import AnyModel
 from invokeai.backend.model_manager.config import DiffusersConfigBase
 
 from .. import ModelLoader, ModelLoaderRegistry

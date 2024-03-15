@@ -8,7 +8,7 @@ from typing import Optional
 import torch
 from diffusers import DiffusionPipeline
 
-from invokeai.backend.model_manager.config import AnyModel
+from invokeai.backend.model_manager.any_model_type import AnyModel
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
 
 

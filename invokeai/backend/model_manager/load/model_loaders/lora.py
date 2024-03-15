@@ -8,13 +8,13 @@ from typing import Optional
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import (
-    AnyModel,
     AnyModelConfig,
     BaseModelType,
     ModelFormat,
     ModelType,
     SubModelType,
 )
+from invokeai.backend.model_manager.any_model_type import AnyModel
 from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
 

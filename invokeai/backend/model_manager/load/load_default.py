@@ -7,11 +7,11 @@ from typing import Optional
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager import (
-    AnyModel,
     AnyModelConfig,
     InvalidModelConfigException,
     SubModelType,
 )
+from invokeai.backend.model_manager.any_model_type import AnyModel
 from invokeai.backend.model_manager.config import DiffusersConfigBase, ModelType
 from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
 from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase

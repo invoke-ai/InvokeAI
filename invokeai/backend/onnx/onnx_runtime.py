@@ -6,17 +6,16 @@ from typing import Any, List, Optional, Tuple, Union
 
 import numpy as np
 import onnx
+import torch
 from onnx import numpy_helper
 from onnxruntime import InferenceSession, SessionOptions, get_available_providers
-
-from ..raw_model import RawModel
 
 ONNX_WEIGHTS_NAME = "model.onnx"
 
 
 # NOTE FROM LS: This was copied from Stalker's original implementation.
 # I have not yet gone through and fixed all the type hints
-class IAIOnnxRuntimeModel(RawModel):
+class IAIOnnxRuntimeModel(torch.nn.Module):
     class _tensor_access:
         def __init__(self, model):  # type: ignore
             self.model = model
@@ -103,7 +102,7 @@ class IAIOnnxRuntimeModel(RawModel):
 
         self.proto = onnx.load(model_path, load_external_data=False)
         """
-
+        super().__init__()
         self.proto = onnx.load(model_path, load_external_data=True)
         # self.data = dict()
         # for tensor in self.proto.graph.initializer:
