@@ -9,10 +9,8 @@ from safetensors.torch import load_file
 from transformers import CLIPTokenizer
 from typing_extensions import Self
 
-from .raw_model import RawModel
 
-
-class TextualInversionModelRaw(RawModel):
+class TextualInversionModelRaw(torch.nn.Module):
     embedding: torch.Tensor  # [n, 768]|[n, 1280]
     embedding_2: Optional[torch.Tensor] = None  # [n, 768]|[n, 1280]   - for SDXL models
 
