@@ -60,6 +60,7 @@ from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_sea
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     IPAdapterConditioningInfo,
+    IPAdapterData,
     Range,
     SDXLConditioningInfo,
     TextConditioningData,
@@ -69,7 +70,6 @@ from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 from ...backend.stable_diffusion.diffusers_pipeline import (
     ControlNetData,
-    IPAdapterData,
     StableDiffusionGeneratorPipeline,
     T2IAdapterData,
     image_resized_to_grid_as_tensor,
@@ -631,6 +631,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
         context: InvocationContext,
         ip_adapter: Optional[Union[IPAdapterField, list[IPAdapterField]]],
         exit_stack: ExitStack,
+        latent_height: int,
+        latent_width: int,
     ) -> Optional[list[IPAdapterData]]:
         """If IP-Adapter is enabled, then this function loads the requisite models, and adds the image prompt embeddings
         to the `conditioning_data` (in-place).
@@ -668,6 +670,11 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     single_ipa_images, image_encoder_model
                 )
 
+            mask = single_ip_adapter.mask
+            if mask is not None:
+                mask = context.tensors.load(mask.mask_name)
+            mask = self._preprocess_regional_prompt_mask(mask, latent_height, latent_width)
+
             ip_adapter_data_list.append(
                 IPAdapterData(
                     ip_adapter_model=ip_adapter_model,
@@ -675,6 +682,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     begin_step_percent=single_ip_adapter.begin_step_percent,
                     end_step_percent=single_ip_adapter.end_step_percent,
                     ip_adapter_conditioning=IPAdapterConditioningInfo(image_prompt_embeds, uncond_image_prompt_embeds),
+                    mask=mask,
                 )
             )
 
@@ -914,6 +922,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     context=context,
                     ip_adapter=self.ip_adapter,
                     exit_stack=exit_stack,
+                    latent_height=latent_height,
+                    latent_width=latent_width,
                 )
 
                 num_inference_steps, timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(

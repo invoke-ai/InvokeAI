@@ -1,5 +1,5 @@
 from builtins import float
-from typing import List, Union
+from typing import List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from typing_extensions import Self
@@ -10,7 +10,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, MaskField, OutputField, UIType
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
@@ -22,12 +22,17 @@ class IPAdapterField(BaseModel):
     image: Union[ImageField, List[ImageField]] = Field(description="The IP-Adapter image prompt(s).")
     ip_adapter_model: ModelIdentifierField = Field(description="The IP-Adapter model to use.")
     image_encoder_model: ModelIdentifierField = Field(description="The name of the CLIP image encoder model.")
-    weight: Union[float, List[float]] = Field(default=1, description="The weight given to the ControlNet")
+    weight: Union[float, List[float]] = Field(default=1, description="The weight given to the IP-Adapter.")
     begin_step_percent: float = Field(
         default=0, ge=0, le=1, description="When the IP-Adapter is first applied (% of total steps)"
     )
     end_step_percent: float = Field(
         default=1, ge=0, le=1, description="When the IP-Adapter is last applied (% of total steps)"
+    )
+    mask: Optional[MaskField] = Field(
+        default=None,
+        description="The bool mask associated with this IP-Adapter. Excluded regions should be set to False, included "
+        "regions should be set to True.",
     )
 
     @field_validator("weight")
@@ -48,7 +53,7 @@ class IPAdapterOutput(BaseInvocationOutput):
     ip_adapter: IPAdapterField = OutputField(description=FieldDescriptions.ip_adapter, title="IP-Adapter")
 
 
-@invocation("ip_adapter", title="IP-Adapter", tags=["ip_adapter", "control"], category="ip_adapter", version="1.1.2")
+@invocation("ip_adapter", title="IP-Adapter", tags=["ip_adapter", "control"], category="ip_adapter", version="1.2.0")
 class IPAdapterInvocation(BaseInvocation):
     """Collects IP-Adapter info to pass to other nodes."""
 
@@ -70,6 +75,9 @@ class IPAdapterInvocation(BaseInvocation):
     )
     end_step_percent: float = InputField(
         default=1, ge=0, le=1, description="When the IP-Adapter is last applied (% of total steps)"
+    )
+    mask: Optional[MaskField] = InputField(
+        default=None, description="A mask defining the region that this IP-Adapter applies to."
     )
 
     @field_validator("weight")
@@ -101,5 +109,6 @@ class IPAdapterInvocation(BaseInvocation):
                 weight=self.weight,
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,
+                mask=self.mask,
             ),
         )
