@@ -4,7 +4,7 @@ import os
 import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, get_args, get_type_hints
 
 import yaml
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
@@ -66,39 +66,39 @@ class InvokeAIAppConfig(BaseSettings):
         log_tokenization: Enable logging of parsed prompt tokens.
         patchmatch: Enable patchmatch inpaint code.
         ignore_missing_core_models: Ignore missing core models on startup. If `True`, the app will attempt to download missing models on startup.
-        autoimport_dir: Path to a directory of models files to be imported on startup. WARNING: This may be a relative path. Use `autoimport_path` to get the resolved absolute path.
-        models_dir: Path to the models directory. WARNING: This may be a relative path. Use `models_path` to get the resolved absolute path.
-        convert_cache_dir: Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location. WARNING: This may be a relative path. Use `convert_cache_path` to get the resolved absolute path.
-        legacy_conf_dir: Path to directory of legacy checkpoint config files. WARNING: This may be a relative path. Use `legacy_conf_path` to get the resolved absolute path.
-        db_dir: Path to InvokeAI databases directory. WARNING: This may be a relative path. Use `db_path` to get the resolved absolute path.
-        outputs_dir: Path to directory for outputs. WARNING: This may be a relative path. Use `outputs_path` to get the resolved absolute path.
-        custom_nodes_dir: Path to directory for custom nodes. WARNING: This may be a relative path. Use `custom_nodes_path` to get the resolved absolute path.
+        autoimport_dir: Path to a directory of models files to be imported on startup.
+        models_dir: Path to the models directory.
+        convert_cache_dir: Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.
+        legacy_conf_dir: Path to directory of legacy checkpoint config files.
+        db_dir: Path to InvokeAI databases directory.
+        outputs_dir: Path to directory for outputs.
+        custom_nodes_dir: Path to directory for custom nodes.
         log_handlers: Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".
-        log_format: Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style.
-        log_level: Emit logging messages at this level or higher.
+        log_format: Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`
+        log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`
         log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.
         use_memory_db: Use in-memory database. Useful for development.
         dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.
         profile_graphs: Enable graph profiling using `cProfile`.
         profile_prefix: An optional prefix for profile output files.
-        profiles_dir: Path to profiles output directory. WARNING: This may be a relative path. Use `profiles_path` to get the resolved absolute path.
+        profiles_dir: Path to profiles output directory.
         ram: Maximum memory amount used by memory model cache for rapid switching (GB).
-        vram: Amount of VRAM reserved for model storage (GB)
-        convert_cache: Maximum size of on-disk converted models cache (GB)
+        vram: Amount of VRAM reserved for model storage (GB).
+        convert_cache: Maximum size of on-disk converted models cache (GB).
         lazy_offload: Keep models in VRAM until their space is needed.
         log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
-        device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.
-        precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.
+        device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `cuda:1`, `mps`
+        precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`, `autocast`
         sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
-        attention_type: Attention type.
-        attention_slice_size: Slice size, valid when attention_type=="sliced".
+        attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
+        attention_slice_size: Slice size, valid when attention_type=="sliced".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`
         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
         max_queue_size: Maximum number of items in the session queue.
         allow_nodes: List of nodes to allow. Omit to allow all.
         deny_nodes: List of nodes to deny. Omit to deny none.
         node_cache_size: How many cached nodes to keep in memory.
-        hashing_algorithm: Model hashing algorthim for model installs. 'blake3' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.
+        hashing_algorithm: Model hashing algorthim for model installs. 'blake3' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`, `blake3`, `blake3_single`, `random`
         remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.
     """
 
@@ -122,13 +122,13 @@ class InvokeAIAppConfig(BaseSettings):
     ignore_missing_core_models:    bool = Field(default=False,              description="Ignore missing core models on startup. If `True`, the app will attempt to download missing models on startup.")
 
     # PATHS
-    autoimport_dir:                Path = Field(default=Path("autoimport"), description="Path to a directory of models files to be imported on startup. WARNING: This may be a relative path. Use `autoimport_path` to get the resolved absolute path.")
-    models_dir:                    Path = Field(default=Path("models"),     description="Path to the models directory. WARNING: This may be a relative path. Use `models_path` to get the resolved absolute path.")
-    convert_cache_dir:             Path = Field(default=Path("models/.cache"), description="Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location. WARNING: This may be a relative path. Use `convert_cache_path` to get the resolved absolute path.")
-    legacy_conf_dir:               Path = Field(default=Path("configs/stable-diffusion"), description="Path to directory of legacy checkpoint config files. WARNING: This may be a relative path. Use `legacy_conf_path` to get the resolved absolute path.")
-    db_dir:                        Path = Field(default=Path("databases"),  description="Path to InvokeAI databases directory. WARNING: This may be a relative path. Use `db_path` to get the resolved absolute path.")
-    outputs_dir:                   Path = Field(default=Path("outputs"),    description="Path to directory for outputs. WARNING: This may be a relative path. Use `outputs_path` to get the resolved absolute path.")
-    custom_nodes_dir:              Path = Field(default=Path("nodes"),      description="Path to directory for custom nodes. WARNING: This may be a relative path. Use `custom_nodes_path` to get the resolved absolute path.")
+    autoimport_dir:                Path = Field(default=Path("autoimport"), description="Path to a directory of models files to be imported on startup.")
+    models_dir:                    Path = Field(default=Path("models"),     description="Path to the models directory.")
+    convert_cache_dir:             Path = Field(default=Path("models/.cache"), description="Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.")
+    legacy_conf_dir:               Path = Field(default=Path("configs/stable-diffusion"), description="Path to directory of legacy checkpoint config files.")
+    db_dir:                        Path = Field(default=Path("databases"),  description="Path to InvokeAI databases directory.")
+    outputs_dir:                   Path = Field(default=Path("outputs"),    description="Path to directory for outputs.")
+    custom_nodes_dir:              Path = Field(default=Path("nodes"),      description="Path to directory for custom nodes.")
 
     # LOGGING
     log_handlers:             list[str] = Field(default=["console"],        description='Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".')
@@ -142,12 +142,12 @@ class InvokeAIAppConfig(BaseSettings):
     dev_reload:                    bool = Field(default=False,              description="Automatically reload when Python sources are changed. Does not reload node definitions.")
     profile_graphs:                bool = Field(default=False,              description="Enable graph profiling using `cProfile`.")
     profile_prefix:       Optional[str] = Field(default=None,               description="An optional prefix for profile output files.")
-    profiles_dir:                  Path = Field(default=Path("profiles"),   description="Path to profiles output directory. WARNING: This may be a relative path. Use `profiles_path` to get the resolved absolute path.")
+    profiles_dir:                  Path = Field(default=Path("profiles"),   description="Path to profiles output directory.")
 
     # CACHE
     ram:                          float = Field(default=DEFAULT_RAM_CACHE, gt=0, description="Maximum memory amount used by memory model cache for rapid switching (GB).")
-    vram:                         float = Field(default=DEFAULT_VRAM_CACHE, ge=0, description="Amount of VRAM reserved for model storage (GB)")
-    convert_cache:                float = Field(default=DEFAULT_CONVERT_CACHE, ge=0, description="Maximum size of on-disk converted models cache (GB)")
+    vram:                         float = Field(default=DEFAULT_VRAM_CACHE, ge=0, description="Amount of VRAM reserved for model storage (GB).")
+    convert_cache:                float = Field(default=DEFAULT_CONVERT_CACHE, ge=0, description="Maximum size of on-disk converted models cache (GB).")
     lazy_offload:                  bool = Field(default=True,               description="Keep models in VRAM until their space is needed.")
     log_memory_usage:              bool = Field(default=False,              description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.")
 
@@ -320,11 +320,18 @@ def generate_config_docstrings() -> str:
     docstring += "    Attributes:\n"
 
     field_descriptions: list[str] = []
+    type_hints = get_type_hints(InvokeAIAppConfig)
 
     for k, v in InvokeAIAppConfig.model_fields.items():
         if v.exclude:
             continue
-        field_descriptions.append(f"        {k}: {v.description}")
+        field_type = type_hints.get(k)
+        extra = ""
+        if getattr(field_type, "__origin__", None) is Literal:
+            # Get options for literals - the docs generator can't pull these out
+            options = [f"`{str(x)}`" for x in get_args(field_type)]
+            extra = f"<br>Valid values: {', '.join(options)}"
+        field_descriptions.append(f"        {k}: {v.description}{extra}")
 
     docstring += "\n".join(field_descriptions)
     docstring += '\n    """'
