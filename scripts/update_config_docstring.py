@@ -35,6 +35,7 @@ def generate_config_docstrings() -> str:
 
     return docstring
 
+
 # The pydantic app config can be documented automatically using mkdocs, but this requires that the docstring
 # for the class is kept up to date. We use a pydantic model for the app config. Each config setting is a field
 # with a `description` parameter. It is tedious to update both the description _and_ the docstring for the class.
@@ -48,7 +49,6 @@ def generate_config_docstrings() -> str:
 def main():
     # Change working directory to the repo root
     os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 
     docstring = generate_config_docstrings()
 
