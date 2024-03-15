@@ -174,14 +174,15 @@ class InvokeAIAppConfig(BaseSettings):
 
     # fmt: on
 
-    model_config = SettingsConfigDict(env_file_encoding="utf-8", case_sensitive=True, env_prefix="INVOKEAI")
+    model_config = SettingsConfigDict(env_prefix="INVOKEAI_", env_ignore_empty=True)
 
-    def update_config(self, config: dict[str, Any] | InvokeAIAppConfig) -> None:
+    def update_config(self, config: dict[str, Any] | InvokeAIAppConfig, clobber: bool = True) -> None:
         """Updates the config, overwriting existing values.
 
         Args:
             config: A dictionary of config settings, or instance of `InvokeAIAppConfig`. If an instance of \
                 `InvokeAIAppConfig`, only the explicitly set fields will be merged into the singleton config.
+            clobber: If `True`, overwrite existing values. If `False`, only update fields that are not already set.
         """
 
         if isinstance(config, dict):
@@ -192,6 +193,10 @@ class InvokeAIAppConfig(BaseSettings):
         for field_name in new_config.model_fields_set:
             new_value = getattr(new_config, field_name)
             current_value = getattr(self, field_name)
+
+            if field_name in self.model_fields_set and not clobber:
+                continue
+
             if new_value != current_value:
                 setattr(self, field_name, new_value)
 
@@ -223,7 +228,8 @@ class InvokeAIAppConfig(BaseSettings):
         """
         path = source_path or self.init_file_path
         config_from_file = load_and_migrate_config(path)
-        self.update_config(config_from_file)
+        # Clobbering here will overwrite any settings that were set via environment variables
+        self.update_config(config_from_file, clobber=False)
 
     def set_root(self, root: Path) -> None:
         """Set the runtime root directory. This is typically set using a CLI arg."""
@@ -415,6 +421,7 @@ def get_config() -> InvokeAIAppConfig:
 
     args = InvokeAIArgs.args
 
+    # CLI args trump environment variables
     if root := getattr(args, "root", None):
         config.set_root(Path(root))
 
