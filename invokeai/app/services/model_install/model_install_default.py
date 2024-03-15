@@ -328,7 +328,7 @@ class ModelInstallService(ModelInstallServiceBase):
         yaml_path.rename(yaml_path.with_suffix(".yaml.bak"))
 
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
-        self._cached_model_paths = {Path(x.path).absolute() for x in self.record_store.all_models()}
+        self._cached_model_paths = {Path(x.path).resolve() for x in self.record_store.all_models()}
         callback = self._scan_install if install else self._scan_register
         search = ModelSearch(on_model_found=callback)
         self._models_installed.clear()
@@ -530,7 +530,7 @@ class ModelInstallService(ModelInstallServiceBase):
         return model
 
     def _scan_register(self, model: Path) -> bool:
-        if any(model == m.resolve() for m in self._cached_model_paths):
+        if model in self._cached_model_paths:
             return True
         try:
             id = self.register_path(model)
