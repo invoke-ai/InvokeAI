@@ -38,6 +38,10 @@ InvokeAI:
     ignore_missing_core_models: false
   Paths:
     outdir: /some/outputs/dir
+    conf_path: /custom/models.yaml
+  Model Cache:
+    max_cache_size: 100
+    max_vram_cache_size: 50
 """
 
 invalid_config = """
@@ -77,6 +81,9 @@ def test_migrate_v3_config_from_file(tmp_path: Path):
     assert config.outputs_dir == Path("/some/outputs/dir")
     assert config.host == "192.168.1.1"
     assert config.port == 8080
+    assert config.ram == 100
+    assert config.vram == 50
+    assert config.legacy_models_yaml_path == Path("/custom/models.yaml")
     # This should be stripped out
     assert not hasattr(config, "esrgan")
 
