@@ -287,11 +287,16 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _migrate_yaml(self) -> None:
         db_models = self.record_store.all_models()
-        legacy_models_yaml_path = self._app_config.root_path / "configs" / "models.yaml"
-        try:
-            legacy_models_yaml = yaml.safe_load(legacy_models_yaml_path.read_text())
-        except OSError:
+
+        legacy_models_yaml_path = (
+            self._app_config.legacy_models_yaml_path or self._app_config.root_path / "configs" / "models.yaml"
+        )
+
+        if not legacy_models_yaml_path.exists():
+            # No yaml to migrate
             return
+
+        legacy_models_yaml = yaml.safe_load(legacy_models_yaml_path.read_text())
 
         yaml_metadata = legacy_models_yaml.pop("__metadata__")
         yaml_version = yaml_metadata.get("version")
@@ -302,7 +307,7 @@ class ModelInstallService(ModelInstallServiceBase):
             )
 
         self._logger.info(
-            f"Starting one-time migration of {len(legacy_models_yaml.items())} models from `models.yaml` to database. This may take a few minutes."
+            f"Starting one-time migration of {len(legacy_models_yaml.items())} models from {str(legacy_models_yaml_path)}. This may take a few minutes."
         )
 
         if len(db_models) == 0 and len(legacy_models_yaml.items()) != 0:
