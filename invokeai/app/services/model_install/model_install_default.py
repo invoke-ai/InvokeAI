@@ -520,7 +520,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         new_path = models_dir / model.base.value / model.type.value / old_path.name
 
-        if old_path == new_path:
+        if old_path == new_path or new_path.exists() and old_path == new_path.resolve():
             return model
 
         self._logger.info(f"Moving {model.name} to {new_path}.")
@@ -530,7 +530,7 @@ class ModelInstallService(ModelInstallServiceBase):
         return model
 
     def _scan_register(self, model: Path) -> bool:
-        if model in self._cached_model_paths:
+        if any(model == m.resolve() for m in self._cached_model_paths):
             return True
         try:
             id = self.register_path(model)
