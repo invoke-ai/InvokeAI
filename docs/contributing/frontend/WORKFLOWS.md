@@ -1,40 +1,5 @@
 # Workflows - Design and Implementation
 
-<!-- @import "[TOC]" {cmd="toc" depthFrom=1 depthTo=6 orderedList=false} -->
-
-<!-- code_chunk_output -->
-
-- [Workflows - Design and Implementation](#workflows---design-and-implementation)
-  - [Design](#design)
-    - [Linear UI](#linear-ui)
-    - [Workflow Editor](#workflow-editor)
-      - [Workflows](#workflows)
-        - [Workflow -> reactflow state -> InvokeAI graph](#workflow---reactflow-state---invokeai-graph)
-        - [Nodes vs Invocations](#nodes-vs-invocations)
-        - [Workflow Linear View](#workflow-linear-view)
-      - [OpenAPI Schema](#openapi-schema)
-        - [Field Instances and Templates](#field-instances-and-templates)
-        - [Stateful vs Stateless Fields](#stateful-vs-stateless-fields)
-        - [Collection and Polymorphic Fields](#collection-and-polymorphic-fields)
-  - [Implementation](#implementation)
-    - [zod Schemas and Types](#zod-schemas-and-types)
-    - [OpenAPI Schema Parsing](#openapi-schema-parsing)
-      - [Parsing Field Types](#parsing-field-types)
-        - [Primitive Types](#primitive-types)
-        - [Complex Types](#complex-types)
-        - [Collection Types](#collection-types)
-        - [Collection or Scalar Types](#collection-or-scalar-types)
-        - [Optional Fields](#optional-fields)
-      - [Building Field Input Templates](#building-field-input-templates)
-      - [Building Field Output Templates](#building-field-output-templates)
-    - [Managing reactflow State](#managing-reactflow-state)
-      - [Building Nodes and Edges](#building-nodes-and-edges)
-      - [Building a Workflow](#building-a-workflow)
-      - [Loading a Workflow](#loading-a-workflow)
-    - [Workflow Migrations](#workflow-migrations)
-
-<!-- /code_chunk_output -->
-
 > This document describes, at a high level, the design and implementation of workflows in the InvokeAI frontend. There are a substantial number of implementation details not included, but which are hopefully clear from the code.
 
 InvokeAI's backend uses graphs, composed of **nodes** and **edges**, to process data and generate images.
@@ -152,13 +117,13 @@ Stateless fields do not store their value in the node, so their field instances 
 
 "Custom" fields will always be treated as stateless fields.
 
-##### Collection and Polymorphic Fields
+##### Collection and Scalar Fields
 
-Field types have a name and two flags which may identify it as a **collection** or **polymorphic** field.
+Field types have a name and two flags which may identify it as a **collection** or **collection or scalar** field.
 
-If a field is annotated in python as a list, its field type is parsed and flagged as a collection type (e.g. `list[int]`).
+If a field is annotated in python as a list, its field type is parsed and flagged as a **collection** type (e.g. `list[int]`).
 
-If it is annotated as a union of a type and list, the type will be flagged as a polymorphic type (e.g. `Union[int, list[int]]`). Fields may not be unions of different types (e.g. `Union[int, list[str]]` and `Union[int, str]` are not allowed).
+If it is annotated as a union of a type and list, the type will be flagged as a **collection or scalar** type (e.g. `Union[int, list[int]]`). Fields may not be unions of different types (e.g. `Union[int, list[str]]` and `Union[int, str]` are not allowed).
 
 ## Implementation
 
@@ -338,13 +303,13 @@ Migration logic is in [migrations.ts].
 [reactflow]: https://github.com/xyflow/xyflow 'reactflow'
 [reactflow-concepts]: https://reactflow.dev/learn/concepts/terms-and-definitions
 [reactflow-events]: https://reactflow.dev/api-reference/react-flow#event-handlers
-[buildWorkflow.ts]: ../src/features/nodes/util/workflow/buildWorkflow.ts
-[nodesSlice.ts]: ../src/features/nodes/store/nodesSlice.ts
-[buildLinearTextToImageGraph.ts]: ../src/features/nodes/util/graph/buildLinearTextToImageGraph.ts
-[buildNodesGraph.ts]: ../src/features/nodes/util/graph/buildNodesGraph.ts
-[buildInvocationNode.ts]: ../src/features/nodes/util/node/buildInvocationNode.ts
-[validateWorkflow.ts]: ../src/features/nodes/util/workflow/validateWorkflow.ts
-[migrations.ts]: ../src/features/nodes/util/workflow/migrations.ts
-[parseSchema.ts]: ../src/features/nodes/util/schema/parseSchema.ts
-[buildFieldInputTemplate.ts]: ../src/features/nodes/util/schema/buildFieldInputTemplate.ts
-[buildFieldOutputTemplate.ts]: ../src/features/nodes/util/schema/buildFieldOutputTemplate.ts
+[buildWorkflow.ts]: https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/src/features/nodes/util/workflow/buildWorkflow.ts
+[nodesSlice.ts]: https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/src/features/nodes/store/nodesSlice.ts
+[buildLinearTextToImageGraph.ts]: https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/src/features/nodes/util/graph/buildLinearTextToImageGraph.ts
+[buildNodesGraph.ts]: https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/src/features/nodes/util/graph/buildNodesGraph.ts
+[buildInvocationNode.ts]: https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/src/features/nodes/util/node/buildInvocationNode.ts
+[validateWorkflow.ts]: https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/src/features/nodes/util/workflow/validateWorkflow.ts
+[migrations.ts]: https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/src/features/nodes/util/workflow/migrations.ts
+[parseSchema.ts]: https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/src/features/nodes/util/schema/parseSchema.ts
+[buildFieldInputTemplate.ts]: https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/src/features/nodes/util/schema/buildFieldInputTemplate.ts
+[buildFieldOutputTemplate.ts]: https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/src/features/nodes/util/schema/buildFieldOutputTemplate.ts

@@ -338,6 +338,21 @@ export const controlAdaptersSlice = createSlice({
     pendingControlImagesCleared: (state) => {
       state.pendingControlImages = [];
     },
+    ipAdaptersReset: (state) => {
+      selectAllIPAdapters(state).forEach((ca) => {
+        caAdapter.removeOne(state, ca.id);
+      });
+    },
+    controlNetsReset: (state) => {
+      selectAllControlNets(state).forEach((ca) => {
+        caAdapter.removeOne(state, ca.id);
+      });
+    },
+    t2iAdaptersReset: (state) => {
+      selectAllT2IAdapters(state).forEach((ca) => {
+        caAdapter.removeOne(state, ca.id);
+      });
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(controlAdapterImageProcessed, (state, action) => {
@@ -376,6 +391,9 @@ export const {
   controlAdapterAutoConfigToggled,
   pendingControlImagesCleared,
   controlAdapterModelCleared,
+  ipAdaptersReset,
+  controlNetsReset,
+  t2iAdaptersReset,
 } = controlAdaptersSlice.actions;
 
 export const isAnyControlAdapterAdded = isAnyOf(controlAdapterAdded, controlAdapterRecalled);

@@ -1,5 +1,6 @@
 import type { JSONObject } from 'common/types';
-import type { AnyModelConfig, CoreMetadataInvocation, ModelMetadataField, NonNullableGraph } from 'services/api/types';
+import type { ModelIdentifierField } from 'features/nodes/types/common';
+import type { AnyModelConfig, CoreMetadataInvocation, NonNullableGraph } from 'services/api/types';
 
 import { METADATA } from './constants';
 
@@ -72,7 +73,7 @@ export const setMetadataReceivingNode = (graph: NonNullableGraph, nodeId: string
   });
 };
 
-export const getModelMetadataField = ({ key, hash, name, base, type }: AnyModelConfig): ModelMetadataField => ({
+export const getModelMetadataField = ({ key, hash, name, base, type }: AnyModelConfig): ModelIdentifierField => ({
   key,
   hash,
   name,

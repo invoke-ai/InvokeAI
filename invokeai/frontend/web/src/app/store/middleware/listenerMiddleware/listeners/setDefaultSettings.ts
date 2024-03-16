@@ -1,26 +1,29 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { setDefaultSettings } from 'features/parameters/store/actions';
 import {
+  heightChanged,
   setCfgRescaleMultiplier,
   setCfgScale,
   setScheduler,
   setSteps,
   vaePrecisionChanged,
   vaeSelected,
+  widthChanged,
 } from 'features/parameters/store/generationSlice';
 import {
   isParameterCFGRescaleMultiplier,
   isParameterCFGScale,
+  isParameterHeight,
   isParameterPrecision,
   isParameterScheduler,
   isParameterSteps,
+  isParameterWidth,
   zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
-import { map } from 'lodash-es';
-import { modelsApi } from 'services/api/endpoints/models';
+import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 
 export const addSetDefaultSettingsListener = (startAppListening: AppStartListening) => {
@@ -35,14 +38,19 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
         return;
       }
 
-      const modelConfig = await dispatch(modelsApi.endpoints.getModelConfig.initiate(currentModel.key)).unwrap();
+      const request = dispatch(modelsApi.endpoints.getModelConfigs.initiate());
+      const data = await request.unwrap();
+      request.unsubscribe();
+      const models = modelConfigsAdapterSelectors.selectAll(data);
+
+      const modelConfig = models.find((model) => model.key === currentModel.key);
 
       if (!modelConfig) {
         return;
       }
 
       if (isNonRefinerMainModelConfig(modelConfig) && modelConfig.default_settings) {
-        const { vae, vae_precision, cfg_scale, cfg_rescale_multiplier, steps, scheduler } =
+        const { vae, vae_precision, cfg_scale, cfg_rescale_multiplier, steps, scheduler, width, height } =
           modelConfig.default_settings;
 
         if (vae) {
@@ -51,11 +59,8 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
           if (vae === 'default') {
             dispatch(vaeSelected(null));
           } else {
-            const { data } = modelsApi.endpoints.getVaeModels.select()(state);
-            const vaeArray = map(data?.entities);
-            const validVae = vaeArray.find((model) => model.key === vae);
-
-            const result = zParameterVAEModel.safeParse(validVae);
+            const vaeModel = models.find((model) => model.key === vae);
+            const result = zParameterVAEModel.safeParse(vaeModel);
             if (!result.success) {
               return;
             }
@@ -90,6 +95,18 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
         if (scheduler) {
           if (isParameterScheduler(scheduler)) {
             dispatch(setScheduler(scheduler));
+          }
+        }
+
+        if (width) {
+          if (isParameterWidth(width)) {
+            dispatch(widthChanged(width));
+          }
+        }
+
+        if (height) {
+          if (isParameterHeight(height)) {
+            dispatch(heightChanged(height));
           }
         }
 

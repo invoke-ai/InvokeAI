@@ -131,13 +131,20 @@ class ModelSourceType(str, Enum):
     HFRepoID = "hf_repo_id"
 
 
+DEFAULTS_PRECISION = Literal["fp16", "fp32"]
+
+
 class MainModelDefaultSettings(BaseModel):
-    vae: str | None
-    vae_precision: str | None
-    scheduler: SCHEDULER_NAME_VALUES | None
-    steps: int | None
-    cfg_scale: float | None
-    cfg_rescale_multiplier: float | None
+    vae: str | None = Field(default=None, description="Default VAE for this model (model key)")
+    vae_precision: DEFAULTS_PRECISION | None = Field(default=None, description="Default VAE precision for this model")
+    scheduler: SCHEDULER_NAME_VALUES | None = Field(default=None, description="Default scheduler for this model")
+    steps: int | None = Field(default=None, gt=0, description="Default number of steps for this model")
+    cfg_scale: float | None = Field(default=None, ge=1, description="Default CFG Scale for this model")
+    cfg_rescale_multiplier: float | None = Field(
+        default=None, ge=0, lt=1, description="Default CFG Rescale Multiplier for this model"
+    )
+    width: int | None = Field(default=None, multiple_of=8, ge=64, description="Default width for this model")
+    height: int | None = Field(default=None, multiple_of=8, ge=64, description="Default height for this model")
 
 
 class ControlAdapterDefaultSettings(BaseModel):

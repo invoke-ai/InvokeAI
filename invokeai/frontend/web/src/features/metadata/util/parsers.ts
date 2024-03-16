@@ -225,28 +225,34 @@ const parseControlNet: MetadataParseFunc<ControlNetConfigMetadata> = async (meta
   const control_model = await getProperty(metadataItem, 'control_model');
   const key = await getModelKey(control_model, 'controlnet');
   const controlNetModel = await fetchModelConfigWithTypeGuard(key, isControlNetModelConfig);
-
-  const image = zControlField.shape.image.nullish().catch(null).parse(getProperty(metadataItem, 'image'));
+  const image = zControlField.shape.image
+    .nullish()
+    .catch(null)
+    .parse(await getProperty(metadataItem, 'image'));
+  const processedImage = zControlField.shape.image
+    .nullish()
+    .catch(null)
+    .parse(await getProperty(metadataItem, 'processed_image'));
   const control_weight = zControlField.shape.control_weight
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'control_weight'));
+    .parse(await getProperty(metadataItem, 'control_weight'));
   const begin_step_percent = zControlField.shape.begin_step_percent
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'begin_step_percent'));
+    .parse(await getProperty(metadataItem, 'begin_step_percent'));
   const end_step_percent = zControlField.shape.end_step_percent
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'end_step_percent'));
+    .parse(await getProperty(metadataItem, 'end_step_percent'));
   const control_mode = zControlField.shape.control_mode
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'control_mode'));
+    .parse(await getProperty(metadataItem, 'control_mode'));
   const resize_mode = zControlField.shape.resize_mode
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'resize_mode'));
+    .parse(await getProperty(metadataItem, 'resize_mode'));
 
   const { processorType, processorNode } = buildControlAdapterProcessor(controlNetModel);
 
@@ -260,7 +266,7 @@ const parseControlNet: MetadataParseFunc<ControlNetConfigMetadata> = async (meta
     controlMode: control_mode ?? initialControlNet.controlMode,
     resizeMode: resize_mode ?? initialControlNet.resizeMode,
     controlImage: image?.image_name ?? null,
-    processedControlImage: image?.image_name ?? null,
+    processedControlImage: processedImage?.image_name ?? null,
     processorType,
     processorNode,
     shouldAutoConfig: true,
@@ -284,20 +290,30 @@ const parseT2IAdapter: MetadataParseFunc<T2IAdapterConfigMetadata> = async (meta
   const key = await getModelKey(t2i_adapter_model, 't2i_adapter');
   const t2iAdapterModel = await fetchModelConfigWithTypeGuard(key, isT2IAdapterModelConfig);
 
-  const image = zT2IAdapterField.shape.image.nullish().catch(null).parse(getProperty(metadataItem, 'image'));
-  const weight = zT2IAdapterField.shape.weight.nullish().catch(null).parse(getProperty(metadataItem, 'weight'));
+  const image = zT2IAdapterField.shape.image
+    .nullish()
+    .catch(null)
+    .parse(await getProperty(metadataItem, 'image'));
+  const processedImage = zT2IAdapterField.shape.image
+    .nullish()
+    .catch(null)
+    .parse(await getProperty(metadataItem, 'processed_image'));
+  const weight = zT2IAdapterField.shape.weight
+    .nullish()
+    .catch(null)
+    .parse(await getProperty(metadataItem, 'weight'));
   const begin_step_percent = zT2IAdapterField.shape.begin_step_percent
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'begin_step_percent'));
+    .parse(await getProperty(metadataItem, 'begin_step_percent'));
   const end_step_percent = zT2IAdapterField.shape.end_step_percent
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'end_step_percent'));
+    .parse(await getProperty(metadataItem, 'end_step_percent'));
   const resize_mode = zT2IAdapterField.shape.resize_mode
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'resize_mode'));
+    .parse(await getProperty(metadataItem, 'resize_mode'));
 
   const { processorType, processorNode } = buildControlAdapterProcessor(t2iAdapterModel);
 
@@ -310,7 +326,7 @@ const parseT2IAdapter: MetadataParseFunc<T2IAdapterConfigMetadata> = async (meta
     endStepPct: end_step_percent ?? initialT2IAdapter.endStepPct,
     resizeMode: resize_mode ?? initialT2IAdapter.resizeMode,
     controlImage: image?.image_name ?? null,
-    processedControlImage: image?.image_name ?? null,
+    processedControlImage: processedImage?.image_name ?? null,
     processorType,
     processorNode,
     shouldAutoConfig: true,
@@ -334,16 +350,22 @@ const parseIPAdapter: MetadataParseFunc<IPAdapterConfigMetadata> = async (metada
   const key = await getModelKey(ip_adapter_model, 'ip_adapter');
   const ipAdapterModel = await fetchModelConfigWithTypeGuard(key, isIPAdapterModelConfig);
 
-  const image = zIPAdapterField.shape.image.nullish().catch(null).parse(getProperty(metadataItem, 'image'));
-  const weight = zIPAdapterField.shape.weight.nullish().catch(null).parse(getProperty(metadataItem, 'weight'));
+  const image = zIPAdapterField.shape.image
+    .nullish()
+    .catch(null)
+    .parse(await getProperty(metadataItem, 'image'));
+  const weight = zIPAdapterField.shape.weight
+    .nullish()
+    .catch(null)
+    .parse(await getProperty(metadataItem, 'weight'));
   const begin_step_percent = zIPAdapterField.shape.begin_step_percent
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'begin_step_percent'));
+    .parse(await getProperty(metadataItem, 'begin_step_percent'));
   const end_step_percent = zIPAdapterField.shape.end_step_percent
     .nullish()
     .catch(null)
-    .parse(getProperty(metadataItem, 'end_step_percent'));
+    .parse(await getProperty(metadataItem, 'end_step_percent'));
 
   const ipAdapter: IPAdapterConfigMetadata = {
     id: uuidv4(),

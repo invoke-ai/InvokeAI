@@ -5,8 +5,7 @@ import { SyncModelsIconButton } from 'features/modelManagerV2/components/SyncMod
 import { fieldMainModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type { MainModelFieldInputInstance, MainModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
-import { NON_SDXL_MAIN_MODELS } from 'services/api/constants';
-import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import { useNonSDXLMainModels } from 'services/api/hooks/modelsByType';
 import type { MainModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
@@ -16,7 +15,7 @@ type Props = FieldComponentProps<MainModelFieldInputInstance, MainModelFieldInpu
 const MainModelFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
-  const { data, isLoading } = useGetMainModelsQuery(NON_SDXL_MAIN_MODELS);
+  const [modelConfigs, { isLoading }] = useNonSDXLMainModels();
   const _onChange = useCallback(
     (value: MainModelConfig | null) => {
       if (!value) {
@@ -33,7 +32,7 @@ const MainModelFieldInputComponent = (props: Props) => {
     [dispatch, field.name, nodeId]
   );
   const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
-    modelEntities: data,
+    modelConfigs,
     onChange: _onChange,
     isLoading,
     selectedModel: field.value,

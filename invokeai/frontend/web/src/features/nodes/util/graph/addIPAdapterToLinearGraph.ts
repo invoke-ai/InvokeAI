@@ -1,25 +1,30 @@
 import type { RootState } from 'app/store/store';
 import { selectValidIPAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import type { IPAdapterConfig } from 'features/controlAdapters/store/types';
+import type { ImageField } from 'features/nodes/types/common';
 import type {
   CollectInvocation,
   CoreMetadataInvocation,
   IPAdapterInvocation,
   NonNullableGraph,
+  S,
 } from 'services/api/types';
-import { isIPAdapterModelConfig } from 'services/api/types';
+import { assert } from 'tsafe';
 
 import { IP_ADAPTER_COLLECT } from './constants';
-import { getModelMetadataField, upsertMetadata } from './metadata';
+import { upsertMetadata } from './metadata';
 
 export const addIPAdapterToLinearGraph = async (
   state: RootState,
   graph: NonNullableGraph,
   baseNodeId: string
 ): Promise<void> => {
-  const validIPAdapters = selectValidIPAdapters(state.controlAdapters).filter(
-    (ca) => ca.model?.base === state.generation.model?.base
-  );
+  const validIPAdapters = selectValidIPAdapters(state.controlAdapters).filter(({ model, controlImage, isEnabled }) => {
+    const hasModel = Boolean(model);
+    const doesBaseMatch = model?.base === state.generation.model?.base;
+    const hasControlImage = controlImage;
+    return isEnabled && hasModel && doesBaseMatch && hasControlImage;
+  });
 
   if (validIPAdapters.length) {
     // Even though denoise_latents' ip adapter input is collection or scalar, keep it simple and always use a collect
@@ -39,11 +44,14 @@ export const addIPAdapterToLinearGraph = async (
 
     const ipAdapterMetdata: CoreMetadataInvocation['ipAdapters'] = [];
 
-    validIPAdapters.forEach(async (ipAdapter) => {
+    for (const ipAdapter of validIPAdapters) {
       if (!ipAdapter.model) {
         return;
       }
-      const { id, weight, model, beginStepPct, endStepPct } = ipAdapter;
+      const { id, weight, model, beginStepPct, endStepPct, controlImage } = ipAdapter;
+
+      assert(controlImage, 'IP Adapter image is required');
+
       const ipAdapterNode: IPAdapterInvocation = {
         id: `ip_adapter_${id}`,
         type: 'ip_adapter',
@@ -52,27 +60,14 @@ export const addIPAdapterToLinearGraph = async (
         ip_adapter_model: model,
         begin_step_percent: beginStepPct,
         end_step_percent: endStepPct,
+        image: {
+          image_name: controlImage,
+        },
       };
-
-      if (ipAdapter.controlImage) {
-        ipAdapterNode.image = {
-          image_name: ipAdapter.controlImage,
-        };
-      } else {
-        return;
-      }
 
       graph.nodes[ipAdapterNode.id] = ipAdapterNode;
 
-      const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isIPAdapterModelConfig);
-
-      ipAdapterMetdata.push({
-        weight: weight,
-        ip_adapter_model: getModelMetadataField(modelConfig),
-        begin_step_percent: beginStepPct,
-        end_step_percent: endStepPct,
-        image: ipAdapterNode.image,
-      });
+      ipAdapterMetdata.push(buildIPAdapterMetadata(ipAdapter));
 
       graph.edges.push({
         source: { node_id: ipAdapterNode.id, field: 'ip_adapter' },
@@ -81,8 +76,32 @@ export const addIPAdapterToLinearGraph = async (
           field: 'item',
         },
       });
-    });
+    }
 
     upsertMetadata(graph, { ipAdapters: ipAdapterMetdata });
   }
+};
+
+const buildIPAdapterMetadata = (ipAdapter: IPAdapterConfig): S['IPAdapterMetadataField'] => {
+  const { controlImage, beginStepPct, endStepPct, model, weight } = ipAdapter;
+
+  assert(model, 'IP Adapter model is required');
+
+  let image: ImageField | null = null;
+
+  if (controlImage) {
+    image = {
+      image_name: controlImage,
+    };
+  }
+
+  assert(image, 'IP Adapter image is required');
+
+  return {
+    ip_adapter_model: model,
+    weight,
+    begin_step_percent: beginStepPct,
+    end_step_percent: endStepPct,
+    image,
+  };
 };
