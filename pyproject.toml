@@ -47,10 +47,10 @@ dependencies = [
   "pytorch-lightning==2.1.3",
   "safetensors==0.4.2",
   "timm==0.6.13",               # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
-  "torch==2.1.2",
+  "torch==2.2.1",
   "torchmetrics==0.11.4",
   "torchsde==0.2.6",
-  "torchvision==0.16.2",
+  "torchvision==0.17.1",
   "transformers==4.38.2",
 
   # Core application dependencies, pinned for reproducible builds.
@@ -98,7 +98,7 @@ dependencies = [
 [project.optional-dependencies]
 "xformers" = [
   # Core generation dependencies, pinned for reproducible builds.
-  "xformers==0.0.23.post1; sys_platform!='darwin'",
+  "xformers==0.0.25; sys_platform!='darwin'",
   # Auxiliary dependencies, pinned only if necessary.
   "triton; sys_platform=='linux'",
 ]
