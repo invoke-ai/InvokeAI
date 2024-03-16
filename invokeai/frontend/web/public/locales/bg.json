@@ -1,19 +1,11 @@
 {
     "accessibility": {
-        "flipHorizontally": "Обърнете хоризонтално",
-        "flipVertically": "Обърнете вертикално",
         "menu": "Меню",
-        "modelSelect": "Избор на модел",
         "nextImage": "Следваща снимка",
         "previousImage": "Предишно изображение",
-        "rotateClockwise": "Завъртете по часовниковата стрелка",
-        "rotateCounterClockwise": "Завъртете обратно на часовниковата стрелка",
         "uploadImage": "Качете изображение",
-        "zoomIn": "Увеличете",
-        "zoomOut": "Отдалечете",
         "invokeProgressBar": "Invoke лента за напредък",
-        "mode": "Режим",
-        "useThisParameter": "Използване на този параметър"
+        "mode": "Режим"
     },
     "boards": {
         "addBoard": "Добавете табло",
@@ -34,38 +26,28 @@
         "myBoard": "Моето табло"
     },
     "accordions": {
-        "generation": {
-            "modelTab": "Модел",
-            "conceptsTab": "Концепции"
-        },
         "image": {
             "title": "Изображение"
         },
         "control": {
-            "title": "Контрол",
-            "controlAdaptersTab": "Контролни адаптери"
+            "title": "Контрол"
         }
     },
     "common": {
         "aboutDesc": "Използвате Invoke за работа? Разгледайте:",
-        "advancedOptions": "Разширени настройки",
         "ai": "ии",
         "areYouSure": "Сигурен ли сте?",
         "back": "Назад",
         "cancel": "Отказ",
-        "close": "Затваряне",
         "or": "или",
         "controlNet": "ControlNet",
         "details": "Детайли",
-        "darkMode": "Тъмен режим",
         "dontAskMeAgain": "Не питай повече",
         "folder": "Папка",
-        "generate": "Генериране",
         "githubLabel": "Github",
         "img2img": "Снимка към снимка",
         "languagePickerLabel": "Език",
         "loading": "Зареждане",
-        "loadingInvokeAI": "Зареждане на Invoke AI",
         "learnMore": "Научете повече",
         "modelManager": "Мениджър на модели",
         "openInNewTab": "Отворете в нов таб",
