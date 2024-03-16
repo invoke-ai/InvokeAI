@@ -15,7 +15,7 @@
         "githubLabel": "Github",
         "hotkeysLabel": "ホットキー",
         "discordLabel": "Discord",
-        "nodes": "ワークフローエディター",
+        "nodes": "ワークフロー",
         "txt2img": "txt2img",
         "postprocessing": "Post Processing",
         "t2iAdapter": "T2I アダプター",
@@ -34,20 +34,84 @@
         "learnMore": "もっと学ぶ",
         "random": "ランダム",
         "batch": "バッチマネージャー",
-        "advanced": "高度な設定"
+        "advanced": "高度な設定",
+        "created": "作成済",
+        "green": "緑",
+        "blue": "青",
+        "alpha": "アルファ",
+        "outpaint": "アウトペイント",
+        "unknown": "不明",
+        "updated": "更新済",
+        "add": "追加",
+        "ai": "AI",
+        "copyError": "$t(gallery.copy) エラー",
+        "data": "データ",
+        "template": "テンプレート",
+        "red": "赤",
+        "or": "または",
+        "checkpoint": "チェックポイント",
+        "direction": "方向",
+        "simple": "シンプル",
+        "save": "保存",
+        "saveAs": "名前をつけて保存",
+        "somethingWentWrong": "何かの問題が発生しました",
+        "details": "詳細",
+        "inpaint": "インペイント",
+        "delete": "削除",
+        "nextPage": "次のページ",
+        "copy": "コピー",
+        "error": "エラー",
+        "file": "ファイル",
+        "folder": "フォルダ",
+        "input": "インプット",
+        "format": "形式",
+        "installed": "インストール済み",
+        "localSystem": "ローカルシステム",
+        "outputs": "アウトプット",
+        "prevPage": "前のページ",
+        "unknownError": "未知のエラー",
+        "orderBy": "並び順:"
     },
     "gallery": {
         "galleryImageSize": "画像のサイズ",
         "gallerySettings": "ギャラリーの設定",
         "loadMore": "さらに読み込む",
-        "noImagesInGallery": "ギャラリーに画像がありません",
-        "autoSwitchNewImages": "新しい画像に自動切替"
+        "noImagesInGallery": "表示する画像がありません",
+        "autoSwitchNewImages": "新しい画像に自動切替",
+        "copy": "コピー",
+        "image": "画像",
+        "setCurrentImage": "現在の画像としてセット",
+        "autoAssignBoardOnClick": "クリックしたボードに自動追加",
+        "featuresWillReset": "この画像を削除すると、これらの機能は即座にリセットされます。",
+        "unstarImage": "スターを外す",
+        "loading": "ロード中",
+        "assets": "アセット",
+        "currentlyInUse": "この画像は現在下記の機能を使用しています:",
+        "problemDeletingImages": "画像の削除中に問題が発生",
+        "drop": "ドロップ",
+        "dropOrUpload": "$t(gallery.drop) またはアップロード",
+        "deleteImage": "画像を削除",
+        "deleteImageBin": "削除された画像はOSのゴミ箱に送られます。",
+        "deleteImagePermanent": "削除された画像は復元できません。",
+        "download": "ダウンロード",
+        "unableToLoad": "ギャラリーをロードできません",
+        "bulkDownloadRequested": "ダウンロード準備中",
+        "bulkDownloadRequestedDesc": "ダウンロードの準備中です。しばらくお待ちください。",
+        "bulkDownloadRequestFailed": "ダウンロード準備中に問題が発生",
+        "bulkDownloadFailed": "ダウンロード失敗",
+        "problemDeletingImagesDesc": "1つ以上の画像を削除できませんでした",
+        "alwaysShowImageSizeBadge": "画像サイズバッジを常に表示",
+        "dropToUpload": "$t(gallery.drop) してアップロード",
+        "noImageSelected": "画像が選択されていません",
+        "deleteSelection": "選択中のものを削除",
+        "downloadSelection": "選択中のものをダウンロード",
+        "starImage": "スターをつける"
     },
     "hotkeys": {
-        "keyboardShortcuts": "キーボードショートカット",
-        "appHotkeys": "アプリのホットキー",
-        "generalHotkeys": "Generalのホットキー",
-        "galleryHotkeys": "ギャラリーのホットキー",
+        "keyboardShortcuts": "ホットキー",
+        "appHotkeys": "アプリケーション",
+        "generalHotkeys": "一般",
+        "galleryHotkeys": "ギャラリー",
         "unifiedCanvasHotkeys": "Unified Canvasのホットキー",
         "invoke": {
             "desc": "画像を生成",
@@ -55,11 +119,11 @@
         },
         "cancel": {
             "title": "キャンセル",
-            "desc": "画像の生成をキャンセル"
+            "desc": "現在のキューをキャンセル"
         },
         "focusPrompt": {
             "desc": "プロンプトテキストボックスにフォーカス",
-            "title": "プロジェクトにフォーカス"
+            "title": "プロンプトにフォーカス"
         },
         "toggleOptions": {
             "title": "オプションパネルのトグル",
@@ -204,6 +268,40 @@
         "resetView": {
             "title": "キャンバスをリセット",
             "desc": "キャンバスをリセット"
+        },
+        "acceptStagingImage": {
+            "title": "プレビュー画像の採用",
+            "desc": "現在のプレビュー画像を採用する"
+        },
+        "addNodes": {
+            "desc": "ノード追加メニューを開く",
+            "title": "ノードを追加"
+        },
+        "moveTool": {
+            "desc": "キャンバスを移動する",
+            "title": "手のひらツール"
+        },
+        "nextStagingImage": {
+            "desc": "次のプレビュー画像"
+        },
+        "cancelAndClear": {
+            "desc": "生成をキャンセルしキューもクリアします",
+            "title": "キャンセルとクリア"
+        },
+        "mergeVisible": {
+            "title": "表示レイヤーを統合",
+            "desc": "全ての表示レイヤーを統合"
+        },
+        "searchHotkeys": "ホットキーを検索",
+        "clearSearch": "検索をクリア",
+        "noHotkeysFound": "ホットキーが見つかりません",
+        "remixImage": {
+            "title": "画像をリミックス",
+            "desc": "現在の画像のシード値を除く全パラメータを使用"
+        },
+        "redoStroke": {
+            "title": "ストロークをやり直す",
+            "desc": "ブラシストロークのやり直し"
         }
     },
     "modelManager": {
@@ -214,7 +312,7 @@
         "manual": "手動",
         "name": "名前",
         "description": "概要",
-        "config": "Config",
+        "config": "コンフィグ",
         "repo_id": "Repo ID",
         "width": "幅",
         "height": "高さ",
@@ -253,7 +351,8 @@
         "convertToDiffusersHelpText1": "このモデルは 🧨 Diffusers フォーマットに変換されます。",
         "modelsSynced": "モデルが同期されました",
         "convertToDiffusersHelpText3": "チェックポイントファイルは、InvokeAIルートフォルダ内にある場合、ディスクから削除されます。カスタムロケーションにある場合は、削除されません。",
-        "convertToDiffusersHelpText4": "これは一回限りのプロセスです。コンピュータの仕様によっては、約30秒から60秒かかる可能性があります。"
+        "convertToDiffusersHelpText4": "これは一回限りのプロセスです。コンピュータの仕様によっては、約30秒から60秒かかる可能性があります。",
+        "cancel": "キャンセル"
     },
     "parameters": {
         "images": "画像",
@@ -364,7 +463,11 @@
         "showOptionsPanel": "サイドパネルを表示",
         "showGalleryPanel": "ギャラリーパネルを表示",
         "menu": "メニュー",
-        "loadMore": "さらに読み込む"
+        "loadMore": "さらに読み込む",
+        "createIssue": "課題の作成",
+        "resetUI": "$t(accessibility.reset) UI",
+        "mode": "モード:",
+        "about": "Invoke について"
     },
     "controlnet": {
         "resize": "リサイズ",
@@ -421,7 +524,34 @@
         "noneDescription": "処理は行われていません",
         "canny": "Canny",
         "hedDescription": "階層的エッジ検出",
-        "maxFaces": "顔の最大数"
+        "maxFaces": "顔の最大数",
+        "depthMidas": "深度 (Midas)",
+        "f": "F",
+        "h": "H",
+        "lineart": "線画",
+        "depthAnythingDescription": "Depth Anything 技術を使って深度マップを生成します",
+        "hed": "HED",
+        "normalBaeDescription": "法線 BAE 処理中",
+        "pidi": "PIDI",
+        "resizeSimple": "リサイズ(シンプル)",
+        "scribble": "らくがき",
+        "small": "小型",
+        "mediapipeFace": "Mediapipe 顔",
+        "mlsd": "M-LSD",
+        "normalBae": "法線 BAE",
+        "base": "ベース",
+        "contentShuffle": "シャッフル",
+        "modelSize": "モデルサイズ",
+        "safe": "セーフモード",
+        "depthZoe": "深度 (Zoe)",
+        "face": "顔",
+        "body": "体",
+        "hands": "手",
+        "large": "大型",
+        "lineartAnime": "アニメ線画",
+        "mlsdDescription": "最小線分検知",
+        "dwOpenpose": "DW オープンポーズ",
+        "dwOpenposeDescription": "DW オープンポーズによる人体ポーズの推定"
     },
     "metadata": {
         "seamless": "シームレス",
@@ -440,7 +570,7 @@
         "pauseSucceeded": "処理が一時停止されました",
         "queueFront": "キューの先頭へ追加",
         "queueBack": "キューに追加",
-        "queueCountPrediction": "{{predicted}}をキューに追加",
+        "queueCountPrediction": "{{promptsCount}} プロンプト × {{iterations}} イテレーション -> {{count}} 枚生成",
         "pause": "一時停止",
         "queue": "キュー",
         "pauseTooltip": "処理を一時停止",
@@ -485,7 +615,13 @@
         "cancelBatchFailed": "バッチのキャンセルに問題があります",
         "clearQueueAlertDialog2": "キューをクリアしてもよろしいですか？",
         "item": "アイテム",
-        "graphFailedToQueue": "グラフをキューに追加できませんでした"
+        "graphFailedToQueue": "グラフをキューに追加できませんでした",
+        "batchFieldValues": "バッチの詳細",
+        "openQueue": "キューを開く",
+        "time": "時間",
+        "completedIn": "完了まで",
+        "back": "戻る",
+        "prune": "刈り込み"
     },
     "models": {
         "noMatchingModels": "一致するモデルがありません",
@@ -545,7 +681,12 @@
         "loading": "ロード中...",
         "topMessage": "このボードには、以下の機能で使用されている画像が含まれています：",
         "bottomMessage": "このボードおよび画像を削除すると、現在これらを利用している機能はリセットされます。",
-        "clearSearch": "検索をクリア"
+        "clearSearch": "検索をクリア",
+        "deleteBoard": "ボードの削除",
+        "deleteBoardAndImages": "ボードと画像の削除",
+        "deleteBoardOnly": "ボードのみ削除",
+        "deletedBoardsCannotbeRestored": "削除されたボードは復元できません",
+        "movingImagesToBoard_other": "{{count}} の画像をボードに移動:"
     },
     "invocationCache": {
         "invocationCache": "呼び出しキャッシュ",
@@ -554,7 +695,15 @@
         "enable": "有効",
         "clear": "クリア",
         "maxCacheSize": "最大キャッシュサイズ",
-        "cacheSize": "キャッシュサイズ"
+        "cacheSize": "キャッシュサイズ",
+        "useCache": "キャッシュを使用",
+        "misses": "見つからないキャッシュ",
+        "hits": "見つかったキャッシュ",
+        "disableSucceeded": "呼び出しキャッシュが無効",
+        "disableFailed": "呼び出しキャッシュの無効化中に問題が発生",
+        "enableSucceeded": "呼び出しキャッシュが有効",
+        "disable": "無効",
+        "enableFailed": "呼び出しキャッシュの有効化中に問題が発生"
     },
     "popovers": {
         "paramRatio": {
@@ -563,5 +712,39 @@
                 "生成された画像の縦横比。"
             ]
         }
+    },
+    "accordions": {
+        "compositing": {
+            "infillTab": "インフィル",
+            "title": "コンポジション",
+            "coherenceTab": "コヒーレンスパス"
+        },
+        "advanced": {
+            "title": "高度な設定"
+        },
+        "control": {
+            "title": "コントロール"
+        },
+        "generation": {
+            "title": "生成"
+        },
+        "image": {
+            "title": "画像"
+        }
+    },
+    "hrf": {
+        "metadata": {
+            "method": "高解像修復の手法",
+            "strength": "高解像修復の強度",
+            "enabled": "高解像修復が有効"
+        },
+        "enableHrf": "高解像修復を有効",
+        "hrf": "高解像修復",
+        "upscaleMethod": "アップスケール手法"
+    },
+    "prompt": {
+        "addPromptTrigger": "プロンプトトリガーを追加",
+        "compatibleEmbeddings": "互換性のある埋め込み",
+        "noMatchingTriggers": "一致するトリガーがありません"
     }
 }
