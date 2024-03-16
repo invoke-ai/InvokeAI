@@ -6,7 +6,7 @@
         "settingsLabel": "Impostazioni",
         "img2img": "Immagine a Immagine",
         "unifiedCanvas": "Tela unificata",
-        "nodes": "Editor del flusso di lavoro",
+        "nodes": "Flussi di lavoro",
         "upload": "Caricamento",
         "load": "Carica",
         "back": "Indietro",
@@ -577,7 +577,7 @@
         "problemMergingCanvas": "Problema nell'unione delle tele",
         "imageUploaded": "Immagine caricata",
         "addedToBoard": "Aggiunto alla bacheca",
-        "modelAddedSimple": "Modello aggiunto",
+        "modelAddedSimple": "Modello aggiunto alla Coda",
         "problemImportingMaskDesc": "Impossibile importare la maschera",
         "problemCopyingCanvas": "Problema durante la copia della tela",
         "problemSavingCanvas": "Problema nel salvataggio della tela",
@@ -852,11 +852,11 @@
         "duplicate": "Duplica",
         "balanced": "Bilanciato",
         "depthMidasDescription": "Generazione di mappe di profondità usando Midas",
-        "control": "ControlNet",
+        "control": "Controllo",
         "crop": "Ritaglia",
         "depthMidas": "Profondità (Midas)",
         "detectResolution": "Rileva risoluzione",
-        "controlMode": "Controllo",
+        "controlMode": "Modalità di controllo",
         "cannyDescription": "Canny rilevamento bordi",
         "depthZoe": "Profondità (Zoe)",
         "autoConfigure": "Configura automaticamente il processore",
@@ -1099,7 +1099,7 @@
         },
         "scaleBeforeProcessing": {
             "paragraphs": [
-                "\"Auto\" ridimensiona l'area selezionata alla dimensione più adatta al modello prima del processo di generazione dell'immagine.",
+                "\"Auto\" scala l'area selezionata alla dimensione più adatta al modello prima del processo di generazione dell'immagine.",
                 "\"Manuale\" consente di scegliere la larghezza e l'altezza a cui verrà ridimensionata l'area selezionata prima del processo di generazione dell'immagine."
             ],
             "heading": "Scala prima dell'elaborazione"
@@ -1149,7 +1149,7 @@
         "controlNetResizeMode": {
             "heading": "Modalità ridimensionamento",
             "paragraphs": [
-                "Metodo per adattare le dimensioni dell'immagine in ingresso dell'adattatore di controllo alle dimensioni della generazione di output."
+                "Metodo per adattare le dimensioni dell'immagine di controllo dell'adattatore alle dimensioni di generazione."
             ]
         },
         "dynamicPromptsSeedBehaviour": {
