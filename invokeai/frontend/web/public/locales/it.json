@@ -159,7 +159,8 @@
         "bulkDownloadRequestedDesc": "La tua richiesta di download è in preparazione. L'operazione potrebbe richiedere alcuni istanti.",
         "bulkDownloadRequestFailed": "Problema durante la preparazione del download",
         "bulkDownloadStarting": "Avvio scaricamento",
-        "bulkDownloadFailed": "Scaricamento fallito"
+        "bulkDownloadFailed": "Scaricamento fallito",
+        "alwaysShowImageSizeBadge": "Mostra sempre le dimensioni dell'immagine"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tasti di scelta rapida",
@@ -554,7 +555,30 @@
         "defaultSettings": "Impostazioni predefinite",
         "metadata": "Metadati",
         "useDefaultSettings": "Usa le impostazioni predefinite",
-        "triggerPhrases": "Frasi trigger"
+        "triggerPhrases": "Frasi Trigger",
+        "deleteModelImage": "Elimina l'immagine del modello",
+        "localOnly": "solo locale",
+        "modelImageDeleted": "Immagine del modello eliminata",
+        "modelImageDeleteFailed": "Eliminazione dell'immagine del modello non riuscita",
+        "modelImageUpdated": "Immagine del modello aggiornata",
+        "modelImageUpdateFailed": "Aggiornamento dell'immagine del modello non riuscito",
+        "pathToConfig": "Percorso file di configurazione",
+        "uploadImage": "Carica immagine",
+        "loraTriggerPhrases": "Frasi Trigger LoRA",
+        "mainModelTriggerPhrases": "Frasi Trigger del modello principale",
+        "inplaceInstall": "Installazione sul posto",
+        "inplaceInstallDesc": "Installa i modelli senza copiare i file. Quando si utilizza il modello, verrà caricato da questa posizione. Se disabilitato, i file del modello verranno copiati nella directory dei modelli gestiti da Invoke durante l'installazione.",
+        "installQueue": "Coda di installazione",
+        "install": "Installa",
+        "installRepo": "Installa Repo",
+        "huggingFacePlaceholder": "proprietario/nome-modello",
+        "huggingFaceHelper": "Se in questo repository vengono trovati più modelli, ti verrà richiesto di selezionarne uno da installare.",
+        "installAll": "Installa tutto",
+        "scanFolderHelper": "La cartella verrà sottoposta a scansione ricorsiva per i modelli. L'operazione può richiedere un po' di tempo per cartelle molto grandi.",
+        "scanPlaceholder": "Percorso di una cartella locale",
+        "simpleModelPlaceholder": "URL o percorso di un file locale o di una cartella diffusori",
+        "urlOrLocalPath": "URL o percorso locale",
+        "urlOrLocalPathHelper": "Gli URL dovrebbero puntare a un singolo file. I percorsi locali possono puntare a un singolo file o cartella per un singolo modello di diffusore."
     },
     "parameters": {
         "images": "Immagini",
@@ -636,7 +660,7 @@
         "clipSkip": "CLIP Skip",
         "aspectRatio": "Proporzioni",
         "maskAdjustmentsHeader": "Regolazioni della maschera",
-        "maskBlur": "Sfocatura maschera",
+        "maskBlur": "Sfoc. maschera",
         "maskBlurMethod": "Metodo sfocatura maschera",
         "seamLowThreshold": "Basso",
         "seamHighThreshold": "Alto",
@@ -695,7 +719,7 @@
         "boxBlur": "Box",
         "gaussianBlur": "Gaussian",
         "remixImage": "Remixa l'immagine",
-        "coherenceEdgeSize": "Dimensione bordo"
+        "coherenceEdgeSize": "Dim. bordo"
     },
     "settings": {
         "models": "Modelli",
@@ -916,7 +940,9 @@
         "saveMask": "Salva $t(unifiedCanvas.mask)",
         "coherenceModeGaussianBlur": "Sfocatura Gaussiana",
         "coherenceModeBoxBlur": "Sfocatura Box",
-        "coherenceModeStaged": "Maschera espansa"
+        "coherenceModeStaged": "Maschera espansa",
+        "invertBrushSizeScrollDirection": "Inverti scorrimento per dimensione pennello",
+        "discardCurrent": "Scarta l'attuale"
     },
     "accessibility": {
         "modelSelect": "Seleziona modello",
@@ -1184,7 +1210,9 @@
         "viewMode": "Utilizzare nella vista lineare",
         "reorderLinearView": "Riordina la vista lineare",
         "editMode": "Modifica nell'editor del flusso di lavoro",
-        "resetToDefaultValue": "Ripristina il valore predefinito"
+        "resetToDefaultValue": "Ripristina il valore predefinito",
+        "noFieldsViewMode": "Questo flusso di lavoro non ha campi selezionati da visualizzare. Visualizza il flusso di lavoro completo per configurare i valori.",
+        "edit": "Modifica"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1886,8 +1914,8 @@
     },
     "prompt": {
         "compatibleEmbeddings": "Incorporamenti compatibili",
-        "addPromptTrigger": "Aggiungi parola chiave nel prompt",
-        "noPromptTriggers": "Nessuna parola chiave disponibile",
-        "noMatchingTriggers": "Nessuna parola chiave corrispondente"
+        "addPromptTrigger": "Aggiungi Trigger nel prompt",
+        "noPromptTriggers": "Nessun Trigger disponibile",
+        "noMatchingTriggers": "Nessun Trigger corrispondente"
     }
 }
