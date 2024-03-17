@@ -30,11 +30,11 @@ class InvokeAIArgs:
     Example:
     ```
     # In a CLI wrapper
-    from invokeai.frontend.cli.app_arg_parser import InvokeAIArgs
+    from invokeai.frontend.cli.arg_parser import InvokeAIArgs
     InvokeAIArgs.parse_args()
 
     # In the application
-    from invokeai.frontend.cli.app_arg_parser import InvokeAIArgs
+    from invokeai.frontend.cli.arg_parser import InvokeAIArgs
     args = InvokeAIArgs.args
     """
 
