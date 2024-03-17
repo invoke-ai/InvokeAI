@@ -319,7 +319,7 @@ class ModelProbe(object):
     @classmethod
     def _scan_and_load_checkpoint(cls, model_path: Path) -> CkptType:
         with SilenceWarnings():
-            if model_path.suffix.endswith((".ckpt", ".pt", ".bin")):
+            if model_path.suffix.endswith((".ckpt", ".pt", ".pth", ".bin")):
                 cls._scan_model(model_path.name, model_path)
                 model = torch.load(model_path)
                 assert isinstance(model, dict)

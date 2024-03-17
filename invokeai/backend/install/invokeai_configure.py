@@ -25,20 +25,20 @@ import npyscreen
 import psutil
 import torch
 import transformers
-from diffusers import AutoencoderKL, ModelMixin
+from diffusers import ModelMixin
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from huggingface_hub import HfFolder
 from huggingface_hub import login as hf_hub_login
 from omegaconf import DictConfig, OmegaConf
 from pydantic.error_wrappers import ValidationError
 from tqdm import tqdm
-from transformers import AutoFeatureExtractor, BertTokenizerFast, CLIPTextConfig, CLIPTextModel, CLIPTokenizer
+from transformers import AutoFeatureExtractor
 
 import invokeai.configs as configs
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.install.install_helper import InstallHelper, InstallSelections
 from invokeai.backend.install.legacy_arg_parsing import legacy_parser
-from invokeai.backend.model_manager import BaseModelType, ModelType
+from invokeai.backend.model_manager import ModelType
 from invokeai.backend.util import choose_precision, choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.model_install import addModelsForm
@@ -210,51 +210,15 @@ def download_with_progress_bar(model_url: str, model_dest: str, label: str = "th
         print(traceback.format_exc(), file=sys.stderr)
 
 
-def download_conversion_models():
+def download_safety_checker():
     target_dir = config.models_path / "core/convert"
     kwargs = {}  # for future use
     try:
-        logger.info("Downloading core tokenizers and text encoders")
-
-        # bert
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=DeprecationWarning)
-            bert = BertTokenizerFast.from_pretrained("bert-base-uncased", **kwargs)
-            bert.save_pretrained(target_dir / "bert-base-uncased", safe_serialization=True)
-
-        # sd-1
-        repo_id = "openai/clip-vit-large-patch14"
-        hf_download_from_pretrained(CLIPTokenizer, repo_id, target_dir / "clip-vit-large-patch14")
-        hf_download_from_pretrained(CLIPTextModel, repo_id, target_dir / "clip-vit-large-patch14")
-
-        # sd-2
-        repo_id = "stabilityai/stable-diffusion-2"
-        pipeline = CLIPTokenizer.from_pretrained(repo_id, subfolder="tokenizer", **kwargs)
-        pipeline.save_pretrained(target_dir / "stable-diffusion-2-clip" / "tokenizer", safe_serialization=True)
-
-        pipeline = CLIPTextModel.from_pretrained(repo_id, subfolder="text_encoder", **kwargs)
-        pipeline.save_pretrained(target_dir / "stable-diffusion-2-clip" / "text_encoder", safe_serialization=True)
-
-        # sd-xl - tokenizer_2
-        repo_id = "laion/CLIP-ViT-bigG-14-laion2B-39B-b160k"
-        _, model_name = repo_id.split("/")
-        pipeline = CLIPTokenizer.from_pretrained(repo_id, **kwargs)
-        pipeline.save_pretrained(target_dir / model_name, safe_serialization=True)
-
-        pipeline = CLIPTextConfig.from_pretrained(repo_id, **kwargs)
-        pipeline.save_pretrained(target_dir / model_name, safe_serialization=True)
-
-        # VAE
-        logger.info("Downloading stable diffusion VAE")
-        vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-mse", **kwargs)
-        vae.save_pretrained(target_dir / "sd-vae-ft-mse", safe_serialization=True)
-
         # safety checking
         logger.info("Downloading safety checker")
         repo_id = "CompVis/stable-diffusion-safety-checker"
         pipeline = AutoFeatureExtractor.from_pretrained(repo_id, **kwargs)
         pipeline.save_pretrained(target_dir / "stable-diffusion-safety-checker", safe_serialization=True)
-
         pipeline = StableDiffusionSafetyChecker.from_pretrained(repo_id, **kwargs)
         pipeline.save_pretrained(target_dir / "stable-diffusion-safety-checker", safe_serialization=True)
     except KeyboardInterrupt:
@@ -307,7 +271,7 @@ def download_lama():
 def download_support_models() -> None:
     download_realesrgan()
     download_lama()
-    download_conversion_models()
+    download_safety_checker()
 
 
 # -------------------------------------
@@ -744,12 +708,7 @@ def initialize_rootdir(root: Path, yes_to_all: bool = False):
         shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
 
     dest = root / "models"
-    for model_base in BaseModelType:
-        for model_type in ModelType:
-            path = dest / model_base.value / model_type.value
-            path.mkdir(parents=True, exist_ok=True)
-    path = dest / "core"
-    path.mkdir(parents=True, exist_ok=True)
+    dest.mkdir(parents=True, exist_ok=True)
 
 
 # -------------------------------------

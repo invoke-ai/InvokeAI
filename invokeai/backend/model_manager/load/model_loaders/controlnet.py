@@ -3,9 +3,6 @@
 
 from pathlib import Path
 
-import torch
-from safetensors.torch import load_file as safetensors_load_file
-
 from invokeai.backend.model_manager import (
     AnyModelConfig,
     BaseModelType,
@@ -37,27 +34,25 @@ class ControlNetLoader(GenericDiffusersLoader):
             return True
 
     def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Path) -> Path:
-        if config.base not in {BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2}:
-            raise Exception(f"ControlNet conversion not supported for model type: {config.base}")
-        else:
-            assert isinstance(config, CheckpointConfigBase)
-            config_file = config.config_path
+        assert isinstance(config, CheckpointConfigBase)
+        config_file = config.config_path
 
-        if model_path.suffix == ".safetensors":
-            checkpoint = safetensors_load_file(model_path, device="cpu")
-        else:
-            checkpoint = torch.load(model_path, map_location="cpu")
-
-        # sometimes weights are hidden under "state_dict", and sometimes not
-        if "state_dict" in checkpoint:
-            checkpoint = checkpoint["state_dict"]
-
-        convert_controlnet_to_diffusers(
-            model_path,
-            output_path,
-            original_config_file=self._app_config.root_path / config_file,
-            image_size=512,
-            scan_needed=True,
-            from_safetensors=model_path.suffix == ".safetensors",
+        image_size = (
+            512
+            if config.base == BaseModelType.StableDiffusion1
+            else 768
+            if config.base == BaseModelType.StableDiffusion2
+            else 1024
         )
+
+        self._logger.info(f"Converting {model_path} to diffusers format")
+        with open(self._app_config.root_path / config_file, "r") as config_stream:
+            convert_controlnet_to_diffusers(
+                model_path,
+                output_path,
+                original_config_file=config_stream,
+                image_size=image_size,
+                precision=self._torch_dtype,
+                from_safetensors=model_path.suffix == ".safetensors",
+            )
         return output_path
