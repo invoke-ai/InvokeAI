@@ -11,6 +11,7 @@ It is currently named model_install2.py, but will ultimately replace model_insta
 
 import argparse
 import curses
+import pathlib
 import sys
 import traceback
 import warnings
@@ -594,18 +595,19 @@ def main() -> None:
     parser.add_argument(
         "--root_dir",
         dest="root",
-        type=str,
+        type=pathlib.Path,
         default=None,
         help="path to root of install directory",
     )
     opt = parser.parse_args()
 
     invoke_args: dict[str, Any] = {}
-    if opt.root:
-        invoke_args["root"] = opt.root
     if opt.full_precision:
         invoke_args["precision"] = "float32"
     config.update_config(invoke_args)
+    if opt.root:
+        config.set_root(opt.root)
+
     logger = InvokeAILogger().get_logger(config=config)
 
     try:
