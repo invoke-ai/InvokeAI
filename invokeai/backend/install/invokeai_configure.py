@@ -33,12 +33,12 @@ from tqdm import tqdm
 from transformers import AutoFeatureExtractor
 
 import invokeai.configs as model_configs
-from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.config import InvokeAIAppConfig, get_config
 from invokeai.backend.install.install_helper import InstallHelper, InstallSelections
 from invokeai.backend.model_manager import ModelType
 from invokeai.backend.util import choose_precision, choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 from invokeai.frontend.install.model_install import addModelsForm
 
 # TO DO - Move all the frontend code into invokeai.frontend.install
@@ -63,8 +63,7 @@ def get_literal_fields(field: str) -> Tuple[Any]:
 
 
 # --------------------------globals-----------------------
-
-config = get_config()
+config = None
 
 PRECISION_CHOICES = get_literal_fields("precision")
 DEVICE_CHOICES = get_literal_fields("device")
@@ -745,6 +744,8 @@ def is_v2_install(root: Path) -> bool:
 # -------------------------------------
 def main() -> None:
     global FORCE_FULL_PRECISION  # FIXME
+    global config
+
     parser = argparse.ArgumentParser(description="InvokeAI model downloader")
     parser.add_argument(
         "--skip-sd-weights",
@@ -787,10 +788,12 @@ def main() -> None:
         default=None,
         help="path to root of install directory",
     )
+
     opt = parser.parse_args()
     updates: dict[str, Any] = {}
-    if opt.root:
-        config.set_root(Path(opt.root))
+
+    InvokeAIArgs.args = opt
+    config = get_config()
     if opt.full_precision:
         updates["precision"] = "float32"
 

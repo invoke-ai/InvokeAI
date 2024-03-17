@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -7,6 +8,7 @@ from omegaconf import OmegaConf
 from pydantic import ValidationError
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig, get_config, load_and_migrate_config
+from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
 v4_config = """
 schema_version: 4
@@ -74,6 +76,13 @@ def test_read_config_from_file(tmp_path: Path):
     config = load_and_migrate_config(temp_config_file)
     assert config.host == "192.168.1.1"
     assert config.port == 8080
+
+
+def test_arg_parsing():
+    sys.argv = ["test_config.py", "--root", "/tmp"]
+    InvokeAIArgs.parse_args()
+    config = get_config()
+    assert config.root_path == Path("/tmp")
 
 
 def test_migrate_v3_config_from_file(tmp_path: Path):
