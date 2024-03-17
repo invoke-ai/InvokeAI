@@ -3,7 +3,7 @@
 
 import warnings
 
-from invokeai.frontend.install.invokeai_configure import invokeai_configure as configure
+from invokeai.frontend.install.invokeai_configure import run_configure as configure
 
 if __name__ == "__main__":
     warnings.warn(

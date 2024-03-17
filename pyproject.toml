@@ -127,7 +127,7 @@ dependencies = [
 [project.scripts]
 
 # legacy entrypoints; provided for backwards compatibility
-"configure_invokeai.py" = "invokeai.frontend.install.invokeai_configure:invokeai_configure"
+"configure_invokeai.py" = "invokeai.frontend.install.invokeai_configure:run_configure"
 "textual_inversion.py" = "invokeai.frontend.training:invokeai_textual_inversion"
 
 # shortcut commands to start web ui
@@ -138,7 +138,7 @@ dependencies = [
 "invokeai-web" = "invokeai.app.run_app:run_app"
 
 # full commands
-"invokeai-configure" = "invokeai.frontend.install.invokeai_configure:invokeai_configure"
+"invokeai-configure" = "invokeai.frontend.install.invokeai_configure:run_configure"
 "invokeai-merge" = "invokeai.frontend.merge.merge_diffusers:main"
 "invokeai-ti" = "invokeai.frontend.training:invokeai_textual_inversion"
 "invokeai-model-install" = "invokeai.frontend.install.model_install:main"
