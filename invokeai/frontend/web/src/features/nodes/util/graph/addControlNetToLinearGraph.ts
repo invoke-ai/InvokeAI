@@ -1,32 +1,33 @@
 import type { RootState } from 'app/store/store';
 import { selectValidControlNets } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { omit } from 'lodash-es';
+import type { ControlAdapterProcessorType, ControlNetConfig } from 'features/controlAdapters/store/types';
+import type { ImageField } from 'features/nodes/types/common';
 import type {
   CollectInvocation,
-  ControlField,
   ControlNetInvocation,
   CoreMetadataInvocation,
   NonNullableGraph,
+  S,
 } from 'services/api/types';
+import { assert } from 'tsafe';
 
-import {
-  CANVAS_COHERENCE_DENOISE_LATENTS,
-  CONTROL_NET_COLLECT,
-} from './constants';
+import { CONTROL_NET_COLLECT } from './constants';
 import { upsertMetadata } from './metadata';
 
-export const addControlNetToLinearGraph = (
+export const addControlNetToLinearGraph = async (
   state: RootState,
   graph: NonNullableGraph,
   baseNodeId: string
-): void => {
+): Promise<void> => {
   const validControlNets = selectValidControlNets(state.controlAdapters).filter(
-    (ca) => ca.model?.base_model === state.generation.model?.base_model
-  );
+    ({ model, processedControlImage, processorType, controlImage, isEnabled }) => {
+      const hasModel = Boolean(model);
+      const doesBaseMatch = model?.base === state.generation.model?.base;
+      const hasControlImage = (processedControlImage && processorType !== 'none') || controlImage;
 
-  // const metadataAccumulator = graph.nodes[METADATA_ACCUMULATOR] as
-  //   | MetadataAccumulatorInvocation
-  //   | undefined;
+      return isEnabled && hasModel && doesBaseMatch && hasControlImage;
+    }
+  );
 
   const controlNetMetadata: CoreMetadataInvocation['controlnets'] = [];
 
@@ -46,17 +47,7 @@ export const addControlNetToLinearGraph = (
       },
     });
 
-    if (CANVAS_COHERENCE_DENOISE_LATENTS in graph.nodes) {
-      graph.edges.push({
-        source: { node_id: CONTROL_NET_COLLECT, field: 'collection' },
-        destination: {
-          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-          field: 'control',
-        },
-      });
-    }
-
-    validControlNets.forEach((controlNet) => {
+    for (const controlNet of validControlNets) {
       if (!controlNet.model) {
         return;
       }
@@ -83,28 +74,12 @@ export const addControlNetToLinearGraph = (
         resize_mode: resizeMode,
         control_model: model,
         control_weight: weight,
+        image: buildControlImage(controlImage, processedControlImage, processorType),
       };
 
-      if (processedControlImage && processorType !== 'none') {
-        // We've already processed the image in the app, so we can just use the processed image
-        controlNetNode.image = {
-          image_name: processedControlImage,
-        };
-      } else if (controlImage) {
-        // The control image is preprocessed
-        controlNetNode.image = {
-          image_name: controlImage,
-        };
-      } else {
-        // Skip ControlNets without an unprocessed image - should never happen if everything is working correctly
-        return;
-      }
+      graph.nodes[controlNetNode.id] = controlNetNode;
 
-      graph.nodes[controlNetNode.id] = controlNetNode as ControlNetInvocation;
-
-      controlNetMetadata.push(
-        omit(controlNetNode, ['id', 'type', 'is_intermediate']) as ControlField
-      );
+      controlNetMetadata.push(buildControlNetMetadata(controlNet));
 
       graph.edges.push({
         source: { node_id: controlNetNode.id, field: 'control' },
@@ -113,7 +88,66 @@ export const addControlNetToLinearGraph = (
           field: 'item',
         },
       });
-    });
+    }
     upsertMetadata(graph, { controlnets: controlNetMetadata });
   }
+};
+
+const buildControlImage = (
+  controlImage: string | null,
+  processedControlImage: string | null,
+  processorType: ControlAdapterProcessorType
+): ImageField => {
+  let image: ImageField | null = null;
+  if (processedControlImage && processorType !== 'none') {
+    // We've already processed the image in the app, so we can just use the processed image
+    image = {
+      image_name: processedControlImage,
+    };
+  } else if (controlImage) {
+    // The control image is preprocessed
+    image = {
+      image_name: controlImage,
+    };
+  }
+  assert(image, 'ControlNet image is required');
+  return image;
+};
+
+const buildControlNetMetadata = (controlNet: ControlNetConfig): S['ControlNetMetadataField'] => {
+  const {
+    controlImage,
+    processedControlImage,
+    beginStepPct,
+    endStepPct,
+    controlMode,
+    resizeMode,
+    model,
+    processorType,
+    weight,
+  } = controlNet;
+
+  assert(model, 'ControlNet model is required');
+
+  const processed_image =
+    processedControlImage && processorType !== 'none'
+      ? {
+          image_name: processedControlImage,
+        }
+      : null;
+
+  assert(controlImage, 'ControlNet image is required');
+
+  return {
+    control_model: model,
+    control_weight: weight,
+    control_mode: controlMode,
+    begin_step_percent: beginStepPct,
+    end_step_percent: endStepPct,
+    resize_mode: resizeMode,
+    image: {
+      image_name: controlImage,
+    },
+    processed_image,
+  };
 };

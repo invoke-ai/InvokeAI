@@ -4,17 +4,22 @@ import type { Middleware } from '@reduxjs/toolkit';
 import { $socketOptions } from 'app/hooks/useSocketIO';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
+import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
 import type { CustomStarUi } from 'app/store/nanostores/customStarUI';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
-import { $headerComponent } from 'app/store/nanostores/headerComponent';
+import { $galleryHeader } from 'app/store/nanostores/galleryHeader';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
+import { $logo } from 'app/store/nanostores/logo';
+import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
 import { $projectId } from 'app/store/nanostores/projectId';
 import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
 import { $store } from 'app/store/nanostores/store';
+import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import { createStore } from 'app/store/store';
 import type { PartialAppConfig } from 'app/types/invokeai';
 import Loading from 'common/components/Loading/Loading';
 import AppDndContext from 'features/dnd/components/AppDndContext';
+import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import type { PropsWithChildren, ReactNode } from 'react';
 import React, { lazy, memo, useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
@@ -26,11 +31,13 @@ const ThemeLocaleProvider = lazy(() => import('./ThemeLocaleProvider'));
 
 interface Props extends PropsWithChildren {
   apiUrl?: string;
+  openAPISchemaUrl?: string;
   token?: string;
   config?: PartialAppConfig;
-  headerComponent?: ReactNode;
+  customNavComponent?: ReactNode;
   middleware?: Middleware[];
   projectId?: string;
+  galleryHeader?: ReactNode;
   queueId?: string;
   selectedImage?: {
     imageName: string;
@@ -39,22 +46,26 @@ interface Props extends PropsWithChildren {
   customStarUi?: CustomStarUi;
   socketOptions?: Partial<ManagerOptions & SocketOptions>;
   isDebugging?: boolean;
-  useNewLogo?: boolean;
+  logo?: ReactNode;
+  workflowCategories?: WorkflowCategory[];
 }
 
 const InvokeAIUI = ({
   apiUrl,
+  openAPISchemaUrl,
   token,
   config,
-  headerComponent,
+  customNavComponent,
   middleware,
   projectId,
+  galleryHeader,
   queueId,
   selectedImage,
   customStarUi,
   socketOptions,
   isDebugging = false,
-  useNewLogo = false,
+  logo,
+  workflowCategories,
 }: Props) => {
   useEffect(() => {
     // configure API client token
@@ -110,14 +121,54 @@ const InvokeAIUI = ({
   }, [customStarUi]);
 
   useEffect(() => {
-    if (headerComponent) {
-      $headerComponent.set(headerComponent);
+    if (customNavComponent) {
+      $customNavComponent.set(customNavComponent);
     }
 
     return () => {
-      $headerComponent.set(undefined);
+      $customNavComponent.set(undefined);
     };
-  }, [headerComponent]);
+  }, [customNavComponent]);
+
+  useEffect(() => {
+    if (openAPISchemaUrl) {
+      $openAPISchemaUrl.set(openAPISchemaUrl);
+    }
+
+    return () => {
+      $openAPISchemaUrl.set(undefined);
+    };
+  }, [openAPISchemaUrl]);
+
+  useEffect(() => {
+    if (galleryHeader) {
+      $galleryHeader.set(galleryHeader);
+    }
+
+    return () => {
+      $galleryHeader.set(undefined);
+    };
+  }, [galleryHeader]);
+
+  useEffect(() => {
+    if (logo) {
+      $logo.set(logo);
+    }
+
+    return () => {
+      $logo.set(undefined);
+    };
+  }, [logo]);
+
+  useEffect(() => {
+    if (workflowCategories) {
+      $workflowCategories.set(workflowCategories);
+    }
+
+    return () => {
+      $workflowCategories.set([]);
+    };
+  }, [workflowCategories]);
 
   useEffect(() => {
     if (socketOptions) {
@@ -143,12 +194,21 @@ const InvokeAIUI = ({
 
   useEffect(() => {
     $store.set(store);
+    if (import.meta.env.MODE === 'development') {
+      window.$store = $store;
+    }
+    () => {
+      $store.set(undefined);
+      if (import.meta.env.MODE === 'development') {
+        window.$store = undefined;
+      }
+    };
   }, [store]);
 
   return (
     <React.StrictMode>
       <Provider store={store}>
-        <React.Suspense fallback={<Loading useNewLogo={!!useNewLogo} />}>
+        <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
             <AppDndContext>
               <App config={config} selectedImage={selectedImage} />

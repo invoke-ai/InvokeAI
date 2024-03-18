@@ -7,7 +7,6 @@
         "img2img": "Obraz na obraz",
         "unifiedCanvas": "Tryb uniwersalny",
         "nodes": "Węzły",
-        "langPolish": "Polski",
         "nodesDesc": "W tym miejscu powstanie graficzny system generowania obrazów oparty na węzłach. Jest na co czekać!",
         "postProcessing": "Przetwarzanie końcowe",
         "postProcessDesc1": "Invoke AI oferuje wiele opcji przetwarzania końcowego. Z poziomu przeglądarki dostępne jest już zwiększanie rozdzielczości oraz poprawianie twarzy. Znajdziesz je wśród ustawień w trybach \"Tekst na obraz\" oraz \"Obraz na obraz\". Są również obecne w pasku menu wyświetlanym nad podglądem wygenerowanego obrazu.",
@@ -42,8 +41,7 @@
         "statusModelChanged": "Zmieniono model",
         "githubLabel": "GitHub",
         "discordLabel": "Discord",
-        "darkMode": "Tryb ciemny",
-        "lightMode": "Tryb jasny"
+        "darkMode": "Tryb ciemny"
     },
     "gallery": {
         "generations": "Wygenerowane",
@@ -85,10 +83,6 @@
         "pinOptions": {
             "title": "Przypnij opcje",
             "desc": "Przypina panel opcji"
-        },
-        "toggleViewer": {
-            "title": "Przełącz podgląd",
-            "desc": "Otwiera lub zamyka widok podglądu"
         },
         "toggleGallery": {
             "title": "Przełącz galerię",
@@ -149,10 +143,6 @@
         "nextImage": {
             "title": "Następny obraz",
             "desc": "Aktywuje następny obraz z galerii"
-        },
-        "toggleGalleryPin": {
-            "title": "Przypnij galerię",
-            "desc": "Przypina lub odpina widok galerii"
         },
         "increaseGalleryThumbSize": {
             "title": "Powiększ obrazy",

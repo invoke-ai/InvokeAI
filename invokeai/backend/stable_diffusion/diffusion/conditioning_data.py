@@ -21,15 +21,16 @@ class ExtraConditioningInfo:
 @dataclass
 class BasicConditioningInfo:
     embeds: torch.Tensor
-    # TODO(ryand): Right now we awkwardly copy the extra conditioning info from here up to `ConditioningData`. This
-    # should only be stored in one place.
     extra_conditioning: Optional[ExtraConditioningInfo]
-    # weight: float
-    # mode: ConditioningAlgo
 
     def to(self, device, dtype=None):
         self.embeds = self.embeds.to(device=device, dtype=dtype)
         return self
+
+
+@dataclass
+class ConditioningFieldData:
+    conditionings: List[BasicConditioningInfo]
 
 
 @dataclass
@@ -41,14 +42,6 @@ class SDXLConditioningInfo(BasicConditioningInfo):
         self.pooled_embeds = self.pooled_embeds.to(device=device, dtype=dtype)
         self.add_time_ids = self.add_time_ids.to(device=device, dtype=dtype)
         return super().to(device=device, dtype=dtype)
-
-
-@dataclass(frozen=True)
-class PostprocessingSettings:
-    threshold: float
-    warmup: float
-    h_symmetry_time_pct: Optional[float]
-    v_symmetry_time_pct: Optional[float]
 
 
 @dataclass
@@ -78,12 +71,7 @@ class ConditioningData:
      ref [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/pdf/2305.08891.pdf)
     """
     guidance_rescale_multiplier: float = 0
-    extra: Optional[ExtraConditioningInfo] = None
     scheduler_args: dict[str, Any] = field(default_factory=dict)
-    """
-    Additional arguments to pass to invokeai_diffuser.do_latent_postprocessing().
-    """
-    postprocessing_settings: Optional[PostprocessingSettings] = None
 
     ip_adapter_conditioning: Optional[list[IPAdapterConditioningInfo]] = None
 

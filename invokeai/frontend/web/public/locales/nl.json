@@ -7,7 +7,6 @@
         "img2img": "Afbeelding naar afbeelding",
         "unifiedCanvas": "Centraal canvas",
         "nodes": "Werkstroom-editor",
-        "langDutch": "Nederlands",
         "nodesDesc": "Een op knooppunten gebaseerd systeem voor het genereren van afbeeldingen is momenteel in ontwikkeling. Blijf op de hoogte voor nieuws over deze verbluffende functie.",
         "postProcessing": "Naverwerking",
         "postProcessDesc1": "Invoke AI biedt een breed scala aan naverwerkingsfuncties. Afbeeldingsopschaling en Gezichtsherstel zijn al beschikbaar in de web-UI. Je kunt ze openen via het menu Uitgebreide opties in de tabbladen Tekst naar afbeelding en Afbeelding naar afbeelding. Je kunt een afbeelding ook direct verwerken via de afbeeldingsactieknoppen boven de weergave van de huidigde afbeelding of in de Viewer.",
@@ -41,18 +40,6 @@
         "statusModelChanged": "Model gewijzigd",
         "githubLabel": "Github",
         "discordLabel": "Discord",
-        "langArabic": "Arabisch",
-        "langEnglish": "Engels",
-        "langFrench": "Frans",
-        "langGerman": "Duits",
-        "langItalian": "Italiaans",
-        "langJapanese": "Japans",
-        "langPolish": "Pools",
-        "langBrPortuguese": "Portugees (Brazilië)",
-        "langRussian": "Russisch",
-        "langSimplifiedChinese": "Chinees (vereenvoudigd)",
-        "langUkranian": "Oekraïens",
-        "langSpanish": "Spaans",
         "training": "Training",
         "back": "Terug",
         "statusConvertingModel": "Omzetten van model",
@@ -61,11 +48,8 @@
         "statusMergedModels": "Modellen samengevoegd",
         "cancel": "Annuleer",
         "accept": "Akkoord",
-        "langPortuguese": "Portugees",
         "loading": "Bezig met laden",
         "loadingInvokeAI": "Bezig met laden van Invoke AI",
-        "langHebrew": "עברית",
-        "langKorean": "한국어",
         "txt2img": "Tekst naar afbeelding",
         "postprocessing": "Naverwerking",
         "dontAskMeAgain": "Vraag niet opnieuw",
@@ -78,7 +62,6 @@
         "batch": "Seriebeheer",
         "modelManager": "Modelbeheer",
         "darkMode": "Donkere modus",
-        "lightMode": "Lichte modus",
         "communityLabel": "Gemeenschap",
         "t2iAdapter": "T2I-adapter",
         "on": "Aan",
@@ -114,8 +97,6 @@
         "featuresWillReset": "Als je deze afbeelding verwijdert, dan worden deze functies onmiddellijk teruggezet.",
         "loading": "Bezig met laden",
         "unableToLoad": "Kan galerij niet laden",
-        "preparingDownload": "Bezig met voorbereiden van download",
-        "preparingDownloadFailed": "Fout bij voorbereiden van download",
         "downloadSelection": "Download selectie",
         "currentlyInUse": "Deze afbeelding is momenteel in gebruik door de volgende functies:",
         "copy": "Kopieer",
@@ -147,10 +128,6 @@
         "pinOptions": {
             "title": "Zet Opties vast",
             "desc": "Zet het deelscherm Opties vast"
-        },
-        "toggleViewer": {
-            "title": "Zet Viewer vast",
-            "desc": "Opent of sluit Afbeeldingsviewer"
         },
         "toggleGallery": {
             "title": "Zet Galerij vast",
@@ -211,10 +188,6 @@
         "nextImage": {
             "title": "Volgende afbeelding",
             "desc": "Toont de volgende afbeelding in de galerij"
-        },
-        "toggleGalleryPin": {
-            "title": "Zet galerij vast/los",
-            "desc": "Zet de galerij vast of los aan de gebruikersinterface"
         },
         "increaseGalleryThumbSize": {
             "title": "Vergroot afbeeldingsgrootte galerij",
@@ -560,8 +533,6 @@
         "coherencePassHeader": "Coherentiestap",
         "maskBlur": "Vervaag",
         "maskBlurMethod": "Vervagingsmethode",
-        "coherenceSteps": "Stappen",
-        "coherenceStrength": "Sterkte",
         "seamHighThreshold": "Hoog",
         "seamLowThreshold": "Laag",
         "invoke": {
@@ -1058,7 +1029,6 @@
         "prompt": "Prompt",
         "depthMidasDescription": "Genereer diepteblad via Midas",
         "controlnet": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.controlNet))",
-        "openPoseDescription": "Menselijke pose-benadering via Openpose",
         "control": "Controle",
         "resizeMode": "Modus schaling",
         "t2iEnabledControlNetDisabled": "$t(common.t2iAdapter) ingeschakeld, $t(common.controlNet)s uitgeschakeld",
@@ -1097,7 +1067,6 @@
         "normalBaeDescription": "Normale BAE-verwerking",
         "noneDescription": "Geen verwerking toegepast",
         "saveControlImage": "Bewaar controle-afbeelding",
-        "openPose": "Openpose",
         "toggleControlNet": "Zet deze ControlNet aan/uit",
         "delete": "Verwijder",
         "controlAdapter_one": "Control-adapter",
@@ -1166,13 +1135,6 @@
                 "Een afbeeldingsgrootte (in aantal pixels) equivalent aan 512x512 wordt aanbevolen voor SD1.5-modellen. Een grootte-equivalent van 1024x1024 wordt aanbevolen voor SDXL-modellen."
             ]
         },
-        "compositingCoherenceSteps": {
-            "heading": "Stappen",
-            "paragraphs": [
-                "Het aantal te gebruiken ontruisingsstappen in de coherentiefase.",
-                "Gelijk aan de hoofdparameter Stappen."
-            ]
-        },
         "dynamicPrompts": {
             "paragraphs": [
                 "Dynamische prompts vormt een enkele prompt om in vele.",
@@ -1186,12 +1148,6 @@
                 "Het model gebruikt voor het vertalen van AI-uitvoer naar de uiteindelijke afbeelding."
             ],
             "heading": "VAE"
-        },
-        "compositingBlur": {
-            "heading": "Vervaging",
-            "paragraphs": [
-                "De vervagingsstraal van het masker."
-            ]
         },
         "paramIterations": {
             "paragraphs": [
@@ -1244,16 +1200,14 @@
         "clipSkip": {
             "paragraphs": [
                 "Kies hoeveel CLIP-modellagen je wilt overslaan.",
-                "Bepaalde modellen werken beter met bepaalde Overslaan CLIP-instellingen.",
-                "Een hogere waarde geeft meestal een minder gedetailleerde afbeelding."
+                "Bepaalde modellen werken beter met bepaalde Overslaan CLIP-instellingen."
             ],
             "heading": "Overslaan CLIP"
         },
         "paramModel": {
             "heading": "Model",
             "paragraphs": [
-                "Model gebruikt voor de ontruisingsstappen.",
-                "Verschillende modellen zijn meestal getraind om zich te specialiseren in het maken van bepaalde esthetische resultaten en materiaal."
+                "Model gebruikt voor de ontruisingsstappen."
             ]
         },
         "compositingCoherencePass": {
@@ -1268,13 +1222,6 @@
                 "0 levert een identieke afbeelding op, waarbij 1 een volledig nieuwe afbeelding oplevert."
             ],
             "heading": "Ontruisingssterkte"
-        },
-        "compositingStrength": {
-            "heading": "Sterkte",
-            "paragraphs": [
-                "Ontruisingssterkte voor de coherentiefase.",
-                "Gelijk aan de parameter Ontruisingssterkte Afbeelding naar afbeelding."
-            ]
         },
         "paramNegativeConditioning": {
             "paragraphs": [

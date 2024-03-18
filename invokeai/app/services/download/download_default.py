@@ -4,8 +4,8 @@
 import os
 import re
 import threading
+import time
 import traceback
-from logging import Logger
 from pathlib import Path
 from queue import Empty, PriorityQueue
 from typing import Any, Dict, List, Optional, Set
@@ -21,6 +21,7 @@ from invokeai.backend.util.logging import InvokeAILogger
 
 from .download_base import (
     DownloadEventHandler,
+    DownloadExceptionHandler,
     DownloadJob,
     DownloadJobCancelledException,
     DownloadJobStatus,
@@ -36,18 +37,6 @@ DOWNLOAD_CHUNK_SIZE = 100000
 class DownloadQueueService(DownloadQueueServiceBase):
     """Class for queued download of models."""
 
-    _jobs: Dict[int, DownloadJob]
-    _max_parallel_dl: int = 5
-    _worker_pool: Set[threading.Thread]
-    _queue: PriorityQueue[DownloadJob]
-    _stop_event: threading.Event
-    _lock: threading.Lock
-    _logger: Logger
-    _events: Optional[EventServiceBase] = None
-    _next_job_id: int = 0
-    _accept_download_requests: bool = False
-    _requests: requests.sessions.Session
-
     def __init__(
         self,
         max_parallel_dl: int = 5,
@@ -60,11 +49,12 @@ class DownloadQueueService(DownloadQueueServiceBase):
         :param max_parallel_dl: Number of simultaneous downloads allowed [5].
         :param requests_session: Optional requests.sessions.Session object, for unit tests.
         """
-        self._jobs = {}
+        self._jobs: Dict[int, DownloadJob] = {}
         self._next_job_id = 0
-        self._queue = PriorityQueue()
+        self._queue: PriorityQueue[DownloadJob] = PriorityQueue()
         self._stop_event = threading.Event()
-        self._worker_pool = set()
+        self._job_completed_event = threading.Event()
+        self._worker_pool: Set[threading.Thread] = set()
         self._lock = threading.Lock()
         self._logger = InvokeAILogger.get_logger("DownloadQueueService")
         self._event_bus = event_bus
@@ -99,6 +89,33 @@ class DownloadQueueService(DownloadQueueServiceBase):
             self._stop_event.set()
             self._worker_pool.clear()
 
+    def submit_download_job(
+        self,
+        job: DownloadJob,
+        on_start: Optional[DownloadEventHandler] = None,
+        on_progress: Optional[DownloadEventHandler] = None,
+        on_complete: Optional[DownloadEventHandler] = None,
+        on_cancelled: Optional[DownloadEventHandler] = None,
+        on_error: Optional[DownloadExceptionHandler] = None,
+    ) -> None:
+        """Enqueue a download job."""
+        if not self._accept_download_requests:
+            raise ServiceInactiveException(
+                "The download service is not currently accepting requests. Please call start() to initialize the service."
+            )
+        with self._lock:
+            job.id = self._next_job_id
+            self._next_job_id += 1
+            job.set_callbacks(
+                on_start=on_start,
+                on_progress=on_progress,
+                on_complete=on_complete,
+                on_cancelled=on_cancelled,
+                on_error=on_error,
+            )
+            self._jobs[job.id] = job
+            self._queue.put(job)
+
     def download(
         self,
         source: AnyHttpUrl,
@@ -109,32 +126,27 @@ class DownloadQueueService(DownloadQueueServiceBase):
         on_progress: Optional[DownloadEventHandler] = None,
         on_complete: Optional[DownloadEventHandler] = None,
         on_cancelled: Optional[DownloadEventHandler] = None,
-        on_error: Optional[DownloadEventHandler] = None,
+        on_error: Optional[DownloadExceptionHandler] = None,
     ) -> DownloadJob:
-        """Create a download job and return its ID."""
+        """Create and enqueue a download job and return it."""
         if not self._accept_download_requests:
             raise ServiceInactiveException(
                 "The download service is not currently accepting requests. Please call start() to initialize the service."
             )
-        with self._lock:
-            id = self._next_job_id
-            self._next_job_id += 1
-            job = DownloadJob(
-                id=id,
-                source=source,
-                dest=dest,
-                priority=priority,
-                access_token=access_token,
-            )
-            job.set_callbacks(
-                on_start=on_start,
-                on_progress=on_progress,
-                on_complete=on_complete,
-                on_cancelled=on_cancelled,
-                on_error=on_error,
-            )
-            self._jobs[id] = job
-            self._queue.put(job)
+        job = DownloadJob(
+            source=source,
+            dest=dest,
+            priority=priority,
+            access_token=access_token,
+        )
+        self.submit_download_job(
+            job,
+            on_start=on_start,
+            on_progress=on_progress,
+            on_complete=on_complete,
+            on_cancelled=on_cancelled,
+            on_error=on_error,
+        )
         return job
 
     def join(self) -> None:
@@ -150,7 +162,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         with self._lock:
             to_delete = set()
             for job_id, job in self._jobs.items():
-                if self._in_terminal_state(job):
+                if job.in_terminal_state:
                     to_delete.add(job_id)
             for job_id in to_delete:
                 del self._jobs[job_id]
@@ -172,18 +184,21 @@ class DownloadQueueService(DownloadQueueServiceBase):
         with self._lock:
             job.cancel()
 
-    def cancel_all_jobs(self, preserve_partial: bool = False) -> None:
+    def cancel_all_jobs(self) -> None:
         """Cancel all jobs (those not in enqueued, running or paused state)."""
         for job in self._jobs.values():
-            if not self._in_terminal_state(job):
+            if not job.in_terminal_state:
                 self.cancel_job(job)
 
-    def _in_terminal_state(self, job: DownloadJob) -> bool:
-        return job.status in [
-            DownloadJobStatus.COMPLETED,
-            DownloadJobStatus.CANCELLED,
-            DownloadJobStatus.ERROR,
-        ]
+    def wait_for_job(self, job: DownloadJob, timeout: int = 0) -> DownloadJob:
+        """Block until the indicated job has reached terminal state, or when timeout limit reached."""
+        start = time.time()
+        while not job.in_terminal_state:
+            if self._job_completed_event.wait(timeout=0.25):  # in case we miss an event
+                self._job_completed_event.clear()
+            if timeout > 0 and time.time() - start > timeout:
+                raise TimeoutError("Timeout exceeded")
+        return job
 
     def _start_workers(self, max_workers: int) -> None:
         """Start the requested number of worker threads."""
@@ -205,22 +220,21 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 job = self._queue.get(timeout=1)
             except Empty:
                 continue
-
             try:
                 job.job_started = get_iso_timestamp()
                 self._do_download(job)
                 self._signal_job_complete(job)
-
             except (OSError, HTTPError) as excp:
                 job.error_type = excp.__class__.__name__ + f"({str(excp)})"
                 job.error = traceback.format_exc()
-                self._signal_job_error(job)
+                self._signal_job_error(job, excp)
             except DownloadJobCancelledException:
                 self._signal_job_cancelled(job)
                 self._cleanup_cancelled_job(job)
 
             finally:
                 job.job_ended = get_iso_timestamp()
+                self._job_completed_event.set()  # signal a change to terminal state
                 self._queue.task_done()
         self._logger.debug(f"Download queue worker thread {threading.current_thread().name} exiting.")
 
@@ -235,6 +249,8 @@ class DownloadQueueService(DownloadQueueServiceBase):
         resp = self._requests.get(str(url), headers=header, stream=True)
         if not resp.ok:
             raise HTTPError(resp.reason)
+
+        job.content_type = resp.headers.get("Content-Type")
         content_length = int(resp.headers.get("content-length", 0))
         job.total_bytes = content_length
 
@@ -296,6 +312,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
                     self._signal_job_progress(job)
 
         # if we get here we are done and can rename the file to the original dest
+        self._logger.debug(f"{job.source}: saved to {job.download_path} (bytes={job.bytes})")
         in_progress_path.rename(job.download_path)
 
     def _validate_filename(self, directory: str, filename: str) -> bool:
@@ -322,7 +339,9 @@ class DownloadQueueService(DownloadQueueServiceBase):
             try:
                 job.on_start(job)
             except Exception as e:
-                self._logger.error(e)
+                self._logger.error(
+                    f"An error occurred while processing the on_start callback: {traceback.format_exception(e)}"
+                )
         if self._event_bus:
             assert job.download_path
             self._event_bus.emit_download_started(str(job.source), job.download_path.as_posix())
@@ -332,7 +351,9 @@ class DownloadQueueService(DownloadQueueServiceBase):
             try:
                 job.on_progress(job)
             except Exception as e:
-                self._logger.error(e)
+                self._logger.error(
+                    f"An error occurred while processing the on_progress callback: {traceback.format_exception(e)}"
+                )
         if self._event_bus:
             assert job.download_path
             self._event_bus.emit_download_progress(
@@ -348,7 +369,9 @@ class DownloadQueueService(DownloadQueueServiceBase):
             try:
                 job.on_complete(job)
             except Exception as e:
-                self._logger.error(e)
+                self._logger.error(
+                    f"An error occurred while processing the on_complete callback: {traceback.format_exception(e)}"
+                )
         if self._event_bus:
             assert job.download_path
             self._event_bus.emit_download_complete(
@@ -356,29 +379,36 @@ class DownloadQueueService(DownloadQueueServiceBase):
             )
 
     def _signal_job_cancelled(self, job: DownloadJob) -> None:
+        if job.status not in [DownloadJobStatus.RUNNING, DownloadJobStatus.WAITING]:
+            return
         job.status = DownloadJobStatus.CANCELLED
         if job.on_cancelled:
             try:
                 job.on_cancelled(job)
             except Exception as e:
-                self._logger.error(e)
+                self._logger.error(
+                    f"An error occurred while processing the on_cancelled callback: {traceback.format_exception(e)}"
+                )
         if self._event_bus:
             self._event_bus.emit_download_cancelled(str(job.source))
 
-    def _signal_job_error(self, job: DownloadJob) -> None:
+    def _signal_job_error(self, job: DownloadJob, excp: Optional[Exception] = None) -> None:
         job.status = DownloadJobStatus.ERROR
+        self._logger.error(f"{str(job.source)}: {traceback.format_exception(excp)}")
         if job.on_error:
             try:
-                job.on_error(job)
+                job.on_error(job, excp)
             except Exception as e:
-                self._logger.error(e)
+                self._logger.error(
+                    f"An error occurred while processing the on_error callback: {traceback.format_exception(e)}"
+                )
         if self._event_bus:
             assert job.error_type
             assert job.error
             self._event_bus.emit_download_error(str(job.source), error_type=job.error_type, error=job.error)
 
     def _cleanup_cancelled_job(self, job: DownloadJob) -> None:
-        self._logger.warning(f"Cleaning up leftover files from cancelled download job {job.download_path}")
+        self._logger.debug(f"Cleaning up leftover files from cancelled download job {job.download_path}")
         try:
             if job.download_path:
                 partial_file = self._in_progress_path(job.download_path)
@@ -389,11 +419,11 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
 # Example on_progress event handler to display a TQDM status bar
 # Activate with:
-#   download_service.download('http://foo.bar/baz', '/tmp', on_progress=TqdmProgress().job_update
+#   download_service.download(DownloadJob('http://foo.bar/baz', '/tmp', on_progress=TqdmProgress().update))
 class TqdmProgress(object):
     """TQDM-based progress bar object to use in on_progress handlers."""
 
-    _bars: Dict[int, tqdm]  # the tqdm object
+    _bars: Dict[int, tqdm]  # type: ignore
     _last: Dict[int, int]  # last bytes downloaded
 
     def __init__(self) -> None:  # noqa D107

@@ -261,12 +261,8 @@ const zControlField = z.object({
   control_weight: z.union([z.number(), z.array(z.number())]).optional(),
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),
-  control_mode: z
-    .enum(['balanced', 'more_prompt', 'more_control', 'unbalanced'])
-    .optional(),
-  resize_mode: z
-    .enum(['just_resize', 'crop_resize', 'fill_resize', 'just_resize_simple'])
-    .optional(),
+  control_mode: z.enum(['balanced', 'more_prompt', 'more_control', 'unbalanced']).optional(),
+  resize_mode: z.enum(['just_resize', 'crop_resize', 'fill_resize', 'just_resize_simple']).optional(),
 });
 
 const zControlInputFieldValue = zInputFieldValueBase.extend({
@@ -317,9 +313,7 @@ const zT2IAdapterField = z.object({
   weight: z.union([z.number(), z.array(z.number())]).optional(),
   begin_step_percent: z.number().optional(),
   end_step_percent: z.number().optional(),
-  resize_mode: z
-    .enum(['just_resize', 'crop_resize', 'fill_resize', 'just_resize_simple'])
-    .optional(),
+  resize_mode: z.enum(['just_resize', 'crop_resize', 'fill_resize', 'just_resize_simple']).optional(),
 });
 
 const zT2IAdapterInputFieldValue = zInputFieldValueBase.extend({
@@ -337,14 +331,7 @@ const zT2IAdapterCollectionInputFieldValue = zInputFieldValueBase.extend({
   value: z.array(zT2IAdapterField).optional(),
 });
 
-const zModelType = z.enum([
-  'onnx',
-  'main',
-  'vae',
-  'lora',
-  'controlnet',
-  'embedding',
-]);
+const zModelType = z.enum(['onnx', 'main', 'vae', 'lora', 'controlnet', 'embedding']);
 
 const zSubModelType = z.enum([
   'unet',
@@ -666,10 +653,7 @@ const zWorkflowNotesNode = z.object({
   position: zPosition,
 });
 
-const zWorkflowNode = z.discriminatedUnion('type', [
-  zWorkflowInvocationNode,
-  zWorkflowNotesNode,
-]);
+const zWorkflowNode = z.discriminatedUnion('type', [zWorkflowInvocationNode, zWorkflowNotesNode]);
 
 const zDefaultWorkflowEdge = z.object({
   source: z.string().trim().min(1),

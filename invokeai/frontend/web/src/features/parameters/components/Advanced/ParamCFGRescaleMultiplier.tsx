@@ -1,44 +1,50 @@
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setCfgRescaleMultiplier } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamCFGRescaleMultiplier = () => {
-  const cfgRescaleMultiplier = useAppSelector(
-    (state) => state.generation.cfgRescaleMultiplier
-  );
+  const cfgRescaleMultiplier = useAppSelector((s) => s.generation.cfgRescaleMultiplier);
+  const initial = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.initial);
+  const sliderMin = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.sliderMin);
+  const sliderMax = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.sliderMax);
+  const numberInputMin = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.numberInputMin);
+  const numberInputMax = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.numberInputMax);
+  const coarseStep = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.coarseStep);
+  const fineStep = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.fineStep);
+
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const handleChange = useCallback(
-    (v: number) => dispatch(setCfgRescaleMultiplier(v)),
-    [dispatch]
-  );
-
-  const handleReset = useCallback(
-    () => dispatch(setCfgRescaleMultiplier(0)),
-    [dispatch]
-  );
+  const handleChange = useCallback((v: number) => dispatch(setCfgRescaleMultiplier(v)), [dispatch]);
 
   return (
-    <InvControl
-      label={t('parameters.cfgRescaleMultiplier')}
-      feature="paramCFGRescaleMultiplier"
-    >
-      <InvSlider
+    <FormControl>
+      <InformationalPopover feature="paramCFGRescaleMultiplier">
+        <FormLabel>{t('parameters.cfgRescaleMultiplier')}</FormLabel>
+      </InformationalPopover>
+      <CompositeSlider
         value={cfgRescaleMultiplier}
-        min={0}
-        max={0.99}
-        step={0.1}
-        fineStep={0.01}
+        defaultValue={initial}
+        min={sliderMin}
+        max={sliderMax}
+        step={coarseStep}
+        fineStep={fineStep}
         onChange={handleChange}
-        onReset={handleReset}
-        withNumberInput
         marks
       />
-    </InvControl>
+      <CompositeNumberInput
+        value={cfgRescaleMultiplier}
+        defaultValue={initial}
+        min={numberInputMin}
+        max={numberInputMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        onChange={handleChange}
+      />
+    </FormControl>
   );
 };
 

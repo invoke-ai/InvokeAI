@@ -1,6 +1,5 @@
+import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import {
   // shouldShowFieldTypeLegendChanged,
   shouldShowMinimapPanelChanged,
@@ -8,11 +7,11 @@ import {
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  FaExpand,
-  // FaInfo,
-  FaMapMarkerAlt,
-} from 'react-icons/fa';
-import { FaMagnifyingGlassMinus, FaMagnifyingGlassPlus } from 'react-icons/fa6';
+  PiFrameCornersBold,
+  PiMagnifyingGlassMinusBold,
+  PiMagnifyingGlassPlusBold,
+  PiMapPinBold,
+} from 'react-icons/pi';
 import { useReactFlow } from 'reactflow';
 
 const ViewportControls = () => {
@@ -20,11 +19,9 @@ const ViewportControls = () => {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const dispatch = useAppDispatch();
   // const shouldShowFieldTypeLegend = useAppSelector(
-  //   (state) => state.nodes.shouldShowFieldTypeLegend
+  //   (s) => s.nodes.shouldShowFieldTypeLegend
   // );
-  const shouldShowMinimapPanel = useAppSelector(
-    (state) => state.nodes.shouldShowMinimapPanel
-  );
+  const shouldShowMinimapPanel = useAppSelector((s) => s.nodes.shouldShowMinimapPanel);
 
   const handleClickedZoomIn = useCallback(() => {
     zoomIn();
@@ -47,55 +44,47 @@ const ViewportControls = () => {
   }, [shouldShowMinimapPanel, dispatch]);
 
   return (
-    <InvButtonGroup orientation="vertical">
-      <InvIconButton
+    <ButtonGroup orientation="vertical">
+      <IconButton
         tooltip={t('nodes.zoomInNodes')}
         aria-label={t('nodes.zoomInNodes')}
         onClick={handleClickedZoomIn}
-        icon={<FaMagnifyingGlassPlus />}
+        icon={<PiMagnifyingGlassPlusBold />}
       />
-      <InvIconButton
+      <IconButton
         tooltip={t('nodes.zoomOutNodes')}
         aria-label={t('nodes.zoomOutNodes')}
         onClick={handleClickedZoomOut}
-        icon={<FaMagnifyingGlassMinus />}
+        icon={<PiMagnifyingGlassMinusBold />}
       />
-      <InvIconButton
+      <IconButton
         tooltip={t('nodes.fitViewportNodes')}
         aria-label={t('nodes.fitViewportNodes')}
         onClick={handleClickedFitView}
-        icon={<FaExpand />}
+        icon={<PiFrameCornersBold />}
       />
-      {/* <InvTooltip
+      {/* <Tooltip
         label={
           shouldShowFieldTypeLegend
             ? t('nodes.hideLegendNodes')
             : t('nodes.showLegendNodes')
         }
       >
-        <InvIconButton
+        <IconButton
           aria-label="Toggle field type legend"
           isChecked={shouldShowFieldTypeLegend}
           onClick={handleClickedToggleFieldTypeLegend}
           icon={<FaInfo />}
         />
-      </InvTooltip> */}
-      <InvIconButton
-        tooltip={
-          shouldShowMinimapPanel
-            ? t('nodes.hideMinimapnodes')
-            : t('nodes.showMinimapnodes')
-        }
-        aria-label={
-          shouldShowMinimapPanel
-            ? t('nodes.hideMinimapnodes')
-            : t('nodes.showMinimapnodes')
-        }
+      </Tooltip> */}
+      <IconButton
+        tooltip={shouldShowMinimapPanel ? t('nodes.hideMinimapnodes') : t('nodes.showMinimapnodes')}
+        aria-label={shouldShowMinimapPanel ? t('nodes.hideMinimapnodes') : t('nodes.showMinimapnodes')}
         isChecked={shouldShowMinimapPanel}
         onClick={handleClickedToggleMiniMapPanel}
-        icon={<FaMapMarkerAlt />}
+        icon={<PiMapPinBold />}
       />
-    </InvButtonGroup>
+    </ButtonGroup>
   );
 };
 

@@ -1,17 +1,16 @@
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
-import { vaeSelected } from 'features/parameters/store/generationSlice';
-import { pick } from 'lodash-es';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
+import { zModelIdentifierField } from 'features/nodes/types/common';
+import { selectGenerationSlice, vaeSelected } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { VaeModelConfigEntity } from 'services/api/endpoints/models';
-import { useGetVaeModelsQuery } from 'services/api/endpoints/models';
+import { useVAEModels } from 'services/api/hooks/modelsByType';
+import type { VAEModelConfig } from 'services/api/types';
 
-const selector = createMemoizedSelector(stateSelector, ({ generation }) => {
+const selector = createMemoizedSelector(selectGenerationSlice, (generation) => {
   const { model, vae } = generation;
   return { model, vae };
 });
@@ -20,43 +19,43 @@ const ParamVAEModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const { model, vae } = useAppSelector(selector);
-  const { data, isLoading } = useGetVaeModelsQuery();
-  const getIsDisabled = (vae: VaeModelConfigEntity): boolean => {
-    const isCompatible = model?.base_model === vae.base_model;
-    const hasMainModel = Boolean(model?.base_model);
-    return !hasMainModel || !isCompatible;
-  };
+  const [modelConfigs, { isLoading }] = useVAEModels();
+  const getIsDisabled = useCallback(
+    (vae: VAEModelConfig): boolean => {
+      const isCompatible = model?.base === vae.base;
+      const hasMainModel = Boolean(model?.base);
+      return !hasMainModel || !isCompatible;
+    },
+    [model?.base]
+  );
   const _onChange = useCallback(
-    (vae: VaeModelConfigEntity | null) => {
-      dispatch(vaeSelected(vae ? pick(vae, 'base_model', 'model_name') : null));
+    (vae: VAEModelConfig | null) => {
+      dispatch(vaeSelected(vae ? zModelIdentifierField.parse(vae) : null));
     },
     [dispatch]
   );
-  const { options, value, onChange, placeholder, noOptionsMessage } =
-    useGroupedModelInvSelect({
-      modelEntities: data,
-      onChange: _onChange,
-      selectedModel: vae ? { ...vae, model_type: 'vae' } : null,
-      isLoading,
-      getIsDisabled,
-    });
+  const { options, value, onChange, noOptionsMessage } = useGroupedModelCombobox({
+    modelConfigs,
+    onChange: _onChange,
+    selectedModel: vae,
+    isLoading,
+    getIsDisabled,
+  });
 
   return (
-    <InvControl
-      label={t('modelManager.vae')}
-      isDisabled={!options.length}
-      isInvalid={!options.length}
-      feature="paramVAE"
-    >
-      <InvSelect
+    <FormControl isDisabled={!options.length} isInvalid={!options.length}>
+      <InformationalPopover feature="paramVAE">
+        <FormLabel>{t('modelManager.vae')}</FormLabel>
+      </InformationalPopover>
+      <Combobox
         isClearable
         value={value}
-        placeholder={value ? placeholder : t('models.defaultVAE')}
+        placeholder={value ? value.value : t('models.defaultVAE')}
         options={options}
         onChange={onChange}
         noOptionsMessage={noOptionsMessage}
       />
-    </InvControl>
+    </FormControl>
   );
 };
 

@@ -1,6 +1,5 @@
+import { Checkbox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvCheckbox } from 'common/components/InvCheckbox/wrapper';
-import { InvControl } from 'common/components/InvControl/InvControl';
 import { useUseCache } from 'features/nodes/hooks/useUseCache';
 import { nodeUseCacheChanged } from 'features/nodes/store/nodesSlice';
 import type { ChangeEvent } from 'react';
@@ -23,13 +22,10 @@ const UseCacheCheckbox = ({ nodeId }: { nodeId: string }) => {
   );
   const { t } = useTranslation();
   return (
-    <InvControl label={t('invocationCache.useCache')}>
-      <InvCheckbox
-        className="nopan"
-        onChange={handleChange}
-        isChecked={useCache}
-      />
-    </InvControl>
+    <FormControl>
+      <FormLabel>{t('invocationCache.useCache')}</FormLabel>
+      <Checkbox className="nopan" onChange={handleChange} isChecked={useCache} />
+    </FormControl>
   );
 };
 

@@ -1,17 +1,15 @@
-import { Flex } from '@chakra-ui/layout';
+import { Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { LoRACard } from 'features/lora/components/LoRACard';
+import { selectLoraSlice } from 'features/lora/store/loraSlice';
 import { map } from 'lodash-es';
 import { memo } from 'react';
 
-const selector = createMemoizedSelector(stateSelector, ({ lora }) => {
-  return { lorasArray: map(lora.loras) };
-});
+const selectLoRAsArray = createMemoizedSelector(selectLoraSlice, (lora) => map(lora.loras));
 
 export const LoRAList = memo(() => {
-  const { lorasArray } = useAppSelector(selector);
+  const lorasArray = useAppSelector(selectLoRAsArray);
 
   if (!lorasArray.length) {
     return null;
@@ -20,7 +18,7 @@ export const LoRAList = memo(() => {
   return (
     <Flex flexWrap="wrap" gap={2}>
       {lorasArray.map((lora) => (
-        <LoRACard key={lora.model_name} lora={lora} />
+        <LoRACard key={lora.model.key} lora={lora} />
       ))}
     </Flex>
   );

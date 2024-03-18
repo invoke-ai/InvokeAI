@@ -19,6 +19,8 @@ their descriptions.
 | Conditioning Primitive                                        | A conditioning tensor primitive value                                                                                                                |
 | Content Shuffle Processor                                     | Applies content shuffle processing to image                                                                                                          |
 | ControlNet                                                    | Collects ControlNet info to pass to other nodes                                                                                                      |
+| Create Denoise Mask                                           | Converts a greyscale or transparency image into a mask for denoising.                                                                                |
+| Create Gradient Mask                                          | Creates a mask for Gradient ("soft", "differential") inpainting that gradually expands during denoising. Improves edge coherence.                    |
 | Denoise Latents                                               | Denoises noisy latents to decodable images                                                                                                           |
 | Divide Integers                                               | Divides two numbers                                                                                                                                  |
 | Dynamic Prompt                                                | Parses a prompt using adieyal/dynamicprompts' random or combinatorial generator                                                                      |
@@ -36,6 +38,7 @@ their descriptions.
 | Integer Math                                                  | Perform basic math operations on two integers                                                                                                        |
 | Convert Image Mode                                            | Converts an image to a different mode.                                                                                                               |
 | Crop Image                                                    | Crops an image to a specified box. The box can be outside of the image.                                                                              |
+| Ideal Size                                                    | Calculates an ideal image size for latents for a first pass of a multi-pass upscaling to avoid duplication and other artifacts                       |
 | Image Hue Adjustment                                          | Adjusts the Hue of an image.                                                                                                                         |
 | Inverse Lerp Image                                            | Inverse linear interpolation of all pixels of an image                                                                                               |
 | Image Primitive                                               | An image primitive value                                                                                                                             |
@@ -80,7 +83,7 @@ their descriptions.
 | ONNX Text to Latents                                          | Generates latents from conditionings.                                                                                                                |
 | ONNX Model Loader                                             | Loads a main model, outputting its submodels.                                                                                                        |
 | OpenCV Inpaint                                                | Simple inpaint using opencv.                                                                                                                         |
-| Openpose Processor                                            | Applies Openpose processing to image                                                                                                                 |
+| DW Openpose Processor                                            | Applies Openpose processing to image                                                                                                                 |
 | PIDI Processor                                                | Applies PIDI processing to image                                                                                                                     |
 | Prompts from File                                             | Loads prompts from a text file                                                                                                                       |
 | Random Integer                                                | Outputs a single random integer.                                                                                                                     |

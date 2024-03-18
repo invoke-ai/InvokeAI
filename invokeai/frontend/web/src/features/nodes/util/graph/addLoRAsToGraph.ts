@@ -1,29 +1,17 @@
 import type { RootState } from 'app/store/store';
-import { forEach, size } from 'lodash-es';
-import type {
-  CoreMetadataInvocation,
-  LoraLoaderInvocation,
-  NonNullableGraph,
-} from 'services/api/types';
+import { zModelIdentifierField } from 'features/nodes/types/common';
+import { filter, size } from 'lodash-es';
+import type { CoreMetadataInvocation, LoRALoaderInvocation, NonNullableGraph } from 'services/api/types';
 
-import {
-  CANVAS_COHERENCE_DENOISE_LATENTS,
-  CANVAS_INPAINT_GRAPH,
-  CANVAS_OUTPAINT_GRAPH,
-  CLIP_SKIP,
-  LORA_LOADER,
-  MAIN_MODEL_LOADER,
-  NEGATIVE_CONDITIONING,
-  POSITIVE_CONDITIONING,
-} from './constants';
+import { CLIP_SKIP, LORA_LOADER, MAIN_MODEL_LOADER, NEGATIVE_CONDITIONING, POSITIVE_CONDITIONING } from './constants';
 import { upsertMetadata } from './metadata';
 
-export const addLoRAsToGraph = (
+export const addLoRAsToGraph = async (
   state: RootState,
   graph: NonNullableGraph,
   baseNodeId: string,
   modelLoaderNodeId: string = MAIN_MODEL_LOADER
-): void => {
+): Promise<void> => {
   /**
    * LoRA nodes get the UNet and CLIP models from the main model loader and apply the LoRA to them.
    * They then output the UNet and CLIP models references on to either the next LoRA in the chain,
@@ -32,8 +20,9 @@ export const addLoRAsToGraph = (
    * So we need to inject a LoRA chain into the graph.
    */
 
-  const { loras } = state.lora;
-  const loraCount = size(loras);
+  // TODO(MM2): check base model
+  const enabledLoRAs = filter(state.lora.loras, (l) => l.isEnabled ?? false);
+  const loraCount = size(enabledLoRAs);
 
   if (loraCount === 0) {
     return;
@@ -41,37 +30,32 @@ export const addLoRAsToGraph = (
 
   // Remove modelLoaderNodeId unet connection to feed it to LoRAs
   graph.edges = graph.edges.filter(
-    (e) =>
-      !(
-        e.source.node_id === modelLoaderNodeId &&
-        ['unet'].includes(e.source.field)
-      )
+    (e) => !(e.source.node_id === modelLoaderNodeId && ['unet'].includes(e.source.field))
   );
   // Remove CLIP_SKIP connections to conditionings to feed it through LoRAs
-  graph.edges = graph.edges.filter(
-    (e) =>
-      !(e.source.node_id === CLIP_SKIP && ['clip'].includes(e.source.field))
-  );
+  graph.edges = graph.edges.filter((e) => !(e.source.node_id === CLIP_SKIP && ['clip'].includes(e.source.field)));
 
   // we need to remember the last lora so we can chain from it
   let lastLoraNodeId = '';
   let currentLoraIndex = 0;
   const loraMetadata: CoreMetadataInvocation['loras'] = [];
 
-  forEach(loras, (lora) => {
-    const { model_name, base_model, weight } = lora;
-    const currentLoraNodeId = `${LORA_LOADER}_${model_name.replace('.', '_')}`;
+  enabledLoRAs.forEach(async (lora) => {
+    const { weight } = lora;
+    const { key } = lora.model;
+    const currentLoraNodeId = `${LORA_LOADER}_${key}`;
+    const parsedModel = zModelIdentifierField.parse(lora.model);
 
-    const loraLoaderNode: LoraLoaderInvocation = {
+    const loraLoaderNode: LoRALoaderInvocation = {
       type: 'lora_loader',
       id: currentLoraNodeId,
       is_intermediate: true,
-      lora: { model_name, base_model },
+      lora: parsedModel,
       weight,
     };
 
     loraMetadata.push({
-      lora: { model_name, base_model },
+      model: parsedModel,
       weight,
     });
 
@@ -136,22 +120,6 @@ export const addLoRAsToGraph = (
           field: 'unet',
         },
       });
-
-      if (
-        graph.id &&
-        [CANVAS_INPAINT_GRAPH, CANVAS_OUTPAINT_GRAPH].includes(graph.id)
-      ) {
-        graph.edges.push({
-          source: {
-            node_id: currentLoraNodeId,
-            field: 'unet',
-          },
-          destination: {
-            node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-            field: 'unet',
-          },
-        });
-      }
 
       graph.edges.push({
         source: {

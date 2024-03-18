@@ -1,9 +1,16 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectFieldOutputTemplate } from 'features/nodes/store/selectors';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 
 import { getFieldColor } from './getEdgeColor';
+
+const defaultReturnValue = {
+  isSelected: false,
+  shouldAnimate: false,
+  stroke: colorTokenToCssVar('base.500'),
+};
 
 export const makeEdgeSelector = (
   source: string,
@@ -12,22 +19,21 @@ export const makeEdgeSelector = (
   targetHandleId: string | null | undefined,
   selected?: boolean
 ) =>
-  createMemoizedSelector(stateSelector, ({ nodes }) => {
+  createMemoizedSelector(selectNodesSlice, (nodes): { isSelected: boolean; shouldAnimate: boolean; stroke: string } => {
     const sourceNode = nodes.nodes.find((node) => node.id === source);
     const targetNode = nodes.nodes.find((node) => node.id === target);
 
-    const isInvocationToInvocationEdge =
-      isInvocationNode(sourceNode) && isInvocationNode(targetNode);
+    const isInvocationToInvocationEdge = isInvocationNode(sourceNode) && isInvocationNode(targetNode);
 
-    const isSelected = sourceNode?.selected || targetNode?.selected || selected;
-    const sourceType = isInvocationToInvocationEdge
-      ? sourceNode?.data?.outputs[sourceHandleId || '']?.type
-      : undefined;
+    const isSelected = Boolean(sourceNode?.selected || targetNode?.selected || selected);
+    if (!sourceNode || !sourceHandleId) {
+      return defaultReturnValue;
+    }
 
-    const stroke =
-      sourceType && nodes.shouldColorEdges
-        ? getFieldColor(sourceType)
-        : colorTokenToCssVar('base.500');
+    const outputFieldTemplate = selectFieldOutputTemplate(nodes, sourceNode.id, sourceHandleId);
+    const sourceType = isInvocationToInvocationEdge ? outputFieldTemplate?.type : undefined;
+
+    const stroke = sourceType && nodes.shouldColorEdges ? getFieldColor(sourceType) : colorTokenToCssVar('base.500');
 
     return {
       isSelected,

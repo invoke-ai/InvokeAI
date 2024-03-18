@@ -4,12 +4,13 @@ import type {
   ParameterIPAdapterModel,
   ParameterT2IAdapterModel,
 } from 'features/parameters/types/parameterSchemas';
-import { isObject } from 'lodash-es';
 import type { components } from 'services/api/schema';
 import type {
   CannyImageProcessorInvocation,
   ColorMapImageProcessorInvocation,
   ContentShuffleImageProcessorInvocation,
+  DepthAnythingImageProcessorInvocation,
+  DWOpenposeImageProcessorInvocation,
   HedImageProcessorInvocation,
   LineartAnimeImageProcessorInvocation,
   LineartImageProcessorInvocation,
@@ -17,7 +18,6 @@ import type {
   MidasDepthImageProcessorInvocation,
   MlsdImageProcessorInvocation,
   NormalbaeImageProcessorInvocation,
-  OpenposeImageProcessorInvocation,
   PidiImageProcessorInvocation,
   ZoeDepthImageProcessorInvocation,
 } from 'services/api/types';
@@ -31,6 +31,7 @@ export type ControlAdapterProcessorNode =
   | CannyImageProcessorInvocation
   | ColorMapImageProcessorInvocation
   | ContentShuffleImageProcessorInvocation
+  | DepthAnythingImageProcessorInvocation
   | HedImageProcessorInvocation
   | LineartAnimeImageProcessorInvocation
   | LineartImageProcessorInvocation
@@ -38,16 +39,33 @@ export type ControlAdapterProcessorNode =
   | MidasDepthImageProcessorInvocation
   | MlsdImageProcessorInvocation
   | NormalbaeImageProcessorInvocation
-  | OpenposeImageProcessorInvocation
+  | DWOpenposeImageProcessorInvocation
   | PidiImageProcessorInvocation
   | ZoeDepthImageProcessorInvocation;
 
 /**
  * Any ControlNet processor type
  */
-export type ControlAdapterProcessorType = NonNullable<
-  ControlAdapterProcessorNode['type'] | 'none'
->;
+export type ControlAdapterProcessorType = NonNullable<ControlAdapterProcessorNode['type'] | 'none'>;
+export const zControlAdapterProcessorType = z.enum([
+  'canny_image_processor',
+  'color_map_image_processor',
+  'content_shuffle_image_processor',
+  'depth_anything_image_processor',
+  'hed_image_processor',
+  'lineart_anime_image_processor',
+  'lineart_image_processor',
+  'mediapipe_face_processor',
+  'midas_depth_image_processor',
+  'mlsd_image_processor',
+  'normalbae_image_processor',
+  'dw_openpose_image_processor',
+  'pidi_image_processor',
+  'zoe_depth_image_processor',
+  'none',
+]);
+export const isControlAdapterProcessorType = (v: unknown): v is ControlAdapterProcessorType =>
+  zControlAdapterProcessorType.safeParse(v).success;
 
 /**
  * The Canny processor node, with parameters flagged as required
@@ -72,6 +90,19 @@ export type RequiredContentShuffleImageProcessorInvocation = O.Required<
   ContentShuffleImageProcessorInvocation,
   'type' | 'detect_resolution' | 'image_resolution' | 'w' | 'h' | 'f'
 >;
+
+/**
+ * The DepthAnything processor node, with parameters flagged as required
+ */
+export type RequiredDepthAnythingImageProcessorInvocation = O.Required<
+  DepthAnythingImageProcessorInvocation,
+  'type' | 'model_size' | 'resolution' | 'offload'
+>;
+
+const zDepthAnythingModelSize = z.enum(['large', 'base', 'small']);
+export type DepthAnythingModelSize = z.infer<typeof zDepthAnythingModelSize>;
+export const isDepthAnythingModelSize = (v: unknown): v is DepthAnythingModelSize =>
+  zDepthAnythingModelSize.safeParse(v).success;
 
 /**
  * The HED processor node, with parameters flagged as required
@@ -130,11 +161,11 @@ export type RequiredNormalbaeImageProcessorInvocation = O.Required<
 >;
 
 /**
- * The Openpose processor node, with parameters flagged as required
+ * The DW Openpose processor node, with parameters flagged as required
  */
-export type RequiredOpenposeImageProcessorInvocation = O.Required<
-  OpenposeImageProcessorInvocation,
-  'type' | 'detect_resolution' | 'image_resolution' | 'hand_and_face'
+export type RequiredDWOpenposeImageProcessorInvocation = O.Required<
+  DWOpenposeImageProcessorInvocation,
+  'type' | 'image_resolution' | 'draw_body' | 'draw_face' | 'draw_hands'
 >;
 
 /**
@@ -148,10 +179,7 @@ export type RequiredPidiImageProcessorInvocation = O.Required<
 /**
  * The ZoeDepth processor node, with parameters flagged as required
  */
-export type RequiredZoeDepthImageProcessorInvocation = O.Required<
-  ZoeDepthImageProcessorInvocation,
-  'type'
->;
+export type RequiredZoeDepthImageProcessorInvocation = O.Required<ZoeDepthImageProcessorInvocation, 'type'>;
 
 /**
  * Any ControlNet Processor node, with its parameters flagged as required
@@ -161,6 +189,7 @@ export type RequiredControlAdapterProcessorNode =
       | RequiredCannyImageProcessorInvocation
       | RequiredColorMapImageProcessorInvocation
       | RequiredContentShuffleImageProcessorInvocation
+      | RequiredDepthAnythingImageProcessorInvocation
       | RequiredHedImageProcessorInvocation
       | RequiredLineartAnimeImageProcessorInvocation
       | RequiredLineartImageProcessorInvocation
@@ -168,218 +197,18 @@ export type RequiredControlAdapterProcessorNode =
       | RequiredMidasDepthImageProcessorInvocation
       | RequiredMlsdImageProcessorInvocation
       | RequiredNormalbaeImageProcessorInvocation
-      | RequiredOpenposeImageProcessorInvocation
+      | RequiredDWOpenposeImageProcessorInvocation
       | RequiredPidiImageProcessorInvocation
       | RequiredZoeDepthImageProcessorInvocation,
       'id'
     >
   | { type: 'none' };
 
-/**
- * Type guard for CannyImageProcessorInvocation
- */
-export const isCannyImageProcessorInvocation = (
-  obj: unknown
-): obj is CannyImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'canny_image_processor') {
-    return true;
-  }
-  return false;
-};
+export type ControlMode = NonNullable<components['schemas']['ControlNetInvocation']['control_mode']>;
 
-/**
- * Type guard for ColorMapImageProcessorInvocation
- */
-export const isColorMapImageProcessorInvocation = (
-  obj: unknown
-): obj is ColorMapImageProcessorInvocation => {
-  if (
-    isObject(obj) &&
-    'type' in obj &&
-    obj.type === 'color_map_image_processor'
-  ) {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for ContentShuffleImageProcessorInvocation
- */
-export const isContentShuffleImageProcessorInvocation = (
-  obj: unknown
-): obj is ContentShuffleImageProcessorInvocation => {
-  if (
-    isObject(obj) &&
-    'type' in obj &&
-    obj.type === 'content_shuffle_image_processor'
-  ) {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for HedImageprocessorInvocation
- */
-export const isHedImageprocessorInvocation = (
-  obj: unknown
-): obj is HedImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'hed_image_processor') {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for LineartAnimeImageProcessorInvocation
- */
-export const isLineartAnimeImageProcessorInvocation = (
-  obj: unknown
-): obj is LineartAnimeImageProcessorInvocation => {
-  if (
-    isObject(obj) &&
-    'type' in obj &&
-    obj.type === 'lineart_anime_image_processor'
-  ) {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for LineartImageProcessorInvocation
- */
-export const isLineartImageProcessorInvocation = (
-  obj: unknown
-): obj is LineartImageProcessorInvocation => {
-  if (
-    isObject(obj) &&
-    'type' in obj &&
-    obj.type === 'lineart_image_processor'
-  ) {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for MediapipeFaceProcessorInvocation
- */
-export const isMediapipeFaceProcessorInvocation = (
-  obj: unknown
-): obj is MediapipeFaceProcessorInvocation => {
-  if (
-    isObject(obj) &&
-    'type' in obj &&
-    obj.type === 'mediapipe_face_processor'
-  ) {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for MidasDepthImageProcessorInvocation
- */
-export const isMidasDepthImageProcessorInvocation = (
-  obj: unknown
-): obj is MidasDepthImageProcessorInvocation => {
-  if (
-    isObject(obj) &&
-    'type' in obj &&
-    obj.type === 'midas_depth_image_processor'
-  ) {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for MlsdImageProcessorInvocation
- */
-export const isMlsdImageProcessorInvocation = (
-  obj: unknown
-): obj is MlsdImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'mlsd_image_processor') {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for NormalbaeImageProcessorInvocation
- */
-export const isNormalbaeImageProcessorInvocation = (
-  obj: unknown
-): obj is NormalbaeImageProcessorInvocation => {
-  if (
-    isObject(obj) &&
-    'type' in obj &&
-    obj.type === 'normalbae_image_processor'
-  ) {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for OpenposeImageProcessorInvocation
- */
-export const isOpenposeImageProcessorInvocation = (
-  obj: unknown
-): obj is OpenposeImageProcessorInvocation => {
-  if (
-    isObject(obj) &&
-    'type' in obj &&
-    obj.type === 'openpose_image_processor'
-  ) {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for PidiImageProcessorInvocation
- */
-export const isPidiImageProcessorInvocation = (
-  obj: unknown
-): obj is PidiImageProcessorInvocation => {
-  if (isObject(obj) && 'type' in obj && obj.type === 'pidi_image_processor') {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Type guard for ZoeDepthImageProcessorInvocation
- */
-export const isZoeDepthImageProcessorInvocation = (
-  obj: unknown
-): obj is ZoeDepthImageProcessorInvocation => {
-  if (
-    isObject(obj) &&
-    'type' in obj &&
-    obj.type === 'zoe_depth_image_processor'
-  ) {
-    return true;
-  }
-  return false;
-};
-
-export type ControlMode = NonNullable<
-  components['schemas']['ControlNetInvocation']['control_mode']
->;
-
-export const zResizeMode = z.enum([
-  'just_resize',
-  'crop_resize',
-  'fill_resize',
-  'just_resize_simple',
-]);
+const zResizeMode = z.enum(['just_resize', 'crop_resize', 'fill_resize', 'just_resize_simple']);
 export type ResizeMode = z.infer<typeof zResizeMode>;
-export const isResizeMode = (v: unknown): v is ResizeMode =>
-  zResizeMode.safeParse(v).success;
+export const isResizeMode = (v: unknown): v is ResizeMode => zResizeMode.safeParse(v).success;
 
 export type ControlNetConfig = {
   type: 'controlnet';
@@ -425,10 +254,7 @@ export type IPAdapterConfig = {
   endStepPct: number;
 };
 
-export type ControlAdapterConfig =
-  | ControlNetConfig
-  | IPAdapterConfig
-  | T2IAdapterConfig;
+export type ControlAdapterConfig = ControlNetConfig | IPAdapterConfig | T2IAdapterConfig;
 
 export type ControlAdapterType = ControlAdapterConfig['type'];
 
@@ -436,21 +262,15 @@ export type ControlAdaptersState = EntityState<ControlAdapterConfig, string> & {
   pendingControlImages: string[];
 };
 
-export const isControlNet = (
-  controlAdapter: ControlAdapterConfig
-): controlAdapter is ControlNetConfig => {
+export const isControlNet = (controlAdapter: ControlAdapterConfig): controlAdapter is ControlNetConfig => {
   return controlAdapter.type === 'controlnet';
 };
 
-export const isIPAdapter = (
-  controlAdapter: ControlAdapterConfig
-): controlAdapter is IPAdapterConfig => {
+export const isIPAdapter = (controlAdapter: ControlAdapterConfig): controlAdapter is IPAdapterConfig => {
   return controlAdapter.type === 'ip_adapter';
 };
 
-export const isT2IAdapter = (
-  controlAdapter: ControlAdapterConfig
-): controlAdapter is T2IAdapterConfig => {
+export const isT2IAdapter = (controlAdapter: ControlAdapterConfig): controlAdapter is T2IAdapterConfig => {
   return controlAdapter.type === 't2i_adapter';
 };
 

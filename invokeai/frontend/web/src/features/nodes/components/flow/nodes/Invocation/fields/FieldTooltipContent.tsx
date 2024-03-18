@@ -1,23 +1,19 @@
-import { Flex } from '@chakra-ui/react';
-import { InvText } from 'common/components/InvText/wrapper';
-import { useFieldInstance } from 'features/nodes/hooks/useFieldData';
+import { Flex, Text } from '@invoke-ai/ui-library';
+import { useFieldInputInstance } from 'features/nodes/hooks/useFieldInputInstance';
 import { useFieldTemplate } from 'features/nodes/hooks/useFieldTemplate';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
-import {
-  isFieldInputInstance,
-  isFieldInputTemplate,
-} from 'features/nodes/types/field';
+import { isFieldInputInstance, isFieldInputTemplate } from 'features/nodes/types/field';
 import { startCase } from 'lodash-es';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 interface Props {
   nodeId: string;
   fieldName: string;
-  kind: 'input' | 'output';
+  kind: 'inputs' | 'outputs';
 }
 
 const FieldTooltipContent = ({ nodeId, fieldName, kind }: Props) => {
-  const field = useFieldInstance(nodeId, fieldName);
+  const field = useFieldInputInstance(nodeId, fieldName);
   const fieldTemplate = useFieldTemplate(nodeId, fieldName, kind);
   const isInputTemplate = isFieldInputTemplate(fieldTemplate);
   const fieldTypeName = useFieldTypeName(fieldTemplate?.type);
@@ -44,21 +40,21 @@ const FieldTooltipContent = ({ nodeId, fieldName, kind }: Props) => {
 
   return (
     <Flex flexDir="column">
-      <InvText fontWeight="semibold">{fieldTitle}</InvText>
+      <Text fontWeight="semibold">{fieldTitle}</Text>
       {fieldTemplate && (
-        <InvText opacity={0.7} fontStyle="oblique 5deg">
+        <Text opacity={0.7} fontStyle="oblique 5deg">
           {fieldTemplate.description}
-        </InvText>
+        </Text>
       )}
       {fieldTypeName && (
-        <InvText>
+        <Text>
           {t('parameters.type')}: {fieldTypeName}
-        </InvText>
+        </Text>
       )}
       {isInputTemplate && (
-        <InvText>
+        <Text>
           {t('common.input')}: {startCase(fieldTemplate.input)}
-        </InvText>
+        </Text>
       )}
     </Flex>
   );

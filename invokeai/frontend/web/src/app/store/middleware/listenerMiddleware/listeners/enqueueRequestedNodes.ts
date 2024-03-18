@@ -1,12 +1,11 @@
 import { enqueueRequested } from 'app/store/actions';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
-import { buildWorkflowRight } from 'features/nodes/util/workflow/buildWorkflow';
+import { buildWorkflowWithValidation } from 'features/nodes/util/workflow/buildWorkflow';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig } from 'services/api/types';
 
-import { startAppListening } from '..';
-
-export const addEnqueueRequestedNodes = () => {
+export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate: (action): action is ReturnType<typeof enqueueRequested> =>
       enqueueRequested.match(action) && action.payload.tabName === 'nodes',
@@ -15,7 +14,7 @@ export const addEnqueueRequestedNodes = () => {
       const { nodes, edges } = state.nodes;
       const workflow = state.workflow;
       const graph = buildNodesGraph(state.nodes);
-      const builtWorkflow = buildWorkflowRight({
+      const builtWorkflow = buildWorkflowWithValidation({
         nodes,
         edges,
         workflow,

@@ -1,62 +1,36 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import { CustomSelect, FormControl } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { useModelCustomSelect } from 'common/hooks/useModelCustomSelect';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterModel } from 'features/controlAdapters/hooks/useControlAdapterModel';
-import { useControlAdapterModelEntities } from 'features/controlAdapters/hooks/useControlAdapterModelEntities';
+import { useControlAdapterModels } from 'features/controlAdapters/hooks/useControlAdapterModels';
 import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
 import { controlAdapterModelChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { pick } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-import type {
-  ControlNetModelConfigEntity,
-  IPAdapterModelConfigEntity,
-  T2IAdapterModelConfigEntity,
-} from 'services/api/endpoints/models';
-import type { AnyModelConfig } from 'services/api/types';
+import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 
 type ParamControlAdapterModelProps = {
   id: string;
 };
 
-const selector = createMemoizedSelector(stateSelector, ({ generation }) => {
-  const { model } = generation;
-  return { mainModel: model };
-});
-
 const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   const isEnabled = useControlAdapterIsEnabled(id);
   const controlAdapterType = useControlAdapterType(id);
-  const model = useControlAdapterModel(id);
+  const { modelConfig } = useControlAdapterModel(id);
   const dispatch = useAppDispatch();
-  const currentBaseModel = useAppSelector(
-    (state) => state.generation.model?.base_model
-  );
-  const { mainModel } = useAppSelector(selector);
-  const { t } = useTranslation();
+  const currentBaseModel = useAppSelector((s) => s.generation.model?.base);
 
-  const models = useControlAdapterModelEntities(controlAdapterType);
+  const [modelConfigs, { isLoading }] = useControlAdapterModels(controlAdapterType);
 
   const _onChange = useCallback(
-    (
-      model:
-        | ControlNetModelConfigEntity
-        | IPAdapterModelConfigEntity
-        | T2IAdapterModelConfigEntity
-        | null
-    ) => {
-      if (!model) {
+    (modelConfig: ControlNetModelConfig | IPAdapterModelConfig | T2IAdapterModelConfig | null) => {
+      if (!modelConfig) {
         return;
       }
       dispatch(
         controlAdapterModelChanged({
           id,
-          model: pick(model, 'base_model', 'model_name'),
+          modelConfig,
         })
       );
     },
@@ -64,45 +38,28 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   );
 
   const selectedModel = useMemo(
-    () =>
-      model && controlAdapterType
-        ? { ...model, model_type: controlAdapterType }
-        : null,
-    [controlAdapterType, model]
+    () => (modelConfig && controlAdapterType ? { ...modelConfig, model_type: controlAdapterType } : null),
+    [controlAdapterType, modelConfig]
   );
 
-  const getIsDisabled = useCallback(
-    (model: AnyModelConfig): boolean => {
-      const isCompatible = currentBaseModel === model.base_model;
-      const hasMainModel = Boolean(currentBaseModel);
-      return !hasMainModel || !isCompatible;
-    },
-    [currentBaseModel]
-  );
-
-  const { options, value, onChange, noOptionsMessage } =
-    useGroupedModelInvSelect({
-      modelEntities: models,
-      onChange: _onChange,
-      selectedModel,
-      getIsDisabled,
-    });
+  const { items, selectedItem, onChange, placeholder } = useModelCustomSelect({
+    modelConfigs,
+    isLoading,
+    selectedModel,
+    onChange: _onChange,
+    modelFilter: (model) => model.base === currentBaseModel,
+  });
 
   return (
-    <InvTooltip label={value?.description}>
-      <InvControl
-        isDisabled={!isEnabled}
-        isInvalid={!value || mainModel?.base_model !== model?.base_model}
-      >
-        <InvSelect
-          options={options}
-          placeholder={t('controlnet.selectModel')}
-          value={value}
-          onChange={onChange}
-          noOptionsMessage={noOptionsMessage}
-        />
-      </InvControl>
-    </InvTooltip>
+    <FormControl isDisabled={!items.length || !isEnabled} isInvalid={!selectedItem || !items.length}>
+      <CustomSelect
+        key={items.length}
+        selectedItem={selectedItem}
+        placeholder={placeholder}
+        items={items}
+        onChange={onChange}
+      />
+    </FormControl>
   );
 };
 

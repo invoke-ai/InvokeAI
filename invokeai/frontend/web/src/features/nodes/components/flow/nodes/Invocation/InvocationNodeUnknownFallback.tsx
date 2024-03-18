@@ -1,5 +1,4 @@
-import { Flex } from '@chakra-ui/react';
-import { InvText } from 'common/components/InvText/wrapper';
+import { Flex, Text } from '@invoke-ai/ui-library';
 import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
 import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import { useNodePack } from 'features/nodes/hooks/useNodePack';
@@ -15,13 +14,7 @@ type Props = {
   selected: boolean;
 };
 
-const InvocationNodeUnknownFallback = ({
-  nodeId,
-  isOpen,
-  label,
-  type,
-  selected,
-}: Props) => {
+const InvocationNodeUnknownFallback = ({ nodeId, isOpen, label, type, selected }: Props) => {
   const { t } = useTranslation();
   const nodePack = useNodePack(nodeId);
   return (
@@ -37,9 +30,9 @@ const InvocationNodeUnknownFallback = ({
         fontSize="sm"
       >
         <NodeCollapseButton nodeId={nodeId} isOpen={isOpen} />
-        <InvText w="full" textAlign="center" pe={8} color="error.300">
+        <Text w="full" textAlign="center" pe={8} color="error.300">
           {label ? `${label} (${type})` : type}
-        </InvText>
+        </Text>
       </Flex>
       {isOpen && (
         <Flex
@@ -54,19 +47,19 @@ const InvocationNodeUnknownFallback = ({
           fontSize="sm"
         >
           <Flex gap={2} flexDir="column">
-            <InvText as="span">
+            <Text as="span">
               {t('nodes.unknownNodeType')}:{' '}
-              <InvText as="span" fontWeight="semibold">
+              <Text as="span" fontWeight="semibold">
                 {type}
-              </InvText>
-            </InvText>
+              </Text>
+            </Text>
             {nodePack && (
-              <InvText as="span">
+              <Text as="span">
                 {t('nodes.nodePack')}:{' '}
-                <InvText as="span" fontWeight="semibold">
+                <Text as="span" fontWeight="semibold">
                   {nodePack}
-                </InvText>
-              </InvText>
+                </Text>
+              </Text>
             )}
           </Flex>
         </Flex>

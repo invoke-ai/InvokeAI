@@ -1,63 +1,22 @@
-import { Flex, useDisclosure } from '@chakra-ui/react';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvConfirmationAlertDialog } from 'common/components/InvConfirmationAlertDialog/InvConfirmationAlertDialog';
-import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
-import { InvText } from 'common/components/InvText/wrapper';
-import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
-import { addToast } from 'features/system/store/systemSlice';
-import { makeToast } from 'features/system/util/makeToast';
+import { MenuItem } from '@invoke-ai/ui-library';
+import { NewWorkflowConfirmationAlertDialog } from 'features/workflowLibrary/components/NewWorkflowConfirmationAlertDialog';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaCircleNodes } from 'react-icons/fa6';
+import { PiFilePlusBold } from 'react-icons/pi';
 
-const NewWorkflowMenuItem = () => {
+export const NewWorkflowMenuItem = memo(() => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const isTouched = useAppSelector((state) => state.workflow.isTouched);
 
-  const handleNewWorkflow = useCallback(() => {
-    dispatch(nodeEditorReset());
-
-    dispatch(
-      addToast(
-        makeToast({
-          title: t('workflows.newWorkflowCreated'),
-          status: 'success',
-        })
-      )
-    );
-
-    onClose();
-  }, [dispatch, onClose, t]);
-
-  const onClick = useCallback(() => {
-    if (!isTouched) {
-      handleNewWorkflow();
-      return;
-    }
-    onOpen();
-  }, [handleNewWorkflow, isTouched, onOpen]);
-
-  return (
-    <>
-      <InvMenuItem as="button" icon={<FaCircleNodes />} onClick={onClick}>
+  const renderButton = useCallback(
+    (onClick: () => void) => (
+      <MenuItem as="button" icon={<PiFilePlusBold />} onClick={onClick}>
         {t('nodes.newWorkflow')}
-      </InvMenuItem>
-
-      <InvConfirmationAlertDialog
-        isOpen={isOpen}
-        onClose={onClose}
-        title={t('nodes.newWorkflow')}
-        acceptCallback={handleNewWorkflow}
-      >
-        <Flex flexDir="column" gap={2}>
-          <InvText>{t('nodes.newWorkflowDesc')}</InvText>
-          <InvText variant="subtext">{t('nodes.newWorkflowDesc2')}</InvText>
-        </Flex>
-      </InvConfirmationAlertDialog>
-    </>
+      </MenuItem>
+    ),
+    [t]
   );
-};
 
-export default memo(NewWorkflowMenuItem);
+  return <NewWorkflowConfirmationAlertDialog renderButton={renderButton} />;
+});
+
+NewWorkflowMenuItem.displayName = 'NewWorkflowMenuItem';

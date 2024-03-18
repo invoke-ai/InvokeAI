@@ -1,59 +1,58 @@
+import { CustomSelect, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { useModelCustomSelect } from 'common/hooks/useModelCustomSelect';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import { modelSelected } from 'features/parameters/store/actions';
-import { pick } from 'lodash-es';
+import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { NON_REFINER_BASE_MODELS } from 'services/api/constants';
-import type { MainModelConfigEntity } from 'services/api/endpoints/models';
-import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import { useMainModels } from 'services/api/hooks/modelsByType';
+import type { MainModelConfig } from 'services/api/types';
 
-const selector = createMemoizedSelector(stateSelector, (state) => ({
-  model: state.generation.model,
-}));
+const selectModel = createMemoizedSelector(selectGenerationSlice, (generation) => generation.model);
 
 const ParamMainModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const { model } = useAppSelector(selector);
-  const { data, isLoading } = useGetMainModelsQuery(NON_REFINER_BASE_MODELS);
+  const selectedModel = useAppSelector(selectModel);
+  const [modelConfigs, { isLoading }] = useMainModels();
+
   const _onChange = useCallback(
-    (model: MainModelConfigEntity | null) => {
+    (model: MainModelConfig | null) => {
       if (!model) {
         return;
       }
-      dispatch(
-        modelSelected(pick(model, ['base_model', 'model_name', 'model_type']))
-      );
+      try {
+        dispatch(modelSelected(zModelIdentifierField.parse(model)));
+      } catch {
+        // no-op
+      }
     },
     [dispatch]
   );
-  const { options, value, onChange, placeholder, noOptionsMessage } =
-    useGroupedModelInvSelect({
-      modelEntities: data,
-      onChange: _onChange,
-      selectedModel: model,
-      isLoading,
-    });
+
+  const { items, selectedItem, onChange, placeholder } = useModelCustomSelect({
+    modelConfigs,
+    isLoading,
+    selectedModel,
+    onChange: _onChange,
+  });
 
   return (
-    <InvControl
-      label={t('modelManager.model')}
-      isDisabled={!options.length}
-      isInvalid={!options.length}
-    >
-      <InvSelect
-        value={value}
+    <FormControl isDisabled={!items.length} isInvalid={!selectedItem || !items.length}>
+      <InformationalPopover feature="paramModel">
+        <FormLabel>{t('modelManager.model')}</FormLabel>
+      </InformationalPopover>
+      <CustomSelect
+        key={items.length}
+        selectedItem={selectedItem}
         placeholder={placeholder}
-        options={options}
+        items={items}
         onChange={onChange}
-        noOptionsMessage={noOptionsMessage}
       />
-    </InvControl>
+    </FormControl>
   );
 };
 

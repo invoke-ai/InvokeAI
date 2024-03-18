@@ -1,21 +1,14 @@
 import { logger } from 'app/logging/logger';
-import {
-  appSocketInvocationRetrievalError,
-  socketInvocationRetrievalError,
-} from 'services/events/actions';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { socketInvocationRetrievalError } from 'services/events/actions';
 
-import { startAppListening } from '../..';
+const log = logger('socketio');
 
-export const addInvocationRetrievalErrorEventListener = () => {
+export const addInvocationRetrievalErrorEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketInvocationRetrievalError,
-    effect: (action, { dispatch }) => {
-      const log = logger('socketio');
-      log.error(
-        action.payload,
-        `Invocation retrieval error (${action.payload.data.graph_execution_state_id})`
-      );
-      dispatch(appSocketInvocationRetrievalError(action.payload));
+    effect: (action) => {
+      log.error(action.payload, `Invocation retrieval error (${action.payload.data.graph_execution_state_id})`);
     },
   });
 };

@@ -1,40 +1,10 @@
 import type { ControlAdapterType } from 'features/controlAdapters/store/types';
-import { useMemo } from 'react';
-import {
-  controlNetModelsAdapter,
-  ipAdapterModelsAdapter,
-  t2iAdapterModelsAdapter,
-  useGetControlNetModelsQuery,
-  useGetIPAdapterModelsQuery,
-  useGetT2IAdapterModelsQuery,
-} from 'services/api/endpoints/models';
+import { useControlNetModels, useIPAdapterModels, useT2IAdapterModels } from 'services/api/hooks/modelsByType';
 
-export const useControlAdapterModels = (type?: ControlAdapterType) => {
-  const { data: controlNetModelsData } = useGetControlNetModelsQuery();
-  const controlNetModels = useMemo(
-    () =>
-      controlNetModelsData
-        ? controlNetModelsAdapter.getSelectors().selectAll(controlNetModelsData)
-        : [],
-    [controlNetModelsData]
-  );
-
-  const { data: t2iAdapterModelsData } = useGetT2IAdapterModelsQuery();
-  const t2iAdapterModels = useMemo(
-    () =>
-      t2iAdapterModelsData
-        ? t2iAdapterModelsAdapter.getSelectors().selectAll(t2iAdapterModelsData)
-        : [],
-    [t2iAdapterModelsData]
-  );
-  const { data: ipAdapterModelsData } = useGetIPAdapterModelsQuery();
-  const ipAdapterModels = useMemo(
-    () =>
-      ipAdapterModelsData
-        ? ipAdapterModelsAdapter.getSelectors().selectAll(ipAdapterModelsData)
-        : [],
-    [ipAdapterModelsData]
-  );
+export const useControlAdapterModels = (type: ControlAdapterType) => {
+  const controlNetModels = useControlNetModels();
+  const t2iAdapterModels = useT2IAdapterModels();
+  const ipAdapterModels = useIPAdapterModels();
 
   if (type === 'controlnet') {
     return controlNetModels;
@@ -45,5 +15,8 @@ export const useControlAdapterModels = (type?: ControlAdapterType) => {
   if (type === 'ip_adapter') {
     return ipAdapterModels;
   }
-  return [];
+
+  // Assert that the end of the function is not reachable.
+  const exhaustiveCheck: never = type;
+  return exhaustiveCheck;
 };

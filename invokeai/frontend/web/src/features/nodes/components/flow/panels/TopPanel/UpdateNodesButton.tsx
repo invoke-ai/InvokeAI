@@ -1,10 +1,10 @@
+import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
 import { useGetNodesNeedUpdate } from 'features/nodes/hooks/useGetNodesNeedUpdate';
 import { updateAllNodesRequested } from 'features/nodes/store/actions';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaExclamationTriangle } from 'react-icons/fa';
+import { PiWarningBold } from 'react-icons/pi';
 
 const UpdateNodesButton = () => {
   const dispatch = useAppDispatch();
@@ -19,13 +19,14 @@ const UpdateNodesButton = () => {
   }
 
   return (
-    <InvButton
-      leftIcon={<FaExclamationTriangle />}
+    <IconButton
+      tooltip={t('nodes.updateAllNodes')}
+      aria-label={t('nodes.updateAllNodes')}
+      icon={<PiWarningBold />}
       onClick={handleClickUpdateNodes}
       pointerEvents="auto"
-    >
-      {t('nodes.updateAllNodes')}
-    </InvButton>
+      colorScheme="warning"
+    />
   );
 };
 

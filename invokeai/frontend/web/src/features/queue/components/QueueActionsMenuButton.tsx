@@ -1,44 +1,40 @@
-import { Box } from '@chakra-ui/layout';
-import { useDisclosure } from '@chakra-ui/react';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { InvBadge } from 'common/components/InvBadge/wrapper';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
-import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
 import {
-  InvMenu,
-  InvMenuButton,
-  InvMenuDivider,
-} from 'common/components/InvMenu/wrapper';
-import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
+  Badge,
+  Box,
+  IconButton,
+  Menu,
+  MenuButton,
+  MenuDivider,
+  MenuItem,
+  MenuList,
+  useDisclosure,
+} from '@invoke-ai/ui-library';
+import { useAppDispatch } from 'app/store/storeHooks';
+import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQueueConfirmationAlertDialog';
+import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
 import { useResumeProcessor } from 'features/queue/hooks/useResumeProcessor';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaPause, FaPlay, FaTimes } from 'react-icons/fa';
-import { FaList } from 'react-icons/fa6';
+import { PiPauseFill, PiPlayFill, PiTrashSimpleBold } from 'react-icons/pi';
+import { RiListCheck, RiPlayList2Fill } from 'react-icons/ri';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
 export const QueueActionsMenuButton = memo(() => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const clearQueueDisclosure = useDisclosure();
   const isPauseEnabled = useFeatureStatus('pauseQueue').isFeatureEnabled;
   const isResumeEnabled = useFeatureStatus('resumeQueue').isFeatureEnabled;
   const { queueSize } = useGetQueueStatusQuery(undefined, {
     selectFromResult: (res) => ({
-      queueSize: res.data
-        ? res.data.queue.pending + res.data.queue.in_progress
-        : 0,
+      queueSize: res.data ? res.data.queue.pending + res.data.queue.in_progress : 0,
     }),
   });
-  const {
-    cancelQueueItem,
-    isLoading: isLoadingCancelQueueItem,
-    isDisabled: isDisabledCancelQueueItem,
-  } = useCancelCurrentQueueItem();
+  const { isLoading: isLoadingClearQueue, isDisabled: isDisabledClearQueue } = useClearQueue();
   const {
     resumeProcessor,
     isLoading: isLoadingResumeProcessor,
@@ -55,61 +51,50 @@ export const QueueActionsMenuButton = memo(() => {
 
   return (
     <Box pos="relative">
-      <InvMenu
-        isOpen={isOpen}
-        onOpen={onOpen}
-        onClose={onClose}
-        placement="bottom-end"
-      >
-        <InvMenuButton
-          as={InvIconButton}
-          aria-label="Queue Actions Menu"
-          icon={<FaList />}
-        />
-        <InvMenuList>
-          <InvMenuItem
+      <ClearQueueConfirmationAlertDialog disclosure={clearQueueDisclosure} />
+
+      <Menu isOpen={isOpen} onOpen={onOpen} onClose={onClose} placement="bottom-end">
+        <MenuButton as={IconButton} aria-label="Queue Actions Menu" icon={<RiListCheck />} />
+        <MenuList>
+          <MenuItem
             isDestructive
-            icon={<FaTimes size="16px" />}
-            onClick={cancelQueueItem}
-            isLoading={isLoadingCancelQueueItem}
-            isDisabled={isDisabledCancelQueueItem}
+            icon={<PiTrashSimpleBold size="16px" />}
+            onClick={clearQueueDisclosure.onOpen}
+            isLoading={isLoadingClearQueue}
+            isDisabled={isDisabledClearQueue}
           >
-            {t('queue.cancelTooltip')}
-          </InvMenuItem>
+            {t('queue.clearTooltip')}
+          </MenuItem>
           {isResumeEnabled && (
-            <InvMenuItem
-              icon={<FaPlay size="14px" />}
+            <MenuItem
+              icon={<PiPlayFill size="14px" />}
               onClick={resumeProcessor}
               isLoading={isLoadingResumeProcessor}
               isDisabled={isDisabledResumeProcessor}
             >
               {t('queue.resumeTooltip')}
-            </InvMenuItem>
+            </MenuItem>
           )}
           {isPauseEnabled && (
-            <InvMenuItem
-              icon={<FaPause size="14px" />}
+            <MenuItem
+              icon={<PiPauseFill size="14px" />}
               onClick={pauseProcessor}
               isLoading={isLoadingPauseProcessor}
               isDisabled={isDisabledPauseProcessor}
             >
               {t('queue.pauseTooltip')}
-            </InvMenuItem>
+            </MenuItem>
           )}
-          <InvMenuDivider />
-          <InvMenuItem onClick={openQueue}>{t('queue.openQueue')}</InvMenuItem>
-        </InvMenuList>
-      </InvMenu>
+          <MenuDivider />
+          <MenuItem icon={<RiPlayList2Fill />} onClick={openQueue}>
+            {t('queue.openQueue')}
+          </MenuItem>
+        </MenuList>
+      </Menu>
       {queueSize > 0 && (
-        <InvBadge
-          pos="absolute"
-          insetInlineStart={-3}
-          insetBlockStart={-1.5}
-          colorScheme="invokeYellow"
-          zIndex="docked"
-        >
+        <Badge pos="absolute" insetInlineStart={-3} insetBlockStart={-1.5} colorScheme="invokeYellow" zIndex="docked">
           {queueSize}
-        </InvBadge>
+        </Badge>
       )}
     </Box>
   );

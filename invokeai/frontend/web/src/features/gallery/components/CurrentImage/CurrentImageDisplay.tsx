@@ -1,4 +1,4 @@
-import { Flex } from '@chakra-ui/react';
+import { Flex } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 
 import CurrentImageButtons from './CurrentImageButtons';

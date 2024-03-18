@@ -1,8 +1,6 @@
-import type { RootState } from 'app/store/store';
+import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import type { InvLabelProps } from 'common/components/InvControl/types';
-import { InvSwitch } from 'common/components/InvSwitch/wrapper';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setHrfEnabled } from 'features/hrf/store/hrfSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -12,21 +10,21 @@ const ParamHrfToggle = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const hrfEnabled = useAppSelector((state: RootState) => state.hrf.hrfEnabled);
+  const hrfEnabled = useAppSelector((s) => s.hrf.hrfEnabled);
 
   const handleHrfEnabled = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) =>
-      dispatch(setHrfEnabled(e.target.checked)),
+    (e: ChangeEvent<HTMLInputElement>) => dispatch(setHrfEnabled(e.target.checked)),
     [dispatch]
   );
 
   return (
-    <InvControl label={t('hrf.enableHrf')} labelProps={labelProps} w="full">
-      <InvSwitch isChecked={hrfEnabled} onChange={handleHrfEnabled} />
-    </InvControl>
+    <FormControl w="full">
+      <InformationalPopover feature="paramHrf">
+        <FormLabel flexGrow={1}>{t('hrf.enableHrf')}</FormLabel>
+      </InformationalPopover>
+      <Switch isChecked={hrfEnabled} onChange={handleHrfEnabled} />
+    </FormControl>
   );
 };
-
-const labelProps: InvLabelProps = { flexGrow: 1 };
 
 export default memo(ParamHrfToggle);

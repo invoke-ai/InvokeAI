@@ -1,20 +1,25 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { AppConfig, PartialAppConfig } from 'app/types/invokeai';
+import type { RootState } from 'app/store/store';
+import type { AppConfig, NumericalParameterConfig, PartialAppConfig } from 'app/types/invokeai';
 import { merge } from 'lodash-es';
 
-export const initialConfigState: AppConfig = {
+const baseDimensionConfig: NumericalParameterConfig = {
+  initial: 512, // determined by model selection, unused in practice
+  sliderMin: 64,
+  sliderMax: 1536,
+  numberInputMin: 64,
+  numberInputMax: 4096,
+  fineStep: 8,
+  coarseStep: 64,
+};
+
+const initialConfigState: AppConfig = {
   shouldUpdateImagesOnConnect: false,
   shouldFetchMetadataFromApi: false,
   disabledTabs: [],
-  disabledFeatures: ['lightbox', 'faceRestore', 'batches', 'bulkDownload'],
-  disabledSDFeatures: [
-    'variation',
-    'symmetry',
-    'hires',
-    'perlinNoise',
-    'noiseThreshold',
-  ],
+  disabledFeatures: ['lightbox', 'faceRestore', 'batches'],
+  disabledSDFeatures: ['variation', 'symmetry', 'hires', 'perlinNoise', 'noiseThreshold'],
   nodesAllowlist: undefined,
   nodesDenylist: undefined,
   canRestoreDeletedImagesFromBin: true,
@@ -23,66 +28,140 @@ export const initialConfigState: AppConfig = {
     disabledControlNetProcessors: [],
     iterations: {
       initial: 1,
-      min: 1,
+      sliderMin: 1,
       sliderMax: 1000,
-      inputMax: 10000,
+      numberInputMin: 1,
+      numberInputMax: 10000,
       fineStep: 1,
       coarseStep: 1,
     },
-    width: {
-      initial: 512,
-      min: 64,
-      sliderMax: 1536,
-      inputMax: 4096,
-      fineStep: 8,
-      coarseStep: 64,
-    },
-    height: {
-      initial: 512,
-      min: 64,
-      sliderMax: 1536,
-      inputMax: 4096,
-      fineStep: 8,
-      coarseStep: 64,
-    },
+    width: { ...baseDimensionConfig },
+    height: { ...baseDimensionConfig },
+    boundingBoxWidth: { ...baseDimensionConfig },
+    boundingBoxHeight: { ...baseDimensionConfig },
+    scaledBoundingBoxWidth: { ...baseDimensionConfig },
+    scaledBoundingBoxHeight: { ...baseDimensionConfig },
+    scheduler: 'euler',
+    vaePrecision: 'fp32',
     steps: {
       initial: 30,
-      min: 1,
+      sliderMin: 1,
       sliderMax: 100,
-      inputMax: 500,
+      numberInputMin: 1,
+      numberInputMax: 500,
       fineStep: 1,
       coarseStep: 1,
     },
     guidance: {
       initial: 7,
-      min: 1,
+      sliderMin: 1,
       sliderMax: 20,
-      inputMax: 200,
+      numberInputMin: 1,
+      numberInputMax: 200,
       fineStep: 0.1,
       coarseStep: 0.5,
     },
     img2imgStrength: {
       initial: 0.7,
-      min: 0,
+      sliderMin: 0,
       sliderMax: 1,
-      inputMax: 1,
+      numberInputMin: 0,
+      numberInputMax: 1,
+      fineStep: 0.01,
+      coarseStep: 0.05,
+    },
+    canvasCoherenceStrength: {
+      initial: 0.3,
+      sliderMin: 0,
+      sliderMax: 1,
+      numberInputMin: 0,
+      numberInputMax: 1,
       fineStep: 0.01,
       coarseStep: 0.05,
     },
     hrfStrength: {
       initial: 0.45,
-      min: 0,
+      sliderMin: 0,
       sliderMax: 1,
-      inputMax: 1,
+      numberInputMin: 0,
+      numberInputMax: 1,
       fineStep: 0.01,
       coarseStep: 0.05,
+    },
+    canvasCoherenceEdgeSize: {
+      initial: 16,
+      sliderMin: 0,
+      sliderMax: 128,
+      numberInputMin: 0,
+      numberInputMax: 1024,
+      fineStep: 8,
+      coarseStep: 16,
+    },
+    cfgRescaleMultiplier: {
+      initial: 0,
+      sliderMin: 0,
+      sliderMax: 0.99,
+      numberInputMin: 0,
+      numberInputMax: 0.99,
+      fineStep: 0.05,
+      coarseStep: 0.1,
+    },
+    clipSkip: {
+      initial: 0,
+      sliderMin: 0,
+      sliderMax: 12, // determined by model selection, unused in practice
+      numberInputMin: 0,
+      numberInputMax: 12, // determined by model selection, unused in practice
+      fineStep: 1,
+      coarseStep: 1,
+    },
+    infillPatchmatchDownscaleSize: {
+      initial: 1,
+      sliderMin: 1,
+      sliderMax: 10,
+      numberInputMin: 1,
+      numberInputMax: 10,
+      fineStep: 1,
+      coarseStep: 1,
+    },
+    infillTileSize: {
+      initial: 32,
+      sliderMin: 16,
+      sliderMax: 64,
+      numberInputMin: 16,
+      numberInputMax: 256,
+      fineStep: 1,
+      coarseStep: 1,
+    },
+    maskBlur: {
+      initial: 16,
+      sliderMin: 0,
+      sliderMax: 128,
+      numberInputMin: 0,
+      numberInputMax: 512,
+      fineStep: 1,
+      coarseStep: 1,
+    },
+    ca: {
+      weight: {
+        initial: 1,
+        sliderMin: 0,
+        sliderMax: 2,
+        numberInputMin: -1,
+        numberInputMax: 2,
+        fineStep: 0.01,
+        coarseStep: 0.05,
+      },
     },
     dynamicPrompts: {
       maxPrompts: {
         initial: 100,
-        min: 1,
+        sliderMin: 1,
         sliderMax: 1000,
-        inputMax: 10000,
+        numberInputMin: 1,
+        numberInputMax: 10000,
+        fineStep: 1,
+        coarseStep: 10,
       },
     },
   },
@@ -100,4 +179,4 @@ export const configSlice = createSlice({
 
 export const { configChanged } = configSlice.actions;
 
-export default configSlice.reducer;
+export const selectConfigSlice = (state: RootState) => state.config;

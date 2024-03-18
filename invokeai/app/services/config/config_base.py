@@ -17,7 +17,8 @@ from argparse import ArgumentParser
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Literal, Optional, Union, get_args, get_origin, get_type_hints
 
-from omegaconf import DictConfig, ListConfig, OmegaConf
+from omegaconf import DictConfig, DictKeyType, ListConfig, OmegaConf
+from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from invokeai.app.services.config.config_common import PagingArgumentParser, int_or_float_or_str
@@ -27,11 +28,11 @@ class InvokeAISettings(BaseSettings):
     """Runtime configuration settings in which default values are read from an omegaconf .yaml file."""
 
     initconf: ClassVar[Optional[DictConfig]] = None
-    argparse_groups: ClassVar[Dict] = {}
+    argparse_groups: ClassVar[Dict[str, Any]] = {}
 
     model_config = SettingsConfigDict(env_file_encoding="utf-8", arbitrary_types_allowed=True, case_sensitive=True)
 
-    def parse_args(self, argv: Optional[list] = sys.argv[1:]):
+    def parse_args(self, argv: Optional[List[str]] = sys.argv[1:]) -> None:
         """Call to parse command-line arguments."""
         parser = self.get_parser()
         opt, unknown_opts = parser.parse_known_args(argv)
@@ -62,13 +63,29 @@ class InvokeAISettings(BaseSettings):
             assert isinstance(category, str)
             if category not in field_dict[type]:
                 field_dict[type][category] = {}
+            if isinstance(value, BaseModel):
+                dump = value.model_dump(exclude_defaults=True, exclude_unset=True, exclude_none=True)
+                field_dict[type][category][name] = dump
+                continue
+            if isinstance(value, list):
+                if not value or len(value) == 0:
+                    continue
+                primitive = isinstance(value[0], get_args(DictKeyType))
+                if not primitive:
+                    val_list: List[Dict[str, Any]] = []
+                    for list_val in value:
+                        if isinstance(list_val, BaseModel):
+                            dump = list_val.model_dump(exclude_defaults=True, exclude_unset=True, exclude_none=True)
+                            val_list.append(dump)
+                    field_dict[type][category][name] = val_list
+                    continue
             # keep paths as strings to make it easier to read
             field_dict[type][category][name] = str(value) if isinstance(value, Path) else value
         conf = OmegaConf.create(field_dict)
         return OmegaConf.to_yaml(conf)
 
     @classmethod
-    def add_parser_arguments(cls, parser):
+    def add_parser_arguments(cls, parser: ArgumentParser) -> None:
         """Dynamically create arguments for a settings parser."""
         if "type" in get_type_hints(cls):
             settings_stanza = get_args(get_type_hints(cls)["type"])[0]
@@ -117,7 +134,8 @@ class InvokeAISettings(BaseSettings):
         """Return the category of a setting."""
         hints = get_type_hints(cls)
         if command_field in hints:
-            return get_args(hints[command_field])[0]
+            result: str = get_args(hints[command_field])[0]
+            return result
         else:
             return "Uncategorized"
 
@@ -155,10 +173,11 @@ class InvokeAISettings(BaseSettings):
             "lora_dir",
             "embedding_dir",
             "controlnet_dir",
+            "conf_path",
         ]
 
     @classmethod
-    def add_field_argument(cls, command_parser, name: str, field, default_override=None):
+    def add_field_argument(cls, command_parser, name: str, field, default_override=None) -> None:
         """Add the argparse arguments for a setting parser."""
         field_type = get_type_hints(cls).get(name)
         default = (

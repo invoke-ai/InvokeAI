@@ -1,10 +1,6 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import type { ContextMenuProps } from '@invoke-ai/ui-library';
+import { ContextMenu, MenuList } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import type { InvContextMenuProps } from 'common/components/InvContextMenu/InvContextMenu';
-import { InvContextMenu } from 'common/components/InvContextMenu/InvContextMenu';
-import { InvMenuList } from 'common/components/InvMenu/InvMenuList';
-import type { MouseEvent } from 'react';
 import { memo, useCallback } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
@@ -13,21 +9,11 @@ import SingleSelectionMenuItems from './SingleSelectionMenuItems';
 
 type Props = {
   imageDTO: ImageDTO | undefined;
-  children: InvContextMenuProps<HTMLDivElement>['children'];
+  children: ContextMenuProps<HTMLDivElement>['children'];
 };
 
-const selector = createMemoizedSelector([stateSelector], ({ gallery }) => {
-  const selectionCount = gallery.selection.length;
-
-  return { selectionCount };
-});
-
 const ImageContextMenu = ({ imageDTO, children }: Props) => {
-  const { selectionCount } = useAppSelector(selector);
-
-  const skipEvent = useCallback((e: MouseEvent<HTMLDivElement>) => {
-    e.preventDefault();
-  }, []);
+  const selectionCount = useAppSelector((s) => s.gallery.selection.length);
 
   const renderMenuFunc = useCallback(() => {
     if (!imageDTO) {
@@ -36,22 +22,20 @@ const ImageContextMenu = ({ imageDTO, children }: Props) => {
 
     if (selectionCount > 1) {
       return (
-        <InvMenuList visibility="visible" onContextMenu={skipEvent}>
+        <MenuList visibility="visible">
           <MultipleSelectionMenuItems />
-        </InvMenuList>
+        </MenuList>
       );
     }
 
     return (
-      <InvMenuList visibility="visible" onContextMenu={skipEvent}>
+      <MenuList visibility="visible">
         <SingleSelectionMenuItems imageDTO={imageDTO} />
-      </InvMenuList>
+      </MenuList>
     );
-  }, [imageDTO, selectionCount, skipEvent]);
+  }, [imageDTO, selectionCount]);
 
-  return (
-    <InvContextMenu renderMenu={renderMenuFunc}>{children}</InvContextMenu>
-  );
+  return <ContextMenu renderMenu={renderMenuFunc}>{children}</ContextMenu>;
 };
 
 export default memo(ImageContextMenu);

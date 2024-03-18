@@ -1,15 +1,8 @@
-import { useStore } from '@nanostores/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  $isDrawing,
-  setCursorPosition,
-} from 'features/canvas/store/canvasNanostore';
+import { $cursorPosition, $isDrawing, $tool } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { addPointToCurrentLine } from 'features/canvas/store/canvasSlice';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import type Konva from 'konva';
 import type { Vector2d } from 'konva/lib/types';
 import type { MutableRefObject } from 'react';
@@ -17,26 +10,13 @@ import { useCallback } from 'react';
 
 import useColorPicker from './useColorUnderCursor';
 
-const selector = createMemoizedSelector(
-  [activeTabNameSelector, stateSelector, isStagingSelector],
-  (activeTabName, { canvas }, isStaging) => {
-    const { tool } = canvas;
-    return {
-      tool,
-      activeTabName,
-      isStaging,
-    };
-  }
-);
-
 const useCanvasMouseMove = (
   stageRef: MutableRefObject<Konva.Stage | null>,
   didMouseMoveRef: MutableRefObject<boolean>,
   lastCursorPositionRef: MutableRefObject<Vector2d>
 ) => {
   const dispatch = useAppDispatch();
-  const isDrawing = useStore($isDrawing);
-  const { tool, isStaging } = useAppSelector(selector);
+  const isStaging = useAppSelector(isStagingSelector);
   const { updateColorUnderCursor } = useColorPicker();
 
   return useCallback(() => {
@@ -50,33 +30,23 @@ const useCanvasMouseMove = (
       return;
     }
 
-    setCursorPosition(scaledCursorPosition);
+    $cursorPosition.set(scaledCursorPosition);
 
     lastCursorPositionRef.current = scaledCursorPosition;
+    const tool = $tool.get();
 
     if (tool === 'colorPicker') {
       updateColorUnderCursor();
       return;
     }
 
-    if (!isDrawing || tool === 'move' || isStaging) {
+    if (!$isDrawing.get() || tool === 'move' || isStaging) {
       return;
     }
 
     didMouseMoveRef.current = true;
-    dispatch(
-      addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y])
-    );
-  }, [
-    didMouseMoveRef,
-    dispatch,
-    isDrawing,
-    isStaging,
-    lastCursorPositionRef,
-    stageRef,
-    tool,
-    updateColorUnderCursor,
-  ]);
+    dispatch(addPointToCurrentLine([scaledCursorPosition.x, scaledCursorPosition.y]));
+  }, [didMouseMoveRef, dispatch, isStaging, lastCursorPositionRef, stageRef, updateColorUnderCursor]);
 };
 
 export default useCanvasMouseMove;

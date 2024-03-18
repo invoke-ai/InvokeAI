@@ -1,10 +1,10 @@
 <div align="center">
 
-![project hero](https://github.com/invoke-ai/InvokeAI/assets/31807370/1a917d94-e099-4fa1-a70f-7dd8d0691018)
+![project hero](https://github.com/invoke-ai/InvokeAI/assets/31807370/6e3728c7-e90e-4711-905c-3b55844ff5be)
 
-# Invoke AI - Generative AI for Professional Creatives
-## Professional Creative Tools for Stable Diffusion, Custom-Trained Models, and more. 
-  To learn more about Invoke AI, get started instantly, or implement our Business solutions, visit [invoke.ai](https://invoke.ai)
+# Invoke - Professional Creative AI Tools for Visual Media 
+##  To learn more about Invoke, or implement our Business solutions, visit [invoke.com](https://www.invoke.com/about)
+  
 
 
 [![discord badge]][discord link]
@@ -56,7 +56,9 @@ the foundation for multiple commercial products.
 
 <div align="center">
 
-![canvas preview](https://github.com/invoke-ai/InvokeAI/raw/main/docs/assets/canvas_preview.png)
+
+![Highlighted Features - Canvas and Workflows](https://github.com/invoke-ai/InvokeAI/assets/31807370/708f7a82-084f-4860-bfbe-e2588c53548d)
+
 
 </div>
 
@@ -167,7 +169,7 @@ the command `npm install -g pnpm` if needed)
     _For Linux with an AMD GPU:_
 
     ```sh
-    pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.4.2
+    pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.6
     ```
 
     _For non-GPU systems:_

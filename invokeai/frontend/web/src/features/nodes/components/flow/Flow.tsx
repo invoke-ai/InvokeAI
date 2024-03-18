@@ -1,6 +1,5 @@
-import { useToken } from '@chakra-ui/react';
+import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
@@ -71,13 +70,11 @@ const snapGrid: [number, number] = [25, 25];
 
 export const Flow = memo(() => {
   const dispatch = useAppDispatch();
-  const nodes = useAppSelector((state) => state.nodes.nodes);
-  const edges = useAppSelector((state) => state.nodes.edges);
-  const viewport = useAppSelector((state) => state.nodes.viewport);
-  const shouldSnapToGrid = useAppSelector(
-    (state) => state.nodes.shouldSnapToGrid
-  );
-  const selectionMode = useAppSelector((state) => state.nodes.selectionMode);
+  const nodes = useAppSelector((s) => s.nodes.nodes);
+  const edges = useAppSelector((s) => s.nodes.edges);
+  const viewport = useAppSelector((s) => s.nodes.viewport);
+  const shouldSnapToGrid = useAppSelector((s) => s.nodes.shouldSnapToGrid);
+  const selectionMode = useAppSelector((s) => s.nodes.selectionMode);
   const flowWrapper = useRef<HTMLDivElement>(null);
   const cursorPosition = useRef<XYPosition | null>(null);
   const isValidConnection = useIsValidConnection();
@@ -160,7 +157,7 @@ export const Flow = memo(() => {
     [dispatch]
   );
 
-  const { onCloseGlobal } = useGlobalMenuCloseTrigger();
+  const { onCloseGlobal } = useGlobalMenuClose();
   const handlePaneClick = useCallback(() => {
     onCloseGlobal();
   }, [onCloseGlobal]);
@@ -196,17 +193,16 @@ export const Flow = memo(() => {
   // Easiest to just keep track of the last mouse event for this particular feature
   const edgeUpdateMouseEvent = useRef<MouseEvent>();
 
-  const onEdgeUpdateStart: NonNullable<ReactFlowProps['onEdgeUpdateStart']> =
-    useCallback(
-      (e, edge, _handleType) => {
-        // update mouse event
-        edgeUpdateMouseEvent.current = e;
-        // always delete the edge when starting an updated
-        dispatch(edgeDeleted(edge.id));
-        dispatch(edgeChangeStarted());
-      },
-      [dispatch]
-    );
+  const onEdgeUpdateStart: NonNullable<ReactFlowProps['onEdgeUpdateStart']> = useCallback(
+    (e, edge, _handleType) => {
+      // update mouse event
+      edgeUpdateMouseEvent.current = e;
+      // always delete the edge when starting an updated
+      dispatch(edgeDeleted(edge.id));
+      dispatch(edgeChangeStarted());
+    },
+    [dispatch]
+  );
 
   const onEdgeUpdate: OnEdgeUpdateFunc = useCallback(
     (_oldEdge, newConnection) => {
@@ -217,24 +213,23 @@ export const Flow = memo(() => {
     [dispatch]
   );
 
-  const onEdgeUpdateEnd: NonNullable<ReactFlowProps['onEdgeUpdateEnd']> =
-    useCallback(
-      (e, edge, _handleType) => {
-        // Handle the case where user begins a drag but didn't move the cursor -
-        // bc we deleted the edge, we need to add it back
-        if (
-          // ignore touch events
-          !('touches' in e) &&
-          edgeUpdateMouseEvent.current?.clientX === e.clientX &&
-          edgeUpdateMouseEvent.current?.clientY === e.clientY
-        ) {
-          dispatch(edgeAdded(edge));
-        }
-        // reset mouse event
-        edgeUpdateMouseEvent.current = undefined;
-      },
-      [dispatch]
-    );
+  const onEdgeUpdateEnd: NonNullable<ReactFlowProps['onEdgeUpdateEnd']> = useCallback(
+    (e, edge, _handleType) => {
+      // Handle the case where user begins a drag but didn't move the cursor -
+      // bc we deleted the edge, we need to add it back
+      if (
+        // ignore touch events
+        !('touches' in e) &&
+        edgeUpdateMouseEvent.current?.clientX === e.clientX &&
+        edgeUpdateMouseEvent.current?.clientY === e.clientY
+      ) {
+        dispatch(edgeAdded(edge));
+      }
+      // reset mouse event
+      edgeUpdateMouseEvent.current = undefined;
+    },
+    [dispatch]
+  );
 
   // #endregion
 

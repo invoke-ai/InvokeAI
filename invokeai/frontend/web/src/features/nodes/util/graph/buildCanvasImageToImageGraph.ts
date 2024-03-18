@@ -1,14 +1,16 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
-import type {
-  ImageDTO,
-  ImageToLatentsInvocation,
-  NonNullableGraph,
+import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
+import {
+  type ImageDTO,
+  type ImageToLatentsInvocation,
+  isNonRefinerMainModelConfig,
+  type NonNullableGraph,
 } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
-import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
@@ -29,15 +31,15 @@ import {
   POSITIVE_CONDITIONING,
   SEAMLESS,
 } from './constants';
-import { addCoreMetadataNode } from './metadata';
+import { addCoreMetadataNode, getModelMetadataField } from './metadata';
 
 /**
  * Builds the Canvas tab's Image to Image graph.
  */
-export const buildCanvasImageToImageGraph = (
+export const buildCanvasImageToImageGraph = async (
   state: RootState,
   initialImage: ImageDTO
-): NonNullableGraph => {
+): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
     positivePrompt,
@@ -63,9 +65,7 @@ export const buildCanvasImageToImageGraph = (
 
   const fp32 = vaePrecision === 'fp32';
   const is_intermediate = true;
-  const isUsingScaledDimensions = ['auto', 'manual'].includes(
-    boundingBoxScaleMethod
-  );
+  const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);
 
   if (!model) {
     log.error('No model found in state');
@@ -119,12 +119,8 @@ export const buildCanvasImageToImageGraph = (
         is_intermediate,
         use_cpu,
         seed,
-        width: !isUsingScaledDimensions
-          ? width
-          : scaledBoundingBoxDimensions.width,
-        height: !isUsingScaledDimensions
-          ? height
-          : scaledBoundingBoxDimensions.height,
+        width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
+        height: !isUsingScaledDimensions ? height : scaledBoundingBoxDimensions.height,
       },
       [IMAGE_TO_LATENTS]: {
         type: 'i2l',
@@ -136,6 +132,7 @@ export const buildCanvasImageToImageGraph = (
         id: DENOISE_LATENTS,
         is_intermediate,
         cfg_scale,
+        cfg_rescale_multiplier,
         scheduler,
         steps,
         denoising_start: 1 - strength,
@@ -144,7 +141,8 @@ export const buildCanvasImageToImageGraph = (
       [CANVAS_OUTPUT]: {
         type: 'l2i',
         id: CANVAS_OUTPUT,
-        is_intermediate,
+        is_intermediate: getIsIntermediate(state),
+        board: getBoardField(state),
         use_cache: false,
       },
     },
@@ -254,7 +252,8 @@ export const buildCanvasImageToImageGraph = (
     graph.nodes[CANVAS_OUTPUT] = {
       id: CANVAS_OUTPUT,
       type: 'img_resize',
-      is_intermediate,
+      is_intermediate: getIsIntermediate(state),
+      board: getBoardField(state),
       width: width,
       height: height,
       use_cache: false,
@@ -296,13 +295,13 @@ export const buildCanvasImageToImageGraph = (
     graph.nodes[CANVAS_OUTPUT] = {
       type: 'l2i',
       id: CANVAS_OUTPUT,
-      is_intermediate,
+      is_intermediate: getIsIntermediate(state),
+      board: getBoardField(state),
       fp32,
       use_cache: false,
     };
 
-    (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image =
-      initialImage;
+    (graph.nodes[IMAGE_TO_LATENTS] as ImageToLatentsInvocation).image = initialImage;
 
     graph.edges.push({
       source: {
@@ -316,21 +315,19 @@ export const buildCanvasImageToImageGraph = (
     });
   }
 
+  const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
+
   addCoreMetadataNode(
     graph,
     {
       generation_mode: 'img2img',
       cfg_scale,
       cfg_rescale_multiplier,
-      width: !isUsingScaledDimensions
-        ? width
-        : scaledBoundingBoxDimensions.width,
-      height: !isUsingScaledDimensions
-        ? height
-        : scaledBoundingBoxDimensions.height,
+      width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
+      height: !isUsingScaledDimensions ? height : scaledBoundingBoxDimensions.height,
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
-      model,
+      model: getModelMetadataField(modelConfig),
       seed,
       steps,
       rand_device: use_cpu ? 'cpu' : 'cuda',
@@ -349,17 +346,17 @@ export const buildCanvasImageToImageGraph = (
   }
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, DENOISE_LATENTS);
+  await addLoRAsToGraph(state, graph, DENOISE_LATENTS);
 
   // optionally add custom VAE
-  addVAEToGraph(state, graph, modelLoaderNodeId);
+  await addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
+  await addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // Add IP Adapter
-  addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
-  addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
+  await addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
+  await addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
@@ -371,8 +368,6 @@ export const buildCanvasImageToImageGraph = (
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
-
-  addLinearUIOutputNode(state, graph);
 
   return graph;
 };

@@ -1,24 +1,21 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
 import { setInfillTileSize } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector([stateSelector], ({ generation }) => {
-  const { infillTileSize, infillMethod } = generation;
-
-  return {
-    infillTileSize,
-    infillMethod,
-  };
-});
-
 const ParamInfillTileSize = () => {
   const dispatch = useAppDispatch();
-  const { infillTileSize, infillMethod } = useAppSelector(selector);
+  const infillTileSize = useAppSelector((s) => s.generation.infillTileSize);
+  const initial = useAppSelector((s) => s.config.sd.infillTileSize.initial);
+  const sliderMin = useAppSelector((s) => s.config.sd.infillTileSize.sliderMin);
+  const sliderMax = useAppSelector((s) => s.config.sd.infillTileSize.sliderMax);
+  const numberInputMin = useAppSelector((s) => s.config.sd.infillTileSize.numberInputMin);
+  const numberInputMax = useAppSelector((s) => s.config.sd.infillTileSize.numberInputMax);
+  const coarseStep = useAppSelector((s) => s.config.sd.infillTileSize.coarseStep);
+  const fineStep = useAppSelector((s) => s.config.sd.infillTileSize.fineStep);
+
+  const infillMethod = useAppSelector((s) => s.generation.infillMethod);
 
   const { t } = useTranslation();
 
@@ -29,26 +26,29 @@ const ParamInfillTileSize = () => {
     [dispatch]
   );
 
-  const handleReset = useCallback(() => {
-    dispatch(setInfillTileSize(32));
-  }, [dispatch]);
-
   return (
-    <InvControl
-      isDisabled={infillMethod !== 'tile'}
-      label={t('parameters.tileSize')}
-    >
-      <InvSlider
-        min={16}
-        max={64}
-        numberInputMax={256}
+    <FormControl isDisabled={infillMethod !== 'tile'}>
+      <FormLabel>{t('parameters.tileSize')}</FormLabel>
+      <CompositeSlider
+        min={sliderMin}
+        max={sliderMax}
         value={infillTileSize}
+        defaultValue={initial}
         onChange={handleChange}
-        withNumberInput
+        step={coarseStep}
+        fineStep={fineStep}
         marks
-        onReset={handleReset}
       />
-    </InvControl>
+      <CompositeNumberInput
+        min={numberInputMin}
+        max={numberInputMax}
+        value={infillTileSize}
+        defaultValue={initial}
+        onChange={handleChange}
+        step={coarseStep}
+        fineStep={fineStep}
+      />
+    </FormControl>
   );
 };
 

@@ -1,27 +1,46 @@
+import { IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
-import { memo, useCallback } from 'react';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { getIsSizeTooLarge, getIsSizeTooSmall } from 'features/parameters/util/optimalDimension';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IoSparkles } from 'react-icons/io5';
+import { RiSparklingFill } from 'react-icons/ri';
 
 export const SetOptimalSizeButton = memo(() => {
   const { t } = useTranslation();
   const ctx = useImageSizeContext();
-  const optimalDimension = useAppSelector((state) =>
-    state.generation.model?.base_model === 'sdxl' ? 1024 : 512
+  const optimalDimension = useAppSelector(selectOptimalDimension);
+  const isSizeTooSmall = useMemo(
+    () => getIsSizeTooSmall(ctx.width, ctx.height, optimalDimension),
+    [ctx.height, ctx.width, optimalDimension]
+  );
+  const isSizeTooLarge = useMemo(
+    () => getIsSizeTooLarge(ctx.width, ctx.height, optimalDimension),
+    [ctx.height, ctx.width, optimalDimension]
   );
   const onClick = useCallback(() => {
-    ctx.sizeReset(optimalDimension, optimalDimension);
-  }, [ctx, optimalDimension]);
+    ctx.setOptimalSize();
+  }, [ctx]);
+  const tooltip = useMemo(() => {
+    if (isSizeTooSmall) {
+      return t('parameters.setToOptimalSizeTooSmall');
+    }
+    if (isSizeTooLarge) {
+      return t('parameters.setToOptimalSizeTooLarge');
+    }
+    return t('parameters.setToOptimalSize');
+  }, [isSizeTooLarge, isSizeTooSmall, t]);
 
   return (
-    <InvIconButton
-      aria-label={t('parameters.lockAspectRatio')}
+    <IconButton
+      tooltip={tooltip}
+      aria-label={t('parameters.setToOptimalSize')}
       onClick={onClick}
       variant="ghost"
       size="sm"
-      icon={<IoSparkles />}
+      icon={<RiSparklingFill />}
+      colorScheme={isSizeTooSmall || isSizeTooLarge ? 'warning' : 'base'}
     />
   );
 });

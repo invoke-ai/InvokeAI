@@ -1,14 +1,15 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodeData } from 'features/nodes/store/selectors';
+import type { InvocationNodeData } from 'features/nodes/types/invocation';
 import { useMemo } from 'react';
 
-export const useNodeData = (nodeId: string) => {
+export const useNodeData = (nodeId: string): InvocationNodeData | null => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ nodes }) => {
-        const node = nodes.nodes.find((node) => node.id === nodeId);
-        return node?.data;
+      createMemoizedSelector(selectNodesSlice, (nodes) => {
+        return selectNodeData(nodes, nodeId);
       }),
     [nodeId]
   );

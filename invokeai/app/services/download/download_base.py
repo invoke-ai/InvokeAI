@@ -34,6 +34,7 @@ class ServiceInactiveException(Exception):
 
 
 DownloadEventHandler = Callable[["DownloadJob"], None]
+DownloadExceptionHandler = Callable[["DownloadJob", Optional[Exception]], None]
 
 
 @total_ordering
@@ -55,6 +56,7 @@ class DownloadJob(BaseModel):
     job_ended: Optional[str] = Field(
         default=None, description="Timestamp for when the download job ende1d (completed or errored)"
     )
+    content_type: Optional[str] = Field(default=None, description="Content type of downloaded file")
     bytes: int = Field(default=0, description="Bytes downloaded so far")
     total_bytes: int = Field(default=0, description="Total file size (bytes)")
 
@@ -70,7 +72,11 @@ class DownloadJob(BaseModel):
     _on_progress: Optional[DownloadEventHandler] = PrivateAttr(default=None)
     _on_complete: Optional[DownloadEventHandler] = PrivateAttr(default=None)
     _on_cancelled: Optional[DownloadEventHandler] = PrivateAttr(default=None)
-    _on_error: Optional[DownloadEventHandler] = PrivateAttr(default=None)
+    _on_error: Optional[DownloadExceptionHandler] = PrivateAttr(default=None)
+
+    def __hash__(self) -> int:
+        """Return hash of the string representation of this object, for indexing."""
+        return hash(str(self))
 
     def __le__(self, other: "DownloadJob") -> bool:
         """Return True if this job's priority is less than another's."""
@@ -88,6 +94,26 @@ class DownloadJob(BaseModel):
         return self._cancelled
 
     @property
+    def complete(self) -> bool:
+        """Return true if job completed without errors."""
+        return self.status == DownloadJobStatus.COMPLETED
+
+    @property
+    def running(self) -> bool:
+        """Return true if the job is running."""
+        return self.status == DownloadJobStatus.RUNNING
+
+    @property
+    def errored(self) -> bool:
+        """Return true if the job is errored."""
+        return self.status == DownloadJobStatus.ERROR
+
+    @property
+    def in_terminal_state(self) -> bool:
+        """Return true if job has finished, one way or another."""
+        return self.status not in [DownloadJobStatus.WAITING, DownloadJobStatus.RUNNING]
+
+    @property
     def on_start(self) -> Optional[DownloadEventHandler]:
         """Return the on_start event handler."""
         return self._on_start
@@ -103,7 +129,7 @@ class DownloadJob(BaseModel):
         return self._on_complete
 
     @property
-    def on_error(self) -> Optional[DownloadEventHandler]:
+    def on_error(self) -> Optional[DownloadExceptionHandler]:
         """Return the on_error event handler."""
         return self._on_error
 
@@ -118,7 +144,7 @@ class DownloadJob(BaseModel):
         on_progress: Optional[DownloadEventHandler] = None,
         on_complete: Optional[DownloadEventHandler] = None,
         on_cancelled: Optional[DownloadEventHandler] = None,
-        on_error: Optional[DownloadEventHandler] = None,
+        on_error: Optional[DownloadExceptionHandler] = None,
     ) -> None:
         """Set the callbacks for download events."""
         self._on_start = on_start
@@ -150,10 +176,10 @@ class DownloadQueueServiceBase(ABC):
         on_progress: Optional[DownloadEventHandler] = None,
         on_complete: Optional[DownloadEventHandler] = None,
         on_cancelled: Optional[DownloadEventHandler] = None,
-        on_error: Optional[DownloadEventHandler] = None,
+        on_error: Optional[DownloadExceptionHandler] = None,
     ) -> DownloadJob:
         """
-        Create a download job.
+        Create and enqueue download job.
 
         :param source: Source of the download as a URL.
         :param dest: Path to download to. See below.
@@ -172,6 +198,25 @@ class DownloadQueueServiceBase(ABC):
         3. If the path exists and is an existing file, then the downloader will try to resume the download from
            the end of the existing file.
 
+        """
+        pass
+
+    @abstractmethod
+    def submit_download_job(
+        self,
+        job: DownloadJob,
+        on_start: Optional[DownloadEventHandler] = None,
+        on_progress: Optional[DownloadEventHandler] = None,
+        on_complete: Optional[DownloadEventHandler] = None,
+        on_cancelled: Optional[DownloadEventHandler] = None,
+        on_error: Optional[DownloadExceptionHandler] = None,
+    ) -> None:
+        """
+        Enqueue a download job.
+
+        :param job: The DownloadJob
+        :param on_start, on_progress, on_complete, on_error: Callbacks for the indicated
+         events.
         """
         pass
 
@@ -197,21 +242,34 @@ class DownloadQueueServiceBase(ABC):
         pass
 
     @abstractmethod
-    def cancel_all_jobs(self):
+    def cancel_all_jobs(self) -> None:
         """Cancel all active and enquedjobs."""
         pass
 
     @abstractmethod
-    def prune_jobs(self):
+    def prune_jobs(self) -> None:
         """Prune completed and errored queue items from the job list."""
         pass
 
     @abstractmethod
-    def cancel_job(self, job: DownloadJob):
+    def cancel_job(self, job: DownloadJob) -> None:
         """Cancel the job, clearing partial downloads and putting it into ERROR state."""
         pass
 
     @abstractmethod
-    def join(self):
+    def join(self) -> None:
         """Wait until all jobs are off the queue."""
+        pass
+
+    @abstractmethod
+    def wait_for_job(self, job: DownloadJob, timeout: int = 0) -> DownloadJob:
+        """Wait until the indicated download job has reached a terminal state.
+
+        This will block until the indicated install job has completed,
+        been cancelled, or errored out.
+
+        :param job: The job to wait on.
+        :param timeout: Wait up to indicated number of seconds. Raise a TimeoutError if
+        the job hasn't completed within the indicated time.
+        """
         pass

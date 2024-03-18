@@ -1,8 +1,8 @@
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { IconButton } from '@invoke-ai/ui-library';
 import { useQueueFront } from 'features/queue/hooks/useQueueFront';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaBoltLightning } from 'react-icons/fa6';
+import { AiFillThunderbolt } from 'react-icons/ai';
 
 import { QueueButtonTooltip } from './QueueButtonTooltip';
 
@@ -10,13 +10,13 @@ const QueueFrontButton = () => {
   const { t } = useTranslation();
   const { queueFront, isLoading, isDisabled } = useQueueFront();
   return (
-    <InvIconButton
+    <IconButton
       aria-label={t('queue.queueFront')}
       isDisabled={isDisabled}
       isLoading={isLoading}
       onClick={queueFront}
       tooltip={<QueueButtonTooltip prepend />}
-      icon={<FaBoltLightning />}
+      icon={<AiFillThunderbolt />}
       size="lg"
     />
   );

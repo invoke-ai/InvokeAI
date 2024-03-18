@@ -1,22 +1,14 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSwitch } from 'common/components/InvSwitch/wrapper';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setSeamlessXAxis } from 'features/parameters/store/generationSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector(stateSelector, ({ generation }) => {
-  const { seamlessXAxis } = generation;
-
-  return { seamlessXAxis };
-});
-
 const ParamSeamlessXAxis = () => {
   const { t } = useTranslation();
-  const { seamlessXAxis } = useAppSelector(selector);
+  const seamlessXAxis = useAppSelector((s) => s.generation.seamlessXAxis);
 
   const dispatch = useAppDispatch();
 
@@ -28,9 +20,12 @@ const ParamSeamlessXAxis = () => {
   );
 
   return (
-    <InvControl label={t('parameters.seamlessXAxis')}>
-      <InvSwitch isChecked={seamlessXAxis} onChange={handleChange} />
-    </InvControl>
+    <FormControl>
+      <InformationalPopover feature="seamlessTilingXAxis">
+        <FormLabel>{t('parameters.seamlessXAxis')}</FormLabel>
+      </InformationalPopover>
+      <Switch isChecked={seamlessXAxis} onChange={handleChange} />
+    </FormControl>
   );
 };
 

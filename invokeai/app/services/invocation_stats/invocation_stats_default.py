@@ -1,5 +1,8 @@
+import json
 import time
-from typing import Dict
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Generator
 
 import psutil
 import torch
@@ -7,161 +10,130 @@ import torch
 import invokeai.backend.util.logging as logger
 from invokeai.app.invocations.baseinvocation import BaseInvocation
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.model_manager.model_manager_base import ModelManagerServiceBase
-from invokeai.backend.model_management.model_cache import CacheStats
+from invokeai.backend.model_manager.load.model_cache import CacheStats
 
 from .invocation_stats_base import InvocationStatsServiceBase
-from .invocation_stats_common import GIG, NodeLog, NodeStats
+from .invocation_stats_common import (
+    GESStatsNotFoundError,
+    GraphExecutionStats,
+    GraphExecutionStatsSummary,
+    InvocationStatsSummary,
+    ModelCacheStatsSummary,
+    NodeExecutionStats,
+    NodeExecutionStatsSummary,
+)
+
+# Size of 1GB in bytes.
+GB = 2**30
 
 
 class InvocationStatsService(InvocationStatsServiceBase):
     """Accumulate performance information about a running graph. Collects time spent in each node,
     as well as the maximum and current VRAM utilisation for CUDA systems"""
 
-    _invoker: Invoker
-
     def __init__(self):
-        # {graph_id => NodeLog}
-        self._stats: Dict[str, NodeLog] = {}
-        self._cache_stats: Dict[str, CacheStats] = {}
-        self.ram_used: float = 0.0
-        self.ram_changed: float = 0.0
+        # Maps graph_execution_state_id to GraphExecutionStats.
+        self._stats: dict[str, GraphExecutionStats] = {}
+        # Maps graph_execution_state_id to model manager CacheStats.
+        self._cache_stats: dict[str, CacheStats] = {}
 
     def start(self, invoker: Invoker) -> None:
         self._invoker = invoker
 
-    class StatsContext:
-        """Context manager for collecting statistics."""
-
-        invocation: BaseInvocation
-        collector: "InvocationStatsServiceBase"
-        graph_id: str
-        start_time: float
-        ram_used: int
-        model_manager: ModelManagerServiceBase
-
-        def __init__(
-            self,
-            invocation: BaseInvocation,
-            graph_id: str,
-            model_manager: ModelManagerServiceBase,
-            collector: "InvocationStatsServiceBase",
-        ):
-            """Initialize statistics for this run."""
-            self.invocation = invocation
-            self.collector = collector
-            self.graph_id = graph_id
-            self.start_time = 0.0
-            self.ram_used = 0
-            self.model_manager = model_manager
-
-        def __enter__(self):
-            self.start_time = time.time()
-            if torch.cuda.is_available():
-                torch.cuda.reset_peak_memory_stats()
-            self.ram_used = psutil.Process().memory_info().rss
-            if self.model_manager:
-                self.model_manager.collect_cache_stats(self.collector._cache_stats[self.graph_id])
-
-        def __exit__(self, *args):
-            """Called on exit from the context."""
-            ram_used = psutil.Process().memory_info().rss
-            self.collector.update_mem_stats(
-                ram_used=ram_used / GIG,
-                ram_changed=(ram_used - self.ram_used) / GIG,
-            )
-            self.collector.update_invocation_stats(
-                graph_id=self.graph_id,
-                invocation_type=self.invocation.type,  # type: ignore # `type` is not on the `BaseInvocation` model, but *is* on all invocations
-                time_used=time.time() - self.start_time,
-                vram_used=torch.cuda.max_memory_allocated() / GIG if torch.cuda.is_available() else 0.0,
-            )
-
-    def collect_stats(
-        self,
-        invocation: BaseInvocation,
-        graph_execution_state_id: str,
-    ) -> StatsContext:
-        if not self._stats.get(graph_execution_state_id):  # first time we're seeing this
-            self._stats[graph_execution_state_id] = NodeLog()
+    @contextmanager
+    def collect_stats(self, invocation: BaseInvocation, graph_execution_state_id: str) -> Generator[None, None, None]:
+        # This is to handle case of the model manager not being initialized, which happens
+        # during some tests.
+        services = self._invoker.services
+        if not self._stats.get(graph_execution_state_id):
+            # First time we're seeing this graph_execution_state_id.
+            self._stats[graph_execution_state_id] = GraphExecutionStats()
             self._cache_stats[graph_execution_state_id] = CacheStats()
-        return self.StatsContext(invocation, graph_execution_state_id, self._invoker.services.model_manager, self)
 
-    def reset_all_stats(self):
-        """Zero all statistics"""
-        self._stats = {}
+        # Record state before the invocation.
+        start_time = time.time()
+        start_ram = psutil.Process().memory_info().rss
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats()
 
-    def reset_stats(self, graph_execution_id: str):
+        assert services.model_manager.load is not None
+        services.model_manager.load.ram_cache.stats = self._cache_stats[graph_execution_state_id]
+
         try:
-            self._stats.pop(graph_execution_id)
-        except KeyError:
-            logger.warning(f"Attempted to clear statistics for unknown graph {graph_execution_id}")
+            # Let the invocation run.
+            yield None
+        finally:
+            # Record state after the invocation.
+            node_stats = NodeExecutionStats(
+                invocation_type=invocation.get_type(),
+                start_time=start_time,
+                end_time=time.time(),
+                start_ram_gb=start_ram / GB,
+                end_ram_gb=psutil.Process().memory_info().rss / GB,
+                peak_vram_gb=torch.cuda.max_memory_allocated() / GB if torch.cuda.is_available() else 0.0,
+            )
+            self._stats[graph_execution_state_id].add_node_execution_stats(node_stats)
 
-    def update_mem_stats(
-        self,
-        ram_used: float,
-        ram_changed: float,
-    ):
-        self.ram_used = ram_used
-        self.ram_changed = ram_changed
+    def reset_stats(self):
+        self._stats = {}
+        self._cache_stats = {}
 
-    def update_invocation_stats(
-        self,
-        graph_id: str,
-        invocation_type: str,
-        time_used: float,
-        vram_used: float,
-    ):
-        if not self._stats[graph_id].nodes.get(invocation_type):
-            self._stats[graph_id].nodes[invocation_type] = NodeStats()
-        stats = self._stats[graph_id].nodes[invocation_type]
-        stats.calls += 1
-        stats.time_used += time_used
-        stats.max_vram = max(stats.max_vram, vram_used)
+    def get_stats(self, graph_execution_state_id: str) -> InvocationStatsSummary:
+        graph_stats_summary = self._get_graph_summary(graph_execution_state_id)
+        node_stats_summaries = self._get_node_summaries(graph_execution_state_id)
+        model_cache_stats_summary = self._get_model_cache_summary(graph_execution_state_id)
+        vram_usage_gb = torch.cuda.memory_allocated() / GB if torch.cuda.is_available() else None
 
-    def log_stats(self):
-        completed = set()
-        errored = set()
-        for graph_id, _node_log in self._stats.items():
-            try:
-                current_graph_state = self._invoker.services.graph_execution_manager.get(graph_id)
-            except Exception:
-                errored.add(graph_id)
-                continue
+        return InvocationStatsSummary(
+            graph_stats=graph_stats_summary,
+            model_cache_stats=model_cache_stats_summary,
+            node_stats=node_stats_summaries,
+            vram_usage_gb=vram_usage_gb,
+        )
 
-            if not current_graph_state.is_complete():
-                continue
+    def log_stats(self, graph_execution_state_id: str) -> None:
+        stats = self.get_stats(graph_execution_state_id)
+        logger.info(str(stats))
 
-            total_time = 0
-            logger.info(f"Graph stats: {graph_id}")
-            logger.info(f"{'Node':>30} {'Calls':>7}{'Seconds':>9} {'VRAM Used':>10}")
-            for node_type, stats in self._stats[graph_id].nodes.items():
-                logger.info(f"{node_type:>30}  {stats.calls:>4}   {stats.time_used:7.3f}s     {stats.max_vram:4.3f}G")
-                total_time += stats.time_used
+    def dump_stats(self, graph_execution_state_id: str, output_path: Path) -> None:
+        stats = self.get_stats(graph_execution_state_id)
+        with open(output_path, "w") as f:
+            f.write(json.dumps(stats.as_dict(), indent=2))
 
-            cache_stats = self._cache_stats[graph_id]
-            hwm = cache_stats.high_watermark / GIG
-            tot = cache_stats.cache_size / GIG
-            loaded = sum(list(cache_stats.loaded_model_sizes.values())) / GIG
+    def _get_model_cache_summary(self, graph_execution_state_id: str) -> ModelCacheStatsSummary:
+        try:
+            cache_stats = self._cache_stats[graph_execution_state_id]
+        except KeyError as e:
+            raise GESStatsNotFoundError(
+                f"Attempted to get model cache statistics for unknown graph {graph_execution_state_id}: {e}."
+            ) from e
 
-            logger.info(f"TOTAL GRAPH EXECUTION TIME:  {total_time:7.3f}s")
-            logger.info("RAM used by InvokeAI process: " + "%4.2fG" % self.ram_used + f" ({self.ram_changed:+5.3f}G)")
-            logger.info(f"RAM used to load models: {loaded:4.2f}G")
-            if torch.cuda.is_available():
-                logger.info("VRAM in use: " + "%4.3fG" % (torch.cuda.memory_allocated() / GIG))
-            logger.info("RAM cache statistics:")
-            logger.info(f"   Model cache hits: {cache_stats.hits}")
-            logger.info(f"   Model cache misses: {cache_stats.misses}")
-            logger.info(f"   Models cached: {cache_stats.in_cache}")
-            logger.info(f"   Models cleared from cache: {cache_stats.cleared}")
-            logger.info(f"   Cache high water mark: {hwm:4.2f}/{tot:4.2f}G")
+        return ModelCacheStatsSummary(
+            cache_hits=cache_stats.hits,
+            cache_misses=cache_stats.misses,
+            high_water_mark_gb=cache_stats.high_watermark / GB,
+            cache_size_gb=cache_stats.cache_size / GB,
+            total_usage_gb=sum(list(cache_stats.loaded_model_sizes.values())) / GB,
+            models_cached=cache_stats.in_cache,
+            models_cleared=cache_stats.cleared,
+        )
 
-            completed.add(graph_id)
+    def _get_graph_summary(self, graph_execution_state_id: str) -> GraphExecutionStatsSummary:
+        try:
+            graph_stats = self._stats[graph_execution_state_id]
+        except KeyError as e:
+            raise GESStatsNotFoundError(
+                f"Attempted to get graph statistics for unknown graph {graph_execution_state_id}: {e}."
+            ) from e
 
-        for graph_id in completed:
-            del self._stats[graph_id]
-            del self._cache_stats[graph_id]
+        return graph_stats.get_graph_stats_summary(graph_execution_state_id)
 
-        for graph_id in errored:
-            del self._stats[graph_id]
-            del self._cache_stats[graph_id]
+    def _get_node_summaries(self, graph_execution_state_id: str) -> list[NodeExecutionStatsSummary]:
+        try:
+            graph_stats = self._stats[graph_execution_state_id]
+        except KeyError as e:
+            raise GESStatsNotFoundError(
+                f"Attempted to get node statistics for unknown graph {graph_execution_state_id}: {e}."
+            ) from e
+
+        return graph_stats.get_node_stats_summaries()

@@ -1,8 +1,7 @@
-import type { SystemStyleObject } from '@chakra-ui/styled-system';
+import type { ComboboxOption, SystemStyleObject } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import type { SingleValue } from 'chakra-react-select';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type { InvSelectOption } from 'common/components/InvSelect/types';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { ASPECT_RATIO_OPTIONS } from 'features/parameters/components/ImageSize/constants';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { isAspectRatioID } from 'features/parameters/components/ImageSize/types';
@@ -14,7 +13,7 @@ export const AspectRatioSelect = memo(() => {
   const ctx = useImageSizeContext();
 
   const onChange = useCallback(
-    (v: SingleValue<InvSelectOption>) => {
+    (v: SingleValue<ComboboxOption>) => {
       if (!v || !isAspectRatioID(v.value)) {
         return;
       }
@@ -24,22 +23,17 @@ export const AspectRatioSelect = memo(() => {
   );
 
   const value = useMemo(
-    () =>
-      ASPECT_RATIO_OPTIONS.filter(
-        (o) => o.value === ctx.aspectRatioState.id
-      )[0],
+    () => ASPECT_RATIO_OPTIONS.filter((o) => o.value === ctx.aspectRatioState.id)[0],
     [ctx.aspectRatioState.id]
   );
 
   return (
-    <InvControl label={t('parameters.aspect')}>
-      <InvSelect
-        value={value}
-        onChange={onChange}
-        options={ASPECT_RATIO_OPTIONS}
-        sx={selectStyles}
-      />
-    </InvControl>
+    <FormControl>
+      <InformationalPopover feature="paramAspect">
+        <FormLabel>{t('parameters.aspect')}</FormLabel>
+      </InformationalPopover>
+      <Combobox value={value} onChange={onChange} options={ASPECT_RATIO_OPTIONS} sx={selectStyles} />
+    </FormControl>
   );
 });
 

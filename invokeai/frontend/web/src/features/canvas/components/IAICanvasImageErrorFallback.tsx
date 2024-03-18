@@ -1,4 +1,4 @@
-import { useToken } from '@chakra-ui/react';
+import { useToken } from '@invoke-ai/ui-library';
 import type { CanvasImage } from 'features/canvas/store/canvasTypes';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,9 +7,7 @@ import { Group, Rect, Text } from 'react-konva';
 type IAICanvasImageErrorFallbackProps = {
   canvasImage: CanvasImage;
 };
-const IAICanvasImageErrorFallback = ({
-  canvasImage,
-}: IAICanvasImageErrorFallbackProps) => {
+const IAICanvasImageErrorFallback = ({ canvasImage }: IAICanvasImageErrorFallbackProps) => {
   const [rectFill, textFill] = useToken('colors', ['base.500', 'base.900']);
   const { t } = useTranslation();
   return (

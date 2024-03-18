@@ -18,7 +18,7 @@ title: Home
       width: 100%;
       max-width: 100%;
       height: 50px;
-      background-color: #448AFF;
+      background-color: #35A4DB;
       color: #fff;
       font-size: 16px;
       border: none;
@@ -43,7 +43,7 @@ title: Home
 <div align="center" markdown>
 
 
-[![project logo](assets/invoke_ai_banner.png)](https://github.com/invoke-ai/InvokeAI)
+[![project logo](https://github.com/invoke-ai/InvokeAI/assets/31807370/6e3728c7-e90e-4711-905c-3b55844ff5be)](https://github.com/invoke-ai/InvokeAI)
 
 [![discord badge]][discord link]
 
@@ -117,6 +117,11 @@ Mac and Linux machines, and runs on GPU cards with as little as 4 GB of RAM.
 
 ## :octicons-gift-24: InvokeAI Features
 
+### Installation
+  - [Automated Installer](installation/010_INSTALL_AUTOMATED.md)
+  - [Manual Installation](installation/020_INSTALL_MANUAL.md)
+  - [Docker Installation](installation/040_INSTALL_DOCKER.md)
+
 ### The InvokeAI Web Interface
 - [WebUI overview](features/WEB.md)
 - [WebUI hotkey reference guide](features/WEBUIHOTKEYS.md)
@@ -144,60 +149,6 @@ Mac and Linux machines, and runs on GPU cards with as little as 4 GB of RAM.
 ### InvokeAI Configuration
 - [Guide to InvokeAI Runtime Settings](features/CONFIGURATION.md)
 - [Database Maintenance and other Command Line Utilities](features/UTILITIES.md)
-
-## :octicons-log-16: Important Changes Since Version 2.3
-
-### Nodes
-
-Behind the scenes, InvokeAI has been completely rewritten to support
-"nodes," small unitary operations that can be combined into graphs to
-form arbitrary workflows. For example, there is a prompt node that
-processes the prompt string and feeds it to a text2latent node that
-generates a latent image. The latents are then fed to a latent2image
-node that translates the latent image into a PNG.
-
-The WebGUI has a node editor that allows you to graphically design and
-execute custom node graphs. The ability to save and load graphs is
-still a work in progress, but coming soon.
-
-### Command-Line Interface Retired
-
-All "invokeai" command-line interfaces have been retired as of version
-3.4.
-
-To launch the Web GUI from the command-line, use the command
-`invokeai-web` rather than the traditional `invokeai --web`.
-
-### ControlNet
-
-This version of InvokeAI features ControlNet, a system that allows you
-to achieve exact poses for human and animal figures by providing a
-model to follow. Full details are found in [ControlNet](features/CONTROLNET.md)
-
-### New Schedulers
-
-The list of schedulers has been completely revamped and brought up to date:
-
-| **Short Name** | **Scheduler**                   | **Notes**                   |
-|----------------|---------------------------------|-----------------------------|
-| **ddim**       | DDIMScheduler                   |                             |
-| **ddpm**       | DDPMScheduler                   |                             |
-| **deis**       | DEISMultistepScheduler          |                             |
-| **lms**        | LMSDiscreteScheduler            |                             |
-| **pndm**       | PNDMScheduler                   |                             |
-| **heun**       | HeunDiscreteScheduler           | original noise schedule     |
-| **heun_k**     | HeunDiscreteScheduler           | using karras noise schedule |
-| **euler**      | EulerDiscreteScheduler          | original noise schedule     |
-| **euler_k**    | EulerDiscreteScheduler          | using karras noise schedule |
-| **kdpm_2**     | KDPM2DiscreteScheduler          |                             |
-| **kdpm_2_a**   | KDPM2AncestralDiscreteScheduler |                             |
-| **dpmpp_2s**   | DPMSolverSinglestepScheduler    |                             |
-| **dpmpp_2m**   | DPMSolverMultistepScheduler     | original noise scnedule     |
-| **dpmpp_2m_k** | DPMSolverMultistepScheduler     | using karras noise schedule |
-| **unipc**      | UniPCMultistepScheduler         | CPU only                    |
-| **lcm**        | LCMScheduler                    |                             |
-
-Please see [3.0.0 Release Notes](https://github.com/invoke-ai/InvokeAI/releases/tag/v3.0.0) for further details.
 
 ## :material-target: Troubleshooting
 

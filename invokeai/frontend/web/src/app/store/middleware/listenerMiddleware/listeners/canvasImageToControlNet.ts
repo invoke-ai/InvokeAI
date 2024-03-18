@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { canvasImageToControlAdapter } from 'features/canvas/store/actions';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { controlAdapterImageChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
@@ -6,9 +7,7 @@ import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 
-import { startAppListening } from '..';
-
-export const addCanvasImageToControlNetListener = () => {
+export const addCanvasImageToControlNetListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: canvasImageToControlAdapter,
     effect: async (action, { dispatch, getState }) => {
@@ -39,7 +38,7 @@ export const addCanvasImageToControlNetListener = () => {
             type: 'image/png',
           }),
           image_category: 'control',
-          is_intermediate: false,
+          is_intermediate: true,
           board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
           crop_visible: false,
           postUploadAction: {

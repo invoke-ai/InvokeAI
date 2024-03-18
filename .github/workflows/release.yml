@@ -1,0 +1,108 @@
+# Main release workflow. Triggered on tag push or manual trigger.
+#
+# - Runs all code checks and tests
+# - Verifies the app version matches the tag version.
+# - Builds the installer and build, uploading them as artifacts.
+# - Publishes to TestPyPI and PyPI. Both are conditional on the previous steps passing and require a manual approval.
+#
+# See docs/RELEASE.md for more information on the release process.
+
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: check python version
+        uses: samuelcolvin/check-python-version@v4
+        id: check-python-version
+        with:
+          version_file_path: invokeai/version/invokeai_version.py
+
+  frontend-checks:
+    uses: ./.github/workflows/frontend-checks.yml
+    with:
+      always_run: true
+
+  frontend-tests:
+    uses: ./.github/workflows/frontend-tests.yml
+    with:
+      always_run: true
+
+  python-checks:
+    uses: ./.github/workflows/python-checks.yml
+    with:
+      always_run: true
+
+  python-tests:
+    uses: ./.github/workflows/python-tests.yml
+    with:
+      always_run: true
+
+  build:
+    uses: ./.github/workflows/build-installer.yml
+
+  publish-testpypi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5 # expected run time: <1 min
+    needs:
+      [
+        check-version,
+        frontend-checks,
+        frontend-tests,
+        python-checks,
+        python-tests,
+        build,
+      ]
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/invokeai
+    permissions:
+      id-token: write
+    steps:
+      - name: download distribution from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: publish distribution to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5 # expected run time: <1 min
+    needs:
+      [
+        check-version,
+        frontend-checks,
+        frontend-tests,
+        python-checks,
+        python-tests,
+        build,
+      ]
+    environment:
+      name: pypi
+      url: https://pypi.org/p/invokeai
+    permissions:
+      id-token: write
+    steps:
+      - name: download distribution from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: publish distribution to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

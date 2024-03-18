@@ -1,21 +1,15 @@
-import { Flex } from '@chakra-ui/react';
+import { Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import {
-  canvasImageToControlAdapter,
-  canvasMaskToControlAdapter,
-} from 'features/canvas/store/actions';
+import { canvasImageToControlAdapter, canvasMaskToControlAdapter } from 'features/canvas/store/actions';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaImage, FaMask } from 'react-icons/fa';
+import { PiExcludeBold, PiImageSquareBold } from 'react-icons/pi';
 
 type ControlNetCanvasImageImportsProps = {
   id: string;
 };
 
-const ControlNetCanvasImageImports = (
-  props: ControlNetCanvasImageImportsProps
-) => {
+const ControlNetCanvasImageImports = (props: ControlNetCanvasImageImportsProps) => {
   const { id } = props;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -29,17 +23,17 @@ const ControlNetCanvasImageImports = (
   }, [id, dispatch]);
 
   return (
-    <Flex gap={2}>
-      <InvIconButton
+    <Flex gap={4}>
+      <IconButton
         size="sm"
-        icon={<FaImage />}
+        icon={<PiImageSquareBold />}
         tooltip={t('controlnet.importImageFromCanvas')}
         aria-label={t('controlnet.importImageFromCanvas')}
         onClick={handleImportImageFromCanvas}
       />
-      <InvIconButton
+      <IconButton
         size="sm"
-        icon={<FaMask />}
+        icon={<PiExcludeBold />}
         tooltip={t('controlnet.importMaskFromCanvas')}
         aria-label={t('controlnet.importMaskFromCanvas')}
         onClick={handleImportMaskFromCanvas}

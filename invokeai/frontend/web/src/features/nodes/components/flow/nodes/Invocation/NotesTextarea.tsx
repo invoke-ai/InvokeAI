@@ -1,6 +1,5 @@
+import { FormControl, FormLabel, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvTextarea } from 'common/components/InvTextarea/InvTextarea';
 import { useNodeData } from 'features/nodes/hooks/useNodeData';
 import { nodeNotesChanged } from 'features/nodes/store/nodesSlice';
 import { isInvocationNodeData } from 'features/nodes/types/invocation';
@@ -22,14 +21,10 @@ const NotesTextarea = ({ nodeId }: { nodeId: string }) => {
     return null;
   }
   return (
-    <InvControl label={t('nodes.notes')} orientation="vertical" h="full">
-      <InvTextarea
-        value={data?.notes}
-        onChange={handleNotesChanged}
-        rows={10}
-        resize="none"
-      />
-    </InvControl>
+    <FormControl orientation="vertical" h="full">
+      <FormLabel>{t('nodes.notes')}</FormLabel>
+      <Textarea value={data?.notes} onChange={handleNotesChanged} rows={10} resize="none" />
+    </FormControl>
   );
 };
 

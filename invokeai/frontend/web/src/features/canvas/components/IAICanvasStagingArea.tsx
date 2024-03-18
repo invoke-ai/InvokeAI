@@ -1,6 +1,6 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import type { GroupConfig } from 'konva/lib/Group';
 import { memo } from 'react';
 import { Group, Rect } from 'react-konva';
@@ -9,7 +9,7 @@ import IAICanvasImage from './IAICanvasImage';
 
 const dash = [4, 4];
 
-const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
+const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
   const {
     layerState,
     shouldShowStagingImage,
@@ -22,9 +22,7 @@ const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
 
   return {
     currentStagingAreaImage:
-      images.length > 0 && selectedImageIndex !== undefined
-        ? images[selectedImageIndex]
-        : undefined,
+      images.length > 0 && selectedImageIndex !== undefined ? images[selectedImageIndex] : undefined,
     isOnFirstImage: selectedImageIndex === 0,
     isOnLastImage: selectedImageIndex === images.length - 1,
     shouldShowStagingImage,
@@ -39,21 +37,12 @@ const selector = createMemoizedSelector([stateSelector], ({ canvas }) => {
 type Props = GroupConfig;
 
 const IAICanvasStagingArea = (props: Props) => {
-  const {
-    currentStagingAreaImage,
-    shouldShowStagingImage,
-    shouldShowStagingOutline,
-    x,
-    y,
-    width,
-    height,
-  } = useAppSelector(selector);
+  const { currentStagingAreaImage, shouldShowStagingImage, shouldShowStagingOutline, x, y, width, height } =
+    useAppSelector(selector);
 
   return (
     <Group {...props}>
-      {shouldShowStagingImage && currentStagingAreaImage && (
-        <IAICanvasImage canvasImage={currentStagingAreaImage} />
-      )}
+      {shouldShowStagingImage && currentStagingAreaImage && <IAICanvasImage canvasImage={currentStagingAreaImage} />}
       {shouldShowStagingOutline && (
         <Group listening={false}>
           <Rect

@@ -273,11 +273,6 @@ const FIELD_TYPE_V1_TO_STATELESS_FIELD_TYPE_V2: {
     isCollection: false,
     isCollectionOrScalar: true,
   },
-  ONNXModelField: {
-    name: 'ONNXModelField',
-    isCollection: false,
-    isCollectionOrScalar: false,
-  },
   T2IAdapterField: {
     name: 'T2IAdapterField',
     isCollection: false,

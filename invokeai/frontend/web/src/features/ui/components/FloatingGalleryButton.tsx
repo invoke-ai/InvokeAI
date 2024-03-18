@@ -1,44 +1,33 @@
-import { Flex } from '@chakra-ui/layout';
-import { Portal } from '@chakra-ui/portal';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { Flex, IconButton, Portal, Tooltip } from '@invoke-ai/ui-library';
+import type { UsePanelReturn } from 'features/ui/hooks/usePanel';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MdPhotoLibrary } from 'react-icons/md';
+import { PiImagesSquareBold } from 'react-icons/pi';
 
 type Props = {
-  isGalleryCollapsed: boolean;
-  expandGallery: () => void;
+  panelApi: UsePanelReturn;
 };
 
-const FloatingGalleryButton = ({
-  isGalleryCollapsed,
-  expandGallery,
-}: Props) => {
+const FloatingGalleryButton = (props: Props) => {
   const { t } = useTranslation();
 
-  if (!isGalleryCollapsed) {
+  if (!props.panelApi.isCollapsed) {
     return null;
   }
 
   return (
     <Portal>
-      <Flex
-        pos="absolute"
-        transform="translate(0, -50%)"
-        minW={8}
-        top="50%"
-        insetInlineEnd="1.63rem"
-      >
-        <InvIconButton
-          tooltip="Show Gallery (G)"
-          aria-label={t('accessibility.showGalleryPanel')}
-          onClick={expandGallery}
-          icon={<MdPhotoLibrary />}
-          p={0}
-          px={3}
-          h={48}
-          borderEndRadius={0}
-        />
+      <Flex pos="absolute" transform="translate(0, -50%)" minW={8} top="50%" insetInlineEnd="21px">
+        <Tooltip label={t('accessibility.showGalleryPanel')} placement="start">
+          <IconButton
+            aria-label={t('accessibility.showGalleryPanel')}
+            onClick={props.panelApi.expand}
+            icon={<PiImagesSquareBold size="20px" />}
+            p={0}
+            h={48}
+            borderEndRadius={0}
+          />
+        </Tooltip>
       </Flex>
     </Portal>
   );

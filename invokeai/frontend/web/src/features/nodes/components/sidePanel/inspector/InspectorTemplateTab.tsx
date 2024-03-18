@@ -1,39 +1,29 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector(
-  stateSelector,
-  ({ nodes, nodeTemplates }) => {
-    const lastSelectedNodeId =
-      nodes.selectedNodes[nodes.selectedNodes.length - 1];
+const selector = createMemoizedSelector(selectNodesSlice, (nodes) => {
+  const lastSelectedNodeId = nodes.selectedNodes[nodes.selectedNodes.length - 1];
 
-    const lastSelectedNode = nodes.nodes.find(
-      (node) => node.id === lastSelectedNodeId
-    );
+  const lastSelectedNode = nodes.nodes.find((node) => node.id === lastSelectedNodeId);
 
-    const lastSelectedNodeTemplate = lastSelectedNode
-      ? nodeTemplates.templates[lastSelectedNode.data.type]
-      : undefined;
+  const lastSelectedNodeTemplate = lastSelectedNode ? nodes.templates[lastSelectedNode.data.type] : undefined;
 
-    return {
-      template: lastSelectedNodeTemplate,
-    };
-  }
-);
+  return {
+    template: lastSelectedNodeTemplate,
+  };
+});
 
 const NodeTemplateInspector = () => {
   const { template } = useAppSelector(selector);
   const { t } = useTranslation();
 
   if (!template) {
-    return (
-      <IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />
-    );
+    return <IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />;
   }
 
   return <DataViewer data={template} label={t('nodes.nodeTemplate')} />;

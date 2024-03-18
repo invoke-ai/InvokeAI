@@ -1,17 +1,9 @@
-import {
-  areAnyPixelsBlack,
-  getImageDataTransparency,
-} from 'common/util/arrayBuffer';
+import { areAnyPixelsBlack, getImageDataTransparency } from 'common/util/arrayBuffer';
 import type { GenerationMode } from 'features/canvas/store/canvasTypes';
 
-export const getCanvasGenerationMode = (
-  baseImageData: ImageData,
-  maskImageData: ImageData
-): GenerationMode => {
-  const {
-    isPartiallyTransparent: baseIsPartiallyTransparent,
-    isFullyTransparent: baseIsFullyTransparent,
-  } = getImageDataTransparency(baseImageData.data);
+export const getCanvasGenerationMode = (baseImageData: ImageData, maskImageData: ImageData): GenerationMode => {
+  const { isPartiallyTransparent: baseIsPartiallyTransparent, isFullyTransparent: baseIsFullyTransparent } =
+    getImageDataTransparency(baseImageData.data);
 
   // check mask for black
   const doesMaskHaveBlackPixels = areAnyPixelsBlack(maskImageData.data);

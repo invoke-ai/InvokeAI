@@ -1,59 +1,47 @@
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { useModelInvSelect } from 'common/components/InvSelect/useModelInvSelect';
-import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { useModelCombobox } from 'common/hooks/useModelCombobox';
+import { zModelIdentifierField } from 'features/nodes/types/common';
+import { refinerModelChanged, selectSdxlSlice } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { REFINER_BASE_MODELS } from 'services/api/constants';
-import type { MainModelConfigEntity } from 'services/api/endpoints/models';
-import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import { useRefinerModels } from 'services/api/hooks/modelsByType';
+import type { MainModelConfig } from 'services/api/types';
 
-const selector = createMemoizedSelector(stateSelector, (state) => ({
-  model: state.sdxl.refinerModel,
-}));
+const selectModel = createMemoizedSelector(selectSdxlSlice, (sdxl) => sdxl.refinerModel);
 
-const optionsFilter = (model: MainModelConfigEntity) =>
-  model.base_model === 'sdxl-refiner';
+const optionsFilter = (model: MainModelConfig) => model.base === 'sdxl-refiner';
 
 const ParamSDXLRefinerModelSelect = () => {
   const dispatch = useAppDispatch();
-  const { model } = useAppSelector(selector);
+  const model = useAppSelector(selectModel);
   const { t } = useTranslation();
-  const { data, isLoading } = useGetMainModelsQuery(REFINER_BASE_MODELS);
+  const [modelConfigs, { isLoading }] = useRefinerModels();
   const _onChange = useCallback(
-    (model: MainModelConfigEntity | null) => {
+    (model: MainModelConfig | null) => {
       if (!model) {
         dispatch(refinerModelChanged(null));
         return;
       }
-      dispatch(
-        refinerModelChanged({
-          base_model: 'sdxl-refiner',
-          model_name: model.model_name,
-          model_type: model.model_type,
-        })
-      );
+      dispatch(refinerModelChanged(zModelIdentifierField.parse(model)));
     },
     [dispatch]
   );
-  const { options, value, onChange, placeholder, noOptionsMessage } =
-    useModelInvSelect({
-      modelEntities: data,
-      onChange: _onChange,
-      selectedModel: model,
-      isLoading,
-      optionsFilter,
-    });
+  const { options, value, onChange, placeholder, noOptionsMessage } = useModelCombobox({
+    modelConfigs,
+    onChange: _onChange,
+    selectedModel: model,
+    isLoading,
+    optionsFilter,
+  });
   return (
-    <InvControl
-      label={t('sdxl.refinermodel')}
-      isDisabled={!options.length}
-      isInvalid={!options.length}
-    >
-      <InvSelect
+    <FormControl isDisabled={!options.length} isInvalid={!options.length}>
+      <InformationalPopover feature="refinerModel">
+        <FormLabel>{t('sdxl.refinermodel')}</FormLabel>
+      </InformationalPopover>
+      <Combobox
         value={value}
         placeholder={placeholder}
         options={options}
@@ -61,7 +49,7 @@ const ParamSDXLRefinerModelSelect = () => {
         noOptionsMessage={noOptionsMessage}
         isClearable
       />
-    </InvControl>
+    </FormControl>
   );
 };
 

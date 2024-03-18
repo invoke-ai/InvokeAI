@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import nullcontext
-from typing import Union
+from typing import Literal, Optional, Union
 
 import torch
 from torch import autocast
@@ -29,23 +29,41 @@ def choose_torch_device() -> torch.device:
         return torch.device(config.device)
 
 
-def choose_precision(device: torch.device) -> str:
-    """Returns an appropriate precision for the given torch device"""
+# We are in transition here from using a single global AppConfig to allowing multiple
+# configurations. It is strongly recommended to pass the app_config to this function.
+def choose_precision(
+    device: torch.device, app_config: Optional[InvokeAIAppConfig] = None
+) -> Literal["float32", "float16", "bfloat16"]:
+    """Return an appropriate precision for the given torch device."""
+    app_config = app_config or config
     if device.type == "cuda":
         device_name = torch.cuda.get_device_name(device)
         if not ("GeForce GTX 1660" in device_name or "GeForce GTX 1650" in device_name):
-            return "float16"
+            if app_config.precision == "float32":
+                return "float32"
+            elif app_config.precision == "bfloat16":
+                return "bfloat16"
+            else:
+                return "float16"
     elif device.type == "mps":
         return "float16"
     return "float32"
 
 
-def torch_dtype(device: torch.device) -> torch.dtype:
-    if config.full_precision:
-        return torch.float32
-    if choose_precision(device) == "float16":
+# We are in transition here from using a single global AppConfig to allowing multiple
+# configurations. It is strongly recommended to pass the app_config to this function.
+def torch_dtype(
+    device: Optional[torch.device] = None,
+    app_config: Optional[InvokeAIAppConfig] = None,
+) -> torch.dtype:
+    device = device or choose_torch_device()
+    precision = choose_precision(device, app_config)
+    if precision == "float16":
         return torch.float16
+    if precision == "bfloat16":
+        return torch.bfloat16
     else:
+        # "auto", "autocast", "float32"
         return torch.float32
 
 

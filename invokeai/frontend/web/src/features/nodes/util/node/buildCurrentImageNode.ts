@@ -3,9 +3,7 @@ import type { CurrentImageNode } from 'features/nodes/types/invocation';
 import type { XYPosition } from 'reactflow';
 import { v4 as uuidv4 } from 'uuid';
 
-export const buildCurrentImageNode = (
-  position: XYPosition
-): CurrentImageNode => {
+export const buildCurrentImageNode = (position: XYPosition): CurrentImageNode => {
   const nodeId = uuidv4();
   const node: CurrentImageNode = {
     ...SHARED_NODE_PROPERTIES,

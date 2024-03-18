@@ -1,18 +1,18 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { isInvocationNode } from 'features/nodes/types/invocation';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodeData } from 'features/nodes/store/selectors';
 import { useMemo } from 'react';
 
-export const useDoesInputHaveValue = (nodeId: string, fieldName: string) => {
+export const useDoesInputHaveValue = (nodeId: string, fieldName: string): boolean => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ nodes }) => {
-        const node = nodes.nodes.find((node) => node.id === nodeId);
-        if (!isInvocationNode(node)) {
-          return;
+      createMemoizedSelector(selectNodesSlice, (nodes) => {
+        const data = selectNodeData(nodes, nodeId);
+        if (!data) {
+          return false;
         }
-        return node?.data.inputs[fieldName]?.value !== undefined;
+        return data.inputs[fieldName]?.value !== undefined;
       }),
     [fieldName, nodeId]
   );

@@ -2,16 +2,13 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { addToast } from 'features/system/store/systemSlice';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  useDisableInvocationCacheMutation,
-  useGetInvocationCacheStatusQuery,
-} from 'services/api/endpoints/appInfo';
+import { useDisableInvocationCacheMutation, useGetInvocationCacheStatusQuery } from 'services/api/endpoints/appInfo';
 
 export const useDisableInvocationCache = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { data: cacheStatus } = useGetInvocationCacheStatusQuery();
-  const isConnected = useAppSelector((state) => state.system.isConnected);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
   const [trigger, { isLoading }] = useDisableInvocationCacheMutation({
     fixedCacheKey: 'disableInvocationCache',
   });

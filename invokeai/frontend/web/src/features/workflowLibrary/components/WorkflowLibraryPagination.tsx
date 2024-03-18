@@ -1,10 +1,8 @@
-import { InvButton } from 'common/components/InvButton/InvButton';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { Button, ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import type { Dispatch, SetStateAction } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 import type { paths } from 'services/api/schema';
 
 const PAGES_TO_DISPLAY = 7;
@@ -33,14 +31,8 @@ const WorkflowLibraryPagination = ({ page, setPage, data }: Props) => {
 
   const pages: PageData[] = useMemo(() => {
     const pages = [];
-    let first =
-      data.pages > PAGES_TO_DISPLAY
-        ? Math.max(0, page - Math.floor(PAGES_TO_DISPLAY / 2))
-        : 0;
-    const last =
-      data.pages > PAGES_TO_DISPLAY
-        ? Math.min(data.pages, first + PAGES_TO_DISPLAY)
-        : data.pages;
+    let first = data.pages > PAGES_TO_DISPLAY ? Math.max(0, page - Math.floor(PAGES_TO_DISPLAY / 2)) : 0;
+    const last = data.pages > PAGES_TO_DISPLAY ? Math.min(data.pages, first + PAGES_TO_DISPLAY) : data.pages;
     if (last - first < PAGES_TO_DISPLAY && data.pages > PAGES_TO_DISPLAY) {
       first = last - PAGES_TO_DISPLAY;
     }
@@ -54,34 +46,34 @@ const WorkflowLibraryPagination = ({ page, setPage, data }: Props) => {
   }, [data.pages, page, setPage]);
 
   return (
-    <InvButtonGroup>
-      <InvIconButton
+    <ButtonGroup>
+      <IconButton
         variant="ghost"
         onClick={handlePrevPage}
         isDisabled={page === 0}
         aria-label={t('common.prevPage')}
-        icon={<FaChevronLeft />}
+        icon={<PiCaretLeftBold />}
       />
       {pages.map((p) => (
-        <InvButton
+        <Button
           w={10}
           isDisabled={data.pages === 1}
           onClick={p.page === page ? undefined : p.onClick}
-          variant={p.page === page ? 'invokeAI' : 'ghost'}
+          variant={p.page === page ? 'solid' : 'ghost'}
           key={p.page}
           transitionDuration="0s" // the delay in animation looks jank
         >
           {p.page + 1}
-        </InvButton>
+        </Button>
       ))}
-      <InvIconButton
+      <IconButton
         variant="ghost"
         onClick={handleNextPage}
         isDisabled={page === data.pages - 1}
         aria-label={t('common.nextPage')}
-        icon={<FaChevronRight />}
+        icon={<PiCaretRightBold />}
       />
-    </InvButtonGroup>
+    </ButtonGroup>
   );
 };
 

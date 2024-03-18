@@ -1,6 +1,6 @@
+import { CompositeRangeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvRangeSlider } from 'common/components/InvRangeSlider/InvRangeSlider';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useControlAdapterBeginEndStepPct } from 'features/controlAdapters/hooks/useControlAdapterBeginEndStepPct';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import {
@@ -55,23 +55,18 @@ export const ParamControlAdapterBeginEnd = memo(({ id }: Props) => {
     );
   }, [dispatch, id]);
 
-  const value = useMemo<[number, number]>(
-    () => [stepPcts?.beginStepPct ?? 0, stepPcts?.endStepPct ?? 1],
-    [stepPcts]
-  );
+  const value = useMemo<[number, number]>(() => [stepPcts?.beginStepPct ?? 0, stepPcts?.endStepPct ?? 1], [stepPcts]);
 
   if (!stepPcts) {
     return null;
   }
 
   return (
-    <InvControl
-      isDisabled={!isEnabled}
-      label={t('controlnet.beginEndStepPercent')}
-      feature="controlNetBeginEnd"
-      orientation="vertical"
-    >
-      <InvRangeSlider
+    <FormControl isDisabled={!isEnabled} orientation="vertical">
+      <InformationalPopover feature="controlNetBeginEnd">
+        <FormLabel>{t('controlnet.beginEndStepPercent')}</FormLabel>
+      </InformationalPopover>
+      <CompositeRangeSlider
         aria-label={ariaLabel}
         value={value}
         onChange={onChange}
@@ -80,12 +75,12 @@ export const ParamControlAdapterBeginEnd = memo(({ id }: Props) => {
         max={1}
         step={0.05}
         fineStep={0.01}
-        minStepsBetweenThumbs={5}
+        minStepsBetweenThumbs={1}
         formatValue={formatPct}
         marks
         withThumbTooltip
       />
-    </InvControl>
+    </FormControl>
   );
 });
 

@@ -1,27 +1,25 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type {
-  ParameterHRFMethod,
-  ParameterStrength,
-} from 'features/parameters/types/parameterSchemas';
+import type { PersistConfig, RootState } from 'app/store/store';
+import type { ParameterHRFMethod, ParameterStrength } from 'features/parameters/types/parameterSchemas';
 
-export interface HRFState {
+interface HRFState {
+  _version: 1;
   hrfEnabled: boolean;
   hrfStrength: ParameterStrength;
   hrfMethod: ParameterHRFMethod;
 }
 
-export const initialHRFState: HRFState = {
+const initialHRFState: HRFState = {
+  _version: 1,
   hrfStrength: 0.45,
   hrfEnabled: false,
   hrfMethod: 'ESRGAN',
 };
 
-const initialState: HRFState = initialHRFState;
-
 export const hrfSlice = createSlice({
   name: 'hrf',
-  initialState,
+  initialState: initialHRFState,
   reducers: {
     setHrfStrength: (state, action: PayloadAction<number>) => {
       state.hrfStrength = action.payload;
@@ -37,4 +35,19 @@ export const hrfSlice = createSlice({
 
 export const { setHrfEnabled, setHrfStrength, setHrfMethod } = hrfSlice.actions;
 
-export default hrfSlice.reducer;
+export const selectHrfSlice = (state: RootState) => state.hrf;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+const migrateHRFState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};
+
+export const hrfPersistConfig: PersistConfig<HRFState> = {
+  name: hrfSlice.name,
+  initialState: initialHRFState,
+  migrate: migrateHRFState,
+  persistDenylist: [],
+};

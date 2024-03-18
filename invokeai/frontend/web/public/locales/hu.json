@@ -1,0 +1,39 @@
+{
+    "accessibility": {
+        "mode": "Mód",
+        "uploadImage": "Fénykép feltöltése",
+        "zoomIn": "Nagyítás",
+        "nextImage": "Következő kép",
+        "previousImage": "Előző kép",
+        "menu": "Menü",
+        "zoomOut": "Kicsinyítés",
+        "loadMore": "Több betöltése"
+    },
+    "boards": {
+        "cancel": "Mégsem",
+        "loading": "Betöltés..."
+    },
+    "accordions": {
+        "image": {
+            "title": "Kép"
+        }
+    },
+    "common": {
+        "accept": "Elfogad",
+        "ai": "ai",
+        "back": "Vissza",
+        "cancel": "Mégsem",
+        "close": "Bezár",
+        "or": "vagy",
+        "details": "Részletek",
+        "darkMode": "Sötét Mód",
+        "error": "Hiba",
+        "file": "Fájl",
+        "githubLabel": "Github",
+        "hotkeysLabel": "Gyorsbillentyűk",
+        "delete": "Törlés",
+        "data": "Adat",
+        "discordLabel": "Discord",
+        "folder": "Mappa"
+    }
+}

@@ -9,7 +9,7 @@ index.html
 .yarn/
 .yalc/
 *.scss
-src/services/api/schema.d.ts
+src/services/api/schema.ts
 static/
 src/theme/css/overlayscrollbars.css
 src/theme_/css/overlayscrollbars.css

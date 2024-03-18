@@ -1,10 +1,10 @@
-import { Box, Flex } from '@chakra-ui/react';
+import { Box, Flex } from '@invoke-ai/ui-library';
 import type { AnimationProps } from 'framer-motion';
 import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 import { memo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { v4 as uuidv4 } from 'uuid';
-
 type Props = {
   isOver: boolean;
   label?: ReactNode;
@@ -23,15 +23,11 @@ const exit: AnimationProps['exit'] = {
 };
 
 const IAIDropOverlay = (props: Props) => {
-  const { isOver, label = 'Drop' } = props;
+  const { t } = useTranslation();
+  const { isOver, label = t('gallery.drop') } = props;
   const motionId = useRef(uuidv4());
   return (
-    <motion.div
-      key={motionId.current}
-      initial={initial}
-      animate={animate}
-      exit={exit}
-    >
+    <motion.div key={motionId.current} initial={initial} animate={animate} exit={exit}>
       <Flex position="absolute" top={0} insetInlineStart={0} w="full" h="full">
         <Flex
           position="absolute"

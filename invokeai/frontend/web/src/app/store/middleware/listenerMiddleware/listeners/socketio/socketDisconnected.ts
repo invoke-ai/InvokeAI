@@ -1,20 +1,14 @@
 import { logger } from 'app/logging/logger';
-import {
-  appSocketDisconnected,
-  socketDisconnected,
-} from 'services/events/actions';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { socketDisconnected } from 'services/events/actions';
 
-import { startAppListening } from '../..';
+const log = logger('socketio');
 
-export const addSocketDisconnectedEventListener = () => {
+export const addSocketDisconnectedEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketDisconnected,
-    effect: (action, { dispatch }) => {
-      const log = logger('socketio');
+    effect: () => {
       log.debug('Disconnected');
-
-      // pass along the socket event as an application action
-      dispatch(appSocketDisconnected(action.payload));
     },
   });
 };

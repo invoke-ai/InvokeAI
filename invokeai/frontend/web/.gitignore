@@ -8,6 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+.pnpm-store
 # We want to distribute the repo
 dist
 dist/**
@@ -40,3 +41,6 @@ stats.html
 # Yalc
 .yalc
 yalc.lock
+
+# vitest
+tsconfig.vitest-temp.json

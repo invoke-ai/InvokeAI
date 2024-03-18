@@ -1,22 +1,9 @@
 {
     "common": {
-        "langArabic": "العربية",
         "reportBugLabel": "Reportar Bug",
         "settingsLabel": "Configurações",
-        "langBrPortuguese": "Português do Brasil",
         "languagePickerLabel": "Seletor de Idioma",
-        "langDutch": "Nederlands",
-        "langEnglish": "English",
         "hotkeysLabel": "Hotkeys",
-        "langPolish": "Polski",
-        "langFrench": "Français",
-        "langGerman": "Deutsch",
-        "langItalian": "Italiano",
-        "langJapanese": "日本語",
-        "langSimplifiedChinese": "简体中文",
-        "langSpanish": "Espanhol",
-        "langRussian": "Русский",
-        "langUkranian": "Украї́нська",
         "img2img": "Imagem para Imagem",
         "unifiedCanvas": "Tela Unificada",
         "nodes": "Nós",
@@ -60,8 +47,7 @@
         "statusMergingModels": "Mesclando Modelos",
         "statusMergedModels": "Modelos Mesclados",
         "loading": "A carregar",
-        "loadingInvokeAI": "A carregar Invoke AI",
-        "langPortuguese": "Português"
+        "loadingInvokeAI": "A carregar Invoke AI"
     },
     "gallery": {
         "galleryImageResetSize": "Resetar Imagem",
@@ -81,10 +67,6 @@
     "hotkeys": {
         "generalHotkeys": "Atalhos Gerais",
         "galleryHotkeys": "Atalhos da Galeria",
-        "toggleViewer": {
-            "title": "Ativar Visualizador",
-            "desc": "Abrir e fechar o Visualizador de Imagens"
-        },
         "maximizeWorkSpace": {
             "desc": "Fechar painéis e maximixar área de trabalho",
             "title": "Maximizar a Área de Trabalho"
@@ -231,10 +213,6 @@
         "deleteImage": {
             "title": "Apagar Imagem",
             "desc": "Apaga a imagem atual"
-        },
-        "toggleGalleryPin": {
-            "title": "Ativar Fixar Galeria",
-            "desc": "Fixa e desafixa a galeria na interface"
         },
         "increaseGalleryThumbSize": {
             "title": "Aumentar Tamanho da Galeria de Imagem",

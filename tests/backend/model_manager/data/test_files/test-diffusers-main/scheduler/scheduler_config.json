@@ -1,0 +1,17 @@
+{
+  "_class_name": "EulerAncestralDiscreteScheduler",
+  "_diffusers_version": "0.23.0",
+  "beta_end": 0.012,
+  "beta_schedule": "scaled_linear",
+  "beta_start": 0.00085,
+  "clip_sample": false,
+  "interpolation_type": "linear",
+  "num_train_timesteps": 1000,
+  "prediction_type": "epsilon",
+  "sample_max_value": 1.0,
+  "set_alpha_to_one": false,
+  "skip_prk_steps": true,
+  "steps_offset": 1,
+  "timestep_spacing": "trailing",
+  "trained_betas": null
+}

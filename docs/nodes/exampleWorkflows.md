@@ -1,6 +1,6 @@
 # Example Workflows
 
-We've curated some example workflows for you to get started with Workflows in InvokeAI
+We've curated some example workflows for you to get started with Workflows in InvokeAI! These can also be found in the Workflow Library, located in the Workflow Editor of Invoke.
 
 To use them, right click on your desired workflow, follow the link to GitHub and click the "⬇" button to download the raw file. You can then use the "Load Workflow" functionality in InvokeAI to load the workflow and start generating images!
 

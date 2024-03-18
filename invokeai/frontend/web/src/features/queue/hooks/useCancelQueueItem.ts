@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useCancelQueueItemMutation } from 'services/api/endpoints/queue';
 
 export const useCancelQueueItem = (item_id: number) => {
-  const isConnected = useAppSelector((state) => state.system.isConnected);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
   const [trigger, { isLoading }] = useCancelQueueItemMutation();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();

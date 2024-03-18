@@ -11,8 +11,6 @@ from invokeai.app.services.workflow_records.workflow_records_common import (
     UnsafeWorkflowWithVersionValidator,
 )
 
-from .util.migrate_yaml_config_1 import MigrateModelYamlToDb1
-
 
 class Migration2Callback:
     def __init__(self, image_files: ImageFileStorageBase, logger: Logger):
@@ -25,8 +23,6 @@ class Migration2Callback:
         self._drop_old_workflow_tables(cursor)
         self._add_workflow_library(cursor)
         self._drop_model_manager_metadata(cursor)
-        self._recreate_model_config(cursor)
-        self._migrate_model_config_records(cursor)
         self._migrate_embedded_workflows(cursor)
 
     def _add_images_has_workflow(self, cursor: sqlite3.Cursor) -> None:
@@ -99,45 +95,6 @@ class Migration2Callback:
     def _drop_model_manager_metadata(self, cursor: sqlite3.Cursor) -> None:
         """Drops the `model_manager_metadata` table."""
         cursor.execute("DROP TABLE IF EXISTS model_manager_metadata;")
-
-    def _recreate_model_config(self, cursor: sqlite3.Cursor) -> None:
-        """
-        Drops the `model_config` table, recreating it.
-
-        In 3.4.0, this table used explicit columns but was changed to use json_extract 3.5.0.
-
-        Because this table is not used in production, we are able to simply drop it and recreate it.
-        """
-
-        cursor.execute("DROP TABLE IF EXISTS model_config;")
-
-        cursor.execute(
-            """--sql
-            CREATE TABLE IF NOT EXISTS model_config (
-                id TEXT NOT NULL PRIMARY KEY,
-                -- The next 3 fields are enums in python, unrestricted string here
-                base TEXT GENERATED ALWAYS as (json_extract(config, '$.base')) VIRTUAL NOT NULL,
-                type TEXT GENERATED ALWAYS as (json_extract(config, '$.type')) VIRTUAL NOT NULL,
-                name TEXT GENERATED ALWAYS as (json_extract(config, '$.name')) VIRTUAL NOT NULL,
-                path TEXT GENERATED ALWAYS as (json_extract(config, '$.path')) VIRTUAL NOT NULL,
-                format TEXT GENERATED ALWAYS as (json_extract(config, '$.format')) VIRTUAL NOT NULL,
-                original_hash TEXT, -- could be null
-                -- Serialized JSON representation of the whole config object,
-                -- which will contain additional fields from subclasses
-                config TEXT NOT NULL,
-                created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- Updated via trigger
-                updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-                -- unique constraint on combo of name, base and type
-                UNIQUE(name, base, type)
-            );
-            """
-        )
-
-    def _migrate_model_config_records(self, cursor: sqlite3.Cursor) -> None:
-        """After updating the model config table, we repopulate it."""
-        model_record_migrator = MigrateModelYamlToDb1(cursor)
-        model_record_migrator.migrate()
 
     def _migrate_embedded_workflows(self, cursor: sqlite3.Cursor) -> None:
         """

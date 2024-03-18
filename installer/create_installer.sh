@@ -2,65 +2,65 @@
 
 set -e
 
-BCYAN="\e[1;36m"
-BYELLOW="\e[1;33m"
-BGREEN="\e[1;32m"
-BRED="\e[1;31m"
-RED="\e[31m"
-RESET="\e[0m"
-
-function is_bin_in_path {
-    builtin type -P "$1" &>/dev/null
-}
+BCYAN="\033[1;36m"
+BYELLOW="\033[1;33m"
+BGREEN="\033[1;32m"
+BRED="\033[1;31m"
+RED="\033[31m"
+RESET="\033[0m"
 
 function git_show {
-    git show -s --format='%h %s' $1
+    git show -s --format=oneline --abbrev-commit "$1" | cat
 }
 
-cd "$(dirname "$0")"
-
-echo -e "${BYELLOW}This script must be run from the installer directory!${RESET}"
-echo "The current working directory is $(pwd)"
-read -p "If that looks right, press any key to proceed, or CTRL-C to exit..."
-echo
-
-# Some machines only have `python3` in PATH, others have `python` - make an alias.
-# We can use a function to approximate an alias within a non-interactive shell.
-if ! is_bin_in_path python && is_bin_in_path python3; then
-    function python {
-        python3 "$@"
-    }
-fi
-
-if [[ -v "VIRTUAL_ENV" ]]; then
+if [[ ! -z "${VIRTUAL_ENV}" ]]; then
     # we can't just call 'deactivate' because this function is not exported
     # to the environment of this script from the bash process that runs the script
     echo -e "${BRED}A virtual environment is activated. Please deactivate it before proceeding.${RESET}"
     exit -1
 fi
 
+cd "$(dirname "$0")"
+
 VERSION=$(
     cd ..
-    python -c "from invokeai.version import __version__ as version; print(version)"
+    python3 -c "from invokeai.version import __version__ as version; print(version)"
 )
-PATCH=""
-VERSION="v${VERSION}${PATCH}"
+VERSION="v${VERSION}"
+
+if [[ ! -z ${CI} ]]; then
+    echo
+    echo -e "${BCYAN}CI environment detected${RESET}"
+    echo
+else
+    echo
+    echo -e "${BYELLOW}This script must be run from the installer directory!${RESET}"
+    echo "The current working directory is $(pwd)"
+    read -p "If that looks right, press any key to proceed, or CTRL-C to exit..."
+    echo
+fi
 
 echo -e "${BGREEN}HEAD${RESET}:"
-git_show
+git_show HEAD
 echo
 
 # ---------------------- FRONTEND ----------------------
 
 pushd ../invokeai/frontend/web >/dev/null
-echo
 echo "Installing frontend dependencies..."
 echo
 pnpm i --frozen-lockfile
 echo
-echo "Building frontend..."
+if [[ ! -z ${CI} ]]; then
+    echo "Building frontend without checks..."
+    # In CI, we have already done the frontend checks and can just build
+    pnpm vite build
+else
+    echo "Running checks and building frontend..."
+    # This runs all the frontend checks and builds
+    pnpm build
+fi
 echo
-pnpm build
 popd
 
 # ---------------------- BACKEND ----------------------
@@ -71,13 +71,13 @@ echo
 
 # install the 'build' package in the user site packages, if needed
 # could be improved by using a temporary venv, but it's tiny and harmless
-if [[ $(python -c 'from importlib.util import find_spec; print(find_spec("build") is None)') == "True" ]]; then
+if [[ $(python3 -c 'from importlib.util import find_spec; print(find_spec("build") is None)') == "True" ]]; then
     pip install --user build
 fi
 
 rm -rf ../build
 
-python -m build --wheel --outdir dist/ ../.
+python3 -m build --outdir dist/ ../.
 
 # ----------------------
 
@@ -97,22 +97,37 @@ done
 mkdir InvokeAI-Installer/lib
 cp lib/*.py InvokeAI-Installer/lib
 
-# Move the wheel
-mv dist/*.whl InvokeAI-Installer/lib/
-
 # Install scripts
 # Mac/Linux
 cp install.sh.in InvokeAI-Installer/install.sh
 chmod a+x InvokeAI-Installer/install.sh
 
 # Windows
-perl -p -e "s/^set INVOKEAI_VERSION=.*/set INVOKEAI_VERSION=$VERSION/" install.bat.in >InvokeAI-Installer/install.bat
+cp install.bat.in InvokeAI-Installer/install.bat
 cp WinLongPathsEnabled.reg InvokeAI-Installer/
 
-# Zip everything up
-zip -r InvokeAI-installer-$VERSION.zip InvokeAI-Installer
+FILENAME=InvokeAI-installer-$VERSION.zip
 
-# clean up
-rm -rf InvokeAI-Installer tmp dist ../invokeai/frontend/web/dist/
+# Zip everything up
+zip -r ${FILENAME} InvokeAI-Installer
+
+echo
+echo -e "${BGREEN}Built installer: ./${FILENAME}${RESET}"
+echo -e "${BGREEN}Built PyPi distribution: ./dist${RESET}"
+
+# clean up, but only if we are not in a github action
+if [[ -z ${CI} ]]; then
+    echo
+    echo "Cleaning up intermediate build files..."
+    rm -rf InvokeAI-Installer tmp ../invokeai/frontend/web/dist/
+fi
+
+if [[ ! -z ${CI} ]]; then
+    echo
+    echo "Setting GitHub action outputs..."
+    echo "INSTALLER_FILENAME=${FILENAME}" >>$GITHUB_OUTPUT
+    echo "INSTALLER_PATH=installer/${FILENAME}" >>$GITHUB_OUTPUT
+    echo "DIST_PATH=installer/dist/" >>$GITHUB_OUTPUT
+fi
 
 exit 0

@@ -1,0 +1,241 @@
+diff --git a/dist/cjs/reselect.cjs b/dist/cjs/reselect.cjs
+index 0ef3a648e253af4ada8f0a2086d6db9302b8ced9..2614db8c901c5a3be4a80d3ffed3be2cf175bf50 100644
+--- a/dist/cjs/reselect.cjs
++++ b/dist/cjs/reselect.cjs
+@@ -639,6 +639,8 @@ function weakMapMemoize(func, options = {}) {
+   return memoized;
+ }
+ 
++weakMapMemoize = lruMemoize
++
+ // src/createSelectorCreator.ts
+ function createSelectorCreator(memoizeOrOptions, ...memoizeOptionsFromArgs) {
+   const createSelectorCreatorOptions = typeof memoizeOrOptions === "function" ? {
+diff --git a/dist/reselect.browser.mjs b/dist/reselect.browser.mjs
+index e8da6c11a333ef9ddf4cca51adbc405fe8f6265d..8bc64f0c19082c0015155d60c59869a46c9f180e 100644
+--- a/dist/reselect.browser.mjs
++++ b/dist/reselect.browser.mjs
+@@ -1,2 +1,2 @@
+-var oe={inputStabilityCheck:"once",identityFunctionCheck:"once"},re=e=>{Object.assign(oe,e)};var M="NOT_FOUND";function w(e,t=`expected a function, instead received ${typeof e}`){if(typeof e!="function")throw new TypeError(t)}function V(e,t=`expected an object, instead received ${typeof e}`){if(typeof e!="object")throw new TypeError(t)}function ie(e,t="expected all items to be functions, instead received the following types: "){if(!e.every(n=>typeof n=="function")){let n=e.map(c=>typeof c=="function"?`function ${c.name||"unnamed"}()`:typeof c).join(", ");throw new TypeError(`${t}[${n}]`)}}var O=e=>Array.isArray(e)?e:[e];function K(e){let t=Array.isArray(e[0])?e[0]:e;return ie(t,"createSelector expects all input-selectors to be functions, but received the following types: "),t}function W(e,t){let n=[],{length:c}=e;for(let s=0;s<c;s++)n.push(e[s].apply(null,t));return n}var G=0,S=null,F=class{revision=G;_value;_lastValue;_isEqual=v;constructor(t,n=v){this._value=this._lastValue=t,this._isEqual=n}get value(){return S?.add(this),this._value}set value(t){this.value!==t&&(this._value=t,this.revision=++G)}};function v(e,t){return e===t}var b=class{_cachedValue;_cachedRevision=-1;_deps=[];hits=0;fn;constructor(t){this.fn=t}clear(){this._cachedValue=void 0,this._cachedRevision=-1,this._deps=[],this.hits=0}get value(){if(this.revision>this._cachedRevision){let{fn:t}=this,n=new Set,c=S;S=n,this._cachedValue=t(),S=c,this.hits++,this._deps=Array.from(n),this._cachedRevision=this.revision}return S?.add(this),this._cachedValue}get revision(){return Math.max(...this._deps.map(t=>t.revision),0)}};function g(e){return e instanceof F||console.warn("Not a valid cell! ",e),e.value}function L(e,t){if(!(e instanceof F))throw new TypeError("setValue must be passed a tracked store created with `createStorage`.");e.value=e._lastValue=t}function $(e,t=v){return new F(e,t)}function Y(e){return w(e,"the first parameter to `createCache` must be a function"),new b(e)}var ce=(e,t)=>!1;function z(){return $(null,ce)}function k(e,t){L(e,t)}var A=e=>{let t=e.collectionTag;t===null&&(t=e.collectionTag=z()),g(t)},h=e=>{let t=e.collectionTag;t!==null&&k(t,null)};var Re=Symbol(),H=0,se=Object.getPrototypeOf({}),I=class{constructor(t){this.value=t;this.value=t,this.tag.value=t}proxy=new Proxy(this,C);tag=z();tags={};children={};collectionTag=null;id=H++},C={get(e,t){function n(){let{value:s}=e,o=Reflect.get(s,t);if(typeof t=="symbol"||t in se)return o;if(typeof o=="object"&&o!==null){let i=e.children[t];return i===void 0&&(i=e.children[t]=E(o)),i.tag&&g(i.tag),i.proxy}else{let i=e.tags[t];return i===void 0&&(i=e.tags[t]=z(),i.value=o),g(i),o}}return n()},ownKeys(e){return A(e),Reflect.ownKeys(e.value)},getOwnPropertyDescriptor(e,t){return Reflect.getOwnPropertyDescriptor(e.value,t)},has(e,t){return Reflect.has(e.value,t)}},N=class{constructor(t){this.value=t;this.value=t,this.tag.value=t}proxy=new Proxy([this],ue);tag=z();tags={};children={};collectionTag=null;id=H++},ue={get([e],t){return t==="length"&&A(e),C.get(e,t)},ownKeys([e]){return C.ownKeys(e)},getOwnPropertyDescriptor([e],t){return C.getOwnPropertyDescriptor(e,t)},has([e],t){return C.has(e,t)}};function E(e){return Array.isArray(e)?new N(e):new I(e)}function D(e,t){let{value:n,tags:c,children:s}=e;if(e.value=t,Array.isArray(n)&&Array.isArray(t)&&n.length!==t.length)h(e);else if(n!==t){let o=0,i=0,r=!1;for(let u in n)o++;for(let u in t)if(i++,!(u in n)){r=!0;break}(r||o!==i)&&h(e)}for(let o in c){let i=n[o],r=t[o];i!==r&&(h(e),k(c[o],r)),typeof r=="object"&&r!==null&&delete c[o]}for(let o in s){let i=s[o],r=t[o];i.value!==r&&(typeof r=="object"&&r!==null?D(i,r):(X(i),delete s[o]))}}function X(e){e.tag&&k(e.tag,null),h(e);for(let t in e.tags)k(e.tags[t],null);for(let t in e.children)X(e.children[t])}function le(e){let t;return{get(n){return t&&e(t.key,n)?t.value:M},put(n,c){t={key:n,value:c}},getEntries(){return t?[t]:[]},clear(){t=void 0}}}function ae(e,t){let n=[];function c(r){let l=n.findIndex(u=>t(r,u.key));if(l>-1){let u=n[l];return l>0&&(n.splice(l,1),n.unshift(u)),u.value}return M}function s(r,l){c(r)===M&&(n.unshift({key:r,value:l}),n.length>e&&n.pop())}function o(){return n}function i(){n=[]}return{get:c,put:s,getEntries:o,clear:i}}var x=(e,t)=>e===t;function j(e){return function(n,c){if(n===null||c===null||n.length!==c.length)return!1;let{length:s}=n;for(let o=0;o<s;o++)if(!e(n[o],c[o]))return!1;return!0}}function pe(e,t){let n=typeof t=="object"?t:{equalityCheck:t},{equalityCheck:c=x,maxSize:s=1,resultEqualityCheck:o}=n,i=j(c),r=0,l=s===1?le(i):ae(s,i);function u(){let a=l.get(arguments);if(a===M){if(a=e.apply(null,arguments),r++,o){let f=l.getEntries().find(p=>o(p.value,a));f&&(a=f.value,r!==0&&r--)}l.put(arguments,a)}return a}return u.clearCache=()=>{l.clear(),u.resetResultsCount()},u.resultsCount=()=>r,u.resetResultsCount=()=>{r=0},u}function me(e){let t=E([]),n=null,c=j(x),s=Y(()=>e.apply(null,t.proxy));function o(){return c(n,arguments)||(D(t,arguments),n=arguments),s.value}return o.clearCache=()=>s.clear(),o}var _=class{constructor(t){this.value=t}deref(){return this.value}},de=typeof WeakRef<"u"?WeakRef:_,fe=0,B=1;function T(){return{s:fe,v:void 0,o:null,p:null}}function R(e,t={}){let n=T(),{resultEqualityCheck:c}=t,s,o=0;function i(){let r=n,{length:l}=arguments;for(let m=0,f=l;m<f;m++){let p=arguments[m];if(typeof p=="function"||typeof p=="object"&&p!==null){let d=r.o;d===null&&(r.o=d=new WeakMap);let y=d.get(p);y===void 0?(r=T(),d.set(p,r)):r=y}else{let d=r.p;d===null&&(r.p=d=new Map);let y=d.get(p);y===void 0?(r=T(),d.set(p,r)):r=y}}let u=r,a;if(r.s===B?a=r.v:(a=e.apply(null,arguments),o++),u.s=B,c){let m=s?.deref()??s;m!=null&&c(m,a)&&(a=m,o!==0&&o--),s=typeof a=="object"&&a!==null||typeof a=="function"?new de(a):a}return u.v=a,a}return i.clearCache=()=>{n=T(),i.resetResultsCount()},i.resultsCount=()=>o,i.resetResultsCount=()=>{o=0},i}function J(e,...t){let n=typeof e=="function"?{memoize:e,memoizeOptions:t}:e;return(...s)=>{let o=0,i=0,r,l={},u=s.pop();typeof u=="object"&&(l=u,u=s.pop()),w(u,`createSelector expects an output function after the inputs, but received: [${typeof u}]`);let a={...n,...l},{memoize:m,memoizeOptions:f=[],argsMemoize:p=R,argsMemoizeOptions:d=[],devModeChecks:y={}}=a,Q=O(f),Z=O(d),q=K(s),P=m(function(){return o++,u.apply(null,arguments)},...Q),Me=!0,ee=p(function(){i++;let ne=W(q,arguments);return r=P.apply(null,ne),r},...Z);return Object.assign(ee,{resultFunc:u,memoizedResultFunc:P,dependencies:q,dependencyRecomputations:()=>i,resetDependencyRecomputations:()=>{i=0},lastResult:()=>r,recomputations:()=>o,resetRecomputations:()=>{o=0},memoize:m,argsMemoize:p})}}var U=J(R);var ye=(e,t=U)=>{V(e,`createStructuredSelector expects first argument to be an object where each property is a selector, instead received a ${typeof e}`);let n=Object.keys(e),c=n.map(o=>e[o]);return t(c,(...o)=>o.reduce((i,r,l)=>(i[n[l]]=r,i),{}))};export{U as createSelector,J as createSelectorCreator,ye as createStructuredSelector,pe as lruMemoize,x as referenceEqualityCheck,re as setGlobalDevModeChecks,me as unstable_autotrackMemoize,R as weakMapMemoize};
++var oe={inputStabilityCheck:"once",identityFunctionCheck:"once"},re=e=>{Object.assign(oe,e)};var M="NOT_FOUND";function w(e,t=`expected a function, instead received ${typeof e}`){if(typeof e!="function")throw new TypeError(t)}function V(e,t=`expected an object, instead received ${typeof e}`){if(typeof e!="object")throw new TypeError(t)}function ie(e,t="expected all items to be functions, instead received the following types: "){if(!e.every(n=>typeof n=="function")){let n=e.map(c=>typeof c=="function"?`function ${c.name||"unnamed"}()`:typeof c).join(", ");throw new TypeError(`${t}[${n}]`)}}var O=e=>Array.isArray(e)?e:[e];function K(e){let t=Array.isArray(e[0])?e[0]:e;return ie(t,"createSelector expects all input-selectors to be functions, but received the following types: "),t}function W(e,t){let n=[],{length:c}=e;for(let s=0;s<c;s++)n.push(e[s].apply(null,t));return n}var G=0,S=null,F=class{revision=G;_value;_lastValue;_isEqual=v;constructor(t,n=v){this._value=this._lastValue=t,this._isEqual=n}get value(){return S?.add(this),this._value}set value(t){this.value!==t&&(this._value=t,this.revision=++G)}};function v(e,t){return e===t}var b=class{_cachedValue;_cachedRevision=-1;_deps=[];hits=0;fn;constructor(t){this.fn=t}clear(){this._cachedValue=void 0,this._cachedRevision=-1,this._deps=[],this.hits=0}get value(){if(this.revision>this._cachedRevision){let{fn:t}=this,n=new Set,c=S;S=n,this._cachedValue=t(),S=c,this.hits++,this._deps=Array.from(n),this._cachedRevision=this.revision}return S?.add(this),this._cachedValue}get revision(){return Math.max(...this._deps.map(t=>t.revision),0)}};function g(e){return e instanceof F||console.warn("Not a valid cell! ",e),e.value}function L(e,t){if(!(e instanceof F))throw new TypeError("setValue must be passed a tracked store created with `createStorage`.");e.value=e._lastValue=t}function $(e,t=v){return new F(e,t)}function Y(e){return w(e,"the first parameter to `createCache` must be a function"),new b(e)}var ce=(e,t)=>!1;function z(){return $(null,ce)}function k(e,t){L(e,t)}var A=e=>{let t=e.collectionTag;t===null&&(t=e.collectionTag=z()),g(t)},h=e=>{let t=e.collectionTag;t!==null&&k(t,null)};var Re=Symbol(),H=0,se=Object.getPrototypeOf({}),I=class{constructor(t){this.value=t;this.value=t,this.tag.value=t}proxy=new Proxy(this,C);tag=z();tags={};children={};collectionTag=null;id=H++},C={get(e,t){function n(){let{value:s}=e,o=Reflect.get(s,t);if(typeof t=="symbol"||t in se)return o;if(typeof o=="object"&&o!==null){let i=e.children[t];return i===void 0&&(i=e.children[t]=E(o)),i.tag&&g(i.tag),i.proxy}else{let i=e.tags[t];return i===void 0&&(i=e.tags[t]=z(),i.value=o),g(i),o}}return n()},ownKeys(e){return A(e),Reflect.ownKeys(e.value)},getOwnPropertyDescriptor(e,t){return Reflect.getOwnPropertyDescriptor(e.value,t)},has(e,t){return Reflect.has(e.value,t)}},N=class{constructor(t){this.value=t;this.value=t,this.tag.value=t}proxy=new Proxy([this],ue);tag=z();tags={};children={};collectionTag=null;id=H++},ue={get([e],t){return t==="length"&&A(e),C.get(e,t)},ownKeys([e]){return C.ownKeys(e)},getOwnPropertyDescriptor([e],t){return C.getOwnPropertyDescriptor(e,t)},has([e],t){return C.has(e,t)}};function E(e){return Array.isArray(e)?new N(e):new I(e)}function D(e,t){let{value:n,tags:c,children:s}=e;if(e.value=t,Array.isArray(n)&&Array.isArray(t)&&n.length!==t.length)h(e);else if(n!==t){let o=0,i=0,r=!1;for(let u in n)o++;for(let u in t)if(i++,!(u in n)){r=!0;break}(r||o!==i)&&h(e)}for(let o in c){let i=n[o],r=t[o];i!==r&&(h(e),k(c[o],r)),typeof r=="object"&&r!==null&&delete c[o]}for(let o in s){let i=s[o],r=t[o];i.value!==r&&(typeof r=="object"&&r!==null?D(i,r):(X(i),delete s[o]))}}function X(e){e.tag&&k(e.tag,null),h(e);for(let t in e.tags)k(e.tags[t],null);for(let t in e.children)X(e.children[t])}function le(e){let t;return{get(n){return t&&e(t.key,n)?t.value:M},put(n,c){t={key:n,value:c}},getEntries(){return t?[t]:[]},clear(){t=void 0}}}function ae(e,t){let n=[];function c(r){let l=n.findIndex(u=>t(r,u.key));if(l>-1){let u=n[l];return l>0&&(n.splice(l,1),n.unshift(u)),u.value}return M}function s(r,l){c(r)===M&&(n.unshift({key:r,value:l}),n.length>e&&n.pop())}function o(){return n}function i(){n=[]}return{get:c,put:s,getEntries:o,clear:i}}var x=(e,t)=>e===t;function j(e){return function(n,c){if(n===null||c===null||n.length!==c.length)return!1;let{length:s}=n;for(let o=0;o<s;o++)if(!e(n[o],c[o]))return!1;return!0}}function pe(e,t){let n=typeof t=="object"?t:{equalityCheck:t},{equalityCheck:c=x,maxSize:s=1,resultEqualityCheck:o}=n,i=j(c),r=0,l=s===1?le(i):ae(s,i);function u(){let a=l.get(arguments);if(a===M){if(a=e.apply(null,arguments),r++,o){let f=l.getEntries().find(p=>o(p.value,a));f&&(a=f.value,r!==0&&r--)}l.put(arguments,a)}return a}return u.clearCache=()=>{l.clear(),u.resetResultsCount()},u.resultsCount=()=>r,u.resetResultsCount=()=>{r=0},u}function me(e){let t=E([]),n=null,c=j(x),s=Y(()=>e.apply(null,t.proxy));function o(){return c(n,arguments)||(D(t,arguments),n=arguments),s.value}return o.clearCache=()=>s.clear(),o}var _=class{constructor(t){this.value=t}deref(){return this.value}},de=typeof WeakRef<"u"?WeakRef:_,fe=0,B=1;function T(){return{s:fe,v:void 0,o:null,p:null}}function R(e,t={}){let n=T(),{resultEqualityCheck:c}=t,s,o=0;function i(){let r=n,{length:l}=arguments;for(let m=0,f=l;m<f;m++){let p=arguments[m];if(typeof p=="function"||typeof p=="object"&&p!==null){let d=r.o;d===null&&(r.o=d=new WeakMap);let y=d.get(p);y===void 0?(r=T(),d.set(p,r)):r=y}else{let d=r.p;d===null&&(r.p=d=new Map);let y=d.get(p);y===void 0?(r=T(),d.set(p,r)):r=y}}let u=r,a;if(r.s===B?a=r.v:(a=e.apply(null,arguments),o++),u.s=B,c){let m=s?.deref()??s;m!=null&&c(m,a)&&(a=m,o!==0&&o--),s=typeof a=="object"&&a!==null||typeof a=="function"?new de(a):a}return u.v=a,a}return i.clearCache=()=>{n=T(),i.resetResultsCount()},i.resultsCount=()=>o,i.resetResultsCount=()=>{o=0},i}function J(e,...t){let n=typeof e=="function"?{memoize:e,memoizeOptions:t}:e;return(...s)=>{let o=0,i=0,r,l={},u=s.pop();typeof u=="object"&&(l=u,u=s.pop()),w(u,`createSelector expects an output function after the inputs, but received: [${typeof u}]`);let a={...n,...l},{memoize:m,memoizeOptions:f=[],argsMemoize:p=R,argsMemoizeOptions:d=[],devModeChecks:y={}}=a,Q=O(f),Z=O(d),q=K(s),P=m(function(){return o++,u.apply(null,arguments)},...Q),Me=!0,ee=p(function(){i++;let ne=W(q,arguments);return r=P.apply(null,ne),r},...Z);return Object.assign(ee,{resultFunc:u,memoizedResultFunc:P,dependencies:q,dependencyRecomputations:()=>i,resetDependencyRecomputations:()=>{i=0},lastResult:()=>r,recomputations:()=>o,resetRecomputations:()=>{o=0},memoize:m,argsMemoize:p})}}var U=J(R);var ye=(e,t=U)=>{V(e,`createStructuredSelector expects first argument to be an object where each property is a selector, instead received a ${typeof e}`);let n=Object.keys(e),c=n.map(o=>e[o]);return t(c,(...o)=>o.reduce((i,r,l)=>(i[n[l]]=r,i),{}))};export{U as createSelector,J as createSelectorCreator,ye as createStructuredSelector,pe as lruMemoize,pe as weakMapMemoize,x as referenceEqualityCheck,re as setGlobalDevModeChecks,me as unstable_autotrackMemoize};
+ //# sourceMappingURL=reselect.browser.mjs.map
+\ No newline at end of file
+diff --git a/dist/reselect.legacy-esm.js b/dist/reselect.legacy-esm.js
+index 9c18982dd0756ccc240f23383b50b893415ba7b3..041426d1db1d1e78cfe35c4e55e38724b2db35dc 100644
+--- a/dist/reselect.legacy-esm.js
++++ b/dist/reselect.legacy-esm.js
+@@ -625,6 +625,8 @@ function weakMapMemoize(func, options = {}) {
+   return memoized;
+ }
+ 
++weakMapMemoize = lruMemoize
++
+ // src/createSelectorCreator.ts
+ function createSelectorCreator(memoizeOrOptions, ...memoizeOptionsFromArgs) {
+   const createSelectorCreatorOptions = typeof memoizeOrOptions === "function" ? {
+diff --git a/dist/reselect.mjs b/dist/reselect.mjs
+index 531dfe6fc16e83dd27dbe90086b5aafea76adb9e..c27aca00d581919325cc595cfa3021cd53c1fa68 100644
+--- a/dist/reselect.mjs
++++ b/dist/reselect.mjs
+@@ -606,6 +606,8 @@ function weakMapMemoize(func, options = {}) {
+   return memoized;
+ }
+ 
++weakMapMemoize = lruMemoize
++
+ // src/createSelectorCreator.ts
+ function createSelectorCreator(memoizeOrOptions, ...memoizeOptionsFromArgs) {
+   const createSelectorCreatorOptions = typeof memoizeOrOptions === "function" ? {
+diff --git a/src/weakMapMemoize.ts b/src/weakMapMemoize.ts
+index f723071db3a8a17f94431bc77cde2dbee026f57f..ddfeb0d7720e5463041d1474f54e58fdbc18fe6d 100644
+--- a/src/weakMapMemoize.ts
++++ b/src/weakMapMemoize.ts
+@@ -1,6 +1,7 @@
+ // Original source:
+ // - https://github.com/facebook/react/blob/0b974418c9a56f6c560298560265dcf4b65784bc/packages/react/src/ReactCache.js
+ 
++import { lruMemoize } from '../dist/reselect.mjs'
+ import type {
+   AnyFunction,
+   DefaultMemoizeFields,
+@@ -169,97 +170,99 @@ export interface WeakMapMemoizeOptions<Result = any> {
+  * @public
+  * @experimental
+  */
+-export function weakMapMemoize<Func extends AnyFunction>(
+-  func: Func,
+-  options: WeakMapMemoizeOptions<ReturnType<Func>> = {}
+-) {
+-  let fnNode = createCacheNode()
+-  const { resultEqualityCheck } = options
++// export function weakMapMemoize<Func extends AnyFunction>(
++//   func: Func,
++//   options: WeakMapMemoizeOptions<ReturnType<Func>> = {}
++// ) {
++//   let fnNode = createCacheNode()
++//   const { resultEqualityCheck } = options
+ 
+-  let lastResult: WeakRef<object> | undefined
++//   let lastResult: WeakRef<object> | undefined
+ 
+-  let resultsCount = 0
++//   let resultsCount = 0
+ 
+-  function memoized() {
+-    let cacheNode = fnNode
+-    const { length } = arguments
+-    for (let i = 0, l = length; i < l; i++) {
+-      const arg = arguments[i]
+-      if (
+-        typeof arg === 'function' ||
+-        (typeof arg === 'object' && arg !== null)
+-      ) {
+-        // Objects go into a WeakMap
+-        let objectCache = cacheNode.o
+-        if (objectCache === null) {
+-          cacheNode.o = objectCache = new WeakMap()
+-        }
+-        const objectNode = objectCache.get(arg)
+-        if (objectNode === undefined) {
+-          cacheNode = createCacheNode()
+-          objectCache.set(arg, cacheNode)
+-        } else {
+-          cacheNode = objectNode
+-        }
+-      } else {
+-        // Primitives go into a regular Map
+-        let primitiveCache = cacheNode.p
+-        if (primitiveCache === null) {
+-          cacheNode.p = primitiveCache = new Map()
+-        }
+-        const primitiveNode = primitiveCache.get(arg)
+-        if (primitiveNode === undefined) {
+-          cacheNode = createCacheNode()
+-          primitiveCache.set(arg, cacheNode)
+-        } else {
+-          cacheNode = primitiveNode
+-        }
+-      }
+-    }
++//   function memoized() {
++//     let cacheNode = fnNode
++//     const { length } = arguments
++//     for (let i = 0, l = length; i < l; i++) {
++//       const arg = arguments[i]
++//       if (
++//         typeof arg === 'function' ||
++//         (typeof arg === 'object' && arg !== null)
++//       ) {
++//         // Objects go into a WeakMap
++//         let objectCache = cacheNode.o
++//         if (objectCache === null) {
++//           cacheNode.o = objectCache = new WeakMap()
++//         }
++//         const objectNode = objectCache.get(arg)
++//         if (objectNode === undefined) {
++//           cacheNode = createCacheNode()
++//           objectCache.set(arg, cacheNode)
++//         } else {
++//           cacheNode = objectNode
++//         }
++//       } else {
++//         // Primitives go into a regular Map
++//         let primitiveCache = cacheNode.p
++//         if (primitiveCache === null) {
++//           cacheNode.p = primitiveCache = new Map()
++//         }
++//         const primitiveNode = primitiveCache.get(arg)
++//         if (primitiveNode === undefined) {
++//           cacheNode = createCacheNode()
++//           primitiveCache.set(arg, cacheNode)
++//         } else {
++//           cacheNode = primitiveNode
++//         }
++//       }
++//     }
+ 
+-    const terminatedNode = cacheNode as unknown as TerminatedCacheNode<any>
++//     const terminatedNode = cacheNode as unknown as TerminatedCacheNode<any>
+ 
+-    let result
++//     let result
+ 
+-    if (cacheNode.s === TERMINATED) {
+-      result = cacheNode.v
+-    } else {
+-      // Allow errors to propagate
+-      result = func.apply(null, arguments as unknown as any[])
+-      resultsCount++
+-    }
++//     if (cacheNode.s === TERMINATED) {
++//       result = cacheNode.v
++//     } else {
++//       // Allow errors to propagate
++//       result = func.apply(null, arguments as unknown as any[])
++//       resultsCount++
++//     }
+ 
+-    terminatedNode.s = TERMINATED
++//     terminatedNode.s = TERMINATED
+ 
+-    if (resultEqualityCheck) {
+-      const lastResultValue = lastResult?.deref() ?? lastResult
+-      if (
+-        lastResultValue != null &&
+-        resultEqualityCheck(lastResultValue as ReturnType<Func>, result)
+-      ) {
+-        result = lastResultValue
+-        resultsCount !== 0 && resultsCount--
+-      }
++//     if (resultEqualityCheck) {
++//       const lastResultValue = lastResult?.deref() ?? lastResult
++//       if (
++//         lastResultValue != null &&
++//         resultEqualityCheck(lastResultValue as ReturnType<Func>, result)
++//       ) {
++//         result = lastResultValue
++//         resultsCount !== 0 && resultsCount--
++//       }
+ 
+-      const needsWeakRef =
+-        (typeof result === 'object' && result !== null) ||
+-        typeof result === 'function'
+-      lastResult = needsWeakRef ? new Ref(result) : result
+-    }
+-    terminatedNode.v = result
+-    return result
+-  }
++//       const needsWeakRef =
++//         (typeof result === 'object' && result !== null) ||
++//         typeof result === 'function'
++//       lastResult = needsWeakRef ? new Ref(result) : result
++//     }
++//     terminatedNode.v = result
++//     return result
++//   }
+ 
+-  memoized.clearCache = () => {
+-    fnNode = createCacheNode()
+-    memoized.resetResultsCount()
+-  }
++//   memoized.clearCache = () => {
++//     fnNode = createCacheNode()
++//     memoized.resetResultsCount()
++//   }
+ 
+-  memoized.resultsCount = () => resultsCount
++//   memoized.resultsCount = () => resultsCount
+ 
+-  memoized.resetResultsCount = () => {
+-    resultsCount = 0
+-  }
++//   memoized.resetResultsCount = () => {
++//     resultsCount = 0
++//   }
+ 
+-  return memoized as Func & Simplify<DefaultMemoizeFields>
+-}
++//   return memoized as Func & Simplify<DefaultMemoizeFields>
++// }
++
++export const weakMapMemoize = lruMemoize

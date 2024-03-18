@@ -1,88 +1,52 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
-import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { setScaledBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector(
-  [stateSelector],
-  ({ canvas, generation }) => {
-    const { boundingBoxScaleMethod, scaledBoundingBoxDimensions } = canvas;
-    const { model, aspectRatio } = generation;
-
-    return {
-      model,
-      scaledBoundingBoxDimensions,
-      aspectRatio,
-      isManual: boundingBoxScaleMethod === 'manual',
-    };
-  }
-);
-
 const ParamScaledWidth = () => {
-  const dispatch = useAppDispatch();
-  const { model, isManual, scaledBoundingBoxDimensions, aspectRatio } =
-    useAppSelector(selector);
-
-  const initial = ['sdxl', 'sdxl-refiner'].includes(model?.base_model as string)
-    ? 1024
-    : 512;
-
   const { t } = useTranslation();
-
-  const handleChangeScaledWidth = useCallback(
-    (v: number) => {
-      const newWidth = Math.floor(v);
-      let newHeight = scaledBoundingBoxDimensions.height;
-
-      if (aspectRatio) {
-        newHeight = roundToMultiple(newWidth / aspectRatio.value, 64);
-      }
-
-      dispatch(
-        setScaledBoundingBoxDimensions({
-          width: newWidth,
-          height: newHeight,
-        })
-      );
+  const dispatch = useAppDispatch();
+  const optimalDimension = useAppSelector(selectOptimalDimension);
+  const isManual = useAppSelector((s) => s.canvas.boundingBoxScaleMethod === 'manual');
+  const width = useAppSelector((s) => s.canvas.scaledBoundingBoxDimensions.width);
+  const sliderMin = useAppSelector((s) => s.config.sd.scaledBoundingBoxWidth.sliderMin);
+  const sliderMax = useAppSelector((s) => s.config.sd.scaledBoundingBoxWidth.sliderMax);
+  const numberInputMin = useAppSelector((s) => s.config.sd.scaledBoundingBoxWidth.numberInputMin);
+  const numberInputMax = useAppSelector((s) => s.config.sd.scaledBoundingBoxWidth.numberInputMax);
+  const coarseStep = useAppSelector((s) => s.config.sd.scaledBoundingBoxWidth.coarseStep);
+  const fineStep = useAppSelector((s) => s.config.sd.scaledBoundingBoxWidth.fineStep);
+  const onChange = useCallback(
+    (width: number) => {
+      dispatch(setScaledBoundingBoxDimensions({ width }));
     },
-    [aspectRatio, dispatch, scaledBoundingBoxDimensions.height]
+    [dispatch]
   );
 
-  const handleResetScaledWidth = useCallback(() => {
-    const resetWidth = Math.floor(initial);
-    let resetHeight = scaledBoundingBoxDimensions.height;
-
-    if (aspectRatio) {
-      resetHeight = roundToMultiple(resetWidth / aspectRatio.value, 64);
-    }
-
-    dispatch(
-      setScaledBoundingBoxDimensions({
-        width: resetWidth,
-        height: resetHeight,
-      })
-    );
-  }, [aspectRatio, dispatch, initial, scaledBoundingBoxDimensions.height]);
-
   return (
-    <InvControl isDisabled={!isManual} label={t('parameters.scaledWidth')}>
-      <InvSlider
-        min={64}
-        max={1536}
-        step={64}
-        value={scaledBoundingBoxDimensions.width}
-        onChange={handleChangeScaledWidth}
-        numberInputMax={4096}
+    <FormControl isDisabled={!isManual}>
+      <FormLabel>{t('parameters.scaledWidth')}</FormLabel>
+      <CompositeSlider
+        min={sliderMin}
+        max={sliderMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        value={width}
+        onChange={onChange}
+        defaultValue={optimalDimension}
         marks
-        withNumberInput
-        onReset={handleResetScaledWidth}
       />
-    </InvControl>
+      <CompositeNumberInput
+        min={numberInputMin}
+        max={numberInputMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        value={width}
+        onChange={onChange}
+        defaultValue={optimalDimension}
+      />
+    </FormControl>
   );
 };
 

@@ -1,8 +1,8 @@
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
+import { IconButton } from '@invoke-ai/ui-library';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IoSwapVertical } from 'react-icons/io5';
+import { PiArrowsDownUpBold } from 'react-icons/pi';
 
 export const SwapDimensionsButton = memo(() => {
   const { t } = useTranslation();
@@ -11,12 +11,13 @@ export const SwapDimensionsButton = memo(() => {
     ctx.dimensionsSwapped();
   }, [ctx]);
   return (
-    <InvIconButton
+    <IconButton
+      tooltip={t('parameters.swapDimensions')}
       aria-label={t('parameters.swapDimensions')}
       onClick={onClick}
       variant="ghost"
       size="sm"
-      icon={<IoSwapVertical />}
+      icon={<PiArrowsDownUpBold />}
     />
   );
 });

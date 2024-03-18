@@ -1,40 +1,33 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { makeConnectionErrorSelector } from 'features/nodes/store/util/makeIsConnectionValidSelector';
 import { useMemo } from 'react';
 
 import { useFieldType } from './useFieldType.ts';
 
-const selectIsConnectionInProgress = createMemoizedSelector(
-  stateSelector,
-  ({ nodes }) =>
-    nodes.connectionStartFieldType !== null &&
-    nodes.connectionStartParams !== null
+const selectIsConnectionInProgress = createSelector(
+  selectNodesSlice,
+  (nodes) => nodes.connectionStartFieldType !== null && nodes.connectionStartParams !== null
 );
 
-export type UseConnectionStateProps = {
+type UseConnectionStateProps = {
   nodeId: string;
   fieldName: string;
-  kind: 'input' | 'output';
+  kind: 'inputs' | 'outputs';
 };
 
-export const useConnectionState = ({
-  nodeId,
-  fieldName,
-  kind,
-}: UseConnectionStateProps) => {
+export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionStateProps) => {
   const fieldType = useFieldType(nodeId, fieldName, kind);
 
   const selectIsConnected = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ nodes }) =>
+      createSelector(selectNodesSlice, (nodes) =>
         Boolean(
           nodes.edges.filter((edge) => {
             return (
-              (kind === 'input' ? edge.target : edge.source) === nodeId &&
-              (kind === 'input' ? edge.targetHandle : edge.sourceHandle) ===
-                fieldName
+              (kind === 'inputs' ? edge.target : edge.source) === nodeId &&
+              (kind === 'inputs' ? edge.targetHandle : edge.sourceHandle) === fieldName
             );
           }).length
         )
@@ -43,24 +36,17 @@ export const useConnectionState = ({
   );
 
   const selectConnectionError = useMemo(
-    () =>
-      makeConnectionErrorSelector(
-        nodeId,
-        fieldName,
-        kind === 'input' ? 'target' : 'source',
-        fieldType
-      ),
+    () => makeConnectionErrorSelector(nodeId, fieldName, kind === 'inputs' ? 'target' : 'source', fieldType),
     [nodeId, fieldName, kind, fieldType]
   );
 
   const selectIsConnectionStartField = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ nodes }) =>
+      createSelector(selectNodesSlice, (nodes) =>
         Boolean(
           nodes.connectionStartParams?.nodeId === nodeId &&
             nodes.connectionStartParams?.handleId === fieldName &&
-            nodes.connectionStartParams?.handleType ===
-              { input: 'target', output: 'source' }[kind]
+            nodes.connectionStartParams?.handleType === { inputs: 'target', outputs: 'source' }[kind]
         )
       ),
     [fieldName, kind, nodeId]
@@ -72,10 +58,7 @@ export const useConnectionState = ({
   const connectionError = useAppSelector(selectConnectionError);
 
   const shouldDim = useMemo(
-    () =>
-      Boolean(
-        isConnectionInProgress && connectionError && !isConnectionStartField
-      ),
+    () => Boolean(isConnectionInProgress && connectionError && !isConnectionStartField),
     [connectionError, isConnectionInProgress, isConnectionStartField]
   );
 

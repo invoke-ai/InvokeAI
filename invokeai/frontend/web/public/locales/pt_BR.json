@@ -7,7 +7,6 @@
         "img2img": "Imagem Para Imagem",
         "unifiedCanvas": "Tela Unificada",
         "nodes": "Nódulos",
-        "langBrPortuguese": "Português do Brasil",
         "nodesDesc": "Um sistema baseado em nódulos para geração de imagens está em contrução. Fique ligado para atualizações sobre essa funcionalidade incrível.",
         "postProcessing": "Pós-processamento",
         "postProcessDesc1": "Invoke AI oferece uma variedade e funcionalidades de pós-processamento. Redimensionador de Imagem e Restauração Facial já estão disponíveis na interface. Você pode acessar elas no menu de Opções Avançadas na aba de Texto para Imagem e Imagem para Imagem. Você também pode processar imagens diretamente, usando os botões de ação de imagem acima da atual tela de imagens ou visualizador.",
@@ -42,23 +41,11 @@
         "statusModelChanged": "Modelo Alterado",
         "githubLabel": "Github",
         "discordLabel": "Discord",
-        "langArabic": "Árabe",
-        "langEnglish": "Inglês",
-        "langDutch": "Holandês",
-        "langFrench": "Francês",
-        "langGerman": "Alemão",
-        "langItalian": "Italiano",
-        "langJapanese": "Japonês",
-        "langPolish": "Polonês",
-        "langSimplifiedChinese": "Chinês",
-        "langUkranian": "Ucraniano",
         "back": "Voltar",
         "statusConvertingModel": "Convertendo Modelo",
         "statusModelConverted": "Modelo Convertido",
         "statusMergingModels": "Mesclando Modelos",
         "statusMergedModels": "Modelos Mesclados",
-        "langRussian": "Russo",
-        "langSpanish": "Espanhol",
         "loadingInvokeAI": "Carregando Invoke AI",
         "loading": "Carregando"
     },
@@ -102,10 +89,6 @@
         "pinOptions": {
             "title": "Fixar Opções",
             "desc": "Fixar o painel de opções"
-        },
-        "toggleViewer": {
-            "title": "Ativar Visualizador",
-            "desc": "Abrir e fechar o Visualizador de Imagens"
         },
         "toggleGallery": {
             "title": "Ativar Galeria",
@@ -166,10 +149,6 @@
         "nextImage": {
             "title": "Próxima Imagem",
             "desc": "Mostra a próxima imagem na galeria"
-        },
-        "toggleGalleryPin": {
-            "title": "Ativar Fixar Galeria",
-            "desc": "Fixa e desafixa a galeria na interface"
         },
         "increaseGalleryThumbSize": {
             "title": "Aumentar Tamanho da Galeria de Imagem",

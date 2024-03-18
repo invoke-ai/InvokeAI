@@ -1,10 +1,9 @@
-import { Box } from '@chakra-ui/layout';
+import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvAutosizeTextarea } from 'common/components/InvAutosizeTextarea/InvAutosizeTextarea';
-import { AddEmbeddingButton } from 'features/embedding/AddEmbeddingButton';
-import { EmbeddingPopover } from 'features/embedding/EmbeddingPopover';
-import { usePrompt } from 'features/embedding/usePrompt';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
+import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
+import { PromptPopover } from 'features/prompt/PromptPopover';
+import { usePrompt } from 'features/prompt/usePrompt';
 import { setNegativeStylePromptSDXL } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -12,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 
 export const ParamSDXLNegativeStylePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((state) => state.sdxl.negativeStylePrompt);
+  const prompt = useAppSelector((s) => s.sdxl.negativeStylePrompt);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const handleChange = useCallback(
@@ -21,15 +20,7 @@ export const ParamSDXLNegativeStylePrompt = memo(() => {
     },
     [dispatch]
   );
-  const {
-    onChange,
-    isOpen,
-    onClose,
-    onOpen,
-    onSelectEmbedding,
-    onKeyDown,
-    onFocus,
-  } = usePrompt({
+  const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown, onFocus } = usePrompt({
     prompt,
     textareaRef: textareaRef,
     onChange: handleChange,
@@ -38,14 +29,9 @@ export const ParamSDXLNegativeStylePrompt = memo(() => {
   useHotkeys('alt+a', onFocus, []);
 
   return (
-    <EmbeddingPopover
-      isOpen={isOpen}
-      onClose={onClose}
-      onSelect={onSelectEmbedding}
-      width={textareaRef.current?.clientWidth}
-    >
+    <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
       <Box pos="relative">
-        <InvAutosizeTextarea
+        <Textarea
           id="prompt"
           name="prompt"
           ref={textareaRef}
@@ -53,17 +39,15 @@ export const ParamSDXLNegativeStylePrompt = memo(() => {
           placeholder={t('sdxl.negStylePrompt')}
           onChange={onChange}
           onKeyDown={onKeyDown}
-          minH="unset"
           fontSize="sm"
-          minRows={2}
-          maxRows={5}
           variant="darkFilled"
+          paddingRight={30}
         />
         <PromptOverlayButtonWrapper>
-          <AddEmbeddingButton isOpen={isOpen} onOpen={onOpen} />
+          <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
         </PromptOverlayButtonWrapper>
       </Box>
-    </EmbeddingPopover>
+    </PromptPopover>
   );
 });
 

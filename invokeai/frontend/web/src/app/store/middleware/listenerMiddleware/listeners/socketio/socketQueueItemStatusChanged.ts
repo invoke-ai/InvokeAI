@@ -1,25 +1,18 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
-import {
-  appSocketQueueItemStatusChanged,
-  socketQueueItemStatusChanged,
-} from 'services/events/actions';
+import { socketQueueItemStatusChanged } from 'services/events/actions';
 
-import { startAppListening } from '../..';
+const log = logger('socketio');
 
-export const addSocketQueueItemStatusChangedEventListener = () => {
+export const addSocketQueueItemStatusChangedEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketQueueItemStatusChanged,
     effect: async (action, { dispatch }) => {
-      const log = logger('socketio');
-
       // we've got new status for the queue item, batch and queue
       const { queue_item, batch_status, queue_status } = action.payload.data;
 
-      log.debug(
-        action.payload,
-        `Queue item ${queue_item.item_id} status updated: ${queue_item.status}`
-      );
+      log.debug(action.payload, `Queue item ${queue_item.item_id} status updated: ${queue_item.status}`);
 
       // Update this specific queue item in the list of queue items (this is the queue item DTO, without the session)
       dispatch(
@@ -43,39 +36,24 @@ export const addSocketQueueItemStatusChangedEventListener = () => {
 
       // Update the batch status
       dispatch(
-        queueApi.util.updateQueryData(
-          'getBatchStatus',
-          { batch_id: batch_status.batch_id },
-          () => batch_status
-        )
+        queueApi.util.updateQueryData('getBatchStatus', { batch_id: batch_status.batch_id }, () => batch_status)
       );
 
       // Update the queue item status (this is the full queue item, including the session)
       dispatch(
-        queueApi.util.updateQueryData(
-          'getQueueItem',
-          queue_item.item_id,
-          (draft) => {
-            if (!draft) {
-              return;
-            }
-            Object.assign(draft, queue_item);
+        queueApi.util.updateQueryData('getQueueItem', queue_item.item_id, (draft) => {
+          if (!draft) {
+            return;
           }
-        )
+          Object.assign(draft, queue_item);
+        })
       );
 
       // Invalidate caches for things we cannot update
       // TODO: technically, we could possibly update the current session queue item, but feels safer to just request it again
       dispatch(
-        queueApi.util.invalidateTags([
-          'CurrentSessionQueueItem',
-          'NextSessionQueueItem',
-          'InvocationCacheStatus',
-        ])
+        queueApi.util.invalidateTags(['CurrentSessionQueueItem', 'NextSessionQueueItem', 'InvocationCacheStatus'])
       );
-
-      // Pass the event along
-      dispatch(appSocketQueueItemStatusChanged(action.payload));
     },
   });
 };

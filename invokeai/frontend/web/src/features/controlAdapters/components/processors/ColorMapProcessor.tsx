@@ -1,5 +1,4 @@
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type { RequiredColorMapImageProcessorInvocation } from 'features/controlAdapters/store/types';
@@ -8,8 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './common/ProcessorWrapper';
 
-const DEFAULTS = CONTROLNET_PROCESSORS.color_map_image_processor
-  .default as RequiredColorMapImageProcessorInvocation;
+const DEFAULTS = CONTROLNET_PROCESSORS.color_map_image_processor.default as RequiredColorMapImageProcessorInvocation;
 
 type ColorMapProcessorProps = {
   controlNetId: string;
@@ -30,30 +28,28 @@ const ColorMapProcessor = (props: ColorMapProcessorProps) => {
     [controlNetId, processorChanged]
   );
 
-  const handleColorMapTileSizeReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      color_map_tile_size: DEFAULTS.color_map_tile_size,
-    });
-  }, [controlNetId, processorChanged]);
-
   return (
     <ProcessorWrapper>
-      <InvControl
-        label={t('controlnet.colorMapTileSize')}
-        isDisabled={!isEnabled}
-      >
-        <InvSlider
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.colorMapTileSize')}</FormLabel>
+        <CompositeSlider
           value={color_map_tile_size}
+          defaultValue={DEFAULTS.color_map_tile_size}
           onChange={handleColorMapTileSizeChanged}
-          onReset={handleColorMapTileSizeReset}
           min={1}
           max={256}
           step={1}
           marks
-          withNumberInput
-          numberInputMax={4096}
         />
-      </InvControl>
+        <CompositeNumberInput
+          value={color_map_tile_size}
+          defaultValue={DEFAULTS.color_map_tile_size}
+          onChange={handleColorMapTileSizeChanged}
+          min={1}
+          max={4096}
+          step={1}
+        />
+      </FormControl>
     </ProcessorWrapper>
   );
 };

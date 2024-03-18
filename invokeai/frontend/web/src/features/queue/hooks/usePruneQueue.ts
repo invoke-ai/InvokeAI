@@ -1,20 +1,14 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  listCursorChanged,
-  listPriorityChanged,
-} from 'features/queue/store/queueSlice';
+import { listCursorChanged, listPriorityChanged } from 'features/queue/store/queueSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  useGetQueueStatusQuery,
-  usePruneQueueMutation,
-} from 'services/api/endpoints/queue';
+import { useGetQueueStatusQuery, usePruneQueueMutation } from 'services/api/endpoints/queue';
 
 export const usePruneQueue = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const isConnected = useAppSelector((state) => state.system.isConnected);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
   const [trigger, { isLoading }] = usePruneQueueMutation({
     fixedCacheKey: 'pruneQueue',
   });
@@ -25,8 +19,7 @@ export const usePruneQueue = () => {
       }
 
       return {
-        finishedCount:
-          data.queue.completed + data.queue.canceled + data.queue.failed,
+        finishedCount: data.queue.completed + data.queue.canceled + data.queue.failed,
       };
     },
   });
@@ -55,10 +48,7 @@ export const usePruneQueue = () => {
     }
   }, [finishedCount, trigger, dispatch, t]);
 
-  const isDisabled = useMemo(
-    () => !isConnected || !finishedCount,
-    [finishedCount, isConnected]
-  );
+  const isDisabled = useMemo(() => !isConnected || !finishedCount, [finishedCount, isConnected]);
 
   return { pruneQueue, isLoading, finishedCount, isDisabled };
 };

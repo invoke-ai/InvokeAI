@@ -1,7 +1,5 @@
-import type { RootState } from 'app/store/store';
+import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSwitch } from 'common/components/InvSwitch/wrapper';
 import { setShouldRandomizeSeed } from 'features/parameters/store/generationSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -11,23 +9,18 @@ export const ParamSeedRandomize = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const shouldRandomizeSeed = useAppSelector(
-    (state: RootState) => state.generation.shouldRandomizeSeed
-  );
+  const shouldRandomizeSeed = useAppSelector((s) => s.generation.shouldRandomizeSeed);
 
   const handleChangeShouldRandomizeSeed = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) =>
-      dispatch(setShouldRandomizeSeed(e.target.checked)),
+    (e: ChangeEvent<HTMLInputElement>) => dispatch(setShouldRandomizeSeed(e.target.checked)),
     [dispatch]
   );
 
   return (
-    <InvControl label={t('common.random')} w="min-content">
-      <InvSwitch
-        isChecked={shouldRandomizeSeed}
-        onChange={handleChangeShouldRandomizeSeed}
-      />
-    </InvControl>
+    <FormControl w="min-content">
+      <FormLabel>{t('common.random')}</FormLabel>
+      <Switch isChecked={shouldRandomizeSeed} onChange={handleChangeShouldRandomizeSeed} />
+    </FormControl>
   );
 });
 

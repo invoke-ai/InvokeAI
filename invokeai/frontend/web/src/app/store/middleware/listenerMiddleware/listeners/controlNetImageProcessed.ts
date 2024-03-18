@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
 import { controlAdapterImageProcessed } from 'features/controlAdapters/store/actions';
 import {
@@ -16,9 +17,7 @@ import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig, ImageDTO } from 'services/api/types';
 import { socketInvocationComplete } from 'services/events/actions';
 
-import { startAppListening } from '..';
-
-export const addControlNetImageProcessedListener = () => {
+export const addControlNetImageProcessedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: controlAdapterImageProcessed,
     effect: async (action, { dispatch, getState, take }) => {
@@ -51,6 +50,7 @@ export const addControlNetImageProcessedListener = () => {
                 image: { image_name: ca.controlImage },
               },
             },
+            edges: [],
           },
           runs: 1,
         },
@@ -64,37 +64,28 @@ export const addControlNetImageProcessedListener = () => {
         );
         const enqueueResult = await req.unwrap();
         req.reset();
-        log.debug(
-          { enqueueResult: parseify(enqueueResult) },
-          t('queue.graphQueued')
-        );
+        log.debug({ enqueueResult: parseify(enqueueResult) }, t('queue.graphQueued'));
 
         const [invocationCompleteAction] = await take(
           (action): action is ReturnType<typeof socketInvocationComplete> =>
             socketInvocationComplete.match(action) &&
-            action.payload.data.queue_batch_id ===
-              enqueueResult.batch.batch_id &&
+            action.payload.data.queue_batch_id === enqueueResult.batch.batch_id &&
             action.payload.data.source_node_id === nodeId
         );
 
         // We still have to check the output type
         if (isImageOutput(invocationCompleteAction.payload.data.result)) {
-          const { image_name } =
-            invocationCompleteAction.payload.data.result.image;
+          const { image_name } = invocationCompleteAction.payload.data.result.image;
 
           // Wait for the ImageDTO to be received
           const [{ payload }] = await take(
             (action) =>
-              imagesApi.endpoints.getImageDTO.matchFulfilled(action) &&
-              action.payload.image_name === image_name
+              imagesApi.endpoints.getImageDTO.matchFulfilled(action) && action.payload.image_name === image_name
           );
 
           const processedControlImage = payload as ImageDTO;
 
-          log.debug(
-            { controlNetId: action.payload, processedControlImage },
-            'ControlNet image processed'
-          );
+          log.debug({ controlNetId: action.payload, processedControlImage }, 'ControlNet image processed');
 
           // Update the processed image in the store
           dispatch(
@@ -105,10 +96,7 @@ export const addControlNetImageProcessedListener = () => {
           );
         }
       } catch (error) {
-        log.error(
-          { enqueueBatchArg: parseify(enqueueBatchArg) },
-          t('queue.graphFailedToQueue')
-        );
+        log.error({ enqueueBatchArg: parseify(enqueueBatchArg) }, t('queue.graphFailedToQueue'));
 
         if (error instanceof Object) {
           if ('data' in error && 'status' in error) {

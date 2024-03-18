@@ -20,12 +20,7 @@ export const areAnyPixelsBlack = (pixels: Uint8ClampedArray) => {
   const len = pixels.length;
   let i = 0;
   for (i; i < len; ) {
-    if (
-      pixels[i++] === 0 &&
-      pixels[i++] === 0 &&
-      pixels[i++] === 0 &&
-      pixels[i++] === 255
-    ) {
+    if (pixels[i++] === 0 && pixels[i++] === 0 && pixels[i++] === 0 && pixels[i++] === 255) {
       return true;
     }
   }

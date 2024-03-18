@@ -1,5 +1,5 @@
 # continuous integration
-/.github/workflows/  @lstein @blessedcoolant @hipsterusername
+/.github/workflows/  @lstein @blessedcoolant @hipsterusername @ebr
 
 # documentation
 /docs/ @lstein @blessedcoolant @hipsterusername @Millu
@@ -10,7 +10,7 @@
 
 # installation and configuration
 /pyproject.toml  @lstein @blessedcoolant @hipsterusername
-/docker/  @lstein @blessedcoolant @hipsterusername
+/docker/  @lstein @blessedcoolant @hipsterusername @ebr
 /scripts/ @ebr @lstein @hipsterusername
 /installer/ @lstein @ebr @hipsterusername
 /invokeai/assets @lstein @ebr @hipsterusername
@@ -26,9 +26,7 @@
 
 # front ends
 /invokeai/frontend/CLI @lstein @hipsterusername
-/invokeai/frontend/install @lstein @ebr @hipsterusername 
+/invokeai/frontend/install @lstein @ebr @hipsterusername
 /invokeai/frontend/merge @lstein @blessedcoolant @hipsterusername
 /invokeai/frontend/training @lstein @blessedcoolant @hipsterusername
 /invokeai/frontend/web @psychedelicious @blessedcoolant @maryhipp @hipsterusername
-
-

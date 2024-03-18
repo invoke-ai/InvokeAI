@@ -1,26 +1,24 @@
 """Test the queued download facility"""
+
 import re
 import time
 from pathlib import Path
-from typing import Any, Dict, List
 
 import pytest
-import requests
-from pydantic import BaseModel
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
-from requests_testadapter import TestAdapter
+from requests_testadapter import TestAdapter, TestSession
 
 from invokeai.app.services.download import DownloadJob, DownloadJobStatus, DownloadQueueService
-from invokeai.app.services.events.events_base import EventServiceBase
+from tests.test_nodes import TestEventService
 
 # Prevent pytest deprecation warnings
-TestAdapter.__test__ = False
+TestAdapter.__test__ = False  # type: ignore
 
 
 @pytest.fixture
-def session() -> requests.sessions.Session:
-    sess = requests.Session()
+def session() -> Session:
+    sess = TestSession()
     for i in ["12345", "9999", "54321"]:
         content = (
             b"I am a safetensors file " + bytearray(i, "utf-8") + bytearray(32_000)
@@ -51,28 +49,6 @@ def session() -> requests.sessions.Session:
     sess.mount("http://www.civitai.com/models/broken", TestAdapter(b"Not found", status=404))
 
     return sess
-
-
-class DummyEvent(BaseModel):
-    """Dummy Event to use with Dummy Event service."""
-
-    event_name: str
-    payload: Dict[str, Any]
-
-
-# A dummy event service for testing event issuing
-class DummyEventService(EventServiceBase):
-    """Dummy event service for testing."""
-
-    events: List[DummyEvent]
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.events = []
-
-    def dispatch(self, event_name: str, payload: Any) -> None:
-        """Dispatch an event by appending it to self.events."""
-        self.events.append(DummyEvent(event_name=payload["event"], payload=payload["data"]))
 
 
 def test_basic_queue_download(tmp_path: Path, session: Session) -> None:
@@ -126,7 +102,7 @@ def test_errors(tmp_path: Path, session: Session) -> None:
 
 
 def test_event_bus(tmp_path: Path, session: Session) -> None:
-    event_bus = DummyEventService()
+    event_bus = TestEventService()
 
     queue = DownloadQueueService(requests_session=session, event_bus=event_bus)
     queue.start()
@@ -160,7 +136,7 @@ def test_event_bus(tmp_path: Path, session: Session) -> None:
     queue.stop()
 
 
-def test_broken_callbacks(tmp_path: Path, session: requests.sessions.Session, capsys) -> None:
+def test_broken_callbacks(tmp_path: Path, session: Session, capsys) -> None:
     queue = DownloadQueueService(
         requests_session=session,
     )
@@ -191,8 +167,9 @@ def test_broken_callbacks(tmp_path: Path, session: requests.sessions.Session, ca
     queue.stop()
 
 
-def test_cancel(tmp_path: Path, session: requests.sessions.Session) -> None:
-    event_bus = DummyEventService()
+@pytest.mark.timeout(timeout=15, method="thread")
+def test_cancel(tmp_path: Path, session: Session) -> None:
+    event_bus = TestEventService()
 
     queue = DownloadQueueService(requests_session=session, event_bus=event_bus)
     queue.start()
@@ -205,6 +182,9 @@ def test_cancel(tmp_path: Path, session: requests.sessions.Session) -> None:
     def cancelled_callback(job: DownloadJob) -> None:
         nonlocal cancelled
         cancelled = True
+
+    def handler(signum, frame):
+        raise TimeoutError("Join took too long to return")
 
     job = queue.download(
         source=AnyHttpUrl("http://www.civitai.com/models/12345"),

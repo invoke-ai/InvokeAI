@@ -1,24 +1,22 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { KIND_MAP } from 'features/nodes/types/constants';
-import { isInvocationNode } from 'features/nodes/types/invocation';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectFieldInputTemplate, selectFieldOutputTemplate } from 'features/nodes/store/selectors';
+import type { FieldInputTemplate, FieldOutputTemplate } from 'features/nodes/types/field';
 import { useMemo } from 'react';
 
 export const useFieldTemplate = (
   nodeId: string,
   fieldName: string,
-  kind: 'input' | 'output'
-) => {
+  kind: 'inputs' | 'outputs'
+): FieldInputTemplate | FieldOutputTemplate | null => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ nodes, nodeTemplates }) => {
-        const node = nodes.nodes.find((node) => node.id === nodeId);
-        if (!isInvocationNode(node)) {
-          return;
+      createMemoizedSelector(selectNodesSlice, (nodes) => {
+        if (kind === 'inputs') {
+          return selectFieldInputTemplate(nodes, nodeId, fieldName);
         }
-        const nodeTemplate = nodeTemplates.templates[node?.data.type ?? ''];
-        return nodeTemplate?.[KIND_MAP[kind]][fieldName];
+        return selectFieldOutputTemplate(nodes, nodeId, fieldName);
       }),
     [fieldName, kind, nodeId]
   );

@@ -3,9 +3,8 @@
 """
 This is the frontend to "textual_inversion_training.py".
 
-Copyright (c) 2023 Lincoln Stein and the InvokeAI Development Team
+Copyright (c) 2023-24 Lincoln Stein and the InvokeAI Development Team
 """
-
 
 import os
 import re
@@ -14,7 +13,7 @@ import sys
 import traceback
 from argparse import Namespace
 from pathlib import Path
-from typing import List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import npyscreen
 from npyscreen import widget
@@ -22,8 +21,9 @@ from omegaconf import OmegaConf
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config import InvokeAIAppConfig
-
-from ...backend.training import do_textual_inversion_training, parse_args
+from invokeai.backend.install.install_helper import initialize_installer
+from invokeai.backend.model_manager import ModelType
+from invokeai.backend.training import do_textual_inversion_training, parse_args
 
 TRAINING_DATA = "text-inversion-training-data"
 TRAINING_DIR = "text-inversion-output"
@@ -44,18 +44,20 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
     precisions = ["no", "fp16", "bf16"]
     learnable_properties = ["object", "style"]
 
-    def __init__(self, parentApp, name, saved_args=None):
+    def __init__(self, parentApp: npyscreen.NPSAppManaged, name: str, saved_args: Optional[Dict[str, str]] = None):
         self.saved_args = saved_args or {}
         super().__init__(parentApp, name)
 
-    def afterEditing(self):
+    def afterEditing(self) -> None:
         self.parentApp.setNextForm(None)
 
-    def create(self):
+    def create(self) -> None:
         self.model_names, default = self.get_model_names()
         default_initializer_token = "★"
         default_placeholder_token = ""
         saved_args = self.saved_args
+
+        assert config is not None
 
         try:
             default = self.model_names.index(saved_args["model"])
@@ -71,7 +73,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         self.model = self.add_widget_intelligent(
             npyscreen.TitleSelectOne,
             name="Model Name:",
-            values=self.model_names,
+            values=sorted(self.model_names),
             value=default,
             max_height=len(self.model_names) + 1,
             scroll_exit=True,
@@ -236,7 +238,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
         )
         self.model.editing = True
 
-    def initializer_changed(self):
+    def initializer_changed(self) -> None:
         placeholder = self.placeholder_token.value
         self.prompt_token.value = f"(Trigger by using <{placeholder}> in your prompts)"
         self.train_data_dir.value = str(config.root_dir / TRAINING_DATA / placeholder)
@@ -258,7 +260,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
     def validate_field_values(self) -> bool:
         bad_fields = []
         if self.model.value is None:
-            bad_fields.append("Model Name must correspond to a known model in models.yaml")
+            bad_fields.append("Model Name must correspond to a known model in invokeai.db")
         if not re.match("^[a-zA-Z0-9.-]+$", self.placeholder_token.value):
             bad_fields.append("Trigger term must only contain alphanumeric characters, the dot and hyphen")
         if self.train_data_dir.value is None:
@@ -275,10 +277,13 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
             return True
 
     def get_model_names(self) -> Tuple[List[str], int]:
-        conf = OmegaConf.load(config.root_dir / "configs/models.yaml")
-        model_names = [idx for idx in sorted(conf.keys()) if conf[idx].get("format", None) == "diffusers"]
-        defaults = [idx for idx in range(len(model_names)) if "default" in conf[model_names[idx]]]
-        default = defaults[0] if len(defaults) > 0 else 0
+        global config
+        assert config is not None
+        installer = initialize_installer(config)
+        store = installer.record_store
+        main_models = store.search_by_attr(model_type=ModelType.Main)
+        model_names = [f"{x.base.value}/{x.type.value}/{x.name}" for x in main_models if x.format == "diffusers"]
+        default = 0
         return (model_names, default)
 
     def marshall_arguments(self) -> dict:
@@ -326,7 +331,7 @@ class textualInversionForm(npyscreen.FormMultiPageAction):
 
 
 class MyApplication(npyscreen.NPSAppManaged):
-    def __init__(self, saved_args=None):
+    def __init__(self, saved_args: Optional[Dict[str, str]] = None):
         super().__init__()
         self.ti_arguments = None
         self.saved_args = saved_args
@@ -341,11 +346,12 @@ class MyApplication(npyscreen.NPSAppManaged):
         )
 
 
-def copy_to_embeddings_folder(args: dict):
+def copy_to_embeddings_folder(args: Dict[str, str]) -> None:
     """
     Copy learned_embeds.bin into the embeddings folder, and offer to
     delete the full model and checkpoints.
     """
+    assert config is not None
     source = Path(args["output_dir"], "learned_embeds.bin")
     dest_dir_name = args["placeholder_token"].strip("<>")
     destination = config.root_dir / "embeddings" / dest_dir_name
@@ -358,10 +364,11 @@ def copy_to_embeddings_folder(args: dict):
         logger.info(f'Keeping {args["output_dir"]}')
 
 
-def save_args(args: dict):
+def save_args(args: dict) -> None:
     """
     Save the current argument values to an omegaconf file
     """
+    assert config is not None
     dest_dir = config.root_dir / TRAINING_DIR
     os.makedirs(dest_dir, exist_ok=True)
     conf_file = dest_dir / CONF_FILE
@@ -373,6 +380,7 @@ def previous_args() -> dict:
     """
     Get the previous arguments used.
     """
+    assert config is not None
     conf_file = config.root_dir / TRAINING_DIR / CONF_FILE
     try:
         conf = OmegaConf.load(conf_file)
@@ -383,24 +391,26 @@ def previous_args() -> dict:
     return conf
 
 
-def do_front_end(args: Namespace):
+def do_front_end() -> None:
+    global config
     saved_args = previous_args()
     myapplication = MyApplication(saved_args=saved_args)
     myapplication.run()
 
-    if args := myapplication.ti_arguments:
-        os.makedirs(args["output_dir"], exist_ok=True)
+    if my_args := myapplication.ti_arguments:
+        os.makedirs(my_args["output_dir"], exist_ok=True)
 
         # Automatically add angle brackets around the trigger
-        if not re.match("^<.+>$", args["placeholder_token"]):
-            args["placeholder_token"] = f"<{args['placeholder_token']}>"
+        if not re.match("^<.+>$", my_args["placeholder_token"]):
+            my_args["placeholder_token"] = f"<{my_args['placeholder_token']}>"
 
-        args["only_save_embeds"] = True
-        save_args(args)
+        my_args["only_save_embeds"] = True
+        save_args(my_args)
 
         try:
-            do_textual_inversion_training(InvokeAIAppConfig.get_config(), **args)
-            copy_to_embeddings_folder(args)
+            print(my_args)
+            do_textual_inversion_training(config, **my_args)
+            copy_to_embeddings_folder(my_args)
         except Exception as e:
             logger.error("An exception occurred during training. The exception was:")
             logger.error(str(e))
@@ -408,11 +418,12 @@ def do_front_end(args: Namespace):
             logger.error(traceback.format_exc())
 
 
-def main():
+def main() -> None:
     global config
 
-    args = parse_args()
+    args: Namespace = parse_args()
     config = InvokeAIAppConfig.get_config()
+    config.parse_args([])
 
     # change root if needed
     if args.root_dir:
@@ -420,7 +431,7 @@ def main():
 
     try:
         if args.front_end:
-            do_front_end(args)
+            do_front_end()
         else:
             do_textual_inversion_training(config, **vars(args))
     except AssertionError as e:
@@ -430,7 +441,7 @@ def main():
         pass
     except (widget.NotEnoughSpaceForWidget, Exception) as e:
         if str(e).startswith("Height of 1 allocated"):
-            logger.error("You need to have at least one diffusers models defined in models.yaml in order to train")
+            logger.error("You need to have at least one diffusers models defined in invokeai.db in order to train")
         elif str(e).startswith("addwstr"):
             logger.error("Not enough window space for the interface. Please make your window larger and try again.")
         else:

@@ -1,22 +1,18 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { isInvocationNode } from 'features/nodes/types/invocation';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodeData } from 'features/nodes/store/selectors';
 import { useMemo } from 'react';
 
-export const useIsIntermediate = (nodeId: string) => {
+export const useIsIntermediate = (nodeId: string): boolean => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(stateSelector, ({ nodes }) => {
-        const node = nodes.nodes.find((node) => node.id === nodeId);
-        if (!isInvocationNode(node)) {
-          return false;
-        }
-        return node.data.isIntermediate;
+      createSelector(selectNodesSlice, (nodes) => {
+        return selectNodeData(nodes, nodeId)?.isIntermediate ?? false;
       }),
     [nodeId]
   );
 
-  const is_intermediate = useAppSelector(selector);
-  return is_intermediate;
+  const isIntermediate = useAppSelector(selector);
+  return isIntermediate;
 };

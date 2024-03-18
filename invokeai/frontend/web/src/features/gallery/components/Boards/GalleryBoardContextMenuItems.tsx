@@ -1,7 +1,7 @@
-import { InvMenuItem } from 'common/components/InvMenu/InvMenuItem';
+import { MenuItem } from '@invoke-ai/ui-library';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaTrash } from 'react-icons/fa';
+import { PiTrashSimpleBold } from 'react-icons/pi';
 import type { BoardDTO } from 'services/api/types';
 
 type Props = {
@@ -20,9 +20,9 @@ const GalleryBoardContextMenuItems = ({ board, setBoardToDelete }: Props) => {
 
   return (
     <>
-      <InvMenuItem color="error.300" icon={<FaTrash />} onClick={handleDelete}>
+      <MenuItem color="error.300" icon={<PiTrashSimpleBold />} onClick={handleDelete}>
         {t('boards.deleteBoard')}
-      </InvMenuItem>
+      </MenuItem>
     </>
   );
 };

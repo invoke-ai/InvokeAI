@@ -1,32 +1,23 @@
-import { Flex } from '@chakra-ui/react';
+import { Combobox, Flex, FormControl } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
-import { SyncModelsIconButton } from 'features/modelManager/components/SyncModels/SyncModelsIconButton';
+import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
+import { SyncModelsIconButton } from 'features/modelManagerV2/components/SyncModels/SyncModelsIconButton';
 import { fieldMainModelValueChanged } from 'features/nodes/store/nodesSlice';
-import type {
-  SDXLMainModelFieldInputInstance,
-  SDXLMainModelFieldInputTemplate,
-} from 'features/nodes/types/field';
+import type { SDXLMainModelFieldInputInstance, SDXLMainModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
-import { SDXL_MAIN_MODELS } from 'services/api/constants';
-import type { MainModelConfigEntity } from 'services/api/endpoints/models';
-import { useGetMainModelsQuery } from 'services/api/endpoints/models';
+import { useSDXLModels } from 'services/api/hooks/modelsByType';
+import type { MainModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
-type Props = FieldComponentProps<
-  SDXLMainModelFieldInputInstance,
-  SDXLMainModelFieldInputTemplate
->;
+type Props = FieldComponentProps<SDXLMainModelFieldInputInstance, SDXLMainModelFieldInputTemplate>;
 
 const SDXLMainModelFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
-  const { data, isLoading } = useGetMainModelsQuery(SDXL_MAIN_MODELS);
+  const [modelConfigs, { isLoading }] = useSDXLModels();
   const _onChange = useCallback(
-    (value: MainModelConfigEntity | null) => {
+    (value: MainModelConfig | null) => {
       if (!value) {
         return;
       }
@@ -40,28 +31,24 @@ const SDXLMainModelFieldInputComponent = (props: Props) => {
     },
     [dispatch, field.name, nodeId]
   );
-  const { options, value, onChange, placeholder, noOptionsMessage } =
-    useGroupedModelInvSelect({
-      modelEntities: data,
-      onChange: _onChange,
-      isLoading,
-    });
+  const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
+    modelConfigs,
+    onChange: _onChange,
+    isLoading,
+    selectedModel: field.value,
+  });
 
   return (
     <Flex w="full" alignItems="center" gap={2}>
-      <InvControl
-        className="nowheel nodrag"
-        isDisabled={!options.length}
-        isInvalid={!value}
-      >
-        <InvSelect
+      <FormControl className="nowheel nodrag" isDisabled={!options.length} isInvalid={!value}>
+        <Combobox
           value={value}
           placeholder={placeholder}
           options={options}
           onChange={onChange}
           noOptionsMessage={noOptionsMessage}
         />
-      </InvControl>
+      </FormControl>
       <SyncModelsIconButton className="nodrag" />
     </Flex>
   );

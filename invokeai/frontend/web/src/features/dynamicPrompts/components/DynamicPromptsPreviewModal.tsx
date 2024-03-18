@@ -1,12 +1,12 @@
-import { Flex } from '@chakra-ui/layout';
 import {
-  InvModal,
-  InvModalBody,
-  InvModalCloseButton,
-  InvModalContent,
-  InvModalHeader,
-  InvModalOverlay,
-} from 'common/components/InvModal/wrapper';
+  Flex,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalHeader,
+  ModalOverlay,
+} from '@invoke-ai/ui-library';
 import { useDynamicPromptsModal } from 'features/dynamicPrompts/hooks/useDynamicPromptsModal';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,27 +20,20 @@ export const DynamicPromptsModal = memo(() => {
   const { isOpen, onClose } = useDynamicPromptsModal();
 
   return (
-    <InvModal isOpen={isOpen} onClose={onClose} isCentered>
-      <InvModalOverlay />
-      <InvModalContent w="80vw" h="80vh" maxW="unset" maxH="unset">
-        <InvModalHeader>{t('dynamicPrompts.dynamicPrompts')}</InvModalHeader>
-        <InvModalCloseButton />
-        <InvModalBody
-          as={Flex}
-          flexDir="column"
-          gap={2}
-          w="full"
-          h="full"
-          pb={4}
-        >
+    <Modal isOpen={isOpen} onClose={onClose} isCentered>
+      <ModalOverlay />
+      <ModalContent w="80vw" h="80vh" maxW="unset" maxH="unset">
+        <ModalHeader>{t('dynamicPrompts.dynamicPrompts')}</ModalHeader>
+        <ModalCloseButton />
+        <ModalBody as={Flex} flexDir="column" gap={4} w="full" h="full" pb={4}>
           <Flex gap={4}>
             <ParamDynamicPromptsSeedBehaviour />
             <ParamDynamicPromptsMaxPrompts />
           </Flex>
           <ParamDynamicPromptsPreview />
-        </InvModalBody>
-      </InvModalContent>
-    </InvModal>
+        </ModalBody>
+      </ModalContent>
+    </Modal>
   );
 });
 

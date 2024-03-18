@@ -1,8 +1,7 @@
-import type { SystemStyleObject } from '@chakra-ui/react';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
 import type { MouseEvent, ReactElement } from 'react';
 import { memo, useMemo } from 'react';
-
-import { InvIconButton } from './InvIconButton/InvIconButton';
 
 type Props = {
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
@@ -26,7 +25,7 @@ const IAIDndImageIcon = (props: Props) => {
         transitionDuration: 'normal',
         fill: 'base.100',
         _hover: { fill: 'base.50' },
-        filter: 'drop-shadow(0px 0px 0.1rem var(--invokeai-colors-base-800))',
+        filter: 'drop-shadow(0px 0px 0.1rem var(--invoke-colors-base-800))',
       },
       ...styleOverrides,
     }),
@@ -34,7 +33,7 @@ const IAIDndImageIcon = (props: Props) => {
   );
 
   return (
-    <InvIconButton
+    <IconButton
       onClick={onClick}
       aria-label={tooltip}
       tooltip={tooltip}

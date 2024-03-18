@@ -1,19 +1,13 @@
+import { Input, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvInput } from 'common/components/InvInput/InvInput';
-import { InvTextarea } from 'common/components/InvTextarea/InvTextarea';
 import { fieldStringValueChanged } from 'features/nodes/store/nodesSlice';
-import type {
-  StringFieldInputInstance,
-  StringFieldInputTemplate,
-} from 'features/nodes/types/field';
+import type { StringFieldInputInstance, StringFieldInputTemplate } from 'features/nodes/types/field';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 
 import type { FieldComponentProps } from './types';
 
-const StringFieldInputComponent = (
-  props: FieldComponentProps<StringFieldInputInstance, StringFieldInputTemplate>
-) => {
+const StringFieldInputComponent = (props: FieldComponentProps<StringFieldInputInstance, StringFieldInputTemplate>) => {
   const { nodeId, field, fieldTemplate } = props;
   const dispatch = useAppDispatch();
 
@@ -31,18 +25,10 @@ const StringFieldInputComponent = (
   );
 
   if (fieldTemplate.ui_component === 'textarea') {
-    return (
-      <InvTextarea
-        className="nodrag"
-        onChange={handleValueChanged}
-        value={field.value}
-        rows={5}
-        resize="none"
-      />
-    );
+    return <Textarea className="nodrag" onChange={handleValueChanged} value={field.value} rows={5} resize="none" />;
   }
 
-  return <InvInput onChange={handleValueChanged} value={field.value} />;
+  return <Input className="nodrag" onChange={handleValueChanged} value={field.value} />;
 };
 
 export default memo(StringFieldInputComponent);

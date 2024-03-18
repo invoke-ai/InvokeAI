@@ -1,41 +1,42 @@
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setRefinerPositiveAestheticScore } from 'features/sdxl/store/sdxlSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamSDXLRefinerPositiveAestheticScore = () => {
-  const refinerPositiveAestheticScore = useAppSelector(
-    (state) => state.sdxl.refinerPositiveAestheticScore
-  );
+  const refinerPositiveAestheticScore = useAppSelector((s) => s.sdxl.refinerPositiveAestheticScore);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const handleChange = useCallback(
-    (v: number) => dispatch(setRefinerPositiveAestheticScore(v)),
-    [dispatch]
-  );
-
-  const handleReset = useCallback(
-    () => dispatch(setRefinerPositiveAestheticScore(6)),
-    [dispatch]
-  );
+  const handleChange = useCallback((v: number) => dispatch(setRefinerPositiveAestheticScore(v)), [dispatch]);
 
   return (
-    <InvControl label={t('sdxl.posAestheticScore')}>
-      <InvSlider
+    <FormControl>
+      <InformationalPopover feature="refinerPositiveAestheticScore">
+        <FormLabel>{t('sdxl.posAestheticScore')}</FormLabel>
+      </InformationalPopover>
+      <CompositeSlider
         step={0.5}
         min={1}
         max={10}
         fineStep={0.1}
         onChange={handleChange}
-        onReset={handleReset}
         value={refinerPositiveAestheticScore}
-        withNumberInput
+        defaultValue={6}
         marks
       />
-    </InvControl>
+      <CompositeNumberInput
+        step={0.5}
+        min={1}
+        max={10}
+        fineStep={0.1}
+        onChange={handleChange}
+        value={refinerPositiveAestheticScore}
+        defaultValue={6}
+      />
+    </FormControl>
   );
 };
 

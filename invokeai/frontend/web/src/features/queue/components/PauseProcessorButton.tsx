@@ -1,7 +1,7 @@
 import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaPause } from 'react-icons/fa';
+import { PiPauseFill } from 'react-icons/pi';
 
 import QueueButton from './common/QueueButton';
 
@@ -20,7 +20,7 @@ const PauseProcessorButton = ({ asIconButton }: Props) => {
       tooltip={t('queue.pauseTooltip')}
       isDisabled={isDisabled}
       isLoading={isLoading}
-      icon={<FaPause />}
+      icon={<PiPauseFill />}
       onClick={pauseProcessor}
       colorScheme="gold"
     />

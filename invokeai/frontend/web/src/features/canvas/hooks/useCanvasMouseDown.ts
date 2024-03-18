@@ -1,14 +1,8 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  setIsDrawing,
-  setIsMovingStage,
-} from 'features/canvas/store/canvasNanostore';
+import { $isDrawing, $isMovingStage, $tool } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import { addLine } from 'features/canvas/store/canvasSlice';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { MutableRefObject } from 'react';
@@ -16,21 +10,9 @@ import { useCallback } from 'react';
 
 import useColorPicker from './useColorUnderCursor';
 
-const selector = createMemoizedSelector(
-  [activeTabNameSelector, stateSelector, isStagingSelector],
-  (activeTabName, { canvas }, isStaging) => {
-    const { tool } = canvas;
-    return {
-      tool,
-      activeTabName,
-      isStaging,
-    };
-  }
-);
-
 const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
   const dispatch = useAppDispatch();
-  const { tool, isStaging } = useAppSelector(selector);
+  const isStaging = useAppSelector(isStagingSelector);
   const { commitColorUnderCursor } = useColorPicker();
 
   return useCallback(
@@ -40,9 +22,10 @@ const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
       }
 
       stageRef.current.container().focus();
+      const tool = $tool.get();
 
       if (tool === 'move' || isStaging) {
-        setIsMovingStage(true);
+        $isMovingStage.set(true);
         return;
       }
 
@@ -59,12 +42,17 @@ const useCanvasMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => {
 
       e.evt.preventDefault();
 
-      setIsDrawing(true);
+      $isDrawing.set(true);
 
       // Add a new line starting from the current cursor position.
-      dispatch(addLine([scaledCursorPosition.x, scaledCursorPosition.y]));
+      dispatch(
+        addLine({
+          points: [scaledCursorPosition.x, scaledCursorPosition.y],
+          tool,
+        })
+      );
     },
-    [stageRef, tool, isStaging, dispatch, commitColorUnderCursor]
+    [stageRef, isStaging, dispatch, commitColorUnderCursor]
   );
 };
 

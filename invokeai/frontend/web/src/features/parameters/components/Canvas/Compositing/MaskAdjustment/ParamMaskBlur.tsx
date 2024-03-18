@@ -1,17 +1,21 @@
-import type { RootState } from 'app/store/store';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setMaskBlur } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamMaskBlur = () => {
-  const dispatch = useAppDispatch();
-  const maskBlur = useAppSelector(
-    (state: RootState) => state.generation.maskBlur
-  );
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const maskBlur = useAppSelector((s) => s.generation.maskBlur);
+  const initial = useAppSelector((s) => s.config.sd.maskBlur.initial);
+  const sliderMin = useAppSelector((s) => s.config.sd.maskBlur.sliderMin);
+  const sliderMax = useAppSelector((s) => s.config.sd.maskBlur.sliderMax);
+  const numberInputMin = useAppSelector((s) => s.config.sd.maskBlur.numberInputMin);
+  const numberInputMax = useAppSelector((s) => s.config.sd.maskBlur.numberInputMax);
+  const coarseStep = useAppSelector((s) => s.config.sd.maskBlur.coarseStep);
+  const fineStep = useAppSelector((s) => s.config.sd.maskBlur.fineStep);
 
   const handleChange = useCallback(
     (v: number) => {
@@ -19,23 +23,32 @@ const ParamMaskBlur = () => {
     },
     [dispatch]
   );
-  const handleReset = useCallback(() => {
-    dispatch(setMaskBlur(16));
-  }, [dispatch]);
 
   return (
-    <InvControl label={t('parameters.maskBlur')} feature="compositingBlur">
-      <InvSlider
-        min={0}
-        max={64}
+    <FormControl>
+      <InformationalPopover feature="compositingMaskBlur">
+        <FormLabel>{t('parameters.maskBlur')}</FormLabel>
+      </InformationalPopover>
+      <CompositeSlider
+        min={sliderMin}
+        max={sliderMax}
         value={maskBlur}
-        onReset={handleReset}
+        defaultValue={initial}
         onChange={handleChange}
+        step={coarseStep}
+        fineStep={fineStep}
         marks
-        withNumberInput
-        numberInputMax={512}
       />
-    </InvControl>
+      <CompositeNumberInput
+        min={numberInputMin}
+        max={numberInputMax}
+        value={maskBlur}
+        defaultValue={initial}
+        onChange={handleChange}
+        step={coarseStep}
+        fineStep={fineStep}
+      />
+    </FormControl>
   );
 };
 

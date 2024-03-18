@@ -1,4 +1,4 @@
-import { Flex } from '@chakra-ui/react';
+import { Flex } from '@invoke-ai/ui-library';
 import { ParamNegativePrompt } from 'features/parameters/components/Core/ParamNegativePrompt';
 import { ParamPositivePrompt } from 'features/parameters/components/Core/ParamPositivePrompt';
 import { memo } from 'react';

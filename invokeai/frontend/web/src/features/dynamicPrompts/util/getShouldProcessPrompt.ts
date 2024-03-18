@@ -1,3 +1,2 @@
-const hasOpenCloseCurlyBracesRegex = /.*\{.*\}.*/;
-export const getShouldProcessPrompt = (prompt: string): boolean =>
-  hasOpenCloseCurlyBracesRegex.test(prompt);
+const hasOpenCloseCurlyBracesRegex = /.*\{[\s\S]*\}.*/;
+export const getShouldProcessPrompt = (prompt: string): boolean => hasOpenCloseCurlyBracesRegex.test(prompt);

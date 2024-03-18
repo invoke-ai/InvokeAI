@@ -1,8 +1,7 @@
-import type { InvSelectOption } from 'common/components/InvSelect/types';
-import type { LoRAModelFormat } from 'services/api/types';
+import type { ComboboxOption } from '@invoke-ai/ui-library';
 
 /**
- * Mapping of model type to human readable name
+ * Mapping of base model to human readable name
  */
 export const MODEL_TYPE_MAP = {
   any: 'Any',
@@ -13,18 +12,18 @@ export const MODEL_TYPE_MAP = {
 };
 
 /**
- * Mapping of model type to (short) human readable name
+ * Mapping of base model to (short) human readable name
  */
 export const MODEL_TYPE_SHORT_MAP = {
   any: 'Any',
-  'sd-1': 'SD1',
-  'sd-2': 'SD2',
+  'sd-1': 'SD1.X',
+  'sd-2': 'SD2.X',
   sdxl: 'SDXL',
   'sdxl-refiner': 'SDXLR',
 };
 
 /**
- * Mapping of model type to CLIP skip parameter constraints
+ * Mapping of base model to CLIP skip parameter constraints
  */
 export const CLIP_SKIP_MAP = {
   any: {
@@ -50,19 +49,9 @@ export const CLIP_SKIP_MAP = {
 };
 
 /**
- * Mapping of LoRA format to human readable name
- */
-export const LORA_MODEL_FORMAT_MAP: {
-  [key in LoRAModelFormat]: string;
-} = {
-  lycoris: 'LyCORIS',
-  diffusers: 'Diffusers',
-};
-
-/**
  * Mapping of schedulers to human readable name
  */
-export const SCHEDULER_OPTIONS: InvSelectOption[] = [
+export const SCHEDULER_OPTIONS: ComboboxOption[] = [
   { value: 'euler', label: 'Euler' },
   { value: 'deis', label: 'DEIS' },
   { value: 'ddim', label: 'DDIM' },

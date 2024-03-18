@@ -7,7 +7,6 @@
         "img2img": "图生图",
         "unifiedCanvas": "统一画布",
         "nodes": "工作流编辑器",
-        "langSimplifiedChinese": "简体中文",
         "nodesDesc": "一个基于节点的图像生成系统目前正在开发中。请持续关注关于这一功能的更新。",
         "postProcessing": "后期处理",
         "postProcessDesc1": "Invoke AI 提供各种各样的后期处理功能。图像放大和面部修复在网页界面中已经可用。你可以从文生图和图生图页面的高级选项菜单中访问它们。你也可以直接使用图像显示上方或查看器中的图像操作按钮处理图像。",
@@ -45,12 +44,9 @@
         "dontAskMeAgain": "不要再次询问",
         "areYouSure": "你确认吗？",
         "imagePrompt": "图片提示词",
-        "langKorean": "朝鲜语",
-        "langPortuguese": "葡萄牙语",
         "random": "随机",
         "generate": "生成",
         "openInNewTab": "在新的标签页打开",
-        "langUkranian": "乌克兰语",
         "back": "返回",
         "statusMergedModels": "模型已合并",
         "statusConvertingModel": "转换模型中",
@@ -58,18 +54,6 @@
         "statusMergingModels": "合并模型",
         "githubLabel": "GitHub",
         "discordLabel": "Discord",
-        "langPolish": "波兰语",
-        "langBrPortuguese": "葡萄牙语（巴西）",
-        "langDutch": "荷兰语",
-        "langFrench": "法语",
-        "langRussian": "俄语",
-        "langGerman": "德语",
-        "langHebrew": "希伯来语",
-        "langItalian": "意大利语",
-        "langJapanese": "日语",
-        "langSpanish": "西班牙语",
-        "langEnglish": "英语",
-        "langArabic": "阿拉伯语",
         "txt2img": "文生图",
         "postprocessing": "后期处理",
         "loading": "加载中",
@@ -81,7 +65,6 @@
         "nodeEditor": "节点编辑器",
         "statusProcessing": "处理中",
         "imageFailedToLoad": "无法加载图像",
-        "lightMode": "浅色模式",
         "learnMore": "了解更多",
         "darkMode": "深色模式",
         "advanced": "高级",
@@ -121,7 +104,11 @@
         "nextPage": "下一页",
         "saveAs": "保存为",
         "unsaved": "未保存",
-        "ai": "ai"
+        "ai": "ai",
+        "preferencesLabel": "首选项",
+        "or": "或",
+        "advancedOptions": "高级选项",
+        "free": "自由"
     },
     "gallery": {
         "generations": "生成的图像",
@@ -149,8 +136,6 @@
         "copy": "复制",
         "download": "下载",
         "setCurrentImage": "设为当前图像",
-        "preparingDownload": "准备下载",
-        "preparingDownloadFailed": "准备下载时出现问题",
         "downloadSelection": "下载所选内容",
         "noImageSelected": "无选中的图像",
         "deleteSelection": "删除所选内容",
@@ -164,18 +149,18 @@
         "starImage": "收藏图像"
     },
     "hotkeys": {
-        "keyboardShortcuts": "键盘快捷键",
-        "appHotkeys": "应用快捷键",
-        "generalHotkeys": "一般快捷键",
-        "galleryHotkeys": "图库快捷键",
-        "unifiedCanvasHotkeys": "统一画布快捷键",
+        "keyboardShortcuts": "快捷键",
+        "appHotkeys": "应用",
+        "generalHotkeys": "一般",
+        "galleryHotkeys": "图库",
+        "unifiedCanvasHotkeys": "统一画布",
         "invoke": {
             "title": "Invoke",
             "desc": "生成图像"
         },
         "cancel": {
             "title": "取消",
-            "desc": "取消图像生成"
+            "desc": "取消当前队列项目"
         },
         "focusPrompt": {
             "title": "打开提示词框",
@@ -188,10 +173,6 @@
         "pinOptions": {
             "title": "常开选项卡",
             "desc": "保持选项浮窗常开"
-        },
-        "toggleViewer": {
-            "title": "切换图像查看器",
-            "desc": "打开或关闭图像查看器"
         },
         "toggleGallery": {
             "title": "切换图库",
@@ -252,10 +233,6 @@
         "nextImage": {
             "title": "下一张图像",
             "desc": "显示图库中的下一张图像"
-        },
-        "toggleGalleryPin": {
-            "title": "切换图库常开",
-            "desc": "开关图库在界面中的常开模式"
         },
         "increaseGalleryThumbSize": {
             "title": "增大预览尺寸",
@@ -369,11 +346,26 @@
             "title": "接受暂存图像",
             "desc": "接受当前暂存区中的图像"
         },
-        "nodesHotkeys": "节点快捷键",
+        "nodesHotkeys": "节点",
         "addNodes": {
             "title": "添加节点",
             "desc": "打开添加节点菜单"
-        }
+        },
+        "cancelAndClear": {
+            "desc": "取消当前队列项目并且清除所有待定项目",
+            "title": "取消和清除"
+        },
+        "resetOptionsAndGallery": {
+            "title": "重置选项和图库",
+            "desc": "重置选项和图库面板"
+        },
+        "searchHotkeys": "检索快捷键",
+        "noHotkeysFound": "未找到快捷键",
+        "toggleOptionsAndGallery": {
+            "desc": "打开和关闭选项和图库面板",
+            "title": "开关选项和图库"
+        },
+        "clearSearch": "清除检索项"
     },
     "modelManager": {
         "modelManager": "模型管理器",
@@ -571,8 +563,8 @@
         "info": "信息",
         "initialImage": "初始图像",
         "showOptionsPanel": "显示侧栏浮窗 (O 或 T)",
-        "seamlessYAxis": "Y 轴",
-        "seamlessXAxis": "X 轴",
+        "seamlessYAxis": "无缝平铺 Y 轴",
+        "seamlessXAxis": "无缝平铺 X 轴",
         "boundingBoxWidth": "边界框宽度",
         "boundingBoxHeight": "边界框高度",
         "denoisingStrength": "去噪强度",
@@ -619,14 +611,12 @@
             "readyToInvoke": "准备调用",
             "noControlImageForControlAdapter": "有 #{{number}} 个 Control Adapter 缺失控制图像",
             "noModelForControlAdapter": "有 #{{number}} 个 Control Adapter 没有选择模型。",
-            "incompatibleBaseModelForControlAdapter": "有 #{{number}} 个 Control Adapter 模型与主模型不匹配。"
+            "incompatibleBaseModelForControlAdapter": "有 #{{number}} 个 Control Adapter 模型与主模型不兼容。"
         },
         "patchmatchDownScaleSize": "缩小",
-        "coherenceSteps": "步数",
         "clipSkip": "CLIP 跳过层",
         "compositingSettingsHeader": "合成设置",
         "useCpuNoise": "使用 CPU 噪声",
-        "coherenceStrength": "强度",
         "enableNoiseSettings": "启用噪声设置",
         "coherenceMode": "模式",
         "cpuNoise": "CPU 噪声",
@@ -650,7 +640,14 @@
         "unmasked": "取消遮罩",
         "cfgRescaleMultiplier": "CFG 重缩放倍数",
         "cfgRescale": "CFG 重缩放",
-        "useSize": "使用尺寸"
+        "useSize": "使用尺寸",
+        "setToOptimalSize": "优化模型大小",
+        "setToOptimalSizeTooSmall": "$t(parameters.setToOptimalSize) （可能过小）",
+        "imageSize": "图像尺寸",
+        "lockAspectRatio": "锁定纵横比",
+        "swapDimensions": "交换尺寸",
+        "aspect": "纵横",
+        "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) （可能过大）"
     },
     "settings": {
         "models": "模型",
@@ -1142,7 +1139,6 @@
         "balanced": "平衡",
         "prompt": "Prompt (提示词控制)",
         "depthMidasDescription": "使用 Midas 生成深度图",
-        "openPoseDescription": "使用 Openpose 进行人体姿态估计",
         "resizeMode": "缩放模式",
         "weight": "权重",
         "selectModel": "选择一个模型",
@@ -1206,10 +1202,10 @@
         "megaControl": "Mega Control (超级控制)",
         "depthZoe": "Depth (Zoe)",
         "colorMap": "Color",
-        "openPose": "Openpose",
         "controlAdapter_other": "Control Adapters",
         "lineartAnime": "Lineart Anime",
-        "canny": "Canny"
+        "canny": "Canny",
+        "resizeSimple": "缩放（简单）"
     },
     "queue": {
         "status": "状态",
@@ -1256,7 +1252,7 @@
         "notReady": "无法排队",
         "batchFailedToQueue": "批次加入队列失败",
         "batchValues": "批次数",
-        "queueCountPrediction": "添加 {{predicted}} 到队列",
+        "queueCountPrediction": "{{promptsCount}} 提示词 × {{iterations}} 迭代次数 -> {{count}} 次生成",
         "batchQueued": "加入队列的批次",
         "queuedCount": "{{pending}} 待处理",
         "front": "前",
@@ -1270,7 +1266,8 @@
         "queueMaxExceeded": "超出最大值 {{max_queue_size}}，将跳过 {{skip}}",
         "graphFailedToQueue": "节点图加入队列失败",
         "batchFieldValues": "批处理值",
-        "time": "时间"
+        "time": "时间",
+        "openQueue": "打开队列"
     },
     "sdxl": {
         "refinerStart": "Refiner 开始作用时机",
@@ -1284,11 +1281,12 @@
         "denoisingStrength": "去噪强度",
         "refinermodel": "Refiner 模型",
         "posAestheticScore": "正向美学评分",
-        "concatPromptStyle": "连接提示词 & 样式",
+        "concatPromptStyle": "链接提示词 & 样式",
         "loading": "加载中...",
         "steps": "步数",
         "posStylePrompt": "正向样式提示词",
-        "refiner": "Refiner"
+        "refiner": "Refiner",
+        "freePromptStyle": "手动输入样式提示词"
     },
     "metadata": {
         "positivePrompt": "正向提示词",
@@ -1332,7 +1330,13 @@
         "noLoRAsInstalled": "无已安装的 LoRA",
         "esrganModel": "ESRGAN 模型",
         "addLora": "添加 LoRA",
-        "noLoRAsLoaded": "无已加载的 LoRA"
+        "noLoRAsLoaded": "无已加载的 LoRA",
+        "noMainModelSelected": "未选择主模型",
+        "lora": "LoRA",
+        "allLoRAsAdded": "已添加所有 LoRA",
+        "defaultVAE": "默认 VAE",
+        "incompatibleBaseModel": "不兼容基础模型",
+        "loraAlreadyAdded": "LoRA 已经被添加"
     },
     "boards": {
         "autoAddBoard": "自动添加面板",
@@ -1376,7 +1380,9 @@
         "maxPrompts": "最大提示词数",
         "dynamicPrompts": "动态提示词",
         "promptsWithCount_other": "{{count}} 个提示词",
-        "promptsPreview": "提示词预览"
+        "promptsPreview": "提示词预览",
+        "showDynamicPrompts": "显示动态提示词",
+        "loading": "生成动态提示词中..."
     },
     "popovers": {
         "compositingMaskAdjustments": {
@@ -1390,19 +1396,6 @@
             "paragraphs": [
                 "生成图像的尺寸纵横比。",
                 "图像尺寸（单位：像素）建议 SD 1.5 模型使用等效 512x512 的尺寸，SDXL 模型使用等效 1024x1024 的尺寸。"
-            ]
-        },
-        "compositingCoherenceSteps": {
-            "heading": "步数",
-            "paragraphs": [
-                "一致性层中使用的去噪步数。",
-                "与主参数中的步数相同。"
-            ]
-        },
-        "compositingBlur": {
-            "heading": "模糊",
-            "paragraphs": [
-                "遮罩模糊半径。"
             ]
         },
         "noiseUseCPU": {
@@ -1434,16 +1427,14 @@
         "clipSkip": {
             "paragraphs": [
                 "选择要跳过 CLIP 模型多少层。",
-                "部分模型跳过特定数值的层时效果会更好。",
-                "较高的数值通常会导致图像细节更少。"
+                "部分模型跳过特定数值的层时效果会更好。"
             ],
             "heading": "CLIP 跳过层"
         },
         "paramModel": {
             "heading": "模型",
             "paragraphs": [
-                "用于去噪过程的模型。",
-                "不同的模型一般会通过接受训练来专门产生特定的美学内容和结果。"
+                "用于去噪过程的模型。"
             ]
         },
         "paramIterations": {
@@ -1457,13 +1448,6 @@
             "heading": "一致性层",
             "paragraphs": [
                 "第二轮去噪有助于合成内补/外扩图像。"
-            ]
-        },
-        "compositingStrength": {
-            "heading": "强度",
-            "paragraphs": [
-                "一致性层使用的去噪强度。",
-                "去噪强度与图生图的参数相同。"
             ]
         },
         "paramNegativeConditioning": {
@@ -1658,5 +1642,28 @@
     },
     "app": {
         "storeNotInitialized": "商店尚未初始化"
+    },
+    "accordions": {
+        "compositing": {
+            "infillTab": "内补",
+            "coherenceTab": "一致性层",
+            "title": "合成"
+        },
+        "control": {
+            "controlAdaptersTab": "Control Adapters",
+            "ipTab": "图像提示",
+            "title": "Control"
+        },
+        "generation": {
+            "title": "生成",
+            "conceptsTab": "概念",
+            "modelTab": "模型"
+        },
+        "advanced": {
+            "title": "高级"
+        },
+        "image": {
+            "title": "图像"
+        }
     }
 }

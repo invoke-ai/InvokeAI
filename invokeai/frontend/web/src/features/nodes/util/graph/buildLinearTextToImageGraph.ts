@@ -1,11 +1,12 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
-import type { NonNullableGraph } from 'services/api/types';
+import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
+import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addHrfToGraph } from './addHrfToGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
-import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
@@ -23,11 +24,9 @@ import {
   SEAMLESS,
   TEXT_TO_IMAGE_GRAPH,
 } from './constants';
-import { addCoreMetadataNode } from './metadata';
+import { addCoreMetadataNode, getModelMetadataField } from './metadata';
 
-export const buildLinearTextToImageGraph = (
-  state: RootState
-): NonNullableGraph => {
+export const buildLinearTextToImageGraph = async (state: RootState): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
     positivePrompt,
@@ -70,7 +69,6 @@ export const buildLinearTextToImageGraph = (
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
 
-  // TODO: Actually create the graph correctly for ONNX
   const graph: NonNullableGraph = {
     id: TEXT_TO_IMAGE_GRAPH,
     nodes: {
@@ -122,7 +120,8 @@ export const buildLinearTextToImageGraph = (
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
         fp32,
-        is_intermediate,
+        is_intermediate: getIsIntermediate(state),
+        board: getBoardField(state),
         use_cache: false,
       },
     },
@@ -214,6 +213,8 @@ export const buildLinearTextToImageGraph = (
     ],
   };
 
+  const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
+
   addCoreMetadataNode(
     graph,
     {
@@ -224,7 +225,7 @@ export const buildLinearTextToImageGraph = (
       width,
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
-      model,
+      model: getModelMetadataField(modelConfig),
       seed,
       steps,
       rand_device: use_cpu ? 'cpu' : 'cuda',
@@ -241,18 +242,18 @@ export const buildLinearTextToImageGraph = (
   }
 
   // optionally add custom VAE
-  addVAEToGraph(state, graph, modelLoaderNodeId);
+  await addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
+  await addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
+  await addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // add IP Adapter
-  addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
+  await addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
 
-  addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
+  await addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // High resolution fix.
   if (state.hrf.hrfEnabled) {
@@ -269,8 +270,6 @@ export const buildLinearTextToImageGraph = (
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph);
   }
-
-  addLinearUIOutputNode(state, graph);
 
   return graph;
 };

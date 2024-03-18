@@ -1,6 +1,8 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
+import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import type {
   DenoiseLatentsInvocation,
   Edge,
@@ -22,6 +24,7 @@ import {
   NOISE,
   NOISE_HRF,
   RESIZE_HRF,
+  SEAMLESS,
   VAE_LOADER,
 } from './constants';
 import { setMetadataReceivingNode, upsertMetadata } from './metadata';
@@ -29,7 +32,6 @@ import { setMetadataReceivingNode, upsertMetadata } from './metadata';
 // Copy certain connections from previous DENOISE_LATENTS to new DENOISE_LATENTS_HRF.
 function copyConnectionsToDenoiseLatentsHrf(graph: NonNullableGraph): void {
   const destinationFields = [
-    'vae',
     'control',
     'ip_adapter',
     'metadata',
@@ -41,10 +43,7 @@ function copyConnectionsToDenoiseLatentsHrf(graph: NonNullableGraph): void {
 
   // Loop through the existing edges connected to DENOISE_LATENTS
   graph.edges.forEach((edge: Edge) => {
-    if (
-      edge.destination.node_id === DENOISE_LATENTS &&
-      destinationFields.includes(edge.destination.field)
-    ) {
+    if (edge.destination.node_id === DENOISE_LATENTS && destinationFields.includes(edge.destination.field)) {
       // Add a similar connection to DENOISE_LATENTS_HRF
       newEdges.push({
         source: {
@@ -66,26 +65,20 @@ function copyConnectionsToDenoiseLatentsHrf(graph: NonNullableGraph): void {
  * Adjusts the width and height to maintain the aspect ratio and constrains them by the model's dimension limits,
  * rounding down to the nearest multiple of 8.
  *
- * @param {string} baseModel The base model type, which determines the base dimension used in calculations.
+ * @param {number} optimalDimension The optimal dimension for the base model.
  * @param {number} width The current width to be adjusted for HRF.
  * @param {number} height The current height to be adjusted for HRF.
  * @return {{newWidth: number, newHeight: number}} The new width and height, adjusted and rounded as needed.
  */
 function calculateHrfRes(
-  baseModel: string,
+  optimalDimension: number,
   width: number,
   height: number
 ): { newWidth: number; newHeight: number } {
   const aspect = width / height;
-  let dimension;
-  if (baseModel == 'sdxl') {
-    dimension = 1024;
-  } else {
-    dimension = 512;
-  }
 
-  const minDimension = Math.floor(dimension * 0.5);
-  const modelArea = dimension * dimension; // Assuming square images for model_area
+  const minDimension = Math.floor(optimalDimension * 0.5);
+  const modelArea = optimalDimension * optimalDimension; // Assuming square images for model_area
 
   let initWidth;
   let initHeight;
@@ -108,41 +101,26 @@ function calculateHrfRes(
 }
 
 // Adds the high-res fix feature to the given graph.
-export const addHrfToGraph = (
-  state: RootState,
-  graph: NonNullableGraph
-): void => {
+export const addHrfToGraph = (state: RootState, graph: NonNullableGraph): void => {
   // Double check hrf is enabled.
-  if (
-    !state.hrf.hrfEnabled ||
-    state.config.disabledSDFeatures.includes('hrf')
-  ) {
+  if (!state.hrf.hrfEnabled || state.config.disabledSDFeatures.includes('hrf')) {
     return;
   }
   const log = logger('txt2img');
 
-  const { vae } = state.generation;
+  const { vae, seamlessXAxis, seamlessYAxis } = state.generation;
   const { hrfStrength, hrfEnabled, hrfMethod } = state.hrf;
   const isAutoVae = !vae;
+  const isSeamlessEnabled = seamlessXAxis || seamlessYAxis;
   const width = state.generation.width;
   const height = state.generation.height;
-  const baseModel = state.generation.model
-    ? state.generation.model.base_model
-    : 'sd1';
-  const { newWidth: hrfWidth, newHeight: hrfHeight } = calculateHrfRes(
-    baseModel,
-    width,
-    height
-  );
+  const optimalDimension = selectOptimalDimension(state);
+  const { newWidth: hrfWidth, newHeight: hrfHeight } = calculateHrfRes(optimalDimension, width, height);
 
   // Pre-existing (original) graph nodes.
-  const originalDenoiseLatentsNode = graph.nodes[DENOISE_LATENTS] as
-    | DenoiseLatentsInvocation
-    | undefined;
+  const originalDenoiseLatentsNode = graph.nodes[DENOISE_LATENTS] as DenoiseLatentsInvocation | undefined;
   const originalNoiseNode = graph.nodes[NOISE] as NoiseInvocation | undefined;
-  const originalLatentsToImageNode = graph.nodes[LATENTS_TO_IMAGE] as
-    | LatentsToImageInvocation
-    | undefined;
+  const originalLatentsToImageNode = graph.nodes[LATENTS_TO_IMAGE] as LatentsToImageInvocation | undefined;
   if (!originalDenoiseLatentsNode) {
     log.error('originalDenoiseLatentsNode is undefined');
     return;
@@ -182,7 +160,7 @@ export const addHrfToGraph = (
     },
     {
       source: {
-        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
+        node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -199,7 +177,7 @@ export const addHrfToGraph = (
     width: width,
     height: height,
   };
-  if (hrfMethod == 'ESRGAN') {
+  if (hrfMethod === 'ESRGAN') {
     let model_name: ESRGANInvocation['model_name'] = 'RealESRGAN_x2plus.pth';
     if ((width * height) / (hrfWidth * hrfHeight) > 2) {
       model_name = 'RealESRGAN_x4plus.pth';
@@ -283,7 +261,7 @@ export const addHrfToGraph = (
   graph.edges.push(
     {
       source: {
-        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
+        node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
         field: 'vae',
       },
       destination: {
@@ -337,16 +315,21 @@ export const addHrfToGraph = (
   );
   copyConnectionsToDenoiseLatentsHrf(graph);
 
+  // The original l2i node is unnecessary now, remove it
+  graph.edges = graph.edges.filter((edge) => edge.destination.node_id !== LATENTS_TO_IMAGE);
+  delete graph.nodes[LATENTS_TO_IMAGE];
+
   graph.nodes[LATENTS_TO_IMAGE_HRF_HR] = {
     type: 'l2i',
     id: LATENTS_TO_IMAGE_HRF_HR,
     fp32: originalLatentsToImageNode?.fp32,
-    is_intermediate: true,
+    is_intermediate: getIsIntermediate(state),
+    board: getBoardField(state),
   };
   graph.edges.push(
     {
       source: {
-        node_id: isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
+        node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? MAIN_MODEL_LOADER : VAE_LOADER,
         field: 'vae',
       },
       destination: {

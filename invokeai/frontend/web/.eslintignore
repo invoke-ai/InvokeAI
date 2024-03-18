@@ -7,4 +7,4 @@ stats.html
 index.html
 .yarn/
 *.scss
-src/services/api/schema.d.ts
+src/services/api/schema.ts

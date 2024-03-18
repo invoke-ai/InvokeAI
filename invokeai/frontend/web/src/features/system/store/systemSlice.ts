@@ -1,30 +1,31 @@
-import type { UseToastOptions } from '@chakra-ui/react';
+import type { UseToastOptions } from '@invoke-ai/ui-library';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
+import type { PersistConfig, RootState } from 'app/store/store';
 import { calculateStepPercentage } from 'features/system/util/calculateStepPercentage';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
 import { startCase } from 'lodash-es';
 import type { LogLevelName } from 'roarr';
 import {
-  appSocketConnected,
-  appSocketDisconnected,
-  appSocketGeneratorProgress,
-  appSocketGraphExecutionStateComplete,
-  appSocketInvocationComplete,
-  appSocketInvocationError,
-  appSocketInvocationRetrievalError,
-  appSocketInvocationStarted,
-  appSocketModelLoadCompleted,
-  appSocketModelLoadStarted,
-  appSocketQueueItemStatusChanged,
-  appSocketSessionRetrievalError,
+  socketConnected,
+  socketDisconnected,
+  socketGeneratorProgress,
+  socketGraphExecutionStateComplete,
+  socketInvocationComplete,
+  socketInvocationError,
+  socketInvocationRetrievalError,
+  socketInvocationStarted,
+  socketModelLoadCompleted,
+  socketModelLoadStarted,
+  socketQueueItemStatusChanged,
+  socketSessionRetrievalError,
 } from 'services/events/actions';
 
 import type { Language, SystemState } from './types';
 
-export const initialSystemState: SystemState = {
-  isInitialized: false,
+const initialSystemState: SystemState = {
+  _version: 1,
   isConnected: false,
   shouldConfirmOnDelete: true,
   enableImageDebugging: false,
@@ -62,10 +63,7 @@ export const systemSlice = createSlice({
     shouldLogToConsoleChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldLogToConsole = action.payload;
     },
-    shouldAntialiasProgressImageChanged: (
-      state,
-      action: PayloadAction<boolean>
-    ) => {
+    shouldAntialiasProgressImageChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldAntialiasProgressImage = action.payload;
     },
     languageChanged: (state, action: PayloadAction<Language>) => {
@@ -77,21 +75,15 @@ export const systemSlice = createSlice({
     shouldUseWatermarkerChanged(state, action: PayloadAction<boolean>) {
       state.shouldUseWatermarker = action.payload;
     },
-    setShouldEnableInformationalPopovers(
-      state,
-      action: PayloadAction<boolean>
-    ) {
+    setShouldEnableInformationalPopovers(state, action: PayloadAction<boolean>) {
       state.shouldEnableInformationalPopovers = action.payload;
-    },
-    isInitializedChanged(state, action: PayloadAction<boolean>) {
-      state.isInitialized = action.payload;
     },
   },
   extraReducers(builder) {
     /**
      * Socket Connected
      */
-    builder.addCase(appSocketConnected, (state) => {
+    builder.addCase(socketConnected, (state) => {
       state.isConnected = true;
       state.denoiseProgress = null;
       state.status = 'CONNECTED';
@@ -100,7 +92,7 @@ export const systemSlice = createSlice({
     /**
      * Socket Disconnected
      */
-    builder.addCase(appSocketDisconnected, (state) => {
+    builder.addCase(socketDisconnected, (state) => {
       state.isConnected = false;
       state.denoiseProgress = null;
       state.status = 'DISCONNECTED';
@@ -109,7 +101,7 @@ export const systemSlice = createSlice({
     /**
      * Invocation Started
      */
-    builder.addCase(appSocketInvocationStarted, (state) => {
+    builder.addCase(socketInvocationStarted, (state) => {
       state.denoiseProgress = null;
       state.status = 'PROCESSING';
     });
@@ -117,7 +109,7 @@ export const systemSlice = createSlice({
     /**
      * Generator Progress
      */
-    builder.addCase(appSocketGeneratorProgress, (state, action) => {
+    builder.addCase(socketGeneratorProgress, (state, action) => {
       const {
         step,
         total_steps,
@@ -143,7 +135,7 @@ export const systemSlice = createSlice({
     /**
      * Invocation Complete
      */
-    builder.addCase(appSocketInvocationComplete, (state) => {
+    builder.addCase(socketInvocationComplete, (state) => {
       state.denoiseProgress = null;
       state.status = 'CONNECTED';
     });
@@ -151,25 +143,21 @@ export const systemSlice = createSlice({
     /**
      * Graph Execution State Complete
      */
-    builder.addCase(appSocketGraphExecutionStateComplete, (state) => {
+    builder.addCase(socketGraphExecutionStateComplete, (state) => {
       state.denoiseProgress = null;
       state.status = 'CONNECTED';
     });
 
-    builder.addCase(appSocketModelLoadStarted, (state) => {
+    builder.addCase(socketModelLoadStarted, (state) => {
       state.status = 'LOADING_MODEL';
     });
 
-    builder.addCase(appSocketModelLoadCompleted, (state) => {
+    builder.addCase(socketModelLoadCompleted, (state) => {
       state.status = 'CONNECTED';
     });
 
-    builder.addCase(appSocketQueueItemStatusChanged, (state, action) => {
-      if (
-        ['completed', 'canceled', 'failed'].includes(
-          action.payload.data.queue_item.status
-        )
-      ) {
+    builder.addCase(socketQueueItemStatusChanged, (state, action) => {
+      if (['completed', 'canceled', 'failed'].includes(action.payload.data.queue_item.status)) {
         state.status = 'CONNECTED';
         state.denoiseProgress = null;
       }
@@ -204,13 +192,23 @@ export const {
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
   setShouldEnableInformationalPopovers,
-  isInitializedChanged,
 } = systemSlice.actions;
 
-export default systemSlice.reducer;
+const isAnyServerError = isAnyOf(socketInvocationError, socketSessionRetrievalError, socketInvocationRetrievalError);
 
-const isAnyServerError = isAnyOf(
-  appSocketInvocationError,
-  appSocketSessionRetrievalError,
-  appSocketInvocationRetrievalError
-);
+export const selectSystemSlice = (state: RootState) => state.system;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+const migrateSystemState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};
+
+export const systemPersistConfig: PersistConfig<SystemState> = {
+  name: systemSlice.name,
+  initialState: initialSystemState,
+  migrate: migrateSystemState,
+  persistDenylist: ['isConnected', 'denoiseProgress', 'status'],
+};

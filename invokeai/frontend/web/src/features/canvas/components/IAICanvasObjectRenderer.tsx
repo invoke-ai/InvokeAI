@@ -12,7 +12,7 @@ import { Group, Line, Rect } from 'react-konva';
 import IAICanvasImage from './IAICanvasImage';
 
 const IAICanvasObjectRenderer = () => {
-  const objects = useAppSelector((state) => state.canvas.layerState.objects);
+  const objects = useAppSelector((s) => s.canvas.layerState.objects);
 
   return (
     <Group name="outpainting-objects" listening={false}>
@@ -31,9 +31,7 @@ const IAICanvasObjectRenderer = () => {
               lineJoin="round"
               shadowForStrokeEnabled={false}
               listening={false}
-              globalCompositeOperation={
-                obj.tool === 'brush' ? 'source-over' : 'destination-out'
-              }
+              globalCompositeOperation={obj.tool === 'brush' ? 'source-over' : 'destination-out'}
             />
           );
           if (obj.clip) {

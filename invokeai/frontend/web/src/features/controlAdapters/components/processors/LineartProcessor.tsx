@@ -1,6 +1,4 @@
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
-import { InvSwitch } from 'common/components/InvSwitch/wrapper';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type { RequiredLineartImageProcessorInvocation } from 'features/controlAdapters/store/types';
@@ -10,8 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './common/ProcessorWrapper';
 
-const DEFAULTS = CONTROLNET_PROCESSORS.lineart_image_processor
-  .default as RequiredLineartImageProcessorInvocation;
+const DEFAULTS = CONTROLNET_PROCESSORS.lineart_image_processor.default as RequiredLineartImageProcessorInvocation;
 
 type LineartProcessorProps = {
   controlNetId: string;
@@ -39,18 +36,6 @@ const LineartProcessor = (props: LineartProcessorProps) => {
     [controlNetId, processorChanged]
   );
 
-  const handleDetectResolutionReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      detect_resolution: DEFAULTS.detect_resolution,
-    });
-  }, [controlNetId, processorChanged]);
-
-  const handleImageResolutionReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      image_resolution: DEFAULTS.image_resolution,
-    });
-  }, [controlNetId, processorChanged]);
-
   const handleCoarseChanged = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       processorChanged(controlNetId, { coarse: e.target.checked });
@@ -60,37 +45,46 @@ const LineartProcessor = (props: LineartProcessorProps) => {
 
   return (
     <ProcessorWrapper>
-      <InvControl
-        label={t('controlnet.detectResolution')}
-        isDisabled={!isEnabled}
-      >
-        <InvSlider
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.detectResolution')}</FormLabel>
+        <CompositeSlider
           value={detect_resolution}
           onChange={handleDetectResolutionChanged}
-          onReset={handleDetectResolutionReset}
+          defaultValue={DEFAULTS.detect_resolution}
           min={0}
           max={4096}
           marks
-          withNumberInput
         />
-      </InvControl>
-      <InvControl
-        label={t('controlnet.imageResolution')}
-        isDisabled={!isEnabled}
-      >
-        <InvSlider
+        <CompositeNumberInput
+          value={detect_resolution}
+          onChange={handleDetectResolutionChanged}
+          defaultValue={DEFAULTS.detect_resolution}
+          min={0}
+          max={4096}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.imageResolution')}</FormLabel>
+        <CompositeSlider
           value={image_resolution}
           onChange={handleImageResolutionChanged}
-          onReset={handleImageResolutionReset}
+          defaultValue={DEFAULTS.image_resolution}
           min={0}
           max={4096}
           marks
-          withNumberInput
         />
-      </InvControl>
-      <InvControl label={t('controlnet.coarse')} isDisabled={!isEnabled}>
-        <InvSwitch isChecked={coarse} onChange={handleCoarseChanged} />
-      </InvControl>
+        <CompositeNumberInput
+          value={image_resolution}
+          onChange={handleImageResolutionChanged}
+          defaultValue={DEFAULTS.image_resolution}
+          min={0}
+          max={4096}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.coarse')}</FormLabel>
+        <Switch isChecked={coarse} onChange={handleCoarseChanged} />
+      </FormControl>
     </ProcessorWrapper>
   );
 };

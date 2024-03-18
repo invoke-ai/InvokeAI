@@ -1,41 +1,21 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useImageSizeContext } from 'features/parameters/components/ImageSize/ImageSizeContext';
+import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
-const selector = createMemoizedSelector(
-  [stateSelector],
-  ({ generation, config }) => {
-    const { min, sliderMax, inputMax, fineStep, coarseStep } = config.sd.height;
-    const { model } = generation;
-
-    const initial = ['sdxl', 'sdxl-refiner'].includes(
-      model?.base_model as string
-    )
-      ? 1024
-      : 512;
-
-    return {
-      initial,
-      min,
-      max: sliderMax,
-      inputMax,
-      step: coarseStep,
-      fineStep,
-    };
-  }
-);
 
 export const ParamHeight = memo(() => {
   const { t } = useTranslation();
   const ctx = useImageSizeContext();
-  const { initial, min, max, inputMax, step, fineStep } =
-    useAppSelector(selector);
+  const optimalDimension = useAppSelector(selectOptimalDimension);
+  const sliderMin = useAppSelector((s) => s.config.sd.height.sliderMin);
+  const sliderMax = useAppSelector((s) => s.config.sd.height.sliderMax);
+  const numberInputMin = useAppSelector((s) => s.config.sd.height.numberInputMin);
+  const numberInputMax = useAppSelector((s) => s.config.sd.height.numberInputMax);
+  const coarseStep = useAppSelector((s) => s.config.sd.height.coarseStep);
+  const fineStep = useAppSelector((s) => s.config.sd.height.fineStep);
 
   const onChange = useCallback(
     (v: number) => {
@@ -44,33 +24,33 @@ export const ParamHeight = memo(() => {
     [ctx]
   );
 
-  const onReset = useCallback(() => {
-    ctx.heightChanged(initial);
-  }, [ctx, initial]);
-
-  const marks = useMemo(() => [min, initial, max], [min, initial, max]);
+  const marks = useMemo(() => [sliderMin, optimalDimension, sliderMax], [sliderMin, optimalDimension, sliderMax]);
 
   return (
-    <InvControl label={t('parameters.height')}>
-      <InvSlider
+    <FormControl>
+      <InformationalPopover feature="paramHeight">
+        <FormLabel>{t('parameters.height')}</FormLabel>
+      </InformationalPopover>
+      <CompositeSlider
         value={ctx.height}
+        defaultValue={optimalDimension}
         onChange={onChange}
-        onReset={onReset}
-        min={min}
-        max={max}
-        step={step}
+        min={sliderMin}
+        max={sliderMax}
+        step={coarseStep}
         fineStep={fineStep}
         marks={marks}
       />
-      <InvNumberInput
+      <CompositeNumberInput
         value={ctx.height}
+        defaultValue={optimalDimension}
         onChange={onChange}
-        min={min}
-        max={inputMax}
-        step={step}
+        min={numberInputMin}
+        max={numberInputMax}
+        step={coarseStep}
         fineStep={fineStep}
       />
-    </InvControl>
+    </FormControl>
   );
 });
 

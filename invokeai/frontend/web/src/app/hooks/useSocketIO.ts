@@ -6,10 +6,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import type { MapStore } from 'nanostores';
 import { atom, map } from 'nanostores';
 import { useEffect, useMemo } from 'react';
-import type {
-  ClientToServerEvents,
-  ServerToClientEvents,
-} from 'services/events/types';
+import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import { setEventListeners } from 'services/events/util/setEventListeners';
 import type { ManagerOptions, Socket, SocketOptions } from 'socket.io-client';
 import { io } from 'socket.io-client';
@@ -22,7 +19,7 @@ declare global {
 }
 
 export const $socketOptions = map<Partial<ManagerOptions & SocketOptions>>({});
-export const $isSocketInitialized = atom<boolean>(false);
+const $isSocketInitialized = atom<boolean>(false);
 
 /**
  * Initializes the socket.io connection and sets up event listeners.
@@ -43,9 +40,9 @@ export const useSocketIO = () => {
   }, [baseUrl]);
 
   const socketOptions = useMemo(() => {
-    const options: Parameters<typeof io>[0] = {
+    const options: Partial<ManagerOptions & SocketOptions> = {
       timeout: 60000,
-      path: '/ws/socket.io',
+      path: baseUrl ? '/ws/socket.io' : `${window.location.pathname}ws/socket.io`,
       autoConnect: false, // achtung! removing this breaks the dynamic middleware
       forceNew: true,
     };
@@ -56,7 +53,7 @@ export const useSocketIO = () => {
     }
 
     return { ...options, ...addlSocketOptions };
-  }, [authToken, addlSocketOptions]);
+  }, [authToken, addlSocketOptions, baseUrl]);
 
   useEffect(() => {
     if ($isSocketInitialized.get()) {
@@ -64,14 +61,11 @@ export const useSocketIO = () => {
       return;
     }
 
-    const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
-      socketUrl,
-      socketOptions
-    );
+    const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(socketUrl, socketOptions);
     setEventListeners({ dispatch, socket });
     socket.connect();
 
-    if ($isDebugging.get()) {
+    if ($isDebugging.get() || import.meta.env.MODE === 'development') {
       window.$socketOptions = $socketOptions;
       console.log('Socket initialized', socket);
     }
@@ -79,7 +73,7 @@ export const useSocketIO = () => {
     $isSocketInitialized.set(true);
 
     return () => {
-      if ($isDebugging.get()) {
+      if ($isDebugging.get() || import.meta.env.MODE === 'development') {
         window.$socketOptions = undefined;
         console.log('Socket teardown', socket);
       }

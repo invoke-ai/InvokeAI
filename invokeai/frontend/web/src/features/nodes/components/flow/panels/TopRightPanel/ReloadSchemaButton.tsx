@@ -1,27 +1,26 @@
-import { useAppDispatch } from 'app/store/storeHooks';
-import { InvButton } from 'common/components/InvButton/InvButton';
+import { Button } from '@invoke-ai/ui-library';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaSyncAlt } from 'react-icons/fa';
-import { receivedOpenAPISchema } from 'services/api/thunks/schema';
+import { PiArrowsClockwiseBold } from 'react-icons/pi';
+import { useLazyGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 
 const ReloadNodeTemplatesButton = () => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
+  const [_getOpenAPISchema] = useLazyGetOpenAPISchemaQuery();
 
   const handleReloadSchema = useCallback(() => {
-    dispatch(receivedOpenAPISchema());
-  }, [dispatch]);
+    _getOpenAPISchema();
+  }, [_getOpenAPISchema]);
 
   return (
-    <InvButton
-      leftIcon={<FaSyncAlt />}
+    <Button
+      leftIcon={<PiArrowsClockwiseBold />}
       tooltip={t('nodes.reloadNodeTemplates')}
       aria-label={t('nodes.reloadNodeTemplates')}
       onClick={handleReloadSchema}
     >
       {t('nodes.reloadNodeTemplates')}
-    </InvButton>
+    </Button>
   );
 };
 

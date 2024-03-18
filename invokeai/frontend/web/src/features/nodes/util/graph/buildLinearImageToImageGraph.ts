@@ -1,14 +1,16 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
-import type {
-  ImageResizeInvocation,
-  ImageToLatentsInvocation,
-  NonNullableGraph,
+import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
+import {
+  type ImageResizeInvocation,
+  type ImageToLatentsInvocation,
+  isNonRefinerMainModelConfig,
+  type NonNullableGraph,
 } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
-import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
@@ -28,14 +30,12 @@ import {
   RESIZE,
   SEAMLESS,
 } from './constants';
-import { addCoreMetadataNode } from './metadata';
+import { addCoreMetadataNode, getModelMetadataField } from './metadata';
 
 /**
  * Builds the Image to Image tab graph.
  */
-export const buildLinearImageToImageGraph = (
-  state: RootState
-): NonNullableGraph => {
+export const buildLinearImageToImageGraph = async (state: RootState): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
     positivePrompt,
@@ -123,12 +123,14 @@ export const buildLinearImageToImageGraph = (
         type: 'l2i',
         id: LATENTS_TO_IMAGE,
         fp32,
-        is_intermediate,
+        is_intermediate: getIsIntermediate(state),
+        board: getBoardField(state),
       },
       [DENOISE_LATENTS]: {
         type: 'denoise_latents',
         id: DENOISE_LATENTS,
         cfg_scale,
+        cfg_rescale_multiplier,
         scheduler,
         steps,
         denoising_start: 1 - strength,
@@ -246,10 +248,7 @@ export const buildLinearImageToImageGraph = (
   };
 
   // handle `fit`
-  if (
-    shouldFitToWidthHeight &&
-    (initialImage.width !== width || initialImage.height !== height)
-  ) {
+  if (shouldFitToWidthHeight && (initialImage.width !== width || initialImage.height !== height)) {
     // The init image needs to be resized to the specified width and height before being passed to `IMAGE_TO_LATENTS`
 
     // Create a resize node, explicitly setting its image
@@ -314,6 +313,8 @@ export const buildLinearImageToImageGraph = (
     });
   }
 
+  const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
+
   addCoreMetadataNode(
     graph,
     {
@@ -324,7 +325,7 @@ export const buildLinearImageToImageGraph = (
       width,
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
-      model,
+      model: getModelMetadataField(modelConfig),
       seed,
       steps,
       rand_device: use_cpu ? 'cpu' : 'cuda',
@@ -343,17 +344,17 @@ export const buildLinearImageToImageGraph = (
   }
 
   // optionally add custom VAE
-  addVAEToGraph(state, graph, modelLoaderNodeId);
+  await addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
+  await addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
+  await addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // Add IP Adapter
-  addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
-  addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
+  await addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
+  await addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
@@ -365,8 +366,6 @@ export const buildLinearImageToImageGraph = (
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph);
   }
-
-  addLinearUIOutputNode(state, graph);
 
   return graph;
 };

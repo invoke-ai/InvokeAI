@@ -1,12 +1,7 @@
-import { Flex } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import type { ComboboxOnChange } from '@invoke-ai/ui-library';
+import { ButtonGroup, Combobox, Flex, FormControl, IconButton, Tooltip } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import type { InvSelectOnChange } from 'common/components/InvSelect/types';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
 import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { useSingleAndDoubleClick } from 'common/hooks/useSingleAndDoubleClick';
@@ -16,31 +11,24 @@ import {
   canvasMerged,
   canvasSavedToGallery,
 } from 'features/canvas/store/actions';
+import { $canvasBaseLayer, $tool } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import {
-  resetCanvas,
-  resetCanvasView,
-  setIsMaskEnabled,
-  setLayer,
-  setTool,
-} from 'features/canvas/store/canvasSlice';
+import { resetCanvas, resetCanvasView, setIsMaskEnabled, setLayer } from 'features/canvas/store/canvasSlice';
 import type { CanvasLayer } from 'features/canvas/store/canvasTypes';
 import { LAYER_NAMES_DICT } from 'features/canvas/store/canvasTypes';
-import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
-import { InvIconButton } from 'index';
 import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
-  FaArrowsAlt,
-  FaCopy,
-  FaCrosshairs,
-  FaDownload,
-  FaLayerGroup,
-  FaSave,
-  FaTrash,
-  FaUpload,
-} from 'react-icons/fa';
+  PiCopyBold,
+  PiCrosshairSimpleBold,
+  PiDownloadSimpleBold,
+  PiFloppyDiskBold,
+  PiHandGrabbingBold,
+  PiStackBold,
+  PiTrashSimpleBold,
+  PiUploadSimpleBold,
+} from 'react-icons/pi';
 
 import IAICanvasMaskOptions from './IAICanvasMaskOptions';
 import IAICanvasRedoButton from './IAICanvasRedoButton';
@@ -48,27 +36,12 @@ import IAICanvasSettingsButtonPopover from './IAICanvasSettingsButtonPopover';
 import IAICanvasToolChooserOptions from './IAICanvasToolChooserOptions';
 import IAICanvasUndoButton from './IAICanvasUndoButton';
 
-export const selector = createMemoizedSelector(
-  [stateSelector, isStagingSelector],
-  ({ canvas }, isStaging) => {
-    const { tool, shouldCropToBoundingBoxOnSave, layer, isMaskEnabled } =
-      canvas;
-
-    return {
-      isStaging,
-      isMaskEnabled,
-      tool,
-      layer,
-      shouldCropToBoundingBoxOnSave,
-    };
-  }
-);
-
 const IAICanvasToolbar = () => {
   const dispatch = useAppDispatch();
-  const { isStaging, isMaskEnabled, layer, tool } = useAppSelector(selector);
-  const canvasBaseLayer = getCanvasBaseLayer();
-
+  const isMaskEnabled = useAppSelector((s) => s.canvas.isMaskEnabled);
+  const layer = useAppSelector((s) => s.canvas.layer);
+  const tool = useStore($tool);
+  const isStaging = useAppSelector(isStagingSelector);
   const { t } = useTranslation();
   const { isClipboardAPIAvailable } = useCopyImageToClipboard();
 
@@ -97,7 +70,7 @@ const IAICanvasToolbar = () => {
       enabled: () => true,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    []
   );
 
   useHotkeys(
@@ -109,19 +82,19 @@ const IAICanvasToolbar = () => {
       enabled: () => !isStaging,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    []
   );
 
   useHotkeys(
     ['shift+s'],
     () => {
-      handleSaveToGallery();
+      !isStaging && handleSaveToGallery();
     },
     {
-      enabled: () => !isStaging,
+      enabled: true,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    [isStaging]
   );
 
   useHotkeys(
@@ -133,7 +106,7 @@ const IAICanvasToolbar = () => {
       enabled: () => !isStaging && isClipboardAPIAvailable,
       preventDefault: true,
     },
-    [canvasBaseLayer, isClipboardAPIAvailable]
+    [isClipboardAPIAvailable]
   );
 
   useHotkeys(
@@ -145,33 +118,42 @@ const IAICanvasToolbar = () => {
       enabled: () => !isStaging,
       preventDefault: true,
     },
-    [canvasBaseLayer]
+    []
   );
 
   const handleSelectMoveTool = useCallback(() => {
-    dispatch(setTool('move'));
-  }, [dispatch]);
+    $tool.set('move');
+  }, []);
 
-  const handleClickResetCanvasView = useSingleAndDoubleClick(
-    () => handleResetCanvasView(false),
-    () => handleResetCanvasView(true)
+  const handleResetCanvasView = useCallback(
+    (shouldScaleTo1 = false) => {
+      const canvasBaseLayer = $canvasBaseLayer.get();
+      if (!canvasBaseLayer) {
+        return;
+      }
+      const clientRect = canvasBaseLayer.getClientRect({
+        skipTransform: true,
+      });
+      dispatch(
+        resetCanvasView({
+          contentRect: clientRect,
+          shouldScaleTo1,
+        })
+      );
+    },
+    [dispatch]
   );
+  const onSingleClick = useCallback(() => {
+    handleResetCanvasView(false);
+  }, [handleResetCanvasView]);
+  const onDoubleClick = useCallback(() => {
+    handleResetCanvasView(true);
+  }, [handleResetCanvasView]);
 
-  const handleResetCanvasView = (shouldScaleTo1 = false) => {
-    const canvasBaseLayer = getCanvasBaseLayer();
-    if (!canvasBaseLayer) {
-      return;
-    }
-    const clientRect = canvasBaseLayer.getClientRect({
-      skipTransform: true,
-    });
-    dispatch(
-      resetCanvasView({
-        contentRect: clientRect,
-        shouldScaleTo1,
-      })
-    );
-  };
+  const handleClickResetCanvasView = useSingleAndDoubleClick({
+    onSingleClick,
+    onDoubleClick,
+  });
 
   const handleResetCanvas = useCallback(() => {
     dispatch(resetCanvas());
@@ -196,7 +178,7 @@ const IAICanvasToolbar = () => {
     dispatch(canvasDownloadedAsImage());
   }, [dispatch]);
 
-  const handleChangeLayer = useCallback<InvSelectOnChange>(
+  const handleChangeLayer = useCallback<ComboboxOnChange>(
     (v) => {
       if (!v) {
         return;
@@ -209,100 +191,93 @@ const IAICanvasToolbar = () => {
     [dispatch, isMaskEnabled]
   );
 
-  const value = useMemo(
-    () => LAYER_NAMES_DICT.filter((o) => o.value === layer)[0],
-    [layer]
-  );
+  const value = useMemo(() => LAYER_NAMES_DICT.filter((o) => o.value === layer)[0], [layer]);
 
   return (
     <Flex alignItems="center" gap={2} flexWrap="wrap">
-      <InvTooltip label={`${t('unifiedCanvas.layer')} (Q)`}>
-        <InvControl isDisabled={isStaging} w="5rem">
-          <InvSelect
-            value={value}
-            options={LAYER_NAMES_DICT}
-            onChange={handleChangeLayer}
-          />
-        </InvControl>
-      </InvTooltip>
+      <Tooltip label={`${t('unifiedCanvas.layer')} (Q)`}>
+        <FormControl isDisabled={isStaging} w="5rem">
+          <Combobox value={value} options={LAYER_NAMES_DICT} onChange={handleChangeLayer} />
+        </FormControl>
+      </Tooltip>
 
       <IAICanvasMaskOptions />
       <IAICanvasToolChooserOptions />
 
-      <InvButtonGroup>
-        <InvIconButton
+      <ButtonGroup>
+        <IconButton
           aria-label={`${t('unifiedCanvas.move')} (V)`}
           tooltip={`${t('unifiedCanvas.move')} (V)`}
-          icon={<FaArrowsAlt />}
+          icon={<PiHandGrabbingBold />}
           isChecked={tool === 'move' || isStaging}
           onClick={handleSelectMoveTool}
         />
-        <InvIconButton
+        <IconButton
           aria-label={`${t('unifiedCanvas.resetView')} (R)`}
           tooltip={`${t('unifiedCanvas.resetView')} (R)`}
-          icon={<FaCrosshairs />}
+          icon={<PiCrosshairSimpleBold />}
           onClick={handleClickResetCanvasView}
         />
-      </InvButtonGroup>
+      </ButtonGroup>
 
-      <InvButtonGroup>
-        <InvIconButton
+      <ButtonGroup>
+        <IconButton
           aria-label={`${t('unifiedCanvas.mergeVisible')} (Shift+M)`}
           tooltip={`${t('unifiedCanvas.mergeVisible')} (Shift+M)`}
-          icon={<FaLayerGroup />}
+          icon={<PiStackBold />}
           onClick={handleMergeVisible}
           isDisabled={isStaging}
         />
-        <InvIconButton
+        <IconButton
           aria-label={`${t('unifiedCanvas.saveToGallery')} (Shift+S)`}
           tooltip={`${t('unifiedCanvas.saveToGallery')} (Shift+S)`}
-          icon={<FaSave />}
+          icon={<PiFloppyDiskBold />}
           onClick={handleSaveToGallery}
           isDisabled={isStaging}
         />
         {isClipboardAPIAvailable && (
-          <InvIconButton
+          <IconButton
             aria-label={`${t('unifiedCanvas.copyToClipboard')} (Cmd/Ctrl+C)`}
             tooltip={`${t('unifiedCanvas.copyToClipboard')} (Cmd/Ctrl+C)`}
-            icon={<FaCopy />}
+            icon={<PiCopyBold />}
             onClick={handleCopyImageToClipboard}
             isDisabled={isStaging}
           />
         )}
-        <InvIconButton
+        <IconButton
           aria-label={`${t('unifiedCanvas.downloadAsImage')} (Shift+D)`}
           tooltip={`${t('unifiedCanvas.downloadAsImage')} (Shift+D)`}
-          icon={<FaDownload />}
+          icon={<PiDownloadSimpleBold />}
           onClick={handleDownloadAsImage}
           isDisabled={isStaging}
         />
-      </InvButtonGroup>
-      <InvButtonGroup>
+      </ButtonGroup>
+      <ButtonGroup>
         <IAICanvasUndoButton />
         <IAICanvasRedoButton />
-      </InvButtonGroup>
+      </ButtonGroup>
 
-      <InvButtonGroup>
-        <InvIconButton
+      <ButtonGroup>
+        <IconButton
           aria-label={`${t('common.upload')}`}
           tooltip={`${t('common.upload')}`}
-          icon={<FaUpload />}
+          icon={<PiUploadSimpleBold />}
           isDisabled={isStaging}
           {...getUploadButtonProps()}
         />
         <input {...getUploadInputProps()} />
-        <InvIconButton
+        <IconButton
           aria-label={`${t('unifiedCanvas.clearCanvas')}`}
           tooltip={`${t('unifiedCanvas.clearCanvas')}`}
-          icon={<FaTrash />}
+          icon={<PiTrashSimpleBold />}
           onClick={handleResetCanvas}
           colorScheme="error"
           isDisabled={isStaging}
         />
-      </InvButtonGroup>
-      <InvButtonGroup>
+      </ButtonGroup>
+      <ButtonGroup>
         <IAICanvasSettingsButtonPopover />
-      </InvButtonGroup>
+      </ButtonGroup>
     </Flex>
   );
 };

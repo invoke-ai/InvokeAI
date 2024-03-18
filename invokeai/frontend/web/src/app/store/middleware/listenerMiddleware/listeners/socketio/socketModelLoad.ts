@@ -1,50 +1,41 @@
 import { logger } from 'app/logging/logger';
-import {
-  appSocketModelLoadCompleted,
-  appSocketModelLoadStarted,
-  socketModelLoadCompleted,
-  socketModelLoadStarted,
-} from 'services/events/actions';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { socketModelLoadCompleted, socketModelLoadStarted } from 'services/events/actions';
 
-import { startAppListening } from '../..';
+const log = logger('socketio');
 
-export const addModelLoadEventListener = () => {
+export const addModelLoadEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketModelLoadStarted,
-    effect: (action, { dispatch }) => {
-      const log = logger('socketio');
-      const { base_model, model_name, model_type, submodel } =
-        action.payload.data;
+    effect: (action) => {
+      const { model_config, submodel_type } = action.payload.data;
+      const { name, base, type } = model_config;
 
-      let message = `Model load started: ${base_model}/${model_type}/${model_name}`;
-
-      if (submodel) {
-        message = message.concat(`/${submodel}`);
+      const extras: string[] = [base, type];
+      if (submodel_type) {
+        extras.push(submodel_type);
       }
 
-      log.debug(action.payload, message);
+      const message = `Model load started: ${name} (${extras.join(', ')})`;
 
-      // pass along the socket event as an application action
-      dispatch(appSocketModelLoadStarted(action.payload));
+      log.debug(action.payload, message);
     },
   });
 
   startAppListening({
     actionCreator: socketModelLoadCompleted,
-    effect: (action, { dispatch }) => {
-      const log = logger('socketio');
-      const { base_model, model_name, model_type, submodel } =
-        action.payload.data;
+    effect: (action) => {
+      const { model_config, submodel_type } = action.payload.data;
+      const { name, base, type } = model_config;
 
-      let message = `Model load complete: ${base_model}/${model_type}/${model_name}`;
-
-      if (submodel) {
-        message = message.concat(`/${submodel}`);
+      const extras: string[] = [base, type];
+      if (submodel_type) {
+        extras.push(submodel_type);
       }
 
+      const message = `Model load complete: ${name} (${extras.join(', ')})`;
+
       log.debug(action.payload, message);
-      // pass along the socket event as an application action
-      dispatch(appSocketModelLoadCompleted(action.payload));
     },
   });
 };

@@ -1,6 +1,4 @@
-import { Collapse, Flex, Grid, GridItem } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import { Collapse, Flex, Grid, GridItem } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
@@ -20,46 +18,29 @@ const overlayScrollbarsStyles: CSSProperties = {
   width: '100%',
 };
 
-const selector = createMemoizedSelector([stateSelector], ({ gallery }) => {
-  const { selectedBoardId, boardSearchText } = gallery;
-  return { selectedBoardId, boardSearchText };
-});
-
 type Props = {
   isOpen: boolean;
 };
 
 const BoardsList = (props: Props) => {
   const { isOpen } = props;
-  const { selectedBoardId, boardSearchText } = useAppSelector(selector);
+  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
+  const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
   const { data: boards } = useListAllBoardsQuery();
   const filteredBoards = boardSearchText
-    ? boards?.filter((board) =>
-        board.board_name.toLowerCase().includes(boardSearchText.toLowerCase())
-      )
+    ? boards?.filter((board) => board.board_name.toLowerCase().includes(boardSearchText.toLowerCase()))
     : boards;
   const [boardToDelete, setBoardToDelete] = useState<BoardDTO>();
 
   return (
     <>
       <Collapse in={isOpen} animateOpacity>
-        <Flex
-          layerStyle="first"
-          flexDir="column"
-          gap={2}
-          p={2}
-          mt={2}
-          borderRadius="base"
-        >
+        <Flex layerStyle="first" flexDir="column" gap={2} p={2} mt={2} borderRadius="base">
           <Flex gap={2} alignItems="center">
             <BoardsSearch />
             <AddBoardButton />
           </Flex>
-          <OverlayScrollbarsComponent
-            defer
-            style={overlayScrollbarsStyles}
-            options={overlayScrollbarsParams.options}
-          >
+          <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
             <Grid
               className="list-container"
               data-testid="boards-list"
@@ -71,11 +52,7 @@ const BoardsList = (props: Props) => {
               </GridItem>
               {filteredBoards &&
                 filteredBoards.map((board, index) => (
-                  <GridItem
-                    key={board.board_id}
-                    p={1.5}
-                    data-testid={`board-${index}`}
-                  >
+                  <GridItem key={board.board_id} p={1.5} data-testid={`board-${index}`}>
                     <GalleryBoard
                       board={board}
                       isSelected={selectedBoardId === board.board_id}
@@ -87,10 +64,7 @@ const BoardsList = (props: Props) => {
           </OverlayScrollbarsComponent>
         </Flex>
       </Collapse>
-      <DeleteBoardModal
-        boardToDelete={boardToDelete}
-        setBoardToDelete={setBoardToDelete}
-      />
+      <DeleteBoardModal boardToDelete={boardToDelete} setBoardToDelete={setBoardToDelete} />
     </>
   );
 };

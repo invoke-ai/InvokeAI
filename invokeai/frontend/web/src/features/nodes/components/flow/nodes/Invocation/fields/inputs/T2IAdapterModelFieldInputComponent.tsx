@@ -1,32 +1,24 @@
+import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldT2IAdapterModelValueChanged } from 'features/nodes/store/nodesSlice';
-import type {
-  T2IAdapterModelFieldInputInstance,
-  T2IAdapterModelFieldInputTemplate,
-} from 'features/nodes/types/field';
+import type { T2IAdapterModelFieldInputInstance, T2IAdapterModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
-import type { T2IAdapterModelConfigEntity } from 'services/api/endpoints/models';
-import { useGetT2IAdapterModelsQuery } from 'services/api/endpoints/models';
+import { useT2IAdapterModels } from 'services/api/hooks/modelsByType';
+import type { T2IAdapterModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
 const T2IAdapterModelFieldInputComponent = (
-  props: FieldComponentProps<
-    T2IAdapterModelFieldInputInstance,
-    T2IAdapterModelFieldInputTemplate
-  >
+  props: FieldComponentProps<T2IAdapterModelFieldInputInstance, T2IAdapterModelFieldInputTemplate>
 ) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
 
-  const { data: t2iAdapterModels } = useGetT2IAdapterModelsQuery();
+  const [modelConfigs, { isLoading }] = useT2IAdapterModels();
 
   const _onChange = useCallback(
-    (value: T2IAdapterModelConfigEntity | null) => {
+    (value: T2IAdapterModelConfig | null) => {
       if (!value) {
         return;
       }
@@ -41,25 +33,19 @@ const T2IAdapterModelFieldInputComponent = (
     [dispatch, field.name, nodeId]
   );
 
-  const { options, value, onChange } = useGroupedModelInvSelect({
-    modelEntities: t2iAdapterModels,
+  const { options, value, onChange } = useGroupedModelCombobox({
+    modelConfigs,
     onChange: _onChange,
-    selectedModel: field.value
-      ? { ...field.value, model_type: 't2i_adapter' }
-      : undefined,
+    selectedModel: field.value,
+    isLoading,
   });
 
   return (
-    <InvTooltip label={value?.description}>
-      <InvControl className="nowheel nodrag" isInvalid={!value}>
-        <InvSelect
-          value={value}
-          placeholder="Pick one"
-          options={options}
-          onChange={onChange}
-        />
-      </InvControl>
-    </InvTooltip>
+    <Tooltip label={value?.description}>
+      <FormControl className="nowheel nodrag" isInvalid={!value}>
+        <Combobox value={value} placeholder="Pick one" options={options} onChange={onChange} />
+      </FormControl>
+    </Tooltip>
   );
 };
 

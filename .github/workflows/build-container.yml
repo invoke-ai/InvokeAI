@@ -11,7 +11,7 @@ on:
       - 'docker/docker-entrypoint.sh'
       - 'workflows/build-container.yml'
     tags:
-      - 'v*'
+      - 'v*.*.*'
   workflow_dispatch:
 
 permissions:
@@ -40,10 +40,14 @@ jobs:
       - name: Free up more disk space on the runner
         # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930
         run: |
+          echo "----- Free space before cleanup"
+          df -h
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
           sudo swapoff /mnt/swapfile
           sudo rm -rf /mnt/swapfile
+          echo "----- Free space after cleanup"
+          df -h
 
       - name: Checkout
         uses: actions/checkout@v3
@@ -91,6 +95,7 @@ jobs:
       #     password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build container
+        timeout-minutes: 40
         id: docker_build
         uses: docker/build-push-action@v4
         with:

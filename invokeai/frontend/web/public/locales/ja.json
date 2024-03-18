@@ -3,7 +3,6 @@
         "languagePickerLabel": "言語",
         "reportBugLabel": "バグ報告",
         "settingsLabel": "設定",
-        "langJapanese": "日本語",
         "nodesDesc": "現在、画像生成のためのノードベースシステムを開発中です。機能についてのアップデートにご期待ください。",
         "postProcessing": "後処理",
         "postProcessDesc1": "Invoke AIは、多彩な後処理の機能を備えています。アップスケーリングと顔修復は、すでにWebUI上で利用可能です。これらは、[Text To Image]および[Image To Image]タブの[詳細オプション]メニューからアクセスできます。また、現在の画像表示の上やビューア内の画像アクションボタンを使って、画像を直接処理することもできます。",
@@ -36,11 +35,6 @@
         "statusModelChanged": "モデルを変更",
         "cancel": "キャンセル",
         "accept": "同意",
-        "langBrPortuguese": "Português do Brasil",
-        "langRussian": "Русский",
-        "langSimplifiedChinese": "简体中文",
-        "langUkranian": "Украї́нська",
-        "langSpanish": "Español",
         "img2img": "img2img",
         "unifiedCanvas": "Unified Canvas",
         "statusMergingModels": "モデルのマージ",
@@ -54,18 +48,8 @@
         "statusMergedModels": "マージ済モデル",
         "githubLabel": "Github",
         "hotkeysLabel": "ホットキー",
-        "langHebrew": "עברית",
         "discordLabel": "Discord",
-        "langItalian": "Italiano",
-        "langEnglish": "English",
-        "langArabic": "アラビア語",
-        "langDutch": "Nederlands",
-        "langFrench": "Français",
-        "langGerman": "Deutsch",
-        "langPortuguese": "Português",
         "nodes": "ワークフローエディター",
-        "langKorean": "한국어",
-        "langPolish": "Polski",
         "txt2img": "txt2img",
         "postprocessing": "Post Processing",
         "t2iAdapter": "T2I アダプター",
@@ -84,7 +68,6 @@
         "imageFailedToLoad": "画像が読み込めません",
         "imagePrompt": "画像プロンプト",
         "modelManager": "モデルマネージャー",
-        "lightMode": "ライトモード",
         "generate": "生成",
         "learnMore": "もっと学ぶ",
         "darkMode": "ダークモード",
@@ -132,10 +115,6 @@
         "pinOptions": {
             "title": "ピン",
             "desc": "オプションパネルを固定"
-        },
-        "toggleViewer": {
-            "title": "ビュワーのトグル",
-            "desc": "ビュワーを開閉"
         },
         "toggleGallery": {
             "title": "ギャラリーのトグル",
@@ -196,10 +175,6 @@
         "nextImage": {
             "title": "次の画像",
             "desc": "ギャラリー内の1つ後の画像を表示"
-        },
-        "toggleGalleryPin": {
-            "title": "ギャラリードロワーの固定",
-            "desc": "ギャラリーをUIにピン留め/解除"
         },
         "increaseGalleryThumbSize": {
             "title": "ギャラリーの画像を拡大",
@@ -580,7 +555,6 @@
         "balanced": "バランス",
         "prompt": "プロンプト",
         "depthMidasDescription": "Midasを使用して深度マップを生成",
-        "openPoseDescription": "Openposeを使用してポーズを推定",
         "control": "コントロール",
         "resizeMode": "リサイズモード",
         "weight": "重み",

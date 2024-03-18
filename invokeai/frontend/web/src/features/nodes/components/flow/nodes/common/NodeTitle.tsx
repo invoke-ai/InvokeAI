@@ -1,12 +1,5 @@
-import type { SystemStyleObject } from '@chakra-ui/react';
-import {
-  Box,
-  Editable,
-  EditableInput,
-  EditablePreview,
-  Flex,
-  useEditableControls,
-} from '@chakra-ui/react';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Box, Editable, EditableInput, EditablePreview, Flex, useEditableControls } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useNodeLabel } from 'features/nodes/hooks/useNodeLabel';
 import { useNodeTemplateTitle } from 'features/nodes/hooks/useNodeTemplateTitle';
@@ -31,9 +24,7 @@ const NodeTitle = ({ nodeId, title }: Props) => {
   const handleSubmit = useCallback(
     async (newTitle: string) => {
       dispatch(nodeLabelChanged({ nodeId, label: newTitle }));
-      setLocalTitle(
-        label || title || templateTitle || t('nodes.problemSettingTitle')
-      );
+      setLocalTitle(label || title || templateTitle || t('nodes.problemSettingTitle'));
     },
     [dispatch, nodeId, title, templateTitle, label, t]
   );
@@ -44,20 +35,11 @@ const NodeTitle = ({ nodeId, title }: Props) => {
 
   useEffect(() => {
     // Another component may change the title; sync local title with global state
-    setLocalTitle(
-      label || title || templateTitle || t('nodes.problemSettingTitle')
-    );
+    setLocalTitle(label || title || templateTitle || t('nodes.problemSettingTitle'));
   }, [label, templateTitle, title, t]);
 
   return (
-    <Flex
-      overflow="hidden"
-      w="full"
-      h="full"
-      alignItems="center"
-      justifyContent="center"
-      cursor="text"
-    >
+    <Flex overflow="hidden" w="full" h="full" alignItems="center" justifyContent="center" cursor="text">
       <Editable
         as={Flex}
         value={localTitle}
@@ -69,11 +51,7 @@ const NodeTitle = ({ nodeId, title }: Props) => {
         h="full"
       >
         <EditablePreview fontSize="sm" p={0} w="full" noOfLines={1} />
-        <EditableInput
-          className="nodrag"
-          fontSize="sm"
-          sx={editableInputStyles}
-        />
+        <EditableInput className="nodrag" fontSize="sm" sx={editableInputStyles} />
         <EditableControls />
       </Editable>
     </Flex>

@@ -1,25 +1,21 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { setInfillPatchmatchDownscaleSize } from 'features/parameters/store/generationSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector([stateSelector], ({ generation }) => {
-  const { infillPatchmatchDownscaleSize, infillMethod } = generation;
-
-  return {
-    infillPatchmatchDownscaleSize,
-    infillMethod,
-  };
-});
-
 const ParamInfillPatchmatchDownscaleSize = () => {
   const dispatch = useAppDispatch();
-  const { infillPatchmatchDownscaleSize, infillMethod } =
-    useAppSelector(selector);
+  const infillMethod = useAppSelector((s) => s.generation.infillMethod);
+  const infillPatchmatchDownscaleSize = useAppSelector((s) => s.generation.infillPatchmatchDownscaleSize);
+  const initial = useAppSelector((s) => s.config.sd.infillPatchmatchDownscaleSize.initial);
+  const sliderMin = useAppSelector((s) => s.config.sd.infillPatchmatchDownscaleSize.sliderMin);
+  const sliderMax = useAppSelector((s) => s.config.sd.infillPatchmatchDownscaleSize.sliderMax);
+  const numberInputMin = useAppSelector((s) => s.config.sd.infillPatchmatchDownscaleSize.numberInputMin);
+  const numberInputMax = useAppSelector((s) => s.config.sd.infillPatchmatchDownscaleSize.numberInputMax);
+  const coarseStep = useAppSelector((s) => s.config.sd.infillPatchmatchDownscaleSize.coarseStep);
+  const fineStep = useAppSelector((s) => s.config.sd.infillPatchmatchDownscaleSize.fineStep);
 
   const { t } = useTranslation();
 
@@ -30,25 +26,31 @@ const ParamInfillPatchmatchDownscaleSize = () => {
     [dispatch]
   );
 
-  const handleReset = useCallback(() => {
-    dispatch(setInfillPatchmatchDownscaleSize(2));
-  }, [dispatch]);
-
   return (
-    <InvControl
-      isDisabled={infillMethod !== 'patchmatch'}
-      label={t('parameters.patchmatchDownScaleSize')}
-    >
-      <InvSlider
-        min={1}
-        max={10}
+    <FormControl isDisabled={infillMethod !== 'patchmatch'}>
+      <InformationalPopover feature="patchmatchDownScaleSize">
+        <FormLabel>{t('parameters.patchmatchDownScaleSize')}</FormLabel>
+      </InformationalPopover>
+      <CompositeSlider
+        min={sliderMin}
+        max={sliderMax}
+        step={coarseStep}
+        fineStep={fineStep}
         value={infillPatchmatchDownscaleSize}
+        defaultValue={initial}
         onChange={handleChange}
-        withNumberInput
         marks
-        onReset={handleReset}
       />
-    </InvControl>
+      <CompositeNumberInput
+        min={numberInputMin}
+        max={numberInputMax}
+        step={coarseStep}
+        fineStep={fineStep}
+        value={infillPatchmatchDownscaleSize}
+        defaultValue={initial}
+        onChange={handleChange}
+      />
+    </FormControl>
   );
 };
 

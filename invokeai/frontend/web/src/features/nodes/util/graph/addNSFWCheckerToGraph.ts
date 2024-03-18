@@ -1,20 +1,15 @@
 import type { RootState } from 'app/store/store';
-import type {
-  ImageNSFWBlurInvocation,
-  LatentsToImageInvocation,
-  NonNullableGraph,
-} from 'services/api/types';
+import type { ImageNSFWBlurInvocation, LatentsToImageInvocation, NonNullableGraph } from 'services/api/types';
 
 import { LATENTS_TO_IMAGE, NSFW_CHECKER } from './constants';
+import { getBoardField, getIsIntermediate } from './graphBuilderUtils';
 
 export const addNSFWCheckerToGraph = (
   state: RootState,
   graph: NonNullableGraph,
   nodeIdToAddTo = LATENTS_TO_IMAGE
 ): void => {
-  const nodeToAddTo = graph.nodes[nodeIdToAddTo] as
-    | LatentsToImageInvocation
-    | undefined;
+  const nodeToAddTo = graph.nodes[nodeIdToAddTo] as LatentsToImageInvocation | undefined;
 
   if (!nodeToAddTo) {
     // something has gone terribly awry
@@ -27,7 +22,8 @@ export const addNSFWCheckerToGraph = (
   const nsfwCheckerNode: ImageNSFWBlurInvocation = {
     id: NSFW_CHECKER,
     type: 'img_nsfw',
-    is_intermediate: true,
+    is_intermediate: getIsIntermediate(state),
+    board: getBoardField(state),
   };
 
   graph.nodes[NSFW_CHECKER] = nsfwCheckerNode as ImageNSFWBlurInvocation;

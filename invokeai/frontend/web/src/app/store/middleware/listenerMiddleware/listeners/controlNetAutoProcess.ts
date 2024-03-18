@@ -1,5 +1,6 @@
 import type { AnyListenerPredicate } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import type { RootState } from 'app/store/store';
 import { controlAdapterImageProcessed } from 'features/controlAdapters/store/actions';
 import {
@@ -12,8 +13,6 @@ import {
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
 
-import { startAppListening } from '..';
-
 type AnyControlAdapterParamChangeAction =
   | ReturnType<typeof controlAdapterProcessorParamsChanged>
   | ReturnType<typeof controlAdapterModelChanged>
@@ -21,11 +20,7 @@ type AnyControlAdapterParamChangeAction =
   | ReturnType<typeof controlAdapterProcessortTypeChanged>
   | ReturnType<typeof controlAdapterAutoConfigToggled>;
 
-const predicate: AnyListenerPredicate<RootState> = (
-  action,
-  state,
-  prevState
-) => {
+const predicate: AnyListenerPredicate<RootState> = (action, state, prevState) => {
   const isActionMatched =
     controlAdapterProcessorParamsChanged.match(action) ||
     controlAdapterModelChanged.match(action) ||
@@ -40,12 +35,7 @@ const predicate: AnyListenerPredicate<RootState> = (
   const { id } = action.payload;
   const prevCA = selectControlAdapterById(prevState.controlAdapters, id);
   const ca = selectControlAdapterById(state.controlAdapters, id);
-  if (
-    !prevCA ||
-    !isControlNetOrT2IAdapter(prevCA) ||
-    !ca ||
-    !isControlNetOrT2IAdapter(ca)
-  ) {
+  if (!prevCA || !isControlNetOrT2IAdapter(prevCA) || !ca || !isControlNetOrT2IAdapter(ca)) {
     return false;
   }
 
@@ -69,12 +59,14 @@ const predicate: AnyListenerPredicate<RootState> = (
   return isProcessorSelected && hasControlImage;
 };
 
+const DEBOUNCE_MS = 300;
+
 /**
  * Listener that automatically processes a ControlNet image when its processor parameters are changed.
  *
- * The network request is debounced by 1 second.
+ * The network request is debounced.
  */
-export const addControlNetAutoProcessListener = () => {
+export const addControlNetAutoProcessListener = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate,
     effect: async (action, { dispatch, cancelActiveListeners, delay }) => {
@@ -85,7 +77,7 @@ export const addControlNetAutoProcessListener = () => {
       cancelActiveListeners();
       log.trace('ControlNet auto-process triggered');
       // Delay before starting actual work
-      await delay(300);
+      await delay(DEBOUNCE_MS);
 
       dispatch(controlAdapterImageProcessed({ id }));
     },

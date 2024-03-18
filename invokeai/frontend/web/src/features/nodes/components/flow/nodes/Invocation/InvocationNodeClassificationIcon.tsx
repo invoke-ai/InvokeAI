@@ -1,11 +1,9 @@
-import { Icon } from '@chakra-ui/react';
-import { InvTooltip } from 'common/components/InvTooltip/InvTooltip';
+import { Icon, Tooltip } from '@invoke-ai/ui-library';
 import { useNodeClassification } from 'features/nodes/hooks/useNodeClassification';
 import type { Classification } from 'features/nodes/types/common';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaFlask } from 'react-icons/fa';
-import { FaHammer } from 'react-icons/fa6';
+import { PiFlaskBold, PiHammerBold } from 'react-icons/pi';
 
 interface Props {
   nodeId: string;
@@ -19,48 +17,41 @@ const InvocationNodeClassificationIcon = ({ nodeId }: Props) => {
   }
 
   return (
-    <InvTooltip
+    <Tooltip
       label={<ClassificationTooltipContent classification={classification} />}
       placement="top"
       shouldWrapChildren
     >
-      <Icon
-        as={getIcon(classification)}
-        display="block"
-        boxSize={4}
-        color="base.400"
-      />
-    </InvTooltip>
+      <Icon as={getIcon(classification)} display="block" boxSize={4} color="base.400" />
+    </Tooltip>
   );
 };
 
 export default memo(InvocationNodeClassificationIcon);
 
-const ClassificationTooltipContent = memo(
-  ({ classification }: { classification: Classification }) => {
-    const { t } = useTranslation();
+const ClassificationTooltipContent = memo(({ classification }: { classification: Classification }) => {
+  const { t } = useTranslation();
 
-    if (classification === 'beta') {
-      return t('nodes.betaDesc');
-    }
-
-    if (classification === 'prototype') {
-      return t('nodes.prototypeDesc');
-    }
-
-    return null;
+  if (classification === 'beta') {
+    return t('nodes.betaDesc');
   }
-);
+
+  if (classification === 'prototype') {
+    return t('nodes.prototypeDesc');
+  }
+
+  return null;
+});
 
 ClassificationTooltipContent.displayName = 'ClassificationTooltipContent';
 
 const getIcon = (classification: Classification) => {
   if (classification === 'beta') {
-    return FaHammer;
+    return PiHammerBold;
   }
 
   if (classification === 'prototype') {
-    return FaFlask;
+    return PiFlaskBold;
   }
 
   return undefined;

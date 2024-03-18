@@ -1,15 +1,11 @@
-import type { SystemStyleObject } from '@chakra-ui/react';
-import { Image } from '@chakra-ui/react';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Image } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo, useMemo } from 'react';
 
 const CurrentImagePreview = () => {
-  const progress_image = useAppSelector(
-    (state) => state.system.denoiseProgress?.progress_image
-  );
-  const shouldAntialiasProgressImage = useAppSelector(
-    (state) => state.system.shouldAntialiasProgressImage
-  );
+  const progress_image = useAppSelector((s) => s.system.denoiseProgress?.progress_image);
+  const shouldAntialiasProgressImage = useAppSelector((s) => s.system.shouldAntialiasProgressImage);
 
   const sx = useMemo<SystemStyleObject>(
     () => ({

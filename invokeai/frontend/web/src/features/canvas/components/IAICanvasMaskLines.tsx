@@ -1,17 +1,8 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { isCanvasMaskLine } from 'features/canvas/store/canvasTypes';
 import type { GroupConfig } from 'konva/lib/Group';
 import { memo } from 'react';
 import { Group, Line } from 'react-konva';
-
-export const canvasLinesSelector = createMemoizedSelector(
-  [stateSelector],
-  ({ canvas }) => {
-    return canvas.layerState.objects.filter(isCanvasMaskLine);
-  }
-);
 
 type InpaintingCanvasLinesProps = GroupConfig;
 
@@ -21,7 +12,7 @@ type InpaintingCanvasLinesProps = GroupConfig;
  * Uses globalCompositeOperation to handle the brush and eraser tools.
  */
 const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
-  const objects = useAppSelector((state) => state.canvas.layerState.objects);
+  const objects = useAppSelector((s) => s.canvas.layerState.objects);
 
   return (
     <Group listening={false} {...props}>
@@ -36,9 +27,7 @@ const IAICanvasLines = (props: InpaintingCanvasLinesProps) => {
           lineJoin="round"
           shadowForStrokeEnabled={false}
           listening={false}
-          globalCompositeOperation={
-            line.tool === 'brush' ? 'source-over' : 'destination-out'
-          }
+          globalCompositeOperation={line.tool === 'brush' ? 'source-over' : 'destination-out'}
         />
       ))}
     </Group>

@@ -1,16 +1,11 @@
-import type { ChakraProps } from '@chakra-ui/react';
-import { Box, useToken } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import type { ChakraProps } from '@invoke-ai/ui-library';
+import { Box, useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
-import { useGlobalMenuCloseTrigger } from 'common/hooks/useGlobalMenuCloseTrigger';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
-import { nodeExclusivelySelected } from 'features/nodes/store/nodesSlice';
-import {
-  DRAG_HANDLE_CLASSNAME,
-  NODE_WIDTH,
-} from 'features/nodes/types/constants';
+import { nodeExclusivelySelected, selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { DRAG_HANDLE_CLASSNAME, NODE_WIDTH } from 'features/nodes/types/constants';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import type { MouseEvent, PropsWithChildren } from 'react';
 import { memo, useCallback, useMemo } from 'react';
@@ -23,16 +18,13 @@ type NodeWrapperProps = PropsWithChildren & {
 
 const NodeWrapper = (props: NodeWrapperProps) => {
   const { nodeId, width, children, selected } = props;
-  const { isMouseOverNode, handleMouseOut, handleMouseOver } =
-    useMouseOverNode(nodeId);
+  const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
 
   const selectIsInProgress = useMemo(
     () =>
-      createMemoizedSelector(
-        stateSelector,
-        ({ nodes }) =>
-          nodes.nodeExecutionStates[nodeId]?.status ===
-          zNodeStatus.enum.IN_PROGRESS
+      createSelector(
+        selectNodesSlice,
+        (nodes) => nodes.nodeExecutionStates[nodeId]?.status === zNodeStatus.enum.IN_PROGRESS
       ),
     [nodeId]
   );
@@ -47,8 +39,8 @@ const NodeWrapper = (props: NodeWrapperProps) => {
 
   const dispatch = useAppDispatch();
 
-  const opacity = useAppSelector((state) => state.nodes.nodeOpacity);
-  const { onCloseGlobal } = useGlobalMenuCloseTrigger();
+  const opacity = useAppSelector((s) => s.nodes.nodeOpacity);
+  const { onCloseGlobal } = useGlobalMenuClose();
 
   const handleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {

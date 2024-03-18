@@ -1,21 +1,18 @@
 import { $logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { canvasMerged } from 'features/canvas/store/actions';
+import { $canvasBaseLayer } from 'features/canvas/store/canvasNanostore';
 import { setMergedCanvas } from 'features/canvas/store/canvasSlice';
 import { getFullBaseLayerBlob } from 'features/canvas/util/getFullBaseLayerBlob';
-import { getCanvasBaseLayer } from 'features/canvas/util/konvaInstanceProvider';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 
-import { startAppListening } from '..';
-
-export const addCanvasMergedListener = () => {
+export const addCanvasMergedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: canvasMerged,
     effect: async (action, { dispatch }) => {
-      const moduleLog = $logger
-        .get()
-        .child({ namespace: 'canvasCopiedToClipboardListener' });
+      const moduleLog = $logger.get().child({ namespace: 'canvasCopiedToClipboardListener' });
       const blob = await getFullBaseLayerBlob();
 
       if (!blob) {
@@ -30,7 +27,7 @@ export const addCanvasMergedListener = () => {
         return;
       }
 
-      const canvasBaseLayer = getCanvasBaseLayer();
+      const canvasBaseLayer = $canvasBaseLayer.get();
 
       if (!canvasBaseLayer) {
         moduleLog.error('Problem getting canvas base layer');

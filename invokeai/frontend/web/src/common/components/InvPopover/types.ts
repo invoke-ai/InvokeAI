@@ -1,9 +1,0 @@
-export type {
-  PopoverArrowProps as InvPopoverArrowProps,
-  PopoverBodyProps as InvPopoverBodyProps,
-  PopoverCloseButtonProps as InvPopoverCloseButtonProps,
-  PopoverContentProps as InvPopoverContentProps,
-  PopoverFooterProps as InvPopoverFooterProps,
-  PopoverHeaderProps as InvPopoverHeaderProps,
-  PopoverProps as InvPopoverProps,
-} from '@chakra-ui/react';

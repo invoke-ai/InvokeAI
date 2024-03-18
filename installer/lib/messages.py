@@ -5,10 +5,11 @@ Installer user interaction
 
 import os
 import platform
+from enum import Enum
 from pathlib import Path
 
 from prompt_toolkit import HTML, prompt
-from prompt_toolkit.completion import PathCompleter
+from prompt_toolkit.completion import FuzzyWordCompleter, PathCompleter
 from prompt_toolkit.validation import Validator
 from rich import box, print
 from rich.console import Console, Group, group
@@ -35,16 +36,26 @@ else:
     console = Console(style=Style(color="grey74", bgcolor="grey19"))
 
 
-def welcome():
+def welcome(available_releases: tuple | None = None) -> None:
     @group()
     def text():
-        if (platform_specific := _platform_specific_help()) != "":
+        if (platform_specific := _platform_specific_help()) is not None:
             yield platform_specific
             yield ""
         yield Text.from_markup(
             "Some of the installation steps take a long time to run. Please be patient. If the script appears to hang for more than 10 minutes, please interrupt with [i]Control-C[/] and retry.",
             justify="center",
         )
+        if available_releases is not None:
+            latest_stable = available_releases[0][0]
+            last_pre = available_releases[1][0]
+            yield ""
+            yield Text.from_markup(
+                f"[red3]🠶[/] Latest stable release (recommended): [b bright_white]{latest_stable}", justify="center"
+            )
+            yield Text.from_markup(
+                f"[red3]🠶[/] Last published pre-release version: [b bright_white]{last_pre}", justify="center"
+            )
 
     console.rule()
     print(
@@ -61,19 +72,30 @@ def welcome():
     console.line()
 
 
-def confirm_install(dest: Path) -> bool:
-    if dest.exists():
-        print(f":exclamation: Directory {dest} already exists :exclamation:")
-        dest_confirmed = Confirm.ask(
-            ":stop_sign: (re)install in this location?",
-            default=False,
-        )
-    else:
-        print(f"InvokeAI will be installed in {dest}")
-        dest_confirmed = Confirm.ask("Use this location?", default=True)
+def choose_version(available_releases: tuple | None = None) -> str:
+    """
+    Prompt the user to choose an Invoke version to install
+    """
+
+    # short circuit if we couldn't get a version list
+    # still try to install the latest stable version
+    if available_releases is None:
+        return "stable"
+
+    console.print(":grey_question: [orange3]Please choose an Invoke version to install.")
+
+    choices = available_releases[0] + available_releases[1]
+
+    response = prompt(
+        message=f"   <Enter> to install the recommended release ({choices[0]}). <Tab> or type to pick a version: ",
+        complete_while_typing=True,
+        completer=FuzzyWordCompleter(choices),
+    )
+    console.print(f"   Version {choices[0] if response == '' else response} will be installed.")
+
     console.line()
 
-    return dest_confirmed
+    return "stable" if response == "" else response
 
 
 def user_wants_auto_configuration() -> bool:
@@ -109,7 +131,23 @@ def user_wants_auto_configuration() -> bool:
     return choice.lower().startswith("a")
 
 
-def dest_path(dest=None) -> Path:
+def confirm_install(dest: Path) -> bool:
+    if dest.exists():
+        print(f":stop_sign: Directory {dest} already exists!")
+        print("   Is this location correct?")
+        default = False
+    else:
+        print(f":file_folder: InvokeAI will be installed in {dest}")
+        default = True
+
+    dest_confirmed = Confirm.ask("   Please confirm:", default=default)
+
+    console.line()
+
+    return dest_confirmed
+
+
+def dest_path(dest=None) -> Path | None:
     """
     Prompt the user for the destination path and create the path
 
@@ -124,25 +162,21 @@ def dest_path(dest=None) -> Path:
     else:
         dest = Path.cwd().expanduser().resolve()
     prev_dest = init_path = dest
-
-    dest_confirmed = confirm_install(dest)
+    dest_confirmed = False
 
     while not dest_confirmed:
-        # if the given destination already exists, the starting point for browsing is its parent directory.
-        # the user may have made a typo, or otherwise wants to place the root dir next to an existing one.
-        # if the destination dir does NOT exist, then the user must have changed their mind about the selection.
-        # since we can't read their mind, start browsing at Path.cwd().
-        browse_start = (prev_dest.parent if prev_dest.exists() else Path.cwd()).expanduser().resolve()
+        browse_start = (dest or Path.cwd()).expanduser().resolve()
 
         path_completer = PathCompleter(
             only_directories=True,
             expanduser=True,
-            get_paths=lambda: [browse_start],  # noqa: B023
+            get_paths=lambda: [str(browse_start)],  # noqa: B023
             # get_paths=lambda: [".."].extend(list(browse_start.iterdir()))
         )
 
         console.line()
-        console.print(f"[orange3]Please select the destination directory for the installation:[/] \\[{browse_start}]: ")
+
+        console.print(f":grey_question: [orange3]Please select the install destination:[/] \\[{browse_start}]: ")
         selected = prompt(
             ">>> ",
             complete_in_thread=True,
@@ -155,6 +189,7 @@ def dest_path(dest=None) -> Path:
         )
         prev_dest = dest
         dest = Path(selected)
+
         console.line()
 
         dest_confirmed = confirm_install(dest.expanduser().resolve())
@@ -182,41 +217,45 @@ def dest_path(dest=None) -> Path:
         console.rule("Goodbye!")
 
 
-def graphical_accelerator():
+class GpuType(Enum):
+    CUDA = "cuda"
+    CUDA_AND_DML = "cuda_and_dml"
+    ROCM = "rocm"
+    CPU = "cpu"
+    AUTODETECT = "autodetect"
+
+
+def select_gpu() -> GpuType:
     """
-    Prompt the user to select the graphical accelerator in their system
-    This does not validate user's choices (yet), but only offers choices
-    valid for the platform.
-    CUDA is the fallback.
-    We may be able to detect the GPU driver by shelling out to `modprobe` or `lspci`,
-    but this is not yet supported or reliable. Also, some users may have exotic preferences.
+    Prompt the user to select the GPU driver
     """
 
     if ARCH == "arm64" and OS != "Darwin":
         print(f"Only CPU acceleration is available on {ARCH} architecture. Proceeding with that.")
-        return "cpu"
+        return GpuType.CPU
 
     nvidia = (
         "an [gold1 b]NVIDIA[/] GPU (using CUDA™)",
-        "cuda",
+        GpuType.CUDA,
     )
     nvidia_with_dml = (
         "an [gold1 b]NVIDIA[/] GPU (using CUDA™, and DirectML™ for ONNX) -- ALPHA",
-        "cuda_and_dml",
+        GpuType.CUDA_AND_DML,
     )
     amd = (
         "an [gold1 b]AMD[/] GPU (using ROCm™)",
-        "rocm",
+        GpuType.ROCM,
     )
     cpu = (
-        "no compatible GPU, or specifically prefer to use the CPU",
-        "cpu",
+        "Do not install any GPU support, use CPU for generation (slow)",
+        GpuType.CPU,
     )
-    idk = (
+    autodetect = (
         "I'm not sure what to choose",
-        "idk",
+        GpuType.AUTODETECT,
     )
 
+    options = []
     if OS == "Windows":
         options = [nvidia, nvidia_with_dml, cpu]
     if OS == "Linux":
@@ -230,7 +269,7 @@ def graphical_accelerator():
         return options[0][1]
 
     # "I don't know" is always added the last option
-    options.append(idk)
+    options.append(autodetect)  # type: ignore
 
     options = {str(i): opt for i, opt in enumerate(options, 1)}
 
@@ -265,9 +304,9 @@ def graphical_accelerator():
         ),
     )
 
-    if options[choice][1] == "idk":
+    if options[choice][1] is GpuType.AUTODETECT:
         console.print(
-            "No problem. We will try to install a version that [i]should[/i] be compatible. :crossed_fingers:"
+            "No problem. We will install CUDA support first :crossed_fingers: If Invoke does not detect a GPU, please re-run the installer and select one of the other GPU types."
         )
 
     return options[choice][1]
@@ -291,7 +330,7 @@ def windows_long_paths_registry() -> None:
     """
 
     with open(str(Path(__file__).parent / "WinLongPathsEnabled.reg"), "r", encoding="utf-16le") as code:
-        syntax = Syntax(code.read(), line_numbers=True)
+        syntax = Syntax(code.read(), line_numbers=True, lexer="regedit")
 
     console.print(
         Panel(
@@ -301,7 +340,7 @@ def windows_long_paths_registry() -> None:
                         "We will now apply a registry fix to enable long paths on Windows. InvokeAI needs this to function correctly. We are asking your permission to modify the Windows Registry on your behalf.",
                         "",
                         "This is the change that will be applied:",
-                        syntax,
+                        str(syntax),
                     ]
                 )
             ),
@@ -340,7 +379,7 @@ def introduction() -> None:
     console.line(2)
 
 
-def _platform_specific_help() -> str:
+def _platform_specific_help() -> Text | None:
     if OS == "Darwin":
         text = Text.from_markup(
             """[b wheat1]macOS Users![/]\n\nPlease be sure you have the [b wheat1]Xcode command-line tools[/] installed before continuing.\nIf not, cancel with [i]Control-C[/] and follow the Xcode install instructions at [deep_sky_blue1]https://www.freecodecamp.org/news/install-xcode-command-line-tools/[/]."""
@@ -354,5 +393,5 @@ def _platform_specific_help() -> str:
      [deep_sky_blue1]https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170[/]"""
         )
     else:
-        text = ""
+        return
     return text

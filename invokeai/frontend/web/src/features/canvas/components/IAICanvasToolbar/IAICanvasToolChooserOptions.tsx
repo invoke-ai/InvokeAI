@@ -1,58 +1,45 @@
-import { Box, Flex } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import {
+  Box,
+  ButtonGroup,
+  CompositeNumberInput,
+  CompositeSlider,
+  Flex,
+  FormControl,
+  FormLabel,
+  IconButton,
+  Popover,
+  PopoverBody,
+  PopoverContent,
+  PopoverTrigger,
+} from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvNumberInput } from 'common/components/InvNumberInput/InvNumberInput';
-import {
-  InvPopoverBody,
-  InvPopoverContent,
-  InvPopoverTrigger,
-} from 'common/components/InvPopover/wrapper';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
-import { resetToolInteractionState } from 'features/canvas/store/canvasNanostore';
+import { $tool, resetToolInteractionState } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import {
-  addEraseRect,
-  addFillRect,
-  setBrushColor,
-  setBrushSize,
-  setTool,
-} from 'features/canvas/store/canvasSlice';
-import { InvIconButton, InvPopover } from 'index';
+import { addEraseRect, addFillRect, setBrushColor, setBrushSize } from 'features/canvas/store/canvasSlice';
 import { clamp } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import type { RgbaColor } from 'react-colorful';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
-  FaEraser,
-  FaEyeDropper,
-  FaFillDrip,
-  FaPaintBrush,
-  FaSlidersH,
-  FaTimes,
-} from 'react-icons/fa';
+  PiEraserBold,
+  PiEyedropperBold,
+  PiPaintBrushBold,
+  PiPaintBucketBold,
+  PiSlidersHorizontalBold,
+  PiXBold,
+} from 'react-icons/pi';
 
-export const selector = createMemoizedSelector(
-  [stateSelector, isStagingSelector],
-  ({ canvas }, isStaging) => {
-    const { tool, brushColor, brushSize } = canvas;
-
-    return {
-      tool,
-      isStaging,
-      brushColor,
-      brushSize,
-    };
-  }
-);
+const marks = [1, 25, 50, 75, 100];
 
 const IAICanvasToolChooserOptions = () => {
   const dispatch = useAppDispatch();
-  const { tool, brushColor, brushSize, isStaging } = useAppSelector(selector);
+  const tool = useStore($tool);
+  const brushColor = useAppSelector((s) => s.canvas.brushColor);
+  const brushSize = useAppSelector((s) => s.canvas.brushSize);
+  const isStaging = useAppSelector(isStagingSelector);
   const { t } = useTranslation();
 
   useHotkeys(
@@ -176,17 +163,17 @@ const IAICanvasToolChooserOptions = () => {
   );
 
   const handleSelectBrushTool = useCallback(() => {
-    dispatch(setTool('brush'));
+    $tool.set('brush');
     resetToolInteractionState();
-  }, [dispatch]);
+  }, []);
   const handleSelectEraserTool = useCallback(() => {
-    dispatch(setTool('eraser'));
+    $tool.set('eraser');
     resetToolInteractionState();
-  }, [dispatch]);
+  }, []);
   const handleSelectColorPickerTool = useCallback(() => {
-    dispatch(setTool('colorPicker'));
+    $tool.set('colorPicker');
     resetToolInteractionState();
-  }, [dispatch]);
+  }, []);
   const handleFillRect = useCallback(() => {
     dispatch(addFillRect());
   }, [dispatch]);
@@ -207,90 +194,87 @@ const IAICanvasToolChooserOptions = () => {
   );
 
   return (
-    <InvButtonGroup>
-      <InvIconButton
+    <ButtonGroup>
+      <IconButton
         aria-label={`${t('unifiedCanvas.brush')} (B)`}
         tooltip={`${t('unifiedCanvas.brush')} (B)`}
-        icon={<FaPaintBrush />}
+        icon={<PiPaintBrushBold />}
         isChecked={tool === 'brush' && !isStaging}
         onClick={handleSelectBrushTool}
         isDisabled={isStaging}
       />
-      <InvIconButton
+      <IconButton
         aria-label={`${t('unifiedCanvas.eraser')} (E)`}
         tooltip={`${t('unifiedCanvas.eraser')} (E)`}
-        icon={<FaEraser />}
+        icon={<PiEraserBold />}
         isChecked={tool === 'eraser' && !isStaging}
         isDisabled={isStaging}
         onClick={handleSelectEraserTool}
       />
-      <InvIconButton
+      <IconButton
         aria-label={`${t('unifiedCanvas.fillBoundingBox')} (Shift+F)`}
         tooltip={`${t('unifiedCanvas.fillBoundingBox')} (Shift+F)`}
-        icon={<FaFillDrip />}
+        icon={<PiPaintBucketBold />}
         isDisabled={isStaging}
         onClick={handleFillRect}
       />
-      <InvIconButton
+      <IconButton
         aria-label={`${t('unifiedCanvas.eraseBoundingBox')} (Del/Backspace)`}
         tooltip={`${t('unifiedCanvas.eraseBoundingBox')} (Del/Backspace)`}
-        icon={<FaTimes />}
+        icon={<PiXBold />}
         isDisabled={isStaging}
         onClick={handleEraseBoundingBox}
       />
-      <InvIconButton
+      <IconButton
         aria-label={`${t('unifiedCanvas.colorPicker')} (C)`}
         tooltip={`${t('unifiedCanvas.colorPicker')} (C)`}
-        icon={<FaEyeDropper />}
+        icon={<PiEyedropperBold />}
         isChecked={tool === 'colorPicker' && !isStaging}
         isDisabled={isStaging}
         onClick={handleSelectColorPickerTool}
       />
-      <InvPopover>
-        <InvPopoverTrigger>
-          <InvIconButton
+      <Popover>
+        <PopoverTrigger>
+          <IconButton
             aria-label={t('unifiedCanvas.brushOptions')}
             tooltip={t('unifiedCanvas.brushOptions')}
-            icon={<FaSlidersH />}
+            icon={<PiSlidersHorizontalBold />}
           />
-        </InvPopoverTrigger>
-        <InvPopoverContent>
-          <InvPopoverBody>
+        </PopoverTrigger>
+        <PopoverContent>
+          <PopoverBody>
             <Flex minWidth={60} direction="column" gap={4} width="100%">
               <Flex gap={4} justifyContent="space-between">
-                <InvControl label={t('unifiedCanvas.brushSize')}>
-                  <InvSlider
+                <FormControl>
+                  <FormLabel>{t('unifiedCanvas.brushSize')}</FormLabel>
+                  <CompositeSlider
                     value={brushSize}
                     min={1}
                     max={100}
                     step={1}
                     onChange={handleChangeBrushSize}
                     marks={marks}
+                    defaultValue={50}
                   />
-                  <InvNumberInput
+                  <CompositeNumberInput
                     value={brushSize}
                     min={1}
                     max={500}
                     step={1}
                     onChange={handleChangeBrushSize}
+                    defaultValue={50}
                   />
-                </InvControl>
+                </FormControl>
               </Flex>
               <Box w="full" pt={2} pb={2}>
-                <IAIColorPicker
-                  withNumberInput={true}
-                  color={brushColor}
-                  onChange={handleChangeBrushColor}
-                />
+                <IAIColorPicker color={brushColor} onChange={handleChangeBrushColor} withNumberInput />
               </Box>
             </Flex>
-          </InvPopoverBody>
-        </InvPopoverContent>
-      </InvPopover>
-    </InvButtonGroup>
+          </PopoverBody>
+        </PopoverContent>
+      </Popover>
+    </ButtonGroup>
   );
 };
 
 export default memo(IAICanvasToolChooserOptions);
-
-const marks = [1, 25, 50, 75, 100];

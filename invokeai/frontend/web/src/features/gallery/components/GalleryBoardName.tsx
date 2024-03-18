@@ -1,16 +1,8 @@
-import { ChevronUpIcon } from '@chakra-ui/icons';
-import { Button, Flex, Spacer } from '@chakra-ui/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
+import { Button, Flex, Icon, Spacer } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo, useMemo } from 'react';
+import { PiCaretUpBold } from 'react-icons/pi';
 import { useBoardName } from 'services/api/hooks/useBoardName';
-
-const selector = createMemoizedSelector([stateSelector], (state) => {
-  const { selectedBoardId } = state.gallery;
-
-  return { selectedBoardId };
-});
 
 type Props = {
   isOpen: boolean;
@@ -19,7 +11,7 @@ type Props = {
 
 const GalleryBoardName = (props: Props) => {
   const { isOpen, onToggle } = props;
-  const { selectedBoardId } = useAppSelector(selector);
+  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const boardName = useBoardName(selectedBoardId);
 
   const formattedBoardName = useMemo(() => {
@@ -44,7 +36,9 @@ const GalleryBoardName = (props: Props) => {
       <Spacer />
       {formattedBoardName}
       <Spacer />
-      <ChevronUpIcon
+      <Icon
+        as={PiCaretUpBold}
+        boxSize={4}
         transform={isOpen ? 'rotate(0deg)' : 'rotate(180deg)'}
         transitionProperty="common"
         transitionDuration="normal"

@@ -1,10 +1,9 @@
-import { idbKeyValStore } from 'app/store/store';
-import { clear } from 'idb-keyval';
+import { clearIdbKeyValStore } from 'app/store/enhancers/reduxRemember/driver';
 import { useCallback } from 'react';
 
 export const useClearStorage = () => {
   const clearStorage = useCallback(() => {
-    clear(idbKeyValStore);
+    clearIdbKeyValStore();
     localStorage.clear();
   }, []);
 

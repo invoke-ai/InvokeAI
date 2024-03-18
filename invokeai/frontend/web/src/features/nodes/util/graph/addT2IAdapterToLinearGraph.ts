@@ -1,27 +1,32 @@
 import type { RootState } from 'app/store/store';
 import { selectValidT2IAdapters } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { omit } from 'lodash-es';
+import type { ControlAdapterProcessorType, T2IAdapterConfig } from 'features/controlAdapters/store/types';
+import type { ImageField } from 'features/nodes/types/common';
 import type {
   CollectInvocation,
   CoreMetadataInvocation,
   NonNullableGraph,
-  T2IAdapterField,
+  S,
   T2IAdapterInvocation,
 } from 'services/api/types';
+import { assert } from 'tsafe';
 
-import {
-  CANVAS_COHERENCE_DENOISE_LATENTS,
-  T2I_ADAPTER_COLLECT,
-} from './constants';
+import { T2I_ADAPTER_COLLECT } from './constants';
 import { upsertMetadata } from './metadata';
 
-export const addT2IAdaptersToLinearGraph = (
+export const addT2IAdaptersToLinearGraph = async (
   state: RootState,
   graph: NonNullableGraph,
   baseNodeId: string
-): void => {
+): Promise<void> => {
   const validT2IAdapters = selectValidT2IAdapters(state.controlAdapters).filter(
-    (ca) => ca.model?.base_model === state.generation.model?.base_model
+    ({ model, processedControlImage, processorType, controlImage, isEnabled }) => {
+      const hasModel = Boolean(model);
+      const doesBaseMatch = model?.base === state.generation.model?.base;
+      const hasControlImage = (processedControlImage && processorType !== 'none') || controlImage;
+
+      return isEnabled && hasModel && doesBaseMatch && hasControlImage;
+    }
   );
 
   if (validT2IAdapters.length) {
@@ -40,18 +45,9 @@ export const addT2IAdaptersToLinearGraph = (
       },
     });
 
-    if (CANVAS_COHERENCE_DENOISE_LATENTS in graph.nodes) {
-      graph.edges.push({
-        source: { node_id: T2I_ADAPTER_COLLECT, field: 'collection' },
-        destination: {
-          node_id: CANVAS_COHERENCE_DENOISE_LATENTS,
-          field: 't2i_adapter',
-        },
-      });
-    }
-    const t2iAdapterMetdata: CoreMetadataInvocation['t2iAdapters'] = [];
+    const t2iAdapterMetadata: CoreMetadataInvocation['t2iAdapters'] = [];
 
-    validT2IAdapters.forEach((t2iAdapter) => {
+    for (const t2iAdapter of validT2IAdapters) {
       if (!t2iAdapter.model) {
         return;
       }
@@ -76,32 +72,12 @@ export const addT2IAdaptersToLinearGraph = (
         resize_mode: resizeMode,
         t2i_adapter_model: model,
         weight: weight,
+        image: buildControlImage(controlImage, processedControlImage, processorType),
       };
 
-      if (processedControlImage && processorType !== 'none') {
-        // We've already processed the image in the app, so we can just use the processed image
-        t2iAdapterNode.image = {
-          image_name: processedControlImage,
-        };
-      } else if (controlImage) {
-        // The control image is preprocessed
-        t2iAdapterNode.image = {
-          image_name: controlImage,
-        };
-      } else {
-        // Skip ControlNets without an unprocessed image - should never happen if everything is working correctly
-        return;
-      }
+      graph.nodes[t2iAdapterNode.id] = t2iAdapterNode;
 
-      graph.nodes[t2iAdapterNode.id] = t2iAdapterNode as T2IAdapterInvocation;
-
-      t2iAdapterMetdata.push(
-        omit(t2iAdapterNode, [
-          'id',
-          'type',
-          'is_intermediate',
-        ]) as T2IAdapterField
-      );
+      t2iAdapterMetadata.push(buildT2IAdapterMetadata(t2iAdapter));
 
       graph.edges.push({
         source: { node_id: t2iAdapterNode.id, field: 't2i_adapter' },
@@ -110,8 +86,57 @@ export const addT2IAdaptersToLinearGraph = (
           field: 'item',
         },
       });
-    });
+    }
 
-    upsertMetadata(graph, { t2iAdapters: t2iAdapterMetdata });
+    upsertMetadata(graph, { t2iAdapters: t2iAdapterMetadata });
   }
+};
+
+const buildControlImage = (
+  controlImage: string | null,
+  processedControlImage: string | null,
+  processorType: ControlAdapterProcessorType
+): ImageField => {
+  let image: ImageField | null = null;
+  if (processedControlImage && processorType !== 'none') {
+    // We've already processed the image in the app, so we can just use the processed image
+    image = {
+      image_name: processedControlImage,
+    };
+  } else if (controlImage) {
+    // The control image is preprocessed
+    image = {
+      image_name: controlImage,
+    };
+  }
+  assert(image, 'T2I Adapter image is required');
+  return image;
+};
+
+const buildT2IAdapterMetadata = (t2iAdapter: T2IAdapterConfig): S['T2IAdapterMetadataField'] => {
+  const { controlImage, processedControlImage, beginStepPct, endStepPct, resizeMode, model, processorType, weight } =
+    t2iAdapter;
+
+  assert(model, 'T2I Adapter model is required');
+
+  const processed_image =
+    processedControlImage && processorType !== 'none'
+      ? {
+          image_name: processedControlImage,
+        }
+      : null;
+
+  assert(controlImage, 'T2I Adapter image is required');
+
+  return {
+    t2i_adapter_model: model,
+    weight,
+    begin_step_percent: beginStepPct,
+    end_step_percent: endStepPct,
+    resize_mode: resizeMode,
+    image: {
+      image_name: controlImage,
+    },
+    processed_image,
+  };
 };

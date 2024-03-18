@@ -1,19 +1,16 @@
 import { $logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { canvasDownloadedAsImage } from 'features/canvas/store/actions';
 import { downloadBlob } from 'features/canvas/util/downloadBlob';
 import { getBaseLayerBlob } from 'features/canvas/util/getBaseLayerBlob';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 
-import { startAppListening } from '..';
-
-export const addCanvasDownloadedAsImageListener = () => {
+export const addCanvasDownloadedAsImageListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: canvasDownloadedAsImage,
     effect: async (action, { dispatch, getState }) => {
-      const moduleLog = $logger
-        .get()
-        .child({ namespace: 'canvasSavedToGalleryListener' });
+      const moduleLog = $logger.get().child({ namespace: 'canvasSavedToGalleryListener' });
       const state = getState();
 
       let blob;
@@ -32,9 +29,7 @@ export const addCanvasDownloadedAsImageListener = () => {
       }
 
       downloadBlob(blob, 'canvas.png');
-      dispatch(
-        addToast({ title: t('toast.canvasDownloaded'), status: 'success' })
-      );
+      dispatch(addToast({ title: t('toast.canvasDownloaded'), status: 'success' }));
     },
   });
 };

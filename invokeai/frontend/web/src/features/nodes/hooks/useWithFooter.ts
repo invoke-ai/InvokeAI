@@ -7,9 +7,6 @@ export const useWithFooter = (nodeId: string) => {
   const hasImageOutput = useHasImageOutput(nodeId);
   const isCacheEnabled = useFeatureStatus('invocationCache').isFeatureEnabled;
 
-  const withFooter = useMemo(
-    () => hasImageOutput || isCacheEnabled,
-    [hasImageOutput, isCacheEnabled]
-  );
+  const withFooter = useMemo(() => hasImageOutput || isCacheEnabled, [hasImageOutput, isCacheEnabled]);
   return withFooter;
 };

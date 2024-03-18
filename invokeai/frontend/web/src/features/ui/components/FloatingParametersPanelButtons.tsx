@@ -1,40 +1,44 @@
-import type { ChakraProps } from '@chakra-ui/react';
-import { Flex, Portal } from '@chakra-ui/react';
-import { InvButtonGroup } from 'common/components/InvButtonGroup/InvButtonGroup';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import CancelCurrentQueueItemButton from 'features/queue/components/CancelCurrentQueueItemButton';
-import ClearQueueButton from 'features/queue/components/ClearQueueButton';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { ButtonGroup, Flex, Icon, IconButton, Portal, spinAnimation, useDisclosure } from '@invoke-ai/ui-library';
+import CancelCurrentQueueItemIconButton from 'features/queue/components/CancelCurrentQueueItemIconButton';
+import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQueueConfirmationAlertDialog';
+import { ClearAllQueueIconButton } from 'features/queue/components/ClearQueueIconButton';
 import { QueueButtonTooltip } from 'features/queue/components/QueueButtonTooltip';
 import { useQueueBack } from 'features/queue/hooks/useQueueBack';
-import type { RefObject } from 'react';
-import { memo, useCallback } from 'react';
+import type { UsePanelReturn } from 'features/ui/hooks/usePanel';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaSlidersH } from 'react-icons/fa';
-import { IoSparkles } from 'react-icons/io5';
-import type { ImperativePanelHandle } from 'react-resizable-panels';
+import { PiCircleNotchBold, PiSlidersHorizontalBold } from 'react-icons/pi';
+import { RiSparklingFill } from 'react-icons/ri';
+import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
-const floatingButtonStyles: ChakraProps['sx'] = {
+const floatingButtonStyles: SystemStyleObject = {
   borderStartRadius: 0,
   flexGrow: 1,
 };
 
 type Props = {
-  isSidePanelCollapsed: boolean;
-  sidePanelRef: RefObject<ImperativePanelHandle>;
+  panelApi: UsePanelReturn;
 };
 
-const FloatingSidePanelButtons = ({
-  isSidePanelCollapsed,
-  sidePanelRef,
-}: Props) => {
+const FloatingSidePanelButtons = (props: Props) => {
   const { t } = useTranslation();
   const { queueBack, isLoading, isDisabled } = useQueueBack();
+  const { data: queueStatus } = useGetQueueStatusQuery();
 
-  const handleShowSidePanel = useCallback(() => {
-    sidePanelRef.current?.expand();
-  }, [sidePanelRef]);
+  const queueButtonIcon = useMemo(
+    () =>
+      !isDisabled && queueStatus?.processor.is_processing ? (
+        <Icon boxSize={6} as={PiCircleNotchBold} animation={spinAnimation} />
+      ) : (
+        <RiSparklingFill size="16px" />
+      ),
+    [isDisabled, queueStatus?.processor.is_processing]
+  );
 
-  if (!isSidePanelCollapsed) {
+  const disclosure = useDisclosure();
+
+  if (!props.panelApi.isCollapsed) {
     return null;
   }
 
@@ -45,38 +49,33 @@ const FloatingSidePanelButtons = ({
         transform="translate(0, -50%)"
         minW={8}
         top="50%"
-        insetInlineStart="5.13rem"
+        insetInlineStart="63px"
         direction="column"
         gap={2}
         h={48}
       >
-        <InvButtonGroup orientation="vertical" flexGrow={3}>
-          <InvIconButton
-            tooltip={t('parameters.showOptionsPanel')}
-            aria-label={t('parameters.showOptionsPanel')}
-            onClick={handleShowSidePanel}
+        <ButtonGroup orientation="vertical" flexGrow={3}>
+          <IconButton
+            tooltip={t('accessibility.showOptionsPanel')}
+            aria-label={t('accessibility.showOptionsPanel')}
+            onClick={props.panelApi.expand}
             sx={floatingButtonStyles}
-            icon={<FaSlidersH />}
+            icon={<PiSlidersHorizontalBold size="16px" />}
           />
-          <InvIconButton
+          <IconButton
             aria-label={t('queue.queueBack')}
-            pos="absolute"
-            insetInlineStart={0}
             onClick={queueBack}
             isLoading={isLoading}
             isDisabled={isDisabled}
-            icon={<IoSparkles />}
-            variant="solid"
-            colorScheme="yellow"
+            icon={queueButtonIcon}
+            colorScheme="invokeYellow"
             tooltip={<QueueButtonTooltip />}
             sx={floatingButtonStyles}
           />
-          <CancelCurrentQueueItemButton
-            asIconButton
-            sx={floatingButtonStyles}
-          />
-        </InvButtonGroup>
-        <ClearQueueButton asIconButton sx={floatingButtonStyles} />
+          <CancelCurrentQueueItemIconButton sx={floatingButtonStyles} />
+        </ButtonGroup>
+        <ClearAllQueueIconButton sx={floatingButtonStyles} onOpen={disclosure.onOpen} />
+        <ClearQueueConfirmationAlertDialog disclosure={disclosure} />
       </Flex>
     </Portal>
   );

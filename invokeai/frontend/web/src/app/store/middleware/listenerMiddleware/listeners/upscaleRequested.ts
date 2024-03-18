@@ -1,5 +1,6 @@
 import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
 import { buildAdHocUpscaleGraph } from 'features/nodes/util/graph/buildAdHocUpscaleGraph';
 import { createIsAllowedToUpscaleSelector } from 'features/parameters/hooks/useIsAllowedToUpscale';
@@ -8,13 +9,9 @@ import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig, ImageDTO } from 'services/api/types';
 
-import { startAppListening } from '..';
+export const upscaleRequested = createAction<{ imageDTO: ImageDTO }>(`upscale/upscaleRequested`);
 
-export const upscaleRequested = createAction<{ imageDTO: ImageDTO }>(
-  `upscale/upscaleRequested`
-);
-
-export const addUpscaleRequestedListener = () => {
+export const addUpscaleRequestedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: upscaleRequested,
     effect: async (action, { dispatch, getState }) => {
@@ -24,8 +21,7 @@ export const addUpscaleRequestedListener = () => {
       const { image_name } = imageDTO;
       const state = getState();
 
-      const { isAllowedToUpscale, detailTKey } =
-        createIsAllowedToUpscaleSelector(imageDTO)(state);
+      const { isAllowedToUpscale, detailTKey } = createIsAllowedToUpscaleSelector(imageDTO)(state);
 
       // if we can't upscale, show a toast and return
       if (!isAllowedToUpscale) {
@@ -42,16 +38,12 @@ export const addUpscaleRequestedListener = () => {
         return;
       }
 
-      const { esrganModelName } = state.postprocessing;
-      const { autoAddBoardId } = state.gallery;
-
       const enqueueBatchArg: BatchConfig = {
         prepend: true,
         batch: {
           graph: buildAdHocUpscaleGraph({
             image_name,
-            esrganModelName,
-            autoAddBoardId,
+            state,
           }),
           runs: 1,
         },
@@ -66,21 +58,11 @@ export const addUpscaleRequestedListener = () => {
 
         const enqueueResult = await req.unwrap();
         req.reset();
-        log.debug(
-          { enqueueResult: parseify(enqueueResult) },
-          t('queue.graphQueued')
-        );
+        log.debug({ enqueueResult: parseify(enqueueResult) }, t('queue.graphQueued'));
       } catch (error) {
-        log.error(
-          { enqueueBatchArg: parseify(enqueueBatchArg) },
-          t('queue.graphFailedToQueue')
-        );
+        log.error({ enqueueBatchArg: parseify(enqueueBatchArg) }, t('queue.graphFailedToQueue'));
 
-        if (
-          error instanceof Object &&
-          'status' in error &&
-          error.status === 403
-        ) {
+        if (error instanceof Object && 'status' in error && error.status === 403) {
           return;
         } else {
           dispatch(

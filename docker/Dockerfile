@@ -18,8 +18,8 @@ ENV INVOKEAI_SRC=/opt/invokeai
 ENV VIRTUAL_ENV=/opt/venv/invokeai
 
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-ARG TORCH_VERSION=2.1.0
-ARG TORCHVISION_VERSION=0.16
+ARG TORCH_VERSION=2.1.2
+ARG TORCHVISION_VERSION=0.16.2
 ARG GPU_DRIVER=cuda
 ARG TARGETPLATFORM="linux/amd64"
 # unused but available
@@ -35,7 +35,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$GPU_DRIVER" = "cpu" ]; then \
         extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cpu"; \
     elif [ "$GPU_DRIVER" = "rocm" ]; then \
-        extra_index_url_arg="--index-url https://download.pytorch.org/whl/rocm5.6"; \
+        extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/rocm5.6"; \
     else \
         extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cu121"; \
     fi &&\
@@ -54,12 +54,12 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     if [ "$GPU_DRIVER" = "cuda" ] && [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
         pip install -e ".[xformers]"; \
     else \
-        pip install -e "."; \
+        pip install $extra_index_url_arg -e "."; \
     fi
 
 # #### Build the Web UI ------------------------------------
 
-FROM node:18-slim AS web-builder
+FROM node:20-slim AS web-builder
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
@@ -68,7 +68,7 @@ WORKDIR /build
 COPY invokeai/frontend/web/ ./
 RUN --mount=type=cache,target=/pnpm/store \
     pnpm install --frozen-lockfile
-RUN pnpm run build
+RUN npx vite build
 
 #### Runtime stage ---------------------------------------
 

@@ -1,10 +1,6 @@
-import { ChevronUpIcon } from '@chakra-ui/icons';
-import { Box, Flex } from '@chakra-ui/react';
+import { Box, Flex, FormControl, FormLabel, Icon, IconButton, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import type { InvLabelProps } from 'common/components/InvControl/types';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
-import { InvSwitch } from 'common/components/InvSwitch/wrapper';
+import ParamControlAdapterModel from 'features/controlAdapters/components/parameters/ParamControlAdapterModel';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
 import {
@@ -16,7 +12,7 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaCopy, FaTrash } from 'react-icons/fa';
+import { PiCaretUpBold, PiCopyBold, PiTrashSimpleBold } from 'react-icons/pi';
 import { useToggle } from 'react-use';
 
 import ControlAdapterImagePreview from './ControlAdapterImagePreview';
@@ -25,14 +21,9 @@ import ControlAdapterShouldAutoConfig from './ControlAdapterShouldAutoConfig';
 import ControlNetCanvasImageImports from './imports/ControlNetCanvasImageImports';
 import { ParamControlAdapterBeginEnd } from './parameters/ParamControlAdapterBeginEnd';
 import ParamControlAdapterControlMode from './parameters/ParamControlAdapterControlMode';
-import ParamControlAdapterModel from './parameters/ParamControlAdapterModel';
 import ParamControlAdapterProcessorSelect from './parameters/ParamControlAdapterProcessorSelect';
 import ParamControlAdapterResizeMode from './parameters/ParamControlAdapterResizeMode';
 import ParamControlAdapterWeight from './parameters/ParamControlAdapterWeight';
-
-const labelProps: InvLabelProps = {
-  flexGrow: 1,
-};
 
 const ControlAdapterConfig = (props: { id: string; number: number }) => {
   const { id, number } = props;
@@ -69,71 +60,47 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
   }
 
   return (
-    <Flex
-      flexDir="column"
-      gap={4}
-      p={4}
-      borderRadius="base"
-      position="relative"
-      bg="base.750"
-    >
+    <Flex flexDir="column" gap={4} p={4} borderRadius="base" position="relative" bg="base.750">
       <Flex gap={2} alignItems="center" justifyContent="space-between">
-        <InvControl
-          label={t(`controlnet.${controlAdapterType}`, { number })}
-          labelProps={labelProps}
-        >
-          <InvSwitch
+        <FormControl>
+          <FormLabel flexGrow={1}>{t(`controlnet.${controlAdapterType}`, { number })}</FormLabel>
+          <Switch
             aria-label={t('controlnet.toggleControlNet')}
             isChecked={isEnabled}
             onChange={handleToggleIsEnabled}
           />
-        </InvControl>
+        </FormControl>
       </Flex>
       <Flex gap={4} alignItems="center">
-        <Box
-          minW={0}
-          w="full"
-          transitionProperty="common"
-          transitionDuration="0.1s"
-        >
+        <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
           <ParamControlAdapterModel id={id} />
         </Box>
-        {activeTabName === 'unifiedCanvas' && (
-          <ControlNetCanvasImageImports id={id} />
-        )}
-        <InvIconButton
+        {activeTabName === 'unifiedCanvas' && <ControlNetCanvasImageImports id={id} />}
+        <IconButton
           size="sm"
           tooltip={t('controlnet.duplicate')}
           aria-label={t('controlnet.duplicate')}
           onClick={handleDuplicate}
-          icon={<FaCopy />}
+          icon={<PiCopyBold />}
         />
-        <InvIconButton
+        <IconButton
           size="sm"
           tooltip={t('controlnet.delete')}
           aria-label={t('controlnet.delete')}
           colorScheme="error"
           onClick={handleDelete}
-          icon={<FaTrash />}
+          icon={<PiTrashSimpleBold />}
         />
-        <InvIconButton
+        <IconButton
           size="sm"
-          tooltip={
-            isExpanded
-              ? t('controlnet.hideAdvanced')
-              : t('controlnet.showAdvanced')
-          }
-          aria-label={
-            isExpanded
-              ? t('controlnet.hideAdvanced')
-              : t('controlnet.showAdvanced')
-          }
+          tooltip={isExpanded ? t('controlnet.hideAdvanced') : t('controlnet.showAdvanced')}
+          aria-label={isExpanded ? t('controlnet.hideAdvanced') : t('controlnet.showAdvanced')}
           onClick={toggleIsExpanded}
           variant="ghost"
           icon={
-            <ChevronUpIcon
+            <Icon
               boxSize={4}
-              color="base.300"
+              as={PiCaretUpBold}
               transform={isExpanded ? 'rotate(0deg)' : 'rotate(180deg)'}
               transitionProperty="common"
               transitionDuration="normal"
@@ -143,19 +110,13 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
       </Flex>
 
       <Flex w="full" flexDir="column" gap={4}>
-        <Flex gap={4} w="full" alignItems="center">
+        <Flex gap={8} w="full" alignItems="center">
           <Flex flexDir="column" gap={2} h={32} w="full">
             <ParamControlAdapterWeight id={id} />
             <ParamControlAdapterBeginEnd id={id} />
           </Flex>
           {!isExpanded && (
-            <Flex
-              alignItems="center"
-              justifyContent="center"
-              h={32}
-              w={32}
-              aspectRatio="1/1"
-            >
+            <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1">
               <ControlAdapterImagePreview id={id} isSmall />
             </Flex>
           )}

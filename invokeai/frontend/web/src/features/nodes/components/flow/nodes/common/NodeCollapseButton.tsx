@@ -1,8 +1,8 @@
-import { ChevronUpIcon } from '@chakra-ui/icons';
+import { Icon, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvIconButton } from 'common/components/InvIconButton/InvIconButton';
 import { nodeIsOpenChanged } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback } from 'react';
+import { PiCaretUpBold } from 'react-icons/pi';
 import { useUpdateNodeInternals } from 'reactflow';
 
 interface Props {
@@ -20,7 +20,7 @@ const NodeCollapseButton = ({ nodeId, isOpen }: Props) => {
   }, [dispatch, isOpen, nodeId, updateNodeInternals]);
 
   return (
-    <InvIconButton
+    <IconButton
       className="nodrag"
       onClick={handleClick}
       aria-label="Minimize"
@@ -29,7 +29,8 @@ const NodeCollapseButton = ({ nodeId, isOpen }: Props) => {
       h={8}
       variant="link"
       icon={
-        <ChevronUpIcon
+        <Icon
+          as={PiCaretUpBold}
           transform={isOpen ? 'rotate(0deg)' : 'rotate(180deg)'}
           transitionProperty="common"
           transitionDuration="normal"

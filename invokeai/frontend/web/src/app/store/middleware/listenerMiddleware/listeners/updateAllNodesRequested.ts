@@ -1,25 +1,20 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { updateAllNodesRequested } from 'features/nodes/store/actions';
 import { nodeReplaced } from 'features/nodes/store/nodesSlice';
 import { NodeUpdateError } from 'features/nodes/types/error';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import {
-  getNeedsUpdate,
-  updateNode,
-} from 'features/nodes/util/node/nodeUpdate';
+import { getNeedsUpdate, updateNode } from 'features/nodes/util/node/nodeUpdate';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
 import { t } from 'i18next';
 
-import { startAppListening } from '..';
-
-export const addUpdateAllNodesRequestedListener = () => {
+export const addUpdateAllNodesRequestedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: updateAllNodesRequested,
     effect: (action, { dispatch, getState }) => {
       const log = logger('nodes');
-      const nodes = getState().nodes.nodes;
-      const templates = getState().nodeTemplates.templates;
+      const { nodes, templates } = getState().nodes;
 
       let unableToUpdateCount = 0;
 

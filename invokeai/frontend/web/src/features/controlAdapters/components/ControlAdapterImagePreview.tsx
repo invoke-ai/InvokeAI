@@ -1,28 +1,25 @@
-import type { SystemStyleObject } from '@chakra-ui/react';
-import { Box, Flex, Spinner } from '@chakra-ui/react';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Box, Flex, Spinner } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
+import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import { useControlAdapterControlImage } from 'features/controlAdapters/hooks/useControlAdapterControlImage';
 import { useControlAdapterProcessedControlImage } from 'features/controlAdapters/hooks/useControlAdapterProcessedControlImage';
 import { useControlAdapterProcessorType } from 'features/controlAdapters/hooks/useControlAdapterProcessorType';
-import { controlAdapterImageChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
-import type {
-  TypesafeDraggableData,
-  TypesafeDroppableData,
-} from 'features/dnd/types';
 import {
-  heightChanged,
-  widthChanged,
-} from 'features/parameters/store/generationSlice';
+  controlAdapterImageChanged,
+  selectControlAdaptersSlice,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
+import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
+import { heightChanged, selectOptimalDimension, widthChanged } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaRulerVertical, FaSave, FaUndo } from 'react-icons/fa';
+import { PiArrowCounterClockwiseBold, PiFloppyDiskBold, PiRulerBold } from 'react-icons/pi';
 import {
   useAddImageToBoardMutation,
   useChangeImageIsIntermediateMutation,
@@ -36,42 +33,32 @@ type Props = {
   isSmall?: boolean;
 };
 
-const selector = createMemoizedSelector(
-  stateSelector,
-  ({ controlAdapters, gallery, system }) => {
-    const { pendingControlImages } = controlAdapters;
-    const { autoAddBoardId } = gallery;
-    const { isConnected } = system;
-
-    return {
-      pendingControlImages,
-      autoAddBoardId,
-      isConnected,
-    };
-  }
+const selectPendingControlImages = createMemoizedSelector(
+  selectControlAdaptersSlice,
+  (controlAdapters) => controlAdapters.pendingControlImages
 );
 
 const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
   const controlImageName = useControlAdapterControlImage(id);
   const processedControlImageName = useControlAdapterProcessedControlImage(id);
   const processorType = useControlAdapterProcessorType(id);
-
-  const dispatch = useAppDispatch();
-  const { t } = useTranslation();
-
-  const { pendingControlImages, autoAddBoardId, isConnected } =
-    useAppSelector(selector);
+  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
+  const isConnected = useAppSelector((s) => s.system.isConnected);
   const activeTabName = useAppSelector(activeTabNameSelector);
+  const optimalDimension = useAppSelector(selectOptimalDimension);
+  const pendingControlImages = useAppSelector(selectPendingControlImages);
 
   const [isMouseOverImage, setIsMouseOverImage] = useState(false);
 
-  const { currentData: controlImage, isError: isErrorControlImage } =
-    useGetImageDTOQuery(controlImageName ?? skipToken);
+  const { currentData: controlImage, isError: isErrorControlImage } = useGetImageDTOQuery(
+    controlImageName ?? skipToken
+  );
 
-  const {
-    currentData: processedControlImage,
-    isError: isErrorProcessedControlImage,
-  } = useGetImageDTOQuery(processedControlImageName ?? skipToken);
+  const { currentData: processedControlImage, isError: isErrorProcessedControlImage } = useGetImageDTOQuery(
+    processedControlImageName ?? skipToken
+  );
 
   const [changeIsIntermediate] = useChangeImageIsIntermediateMutation();
   const [addToBoard] = useAddImageToBoardMutation();
@@ -98,31 +85,23 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
     } else {
       removeFromBoard({ imageDTO: processedControlImage });
     }
-  }, [
-    processedControlImage,
-    changeIsIntermediate,
-    autoAddBoardId,
-    addToBoard,
-    removeFromBoard,
-  ]);
+  }, [processedControlImage, changeIsIntermediate, autoAddBoardId, addToBoard, removeFromBoard]);
 
   const handleSetControlImageToDimensions = useCallback(() => {
     if (!controlImage) {
       return;
     }
 
+    const width = roundToMultiple(controlImage.width, 8);
+    const height = roundToMultiple(controlImage.height, 8);
+
     if (activeTabName === 'unifiedCanvas') {
-      dispatch(
-        setBoundingBoxDimensions({
-          width: controlImage.width,
-          height: controlImage.height,
-        })
-      );
+      dispatch(setBoundingBoxDimensions({ width, height }, optimalDimension));
     } else {
-      dispatch(widthChanged(controlImage.width));
-      dispatch(heightChanged(controlImage.height));
+      dispatch(widthChanged(width));
+      dispatch(heightChanged(height));
     }
-  }, [controlImage, activeTabName, dispatch]);
+  }, [controlImage, activeTabName, dispatch, optimalDimension]);
 
   const handleMouseEnter = useCallback(() => {
     setIsMouseOverImage(true);
@@ -151,10 +130,7 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
     [id]
   );
 
-  const postUploadAction = useMemo<PostUploadAction>(
-    () => ({ type: 'SET_CONTROL_ADAPTER_IMAGE', id }),
-    [id]
-  );
+  const postUploadAction = useMemo<PostUploadAction>(() => ({ type: 'SET_CONTROL_ADAPTER_IMAGE', id }), [id]);
 
   const shouldShowProcessedImage =
     controlImage &&
@@ -167,12 +143,7 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
     if (isConnected && (isErrorControlImage || isErrorProcessedControlImage)) {
       handleResetControlImage();
     }
-  }, [
-    handleResetControlImage,
-    isConnected,
-    isErrorControlImage,
-    isErrorProcessedControlImage,
-  ]);
+  }, [handleResetControlImage, isConnected, isErrorControlImage, isErrorProcessedControlImage]);
 
   return (
     <Flex
@@ -214,18 +185,18 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
       <>
         <IAIDndImageIcon
           onClick={handleResetControlImage}
-          icon={controlImage ? <FaUndo /> : undefined}
+          icon={controlImage ? <PiArrowCounterClockwiseBold size={16} /> : undefined}
           tooltip={t('controlnet.resetControlImage')}
         />
         <IAIDndImageIcon
           onClick={handleSaveControlImage}
-          icon={controlImage ? <FaSave size={16} /> : undefined}
+          icon={controlImage ? <PiFloppyDiskBold size={16} /> : undefined}
           tooltip={t('controlnet.saveControlImage')}
           styleOverrides={saveControlImageStyleOverrides}
         />
         <IAIDndImageIcon
           onClick={handleSetControlImageToDimensions}
-          icon={controlImage ? <FaRulerVertical size={16} /> : undefined}
+          icon={controlImage ? <PiRulerBold size={16} /> : undefined}
           tooltip={t('controlnet.setControlImageDimensions')}
           styleOverrides={setControlImageDimensionsStyleOverrides}
         />

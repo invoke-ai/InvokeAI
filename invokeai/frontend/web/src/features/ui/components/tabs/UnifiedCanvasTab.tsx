@@ -1,7 +1,8 @@
-import { Flex } from '@chakra-ui/react';
+import { Flex } from '@invoke-ai/ui-library';
 import IAIDropOverlay from 'common/components/IAIDropOverlay';
 import IAICanvas from 'features/canvas/components/IAICanvas';
 import IAICanvasToolbar from 'features/canvas/components/IAICanvasToolbar/IAICanvasToolbar';
+import { CANVAS_TAB_TESTID } from 'features/canvas/store/constants';
 import { useDroppableTypesafe } from 'features/dnd/hooks/typesafeHooks';
 import type { CanvasInitialImageDropData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
@@ -28,7 +29,6 @@ const UnifiedCanvasTab = () => {
     <Flex
       layerStyle="first"
       ref={setDroppableRef}
-      tabIndex={-1}
       flexDirection="column"
       alignItems="center"
       gap={4}
@@ -36,14 +36,12 @@ const UnifiedCanvasTab = () => {
       borderRadius="base"
       w="full"
       h="full"
+      data-testid={CANVAS_TAB_TESTID}
     >
       <IAICanvasToolbar />
       <IAICanvas />
       {isValidDrop(droppableData, active) && (
-        <IAIDropOverlay
-          isOver={isOver}
-          label={t('toast.setCanvasInitialImage')}
-        />
+        <IAIDropOverlay isOver={isOver} label={t('toast.setCanvasInitialImage')} />
       )}
     </Flex>
   );

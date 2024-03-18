@@ -1,9 +1,8 @@
-import { useDisclosure } from '@chakra-ui/react';
-import { InvButton } from 'common/components/InvButton/InvButton';
+import { IconButton, useDisclosure } from '@invoke-ai/ui-library';
 import { WorkflowLibraryModalContext } from 'features/workflowLibrary/context/WorkflowLibraryModalContext';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaFolderOpen } from 'react-icons/fa';
+import { PiFolderOpenBold } from 'react-icons/pi';
 
 import WorkflowLibraryModal from './WorkflowLibraryModal';
 
@@ -13,13 +12,13 @@ const WorkflowLibraryButton = () => {
 
   return (
     <WorkflowLibraryModalContext.Provider value={disclosure}>
-      <InvButton
-        leftIcon={<FaFolderOpen />}
+      <IconButton
+        aria-label={t('workflows.workflowLibrary')}
+        tooltip={t('workflows.workflowLibrary')}
+        icon={<PiFolderOpenBold />}
         onClick={disclosure.onOpen}
         pointerEvents="auto"
-      >
-        {t('workflows.workflowLibrary')}
-      </InvButton>
+      />
       <WorkflowLibraryModal />
     </WorkflowLibraryModalContext.Provider>
   );

@@ -5,7 +5,7 @@ import ParamInfillPatchmatchDownscaleSize from './ParamInfillPatchmatchDownscale
 import ParamInfillTilesize from './ParamInfillTilesize';
 
 const ParamInfillOptions = () => {
-  const infillMethod = useAppSelector((state) => state.generation.infillMethod);
+  const infillMethod = useAppSelector((s) => s.generation.infillMethod);
   if (infillMethod === 'tile') {
     return <ParamInfillTilesize />;
   }

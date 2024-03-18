@@ -6,10 +6,7 @@ import type { ListRange } from 'react-virtuoso';
  * @param range The range of items currently visible.
  * @returns
  */
-export const getScrollToIndexAlign = (
-  index: number,
-  range: ListRange
-): 'start' | 'end' => {
+export const getScrollToIndexAlign = (index: number, range: ListRange): 'start' | 'end' => {
   if (index > (range.endIndex - range.startIndex) / 2 + range.startIndex) {
     return 'end';
   }

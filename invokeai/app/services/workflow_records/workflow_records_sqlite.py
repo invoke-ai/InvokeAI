@@ -169,7 +169,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
             self._cursor.execute(count_query, count_params)
             total = self._cursor.fetchone()[0]
-            pages = int(total / per_page) + 1
+            pages = total // per_page + (total % per_page > 0)
 
             return PaginatedResults(
                 items=workflows,

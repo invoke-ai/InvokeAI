@@ -1,23 +1,20 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useControlAdapterModels } from 'features/controlAdapters/hooks/useControlAdapterModels';
+import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import { controlAdapterAdded } from 'features/controlAdapters/store/controlAdaptersSlice';
-import type { ControlAdapterType } from 'features/controlAdapters/store/types';
+import { type ControlAdapterType, isControlAdapterProcessorType } from 'features/controlAdapters/store/types';
 import { useCallback, useMemo } from 'react';
-
-import { useControlAdapterModels } from './useControlAdapterModels';
+import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 
 export const useAddControlAdapter = (type: ControlAdapterType) => {
-  const baseModel = useAppSelector(
-    (state) => state.generation.model?.base_model
-  );
+  const baseModel = useAppSelector((s) => s.generation.model?.base);
   const dispatch = useAppDispatch();
 
-  const models = useControlAdapterModels(type);
+  const [models] = useControlAdapterModels(type);
 
-  const firstModel = useMemo(() => {
+  const firstModel: ControlNetModelConfig | T2IAdapterModelConfig | IPAdapterModelConfig | undefined = useMemo(() => {
     // prefer to use a model that matches the base model
-    const firstCompatibleModel = models.filter((m) =>
-      baseModel ? m.base_model === baseModel : true
-    )[0];
+    const firstCompatibleModel = models.filter((m) => (baseModel ? m.base === baseModel : true))[0];
 
     if (firstCompatibleModel) {
       return firstCompatibleModel;
@@ -30,6 +27,26 @@ export const useAddControlAdapter = (type: ControlAdapterType) => {
 
   const addControlAdapter = useCallback(() => {
     if (isDisabled) {
+      return;
+    }
+
+    if (
+      (type === 'controlnet' || type === 't2i_adapter') &&
+      (firstModel?.type === 'controlnet' || firstModel?.type === 't2i_adapter')
+    ) {
+      const defaultPreprocessor = firstModel.default_settings?.preprocessor;
+      const processorType = isControlAdapterProcessorType(defaultPreprocessor) ? defaultPreprocessor : 'none';
+      const processorNode = CONTROLNET_PROCESSORS[processorType].default;
+      dispatch(
+        controlAdapterAdded({
+          type,
+          overrides: {
+            model: firstModel,
+            processorType,
+            processorNode,
+          },
+        })
+      );
       return;
     }
     dispatch(

@@ -1,6 +1,5 @@
+import { Checkbox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InvCheckbox } from 'common/components/InvCheckbox/wrapper';
-import { InvControl } from 'common/components/InvControl/InvControl';
 import { useHasImageOutput } from 'features/nodes/hooks/useHasImageOutput';
 import { useIsIntermediate } from 'features/nodes/hooks/useIsIntermediate';
 import { nodeIsIntermediateChanged } from 'features/nodes/store/nodesSlice';
@@ -30,9 +29,10 @@ const SaveToGalleryCheckbox = ({ nodeId }: { nodeId: string }) => {
   }
 
   return (
-    <InvControl label={t('hotkeys.saveToGallery.title')} className="nopan">
-      <InvCheckbox onChange={handleChange} isChecked={!isIntermediate} />
-    </InvControl>
+    <FormControl className="nopan">
+      <FormLabel>{t('hotkeys.saveToGallery.title')} </FormLabel>
+      <Checkbox onChange={handleChange} isChecked={!isIntermediate} />
+    </FormControl>
   );
 };
 

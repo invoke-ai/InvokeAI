@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 
 export const usePanelStorage = () => {
   const dispatch = useAppDispatch();
-  const panels = useAppSelector((state) => state.ui.panels);
+  const panels = useAppSelector((s) => s.ui.panels);
   const getItem = useCallback((name: string) => panels[name] ?? '', [panels]);
   const setItem = useCallback(
     (name: string, value: string) => {

@@ -5,20 +5,23 @@ from pydantic import BaseModel, ConfigDict, Field
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    InputField,
-    InvocationContext,
-    MetadataField,
-    OutputField,
-    UIType,
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.controlnet_image_processors import ControlField
-from invokeai.app.invocations.ip_adapter import IPAdapterModelField
-from invokeai.app.invocations.model import LoRAModelField, MainModelField, VAEModelField
-from invokeai.app.invocations.primitives import ImageField
-from invokeai.app.invocations.t2i_adapter import T2IAdapterField
-from invokeai.app.shared.fields import FieldDescriptions
+from invokeai.app.invocations.controlnet_image_processors import (
+    CONTROLNET_MODE_VALUES,
+    CONTROLNET_RESIZE_VALUES,
+)
+from invokeai.app.invocations.fields import (
+    FieldDescriptions,
+    ImageField,
+    InputField,
+    MetadataField,
+    OutputField,
+    UIType,
+)
+from invokeai.app.invocations.model import ModelIdentifierField
+from invokeai.app.services.shared.invocation_context import InvocationContext
 
 from ...version import __version__
 
@@ -31,7 +34,7 @@ class MetadataItemField(BaseModel):
 class LoRAMetadataField(BaseModel):
     """LoRA Metadata Field"""
 
-    lora: LoRAModelField = Field(description=FieldDescriptions.lora_model)
+    model: ModelIdentifierField = Field(description=FieldDescriptions.lora_model)
     weight: float = Field(description=FieldDescriptions.lora_weight)
 
 
@@ -39,14 +42,39 @@ class IPAdapterMetadataField(BaseModel):
     """IP Adapter Field, minus the CLIP Vision Encoder model"""
 
     image: ImageField = Field(description="The IP-Adapter image prompt.")
-    ip_adapter_model: IPAdapterModelField = Field(
-        description="The IP-Adapter model.",
-    )
-    weight: Union[float, list[float]] = Field(
-        description="The weight given to the IP-Adapter",
-    )
+    ip_adapter_model: ModelIdentifierField = Field(description="The IP-Adapter model.")
+    weight: Union[float, list[float]] = Field(description="The weight given to the IP-Adapter")
     begin_step_percent: float = Field(description="When the IP-Adapter is first applied (% of total steps)")
     end_step_percent: float = Field(description="When the IP-Adapter is last applied (% of total steps)")
+
+
+class T2IAdapterMetadataField(BaseModel):
+    image: ImageField = Field(description="The control image.")
+    processed_image: Optional[ImageField] = Field(default=None, description="The control image, after processing.")
+    t2i_adapter_model: ModelIdentifierField = Field(description="The T2I-Adapter model to use.")
+    weight: Union[float, list[float]] = Field(default=1, description="The weight given to the T2I-Adapter")
+    begin_step_percent: float = Field(
+        default=0, ge=0, le=1, description="When the T2I-Adapter is first applied (% of total steps)"
+    )
+    end_step_percent: float = Field(
+        default=1, ge=0, le=1, description="When the T2I-Adapter is last applied (% of total steps)"
+    )
+    resize_mode: CONTROLNET_RESIZE_VALUES = Field(default="just_resize", description="The resize mode to use")
+
+
+class ControlNetMetadataField(BaseModel):
+    image: ImageField = Field(description="The control image")
+    processed_image: Optional[ImageField] = Field(default=None, description="The control image, after processing.")
+    control_model: ModelIdentifierField = Field(description="The ControlNet model to use")
+    control_weight: Union[float, list[float]] = Field(default=1, description="The weight given to the ControlNet")
+    begin_step_percent: float = Field(
+        default=0, ge=0, le=1, description="When the ControlNet is first applied (% of total steps)"
+    )
+    end_step_percent: float = Field(
+        default=1, ge=0, le=1, description="When the ControlNet is last applied (% of total steps)"
+    )
+    control_mode: CONTROLNET_MODE_VALUES = Field(default="balanced", description="The control mode to use")
+    resize_mode: CONTROLNET_RESIZE_VALUES = Field(default="just_resize", description="The resize mode to use")
 
 
 @invocation_output("metadata_item_output")
@@ -112,7 +140,7 @@ GENERATION_MODES = Literal[
 ]
 
 
-@invocation("core_metadata", title="Core Metadata", tags=["metadata"], category="metadata", version="1.0.1")
+@invocation("core_metadata", title="Core Metadata", tags=["metadata"], category="metadata", version="1.1.1")
 class CoreMetadataInvocation(BaseInvocation):
     """Collects core generation metadata into a MetadataField"""
 
@@ -138,14 +166,14 @@ class CoreMetadataInvocation(BaseInvocation):
         default=None,
         description="The number of skipped CLIP layers",
     )
-    model: Optional[MainModelField] = InputField(default=None, description="The main model used for inference")
-    controlnets: Optional[list[ControlField]] = InputField(
+    model: Optional[ModelIdentifierField] = InputField(default=None, description="The main model used for inference")
+    controlnets: Optional[list[ControlNetMetadataField]] = InputField(
         default=None, description="The ControlNets used for inference"
     )
     ipAdapters: Optional[list[IPAdapterMetadataField]] = InputField(
         default=None, description="The IP Adapters used for inference"
     )
-    t2iAdapters: Optional[list[T2IAdapterField]] = InputField(
+    t2iAdapters: Optional[list[T2IAdapterMetadataField]] = InputField(
         default=None, description="The IP Adapters used for inference"
     )
     loras: Optional[list[LoRAMetadataField]] = InputField(default=None, description="The LoRAs used for inference")
@@ -157,7 +185,7 @@ class CoreMetadataInvocation(BaseInvocation):
         default=None,
         description="The name of the initial image",
     )
-    vae: Optional[VAEModelField] = InputField(
+    vae: Optional[ModelIdentifierField] = InputField(
         default=None,
         description="The VAE used for decoding, if the main model's default was not used",
     )
@@ -188,7 +216,7 @@ class CoreMetadataInvocation(BaseInvocation):
     )
 
     # SDXL Refiner
-    refiner_model: Optional[MainModelField] = InputField(
+    refiner_model: Optional[ModelIdentifierField] = InputField(
         default=None,
         description="The SDXL Refiner model used",
     )
@@ -220,10 +248,9 @@ class CoreMetadataInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> MetadataOutput:
         """Collects and outputs a CoreMetadata object"""
 
-        return MetadataOutput(
-            metadata=MetadataField.model_validate(
-                self.model_dump(exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"})
-            )
-        )
+        as_dict = self.model_dump(exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"})
+        as_dict["app_version"] = __version__
+
+        return MetadataOutput(metadata=MetadataField.model_validate(as_dict))
 
     model_config = ConfigDict(extra="allow")

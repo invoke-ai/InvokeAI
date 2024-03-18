@@ -1,10 +1,11 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
-import type { NonNullableGraph } from 'services/api/types';
+import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
+import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
 import { addIPAdapterToLinearGraph } from './addIPAdapterToLinearGraph';
-import { addLinearUIOutputNode } from './addLinearUIOutputNode';
 import { addLoRAsToGraph } from './addLoRAsToGraph';
 import { addNSFWCheckerToGraph } from './addNSFWCheckerToGraph';
 import { addSeamlessToLinearGraph } from './addSeamlessToLinearGraph';
@@ -23,14 +24,12 @@ import {
   POSITIVE_CONDITIONING,
   SEAMLESS,
 } from './constants';
-import { addCoreMetadataNode } from './metadata';
+import { addCoreMetadataNode, getModelMetadataField } from './metadata';
 
 /**
  * Builds the Canvas tab's Text to Image graph.
  */
-export const buildCanvasTextToImageGraph = (
-  state: RootState
-): NonNullableGraph => {
+export const buildCanvasTextToImageGraph = async (state: RootState): Promise<NonNullableGraph> => {
   const log = logger('nodes');
   const {
     positivePrompt,
@@ -55,9 +54,7 @@ export const buildCanvasTextToImageGraph = (
 
   const fp32 = vaePrecision === 'fp32';
   const is_intermediate = true;
-  const isUsingScaledDimensions = ['auto', 'manual'].includes(
-    boundingBoxScaleMethod
-  );
+  const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);
 
   if (!model) {
     log.error('No model found in state');
@@ -78,7 +75,6 @@ export const buildCanvasTextToImageGraph = (
    */
 
   // copy-pasted graph from node editor, filled in with state values & friendly node ids
-  // TODO: Actually create the graph correctly for ONNX
   const graph: NonNullableGraph = {
     id: CANVAS_TEXT_TO_IMAGE_GRAPH,
     nodes: {
@@ -111,12 +107,8 @@ export const buildCanvasTextToImageGraph = (
         id: NOISE,
         is_intermediate,
         seed,
-        width: !isUsingScaledDimensions
-          ? width
-          : scaledBoundingBoxDimensions.width,
-        height: !isUsingScaledDimensions
-          ? height
-          : scaledBoundingBoxDimensions.height,
+        width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
+        height: !isUsingScaledDimensions ? height : scaledBoundingBoxDimensions.height,
         use_cpu,
       },
       [DENOISE_LATENTS]: {
@@ -124,6 +116,7 @@ export const buildCanvasTextToImageGraph = (
         id: DENOISE_LATENTS,
         is_intermediate,
         cfg_scale,
+        cfg_rescale_multiplier,
         scheduler,
         steps,
         denoising_start: 0,
@@ -219,7 +212,8 @@ export const buildCanvasTextToImageGraph = (
     graph.nodes[CANVAS_OUTPUT] = {
       id: CANVAS_OUTPUT,
       type: 'img_resize',
-      is_intermediate,
+      is_intermediate: getIsIntermediate(state),
+      board: getBoardField(state),
       width: width,
       height: height,
       use_cache: false,
@@ -251,7 +245,8 @@ export const buildCanvasTextToImageGraph = (
     graph.nodes[CANVAS_OUTPUT] = {
       type: 'l2i',
       id: CANVAS_OUTPUT,
-      is_intermediate,
+      is_intermediate: getIsIntermediate(state),
+      board: getBoardField(state),
       fp32,
       use_cache: false,
     };
@@ -268,21 +263,19 @@ export const buildCanvasTextToImageGraph = (
     });
   }
 
+  const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
+
   addCoreMetadataNode(
     graph,
     {
       generation_mode: 'txt2img',
       cfg_scale,
       cfg_rescale_multiplier,
-      width: !isUsingScaledDimensions
-        ? width
-        : scaledBoundingBoxDimensions.width,
-      height: !isUsingScaledDimensions
-        ? height
-        : scaledBoundingBoxDimensions.height,
+      width: !isUsingScaledDimensions ? width : scaledBoundingBoxDimensions.width,
+      height: !isUsingScaledDimensions ? height : scaledBoundingBoxDimensions.height,
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
-      model,
+      model: getModelMetadataField(modelConfig),
       seed,
       steps,
       rand_device: use_cpu ? 'cpu' : 'cuda',
@@ -299,17 +292,17 @@ export const buildCanvasTextToImageGraph = (
   }
 
   // optionally add custom VAE
-  addVAEToGraph(state, graph, modelLoaderNodeId);
+  await addVAEToGraph(state, graph, modelLoaderNodeId);
 
   // add LoRA support
-  addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
+  await addLoRAsToGraph(state, graph, DENOISE_LATENTS, modelLoaderNodeId);
 
   // add controlnet, mutating `graph`
-  addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
+  await addControlNetToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // Add IP Adapter
-  addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
-  addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
+  await addIPAdapterToLinearGraph(state, graph, DENOISE_LATENTS);
+  await addT2IAdaptersToLinearGraph(state, graph, DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
@@ -321,8 +314,6 @@ export const buildCanvasTextToImageGraph = (
     // must add after nsfw checker!
     addWatermarkerToGraph(state, graph, CANVAS_OUTPUT);
   }
-
-  addLinearUIOutputNode(state, graph);
 
   return graph;
 };

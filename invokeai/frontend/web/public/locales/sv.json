@@ -26,24 +26,8 @@
         "githubLabel": "Github",
         "discordLabel": "Discord",
         "settingsLabel": "Inställningar",
-        "langEnglish": "Engelska",
-        "langDutch": "Nederländska",
-        "langFrench": "Franska",
-        "langGerman": "Tyska",
-        "langItalian": "Italienska",
-        "langArabic": "العربية",
-        "langHebrew": "עברית",
-        "langPolish": "Polski",
-        "langPortuguese": "Português",
-        "langBrPortuguese": "Português do Brasil",
-        "langSimplifiedChinese": "简体中文",
-        "langJapanese": "日本語",
-        "langKorean": "한국어",
-        "langRussian": "Русский",
         "unifiedCanvas": "Förenad kanvas",
         "nodesDesc": "Ett nodbaserat system för bildgenerering är under utveckling. Håll utkik för uppdateringar om denna fantastiska funktion.",
-        "langUkranian": "Украї́нська",
-        "langSpanish": "Español",
         "postProcessDesc2": "Ett dedikerat användargränssnitt kommer snart att släppas för att underlätta mer avancerade arbetsflöden av efterbehandling.",
         "trainingDesc1": "Ett dedikerat arbetsflöde för träning av dina egna inbäddningar och kontrollpunkter genom Textual Inversion eller Dreambooth från webbgränssnittet.",
         "trainingDesc2": "InvokeAI stöder redan träning av anpassade inbäddningar med hjälp av Textual Inversion genom huvudscriptet.",
@@ -129,10 +113,6 @@
             "title": "Växla inställningar",
             "desc": "Öppna och stäng alternativpanelen"
         },
-        "toggleViewer": {
-            "title": "Växla visaren",
-            "desc": "Öppna och stäng bildvisaren"
-        },
         "toggleGallery": {
             "title": "Växla galleri",
             "desc": "Öppna eller stäng galleribyrån"
@@ -192,10 +172,6 @@
         "nextImage": {
             "title": "Nästa bild",
             "desc": "Visa nästa bild"
-        },
-        "toggleGalleryPin": {
-            "title": "Växla gallerinål",
-            "desc": "Nålar fast eller nålar av galleriet i gränssnittet"
         },
         "increaseGalleryThumbSize": {
             "title": "Förstora galleriets bildstorlek",

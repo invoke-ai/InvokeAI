@@ -1,0 +1,80 @@
+# Runs frontend code quality checks.
+#
+# Checks for changes to frontend files before running the checks.
+# If always_run is true, always runs the checks.
+
+name: 'frontend checks'
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    types:
+      - 'ready_for_review'
+      - 'opened'
+      - 'synchronize'
+  merge_group:
+  workflow_dispatch:
+    inputs:
+      always_run:
+        description: 'Always run the checks'
+        required: true
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      always_run:
+        description: 'Always run the checks'
+        required: true
+        type: boolean
+        default: true
+
+defaults:
+  run:
+    working-directory: invokeai/frontend/web
+
+jobs:
+  frontend-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10 # expected run time: <2 min
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: check for changed frontend files
+        if: ${{ inputs.always_run != true }}
+        id: changed-files
+        uses: tj-actions/changed-files@v42
+        with:
+          files_yaml: |
+            frontend:
+              - 'invokeai/frontend/web/**'
+
+      - name: install dependencies
+        if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
+        uses: ./.github/actions/install-frontend-deps
+
+      - name: tsc
+        if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
+        run: 'pnpm lint:tsc'
+        shell: bash
+
+      - name: dpdm
+        if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
+        run: 'pnpm lint:dpdm'
+        shell: bash
+
+      - name: eslint
+        if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
+        run: 'pnpm lint:eslint'
+        shell: bash
+
+      - name: prettier
+        if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
+        run: 'pnpm lint:prettier'
+        shell: bash
+
+      - name: knip
+        if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
+        run: 'pnpm lint:knip'
+        shell: bash

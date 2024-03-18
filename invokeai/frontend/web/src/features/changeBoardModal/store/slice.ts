@@ -1,10 +1,11 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import type { ImageDTO } from 'services/api/types';
 
 import { initialState } from './initialState';
 
-const changeBoardModal = createSlice({
+export const changeBoardModalSlice = createSlice({
   name: 'changeBoardModal',
   initialState,
   reducers: {
@@ -21,7 +22,6 @@ const changeBoardModal = createSlice({
   },
 });
 
-export const { isModalOpenChanged, imagesToChangeSelected, changeBoardReset } =
-  changeBoardModal.actions;
+export const { isModalOpenChanged, imagesToChangeSelected, changeBoardReset } = changeBoardModalSlice.actions;
 
-export default changeBoardModal.reducer;
+export const selectChangeBoardModalSlice = (state: RootState) => state.changeBoardModal;

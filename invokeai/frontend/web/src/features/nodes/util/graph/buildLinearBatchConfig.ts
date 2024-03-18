@@ -5,21 +5,12 @@ import { range } from 'lodash-es';
 import type { components } from 'services/api/schema';
 import type { Batch, BatchConfig, NonNullableGraph } from 'services/api/types';
 
-import {
-  CANVAS_COHERENCE_NOISE,
-  METADATA,
-  NOISE,
-  POSITIVE_CONDITIONING,
-} from './constants';
+import { CANVAS_COHERENCE_NOISE, METADATA, NOISE, POSITIVE_CONDITIONING } from './constants';
 import { getHasMetadata, removeMetadata } from './metadata';
 
-export const prepareLinearUIBatch = (
-  state: RootState,
-  graph: NonNullableGraph,
-  prepend: boolean
-): BatchConfig => {
+export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, prepend: boolean): BatchConfig => {
   const { iterations, model, shouldRandomizeSeed, seed } = state.generation;
-  const { shouldConcatSDXLStylePrompt, positiveStylePrompt } = state.sdxl;
+  const { shouldConcatSDXLStylePrompt } = state.sdxl;
   const { prompts, seedBehaviour } = state.dynamicPrompts;
 
   const data: Batch['data'] = [];
@@ -93,10 +84,7 @@ export const prepareLinearUIBatch = (
     data.push(secondBatchDatumList);
   }
 
-  const extendedPrompts =
-    seedBehaviour === 'PER_PROMPT'
-      ? range(iterations).flatMap(() => prompts)
-      : prompts;
+  const extendedPrompts = seedBehaviour === 'PER_PROMPT' ? range(iterations).flatMap(() => prompts) : prompts;
 
   // zipped batch of prompts
   if (graph.nodes[POSITIVE_CONDITIONING]) {
@@ -117,16 +105,12 @@ export const prepareLinearUIBatch = (
     });
   }
 
-  if (shouldConcatSDXLStylePrompt && model?.base_model === 'sdxl') {
-    const stylePrompts = extendedPrompts.map((p) =>
-      [p, positiveStylePrompt].join(' ')
-    );
-
+  if (shouldConcatSDXLStylePrompt && model?.base === 'sdxl') {
     if (graph.nodes[POSITIVE_CONDITIONING]) {
       firstBatchDatumList.push({
         node_path: POSITIVE_CONDITIONING,
         field_name: 'style',
-        items: stylePrompts,
+        items: extendedPrompts,
       });
     }
 

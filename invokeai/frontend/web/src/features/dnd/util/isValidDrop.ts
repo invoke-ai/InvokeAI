@@ -1,9 +1,6 @@
 import type { TypesafeActive, TypesafeDroppableData } from 'features/dnd/types';
 
-export const isValidDrop = (
-  overData: TypesafeDroppableData | undefined,
-  active: TypesafeActive | null
-) => {
+export const isValidDrop = (overData: TypesafeDroppableData | undefined, active: TypesafeActive | null) => {
   if (!overData || !active?.data.current) {
     return false;
   }
@@ -16,8 +13,6 @@ export const isValidDrop = (
   }
 
   switch (actionType) {
-    case 'ADD_FIELD_TO_LINEAR':
-      return payloadType === 'NODE_FIELD';
     case 'SET_CURRENT_IMAGE':
       return payloadType === 'IMAGE_DTO';
     case 'SET_INITIAL_IMAGE':
@@ -28,15 +23,11 @@ export const isValidDrop = (
       return payloadType === 'IMAGE_DTO';
     case 'SET_NODES_IMAGE':
       return payloadType === 'IMAGE_DTO';
-    case 'SET_MULTI_NODES_IMAGE':
-      return payloadType === 'IMAGE_DTO' || 'IMAGE_DTOS';
-    case 'ADD_TO_BATCH':
-      return payloadType === 'IMAGE_DTO' || 'IMAGE_DTOS';
     case 'ADD_TO_BOARD': {
       // If the board is the same, don't allow the drop
 
       // Check the payload types
-      const isPayloadValid = payloadType === 'IMAGE_DTO' || 'IMAGE_DTOS';
+      const isPayloadValid = ['IMAGE_DTO', 'GALLERY_SELECTION'].includes(payloadType);
       if (!isPayloadValid) {
         return false;
       }
@@ -50,12 +41,10 @@ export const isValidDrop = (
         return currentBoard !== destinationBoard;
       }
 
-      if (payloadType === 'IMAGE_DTOS') {
+      if (payloadType === 'GALLERY_SELECTION') {
         // Assume all images are on the same board - this is true for the moment
-        const { imageDTOs } = active.data.current.payload;
-        const currentBoard = imageDTOs[0]?.board_id ?? 'none';
+        const currentBoard = active.data.current.payload.boardId;
         const destinationBoard = overData.context.boardId;
-
         return currentBoard !== destinationBoard;
       }
 
@@ -65,7 +54,7 @@ export const isValidDrop = (
       // If the board is the same, don't allow the drop
 
       // Check the payload types
-      const isPayloadValid = payloadType === 'IMAGE_DTO' || 'IMAGE_DTOS';
+      const isPayloadValid = ['IMAGE_DTO', 'GALLERY_SELECTION'].includes(payloadType);
       if (!isPayloadValid) {
         return false;
       }
@@ -78,11 +67,8 @@ export const isValidDrop = (
         return currentBoard !== 'none';
       }
 
-      if (payloadType === 'IMAGE_DTOS') {
-        // Assume all images are on the same board - this is true for the moment
-        const { imageDTOs } = active.data.current.payload;
-        const currentBoard = imageDTOs[0]?.board_id ?? 'none';
-
+      if (payloadType === 'GALLERY_SELECTION') {
+        const currentBoard = active.data.current.payload.boardId;
         return currentBoard !== 'none';
       }
 

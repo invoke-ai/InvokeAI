@@ -1,37 +1,24 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
 import { memo } from 'react';
 import { Group, Rect } from 'react-konva';
 
-const selector = createMemoizedSelector(stateSelector, ({ canvas }) => {
-  const {
-    boundingBoxCoordinates,
-    boundingBoxDimensions,
-    stageDimensions,
-    stageScale,
-    shouldDarkenOutsideBoundingBox,
-    stageCoordinates,
-  } = canvas;
+const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
+  const { boundingBoxCoordinates, boundingBoxDimensions, stageDimensions, stageCoordinates } = canvas;
 
   return {
     boundingBoxCoordinates,
     boundingBoxDimensions,
-    shouldDarkenOutsideBoundingBox,
     stageCoordinates,
     stageDimensions,
-    stageScale,
   };
 });
+
 const IAICanvasBoundingBoxOverlay = () => {
-  const {
-    boundingBoxCoordinates,
-    boundingBoxDimensions,
-    shouldDarkenOutsideBoundingBox,
-    stageCoordinates,
-    stageDimensions,
-    stageScale,
-  } = useAppSelector(selector);
+  const { boundingBoxCoordinates, boundingBoxDimensions, stageCoordinates, stageDimensions } = useAppSelector(selector);
+  const shouldDarkenOutsideBoundingBox = useAppSelector((s) => s.canvas.shouldDarkenOutsideBoundingBox);
+  const stageScale = useAppSelector((s) => s.canvas.stageScale);
 
   return (
     <Group listening={false}>

@@ -12,7 +12,6 @@ import torch
 import torchvision.transforms as T
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
 from diffusers.models.controlnet import ControlNetModel
-from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from diffusers.schedulers import KarrasDiffusionSchedulers
@@ -26,9 +25,9 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.ip_adapter.unet_patcher import UNetPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData
+from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 
 from ..util import auto_detect_slice_size, normalize_device
-from .diffusion import AttentionMapSaver, InvokeAIDiffuserComponent
 
 
 @dataclass
@@ -39,7 +38,6 @@ class PipelineIntermediateState:
     timestep: int
     latents: torch.Tensor
     predicted_original: Optional[torch.Tensor] = None
-    attention_map_saver: Optional[AttentionMapSaver] = None
 
 
 @dataclass
@@ -86,6 +84,7 @@ class AddsMaskGuidance:
     mask_latents: torch.FloatTensor
     scheduler: SchedulerMixin
     noise: torch.Tensor
+    gradient_mask: bool
 
     def __call__(self, step_output: Union[BaseOutput, SchedulerOutput], t: torch.Tensor, conditioning) -> BaseOutput:
         output_class = step_output.__class__  # We'll create a new one with masked data.
@@ -121,7 +120,12 @@ class AddsMaskGuidance:
         # TODO: Do we need to also apply scheduler.scale_model_input? Or is add_noise appropriately scaled already?
         # mask_latents = self.scheduler.scale_model_input(mask_latents, t)
         mask_latents = einops.repeat(mask_latents, "b c h w -> (repeat b) c h w", repeat=batch_size)
-        masked_input = torch.lerp(mask_latents.to(dtype=latents.dtype), latents, mask.to(dtype=latents.dtype))
+        if self.gradient_mask:
+            threshhold = (t.item()) / self.scheduler.config.num_train_timesteps
+            mask_bool = mask > threshhold  # I don't know when mask got inverted, but it did
+            masked_input = torch.where(mask_bool, latents, mask_latents)
+        else:
+            masked_input = torch.lerp(mask_latents.to(dtype=latents.dtype), latents, mask.to(dtype=latents.dtype))
         return masked_input
 
 
@@ -182,19 +186,6 @@ class T2IAdapterData:
     weight: Union[float, list[float]] = Field(default=1.0)
     begin_step_percent: float = Field(default=0.0)
     end_step_percent: float = Field(default=1.0)
-
-
-@dataclass
-class InvokeAIStableDiffusionPipelineOutput(StableDiffusionPipelineOutput):
-    r"""
-    Output class for InvokeAI's Stable Diffusion pipeline.
-
-    Args:
-        attention_map_saver (`AttentionMapSaver`): Object containing attention maps that can be displayed to the user
-         after generation completes. Optional.
-    """
-
-    attention_map_saver: Optional[AttentionMapSaver]
 
 
 class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
@@ -335,10 +326,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
         mask: Optional[torch.Tensor] = None,
         masked_latents: Optional[torch.Tensor] = None,
+        gradient_mask: Optional[bool] = False,
         seed: Optional[int] = None,
-    ) -> tuple[torch.Tensor, Optional[AttentionMapSaver]]:
+    ) -> torch.Tensor:
         if init_timestep.shape[0] == 0:
-            return latents, None
+            return latents
 
         if additional_guidance is None:
             additional_guidance = []
@@ -375,10 +367,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     self._unet_forward, mask, masked_latents
                 )
             else:
-                additional_guidance.append(AddsMaskGuidance(mask, orig_latents, self.scheduler, noise))
+                additional_guidance.append(AddsMaskGuidance(mask, orig_latents, self.scheduler, noise, gradient_mask))
 
         try:
-            latents, attention_map_saver = self.generate_latents_from_embeddings(
+            latents = self.generate_latents_from_embeddings(
                 latents,
                 timesteps,
                 conditioning_data,
@@ -392,10 +384,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             self.invokeai_diffuser.model_forward_callback = self._unet_forward
 
         # restore unmasked part
-        if mask is not None:
+        if mask is not None and not gradient_mask:
             latents = torch.lerp(orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype))
 
-        return latents, attention_map_saver
+        return latents
 
     def generate_latents_from_embeddings(
         self,
@@ -408,23 +400,22 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         ip_adapter_data: Optional[list[IPAdapterData]] = None,
         t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
         callback: Callable[[PipelineIntermediateState], None] = None,
-    ):
+    ) -> torch.Tensor:
         self._adjust_memory_efficient_attention(latents)
         if additional_guidance is None:
             additional_guidance = []
 
         batch_size = latents.shape[0]
-        attention_map_saver: Optional[AttentionMapSaver] = None
 
         if timesteps.shape[0] == 0:
-            return latents, attention_map_saver
+            return latents
 
         ip_adapter_unet_patcher = None
-        if conditioning_data.extra is not None and conditioning_data.extra.wants_cross_attention_control:
+        extra_conditioning_info = conditioning_data.text_embeddings.extra_conditioning
+        if extra_conditioning_info is not None and extra_conditioning_info.wants_cross_attention_control:
             attn_ctx = self.invokeai_diffuser.custom_attention_context(
                 self.invokeai_diffuser.model,
-                extra_conditioning_info=conditioning_data.extra,
-                step_count=len(self.scheduler.timesteps),
+                extra_conditioning_info=extra_conditioning_info,
             )
             self.use_ip_adapter = False
         elif ip_adapter_data is not None:
@@ -464,23 +455,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     ip_adapter_unet_patcher=ip_adapter_unet_patcher,
                 )
                 latents = step_output.prev_sample
-
-                latents = self.invokeai_diffuser.do_latent_postprocessing(
-                    postprocessing_settings=conditioning_data.postprocessing_settings,
-                    latents=latents,
-                    sigma=batched_t,
-                    step_index=i,
-                    total_step_count=len(timesteps),
-                )
-
                 predicted_original = getattr(step_output, "pred_original_sample", None)
-
-                # TODO resuscitate attention map saving
-                # if i == len(timesteps)-1 and extra_conditioning_info is not None:
-                #    eos_token_index = extra_conditioning_info.tokens_count_including_eos_bos - 1
-                #    attention_map_token_ids = range(1, eos_token_index)
-                #    attention_map_saver = AttentionMapSaver(token_ids=attention_map_token_ids, latents_shape=latents.shape[-2:])
-                #    self.invokeai_diffuser.setup_attention_map_saving(attention_map_saver)
 
                 if callback is not None:
                     callback(
@@ -491,11 +466,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                             timestep=int(t),
                             latents=latents,
                             predicted_original=predicted_original,
-                            attention_map_saver=attention_map_saver,
                         )
                     )
 
-            return latents, attention_map_saver
+            return latents
 
     @torch.inference_mode()
     def step(
@@ -537,15 +511,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     # Otherwise, set the IP-Adapter's scale to 0, so it has no effect.
                     ip_adapter_unet_patcher.set_scale(i, 0.0)
 
-        # Handle ControlNet(s) and T2I-Adapter(s)
+        # Handle ControlNet(s)
         down_block_additional_residuals = None
         mid_block_additional_residual = None
-        down_intrablock_additional_residuals = None
-        # if control_data is not None and t2i_adapter_data is not None:
-        # TODO(ryand): This is a limitation of the UNet2DConditionModel API, not a fundamental incompatibility
-        # between ControlNets and T2I-Adapters. We will try to fix this upstream in diffusers.
-        #    raise Exception("ControlNet(s) and T2I-Adapter(s) cannot be used simultaneously (yet).")
-        # elif control_data is not None:
         if control_data is not None:
             down_block_additional_residuals, mid_block_additional_residual = self.invokeai_diffuser.do_controlnet_step(
                 control_data=control_data,
@@ -555,7 +523,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 total_step_count=total_step_count,
                 conditioning_data=conditioning_data,
             )
-        # elif t2i_adapter_data is not None:
+
+        # Handle T2I-Adapter(s)
+        down_intrablock_additional_residuals = None
         if t2i_adapter_data is not None:
             accum_adapter_state = None
             for single_t2i_adapter_data in t2i_adapter_data:
@@ -581,7 +551,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     for idx, value in enumerate(single_t2i_adapter_data.adapter_state):
                         accum_adapter_state[idx] += value * t2i_adapter_weight
 
-            # down_block_additional_residuals = accum_adapter_state
             down_intrablock_additional_residuals = accum_adapter_state
 
         uc_noise_pred, c_noise_pred = self.invokeai_diffuser.do_unet_step(
@@ -590,7 +559,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             step_index=step_index,
             total_step_count=total_step_count,
             conditioning_data=conditioning_data,
-            # extra:
             down_block_additional_residuals=down_block_additional_residuals,  # for ControlNet
             mid_block_additional_residual=mid_block_additional_residual,  # for ControlNet
             down_intrablock_additional_residuals=down_intrablock_additional_residuals,  # for T2I-Adapter

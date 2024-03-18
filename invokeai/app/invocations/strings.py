@@ -2,16 +2,15 @@
 
 import re
 
+from invokeai.app.services.shared.invocation_context import InvocationContext
+
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    InputField,
-    InvocationContext,
-    OutputField,
-    UIComponent,
     invocation,
     invocation_output,
 )
+from .fields import InputField, OutputField, UIComponent
 from .primitives import StringOutput
 
 

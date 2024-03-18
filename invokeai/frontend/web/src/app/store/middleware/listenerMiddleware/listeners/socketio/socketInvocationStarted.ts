@@ -1,23 +1,14 @@
 import { logger } from 'app/logging/logger';
-import {
-  appSocketInvocationStarted,
-  socketInvocationStarted,
-} from 'services/events/actions';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { socketInvocationStarted } from 'services/events/actions';
 
-import { startAppListening } from '../..';
+const log = logger('socketio');
 
-export const addInvocationStartedEventListener = () => {
+export const addInvocationStartedEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketInvocationStarted,
-    effect: (action, { dispatch }) => {
-      const log = logger('socketio');
-
-      log.debug(
-        action.payload,
-        `Invocation started (${action.payload.data.node.type})`
-      );
-
-      dispatch(appSocketInvocationStarted(action.payload));
+    effect: (action) => {
+      log.debug(action.payload, `Invocation started (${action.payload.data.node.type})`);
     },
   });
 };

@@ -1,19 +1,14 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import {
-  canvasBatchIdsReset,
-  commitStagingAreaImage,
-  discardStagedImages,
-} from 'features/canvas/store/canvasSlice';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { canvasBatchIdsReset, commitStagingAreaImage, discardStagedImages } from 'features/canvas/store/canvasSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
 
-import { startAppListening } from '..';
-
 const matcher = isAnyOf(commitStagingAreaImage, discardStagedImages);
 
-export const addCommitStagingAreaImageListener = () => {
+export const addCommitStagingAreaImageListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher,
     effect: async (_, { dispatch, getState }) => {
@@ -23,10 +18,7 @@ export const addCommitStagingAreaImageListener = () => {
 
       try {
         const req = dispatch(
-          queueApi.endpoints.cancelByBatchIds.initiate(
-            { batch_ids: batchIds },
-            { fixedCacheKey: 'cancelByBatchIds' }
-          )
+          queueApi.endpoints.cancelByBatchIds.initiate({ batch_ids: batchIds }, { fixedCacheKey: 'cancelByBatchIds' })
         );
         const { canceled } = await req.unwrap();
         req.reset();

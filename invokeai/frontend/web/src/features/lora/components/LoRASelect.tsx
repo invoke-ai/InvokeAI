@@ -1,38 +1,33 @@
-import type { ChakraProps } from '@chakra-ui/react';
+import type { ChakraProps } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSelect } from 'common/components/InvSelect/InvSelect';
-import { useGroupedModelInvSelect } from 'common/components/InvSelect/useGroupedModelInvSelect';
-import { loraAdded } from 'features/lora/store/loraSlice';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
+import { loraAdded, selectLoraSlice } from 'features/lora/store/loraSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { LoRAModelConfigEntity } from 'services/api/endpoints/models';
-import { useGetLoRAModelsQuery } from 'services/api/endpoints/models';
+import { useLoRAModels } from 'services/api/hooks/modelsByType';
+import type { LoRAModelConfig } from 'services/api/types';
 
-const selector = createMemoizedSelector(stateSelector, ({ lora }) => ({
-  addedLoRAs: lora.loras,
-}));
+const selectAddedLoRAs = createMemoizedSelector(selectLoraSlice, (lora) => lora.loras);
 
 const LoRASelect = () => {
   const dispatch = useAppDispatch();
-  const { data, isLoading } = useGetLoRAModelsQuery();
+  const [modelConfigs, { isLoading }] = useLoRAModels();
   const { t } = useTranslation();
-  const { addedLoRAs } = useAppSelector(selector);
-  const currentBaseModel = useAppSelector(
-    (state) => state.generation.model?.base_model
-  );
+  const addedLoRAs = useAppSelector(selectAddedLoRAs);
+  const currentBaseModel = useAppSelector((s) => s.generation.model?.base);
 
-  const getIsDisabled = (lora: LoRAModelConfigEntity): boolean => {
-    const isCompatible = currentBaseModel === lora.base_model;
-    const isAdded = Boolean(addedLoRAs[lora.id]);
+  const getIsDisabled = (lora: LoRAModelConfig): boolean => {
+    const isCompatible = currentBaseModel === lora.base;
+    const isAdded = Boolean(addedLoRAs[lora.key]);
     const hasMainModel = Boolean(currentBaseModel);
     return !hasMainModel || !isCompatible || isAdded;
   };
 
   const _onChange = useCallback(
-    (lora: LoRAModelConfigEntity | null) => {
+    (lora: LoRAModelConfig | null) => {
       if (!lora) {
         return;
       }
@@ -41,8 +36,8 @@ const LoRASelect = () => {
     [dispatch]
   );
 
-  const { options, onChange } = useGroupedModelInvSelect({
-    modelEntities: data,
+  const { options, onChange } = useGroupedModelCombobox({
+    modelConfigs,
     getIsDisabled,
     onChange: _onChange,
   });
@@ -62,8 +57,11 @@ const LoRASelect = () => {
   const noOptionsMessage = useCallback(() => t('models.noMatchingLoRAs'), [t]);
 
   return (
-    <InvControl label={t('models.lora')} isDisabled={!options.length}>
-      <InvSelect
+    <FormControl isDisabled={!options.length}>
+      <InformationalPopover feature="lora">
+        <FormLabel>{t('models.concepts')} </FormLabel>
+      </InformationalPopover>
+      <Combobox
         placeholder={placeholder}
         value={null}
         options={options}
@@ -72,7 +70,7 @@ const LoRASelect = () => {
         data-testid="add-lora"
         sx={selectStyles}
       />
-    </InvControl>
+    </FormControl>
   );
 };
 

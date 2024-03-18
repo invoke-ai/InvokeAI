@@ -1,17 +1,16 @@
-import { Box } from '@chakra-ui/layout';
+import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InvAutosizeTextarea } from 'common/components/InvAutosizeTextarea/InvAutosizeTextarea';
-import { AddEmbeddingButton } from 'features/embedding/AddEmbeddingButton';
-import { EmbeddingPopover } from 'features/embedding/EmbeddingPopover';
-import { usePrompt } from 'features/embedding/usePrompt';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { setNegativePrompt } from 'features/parameters/store/generationSlice';
+import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
+import { PromptPopover } from 'features/prompt/PromptPopover';
+import { usePrompt } from 'features/prompt/usePrompt';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const ParamNegativePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((state) => state.generation.negativePrompt);
+  const prompt = useAppSelector((s) => s.generation.negativePrompt);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const _onChange = useCallback(
@@ -20,22 +19,16 @@ export const ParamNegativePrompt = memo(() => {
     },
     [dispatch]
   );
-  const { onChange, isOpen, onClose, onOpen, onSelectEmbedding, onKeyDown } =
-    usePrompt({
-      prompt,
-      textareaRef,
-      onChange: _onChange,
-    });
+  const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown } = usePrompt({
+    prompt,
+    textareaRef,
+    onChange: _onChange,
+  });
 
   return (
-    <EmbeddingPopover
-      isOpen={isOpen}
-      onClose={onClose}
-      onSelect={onSelectEmbedding}
-      width={textareaRef.current?.clientWidth}
-    >
+    <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
       <Box pos="relative">
-        <InvAutosizeTextarea
+        <Textarea
           id="negativePrompt"
           name="negativePrompt"
           ref={textareaRef}
@@ -43,17 +36,15 @@ export const ParamNegativePrompt = memo(() => {
           placeholder={t('parameters.negativePromptPlaceholder')}
           onChange={onChange}
           onKeyDown={onKeyDown}
-          minH="unset"
           fontSize="sm"
-          minRows={2}
-          maxRows={5}
           variant="darkFilled"
+          paddingRight={30}
         />
         <PromptOverlayButtonWrapper>
-          <AddEmbeddingButton isOpen={isOpen} onOpen={onOpen} />
+          <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
         </PromptOverlayButtonWrapper>
       </Box>
-    </EmbeddingPopover>
+    </PromptPopover>
   );
 });
 

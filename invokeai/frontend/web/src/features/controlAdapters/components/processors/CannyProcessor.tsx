@@ -1,5 +1,4 @@
-import { InvControl } from 'common/components/InvControl/InvControl';
-import { InvSlider } from 'common/components/InvSlider/InvSlider';
+import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type { RequiredCannyImageProcessorInvocation } from 'features/controlAdapters/store/types';
@@ -8,8 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './common/ProcessorWrapper';
 
-const DEFAULTS = CONTROLNET_PROCESSORS.canny_image_processor
-  .default as RequiredCannyImageProcessorInvocation;
+const DEFAULTS = CONTROLNET_PROCESSORS.canny_image_processor.default as RequiredCannyImageProcessorInvocation;
 
 type CannyProcessorProps = {
   controlNetId: string;
@@ -30,12 +28,6 @@ const CannyProcessor = (props: CannyProcessorProps) => {
     [controlNetId, processorChanged]
   );
 
-  const handleLowThresholdReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      low_threshold: DEFAULTS.low_threshold,
-    });
-  }, [controlNetId, processorChanged]);
-
   const handleHighThresholdChanged = useCallback(
     (v: number) => {
       processorChanged(controlNetId, { high_threshold: v });
@@ -43,34 +35,42 @@ const CannyProcessor = (props: CannyProcessorProps) => {
     [controlNetId, processorChanged]
   );
 
-  const handleHighThresholdReset = useCallback(() => {
-    processorChanged(controlNetId, {
-      high_threshold: DEFAULTS.high_threshold,
-    });
-  }, [controlNetId, processorChanged]);
-
   return (
     <ProcessorWrapper>
-      <InvControl label={t('controlnet.lowThreshold')} isDisabled={!isEnabled}>
-        <InvSlider
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.lowThreshold')}</FormLabel>
+        <CompositeSlider
           value={low_threshold}
           onChange={handleLowThresholdChanged}
-          onReset={handleLowThresholdReset}
+          defaultValue={DEFAULTS.low_threshold}
           min={0}
           max={255}
-          withNumberInput
         />
-      </InvControl>
-      <InvControl label={t('controlnet.highThreshold')} isDisabled={!isEnabled}>
-        <InvSlider
+        <CompositeNumberInput
+          value={low_threshold}
+          onChange={handleLowThresholdChanged}
+          defaultValue={DEFAULTS.low_threshold}
+          min={0}
+          max={255}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.highThreshold')}</FormLabel>
+        <CompositeSlider
           value={high_threshold}
           onChange={handleHighThresholdChanged}
-          onReset={handleHighThresholdReset}
+          defaultValue={DEFAULTS.high_threshold}
           min={0}
           max={255}
-          withNumberInput
         />
-      </InvControl>
+        <CompositeNumberInput
+          value={high_threshold}
+          onChange={handleHighThresholdChanged}
+          defaultValue={DEFAULTS.high_threshold}
+          min={0}
+          max={255}
+        />
+      </FormControl>
     </ProcessorWrapper>
   );
 };

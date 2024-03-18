@@ -14,24 +14,18 @@ edit_uri: edit/main/docs/
 # Copyright
 copyright: Copyright &copy; 2023 InvokeAI Team
 
+extra_css:
+  - stylesheets/extra.css
+
 # Configuration
 theme:
   name: material
   icon:
     repo: fontawesome/brands/github
     edit: material/file-document-edit-outline
+  favicon: img/favicon.ico
   palette:
-    - media: '(prefers-color-scheme: light)'
-      scheme: default
-      toggle:
-        icon: material/lightbulb
-        name: Switch to dark mode
-    - media: '(prefers-color-scheme: dark)'
-      scheme: slate
-      primary: blue
-      toggle:
-        icon: material/lightbulb-outline
-        name: Switch to light mode
+    scheme: slate
   features:
     - navigation.instant
     - navigation.tabs
@@ -60,8 +54,8 @@ markdown_extensions:
   - pymdownx.caret
   - pymdownx.details
   - pymdownx.emoji:
-      emoji_index: !!python/name:materialx.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
@@ -91,17 +85,29 @@ plugins:
       enable_creation_date: true
   - redirects:
       redirect_maps:
-          'installation/INSTALL_AUTOMATED.md': 'installation/010_INSTALL_AUTOMATED.md'
-          'installation/INSTALL_MANUAL.md': 'installation/020_INSTALL_MANUAL.md'
-          'installation/INSTALL_SOURCE.md': 'installation/020_INSTALL_MANUAL.md'
-          'installation/INSTALL_DOCKER.md': 'installation/040_INSTALL_DOCKER.md'
-          'installation/INSTALLING_MODELS.md': 'installation/050_INSTALLING_MODELS.md'
-          'installation/INSTALL_PATCHMATCH.md': 'installation/060_INSTALL_PATCHMATCH.md'
+        'installation/INSTALL_AUTOMATED.md': 'installation/010_INSTALL_AUTOMATED.md'
+        'installation/INSTALL_MANUAL.md': 'installation/020_INSTALL_MANUAL.md'
+        'installation/INSTALL_SOURCE.md': 'installation/020_INSTALL_MANUAL.md'
+        'installation/INSTALL_DOCKER.md': 'installation/040_INSTALL_DOCKER.md'
+        'installation/INSTALLING_MODELS.md': 'installation/050_INSTALLING_MODELS.md'
+        'installation/INSTALL_PATCHMATCH.md': 'installation/060_INSTALL_PATCHMATCH.md'
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            separate_signature: true
+            show_signature_annotations: true
+            parameter_headings: false
+            signature_crossrefs: true
+            show_source: false
+            summary: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_bases: false
 
 extra_javascript:
   - https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js
   - javascripts/tablesort.js
-  - https://widget.kapa.ai/kapa-widget.bundle.js
   - javascript/init_kapa_widget.js
 
 extra:
@@ -110,8 +116,8 @@ extra:
     property: G-2X4JR4S4FB
 
 nav:
-    - Home: 'index.md'
-    - Installation:
+  - Home: 'index.md'
+  - Installation:
       - Overview: 'installation/INSTALLATION.md'
       - Installing with the Automated Installer: 'installation/010_INSTALL_AUTOMATED.md'
       - Installing Manually: 'installation/020_INSTALL_MANUAL.md'
@@ -122,74 +128,81 @@ nav:
       - Installing xFormers: 'installation/070_INSTALL_XFORMERS.md'
       - Developers Documentation: 'installation/Developers_documentation/BUILDING_BINARY_INSTALLERS.md'
       - Deprecated Documentation:
-        - Binary Installer: 'installation/deprecated_documentation/INSTALL_BINARY.md'
-        - Runninng InvokeAI on Google Colab: 'installation/deprecated_documentation/INSTALL_JUPYTER.md'
-        - Manual Installation on Linux: 'installation/deprecated_documentation/INSTALL_LINUX.md'
-        - Manual Installation on macOS: 'installation/deprecated_documentation/INSTALL_MAC.md'
-        - Manual Installation on Windows: 'installation/deprecated_documentation/INSTALL_WINDOWS.md'
-        - Installing Invoke with pip: 'installation/deprecated_documentation/INSTALL_PCP.md'
-        - Source Installer: 'installation/deprecated_documentation/INSTALL_SOURCE.md'
-    - Workflows & Nodes:
-      - Community Nodes: 'nodes/communityNodes.md'
-      - Example Workflows: 'nodes/exampleWorkflows.md'
+          - Binary Installer: 'installation/deprecated_documentation/INSTALL_BINARY.md'
+          - Runninng InvokeAI on Google Colab: 'installation/deprecated_documentation/INSTALL_JUPYTER.md'
+          - Manual Installation on Linux: 'installation/deprecated_documentation/INSTALL_LINUX.md'
+          - Manual Installation on macOS: 'installation/deprecated_documentation/INSTALL_MAC.md'
+          - Manual Installation on Windows: 'installation/deprecated_documentation/INSTALL_WINDOWS.md'
+          - Installing Invoke with pip: 'installation/deprecated_documentation/INSTALL_PCP.md'
+          - Source Installer: 'installation/deprecated_documentation/INSTALL_SOURCE.md'
+  - Workflows & Nodes:
       - Nodes Overview: 'nodes/overview.md'
+      - Workflow Editor Basics: 'nodes/NODES.md'
       - List of Default Nodes: 'nodes/defaultNodes.md'
-      - Workflow Editor Usage: 'nodes/NODES.md'
+      - Example Workflows: 'nodes/exampleWorkflows.md'
       - ComfyUI to InvokeAI: 'nodes/comfyToInvoke.md'
       - Facetool Node: 'nodes/detailedNodes/faceTools.md'
       - Contributing Nodes: 'nodes/contributingNodes.md'
-    - Features:
+      - Migrating from v3 to v4: 'nodes/NODES_MIGRATION_V3_V4.md'
+      - Invocation API: 'nodes/INVOCATION_API.md'
+  - Community Nodes: 'nodes/communityNodes.md'
+  - Features:
       - Overview: 'features/index.md'
       - New to InvokeAI?: 'help/gettingStartedWithAI.md'
       - Configuration: 'features/CONFIGURATION.md'
+      - Database: 'features/DATABASE.md'
       - Control Adapters: 'features/CONTROLNET.md'
       - Image-to-Image: 'features/IMG2IMG.md'
       - Controlling Logging: 'features/LOGGING.md'
       - LoRAs & LCM-LoRAs: 'features/LORAS.md'
       - Model Merging: 'features/MODEL_MERGING.md'
-      - Nodes & Workflows: 'nodes/overview.md'
+      - Workflows &  Nodes: 'nodes/overview'
       - NSFW Checker: 'features/WATERMARK+NSFW.md'
       - Postprocessing: 'features/POSTPROCESS.md'
       - Prompting Features: 'features/PROMPTS.md'
       - Textual Inversions:
-        - Textual Inversions: 'features/TEXTUAL_INVERSIONS.md'
-        - Textual Inversion Training: 'features/TRAINING.md'
+          - Textual Inversions: 'features/TEXTUAL_INVERSIONS.md'
+          - Textual Inversion Training: 'features/TRAINING.md'
       - Unified Canvas: 'features/UNIFIED_CANVAS.md'
       - InvokeAI Web Server: 'features/WEB.md'
-      - WebUI Hotkeys: "features/WEBUIHOTKEYS.md"
-      - Maintenance Utilities: "features/UTILITIES.md"
+      - WebUI Hotkeys: 'features/WEBUIHOTKEYS.md'
+      - Maintenance Utilities: 'features/UTILITIES.md'
       - Other: 'features/OTHER.md'
-    - Contributing:
+  - Contributing:
       - How to Contribute: 'contributing/CONTRIBUTING.md'
       - InvokeAI Code of Conduct: 'CODE_OF_CONDUCT.md'
       - Development:
-        - Overview: 'contributing/contribution_guides/development.md'
-        - New Contributors: 'contributing/contribution_guides/newContributorChecklist.md'
-        - InvokeAI Architecture: 'contributing/ARCHITECTURE.md'
-        - Model Manager v2: 'contributing/MODEL_MANAGER.md'
-        - Frontend Documentation: 'contributing/contribution_guides/contributingToFrontend.md'
-        - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
-        - Adding Tests: 'contributing/TESTS.md'
+          - Overview: 'contributing/contribution_guides/development.md'
+          - New Contributors: 'contributing/contribution_guides/newContributorChecklist.md'
+          - Model Manager v2: 'contributing/MODEL_MANAGER.md'
+          - Frontend Documentation: 'contributing/contribution_guides/contributingToFrontend.md'
+          - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
+          - Testing: 'contributing/TESTS.md'
+          - Frontend:
+              - Overview: 'contributing/frontend/OVERVIEW.md'
+              - State Management: 'contributing/frontend/STATE_MGMT.md'
+              - Workflows: 'contributing/frontend/WORKFLOWS.md'
       - Documentation: 'contributing/contribution_guides/documentation.md'
       - Nodes: 'contributing/INVOCATIONS.md'
       - Model Manager: 'contributing/MODEL_MANAGER.md'
       - Download Queue: 'contributing/DOWNLOAD_QUEUE.md'
       - Translation: 'contributing/contribution_guides/translation.md'
       - Tutorials: 'contributing/contribution_guides/tutorials.md'
-    - Changelog: 'CHANGELOG.md'
-    - Deprecated:
+  - Deprecated:
+      - InvokeAI 2.3: 'deprecated/2to3.md'
       - Command Line Interface: 'deprecated/CLI.md'
+      - Changelog: 'CHANGELOG.md'
       - Variations: 'deprecated/VARIATIONS.md'
       - Translations: 'deprecated/TRANSLATION.md'
       - Embiggen: 'deprecated/EMBIGGEN.md'
       - Inpainting: 'deprecated/INPAINTING.md'
       - Outpainting: 'deprecated/OUTPAINTING.md'
       - Troubleshooting: 'help/deprecated/TROUBLESHOOT.md'
-    - Help:
+  - Help:
       - Getting Started: 'help/gettingStartedWithAI.md'
       - FAQs: 'help/FAQ.md'
       - Diffusion Overview: 'help/diffusion.md'
       - Sampler Convergence: 'help/SAMPLER_CONVERGENCE.md'
-    - Other:
+  - Other:
       - Contributors: 'other/CONTRIBUTORS.md'
       - CompViz-README: 'other/README-CompViz.md'

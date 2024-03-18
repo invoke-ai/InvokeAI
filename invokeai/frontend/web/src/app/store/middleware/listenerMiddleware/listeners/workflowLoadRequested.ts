@@ -1,37 +1,26 @@
 import { logger } from 'app/logging/logger';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
-import {
-  workflowLoaded,
-  workflowLoadRequested,
-} from 'features/nodes/store/actions';
+import { workflowLoaded, workflowLoadRequested } from 'features/nodes/store/actions';
 import { $flow } from 'features/nodes/store/reactFlowInstance';
-import {
-  WorkflowMigrationError,
-  WorkflowVersionError,
-} from 'features/nodes/types/error';
+import { WorkflowMigrationError, WorkflowVersionError } from 'features/nodes/types/error';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import { setActiveTab } from 'features/ui/store/uiSlice';
 import { t } from 'i18next';
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 
-import { startAppListening } from '..';
-
-export const addWorkflowLoadRequestedListener = () => {
+export const addWorkflowLoadRequestedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: workflowLoadRequested,
     effect: (action, { dispatch, getState }) => {
       const log = logger('nodes');
       const { workflow, asCopy } = action.payload;
-      const nodeTemplates = getState().nodeTemplates.templates;
+      const nodeTemplates = getState().nodes.templates;
 
       try {
-        const { workflow: validatedWorkflow, warnings } = validateWorkflow(
-          workflow,
-          nodeTemplates
-        );
+        const { workflow: validatedWorkflow, warnings } = validateWorkflow(workflow, nodeTemplates);
 
         if (asCopy) {
           // If we're loading a copy, we need to remove the ID so that the backend will create a new workflow
@@ -62,7 +51,6 @@ export const addWorkflowLoadRequestedListener = () => {
           });
         }
 
-        dispatch(setActiveTab('nodes'));
         requestAnimationFrame(() => {
           $flow.get()?.fitView();
         });
@@ -108,10 +96,7 @@ export const addWorkflowLoadRequestedListener = () => {
           );
         } else {
           // Some other error occurred
-          log.error(
-            { error: parseify(e) },
-            t('nodes.unknownErrorValidatingWorkflow')
-          );
+          log.error({ error: parseify(e) }, t('nodes.unknownErrorValidatingWorkflow'));
           dispatch(
             addToast(
               makeToast({

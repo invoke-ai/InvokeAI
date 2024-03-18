@@ -1,28 +1,31 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { stateSelector } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectControlAdapterAll } from 'features/controlAdapters/store/controlAdaptersSlice';
+import {
+  selectControlAdapterAll,
+  selectControlAdaptersSlice,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
 import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
+import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
+import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
+import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
+import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
 import { forEach } from 'lodash-es';
 import { getConnectedEdges } from 'reactflow';
 
 const selector = createMemoizedSelector(
-  [stateSelector, activeTabNameSelector],
-  (
-    {
-      controlAdapters,
-      generation,
-      system,
-      nodes,
-      nodeTemplates,
-      dynamicPrompts,
-    },
-    activeTabName
-  ) => {
+  [
+    selectControlAdaptersSlice,
+    selectGenerationSlice,
+    selectSystemSlice,
+    selectNodesSlice,
+    selectDynamicPromptsSlice,
+    activeTabNameSelector,
+  ],
+  (controlAdapters, generation, system, nodes, dynamicPrompts, activeTabName) => {
     const { initialImage, model, positivePrompt } = generation;
 
     const { isConnected } = system;
@@ -49,7 +52,7 @@ const selector = createMemoizedSelector(
             return;
           }
 
-          const nodeTemplate = nodeTemplates.templates[node.data.type];
+          const nodeTemplate = nodes.templates[node.data.type];
 
           if (!nodeTemplate) {
             // Node type not found
@@ -62,8 +65,7 @@ const selector = createMemoizedSelector(
           forEach(node.data.inputs, (field) => {
             const fieldTemplate = nodeTemplate.inputs[field.name];
             const hasConnection = connectedEdges.some(
-              (edge) =>
-                edge.target === node.id && edge.targetHandle === field.name
+              (edge) => edge.target === node.id && edge.targetHandle === field.name
             );
 
             if (!fieldTemplate) {
@@ -71,11 +73,7 @@ const selector = createMemoizedSelector(
               return;
             }
 
-            if (
-              fieldTemplate.required &&
-              field.value === undefined &&
-              !hasConnection
-            ) {
+            if (fieldTemplate.required && field.value === undefined && !hasConnection) {
               reasons.push(
                 i18n.t('parameters.invoke.missingInputForField', {
                   nodeLabel: node.data.label || nodeTemplate.title,
@@ -88,10 +86,7 @@ const selector = createMemoizedSelector(
         });
       }
     } else {
-      if (
-        dynamicPrompts.prompts.length === 0 &&
-        getShouldProcessPrompt(positivePrompt)
-      ) {
+      if (dynamicPrompts.prompts.length === 0 && getShouldProcessPrompt(positivePrompt)) {
         reasons.push(i18n.t('parameters.invoke.noPrompts'));
       }
 
@@ -110,7 +105,7 @@ const selector = createMemoizedSelector(
               number: i + 1,
             })
           );
-        } else if (ca.model.base_model !== model?.base_model) {
+        } else if (ca.model.base !== model?.base) {
           // This should never happen, just a sanity check
           reasons.push(
             i18n.t('parameters.invoke.incompatibleBaseModelForControlAdapter', {
@@ -121,9 +116,7 @@ const selector = createMemoizedSelector(
 
         if (
           !ca.controlImage ||
-          (isControlNetOrT2IAdapter(ca) &&
-            !ca.processedControlImage &&
-            ca.processorType !== 'none')
+          (isControlNetOrT2IAdapter(ca) && !ca.processedControlImage && ca.processorType !== 'none')
         ) {
           reasons.push(
             i18n.t('parameters.invoke.noControlImageForControlAdapter', {

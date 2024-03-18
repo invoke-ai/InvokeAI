@@ -1,18 +1,14 @@
 import { logger } from 'app/logging/logger';
-import {
-  appSocketSubscribedSession,
-  socketSubscribedSession,
-} from 'services/events/actions';
+import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { socketSubscribedSession } from 'services/events/actions';
 
-import { startAppListening } from '../..';
+const log = logger('socketio');
 
-export const addSocketSubscribedEventListener = () => {
+export const addSocketSubscribedEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketSubscribedSession,
-    effect: (action, { dispatch }) => {
-      const log = logger('socketio');
+    effect: (action) => {
       log.debug(action.payload, 'Subscribed');
-      dispatch(appSocketSubscribedSession(action.payload));
     },
   });
 };

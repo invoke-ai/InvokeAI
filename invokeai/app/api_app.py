@@ -3,6 +3,8 @@
 # values from the command line or config file.
 import sys
 
+from invokeai.app.invocations.model import ModelIdentifierField
+from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.version.invokeai_version import __version__
 
 from .services.config import InvokeAIAppConfig
@@ -17,6 +19,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     import asyncio
     import mimetypes
     import socket
+    from contextlib import asynccontextmanager
     from inspect import signature
     from pathlib import Path
     from typing import Any
@@ -27,8 +30,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     from fastapi.middleware.gzip import GZipMiddleware
     from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
     from fastapi.openapi.utils import get_openapi
-    from fastapi.responses import FileResponse, HTMLResponse
-    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import HTMLResponse
     from fastapi_events.handlers.local import local_handler
     from fastapi_events.middleware import EventHandlerASGIMiddleware
     from pydantic.json_schema import models_json_schema
@@ -38,6 +40,7 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
     # noinspection PyUnresolvedReferences
     import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
     import invokeai.frontend.web as web_dir
+    from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 
     from ..backend.util.logging import InvokeAILogger
     from .api.dependencies import ApiDependencies
@@ -47,20 +50,17 @@ if True:  # hack to make flake8 happy with imports coming after setting up the c
         boards,
         download_queue,
         images,
-        model_records,
-        models,
+        model_manager,
         session_queue,
-        sessions,
         utilities,
         workflows,
     )
     from .api.sockets import SocketIO
     from .invocations.baseinvocation import (
         BaseInvocation,
-        InputFieldJSONSchemaExtra,
-        OutputFieldJSONSchemaExtra,
         UIConfigBase,
     )
+    from .invocations.fields import InputFieldJSONSchemaExtra, OutputFieldJSONSchemaExtra
 
     if is_mps_available():
         import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
@@ -74,9 +74,25 @@ logger = InvokeAILogger.get_logger(config=app_config)
 mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("text/css", ".css")
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Add startup event to load dependencies
+    ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, logger=logger)
+    yield
+    # Shut down threads
+    ApiDependencies.shutdown()
+
+
 # Create the app
 # TODO: create this all in a method so configuration/etc. can be passed in?
-app = FastAPI(title="Invoke AI", docs_url=None, redoc_url=None, separate_input_output_schemas=False)
+app = FastAPI(
+    title="Invoke - Community Edition",
+    docs_url=None,
+    redoc_url=None,
+    separate_input_output_schemas=False,
+    lifespan=lifespan,
+)
 
 # Add event handler
 event_handler_id: int = id(app)
@@ -99,24 +115,9 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
-# Add startup event to load dependencies
-@app.on_event("startup")
-async def startup_event() -> None:
-    ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, logger=logger)
-
-
-# Shut down threads
-@app.on_event("shutdown")
-async def shutdown_event() -> None:
-    ApiDependencies.shutdown()
-
-
 # Include all routers
-app.include_router(sessions.session_router, prefix="/api")
-
 app.include_router(utilities.utilities_router, prefix="/api")
-app.include_router(models.models_router, prefix="/api")
-app.include_router(model_records.model_records_router, prefix="/api")
+app.include_router(model_manager.model_manager_router, prefix="/api")
 app.include_router(download_queue.download_queue_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
 app.include_router(boards.boards_router, prefix="/api")
@@ -154,18 +155,22 @@ def custom_openapi() -> dict[str, Any]:
         # TODO: note that we assume the schema_key here is the TYPE.__name__
         # This could break in some cases, figure out a better way to do it
         output_type_titles[schema_key] = output_schema["title"]
+        openapi_schema["components"]["schemas"][schema_key] = output_schema
+        openapi_schema["components"]["schemas"][schema_key]["class"] = "output"
 
-    # Add Node Editor UI helper schemas
-    ui_config_schemas = models_json_schema(
+    # Some models don't end up in the schemas as standalone definitions
+    additional_schemas = models_json_schema(
         [
             (UIConfigBase, "serialization"),
             (InputFieldJSONSchemaExtra, "serialization"),
             (OutputFieldJSONSchemaExtra, "serialization"),
+            (ModelIdentifierField, "serialization"),
+            (ProgressImage, "serialization"),
         ],
         ref_template="#/components/schemas/{model}",
     )
-    for schema_key, ui_config_schema in ui_config_schemas[1]["$defs"].items():
-        openapi_schema["components"]["schemas"][schema_key] = ui_config_schema
+    for schema_key, schema_json in additional_schemas[1]["$defs"].items():
+        openapi_schema["components"]["schemas"][schema_key] = schema_json
 
     # Add a reference to the output type to additionalProperties of the invoker schema
     for invoker in all_invocations:
@@ -176,23 +181,24 @@ def custom_openapi() -> dict[str, Any]:
         outputs_ref = {"$ref": f"#/components/schemas/{output_type_title}"}
         invoker_schema["output"] = outputs_ref
         invoker_schema["class"] = "invocation"
-        openapi_schema["components"]["schemas"][f"{output_type_title}"]["class"] = "output"
 
-    from invokeai.backend.model_management.models import get_model_config_enums
+    # This code no longer seems to be necessary?
+    # Leave it here just in case
+    #
+    # from invokeai.backend.model_manager import get_model_config_formats
+    # formats = get_model_config_formats()
+    # for model_config_name, enum_set in formats.items():
 
-    for model_config_format_enum in set(get_model_config_enums()):
-        name = model_config_format_enum.__qualname__
+    #     if model_config_name in openapi_schema["components"]["schemas"]:
+    #         # print(f"Config with name {name} already defined")
+    #         continue
 
-        if name in openapi_schema["components"]["schemas"]:
-            # print(f"Config with name {name} already defined")
-            continue
-
-        openapi_schema["components"]["schemas"][name] = {
-            "title": name,
-            "description": "An enumeration.",
-            "type": "string",
-            "enum": [v.value for v in model_config_format_enum],
-        }
+    #     openapi_schema["components"]["schemas"][model_config_name] = {
+    #         "title": model_config_name,
+    #         "description": "An enumeration.",
+    #         "type": "string",
+    #         "enum": [v.value for v in enum_set],
+    #     }
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema
@@ -205,8 +211,8 @@ app.openapi = custom_openapi  # type: ignore [method-assign] # this is a valid a
 def overridden_swagger() -> HTMLResponse:
     return get_swagger_ui_html(
         openapi_url=app.openapi_url,  # type: ignore [arg-type] # this is always a string
-        title=app.title,
-        swagger_favicon_url="/static/docs/favicon.ico",
+        title=f"{app.title} - Swagger UI",
+        swagger_favicon_url="static/docs/invoke-favicon-docs.svg",
     )
 
 
@@ -214,26 +220,20 @@ def overridden_swagger() -> HTMLResponse:
 def overridden_redoc() -> HTMLResponse:
     return get_redoc_html(
         openapi_url=app.openapi_url,  # type: ignore [arg-type] # this is always a string
-        title=app.title,
-        redoc_favicon_url="/static/docs/favicon.ico",
+        title=f"{app.title} - Redoc",
+        redoc_favicon_url="static/docs/invoke-favicon-docs.svg",
     )
 
 
 web_root_path = Path(list(web_dir.__path__)[0])
 
-# Only serve the UI if we it has a build
-if (web_root_path / "dist").exists():
-    # Cannot add headers to StaticFiles, so we must serve index.html with a custom route
-    # Add cache-control: no-store header to prevent caching of index.html, which leads to broken UIs at release
-    @app.get("/", include_in_schema=False, name="ui_root")
-    def get_index() -> FileResponse:
-        return FileResponse(Path(web_root_path, "dist/index.html"), headers={"Cache-Control": "no-store"})
-
-    # # Must mount *after* the other routes else it borks em
-    app.mount("/assets", StaticFiles(directory=Path(web_root_path, "dist/assets/")), name="assets")
-    app.mount("/locales", StaticFiles(directory=Path(web_root_path, "dist/locales/")), name="locales")
-
-app.mount("/static", StaticFiles(directory=Path(web_root_path, "static/")), name="static")  # docs favicon is in here
+try:
+    app.mount("/", NoCacheStaticFiles(directory=Path(web_root_path, "dist"), html=True), name="ui")
+except RuntimeError:
+    logger.warn(f"No UI found at {web_root_path}/dist, skipping UI mount")
+app.mount(
+    "/static", NoCacheStaticFiles(directory=Path(web_root_path, "static/")), name="static"
+)  # docs favicon is in here
 
 
 def invoke_api() -> None:

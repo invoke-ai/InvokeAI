@@ -1,6 +1,7 @@
 """
 initialization file for invokeai
 """
+
 from .invokeai_version import __version__  # noqa: F401
 
 __app_id__ = "invoke-ai/InvokeAI"
