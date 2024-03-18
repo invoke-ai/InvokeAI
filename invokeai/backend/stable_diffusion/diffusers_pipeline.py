@@ -15,9 +15,8 @@ from diffusers.models.controlnet import ControlNetModel
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from diffusers.schedulers import KarrasDiffusionSchedulers
-from diffusers.schedulers.scheduling_utils import SchedulerMixin, SchedulerOutput
+from diffusers.schedulers.scheduling_utils import SchedulerMixin
 from diffusers.utils.import_utils import is_xformers_available
-from diffusers.utils.outputs import BaseOutput
 from pydantic import Field
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
@@ -87,7 +86,7 @@ class AddsMaskGuidance:
     gradient_mask: bool
 
     def __call__(self, latents: torch.Tensor, t: torch.Tensor, conditioning) -> torch.Tensor:
-        return self.apply_mask(latents,t)
+        return self.apply_mask(latents, t)
 
     def apply_mask(self, latents: torch.Tensor, t) -> torch.Tensor:
         batch_size = latents.size(0)
@@ -371,7 +370,9 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             if gradient_mask:
                 latents = torch.where(mask > 0, latents, orig_latents)
             else:
-                latents = torch.lerp(orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype))
+                latents = torch.lerp(
+                    orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype)
+                )
 
         return latents
 
@@ -569,7 +570,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # compute the previous noisy sample x_t -> x_t-1
         step_output = self.scheduler.step(noise_pred, timestep, latents, **conditioning_data.scheduler_args)
-        
+
         return step_output
 
     @staticmethod
