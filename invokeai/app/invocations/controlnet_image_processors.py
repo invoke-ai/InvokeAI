@@ -190,7 +190,12 @@ class CannyImageProcessorInvocation(ImageProcessorInvocation):
 
     def run_processor(self, image):
         canny_processor = CannyDetector()
-        processed_image = canny_processor(image, self.low_threshold, self.high_threshold, image_resolution=self.image_resolution,)
+        processed_image = canny_processor(
+            image,
+            self.low_threshold,
+            self.high_threshold,
+            image_resolution=self.image_resolution,
+        )
         return processed_image
 
 
@@ -290,7 +295,7 @@ class MidasDepthImageProcessorInvocation(ImageProcessorInvocation):
             image,
             a=np.pi * self.a_mult,
             bg_th=self.bg_th,
-            image_resolution=self.image_resolution
+            image_resolution=self.image_resolution,
             # dept_and_normal not supported in controlnet_aux v0.0.3
             # depth_and_normal=self.depth_and_normal,
         )
@@ -426,7 +431,9 @@ class MediapipeFaceProcessorInvocation(ImageProcessorInvocation):
 
     def run_processor(self, image):
         mediapipe_face_processor = MediapipeFaceDetector()
-        processed_image = mediapipe_face_processor(image, max_faces=self.max_faces, min_confidence=self.min_confidence, image_resolution=self.image_resolution)
+        processed_image = mediapipe_face_processor(
+            image, max_faces=self.max_faces, min_confidence=self.min_confidence, image_resolution=self.image_resolution
+        )
         return processed_image
 
 
@@ -508,6 +515,7 @@ class TileResamplerProcessorInvocation(ImageProcessorInvocation):
 )
 class SegmentAnythingProcessorInvocation(ImageProcessorInvocation):
     """Applies segment anything processing to image"""
+
     image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
 
     def run_processor(self, image):
