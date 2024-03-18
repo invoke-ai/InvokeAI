@@ -1,14 +1,12 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
-import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import { useGetDefaultForControlnetProcessor } from 'features/controlAdapters/hooks/useGetDefaultForControlnetProcessor';
 import type { RequiredPidiImageProcessorInvocation } from 'features/controlAdapters/store/types';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './common/ProcessorWrapper';
-
-const DEFAULTS = CONTROLNET_PROCESSORS.pidi_image_processor.default as RequiredPidiImageProcessorInvocation;
 
 type Props = {
   controlNetId: string;
@@ -21,6 +19,8 @@ const PidiProcessor = (props: Props) => {
   const { image_resolution, detect_resolution, scribble, safe } = processorNode;
   const processorChanged = useProcessorNodeChanged();
   const { t } = useTranslation();
+
+  const defaults = useGetDefaultForControlnetProcessor('pidi_image_processor') as RequiredPidiImageProcessorInvocation;
 
   const handleDetectResolutionChanged = useCallback(
     (v: number) => {
@@ -57,7 +57,7 @@ const PidiProcessor = (props: Props) => {
         <CompositeSlider
           value={detect_resolution}
           onChange={handleDetectResolutionChanged}
-          defaultValue={DEFAULTS.detect_resolution}
+          defaultValue={defaults.detect_resolution}
           min={0}
           max={4096}
           marks
@@ -65,7 +65,7 @@ const PidiProcessor = (props: Props) => {
         <CompositeNumberInput
           value={detect_resolution}
           onChange={handleDetectResolutionChanged}
-          defaultValue={DEFAULTS.detect_resolution}
+          defaultValue={defaults.detect_resolution}
           min={0}
           max={4096}
         />
@@ -75,7 +75,7 @@ const PidiProcessor = (props: Props) => {
         <CompositeSlider
           value={image_resolution}
           onChange={handleImageResolutionChanged}
-          defaultValue={DEFAULTS.image_resolution}
+          defaultValue={defaults.image_resolution}
           min={0}
           max={4096}
           marks
@@ -83,7 +83,7 @@ const PidiProcessor = (props: Props) => {
         <CompositeNumberInput
           value={image_resolution}
           onChange={handleImageResolutionChanged}
-          defaultValue={DEFAULTS.image_resolution}
+          defaultValue={defaults.image_resolution}
           min={0}
           max={4096}
         />

@@ -1,7 +1,7 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
-import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import { useGetDefaultForControlnetProcessor } from 'features/controlAdapters/hooks/useGetDefaultForControlnetProcessor';
 import type {
   DepthAnythingModelSize,
   RequiredDepthAnythingImageProcessorInvocation,
@@ -11,9 +11,6 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './common/ProcessorWrapper';
-
-const DEFAULTS = CONTROLNET_PROCESSORS.midas_depth_image_processor
-  .default as RequiredDepthAnythingImageProcessorInvocation;
 
 type Props = {
   controlNetId: string;
@@ -25,8 +22,11 @@ const DepthAnythingProcessor = (props: Props) => {
   const { controlNetId, processorNode, isEnabled } = props;
   const { model_size, resolution } = processorNode;
   const processorChanged = useProcessorNodeChanged();
-
   const { t } = useTranslation();
+
+  const defaults = useGetDefaultForControlnetProcessor(
+    'midas_depth_image_processor'
+  ) as RequiredDepthAnythingImageProcessorInvocation;
 
   const handleModelSizeChange = useCallback<ComboboxOnChange>(
     (v) => {
@@ -68,7 +68,7 @@ const DepthAnythingProcessor = (props: Props) => {
         <FormLabel>{t('controlnet.modelSize')}</FormLabel>
         <Combobox
           value={value}
-          defaultInputValue={DEFAULTS.model_size}
+          defaultInputValue={defaults.model_size}
           options={options}
           onChange={handleModelSizeChange}
         />
@@ -78,7 +78,7 @@ const DepthAnythingProcessor = (props: Props) => {
         <CompositeSlider
           value={resolution}
           onChange={handleResolutionChange}
-          defaultValue={DEFAULTS.resolution}
+          defaultValue={defaults.resolution}
           min={64}
           max={4096}
           step={64}
@@ -88,7 +88,7 @@ const DepthAnythingProcessor = (props: Props) => {
         <CompositeNumberInput
           value={resolution}
           onChange={handleResolutionChange}
-          defaultValue={DEFAULTS.resolution}
+          defaultValue={defaults.resolution}
           min={64}
           max={4096}
           step={64}
