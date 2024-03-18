@@ -80,7 +80,7 @@ export type RequiredCannyImageProcessorInvocation = O.Required<
  */
 export type RequiredColorMapImageProcessorInvocation = O.Required<
   ColorMapImageProcessorInvocation,
-  'type' | 'color_map_tile_size' | 'image_resolution'
+  'type' | 'color_map_tile_size'
 >;
 
 /**
@@ -186,22 +186,22 @@ export type RequiredZoeDepthImageProcessorInvocation = O.Required<ZoeDepthImageP
  */
 export type RequiredControlAdapterProcessorNode =
   | O.Required<
-      | RequiredCannyImageProcessorInvocation
-      | RequiredColorMapImageProcessorInvocation
-      | RequiredContentShuffleImageProcessorInvocation
-      | RequiredDepthAnythingImageProcessorInvocation
-      | RequiredHedImageProcessorInvocation
-      | RequiredLineartAnimeImageProcessorInvocation
-      | RequiredLineartImageProcessorInvocation
-      | RequiredMediapipeFaceProcessorInvocation
-      | RequiredMidasDepthImageProcessorInvocation
-      | RequiredMlsdImageProcessorInvocation
-      | RequiredNormalbaeImageProcessorInvocation
-      | RequiredDWOpenposeImageProcessorInvocation
-      | RequiredPidiImageProcessorInvocation
-      | RequiredZoeDepthImageProcessorInvocation,
-      'id'
-    >
+    | RequiredCannyImageProcessorInvocation
+    | RequiredColorMapImageProcessorInvocation
+    | RequiredContentShuffleImageProcessorInvocation
+    | RequiredDepthAnythingImageProcessorInvocation
+    | RequiredHedImageProcessorInvocation
+    | RequiredLineartAnimeImageProcessorInvocation
+    | RequiredLineartImageProcessorInvocation
+    | RequiredMediapipeFaceProcessorInvocation
+    | RequiredMidasDepthImageProcessorInvocation
+    | RequiredMlsdImageProcessorInvocation
+    | RequiredNormalbaeImageProcessorInvocation
+    | RequiredDWOpenposeImageProcessorInvocation
+    | RequiredPidiImageProcessorInvocation
+    | RequiredZoeDepthImageProcessorInvocation,
+    'id'
+  >
   | { type: 'none' };
 
 export type ControlMode = NonNullable<components['schemas']['ControlNetInvocation']['control_mode']>;
