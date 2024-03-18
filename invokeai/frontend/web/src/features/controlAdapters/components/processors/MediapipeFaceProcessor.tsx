@@ -1,13 +1,11 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
-import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import { useGetDefaultForControlnetProcessor } from 'features/controlAdapters/hooks/useGetDefaultForControlnetProcessor';
 import type { RequiredMediapipeFaceProcessorInvocation } from 'features/controlAdapters/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './common/ProcessorWrapper';
-
-const DEFAULTS = CONTROLNET_PROCESSORS.mediapipe_face_processor.default as RequiredMediapipeFaceProcessorInvocation;
 
 type Props = {
   controlNetId: string;
@@ -17,9 +15,13 @@ type Props = {
 
 const MediapipeFaceProcessor = (props: Props) => {
   const { controlNetId, processorNode, isEnabled } = props;
-  const { max_faces, min_confidence } = processorNode;
+  const { max_faces, min_confidence, image_resolution } = processorNode;
   const processorChanged = useProcessorNodeChanged();
   const { t } = useTranslation();
+
+  const defaults = useGetDefaultForControlnetProcessor(
+    'mediapipe_face_processor'
+  ) as RequiredMediapipeFaceProcessorInvocation;
 
   const handleMaxFacesChanged = useCallback(
     (v: number) => {
@@ -35,6 +37,13 @@ const MediapipeFaceProcessor = (props: Props) => {
     [controlNetId, processorChanged]
   );
 
+  const handleImageResolutionChanged = useCallback(
+    (v: number) => {
+      processorChanged(controlNetId, { image_resolution: v });
+    },
+    [controlNetId, processorChanged]
+  );
+
   return (
     <ProcessorWrapper>
       <FormControl isDisabled={!isEnabled}>
@@ -42,7 +51,7 @@ const MediapipeFaceProcessor = (props: Props) => {
         <CompositeSlider
           value={max_faces}
           onChange={handleMaxFacesChanged}
-          defaultValue={DEFAULTS.max_faces}
+          defaultValue={defaults.max_faces}
           min={1}
           max={20}
           marks
@@ -50,7 +59,7 @@ const MediapipeFaceProcessor = (props: Props) => {
         <CompositeNumberInput
           value={max_faces}
           onChange={handleMaxFacesChanged}
-          defaultValue={DEFAULTS.max_faces}
+          defaultValue={defaults.max_faces}
           min={1}
           max={20}
         />
@@ -60,7 +69,7 @@ const MediapipeFaceProcessor = (props: Props) => {
         <CompositeSlider
           value={min_confidence}
           onChange={handleMinConfidenceChanged}
-          defaultValue={DEFAULTS.min_confidence}
+          defaultValue={defaults.min_confidence}
           min={0}
           max={1}
           step={0.01}
@@ -69,10 +78,28 @@ const MediapipeFaceProcessor = (props: Props) => {
         <CompositeNumberInput
           value={min_confidence}
           onChange={handleMinConfidenceChanged}
-          defaultValue={DEFAULTS.min_confidence}
+          defaultValue={defaults.min_confidence}
           min={0}
           max={1}
           step={0.01}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.imageResolution')}</FormLabel>
+        <CompositeSlider
+          value={image_resolution}
+          onChange={handleImageResolutionChanged}
+          defaultValue={defaults.image_resolution}
+          min={0}
+          max={4096}
+          marks
+        />
+        <CompositeNumberInput
+          value={image_resolution}
+          onChange={handleImageResolutionChanged}
+          defaultValue={defaults.image_resolution}
+          min={0}
+          max={4096}
         />
       </FormControl>
     </ProcessorWrapper>

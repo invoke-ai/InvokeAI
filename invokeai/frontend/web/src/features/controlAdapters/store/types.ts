@@ -72,7 +72,7 @@ export const isControlAdapterProcessorType = (v: unknown): v is ControlAdapterPr
  */
 export type RequiredCannyImageProcessorInvocation = O.Required<
   CannyImageProcessorInvocation,
-  'type' | 'low_threshold' | 'high_threshold'
+  'type' | 'low_threshold' | 'high_threshold' | 'image_resolution'
 >;
 
 /**
@@ -80,7 +80,7 @@ export type RequiredCannyImageProcessorInvocation = O.Required<
  */
 export type RequiredColorMapImageProcessorInvocation = O.Required<
   ColorMapImageProcessorInvocation,
-  'type' | 'color_map_tile_size'
+  'type' | 'color_map_tile_size' | 'image_resolution'
 >;
 
 /**
@@ -133,7 +133,7 @@ export type RequiredLineartImageProcessorInvocation = O.Required<
  */
 export type RequiredMediapipeFaceProcessorInvocation = O.Required<
   MediapipeFaceProcessorInvocation,
-  'type' | 'max_faces' | 'min_confidence'
+  'type' | 'max_faces' | 'min_confidence' | 'image_resolution'
 >;
 
 /**
@@ -141,7 +141,7 @@ export type RequiredMediapipeFaceProcessorInvocation = O.Required<
  */
 export type RequiredMidasDepthImageProcessorInvocation = O.Required<
   MidasDepthImageProcessorInvocation,
-  'type' | 'a_mult' | 'bg_th'
+  'type' | 'a_mult' | 'bg_th' | 'image_resolution'
 >;
 
 /**
