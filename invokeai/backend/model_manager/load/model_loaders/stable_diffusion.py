@@ -4,9 +4,6 @@
 from pathlib import Path
 from typing import Optional
 
-from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
-from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_inpaint import StableDiffusionInpaintPipeline
-
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,
@@ -14,7 +11,7 @@ from invokeai.backend.model_manager import (
     ModelFormat,
     ModelRepoVariant,
     ModelType,
-    ModelVariantType,
+    SchedulerPredictionType,
     SubModelType,
 )
 from invokeai.backend.model_manager.config import CheckpointConfigBase, MainCheckpointConfig
@@ -68,27 +65,31 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
 
     def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Path) -> Path:
         assert isinstance(config, MainCheckpointConfig)
-        variant = config.variant
         base = config.base
-        pipeline_class = (
-            StableDiffusionInpaintPipeline if variant == ModelVariantType.Inpaint else StableDiffusionPipeline
-        )
 
         config_file = config.config_path
+        prediction_type = config.prediction_type.value
+        upcast_attention = config.upcast_attention
+        image_size = (
+            1024
+            if base == BaseModelType.StableDiffusionXL
+            else 768
+            if config.prediction_type == SchedulerPredictionType.VPrediction and base == BaseModelType.StableDiffusion2
+            else 512
+        )
 
         self._logger.info(f"Converting {model_path} to diffusers format")
         convert_ckpt_to_diffusers(
             model_path,
             output_path,
             model_type=self.model_base_to_model_type[base],
-            model_version=base,
-            model_variant=variant,
             original_config_file=self._app_config.root_path / config_file,
             extract_ema=True,
-            scan_needed=True,
-            pipeline_class=pipeline_class,
             from_safetensors=model_path.suffix == ".safetensors",
             precision=self._torch_dtype,
+            prediction_type=prediction_type,
+            image_size=image_size,
+            upcast_attention=upcast_attention,
             load_safety_checker=False,
         )
         return output_path

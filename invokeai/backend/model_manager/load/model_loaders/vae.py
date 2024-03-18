@@ -57,12 +57,12 @@ class VAELoader(GenericDiffusersLoader):
 
         ckpt_config = OmegaConf.load(self._app_config.root_path / config_file)
         assert isinstance(ckpt_config, DictConfig)
-
+        self._logger.info(f"Converting {model_path} to diffusers format")
         vae_model = convert_ldm_vae_to_diffusers(
             checkpoint=checkpoint,
             vae_config=ckpt_config,
             image_size=512,
+            precision=self._torch_dtype,
         )
-        vae_model.to(self._torch_dtype)  # set precision appropriately
         vae_model.save_pretrained(output_path, safe_serialization=True)
         return output_path

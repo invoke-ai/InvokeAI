@@ -492,6 +492,8 @@ class ModelInstallService(ModelInstallServiceBase):
             for cur_base_model in BaseModelType:
                 for cur_model_type in ModelType:
                     models_dir = self._app_config.models_path / Path(cur_base_model.value, cur_model_type.value)
+                    if not models_dir.exists():
+                        continue
                     installed.update(self.scan_directory(models_dir))
             self._logger.info(f"{len(installed)} new models registered; {len(defunct_models)} unregistered")
 
