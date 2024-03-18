@@ -132,8 +132,7 @@ class ModelProbe(object):
 
         format_type = ModelFormat.Diffusers if model_path.is_dir() else ModelFormat.Checkpoint
         model_info = None
-        model_type = fields["type"] if "type" in fields else None
-        model_type = ModelType(model_type) if isinstance(model_type, str) else model_type
+        model_type = ModelType(fields["type"]) if "type" in fields and fields["type"] else None
         if not model_type:
             if format_type is ModelFormat.Diffusers:
                 model_type = cls.get_model_type_from_folder(model_path)

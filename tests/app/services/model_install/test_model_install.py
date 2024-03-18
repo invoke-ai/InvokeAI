@@ -286,15 +286,27 @@ def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: In
 )
 def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, model_params: Dict[str, str]):
     """Test whether or not type is respected on configs when passed to heuristic import."""
-    config: Dict[str, Any] = {
+    assert "name" in model_params and "type" in model_params
+    config1: Dict[str, Any] = {
+        "name": f"{model_params['name']}_1",
         "type": model_params["type"],
+    }
+    config2: Dict[str, Any] = {
+        "name": f"{model_params['name']}_2",
+        "type": ModelType(model_params["type"]),
     }
     try:
         assert "repo_id" in model_params
-        install_job = mm2_installer.heuristic_import(source=model_params["repo_id"], config=config)
+        install_job1 = mm2_installer.heuristic_import(source=model_params["repo_id"], config=config1)
 
-        while not install_job.in_terminal_state:
+        while not install_job1.in_terminal_state:
             sleep(0.01)
-        assert install_job.config_out if model_params["type"] == "embedding" else not install_job.config_out
+        assert install_job1.config_out if model_params["type"] == "embedding" else not install_job1.config_out
+
+        install_job2 = mm2_installer.heuristic_import(source=model_params["repo_id"], config=config2)
+
+        while not install_job2.in_terminal_state:
+            sleep(0.01)
+        assert install_job2.config_out if model_params["type"] == "embedding" else not install_job2.config_out
     except InvalidModelConfigException:
         assert model_params["type"] != "embedding"
