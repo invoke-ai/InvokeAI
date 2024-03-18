@@ -87,26 +87,7 @@ class AddsMaskGuidance:
     gradient_mask: bool
 
     def __call__(self, latents: torch.Tensor, t: torch.Tensor, conditioning) -> torch.Tensor:
-        #output_class = step_output.__class__  # We'll create a new one with masked data.
-
-        # The problem with taking SchedulerOutput instead of the model output is that we're less certain what's in it.
-        # It's reasonable to assume the first thing is prev_sample, but then does it have other things
-        # like pred_original_sample? Should we apply the mask to them too?
-        # But what if there's just some other random field?
-        #prev_sample = step_output[0]
-        # Mask anything that has the same shape as prev_sample, return others as-is.
-        # return output_class(
-        #     {
-        #         k: self.apply_mask(v, self._t_for_field(k, t)) if are_like_tensors(prev_sample, v) else v
-        #         for k, v in step_output.items()
-        #     }
-        # )
         return self.apply_mask(latents,t)
-
-    # def _t_for_field(self, field_name: str, t):
-    #     if field_name == "pred_original_sample":
-    #         return self.scheduler.timesteps[-1]
-    #     return t
 
     def apply_mask(self, latents: torch.Tensor, t) -> torch.Tensor:
         batch_size = latents.size(0)
