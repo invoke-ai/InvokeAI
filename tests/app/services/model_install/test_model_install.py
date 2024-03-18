@@ -298,16 +298,19 @@ def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, mode
         "hash": "placeholder2",
     }
     assert "repo_id" in model_params
-    install_job1 = mm2_installer.heuristic_import(source=model_params["repo_id"], config=config1)
-    mm2_installer.wait_for_installs(timeout=20)
-    if model_params["type"] != "embedding":
-        assert install_job1.errored
-        assert install_job1.error_type == "InvalidModelConfigException"
-        return
-    assert install_job1.complete
-    assert install_job1.config_out if model_params["type"] == "embedding" else not install_job1.config_out
+    try:
+        install_job1 = mm2_installer.heuristic_import(source=model_params["repo_id"], config=config1)
+        mm2_installer.wait_for_installs(timeout=20)
+        if model_params["type"] != "embedding":
+            assert install_job1.errored
+            assert install_job1.error_type == "InvalidModelConfigException"
+            return
+        assert install_job1.complete
+        assert install_job1.config_out if model_params["type"] == "embedding" else not install_job1.config_out
 
-    install_job2 = mm2_installer.heuristic_import(source=model_params["repo_id"], config=config2)
-    mm2_installer.wait_for_installs(timeout=20)
-    assert install_job2.complete
-    assert install_job2.config_out if model_params["type"] == "embedding" else not install_job2.config_out
+        install_job2 = mm2_installer.heuristic_import(source=model_params["repo_id"], config=config2)
+        mm2_installer.wait_for_installs(timeout=20)
+        assert install_job2.complete
+        assert install_job2.config_out if model_params["type"] == "embedding" else not install_job2.config_out
+    except InvalidModelConfigException:
+        assert model_params["type"] != "embedding"
