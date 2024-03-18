@@ -411,6 +411,8 @@ def get_config() -> InvokeAIAppConfig:
     # CLI args trump environment variables
     if root := getattr(args, "root", None):
         config.set_root(Path(root))
+    if ignore_missing_core_models := getattr(args, "ignore_missing_core_models", None):
+        config.ignore_missing_core_models = ignore_missing_core_models
 
     # TODO(psyche): This shouldn't be wrapped in a try/catch. The configuration script imports a number of classes
     # from throughout the app, which in turn call get_config(). At that time, there may not be a config file to
