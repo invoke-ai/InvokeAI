@@ -8,19 +8,19 @@ from invokeai.app.services.config import InvokeAIAppConfig
 
 
 # TODO(psyche): Should this also check for things like ESRGAN models, database, etc?
-def validate_root_structure(config: InvokeAIAppConfig) -> None:
+def validate_directories(config: InvokeAIAppConfig) -> None:
     assert config.db_path.parent.exists(), f"{config.db_path.parent} not found"
     assert config.models_path.exists(), f"{config.models_path} not found"
 
 
-def check_invokeai_root(config: InvokeAIAppConfig):
+def check_directories(config: InvokeAIAppConfig):
     try:
-        validate_root_structure(config)
+        validate_directories(config)
     except Exception as e:
         print()
         print(f"An exception has occurred: {str(e)}")
         print("== STARTUP ABORTED ==")
-        print("** One or more necessary files is missing from your InvokeAI root directory **")
+        print("** One or more necessary files is missing from your InvokeAI directories **")
         print("** Please rerun the configuration script to fix this problem. **")
         print("** From the launcher, selection option [6]. **")
         print(

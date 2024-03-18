@@ -233,9 +233,9 @@ def invoke_api() -> None:
             else:
                 return port
 
-    from invokeai.backend.install.check_root import check_invokeai_root
+    from invokeai.backend.install.check_root import check_directories
 
-    check_invokeai_root(app_config)  # note, may exit with an exception if root not set up
+    check_directories(app_config)  # note, may exit with an exception if root not set up
 
     if app_config.dev_reload:
         try:
