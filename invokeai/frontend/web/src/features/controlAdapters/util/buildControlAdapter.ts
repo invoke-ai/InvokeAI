@@ -21,7 +21,7 @@ export const initialControlNet: Omit<ControlNetConfig, 'id'> = {
   controlImage: null,
   processedControlImage: null,
   processorType: 'canny_image_processor',
-  processorNode: CONTROLNET_PROCESSORS.canny_image_processor.default as RequiredCannyImageProcessorInvocation,
+  processorNode: CONTROLNET_PROCESSORS.canny_image_processor.buildDefaults() as RequiredCannyImageProcessorInvocation,
   shouldAutoConfig: true,
 };
 
@@ -36,7 +36,7 @@ export const initialT2IAdapter: Omit<T2IAdapterConfig, 'id'> = {
   controlImage: null,
   processedControlImage: null,
   processorType: 'canny_image_processor',
-  processorNode: CONTROLNET_PROCESSORS.canny_image_processor.default as RequiredCannyImageProcessorInvocation,
+  processorNode: CONTROLNET_PROCESSORS.canny_image_processor.buildDefaults() as RequiredCannyImageProcessorInvocation,
   shouldAutoConfig: true,
 };
 
