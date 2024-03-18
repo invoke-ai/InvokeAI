@@ -9,8 +9,6 @@ import invokeai.backend.util.logging as logger
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.util.devices import choose_torch_device
 
-config = get_config()
-
 
 def norm_img(np_img):
     if len(np_img.shape) == 2:

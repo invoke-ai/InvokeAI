@@ -10,8 +10,6 @@ import numpy as np
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config.config_default import get_config
 
-config = get_config()
-
 
 class PatchMatch:
     """
@@ -28,7 +26,7 @@ class PatchMatch:
     def _load_patch_match(self):
         if self.tried_load:
             return
-        if config.patchmatch:
+        if get_config().patchmatch:
             from patchmatch import patch_match as pm
 
             if pm.patchmatch_available:
