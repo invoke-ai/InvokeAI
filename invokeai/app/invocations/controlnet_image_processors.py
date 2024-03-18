@@ -404,11 +404,9 @@ class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation):
 class ZoeDepthImageProcessorInvocation(ImageProcessorInvocation):
     """Applies Zoe depth processing to image"""
 
-    image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
-
     def run_processor(self, image):
         zoe_depth_processor = ZoeDetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = zoe_depth_processor(image, image_resolution=self.image_resolution)
+        processed_image = zoe_depth_processor(image)
         return processed_image
 
 
