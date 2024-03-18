@@ -174,7 +174,6 @@ const buildHandlers: BuildMetadataHandlers = ({
 
 export const handlers = {
   // Misc
-  createdBy: buildHandlers({ getLabel: () => t('metadata.createdBy'), parser: parsers.createdBy }),
   generationMode: buildHandlers({ getLabel: () => t('metadata.generationMode'), parser: parsers.generationMode }),
 
   // Core parameters
