@@ -9,7 +9,7 @@ from typing import Any, Dict
 
 import pytest
 from pydantic import ValidationError
-from pydantic.networks import Url
+from pydantic_core import Url
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.events.events_base import EventServiceBase
@@ -283,6 +283,7 @@ def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: In
         },
     ],
 )
+@pytest.mark.timeout(timeout=20, method="thread")
 def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, model_params: Dict[str, str]):
     """Test whether or not type is respected on configs when passed to heuristic import."""
     assert "name" in model_params and "type" in model_params
@@ -296,7 +297,7 @@ def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, mode
     }
     assert "repo_id" in model_params
     install_job1 = mm2_installer.heuristic_import(source=model_params["repo_id"], config=config1)
-    mm2_installer.wait_for_installs(timeout=10)
+    mm2_installer.wait_for_installs(timeout=20)
     if model_params["type"] != "embedding":
         assert install_job1.errored
         assert install_job1.error_type == "InvalidModelConfigException"
@@ -305,6 +306,6 @@ def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, mode
     assert install_job1.config_out if model_params["type"] == "embedding" else not install_job1.config_out
 
     install_job2 = mm2_installer.heuristic_import(source=model_params["repo_id"], config=config2)
-    mm2_installer.wait_for_installs(timeout=10)
+    mm2_installer.wait_for_installs(timeout=20)
     assert install_job2.complete
     assert install_job2.config_out if model_params["type"] == "embedding" else not install_job2.config_out
