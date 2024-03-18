@@ -328,7 +328,7 @@ class ModelInstallService(ModelInstallServiceBase):
         yaml_path.rename(yaml_path.with_suffix(".yaml.bak"))
 
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
-        self._cached_model_paths = {Path(x.path).absolute() for x in self.record_store.all_models()}
+        self._cached_model_paths = {Path(x.path).resolve() for x in self.record_store.all_models()}
         callback = self._scan_install if install else self._scan_register
         search = ModelSearch(on_model_found=callback)
         self._models_installed.clear()
@@ -342,7 +342,7 @@ class ModelInstallService(ModelInstallServiceBase):
         """Unregister the model. Delete its files only if they are within our models directory."""
         model = self.record_store.get_model(key)
         models_dir = self.app_config.models_path
-        model_path = models_dir / Path(model.path) # handle legacy relative model paths
+        model_path = models_dir / Path(model.path)  # handle legacy relative model paths
         if model_path.is_relative_to(models_dir):
             self.unconditionally_delete(key)
         else:
@@ -492,6 +492,8 @@ class ModelInstallService(ModelInstallServiceBase):
             for cur_base_model in BaseModelType:
                 for cur_model_type in ModelType:
                     models_dir = self._app_config.models_path / Path(cur_base_model.value, cur_model_type.value)
+                    if not models_dir.exists():
+                        continue
                     installed.update(self.scan_directory(models_dir))
             self._logger.info(f"{len(installed)} new models registered; {len(defunct_models)} unregistered")
 
@@ -518,7 +520,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         new_path = models_dir / model.base.value / model.type.value / old_path.name
 
-        if old_path == new_path:
+        if old_path == new_path or new_path.exists() and old_path == new_path.resolve():
             return model
 
         self._logger.info(f"Moving {model.name} to {new_path}.")
