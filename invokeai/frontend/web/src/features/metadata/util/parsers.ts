@@ -108,8 +108,6 @@ const getProperty = <T = unknown>(
   });
 };
 
-const parseCreatedBy: MetadataParseFunc<string> = (metadata) => getProperty(metadata, 'created_by', isString);
-
 const parseGenerationMode: MetadataParseFunc<string> = (metadata) => getProperty(metadata, 'generation_mode', isString);
 
 const parsePositivePrompt: MetadataParseFunc<ParameterPositivePrompt> = (metadata) =>
@@ -391,7 +389,6 @@ const parseAllIPAdapters: MetadataParseFunc<IPAdapterConfigMetadata[]> = async (
 };
 
 export const parsers = {
-  createdBy: parseCreatedBy,
   generationMode: parseGenerationMode,
   positivePrompt: parsePositivePrompt,
   negativePrompt: parseNegativePrompt,
