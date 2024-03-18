@@ -86,26 +86,27 @@ class AddsMaskGuidance:
     noise: torch.Tensor
     gradient_mask: bool
 
-    def __call__(self, step_output: Union[BaseOutput, SchedulerOutput], t: torch.Tensor, conditioning) -> BaseOutput:
-        output_class = step_output.__class__  # We'll create a new one with masked data.
+    def __call__(self, latents: torch.Tensor, t: torch.Tensor, conditioning) -> torch.Tensor:
+        #output_class = step_output.__class__  # We'll create a new one with masked data.
 
         # The problem with taking SchedulerOutput instead of the model output is that we're less certain what's in it.
         # It's reasonable to assume the first thing is prev_sample, but then does it have other things
         # like pred_original_sample? Should we apply the mask to them too?
         # But what if there's just some other random field?
-        prev_sample = step_output[0]
+        #prev_sample = step_output[0]
         # Mask anything that has the same shape as prev_sample, return others as-is.
-        return output_class(
-            {
-                k: self.apply_mask(v, self._t_for_field(k, t)) if are_like_tensors(prev_sample, v) else v
-                for k, v in step_output.items()
-            }
-        )
+        # return output_class(
+        #     {
+        #         k: self.apply_mask(v, self._t_for_field(k, t)) if are_like_tensors(prev_sample, v) else v
+        #         for k, v in step_output.items()
+        #     }
+        # )
+        return self.apply_mask(latents,t)
 
-    def _t_for_field(self, field_name: str, t):
-        if field_name == "pred_original_sample":
-            return self.scheduler.timesteps[-1]
-        return t
+    # def _t_for_field(self, field_name: str, t):
+    #     if field_name == "pred_original_sample":
+    #         return self.scheduler.timesteps[-1]
+    #     return t
 
     def apply_mask(self, latents: torch.Tensor, t) -> torch.Tensor:
         batch_size = latents.size(0)
@@ -383,9 +384,13 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         finally:
             self.invokeai_diffuser.model_forward_callback = self._unet_forward
 
-        # restore unmasked part
-        if mask is not None and not gradient_mask:
-            latents = torch.lerp(orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype))
+        # restore unmasked part after the last step is completed
+        # in-process masking happens before each step
+        if mask is not None:
+            if gradient_mask:
+                latents = torch.where(mask > 0, latents, orig_latents)
+            else:
+                latents = torch.lerp(orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype))
 
         return latents
 
@@ -490,6 +495,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if additional_guidance is None:
             additional_guidance = []
 
+        # one day we will expand this extension point, but for now it just does denoise masking
+        for guidance in additional_guidance:
+            latents = guidance(latents, timestep, conditioning_data)
+
         # TODO: should this scaling happen here or inside self._unet_forward?
         #     i.e. before or after passing it to InvokeAIDiffuserComponent
         latent_model_input = self.scheduler.scale_model_input(latents, timestep)
@@ -579,23 +588,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # compute the previous noisy sample x_t -> x_t-1
         step_output = self.scheduler.step(noise_pred, timestep, latents, **conditioning_data.scheduler_args)
-
-        # TODO: issue to diffusers?
-        # undo internal counter increment done by scheduler.step, so timestep can be resolved as before call
-        # this needed to be able call scheduler.add_noise with current timestep
-        if self.scheduler.order == 2:
-            self.scheduler._index_counter[timestep.item()] -= 1
-
-        # TODO: this additional_guidance extension point feels redundant with InvokeAIDiffusionComponent.
-        #    But the way things are now, scheduler runs _after_ that, so there was
-        #    no way to use it to apply an operation that happens after the last scheduler.step.
-        for guidance in additional_guidance:
-            step_output = guidance(step_output, timestep, conditioning_data)
-
-        # restore internal counter
-        if self.scheduler.order == 2:
-            self.scheduler._index_counter[timestep.item()] += 1
-
+        
         return step_output
 
     @staticmethod
