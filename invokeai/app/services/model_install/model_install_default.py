@@ -133,6 +133,10 @@ class ModelInstallService(ModelInstallServiceBase):
             self._download_cache.clear()
             self._running = False
 
+    def _put_in_queue(self, job: ModelInstallJob) -> None:
+        if not self._stop_event.is_set():
+            self._install_queue.put(job)
+
     def register_path(
         self,
         model_path: Union[Path, str],
@@ -218,7 +222,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         if isinstance(source, LocalModelSource):
             install_job = self._import_local_model(source, config)
-            self._install_queue.put(install_job)  # synchronously install
+            self._put_in_queue(install_job)  # synchronously install
         elif isinstance(source, HFModelSource):
             install_job = self._import_from_hf(source, config)
         elif isinstance(source, URLModelSource):
@@ -788,7 +792,7 @@ class ModelInstallService(ModelInstallServiceBase):
             # are there any more active jobs left in this task?
             if install_job.downloading and all(x.complete for x in install_job.download_parts):
                 install_job.status = InstallStatus.DOWNLOADS_DONE
-                self._install_queue.put(install_job)
+                self._put_in_queue(install_job)
 
             # Let other threads know that the number of downloads has changed
             self._downloads_changed_event.set()
@@ -830,7 +834,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         if all(x.in_terminal_state for x in install_job.download_parts):
             # When all parts have reached their terminal state, we finalize the job to clean up the temporary directory and other resources
-            self._install_queue.put(install_job)
+            self._put_in_queue(install_job)
 
     # ------------------------------------------------------------------------------------------------
     # Internal methods that put events on the event bus
