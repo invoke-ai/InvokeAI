@@ -25,7 +25,7 @@ from npyscreen import widget
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.services.model_install import ModelInstallServiceBase
-from invokeai.backend.install.check_root import validate_directories
+from invokeai.backend.install.check_directories import validate_directories
 from invokeai.backend.install.install_helper import InstallHelper, InstallSelections, UnifiedModelInfo
 from invokeai.backend.model_manager import ModelType
 from invokeai.backend.util import choose_precision, choose_torch_device
