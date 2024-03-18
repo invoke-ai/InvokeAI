@@ -186,22 +186,22 @@ export type RequiredZoeDepthImageProcessorInvocation = O.Required<ZoeDepthImageP
  */
 export type RequiredControlAdapterProcessorNode =
   | O.Required<
-    | RequiredCannyImageProcessorInvocation
-    | RequiredColorMapImageProcessorInvocation
-    | RequiredContentShuffleImageProcessorInvocation
-    | RequiredDepthAnythingImageProcessorInvocation
-    | RequiredHedImageProcessorInvocation
-    | RequiredLineartAnimeImageProcessorInvocation
-    | RequiredLineartImageProcessorInvocation
-    | RequiredMediapipeFaceProcessorInvocation
-    | RequiredMidasDepthImageProcessorInvocation
-    | RequiredMlsdImageProcessorInvocation
-    | RequiredNormalbaeImageProcessorInvocation
-    | RequiredDWOpenposeImageProcessorInvocation
-    | RequiredPidiImageProcessorInvocation
-    | RequiredZoeDepthImageProcessorInvocation,
-    'id'
-  >
+      | RequiredCannyImageProcessorInvocation
+      | RequiredColorMapImageProcessorInvocation
+      | RequiredContentShuffleImageProcessorInvocation
+      | RequiredDepthAnythingImageProcessorInvocation
+      | RequiredHedImageProcessorInvocation
+      | RequiredLineartAnimeImageProcessorInvocation
+      | RequiredLineartImageProcessorInvocation
+      | RequiredMediapipeFaceProcessorInvocation
+      | RequiredMidasDepthImageProcessorInvocation
+      | RequiredMlsdImageProcessorInvocation
+      | RequiredNormalbaeImageProcessorInvocation
+      | RequiredDWOpenposeImageProcessorInvocation
+      | RequiredPidiImageProcessorInvocation
+      | RequiredZoeDepthImageProcessorInvocation,
+      'id'
+    >
   | { type: 'none' };
 
 export type ControlMode = NonNullable<components['schemas']['ControlNetInvocation']['control_mode']>;
