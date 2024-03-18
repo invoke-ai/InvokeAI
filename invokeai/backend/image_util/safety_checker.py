@@ -14,8 +14,6 @@ from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.util.devices import choose_torch_device
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
-config = get_config()
-
 CHECKER_PATH = "core/convert/stable-diffusion-safety-checker"
 
 
@@ -34,8 +32,8 @@ class SafetyChecker:
             return
 
         try:
-            cls.safety_checker = StableDiffusionSafetyChecker.from_pretrained(config.models_path / CHECKER_PATH)
-            cls.feature_extractor = AutoFeatureExtractor.from_pretrained(config.models_path / CHECKER_PATH)
+            cls.safety_checker = StableDiffusionSafetyChecker.from_pretrained(get_config().models_path / CHECKER_PATH)
+            cls.feature_extractor = AutoFeatureExtractor.from_pretrained(get_config().models_path / CHECKER_PATH)
             logger.info("NSFW checker initialized")
         except Exception as e:
             logger.warning(f"Could not load NSFW checker: {str(e)}")
