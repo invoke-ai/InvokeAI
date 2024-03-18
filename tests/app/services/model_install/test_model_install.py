@@ -5,7 +5,6 @@ Test the model installer
 import platform
 import uuid
 from pathlib import Path
-from time import sleep
 from typing import Any, Dict
 
 import pytest
@@ -300,7 +299,7 @@ def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, mode
     mm2_installer.wait_for_installs(timeout=10)
     if model_params["type"] != "embedding":
         assert install_job1.errored
-        assert install_job1.error_type == 'InvalidModelConfigException'
+        assert install_job1.error_type == "InvalidModelConfigException"
         return
     assert install_job1.complete
     assert install_job1.config_out if model_params["type"] == "embedding" else not install_job1.config_out
