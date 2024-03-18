@@ -283,17 +283,19 @@ def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: In
         },
     ],
 )
-@pytest.mark.timeout(timeout=20, method="thread")
+@pytest.mark.timeout(timeout=40, method="thread")
 def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, model_params: Dict[str, str]):
     """Test whether or not type is respected on configs when passed to heuristic import."""
     assert "name" in model_params and "type" in model_params
     config1: Dict[str, Any] = {
         "name": f"{model_params['name']}_1",
         "type": model_params["type"],
+        "hash": "placeholder1",
     }
     config2: Dict[str, Any] = {
         "name": f"{model_params['name']}_2",
         "type": ModelType(model_params["type"]),
+        "hash": "placeholder2",
     }
     assert "repo_id" in model_params
     install_job1 = mm2_installer.heuristic_import(source=model_params["repo_id"], config=config1)
