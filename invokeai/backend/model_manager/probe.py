@@ -138,7 +138,7 @@ class ModelProbe(object):
                 model_type = cls.get_model_type_from_folder(model_path)
             else:
                 model_type = cls.get_model_type_from_checkpoint(model_path)
-            format_type = ModelFormat.ONNX if model_type == ModelType.ONNX else format_type
+        format_type = ModelFormat.ONNX if model_type == ModelType.ONNX else format_type
 
         probe_class = cls.PROBES[format_type].get(model_type)
         if not probe_class:
