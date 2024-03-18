@@ -14,6 +14,7 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MaskField,
     OutputField,
     UIComponent,
 )
@@ -405,7 +406,17 @@ class ColorInvocation(BaseInvocation):
 
 # endregion
 
+
 # region Conditioning
+
+
+@invocation_output("mask_output")
+class MaskOutput(BaseInvocationOutput):
+    """A torch mask tensor."""
+
+    mask: MaskField = OutputField(description="The mask.")
+    width: int = OutputField(description="The width of the mask in pixels.")
+    height: int = OutputField(description="The height of the mask in pixels.")
 
 
 @invocation_output("conditioning_output")

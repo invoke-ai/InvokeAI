@@ -1,7 +1,5 @@
-import dataclasses
-import inspect
-from dataclasses import dataclass, field
-from typing import Any, List, Optional, Union
+from dataclasses import dataclass
+from typing import List, Optional, Union
 
 import torch
 
@@ -10,6 +8,10 @@ from .cross_attention_control import Arguments
 
 @dataclass
 class ExtraConditioningInfo:
+    """Extra conditioning information produced by Compel.
+    This is used for prompt-to-prompt cross-attention control (a.k.a. `.swap()` in Compel).
+    """
+
     tokens_count_including_eos_bos: int
     cross_attention_control_args: Optional[Arguments] = None
 
@@ -20,6 +22,8 @@ class ExtraConditioningInfo:
 
 @dataclass
 class BasicConditioningInfo:
+    """SD 1/2 text conditioning information produced by Compel."""
+
     embeds: torch.Tensor
     extra_conditioning: Optional[ExtraConditioningInfo]
 
@@ -35,6 +39,8 @@ class ConditioningFieldData:
 
 @dataclass
 class SDXLConditioningInfo(BasicConditioningInfo):
+    """SDXL text conditioning information produced by Compel."""
+
     pooled_embeds: torch.Tensor
     add_time_ids: torch.Tensor
 
@@ -57,37 +63,52 @@ class IPAdapterConditioningInfo:
 
 
 @dataclass
-class ConditioningData:
-    unconditioned_embeddings: BasicConditioningInfo
-    text_embeddings: BasicConditioningInfo
-    """
-    Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
-    `guidance_scale` is defined as `w` of equation 2. of [Imagen Paper](https://arxiv.org/pdf/2205.11487.pdf).
-    Guidance scale is enabled by setting `guidance_scale > 1`. Higher guidance scale encourages to generate
-    images that are closely linked to the text `prompt`, usually at the expense of lower image quality.
-    """
-    guidance_scale: Union[float, List[float]]
-    """ for models trained using zero-terminal SNR ("ztsnr"), it's suggested to use guidance_rescale_multiplier of 0.7 .
-     ref [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/pdf/2305.08891.pdf)
-    """
-    guidance_rescale_multiplier: float = 0
-    scheduler_args: dict[str, Any] = field(default_factory=dict)
+class Range:
+    start: int
+    end: int
 
-    ip_adapter_conditioning: Optional[list[IPAdapterConditioningInfo]] = None
 
-    @property
-    def dtype(self):
-        return self.text_embeddings.dtype
+class TextConditioningRegions:
+    def __init__(
+        self,
+        masks: torch.Tensor,
+        ranges: list[Range],
+    ):
+        # A binary mask indicating the regions of the image that the prompt should be applied to.
+        # Shape: (1, num_prompts, height, width)
+        # Dtype: torch.bool
+        self.masks = masks
 
-    def add_scheduler_args_if_applicable(self, scheduler, **kwargs):
-        scheduler_args = dict(self.scheduler_args)
-        step_method = inspect.signature(scheduler.step)
-        for name, value in kwargs.items():
-            try:
-                step_method.bind_partial(**{name: value})
-            except TypeError:
-                # FIXME: don't silently discard arguments
-                pass  # debug("%s does not accept argument named %r", scheduler, name)
-            else:
-                scheduler_args[name] = value
-        return dataclasses.replace(self, scheduler_args=scheduler_args)
+        # A list of ranges indicating the start and end indices of the embeddings that corresponding mask applies to.
+        # ranges[i] contains the embedding range for the i'th prompt / mask.
+        self.ranges = ranges
+
+        assert self.masks.shape[1] == len(self.ranges)
+
+
+class TextConditioningData:
+    def __init__(
+        self,
+        uncond_text: Union[BasicConditioningInfo, SDXLConditioningInfo],
+        cond_text: Union[BasicConditioningInfo, SDXLConditioningInfo],
+        uncond_regions: Optional[TextConditioningRegions],
+        cond_regions: Optional[TextConditioningRegions],
+        guidance_scale: Union[float, List[float]],
+        guidance_rescale_multiplier: float = 0,
+    ):
+        self.uncond_text = uncond_text
+        self.cond_text = cond_text
+        self.uncond_regions = uncond_regions
+        self.cond_regions = cond_regions
+        # Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
+        # `guidance_scale` is defined as `w` of equation 2. of [Imagen Paper](https://arxiv.org/pdf/2205.11487.pdf).
+        # Guidance scale is enabled by setting `guidance_scale > 1`. Higher guidance scale encourages to generate
+        # images that are closely linked to the text `prompt`, usually at the expense of lower image quality.
+        self.guidance_scale = guidance_scale
+        # For models trained using zero-terminal SNR ("ztsnr"), it's suggested to use guidance_rescale_multiplier of 0.7.
+        # See [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/pdf/2305.08891.pdf).
+        self.guidance_rescale_multiplier = guidance_rescale_multiplier
+
+    def is_sdxl(self):
+        assert isinstance(self.uncond_text, SDXLConditioningInfo) == isinstance(self.cond_text, SDXLConditioningInfo)
+        return isinstance(self.cond_text, SDXLConditioningInfo)
