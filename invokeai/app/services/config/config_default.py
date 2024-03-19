@@ -15,6 +15,8 @@ import yaml
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+import invokeai.configs as model_configs
+from invokeai.app.util.hf_login import hf_login
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
@@ -418,9 +420,17 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
 
 @lru_cache(maxsize=1)
 def get_config() -> InvokeAIAppConfig:
-    """Return the global singleton app config.
+    """Get the global singleton app config.
 
-    When called, this function will parse the CLI args and merge in config from the `invokeai.yaml` config file.
+    When first called, this function:
+    - Creates a config object. `pydantic-settings` handles merging of settings from environment variables, but not the init file.
+    - Retrieves any provided CLI args from the InvokeAIArgs class. It does not _parse_ the CLI args; that is done in the main entrypoint.
+    - Sets the root dir, if provided via CLI args.
+    - Logs in to HF if there is no valid token already.
+    - Copies all legacy configs to the legacy conf dir (needed for conversion from ckpt to diffusers).
+    - Reads and merges in settings from the config file if it exists, else writes out a default config file.
+
+    On subsequent calls, the object is returned from the cache.
     """
     config = InvokeAIAppConfig()
 
@@ -429,21 +439,17 @@ def get_config() -> InvokeAIAppConfig:
     # CLI args trump environment variables
     if root := getattr(args, "root", None):
         config.set_root(Path(root))
-    if ignore_missing_core_models := getattr(args, "ignore_missing_core_models", None):
-        config.ignore_missing_core_models = ignore_missing_core_models
 
-    # TODO(psyche): This shouldn't be wrapped in a try/catch. The configuration script imports a number of classes
-    # from throughout the app, which in turn call get_config(). At that time, there may not be a config file to
-    # read from, and this raises.
-    #
-    # Once we move all* model installation to the web app, the configure script will not be reaching into the main app
-    # and we can make this an unhandled error, which feels correct.
-    #
-    # *all user-facing models. Core model installation will still be handled by the configure/install script.
+    # Log in to HF
+    hf_login()
 
-    try:
+    # Copy all legacy configs - We know `__path__[0]` is correct here
+    configs_src = Path(model_configs.__path__[0])  # pyright: ignore [reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
+    shutil.copytree(configs_src, config.legacy_conf_path, dirs_exist_ok=True)
+
+    if config.init_file_path.exists():
         config.merge_from_file()
-    except FileNotFoundError:
-        pass
+    else:
+        config.write_file(config.init_file_path)
 
     return config
