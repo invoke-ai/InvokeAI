@@ -27,6 +27,9 @@ type GetModelConfigsResponse = NonNullable<
   paths['/api/v2/models/']['get']['responses']['200']['content']['application/json']
 >;
 
+export type GetStarterModelsResponse =
+  paths['/api/v2/models/starter_models']['get']['responses']['200']['content']['application/json'];
+
 type DeleteModelArg = {
   key: string;
 };
@@ -259,6 +262,9 @@ export const modelsApi = api.injectEndpoints({
         });
       },
     }),
+    getStarterModels: build.query<GetStarterModelsResponse, void>({
+      query: () => buildModelsUrl('starter_models'),
+    }),
   }),
 });
 
@@ -277,4 +283,5 @@ export const {
   useListModelInstallsQuery,
   useCancelModelInstallMutation,
   usePruneCompletedModelInstallsMutation,
+  useGetStarterModelsQuery,
 } = modelsApi;

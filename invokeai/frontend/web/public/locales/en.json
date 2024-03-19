@@ -688,6 +688,7 @@
         "settings": "Settings",
         "simpleModelPlaceholder": "URL or path to a local file or diffusers folder",
         "source": "Source",
+        "starterModels": "Starter Models",
         "syncModels": "Sync Models",
         "triggerPhrases": "Trigger Phrases",
         "loraTriggerPhrases": "LoRA Trigger Phrases",
