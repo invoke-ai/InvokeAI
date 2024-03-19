@@ -298,9 +298,6 @@ def mm2_session(embedding_file: Path, diffusers_dir: Path) -> Session:
             headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(RepoHFMetadata1)},
         ),
     )
-
-    with open(embedding_file, "rb") as f:
-        data = f.read()  # file is small - just 15K
     sess.mount(
         "https://huggingface.co/api/models/InvokeAI-test/textual_inversion_tests?blobs=True",
         TestAdapter(
