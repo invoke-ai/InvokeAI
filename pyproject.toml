@@ -79,6 +79,8 @@ dependencies = [
   "picklescan",
   "pillow",
   "prompt-toolkit",
+  # This fork allows Ctrl + C to interrupt the password input. It is pending merge to the original package.
+  "pwinput@https://github.com/binbash23/pwinput/archive/24af675b08b9916486239e59a37f63d58b694ca8.zip",
   "pympler~=1.0.1",
   "pypatchmatch",
   'pyperclip',
