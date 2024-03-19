@@ -248,7 +248,7 @@ class InvokeAIAppConfig(BaseSettings):
             file.write("# Internal metadata - do not edit:\n")
             file.write(yaml.dump(meta_dict, sort_keys=False))
             file.write("\n")
-            file.write("# Put user settings here:\n")
+            file.write("# Put user settings here - see https://invoke-ai.github.io/InvokeAI/features/CONFIGURATION/:\n")
             if len(config_dict) > 0:
                 file.write(yaml.dump(config_dict, sort_keys=False))
 
