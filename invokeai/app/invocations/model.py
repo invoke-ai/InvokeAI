@@ -98,7 +98,7 @@ class ModelLoaderOutput(UNetOutput, CLIPOutput, VAEOutput):
     title="Main Model",
     tags=["model"],
     category="model",
-    version="1.0.1",
+    version="1.0.2",
 )
 class MainModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
@@ -134,7 +134,7 @@ class LoRALoaderOutput(BaseInvocationOutput):
     clip: Optional[CLIPField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
 
 
-@invocation("lora_loader", title="LoRA", tags=["model"], category="model", version="1.0.1")
+@invocation("lora_loader", title="LoRA", tags=["model"], category="model", version="1.0.2")
 class LoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
@@ -204,7 +204,7 @@ class SDXLLoRALoaderOutput(BaseInvocationOutput):
     title="SDXL LoRA",
     tags=["lora", "model"],
     category="model",
-    version="1.0.1",
+    version="1.0.2",
 )
 class SDXLLoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
@@ -279,7 +279,7 @@ class SDXLLoRALoaderInvocation(BaseInvocation):
         return output
 
 
-@invocation("vae_loader", title="VAE", tags=["vae", "model"], category="model", version="1.0.1")
+@invocation("vae_loader", title="VAE", tags=["vae", "model"], category="model", version="1.0.2")
 class VAELoaderInvocation(BaseInvocation):
     """Loads a VAE model, outputting a VaeLoaderOutput"""
 
@@ -309,7 +309,7 @@ class SeamlessModeOutput(BaseInvocationOutput):
     title="Seamless",
     tags=["seamless", "model"],
     category="model",
-    version="1.0.0",
+    version="1.0.1",
 )
 class SeamlessModeInvocation(BaseInvocation):
     """Applies the seamless transformation to the Model UNet and VAE."""
@@ -349,7 +349,7 @@ class SeamlessModeInvocation(BaseInvocation):
         return SeamlessModeOutput(unet=unet, vae=vae)
 
 
-@invocation("freeu", title="FreeU", tags=["freeu"], category="unet", version="1.0.0")
+@invocation("freeu", title="FreeU", tags=["freeu"], category="unet", version="1.0.1")
 class FreeUInvocation(BaseInvocation):
     """
     Applies FreeU to the UNet. Suggested values (b1/b2/s1/s2):

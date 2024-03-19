@@ -81,7 +81,7 @@ class NoiseOutput(BaseInvocationOutput):
     title="Noise",
     tags=["latents", "noise"],
     category="latents",
-    version="1.0.1",
+    version="1.0.2",
 )
 class NoiseInvocation(BaseInvocation):
     """Generates latent noise."""

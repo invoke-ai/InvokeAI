@@ -27,7 +27,7 @@ class StringPosNegOutput(BaseInvocationOutput):
     title="String Split Negative",
     tags=["string", "split", "negative"],
     category="string",
-    version="1.0.0",
+    version="1.0.1",
 )
 class StringSplitNegInvocation(BaseInvocation):
     """Splits string into two strings, inside [] goes into negative string everthing else goes into positive string. Each [ and ] character is replaced with a space"""
@@ -69,7 +69,7 @@ class String2Output(BaseInvocationOutput):
     string_2: str = OutputField(description="string 2")
 
 
-@invocation("string_split", title="String Split", tags=["string", "split"], category="string", version="1.0.0")
+@invocation("string_split", title="String Split", tags=["string", "split"], category="string", version="1.0.1")
 class StringSplitInvocation(BaseInvocation):
     """Splits string into two strings, based on the first occurance of the delimiter. The delimiter will be removed from the string"""
 
@@ -89,7 +89,7 @@ class StringSplitInvocation(BaseInvocation):
         return String2Output(string_1=part1, string_2=part2)
 
 
-@invocation("string_join", title="String Join", tags=["string", "join"], category="string", version="1.0.0")
+@invocation("string_join", title="String Join", tags=["string", "join"], category="string", version="1.0.1")
 class StringJoinInvocation(BaseInvocation):
     """Joins string left to string right"""
 
@@ -100,7 +100,7 @@ class StringJoinInvocation(BaseInvocation):
         return StringOutput(value=((self.string_left or "") + (self.string_right or "")))
 
 
-@invocation("string_join_three", title="String Join Three", tags=["string", "join"], category="string", version="1.0.0")
+@invocation("string_join_three", title="String Join Three", tags=["string", "join"], category="string", version="1.0.1")
 class StringJoinThreeInvocation(BaseInvocation):
     """Joins string left to string middle to string right"""
 
@@ -113,7 +113,7 @@ class StringJoinThreeInvocation(BaseInvocation):
 
 
 @invocation(
-    "string_replace", title="String Replace", tags=["string", "replace", "regex"], category="string", version="1.0.0"
+    "string_replace", title="String Replace", tags=["string", "replace", "regex"], category="string", version="1.0.1"
 )
 class StringReplaceInvocation(BaseInvocation):
     """Replaces the search string with the replace string"""

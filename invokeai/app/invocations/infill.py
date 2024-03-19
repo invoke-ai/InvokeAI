@@ -120,7 +120,7 @@ def tile_fill_missing(im: Image.Image, tile_size: int = 16, seed: Optional[int] 
     return si
 
 
-@invocation("infill_rgba", title="Solid Color Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.1")
+@invocation("infill_rgba", title="Solid Color Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.2")
 class InfillColorInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Infills transparent areas of an image with a solid color"""
 
@@ -143,7 +143,7 @@ class InfillColorInvocation(BaseInvocation, WithMetadata, WithBoard):
         return ImageOutput.build(image_dto)
 
 
-@invocation("infill_tile", title="Tile Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.2")
+@invocation("infill_tile", title="Tile Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.3")
 class InfillTileInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Infills transparent areas of an image with tiles of the image"""
 
@@ -168,7 +168,7 @@ class InfillTileInvocation(BaseInvocation, WithMetadata, WithBoard):
 
 
 @invocation(
-    "infill_patchmatch", title="PatchMatch Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.1"
+    "infill_patchmatch", title="PatchMatch Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.2"
 )
 class InfillPatchMatchInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Infills transparent areas of an image using the PatchMatch algorithm"""
@@ -208,7 +208,7 @@ class InfillPatchMatchInvocation(BaseInvocation, WithMetadata, WithBoard):
         return ImageOutput.build(image_dto)
 
 
-@invocation("infill_lama", title="LaMa Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.1")
+@invocation("infill_lama", title="LaMa Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.2")
 class LaMaInfillInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Infills transparent areas of an image using the LaMa model"""
 
@@ -224,7 +224,7 @@ class LaMaInfillInvocation(BaseInvocation, WithMetadata, WithBoard):
         return ImageOutput.build(image_dto)
 
 
-@invocation("infill_cv2", title="CV2 Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.1")
+@invocation("infill_cv2", title="CV2 Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.2")
 class CV2InfillInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Infills transparent areas of an image using OpenCV Inpainting"""
 
