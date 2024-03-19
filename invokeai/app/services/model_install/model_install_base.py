@@ -114,8 +114,10 @@ class HFModelSource(StringLikeSource):
     def __str__(self) -> str:
         """Return string version of repoid when string rep needed."""
         base: str = self.repo_id
-        base += f":{self.variant or ''}"
-        base += f":{self.subfolder}" if self.subfolder else ""
+        if self.variant:
+            base += f":{self.variant or ''}"
+        if self.subfolder:
+            base += f":{self.subfolder}"
         return base
 
 
