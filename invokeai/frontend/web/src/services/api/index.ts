@@ -26,7 +26,6 @@ export const tagTypes = [
   'NextSessionQueueItem',
   'BatchStatus',
   'InvocationCacheStatus',
-  'Model',
   'ModelConfig',
   'ModelInstalls',
   'T2IAdapterModel',
