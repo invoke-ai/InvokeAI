@@ -5,6 +5,7 @@ import io
 import pathlib
 import shutil
 import traceback
+from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
 from fastapi import Body, Path, Query, Response, UploadFile
@@ -32,6 +33,7 @@ from invokeai.backend.model_manager.config import (
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
 from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
 from invokeai.backend.model_manager.search import ModelSearch
+from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel
 
 from ..dependencies import ApiDependencies
 
@@ -780,3 +782,15 @@ async def convert_model(
 #     except ValueError as e:
 #         raise HTTPException(status_code=400, detail=str(e))
 #     return response
+
+
+@model_manager_router.get("/starter_models", operation_id="get_starter_models", response_model=list[StarterModel])
+async def get_starter_models() -> list[StarterModel]:
+    installed_models = ApiDependencies.invoker.services.model_manager.store.search_by_attr()
+    installed_model_sources = {m.source for m in installed_models}
+    starter_models = deepcopy(STARTER_MODELS)
+    for model in starter_models:
+        if model.source in installed_model_sources:
+            model.is_installed = True
+
+    return starter_models
