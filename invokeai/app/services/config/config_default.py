@@ -32,7 +32,7 @@ ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
 ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
-CONFIG_SCHEMA_VERSION = 4
+CONFIG_SCHEMA_VERSION = "4.0.0"
 
 
 def get_default_ram_cache_size() -> float:
@@ -126,7 +126,7 @@ class InvokeAIAppConfig(BaseSettings):
     # fmt: off
 
     # INTERNAL
-    schema_version:                 int = Field(default=CONFIG_SCHEMA_VERSION, description="Schema version of the config file. This is not a user-configurable setting.")
+    schema_version:                 str = Field(default=CONFIG_SCHEMA_VERSION, description="Schema version of the config file. This is not a user-configurable setting.")
     # This is only used during v3 models.yaml migration
     legacy_models_yaml_path: Optional[Path] = Field(default=None,           description="Path to the legacy models.yaml file. This is not a user-configurable setting.")
 
@@ -223,7 +223,7 @@ class InvokeAIAppConfig(BaseSettings):
             if new_value != current_value:
                 setattr(self, field_name, new_value)
 
-    def write_file(self, dest_path: Path) -> None:
+    def write_file(self, dest_path: Path, as_example: bool = False) -> None:
         """Write the current configuration to file. This will overwrite the existing file.
 
         A `meta` stanza is added to the top of the file, containing metadata about the config file. This is not stored in the config object.
@@ -238,11 +238,16 @@ class InvokeAIAppConfig(BaseSettings):
             # User settings
             config_dict = self.model_dump(
                 mode="json",
-                exclude_unset=True,
-                exclude_defaults=True,
+                exclude_unset=False if as_example else True,
+                exclude_defaults=False if as_example else True,
+                exclude_none=True if as_example else False,
                 exclude={"schema_version", "legacy_models_yaml_path"},
             )
 
+            if as_example:
+                file.write(
+                    "# This is an example file with default and example settings. Use the values here as a baseline.\n\n"
+                )
             file.write("# Internal metadata - do not edit:\n")
             file.write(yaml.dump(meta_dict, sort_keys=False))
             file.write("\n")
@@ -435,6 +440,14 @@ def get_config() -> InvokeAIAppConfig:
         config._root = Path(root)
     if config_file := getattr(args, "config_file", None):
         config._config_file = Path(config_file)
+
+    # Create the example file from a deep copy, with some extra values provided
+    example_config = config.model_copy(deep=True)
+    example_config.remote_api_tokens = [
+        URLRegexTokenPair(url_regex="cool-models.com", token="my_secret_token"),
+        URLRegexTokenPair(url_regex="nifty-models.com", token="some_other_token"),
+    ]
+    example_config.write_file(config.config_file_path.with_suffix(".example.yaml"), as_example=True)
 
     # Log in to HF
     hf_login()
