@@ -1,14 +1,11 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
-import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import { useGetDefaultForControlnetProcessor } from 'features/controlAdapters/hooks/useGetDefaultForControlnetProcessor';
 import type { RequiredContentShuffleImageProcessorInvocation } from 'features/controlAdapters/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './common/ProcessorWrapper';
-
-const DEFAULTS = CONTROLNET_PROCESSORS.content_shuffle_image_processor
-  .default as RequiredContentShuffleImageProcessorInvocation;
 
 type Props = {
   controlNetId: string;
@@ -21,6 +18,10 @@ const ContentShuffleProcessor = (props: Props) => {
   const { image_resolution, detect_resolution, w, h, f } = processorNode;
   const processorChanged = useProcessorNodeChanged();
   const { t } = useTranslation();
+
+  const defaults = useGetDefaultForControlnetProcessor(
+    'content_shuffle_image_processor'
+  ) as RequiredContentShuffleImageProcessorInvocation;
 
   const handleDetectResolutionChanged = useCallback(
     (v: number) => {
@@ -63,7 +64,7 @@ const ContentShuffleProcessor = (props: Props) => {
         <FormLabel>{t('controlnet.detectResolution')}</FormLabel>
         <CompositeSlider
           value={detect_resolution}
-          defaultValue={DEFAULTS.detect_resolution}
+          defaultValue={defaults.detect_resolution}
           onChange={handleDetectResolutionChanged}
           min={0}
           max={4096}
@@ -71,7 +72,7 @@ const ContentShuffleProcessor = (props: Props) => {
         />
         <CompositeNumberInput
           value={detect_resolution}
-          defaultValue={DEFAULTS.detect_resolution}
+          defaultValue={defaults.detect_resolution}
           onChange={handleDetectResolutionChanged}
           min={0}
           max={4096}
@@ -81,7 +82,7 @@ const ContentShuffleProcessor = (props: Props) => {
         <FormLabel>{t('controlnet.imageResolution')}</FormLabel>
         <CompositeSlider
           value={image_resolution}
-          defaultValue={DEFAULTS.image_resolution}
+          defaultValue={defaults.image_resolution}
           onChange={handleImageResolutionChanged}
           min={0}
           max={4096}
@@ -89,7 +90,7 @@ const ContentShuffleProcessor = (props: Props) => {
         />
         <CompositeNumberInput
           value={image_resolution}
-          defaultValue={DEFAULTS.image_resolution}
+          defaultValue={defaults.image_resolution}
           onChange={handleImageResolutionChanged}
           min={0}
           max={4096}
@@ -97,18 +98,18 @@ const ContentShuffleProcessor = (props: Props) => {
       </FormControl>
       <FormControl isDisabled={!isEnabled}>
         <FormLabel>{t('controlnet.w')}</FormLabel>
-        <CompositeSlider value={w} defaultValue={DEFAULTS.w} onChange={handleWChanged} min={0} max={4096} marks />
-        <CompositeNumberInput value={w} defaultValue={DEFAULTS.w} onChange={handleWChanged} min={0} max={4096} />
+        <CompositeSlider value={w} defaultValue={defaults.w} onChange={handleWChanged} min={0} max={4096} marks />
+        <CompositeNumberInput value={w} defaultValue={defaults.w} onChange={handleWChanged} min={0} max={4096} />
       </FormControl>
       <FormControl isDisabled={!isEnabled}>
         <FormLabel>{t('controlnet.h')}</FormLabel>
-        <CompositeSlider value={h} defaultValue={DEFAULTS.h} onChange={handleHChanged} min={0} max={4096} marks />
-        <CompositeNumberInput value={h} defaultValue={DEFAULTS.h} onChange={handleHChanged} min={0} max={4096} />
+        <CompositeSlider value={h} defaultValue={defaults.h} onChange={handleHChanged} min={0} max={4096} marks />
+        <CompositeNumberInput value={h} defaultValue={defaults.h} onChange={handleHChanged} min={0} max={4096} />
       </FormControl>
       <FormControl isDisabled={!isEnabled}>
         <FormLabel>{t('controlnet.f')}</FormLabel>
-        <CompositeSlider value={f} defaultValue={DEFAULTS.f} onChange={handleFChanged} min={0} max={4096} marks />
-        <CompositeNumberInput value={f} defaultValue={DEFAULTS.f} onChange={handleFChanged} min={0} max={4096} />
+        <CompositeSlider value={f} defaultValue={defaults.f} onChange={handleFChanged} min={0} max={4096} marks />
+        <CompositeNumberInput value={f} defaultValue={defaults.f} onChange={handleFChanged} min={0} max={4096} />
       </FormControl>
     </ProcessorWrapper>
   );
