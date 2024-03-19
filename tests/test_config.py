@@ -170,7 +170,7 @@ def test_set_and_resolve_paths():
     """Test setting root and resolving paths based on it."""
     with TemporaryDirectory() as tmpdir:
         config = InvokeAIAppConfig()
-        config.set_root(Path(tmpdir))
+        config._root = Path(tmpdir)
         assert config.models_path == Path(tmpdir).resolve() / "models"
         assert config.db_path == Path(tmpdir).resolve() / "databases" / "invokeai.db"
 

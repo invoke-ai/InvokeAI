@@ -35,7 +35,7 @@ def store(
     datadir: Any,
 ) -> ModelRecordServiceSQL:
     config = InvokeAIAppConfig()
-    config.set_root(datadir)
+    config._root = datadir
     logger = InvokeAILogger.get_logger(config=config)
     db = create_mock_sqlite_database(config, logger)
     return ModelRecordServiceSQL(db)
