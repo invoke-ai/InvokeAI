@@ -36,7 +36,7 @@ export const useAddControlAdapter = (type: ControlAdapterType) => {
     ) {
       const defaultPreprocessor = firstModel.default_settings?.preprocessor;
       const processorType = isControlAdapterProcessorType(defaultPreprocessor) ? defaultPreprocessor : 'none';
-      const processorNode = CONTROLNET_PROCESSORS[processorType].default;
+      const processorNode = CONTROLNET_PROCESSORS[processorType].buildDefaults(baseModel);
       dispatch(
         controlAdapterAdded({
           type,
@@ -55,7 +55,7 @@ export const useAddControlAdapter = (type: ControlAdapterType) => {
         overrides: { model: firstModel },
       })
     );
-  }, [dispatch, firstModel, isDisabled, type]);
+  }, [dispatch, firstModel, isDisabled, type, baseModel]);
 
   return [addControlAdapter, isDisabled] as const;
 };

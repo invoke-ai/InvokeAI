@@ -2,11 +2,9 @@
     "accessibility": {
         "mode": "Mód",
         "uploadImage": "Fénykép feltöltése",
-        "zoomIn": "Nagyítás",
         "nextImage": "Következő kép",
         "previousImage": "Előző kép",
         "menu": "Menü",
-        "zoomOut": "Kicsinyítés",
         "loadMore": "Több betöltése"
     },
     "boards": {
@@ -23,10 +21,8 @@
         "ai": "ai",
         "back": "Vissza",
         "cancel": "Mégsem",
-        "close": "Bezár",
         "or": "vagy",
         "details": "Részletek",
-        "darkMode": "Sötét Mód",
         "error": "Hiba",
         "file": "Fájl",
         "githubLabel": "Github",

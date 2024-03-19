@@ -1,13 +1,11 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
-import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import { useGetDefaultForControlnetProcessor } from 'features/controlAdapters/hooks/useGetDefaultForControlnetProcessor';
 import type { RequiredColorMapImageProcessorInvocation } from 'features/controlAdapters/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './common/ProcessorWrapper';
-
-const DEFAULTS = CONTROLNET_PROCESSORS.color_map_image_processor.default as RequiredColorMapImageProcessorInvocation;
 
 type ColorMapProcessorProps = {
   controlNetId: string;
@@ -20,6 +18,9 @@ const ColorMapProcessor = (props: ColorMapProcessorProps) => {
   const { color_map_tile_size } = processorNode;
   const processorChanged = useProcessorNodeChanged();
   const { t } = useTranslation();
+  const defaults = useGetDefaultForControlnetProcessor(
+    'color_map_image_processor'
+  ) as RequiredColorMapImageProcessorInvocation;
 
   const handleColorMapTileSizeChanged = useCallback(
     (v: number) => {
@@ -34,7 +35,7 @@ const ColorMapProcessor = (props: ColorMapProcessorProps) => {
         <FormLabel>{t('controlnet.colorMapTileSize')}</FormLabel>
         <CompositeSlider
           value={color_map_tile_size}
-          defaultValue={DEFAULTS.color_map_tile_size}
+          defaultValue={defaults.color_map_tile_size}
           onChange={handleColorMapTileSizeChanged}
           min={1}
           max={256}
@@ -43,7 +44,7 @@ const ColorMapProcessor = (props: ColorMapProcessorProps) => {
         />
         <CompositeNumberInput
           value={color_map_tile_size}
-          defaultValue={DEFAULTS.color_map_tile_size}
+          defaultValue={defaults.color_map_tile_size}
           onChange={handleColorMapTileSizeChanged}
           min={1}
           max={4096}

@@ -1,13 +1,11 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
-import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import { useGetDefaultForControlnetProcessor } from 'features/controlAdapters/hooks/useGetDefaultForControlnetProcessor';
 import type { RequiredMlsdImageProcessorInvocation } from 'features/controlAdapters/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './common/ProcessorWrapper';
-
-const DEFAULTS = CONTROLNET_PROCESSORS.mlsd_image_processor.default as RequiredMlsdImageProcessorInvocation;
 
 type Props = {
   controlNetId: string;
@@ -20,6 +18,8 @@ const MlsdImageProcessor = (props: Props) => {
   const { image_resolution, detect_resolution, thr_d, thr_v } = processorNode;
   const processorChanged = useProcessorNodeChanged();
   const { t } = useTranslation();
+
+  const defaults = useGetDefaultForControlnetProcessor('mlsd_image_processor') as RequiredMlsdImageProcessorInvocation;
 
   const handleDetectResolutionChanged = useCallback(
     (v: number) => {
@@ -56,7 +56,7 @@ const MlsdImageProcessor = (props: Props) => {
         <CompositeSlider
           value={detect_resolution}
           onChange={handleDetectResolutionChanged}
-          defaultValue={DEFAULTS.detect_resolution}
+          defaultValue={defaults.detect_resolution}
           min={0}
           max={4096}
           marks={marks0to4096}
@@ -64,7 +64,7 @@ const MlsdImageProcessor = (props: Props) => {
         <CompositeNumberInput
           value={detect_resolution}
           onChange={handleDetectResolutionChanged}
-          defaultValue={DEFAULTS.detect_resolution}
+          defaultValue={defaults.detect_resolution}
           min={0}
           max={4096}
         />
@@ -74,7 +74,7 @@ const MlsdImageProcessor = (props: Props) => {
         <CompositeSlider
           value={image_resolution}
           onChange={handleImageResolutionChanged}
-          defaultValue={DEFAULTS.image_resolution}
+          defaultValue={defaults.image_resolution}
           min={0}
           max={4096}
           marks={marks0to4096}
@@ -82,7 +82,7 @@ const MlsdImageProcessor = (props: Props) => {
         <CompositeNumberInput
           value={image_resolution}
           onChange={handleImageResolutionChanged}
-          defaultValue={DEFAULTS.image_resolution}
+          defaultValue={defaults.image_resolution}
           min={0}
           max={4096}
         />
@@ -92,7 +92,7 @@ const MlsdImageProcessor = (props: Props) => {
         <CompositeSlider
           value={thr_d}
           onChange={handleThrDChanged}
-          defaultValue={DEFAULTS.thr_d}
+          defaultValue={defaults.thr_d}
           min={0}
           max={1}
           step={0.01}
@@ -101,7 +101,7 @@ const MlsdImageProcessor = (props: Props) => {
         <CompositeNumberInput
           value={thr_d}
           onChange={handleThrDChanged}
-          defaultValue={DEFAULTS.thr_d}
+          defaultValue={defaults.thr_d}
           min={0}
           max={1}
           step={0.01}
@@ -112,7 +112,7 @@ const MlsdImageProcessor = (props: Props) => {
         <CompositeSlider
           value={thr_v}
           onChange={handleThrVChanged}
-          defaultValue={DEFAULTS.thr_v}
+          defaultValue={defaults.thr_v}
           min={0}
           max={1}
           step={0.01}
@@ -121,7 +121,7 @@ const MlsdImageProcessor = (props: Props) => {
         <CompositeNumberInput
           value={thr_v}
           onChange={handleThrVChanged}
-          defaultValue={DEFAULTS.thr_v}
+          defaultValue={defaults.thr_v}
           min={0}
           max={1}
           step={0.01}

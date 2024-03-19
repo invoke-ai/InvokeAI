@@ -1,14 +1,11 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
-import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import { useGetDefaultForControlnetProcessor } from 'features/controlAdapters/hooks/useGetDefaultForControlnetProcessor';
 import type { RequiredLineartAnimeImageProcessorInvocation } from 'features/controlAdapters/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './common/ProcessorWrapper';
-
-const DEFAULTS = CONTROLNET_PROCESSORS.lineart_anime_image_processor
-  .default as RequiredLineartAnimeImageProcessorInvocation;
 
 type Props = {
   controlNetId: string;
@@ -21,6 +18,10 @@ const LineartAnimeProcessor = (props: Props) => {
   const { image_resolution, detect_resolution } = processorNode;
   const processorChanged = useProcessorNodeChanged();
   const { t } = useTranslation();
+
+  const defaults = useGetDefaultForControlnetProcessor(
+    'lineart_anime_image_processor'
+  ) as RequiredLineartAnimeImageProcessorInvocation;
 
   const handleDetectResolutionChanged = useCallback(
     (v: number) => {
@@ -42,7 +43,7 @@ const LineartAnimeProcessor = (props: Props) => {
         <FormLabel>{t('controlnet.detectResolution')}</FormLabel>
         <CompositeSlider
           value={detect_resolution}
-          defaultValue={DEFAULTS.detect_resolution}
+          defaultValue={defaults.detect_resolution}
           onChange={handleDetectResolutionChanged}
           min={0}
           max={4096}
@@ -50,7 +51,7 @@ const LineartAnimeProcessor = (props: Props) => {
         />
         <CompositeNumberInput
           value={detect_resolution}
-          defaultValue={DEFAULTS.detect_resolution}
+          defaultValue={defaults.detect_resolution}
           onChange={handleDetectResolutionChanged}
           min={0}
           max={4096}
@@ -61,7 +62,7 @@ const LineartAnimeProcessor = (props: Props) => {
         <CompositeSlider
           value={image_resolution}
           onChange={handleImageResolutionChanged}
-          defaultValue={DEFAULTS.image_resolution}
+          defaultValue={defaults.image_resolution}
           min={0}
           max={4096}
           marks
@@ -69,7 +70,7 @@ const LineartAnimeProcessor = (props: Props) => {
         <CompositeNumberInput
           value={image_resolution}
           onChange={handleImageResolutionChanged}
-          defaultValue={DEFAULTS.image_resolution}
+          defaultValue={defaults.image_resolution}
           min={0}
           max={4096}
         />

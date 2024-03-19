@@ -19,7 +19,6 @@ const ImageMetadataActions = (props: Props) => {
 
   return (
     <>
-      <MetadataItem metadata={metadata} handlers={handlers.createdBy} />
       <MetadataItem metadata={metadata} handlers={handlers.generationMode} />
       <MetadataItem metadata={metadata} handlers={handlers.positivePrompt} direction="column" />
       <MetadataItem metadata={metadata} handlers={handlers.negativePrompt} direction="column" />
