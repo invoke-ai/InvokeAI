@@ -134,7 +134,11 @@ class ModelInstallService(ModelInstallServiceBase):
             self._running = False
 
     def _put_in_queue(self, job: ModelInstallJob) -> None:
-        if not self._stop_event.is_set():
+        print(f'DEBUG: in _put_in_queue({job.id}')
+        if self._stop_event.is_set():
+            self.cancel_job(job)
+        else:
+            print(f'DEBUG: putting {job.id} into the install queue')
             self._install_queue.put(job)
 
     def register_path(
@@ -407,10 +411,11 @@ class ModelInstallService(ModelInstallServiceBase):
                 done = True
                 continue
             try:
+                print(f'DEBUG: _install_next_item() checking for a job to install')
                 job = self._install_queue.get(timeout=1)
             except Empty:
                 continue
-
+            print(f'DEBUG: _install_next_item() got job {job.id}, status={job.status}')
             assert job.local_path is not None
             try:
                 if job.cancelled:
@@ -436,6 +441,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     else:
                         key = self.install_path(job.local_path, job.config_in)
                     job.config_out = self.record_store.get_model(key)
+                    print(f'DEBUG: _install_next_item() signaling completion for job={job.id}, status={job.status}')
                     self._signal_job_completed(job)
 
             except InvalidModelConfigException as excp:
@@ -791,7 +797,9 @@ class ModelInstallService(ModelInstallServiceBase):
 
             # are there any more active jobs left in this task?
             if install_job.downloading and all(x.complete for x in install_job.download_parts):
+                print(f'DEBUG: setting job {install_job.id} to DOWNLOADS_DONE')
                 install_job.status = InstallStatus.DOWNLOADS_DONE
+                print(f'DEBUG: putting {install_job.id} into the install queue')
                 self._put_in_queue(install_job)
 
             # Let other threads know that the number of downloads has changed
