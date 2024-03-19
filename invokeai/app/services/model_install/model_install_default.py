@@ -304,6 +304,10 @@ class ModelInstallService(ModelInstallServiceBase):
             self._app_config.legacy_models_yaml_path or self._app_config.root_path / "configs" / "models.yaml"
         )
 
+        # The old path may be relative to the root path
+        if not legacy_models_yaml_path.exists():
+            legacy_models_yaml_path = Path(self._app_config.root_path, legacy_models_yaml_path)
+
         if legacy_models_yaml_path.exists():
             legacy_models_yaml = yaml.safe_load(legacy_models_yaml_path.read_text())
 

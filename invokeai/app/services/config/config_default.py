@@ -127,6 +127,7 @@ class InvokeAIAppConfig(BaseSettings):
 
     # INTERNAL
     schema_version:                 int = Field(default=CONFIG_SCHEMA_VERSION, description="Schema version of the config file. This is not a user-configurable setting.")
+    # This is only used during v3 models.yaml migration
     legacy_models_yaml_path: Optional[Path] = Field(default=None,           description="Path to the legacy models.yaml file. This is not a user-configurable setting.")
 
     # WEB
@@ -231,11 +232,8 @@ class InvokeAIAppConfig(BaseSettings):
             dest_path: Path to write the config to.
         """
         with open(dest_path, "w") as file:
-            # Meta fields should be written in a separate stanza
+            # Meta fields should be written in a separate stanza - skip legacy_models_yaml_path
             meta_dict = self.model_dump(mode="json", include={"schema_version"})
-            # Only include the legacy_models_yaml_path if it's set
-            if self.legacy_models_yaml_path:
-                meta_dict.update(self.model_dump(mode="json", include={"legacy_models_yaml_path"}))
 
             # User settings
             config_dict = self.model_dump(
