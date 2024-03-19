@@ -36,7 +36,7 @@ from .model import CLIPField
     title="Prompt",
     tags=["prompt", "compel"],
     category="conditioning",
-    version="1.0.1",
+    version="1.1.1",
 )
 class CompelInvocation(BaseInvocation):
     """Parse prompt using compel package to conditioning."""
@@ -232,7 +232,7 @@ class SDXLPromptInvocationBase:
     title="SDXL Prompt",
     tags=["sdxl", "compel", "prompt"],
     category="conditioning",
-    version="1.0.1",
+    version="1.1.1",
 )
 class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     """Parse prompt using compel package to conditioning."""
@@ -325,7 +325,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     title="SDXL Refiner Prompt",
     tags=["sdxl", "compel", "prompt"],
     category="conditioning",
-    version="1.0.1",
+    version="1.1.1",
 )
 class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     """Parse prompt using compel package to conditioning."""
@@ -381,7 +381,7 @@ class CLIPSkipInvocationOutput(BaseInvocationOutput):
     title="CLIP Skip",
     tags=["clipskip", "clip", "skip"],
     category="conditioning",
-    version="1.0.0",
+    version="1.1.0",
 )
 class CLIPSkipInvocation(BaseInvocation):
     """Skip layers in clip text_encoder model."""
