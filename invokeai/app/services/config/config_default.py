@@ -230,6 +230,7 @@ class InvokeAIAppConfig(BaseSettings):
         Args:
             dest_path: Path to write the config to.
         """
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
         with open(dest_path, "w") as file:
             # Meta fields should be written in a separate stanza - skip legacy_models_yaml_path
             meta_dict = self.model_dump(mode="json", include={"schema_version"})
