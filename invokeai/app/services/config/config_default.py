@@ -82,7 +82,6 @@ class InvokeAIAppConfig(BaseSettings):
         ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.
         log_tokenization: Enable logging of parsed prompt tokens.
         patchmatch: Enable patchmatch inpaint code.
-        ignore_missing_core_models: Ignore missing core models on startup. If `True`, the app will attempt to download missing models on startup.
         autoimport_dir: Path to a directory of models files to be imported on startup.
         models_dir: Path to the models directory.
         convert_cache_dir: Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.
@@ -140,7 +139,6 @@ class InvokeAIAppConfig(BaseSettings):
     # MISC FEATURES
     log_tokenization:              bool = Field(default=False,              description="Enable logging of parsed prompt tokens.")
     patchmatch:                    bool = Field(default=True,               description="Enable patchmatch inpaint code.")
-    ignore_missing_core_models:    bool = Field(default=False,              description="Ignore missing core models on startup. If `True`, the app will attempt to download missing models on startup.")
 
     # PATHS
     autoimport_dir:                Path = Field(default=Path("autoimport"), description="Path to a directory of models files to be imported on startup.")
