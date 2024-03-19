@@ -146,7 +146,7 @@ class InvokeAIAppConfig(BaseSettings):
     autoimport_dir:                Path = Field(default=Path("autoimport"), description="Path to a directory of models files to be imported on startup.")
     models_dir:                    Path = Field(default=Path("models"),     description="Path to the models directory.")
     convert_cache_dir:             Path = Field(default=Path("models/.cache"), description="Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.")
-    legacy_conf_dir:               Path = Field(default=Path("configs/stable-diffusion"), description="Path to directory of legacy checkpoint config files.")
+    legacy_conf_dir:               Path = Field(default=Path("configs"), description="Path to directory of legacy checkpoint config files.")
     db_dir:                        Path = Field(default=Path("databases"),  description="Path to InvokeAI databases directory.")
     outputs_dir:                   Path = Field(default=Path("outputs"),    description="Path to directory for outputs.")
     custom_nodes_dir:              Path = Field(default=Path("nodes"),      description="Path to directory for custom nodes.")
