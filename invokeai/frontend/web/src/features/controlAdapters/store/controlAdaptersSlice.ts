@@ -294,7 +294,7 @@ export const controlAdaptersSlice = createSlice({
       }
 
       const processorNode = cloneDeep(
-        CONTROLNET_PROCESSORS[processorType].default
+        CONTROLNET_PROCESSORS[processorType].buildDefaults(cn.model?.base)
       ) as RequiredControlAdapterProcessorNode;
 
       caAdapter.updateOne(state, {

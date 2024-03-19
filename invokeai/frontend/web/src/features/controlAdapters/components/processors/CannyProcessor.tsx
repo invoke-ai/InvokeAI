@@ -1,13 +1,11 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
-import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import { useGetDefaultForControlnetProcessor } from 'features/controlAdapters/hooks/useGetDefaultForControlnetProcessor';
 import type { RequiredCannyImageProcessorInvocation } from 'features/controlAdapters/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './common/ProcessorWrapper';
-
-const DEFAULTS = CONTROLNET_PROCESSORS.canny_image_processor.default as RequiredCannyImageProcessorInvocation;
 
 type CannyProcessorProps = {
   controlNetId: string;
@@ -17,9 +15,12 @@ type CannyProcessorProps = {
 
 const CannyProcessor = (props: CannyProcessorProps) => {
   const { controlNetId, processorNode, isEnabled } = props;
-  const { low_threshold, high_threshold } = processorNode;
+  const { low_threshold, high_threshold, image_resolution } = processorNode;
   const processorChanged = useProcessorNodeChanged();
   const { t } = useTranslation();
+  const defaults = useGetDefaultForControlnetProcessor(
+    'canny_image_processor'
+  ) as RequiredCannyImageProcessorInvocation;
 
   const handleLowThresholdChanged = useCallback(
     (v: number) => {
@@ -35,6 +36,13 @@ const CannyProcessor = (props: CannyProcessorProps) => {
     [controlNetId, processorChanged]
   );
 
+  const handleImageResolutionChanged = useCallback(
+    (v: number) => {
+      processorChanged(controlNetId, { image_resolution: v });
+    },
+    [controlNetId, processorChanged]
+  );
+
   return (
     <ProcessorWrapper>
       <FormControl isDisabled={!isEnabled}>
@@ -42,14 +50,14 @@ const CannyProcessor = (props: CannyProcessorProps) => {
         <CompositeSlider
           value={low_threshold}
           onChange={handleLowThresholdChanged}
-          defaultValue={DEFAULTS.low_threshold}
+          defaultValue={defaults.low_threshold}
           min={0}
           max={255}
         />
         <CompositeNumberInput
           value={low_threshold}
           onChange={handleLowThresholdChanged}
-          defaultValue={DEFAULTS.low_threshold}
+          defaultValue={defaults.low_threshold}
           min={0}
           max={255}
         />
@@ -59,16 +67,34 @@ const CannyProcessor = (props: CannyProcessorProps) => {
         <CompositeSlider
           value={high_threshold}
           onChange={handleHighThresholdChanged}
-          defaultValue={DEFAULTS.high_threshold}
+          defaultValue={defaults.high_threshold}
           min={0}
           max={255}
         />
         <CompositeNumberInput
           value={high_threshold}
           onChange={handleHighThresholdChanged}
-          defaultValue={DEFAULTS.high_threshold}
+          defaultValue={defaults.high_threshold}
           min={0}
           max={255}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.imageResolution')}</FormLabel>
+        <CompositeSlider
+          value={image_resolution}
+          onChange={handleImageResolutionChanged}
+          defaultValue={defaults.image_resolution}
+          min={0}
+          max={4096}
+          marks
+        />
+        <CompositeNumberInput
+          value={image_resolution}
+          onChange={handleImageResolutionChanged}
+          defaultValue={defaults.image_resolution}
+          min={0}
+          max={4096}
         />
       </FormControl>
     </ProcessorWrapper>

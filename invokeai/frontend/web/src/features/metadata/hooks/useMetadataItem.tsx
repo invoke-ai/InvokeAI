@@ -72,5 +72,12 @@ export const useMetadataItem = <T,>(metadata: unknown, handlers: MetadataHandler
     handlers.recall(value, true);
   }, [handlers, value]);
 
-  return { label, isDisabled, value, renderedValue, onRecall };
+  const valueOrNull = useMemo(() => {
+    if (value === MetadataParsePendingToken || value === MetadataParseFailedToken) {
+      return null;
+    }
+    return value;
+  }, [value]);
+
+  return { label, isDisabled, value, renderedValue, onRecall, valueOrNull };
 };
