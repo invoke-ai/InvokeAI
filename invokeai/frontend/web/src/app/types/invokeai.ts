@@ -25,7 +25,8 @@ export type AppFeature =
   | 'prependQueue'
   | 'invocationCache'
   | 'bulkDownload'
-  | 'starterModels';
+  | 'starterModels'
+  | 'hfToken';
 
 /**
  * A disable-able Stable Diffusion feature
