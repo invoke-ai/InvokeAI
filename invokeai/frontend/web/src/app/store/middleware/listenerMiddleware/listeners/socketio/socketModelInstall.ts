@@ -1,5 +1,5 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { api } from 'services/api';
+import { api, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import {
   socketModelInstallCancelled,
@@ -42,7 +42,7 @@ export const addModelInstallEventListener = (startAppListening: AppStartListenin
           return draft;
         })
       );
-      dispatch(api.util.invalidateTags(['Model']));
+      dispatch(api.util.invalidateTags([{ type: 'ModelConfig', id: LIST_TAG }]));
     },
   });
 
