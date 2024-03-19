@@ -78,14 +78,12 @@ class ModelManagerService(ModelManagerServiceBase):
         logger.setLevel(app_config.log_level.upper())
 
         ram_cache = ModelCache(
-            max_cache_size=app_config.ram_cache_size,
-            max_vram_cache_size=app_config.vram_cache_size,
+            max_cache_size=app_config.ram,
+            max_vram_cache_size=app_config.vram,
             logger=logger,
             execution_device=execution_device,
         )
-        convert_cache = ModelConvertCache(
-            cache_path=app_config.models_convert_cache_path, max_size=app_config.convert_cache_size
-        )
+        convert_cache = ModelConvertCache(cache_path=app_config.convert_cache_path, max_size=app_config.convert_cache)
         loader = ModelLoadService(
             app_config=app_config,
             ram_cache=ram_cache,

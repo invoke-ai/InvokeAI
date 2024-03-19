@@ -8,7 +8,7 @@ import torch
 from diffusers import UNet2DConditionModel
 from typing_extensions import TypeAlias
 
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningData,
     ExtraConditioningInfo,
@@ -54,7 +54,7 @@ class InvokeAIDiffuserComponent:
         :param model: the unet model to pass through to cross attention control
         :param model_forward_callback: a lambda with arguments (x, sigma, conditioning_to_apply). will be called repeatedly. most likely, this should simply call model.forward(x, sigma, conditioning)
         """
-        config = InvokeAIAppConfig.get_config()
+        config = get_config()
         self.conditioning = None
         self.model = model
         self.model_forward_callback = model_forward_callback

@@ -88,17 +88,18 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         )
 
         self._logger.info(f"Converting {model_path} to diffusers format")
-        convert_ckpt_to_diffusers(
-            model_path,
-            output_path,
-            model_type=self.model_base_to_model_type[base],
-            original_config_file=self._app_config.root_path / config_file,
-            extract_ema=True,
-            from_safetensors=model_path.suffix == ".safetensors",
-            precision=self._torch_dtype,
-            prediction_type=prediction_type,
-            image_size=image_size,
-            upcast_attention=upcast_attention,
-            load_safety_checker=False,
-        )
+        with open(self._app_config.root_path / config_file, "r") as config_stream:
+            convert_ckpt_to_diffusers(
+                model_path,
+                output_path,
+                model_type=self.model_base_to_model_type[base],
+                original_config_file=config_stream,
+                extract_ema=True,
+                from_safetensors=model_path.suffix == ".safetensors",
+                precision=self._torch_dtype,
+                prediction_type=prediction_type,
+                image_size=image_size,
+                upcast_attention=upcast_attention,
+                load_safety_checker=False,
+            )
         return output_path

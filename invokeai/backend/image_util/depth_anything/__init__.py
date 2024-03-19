@@ -9,14 +9,14 @@ from einops import repeat
 from PIL import Image
 from torchvision.transforms import Compose
 
-from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.image_util.depth_anything.model.dpt import DPT_DINOv2
 from invokeai.backend.image_util.depth_anything.utilities.util import NormalizeImage, PrepareForNet, Resize
 from invokeai.backend.util.devices import choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.util import download_with_progress_bar
 
-config = InvokeAIAppConfig.get_config()
+config = get_config()
 logger = InvokeAILogger.get_logger(config=config)
 
 DEPTH_ANYTHING_MODELS = {

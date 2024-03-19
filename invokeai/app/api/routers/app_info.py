@@ -12,7 +12,6 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.invocations.upscale import ESRGAN_MODELS
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
-from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.patchmatch import PatchMatch
 from invokeai.backend.image_util.safety_checker import SafetyChecker
 from invokeai.backend.util.logging import logging
@@ -114,9 +113,7 @@ async def get_config() -> AppConfig:
     if SafetyChecker.safety_checker_available():
         nsfw_methods.append("nsfw_checker")
 
-    watermarking_methods = []
-    if InvisibleWatermark.invisible_watermark_available():
-        watermarking_methods.append("invisible_watermark")
+    watermarking_methods = ["invisible_watermark"]
 
     return AppConfig(
         infill_methods=infill_methods,

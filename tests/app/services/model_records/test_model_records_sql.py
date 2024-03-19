@@ -34,7 +34,8 @@ from tests.fixtures.sqlite_database import create_mock_sqlite_database
 def store(
     datadir: Any,
 ) -> ModelRecordServiceSQL:
-    config = InvokeAIAppConfig(root=datadir)
+    config = InvokeAIAppConfig()
+    config.set_root(datadir)
     logger = InvokeAILogger.get_logger(config=config)
     db = create_mock_sqlite_database(config, logger)
     return ModelRecordServiceSQL(db)

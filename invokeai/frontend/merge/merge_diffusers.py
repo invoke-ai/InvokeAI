@@ -16,7 +16,7 @@ from typing import List, Optional, Tuple
 import npyscreen
 from npyscreen import widget
 
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import get_config
 from invokeai.app.services.download import DownloadQueueService
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.model_install import ModelInstallService
@@ -32,7 +32,7 @@ from invokeai.backend.model_manager.merge import ModelMerger
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.install.widgets import FloatTitleSlider, SingleSelectColumns, TextBox
 
-config = InvokeAIAppConfig.get_config()
+config = get_config()
 logger = InvokeAILogger.get_logger()
 
 BASE_TYPES = [
@@ -47,7 +47,7 @@ def _parse_args() -> Namespace:
     parser.add_argument(
         "--root_dir",
         type=Path,
-        default=config.root,
+        default=config.root_path,
         help="Path to the invokeai runtime directory",
     )
     parser.add_argument(
@@ -408,7 +408,7 @@ def run_cli(args: Namespace):
 
 
 def get_config_store() -> ModelRecordServiceSQL:
-    output_path = config.output_path
+    output_path = config.outputs_path
     assert output_path is not None
     image_files = DiskImageFileStorage(output_path / "images")
     db = init_db(config=config, logger=InvokeAILogger.get_logger(), image_files=image_files)
@@ -424,9 +424,7 @@ def get_model_merger(record_store: ModelRecordServiceBase) -> ModelMerger:
 def main():
     args = _parse_args()
     if args.root_dir:
-        config.parse_args(["--root", str(args.root_dir)])
-    else:
-        config.parse_args([])
+        config.set_root(Path(args.root_dir))
 
     try:
         if args.front_end:

@@ -11,8 +11,8 @@ from shutil import copyfile, copytree, move, rmtree
 from tempfile import mkdtemp
 from typing import Any, Dict, List, Optional, Set, Union
 
+import yaml
 from huggingface_hub import HfFolder
-from omegaconf import DictConfig, OmegaConf
 from pydantic.networks import AnyHttpUrl
 from requests import Session
 
@@ -279,53 +279,59 @@ class ModelInstallService(ModelInstallServiceBase):
     def sync_to_config(self) -> None:
         """Synchronize models on disk to those in the config record store database."""
         self._scan_models_directory()
-        if autoimport := self._app_config.autoimport_dir:
+        if self._app_config.autoimport_path:
             self._logger.info("Scanning autoimport directory for new models")
-            installed = self.scan_directory(self._app_config.root_path / autoimport)
+            installed = self.scan_directory(self._app_config.autoimport_path)
             self._logger.info(f"{len(installed)} new models registered")
         self._logger.info("Model installer (re)initialized")
 
     def _migrate_yaml(self) -> None:
         db_models = self.record_store.all_models()
-        try:
-            yaml = self._get_yaml()
-        except OSError:
-            return
 
-        yaml_metadata = yaml.pop("__metadata__")
-        yaml_version = yaml_metadata.get("version")
-
-        if yaml_version != "3.0.0":
-            raise ValueError(
-                f"Attempted migration of unsupported `models.yaml` v{yaml_version}. Only v3.0.0 is supported. Exiting."
-            )
-
-        self._logger.info(
-            f"Starting one-time migration of {len(yaml.items())} models from `models.yaml` to database. This may take a few minutes."
+        legacy_models_yaml_path = (
+            self._app_config.legacy_models_yaml_path or self._app_config.root_path / "configs" / "models.yaml"
         )
 
-        if len(db_models) == 0 and len(yaml.items()) != 0:
-            for model_key, stanza in yaml.items():
-                _, _, model_name = str(model_key).split("/")
-                model_path = Path(stanza["path"])
-                if not model_path.is_absolute():
-                    model_path = self._app_config.models_path / model_path
-                model_path = model_path.resolve()
+        if legacy_models_yaml_path.exists():
+            legacy_models_yaml = yaml.safe_load(legacy_models_yaml_path.read_text())
 
-                config: dict[str, Any] = {}
-                config["name"] = model_name
-                config["description"] = stanza.get("description")
-                config["config_path"] = stanza.get("config")
+            yaml_metadata = legacy_models_yaml.pop("__metadata__")
+            yaml_version = yaml_metadata.get("version")
 
-                try:
-                    id = self.register_path(model_path=model_path, config=config)
-                    self._logger.info(f"Migrated {model_name} with id {id}")
-                except Exception as e:
-                    self._logger.warning(f"Model at {model_path} could not be migrated: {e}")
+            if yaml_version != "3.0.0":
+                raise ValueError(
+                    f"Attempted migration of unsupported `models.yaml` v{yaml_version}. Only v3.0.0 is supported. Exiting."
+                )
 
-        # Rename `models.yaml` to `models.yaml.bak` to prevent re-migration
-        yaml_path = self._app_config.model_conf_path
-        yaml_path.rename(yaml_path.with_suffix(".yaml.bak"))
+            self._logger.info(
+                f"Starting one-time migration of {len(legacy_models_yaml.items())} models from {str(legacy_models_yaml_path)}. This may take a few minutes."
+            )
+
+            if len(db_models) == 0 and len(legacy_models_yaml.items()) != 0:
+                for model_key, stanza in legacy_models_yaml.items():
+                    _, _, model_name = str(model_key).split("/")
+                    model_path = Path(stanza["path"])
+                    if not model_path.is_absolute():
+                        model_path = self._app_config.models_path / model_path
+                    model_path = model_path.resolve()
+
+                    config: dict[str, Any] = {}
+                    config["name"] = model_name
+                    config["description"] = stanza.get("description")
+                    config["config_path"] = stanza.get("config")
+
+                    try:
+                        id = self.register_path(model_path=model_path, config=config)
+                        self._logger.info(f"Migrated {model_name} with id {id}")
+                    except Exception as e:
+                        self._logger.warning(f"Model at {model_path} could not be migrated: {e}")
+
+            # Rename `models.yaml` to `models.yaml.bak` to prevent re-migration
+            legacy_models_yaml_path.rename(legacy_models_yaml_path.with_suffix(".yaml.bak"))
+
+        # Remove `legacy_models_yaml_path` from the config file - we are done with it either way
+        self._app_config.legacy_models_yaml_path = None
+        self._app_config.write_file(self._app_config.init_file_path)
 
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
         self._cached_model_paths = {Path(x.path).resolve() for x in self.record_store.all_models()}
@@ -365,7 +371,7 @@ class ModelInstallService(ModelInstallServiceBase):
     ) -> Path:
         """Download the model file located at source to the models cache and return its Path."""
         model_hash = sha256(str(source).encode("utf-8")).hexdigest()[0:32]
-        model_path = self._app_config.models_convert_cache_path / model_hash
+        model_path = self._app_config.convert_cache_path / model_hash
 
         # We expect the cache directory to contain one and only one downloaded file.
         # We don't know the file's name in advance, as it is set by the download
@@ -591,7 +597,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         # add 'main' specific fields
         if isinstance(info, CheckpointConfigBase):
-            legacy_conf = (self.app_config.root_dir / self.app_config.legacy_conf_dir / info.config_path).resolve()
+            legacy_conf = (self.app_config.legacy_conf_path / info.config_path).resolve()
             info.config_path = legacy_conf.as_posix()
         self.record_store.add_model(info)
         return info.key
@@ -601,16 +607,6 @@ class ModelInstallService(ModelInstallServiceBase):
             id = self._next_job_id
             self._next_job_id += 1
         return id
-
-    # --------------------------------------------------------------------------------------------
-    # Internal functions that manage the old yaml config
-    # --------------------------------------------------------------------------------------------
-    def _get_yaml(self) -> DictConfig:
-        """Fetch the models.yaml DictConfig for this installation."""
-        yaml_path = self._app_config.model_conf_path
-        omegaconf = OmegaConf.load(yaml_path)
-        assert isinstance(omegaconf, DictConfig)
-        return omegaconf
 
     @staticmethod
     def _guess_variant() -> Optional[ModelRepoVariant]:

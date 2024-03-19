@@ -181,6 +181,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import get_config
 
 try:
     import syslog
@@ -338,9 +339,8 @@ class InvokeAILogger(object):  # noqa D102
     loggers: Dict[str, logging.Logger] = {}
 
     @classmethod
-    def get_logger(
-        cls, name: str = "InvokeAI", config: InvokeAIAppConfig = InvokeAIAppConfig.get_config()
-    ) -> logging.Logger:  # noqa D102
+    def get_logger(cls, name: str = "InvokeAI", config: Optional[InvokeAIAppConfig] = None) -> logging.Logger:  # noqa D102
+        config = config or get_config()
         if name in cls.loggers:
             return cls.loggers[name]
 

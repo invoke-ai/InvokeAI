@@ -6,7 +6,7 @@ import pathlib
 import numpy as np
 import onnxruntime as ort
 
-from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.util.devices import choose_torch_device
 from invokeai.backend.util.util import download_with_progress_bar
 
@@ -24,7 +24,7 @@ DWPOSE_MODELS = {
     },
 }
 
-config = InvokeAIAppConfig.get_config()
+config = get_config
 
 
 class Wholebody:

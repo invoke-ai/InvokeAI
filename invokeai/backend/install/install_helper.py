@@ -36,7 +36,7 @@ INITIAL_MODELS = "INITIAL_MODELS.yaml"
 def initialize_record_store(app_config: InvokeAIAppConfig) -> ModelRecordServiceBase:
     """Return an initialized ModelConfigRecordServiceBase object."""
     logger = InvokeAILogger.get_logger(config=app_config)
-    image_files = DiskImageFileStorage(f"{app_config.output_path}/images")
+    image_files = DiskImageFileStorage(f"{app_config.outputs_path}/images")
     db = init_db(config=app_config, logger=logger, image_files=image_files)
     obj: ModelRecordServiceBase = ModelRecordServiceSQL(db)
     return obj
@@ -149,7 +149,7 @@ class InstallHelper(object):
         """
         # previously-installed models
         for model in self._installer.record_store.all_models():
-            info = UnifiedModelInfo.parse_obj(model.dict())
+            info = UnifiedModelInfo.model_validate(model.model_dump())
             info.installed = True
             model_key = f"{model.base.value}/{model.type.value}/{model.name}"
             self.all_models[model_key] = info
@@ -183,7 +183,7 @@ class InstallHelper(object):
 
         # previously-installed models
         for model in self._installer.record_store.all_models():
-            info = UnifiedModelInfo.parse_obj(model.dict())
+            info = UnifiedModelInfo.model_validate(model.model_dump())
             info.installed = True
             model_key = f"{model.base.value}/{model.type.value}/{model.name}"
             self.all_models[model_key] = info

@@ -118,7 +118,7 @@ class ModelMerger(object):
         config = self._installer.app_config
         store = self._installer.record_store
         base_models: Set[BaseModelType] = set()
-        variant = None if self._installer.app_config.full_precision else "fp16"
+        variant = None if self._installer.app_config.precision == "float32" else "fp16"
 
         assert (
             len(model_keys) <= 2 or interp == MergeInterpolationMethod.AddDifference

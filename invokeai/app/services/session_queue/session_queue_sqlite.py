@@ -151,7 +151,7 @@ class SqliteSessionQueue(SessionQueueBase):
 
             # TODO: how does this work in a multi-user scenario?
             current_queue_size = self._get_current_queue_size(queue_id)
-            max_queue_size = self.__invoker.services.configuration.get_config().max_queue_size
+            max_queue_size = self.__invoker.services.configuration.max_queue_size
             max_new_queue_items = max_queue_size - current_queue_size
 
             priority = 0

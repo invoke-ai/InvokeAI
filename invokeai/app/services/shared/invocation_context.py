@@ -423,7 +423,7 @@ class ConfigInterface(InvocationContextInterface):
             The app's config.
         """
 
-        return self._services.configuration.get_config()
+        return self._services.configuration
 
 
 class UtilInterface(InvocationContextInterface):

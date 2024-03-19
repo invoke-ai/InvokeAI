@@ -866,7 +866,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 vae.to(dtype=torch.float16)
                 latents = latents.half()
 
-            if self.tiled or context.config.get().tiled_decode:
+            if self.tiled or context.config.get().force_tiled_decode:
                 vae.enable_tiling()
             else:
                 vae.disable_tiling()
