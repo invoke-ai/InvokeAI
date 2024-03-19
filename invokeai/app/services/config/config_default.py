@@ -436,6 +436,11 @@ def get_config() -> InvokeAIAppConfig:
 
     args = InvokeAIArgs.args
 
+    # This flag serves as a proxy for whether the config was retrieved in the context of the full application or not.
+    # If it is False, we should just return a default config and not set the root, log in to HF, etc.
+    if not InvokeAIArgs.did_parse:
+        return config
+
     # CLI args trump environment variables
     if root := getattr(args, "root", None):
         config.set_root(Path(root))
