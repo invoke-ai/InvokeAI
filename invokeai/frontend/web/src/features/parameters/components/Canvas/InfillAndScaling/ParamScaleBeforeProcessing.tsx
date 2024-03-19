@@ -8,19 +8,19 @@ import { selectOptimalDimension } from 'features/parameters/store/generationSlic
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-
 const ParamScaleBeforeProcessing = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const boundingBoxScaleMethod = useAppSelector((s) => s.canvas.boundingBoxScaleMethod);
   const optimalDimension = useAppSelector(selectOptimalDimension);
 
-  const OPTIONS: ComboboxOption[] = useMemo(() => [
-    { label: t('modelManager.none'), value: 'none' },
-    { label: t('common.auto'), value: 'auto' },
-    { label: t('modelManager.manual'), value: 'manual' },
-  ],
-  [t]
+  const OPTIONS: ComboboxOption[] = useMemo(
+    () => [
+      { label: t('modelManager.none'), value: 'none' },
+      { label: t('common.auto'), value: 'auto' },
+      { label: t('modelManager.manual'), value: 'manual' },
+    ],
+    [t]
   );
 
   const onChange = useCallback<ComboboxOnChange>(
@@ -33,7 +33,10 @@ const ParamScaleBeforeProcessing = () => {
     [dispatch, optimalDimension]
   );
 
-  const value = useMemo(() => OPTIONS.find((o) => o.value === boundingBoxScaleMethod), [boundingBoxScaleMethod]);
+  const value = useMemo(
+    () => OPTIONS.find((o) => o.value === boundingBoxScaleMethod),
+    [boundingBoxScaleMethod, OPTIONS]
+  );
 
   return (
     <FormControl>
