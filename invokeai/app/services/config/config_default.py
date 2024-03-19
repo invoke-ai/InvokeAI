@@ -16,7 +16,6 @@ from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 import invokeai.configs as model_configs
-from invokeai.app.util.hf_login import hf_login
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
@@ -448,9 +447,6 @@ def get_config() -> InvokeAIAppConfig:
         URLRegexTokenPair(url_regex="nifty-models.com", token="some_other_token"),
     ]
     example_config.write_file(config.config_file_path.with_suffix(".example.yaml"), as_example=True)
-
-    # Log in to HF
-    hf_login()
 
     # Copy all legacy configs - We know `__path__[0]` is correct here
     configs_src = Path(model_configs.__path__[0])  # pyright: ignore [reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
