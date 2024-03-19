@@ -71,7 +71,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   }, [dispatch]);
 
   useStarterModelsToast();
-  useHFLoginToast()
+  useHFLoginToast();
 
   return (
     <ErrorBoundary onReset={handleReset} FallbackComponent={AppErrorBoundaryFallback}>

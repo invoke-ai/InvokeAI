@@ -67,8 +67,7 @@ const ToastDescription = ({ token_status }: Props) => {
   if (token_status === 'invalid') {
     return (
       <Text fontSize="md">
-        {t('modelManager.hfTokenInvalidErrorMessage')}{' '}
-        {t('modelManager.hfTokenInvalidErrorMessage2')}
+        {t('modelManager.hfTokenInvalidErrorMessage')} {t('modelManager.hfTokenInvalidErrorMessage2')}
         <Button onClick={onClick} variant="link" color="base.50" flexGrow={0}>
           {t('modelManager.modelManager')}.
         </Button>

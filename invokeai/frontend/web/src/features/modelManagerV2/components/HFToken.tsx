@@ -69,10 +69,7 @@ export const HFToken = () => {
           </Button>
         </Flex>
         <FormHelperText>
-          <ExternalLink
-            label={t('modelManager.hfTokenHelperText')}
-            href="https://huggingface.co/settings/tokens"
-          />
+          <ExternalLink label={t('modelManager.hfTokenHelperText')} href="https://huggingface.co/settings/tokens" />
         </FormHelperText>
         <FormErrorMessage>{error}</FormErrorMessage>
       </FormControl>
