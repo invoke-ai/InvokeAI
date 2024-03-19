@@ -36,7 +36,6 @@ class SafetyChecker:
         try:
             cls.safety_checker = StableDiffusionSafetyChecker.from_pretrained(get_config().models_path / CHECKER_PATH)
             cls.feature_extractor = AutoFeatureExtractor.from_pretrained(get_config().models_path / CHECKER_PATH)
-            logger.info("NSFW checker initialized")
         except Exception as e:
             logger.warning(f"Could not load NSFW checker: {str(e)}")
         cls.tried_load = True
