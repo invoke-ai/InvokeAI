@@ -10,6 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal, Optional
 
+import psutil
 import yaml
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -30,6 +31,24 @@ ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
 CONFIG_SCHEMA_VERSION = 4
+
+
+def get_default_ram_cache_size() -> float:
+    """Run a heuristic for the default RAM cache based on installed RAM."""
+
+    # On some machines, psutil.virtual_memory().total gives a value that is slightly less than the actual RAM, so the
+    # limits are set slightly lower than than what we expect the actual RAM to be.
+
+    GB = 1024**3
+    max_ram = psutil.virtual_memory().total / GB
+
+    if max_ram >= 60:
+        return 15.0
+    if max_ram >= 30:
+        return 7.5
+    if max_ram >= 14:
+        return 4.0
+    return 2.1  # 2.1 is just large enough for sd 1.5 ;-)
 
 
 class URLRegexTokenPair(BaseModel):
@@ -147,7 +166,7 @@ class InvokeAIAppConfig(BaseSettings):
     profiles_dir:                  Path = Field(default=Path("profiles"),   description="Path to profiles output directory.")
 
     # CACHE
-    ram:                          float = Field(default=DEFAULT_RAM_CACHE, gt=0, description="Maximum memory amount used by memory model cache for rapid switching (GB).")
+    ram:                          float = Field(default_factory=get_default_ram_cache_size, gt=0, description="Maximum memory amount used by memory model cache for rapid switching (GB).")
     vram:                         float = Field(default=DEFAULT_VRAM_CACHE, ge=0, description="Amount of VRAM reserved for model storage (GB).")
     convert_cache:                float = Field(default=DEFAULT_CONVERT_CACHE, ge=0, description="Maximum size of on-disk converted models cache (GB).")
     lazy_offload:                  bool = Field(default=True,               description="Keep models in VRAM until their space is needed.")
