@@ -34,9 +34,11 @@ class InvokeAIArgs:
     """
 
     args: Optional[Namespace] = None
+    did_parse: bool = False
 
     @staticmethod
     def parse_args() -> Optional[Namespace]:
         """Parse CLI args and store the result."""
         InvokeAIArgs.args = _parser.parse_args()
+        InvokeAIArgs.did_parse = True
         return InvokeAIArgs.args
