@@ -386,6 +386,17 @@ class EventServiceBase:
             },
         )
 
+    def emit_model_install_downloads_done(self, source: str) -> None:
+        """
+        Emit once when all parts are downloaded, but before the probing and registration start.
+
+        :param source: Source of the model; local path, repo_id or url
+        """
+        self.__emit_model_event(
+            event_name="model_install_downloads_done",
+            payload={"source": source},
+        )
+
     def emit_model_install_running(self, source: str) -> None:
         """
         Emit once when an install job becomes active.
