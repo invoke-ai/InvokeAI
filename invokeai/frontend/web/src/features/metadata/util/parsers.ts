@@ -185,7 +185,6 @@ const parseRefinerModel: MetadataParseFunc<ParameterSDXLRefinerModel> = async (m
   const key = await getModelKey(refiner_model, 'main');
   const refinerModelConfig = await fetchModelConfigWithTypeGuard(key, isRefinerMainModelModelConfig);
   const modelIdentifier = zModelIdentifierField.parse(refinerModelConfig);
-  console.log({ modelIdentifier });
   return modelIdentifier;
 };
 
