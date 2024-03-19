@@ -464,8 +464,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
             except (OSError, DuplicateModelException) as excp:
                 job.set_error(excp)
-                with self._lock:
-                    self._signal_job_errored(job)
+                self._signal_job_errored(job)
 
             finally:
                 # if this is an install of a remote file, then clean up the temporary directory
@@ -791,7 +790,7 @@ class ModelInstallService(ModelInstallServiceBase):
             install_job = self._download_cache[download_job.source]
 
             # are there any more active jobs left in this task?
-            if install_job and install_job.downloading and all(x.complete for x in install_job.download_parts):
+            if install_job.downloading and all(x.complete for x in install_job.download_parts):
                 self._signal_job_downloads_done(install_job)
                 self._put_in_queue(install_job)
 
