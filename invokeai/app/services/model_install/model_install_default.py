@@ -134,7 +134,7 @@ class ModelInstallService(ModelInstallServiceBase):
             self._running = False
 
     def _put_in_queue(self, job: ModelInstallJob) -> None:
-        print(f'DEBUG: in _put_in_queue({job.id}')
+        print(f'DEBUG: in _put_in_queue(job={job.id})')
         if self._stop_event.is_set():
             self.cancel_job(job)
         else:
@@ -791,12 +791,12 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _download_complete_callback(self, download_job: DownloadJob) -> None:
         self._logger.info(f"{download_job.source}: model download complete")
+        print(f'DEBUG: _download_complete_callback(download_job={download_job.source}')
         with self._lock:
-            install_job = self._download_cache[download_job.source]
-            self._download_cache.pop(download_job.source, None)
-
+            install_job = self._download_cache.pop(download_job.source, None)
+            print(f'DEBUG: download_job={download_job.source} / install_job={install_job}')
             # are there any more active jobs left in this task?
-            if install_job.downloading and all(x.complete for x in install_job.download_parts):
+            if install_job and install_job.downloading and all(x.complete for x in install_job.download_parts):
                 print(f'DEBUG: setting job {install_job.id} to DOWNLOADS_DONE')
                 install_job.status = InstallStatus.DOWNLOADS_DONE
                 print(f'DEBUG: putting {install_job.id} into the install queue')
