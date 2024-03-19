@@ -3,14 +3,16 @@ from typing import Optional
 
 from invokeai.version import __version__
 
-_root_help = r"""Sets a root directory for the app.
-If omitted, the app will search for the root directory in the following order:
+_root_help = r"""Path to the runtime root directory. If omitted, the app will search for the root directory in the following order:
 - The `$INVOKEAI_ROOT` environment variable
 - The currently active virtual environment's parent directory
 - `$HOME/invokeai`"""
 
+_config_file_help = r"""Path to the invokeai.yaml configuration file. If omitted, the app will search for the file in the root directory."""
+
 _parser = ArgumentParser(description="Invoke Studio", formatter_class=RawTextHelpFormatter)
 _parser.add_argument("--root", type=str, help=_root_help)
+_parser.add_argument("--config", dest="config_file", type=str, help=_config_file_help)
 _parser.add_argument("--version", action="version", version=__version__, help="Displays the version and exits.")
 
 

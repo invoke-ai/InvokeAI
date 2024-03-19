@@ -121,6 +121,7 @@ class InvokeAIAppConfig(BaseSettings):
     """
 
     _root: Optional[Path] = PrivateAttr(default=None)
+    _config_file: Optional[Path] = PrivateAttr(default=None)
 
     # fmt: off
 
@@ -251,24 +252,6 @@ class InvokeAIAppConfig(BaseSettings):
             if len(config_dict) > 0:
                 file.write(yaml.dump(config_dict, sort_keys=False))
 
-    def merge_from_file(self, source_path: Optional[Path] = None) -> None:
-        """Read the config from the `invokeai.yaml` file, migrating it if necessary and merging it into the singleton config.
-
-        This function will write to the `invokeai.yaml` file if the config is migrated.
-
-        Args:
-            source_path: Path to the config file. If not provided, the default path is used.
-        """
-        path = source_path or self.init_file_path
-        config_from_file = load_and_migrate_config(path)
-        # Clobbering here will overwrite any settings that were set via environment variables
-        self.update_config(config_from_file, clobber=False)
-
-    def set_root(self, root: Path) -> None:
-        """Set the runtime root directory. This is typically set using a CLI arg."""
-        assert isinstance(root, Path)
-        self._root = root
-
     def _resolve(self, partial_path: Path) -> Path:
         return (self.root_path / partial_path).resolve()
 
@@ -283,9 +266,9 @@ class InvokeAIAppConfig(BaseSettings):
         return root.resolve()
 
     @property
-    def init_file_path(self) -> Path:
+    def config_file_path(self) -> Path:
         """Path to invokeai.yaml, resolved to an absolute path.."""
-        resolved_path = self._resolve(INIT_FILE)
+        resolved_path = self._resolve(self._config_file or INIT_FILE)
         assert resolved_path is not None
         return resolved_path
 
@@ -441,9 +424,11 @@ def get_config() -> InvokeAIAppConfig:
     if not InvokeAIArgs.did_parse:
         return config
 
-    # CLI args trump environment variables
+    # Set CLI args
     if root := getattr(args, "root", None):
-        config.set_root(Path(root))
+        config._root = Path(root)
+    if config_file := getattr(args, "config_file", None):
+        config._config_file = Path(config_file)
 
     # Log in to HF
     hf_login()
@@ -452,9 +437,11 @@ def get_config() -> InvokeAIAppConfig:
     configs_src = Path(model_configs.__path__[0])  # pyright: ignore [reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
     shutil.copytree(configs_src, config.legacy_conf_path, dirs_exist_ok=True)
 
-    if config.init_file_path.exists():
-        config.merge_from_file()
+    if config.config_file_path.exists():
+        incoming_config = load_and_migrate_config(config.config_file_path)
+        # Clobbering here will overwrite any settings that were set via environment variables
+        config.update_config(incoming_config, clobber=False)
     else:
-        config.write_file(config.init_file_path)
+        config.write_file(config.config_file_path)
 
     return config
