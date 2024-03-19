@@ -796,6 +796,12 @@ async def get_starter_models() -> list[StarterModel]:
     for model in starter_models:
         if model.source in installed_model_sources:
             model.is_installed = True
+        # Remove already-installed dependencies
+        missing_deps: list[str] = []
+        for dep in model.dependencies or []:
+            if dep not in installed_model_sources:
+                missing_deps.append(dep)
+        model.dependencies = missing_deps
 
     return starter_models
 
