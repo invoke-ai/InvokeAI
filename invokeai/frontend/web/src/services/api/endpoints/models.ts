@@ -273,6 +273,7 @@ export const modelsApi = api.injectEndpoints({
     }),
     getStarterModels: build.query<GetStarterModelsResponse, void>({
       query: () => buildModelsUrl('starter_models'),
+      providesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
     }),
     getHFTokenStatus: build.query<GetHFTokenStatusResponse, void>({
       query: () => buildModelsUrl('hf_login'),
