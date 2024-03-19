@@ -395,7 +395,8 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
         # This is a v3 config file, attempt to migrate it
         shutil.copy(config_path, config_path.with_suffix(".yaml.bak"))
         try:
-            config = migrate_v3_config_dict(loaded_config_dict)
+            # This could be the wrong shape, but we will catch all exceptions below
+            config = migrate_v3_config_dict(loaded_config_dict)  # pyright: ignore [reportUnknownArgumentType]
         except Exception as e:
             shutil.copy(config_path.with_suffix(".yaml.bak"), config_path)
             raise RuntimeError(f"Failed to load and migrate v3 config file {config_path}: {e}") from e
