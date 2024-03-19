@@ -73,7 +73,7 @@ dependencies = [
   "easing-functions",
   "einops",
   "facexlib",
-  "matplotlib",                            # needed for plotting of Penner easing functions
+  "matplotlib",       # needed for plotting of Penner easing functions
   "npyscreen",
   "omegaconf",
   "picklescan",
@@ -127,27 +127,8 @@ dependencies = [
 ]
 
 [project.scripts]
-
-# legacy entrypoints; provided for backwards compatibility
-"configure_invokeai.py" = "invokeai.frontend.install.invokeai_configure:run_configure"
-"textual_inversion.py" = "invokeai.frontend.training:invokeai_textual_inversion"
-
-# shortcut commands to start web ui
-# "invokeai --web" will launch the web interface
-# "invokeai" = "invokeai.frontend.legacy_launch_invokeai:main"
-
-# new shortcut to launch web interface
 "invokeai-web" = "invokeai.app.run_app:run_app"
-
-# full commands
-"invokeai-configure" = "invokeai.frontend.install.invokeai_configure:run_configure"
-"invokeai-merge" = "invokeai.frontend.merge.merge_diffusers:main"
-"invokeai-ti" = "invokeai.frontend.training:invokeai_textual_inversion"
-"invokeai-model-install" = "invokeai.frontend.install.model_install:main"
-"invokeai-model-install2" = "invokeai.frontend.install.model_install2:main"              # will eventually be renamed to invokeai-model-install
-"invokeai-migrate3" = "invokeai.backend.install.migrate_to_3:main"
 "invokeai-update" = "invokeai.frontend.install.invokeai_update:main"
-"invokeai-metadata" = "invokeai.backend.image_util.invoke_metadata:main"
 "invokeai-import-images" = "invokeai.frontend.install.import_images:main"
 "invokeai-db-maintenance" = "invokeai.backend.util.db_maintenance:main"
 
@@ -191,7 +172,7 @@ version = { attr = "invokeai.version.__version__" }
 addopts = "--cov-report term --cov-report html --cov-report xml --strict-markers -m \"not slow\""
 markers = [
   "slow: Marks tests as slow. Disabled by default. To run all tests, use -m \"\". To run only slow tests, use -m \"slow\".",
-  "timeout: Marks the timeout override."
+  "timeout: Marks the timeout override.",
 ]
 [tool.coverage.run]
 branch = true
