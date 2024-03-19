@@ -44,11 +44,20 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         load_class = self.get_hf_load_class(model_path, submodel_type)
         variant = model_variant.value if model_variant else None
         model_path = model_path / submodel_type.value
-        result: AnyModel = load_class.from_pretrained(
-            model_path,
-            torch_dtype=self._torch_dtype,
-            variant=variant,
-        )  # type: ignore
+        try:
+            result: AnyModel = load_class.from_pretrained(
+                model_path,
+                torch_dtype=self._torch_dtype,
+                variant=variant,
+            )
+        except OSError as e:
+            if variant and "no file named" in str(
+                e
+            ):  # try without the variant, just in case user's preferences changed
+                result = load_class.from_pretrained(model_path, torch_dtype=self._torch_dtype)
+            else:
+                raise e
+
         return result
 
     def _needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool:
