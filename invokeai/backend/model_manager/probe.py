@@ -178,13 +178,14 @@ class ModelProbe(object):
             fields["type"] in [ModelType.Main, ModelType.ControlNet, ModelType.VAE]
             and fields["format"] is ModelFormat.Checkpoint
         ):
-            fields["config_path"] = cls._get_checkpoint_config_path(
+            ckpt_config_path = cls._get_checkpoint_config_path(
                 model_path,
                 model_type=fields["type"],
                 base_type=fields["base"],
                 variant_type=fields["variant"],
                 prediction_type=fields["prediction_type"],
-            ).as_posix()
+            )
+            fields["config_path"] = str(ckpt_config_path)
 
         # additional fields needed for main non-checkpoint models
         elif fields["type"] == ModelType.Main and fields["format"] in [
@@ -298,23 +299,23 @@ class ModelProbe(object):
             config_file = LEGACY_CONFIGS[base_type][variant_type]
             if isinstance(config_file, dict):  # need another tier for sd-2.x models
                 config_file = config_file[prediction_type]
+            config_file = f"stable-diffusion/{config_file}"
         elif model_type is ModelType.ControlNet:
             config_file = (
-                "../controlnet/cldm_v15.yaml"
+                "controlnet/cldm_v15.yaml"
                 if base_type is BaseModelType.StableDiffusion1
-                else "../controlnet/cldm_v21.yaml"
+                else "controlnet/cldm_v21.yaml"
             )
         elif model_type is ModelType.VAE:
             config_file = (
-                "../stable-diffusion/v1-inference.yaml"
+                "stable-diffusion/v1-inference.yaml"
                 if base_type is BaseModelType.StableDiffusion1
-                else "../stable-diffusion/v2-inference.yaml"
+                else "stable-diffusion/v2-inference.yaml"
             )
         else:
             raise InvalidModelConfigException(
                 f"{model_path}: Unrecognized combination of model_type={model_type}, base_type={base_type}"
             )
-        assert isinstance(config_file, str)
         return Path(config_file)
 
     @classmethod

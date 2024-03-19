@@ -604,7 +604,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         info.path = model_path.as_posix()
 
-        # add 'main' specific fields
+        # Checkpoints have a config file needed for conversion - resolve this to an absolute path
         if isinstance(info, CheckpointConfigBase):
             legacy_conf = (self.app_config.legacy_conf_path / info.config_path).resolve()
             info.config_path = legacy_conf.as_posix()
