@@ -667,6 +667,8 @@
         "modelUpdated": "Model Updated",
         "modelUpdateFailed": "Model Update Failed",
         "name": "Name",
+        "noModelsInstalled": "No Models Installed",
+        "noModelsInstalledDesc1": "Install models with the",
         "noModelSelected": "No Model Selected",
         "none": "none",
         "path": "Path",
