@@ -166,13 +166,13 @@ class InvokeAIAppConfig(BaseSettings):
     max_queue_size:                 int = Field(default=10000, gt=0,        description="Maximum number of items in the session queue.")
 
     # NODES
-    allow_nodes:    Optional[list[str]] = Field(default=None,               description="List of nodes to allow. Omit to allow all.")
-    deny_nodes:     Optional[list[str]] = Field(default=None,               description="List of nodes to deny. Omit to deny none.")
+    allow_nodes:              list[str] = Field(default=[],                 description="List of nodes to allow. Omit to allow all.")
+    deny_nodes:               list[str] = Field(default=[],                 description="List of nodes to deny. Omit to deny none.")
     node_cache_size:                int = Field(default=512,                description="How many cached nodes to keep in memory.")
 
     # MODEL INSTALL
     hashing_algorithm: HASHING_ALGORITHMS = Field(default="blake3",         description="Model hashing algorthim for model installs. 'blake3' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.")
-    remote_api_tokens: Optional[list[URLRegexTokenPair]] = Field(default=None, description="List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.")
+    remote_api_tokens: list[URLRegexTokenPair] = Field(default=[],          description="List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.")
 
     # fmt: on
 
