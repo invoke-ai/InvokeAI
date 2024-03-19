@@ -23,7 +23,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   //   dispatch(setShouldShowImageDetails(false));
   // });
   const { t } = useTranslation();
-  
+
   const { metadata } = useDebouncedMetadata(image.image_name);
   const createdBy = useMetadataItem(metadata, handlers.createdBy);
 
