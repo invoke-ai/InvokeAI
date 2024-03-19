@@ -124,14 +124,27 @@ class ModelInstallService(ModelInstallServiceBase):
             if not self._running:
                 raise Exception("Attempt to stop the install service before it was started")
             self._stop_event.set()
-            with self._install_queue.mutex:
-                self._install_queue.queue.clear()  # get rid of pending jobs
-            active_jobs = [x for x in self.list_jobs() if x.running]
-            if active_jobs:
-                self._logger.warning("Waiting for active install job to complete")
-            self.wait_for_installs()
+            self._clear_pending_jobs()
             self._download_cache.clear()
             self._running = False
+
+    def _clear_pending_jobs(self) -> None:
+        for job in self.list_jobs():
+            if not job.in_terminal_state:
+                self._logger.warning("Cancelling job {job.id}")
+                self.cancel_job(job)
+        while True:
+            try:
+                job = self._install_queue.get(block=False)
+                self._install_queue.task_done()
+            except Empty:
+                break
+
+    def _put_in_queue(self, job: ModelInstallJob) -> None:
+        if self._stop_event.is_set():
+            self.cancel_job(job)
+        else:
+            self._install_queue.put(job)
 
     def register_path(
         self,
@@ -218,7 +231,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         if isinstance(source, LocalModelSource):
             install_job = self._import_local_model(source, config)
-            self._install_queue.put(install_job)  # synchronously install
+            self._put_in_queue(install_job)  # synchronously install
         elif isinstance(source, HFModelSource):
             install_job = self._import_from_hf(source, config)
         elif isinstance(source, URLModelSource):
@@ -253,7 +266,6 @@ class ModelInstallService(ModelInstallServiceBase):
                 raise TimeoutError("Timeout exceeded")
         return job
 
-    # TODO: Better name? Maybe wait_for_jobs()? Maybe too easily confused with above
     def wait_for_installs(self, timeout: int = 0) -> List[ModelInstallJob]:  # noqa D102
         """Block until all installation jobs are done."""
         start = time.time()
@@ -412,7 +424,6 @@ class ModelInstallService(ModelInstallServiceBase):
                 job = self._install_queue.get(timeout=1)
             except Empty:
                 continue
-
             assert job.local_path is not None
             try:
                 if job.cancelled:
@@ -461,8 +472,6 @@ class ModelInstallService(ModelInstallServiceBase):
                     rmtree(job._install_tmpdir)
                 self._install_completed_event.set()
                 self._install_queue.task_done()
-
-        self._logger.info("Install thread exiting")
 
     # --------------------------------------------------------------------------------------------
     # Internal functions that manage the models directory
@@ -779,14 +788,14 @@ class ModelInstallService(ModelInstallServiceBase):
         self._logger.info(f"{download_job.source}: model download complete")
         with self._lock:
             install_job = self._download_cache[download_job.source]
-            self._download_cache.pop(download_job.source, None)
 
             # are there any more active jobs left in this task?
             if install_job.downloading and all(x.complete for x in install_job.download_parts):
-                install_job.status = InstallStatus.DOWNLOADS_DONE
-                self._install_queue.put(install_job)
+                self._signal_job_downloads_done(install_job)
+                self._put_in_queue(install_job)
 
             # Let other threads know that the number of downloads has changed
+            self._download_cache.pop(download_job.source, None)
             self._downloads_changed_event.set()
 
     def _download_error_callback(self, download_job: DownloadJob, excp: Optional[Exception] = None) -> None:
@@ -826,7 +835,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         if all(x.in_terminal_state for x in install_job.download_parts):
             # When all parts have reached their terminal state, we finalize the job to clean up the temporary directory and other resources
-            self._install_queue.put(install_job)
+            self._put_in_queue(install_job)
 
     # ------------------------------------------------------------------------------------------------
     # Internal methods that put events on the event bus
@@ -858,6 +867,12 @@ class ModelInstallService(ModelInstallServiceBase):
                 total_bytes=job.total_bytes,
                 id=job.id,
             )
+
+    def _signal_job_downloads_done(self, job: ModelInstallJob) -> None:
+        job.status = InstallStatus.DOWNLOADS_DONE
+        self._logger.info(f"{job.source}: all parts of this model are downloaded")
+        if self._event_bus:
+            self._event_bus.emit_model_install_downloads_done(str(job.source))
 
     def _signal_job_completed(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.COMPLETED
