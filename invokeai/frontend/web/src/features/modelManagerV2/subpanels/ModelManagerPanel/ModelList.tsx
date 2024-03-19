@@ -1,4 +1,4 @@
-import { Flex, Spinner, Text } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { memo, useMemo } from 'react';
@@ -13,6 +13,7 @@ import {
 } from 'services/api/hooks/modelsByType';
 import type { AnyModelConfig, ModelType } from 'services/api/types';
 
+import { FetchingModelsLoader } from './FetchingModelsLoader';
 import { ModelListWrapper } from './ModelListWrapper';
 
 const ModelList = () => {
@@ -121,15 +122,3 @@ const modelsFilter = <T extends AnyModelConfig>(
   });
 };
 
-const FetchingModelsLoader = memo(({ loadingMessage }: { loadingMessage?: string }) => {
-  return (
-    <Flex flexDirection="column" gap={4} borderRadius="base" p={4} bg="base.800">
-      <Flex justifyContent="center" alignItems="center" flexDirection="column" p={4} gap={8}>
-        <Spinner />
-        <Text variant="subtext">{loadingMessage ? loadingMessage : 'Fetching...'}</Text>
-      </Flex>
-    </Flex>
-  );
-});
-
-FetchingModelsLoader.displayName = 'FetchingModelsLoader';
