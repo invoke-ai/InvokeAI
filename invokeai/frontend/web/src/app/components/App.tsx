@@ -69,8 +69,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
     dispatch(appStarted());
   }, [dispatch]);
 
-
-  useStarterModelsToast()
+  useStarterModelsToast();
 
   return (
     <ErrorBoundary onReset={handleReset} FallbackComponent={AppErrorBoundaryFallback}>
