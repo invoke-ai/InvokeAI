@@ -17,6 +17,7 @@ import type {
   ParameterVAEModel,
   ParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
+import type { RgbaColor } from 'react-colorful';
 
 export interface GenerationState {
   _version: 2;
@@ -51,6 +52,10 @@ export interface GenerationState {
   shouldUseCpuNoise: boolean;
   shouldShowAdvancedOptions: boolean;
   aspectRatio: AspectRatioState;
+  infillMosaicTileWidth: number;
+  infillMosaicTileHeight: number;
+  infillMosaicMinColor: RgbaColor;
+  infillMosaicMaxColor: RgbaColor;
 }
 
 export type PayloadActionWithOptimalDimension<T = void> = PayloadAction<T, string, { optimalDimension: number }>;
