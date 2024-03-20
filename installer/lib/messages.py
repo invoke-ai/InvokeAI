@@ -8,7 +8,7 @@ import platform
 from enum import Enum
 from pathlib import Path
 
-from prompt_toolkit import HTML, prompt
+from prompt_toolkit import prompt
 from prompt_toolkit.completion import FuzzyWordCompleter, PathCompleter
 from prompt_toolkit.validation import Validator
 from rich import box, print
@@ -96,39 +96,6 @@ def choose_version(available_releases: tuple | None = None) -> str:
     console.line()
 
     return "stable" if response == "" else response
-
-
-def user_wants_auto_configuration() -> bool:
-    """Prompt the user to choose between manual and auto configuration."""
-    console.rule("InvokeAI Configuration Section")
-    console.print(
-        Panel(
-            Group(
-                "\n".join(
-                    [
-                        "Libraries are installed and InvokeAI will now set up its root directory and configuration. Choose between:",
-                        "",
-                        "  * AUTOMATIC configuration:  install reasonable defaults and a minimal set of starter models.",
-                        "  * MANUAL configuration: manually inspect and adjust configuration options and pick from a larger set of starter models.",
-                        "",
-                        "Later you can fine tune your configuration by selecting option [6] 'Change InvokeAI startup options' from the invoke.bat/invoke.sh launcher script.",
-                    ]
-                ),
-            ),
-            box=box.MINIMAL,
-            padding=(1, 1),
-        )
-    )
-    choice = (
-        prompt(
-            HTML("Choose <b>&lt;a&gt;</b>utomatic or <b>&lt;m&gt;</b>anual configuration [a/m] (a): "),
-            validator=Validator.from_callable(
-                lambda n: n == "" or n.startswith(("a", "A", "m", "M")), error_message="Please select 'a' or 'm'"
-            ),
-        )
-        or "a"
-    )
-    return choice.lower().startswith("a")
 
 
 def confirm_install(dest: Path) -> bool:
@@ -349,34 +316,6 @@ def windows_long_paths_registry() -> None:
             padding=(1, 1),
         )
     )
-
-
-def introduction() -> None:
-    """
-    Display a banner when starting configuration of the InvokeAI application
-    """
-
-    console.rule()
-
-    console.print(
-        Panel(
-            title=":art: Configuring InvokeAI :art:",
-            renderable=Group(
-                "",
-                "[b]This script will:",
-                "",
-                "1. Configure the InvokeAI application directory",
-                "2. Help download the Stable Diffusion weight files",
-                "   and other large models that are needed for text to image generation",
-                "3. Create initial configuration files.",
-                "",
-                "[i]At any point you may interrupt this program and resume later.",
-                "",
-                "[b]For the best user experience, please enlarge or maximize this window",
-            ),
-        )
-    )
-    console.line(2)
 
 
 def _platform_specific_help() -> Text | None:
