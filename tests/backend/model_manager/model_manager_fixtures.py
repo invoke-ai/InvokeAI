@@ -33,6 +33,7 @@ from invokeai.backend.model_manager.config import (
 from invokeai.backend.model_manager.load import ModelCache, ModelConvertCache
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_metadata.metadata_examples import (
+    HFTestLoraMetadata,
     RepoCivitaiModelMetadata1,
     RepoCivitaiVersionMetadata1,
     RepoHFMetadata1,
@@ -92,11 +93,8 @@ def diffusers_dir(mm2_model_files: Path) -> Path:
 
 @pytest.fixture
 def mm2_app_config(mm2_root_dir: Path) -> InvokeAIAppConfig:
-    app_config = InvokeAIAppConfig(
-        root=mm2_root_dir,
-        models_dir=mm2_root_dir / "models",
-        log_level="info",
-    )
+    app_config = InvokeAIAppConfig(models_dir=mm2_root_dir / "models", log_level="info")
+    app_config.set_root(mm2_root_dir)
     return app_config
 
 
@@ -116,10 +114,10 @@ def mm2_download_queue(mm2_session: Session, request: FixtureRequest) -> Downloa
 def mm2_loader(mm2_app_config: InvokeAIAppConfig, mm2_record_store: ModelRecordServiceBase) -> ModelLoadServiceBase:
     ram_cache = ModelCache(
         logger=InvokeAILogger.get_logger(),
-        max_cache_size=mm2_app_config.ram_cache_size,
-        max_vram_cache_size=mm2_app_config.vram_cache_size,
+        max_cache_size=mm2_app_config.ram,
+        max_vram_cache_size=mm2_app_config.vram,
     )
-    convert_cache = ModelConvertCache(mm2_app_config.models_convert_cache_path)
+    convert_cache = ModelConvertCache(mm2_app_config.convert_cache_path)
     return ModelLoadService(
         app_config=mm2_app_config,
         ram_cache=ram_cache,
@@ -298,6 +296,20 @@ def mm2_session(embedding_file: Path, diffusers_dir: Path) -> Session:
         TestAdapter(
             RepoHFMetadata1,
             headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(RepoHFMetadata1)},
+        ),
+    )
+    sess.mount(
+        "https://huggingface.co/api/models/InvokeAI-test/textual_inversion_tests?blobs=True",
+        TestAdapter(
+            HFTestLoraMetadata,
+            headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(HFTestLoraMetadata)},
+        ),
+    )
+    sess.mount(
+        "https://huggingface.co/InvokeAI-test/textual_inversion_tests/resolve/main/learned_embeds-steps-1000.safetensors",
+        TestAdapter(
+            data,
+            headers={"Content-Type": "application/json; charset=utf-8", "Content-Length": len(data)},
         ),
     )
     for root, _, files in os.walk(diffusers_dir):

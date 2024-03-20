@@ -33,11 +33,10 @@ from PIL import Image, ImageOps
 from transformers import AutoProcessor, CLIPSegForImageSegmentation
 
 import invokeai.backend.util.logging as logger
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import get_config
 
 CLIPSEG_MODEL = "CIDAS/clipseg-rd64-refined"
 CLIPSEG_SIZE = 352
-config = InvokeAIAppConfig.get_config()
 
 
 class SegmentedGrayscale(object):
@@ -78,8 +77,8 @@ class Txt2Mask(object):
 
         # BUG: we are not doing anything with the device option at this time
         self.device = device
-        self.processor = AutoProcessor.from_pretrained(CLIPSEG_MODEL, cache_dir=config.cache_dir)
-        self.model = CLIPSegForImageSegmentation.from_pretrained(CLIPSEG_MODEL, cache_dir=config.cache_dir)
+        self.processor = AutoProcessor.from_pretrained(CLIPSEG_MODEL, cache_dir=get_config().cache_dir)
+        self.model = CLIPSegForImageSegmentation.from_pretrained(CLIPSEG_MODEL, cache_dir=get_config().cache_dir)
 
     @torch.no_grad()
     def segment(self, image: Image.Image, prompt: str) -> SegmentedGrayscale:

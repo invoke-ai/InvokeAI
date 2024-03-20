@@ -51,7 +51,7 @@ from .fields import InputField
     title="Float Range",
     tags=["math", "range"],
     category="math",
-    version="1.0.0",
+    version="1.0.1",
 )
 class FloatLinearRangeInvocation(BaseInvocation):
     """Creates a range"""
@@ -111,7 +111,7 @@ EASING_FUNCTION_KEYS = Literal[tuple(EASING_FUNCTIONS_MAP.keys())]
     title="Step Param Easing",
     tags=["step", "easing"],
     category="step",
-    version="1.0.1",
+    version="1.0.2",
 )
 class StepParamEasingInvocation(BaseInvocation):
     """Experimental per-step parameter easing for denoising steps"""

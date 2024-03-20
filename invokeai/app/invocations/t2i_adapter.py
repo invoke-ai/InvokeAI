@@ -45,7 +45,7 @@ class T2IAdapterOutput(BaseInvocationOutput):
 
 
 @invocation(
-    "t2i_adapter", title="T2I-Adapter", tags=["t2i_adapter", "control"], category="t2i_adapter", version="1.0.1"
+    "t2i_adapter", title="T2I-Adapter", tags=["t2i_adapter", "control"], category="t2i_adapter", version="1.0.2"
 )
 class T2IAdapterInvocation(BaseInvocation):
     """Collects T2I-Adapter info to pass to other nodes."""

@@ -17,7 +17,7 @@ from .fields import InputField, UIComponent
     title="Dynamic Prompt",
     tags=["prompt", "collection"],
     category="prompt",
-    version="1.0.0",
+    version="1.0.1",
     use_cache=False,
 )
 class DynamicPromptInvocation(BaseInvocation):
@@ -46,7 +46,7 @@ class DynamicPromptInvocation(BaseInvocation):
     title="Prompts from File",
     tags=["prompt", "file"],
     category="prompt",
-    version="1.0.1",
+    version="1.0.2",
 )
 class PromptsFromFileInvocation(BaseInvocation):
     """Loads prompts from a text file"""

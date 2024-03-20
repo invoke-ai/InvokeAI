@@ -1,73 +1,59 @@
-# parse_args() must be called before any other imports. if it is not called first, consumers of the config
-# which are imported/used before parse_args() is called will get the default config values instead of the
-# values from the command line or config file.
-import sys
+import asyncio
+import mimetypes
+import socket
+from contextlib import asynccontextmanager
+from inspect import signature
+from pathlib import Path
+from typing import Any
 
+import uvicorn
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+from fastapi.openapi.utils import get_openapi
+from fastapi.responses import HTMLResponse
+from fastapi_events.handlers.local import local_handler
+from fastapi_events.middleware import EventHandlerASGIMiddleware
+from pydantic.json_schema import models_json_schema
+from torch.backends.mps import is_available as is_mps_available
+
+# for PyCharm:
+# noinspection PyUnresolvedReferences
+import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
+import invokeai.frontend.web as web_dir
+from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 from invokeai.app.invocations.model import ModelIdentifierField
+from invokeai.app.services.config.config_default import get_config
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
-from invokeai.version.invokeai_version import __version__
 
-from .services.config import InvokeAIAppConfig
+from ..backend.util.logging import InvokeAILogger
+from .api.dependencies import ApiDependencies
+from .api.routers import (
+    app_info,
+    board_images,
+    boards,
+    download_queue,
+    images,
+    model_manager,
+    session_queue,
+    utilities,
+    workflows,
+)
+from .api.sockets import SocketIO
+from .invocations.baseinvocation import (
+    BaseInvocation,
+    UIConfigBase,
+)
+from .invocations.fields import InputFieldJSONSchemaExtra, OutputFieldJSONSchemaExtra
 
-app_config = InvokeAIAppConfig.get_config()
-app_config.parse_args()
-if app_config.version:
-    print(f"InvokeAI version {__version__}")
-    sys.exit(0)
-
-if True:  # hack to make flake8 happy with imports coming after setting up the config
-    import asyncio
-    import mimetypes
-    import socket
-    from contextlib import asynccontextmanager
-    from inspect import signature
-    from pathlib import Path
-    from typing import Any
-
-    import uvicorn
-    from fastapi import FastAPI
-    from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.middleware.gzip import GZipMiddleware
-    from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
-    from fastapi.openapi.utils import get_openapi
-    from fastapi.responses import HTMLResponse
-    from fastapi_events.handlers.local import local_handler
-    from fastapi_events.middleware import EventHandlerASGIMiddleware
-    from pydantic.json_schema import models_json_schema
-    from torch.backends.mps import is_available as is_mps_available
-
-    # for PyCharm:
-    # noinspection PyUnresolvedReferences
-    import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
-    import invokeai.frontend.web as web_dir
-    from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
-
-    from ..backend.util.logging import InvokeAILogger
-    from .api.dependencies import ApiDependencies
-    from .api.routers import (
-        app_info,
-        board_images,
-        boards,
-        download_queue,
-        images,
-        model_manager,
-        session_queue,
-        utilities,
-        workflows,
-    )
-    from .api.sockets import SocketIO
-    from .invocations.baseinvocation import (
-        BaseInvocation,
-        UIConfigBase,
-    )
-    from .invocations.fields import InputFieldJSONSchemaExtra, OutputFieldJSONSchemaExtra
-
-    if is_mps_available():
-        import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
+app_config = get_config()
 
 
-app_config = InvokeAIAppConfig.get_config()
-app_config.parse_args()
+if is_mps_available():
+    import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
+
+
 logger = InvokeAILogger.get_logger(config=app_config)
 # fix for windows mimetypes registry entries being borked
 # see https://github.com/invoke-ai/InvokeAI/discussions/3684#discussioncomment-6391352
@@ -247,9 +233,9 @@ def invoke_api() -> None:
             else:
                 return port
 
-    from invokeai.backend.install.check_root import check_invokeai_root
+    from invokeai.backend.install.check_directories import check_directories
 
-    check_invokeai_root(app_config)  # note, may exit with an exception if root not set up
+    check_directories(app_config)  # note, may exit with an exception if root not set up
 
     if app_config.dev_reload:
         try:

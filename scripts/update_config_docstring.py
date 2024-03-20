@@ -1,4 +1,42 @@
 import os
+from typing import Literal, get_args, get_type_hints
+
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
+
+_excluded = {"schema_version", "legacy_models_yaml_path"}
+
+
+def generate_config_docstrings() -> str:
+    """Helper function for mkdocs. Generates a docstring for the InvokeAIAppConfig class.
+
+    You shouldn't run this manually. Instead, run `scripts/update-config-docstring.py` to update the docstring.
+    A makefile target is also available: `make update-config-docstring`.
+
+    See that script for more information about why this is necessary.
+    """
+    docstring = '    """Invoke\'s global app configuration.\n\n'
+    docstring += "    Typically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.\n\n"
+    docstring += "    Attributes:\n"
+
+    field_descriptions: list[str] = []
+    type_hints = get_type_hints(InvokeAIAppConfig)
+
+    for k, v in InvokeAIAppConfig.model_fields.items():
+        if v.exclude or k in _excluded:
+            continue
+        field_type = type_hints.get(k)
+        extra = ""
+        if getattr(field_type, "__origin__", None) is Literal:
+            # Get options for literals - the docs generator can't pull these out
+            options = [f"`{str(x)}`" for x in get_args(field_type)]
+            extra = f"<br>Valid values: {', '.join(options)}"
+        field_descriptions.append(f"        {k}: {v.description}{extra}")
+
+    docstring += "\n".join(field_descriptions)
+    docstring += '\n    """'
+
+    return docstring
+
 
 # The pydantic app config can be documented automatically using mkdocs, but this requires that the docstring
 # for the class is kept up to date. We use a pydantic model for the app config. Each config setting is a field
@@ -14,9 +52,7 @@ def main():
     # Change working directory to the repo root
     os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-    from invokeai.app.services.config.config_default import InvokeAIAppConfig
-
-    docstring = InvokeAIAppConfig.generate_docstrings()
+    docstring = generate_config_docstrings()
 
     # Replace the docstring in the file
     with open("invokeai/app/services/config/config_default.py", "r") as f:

@@ -113,7 +113,7 @@ class SchedulerInvocation(BaseInvocation):
     title="Create Denoise Mask",
     tags=["mask", "denoise"],
     category="latents",
-    version="1.0.1",
+    version="1.0.2",
 )
 class CreateDenoiseMaskInvocation(BaseInvocation):
     """Creates mask for denoising model run."""
@@ -279,7 +279,7 @@ def get_scheduler(
     title="Denoise Latents",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.5.2",
+    version="1.5.3",
 )
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
@@ -816,7 +816,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     title="Latents to Image",
     tags=["latents", "image", "vae", "l2i"],
     category="latents",
-    version="1.2.1",
+    version="1.2.2",
 )
 class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generates an image from latents."""
@@ -866,7 +866,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 vae.to(dtype=torch.float16)
                 latents = latents.half()
 
-            if self.tiled or context.config.get().tiled_decode:
+            if self.tiled or context.config.get().force_tiled_decode:
                 vae.enable_tiling()
             else:
                 vae.disable_tiling()
@@ -903,7 +903,7 @@ LATENTS_INTERPOLATION_MODE = Literal["nearest", "linear", "bilinear", "bicubic",
     title="Resize Latents",
     tags=["latents", "resize"],
     category="latents",
-    version="1.0.1",
+    version="1.0.2",
 )
 class ResizeLatentsInvocation(BaseInvocation):
     """Resizes latents to explicit width/height (in pixels). Provided dimensions are floor-divided by 8."""
@@ -953,7 +953,7 @@ class ResizeLatentsInvocation(BaseInvocation):
     title="Scale Latents",
     tags=["latents", "resize"],
     category="latents",
-    version="1.0.1",
+    version="1.0.2",
 )
 class ScaleLatentsInvocation(BaseInvocation):
     """Scales latents by a given factor."""
@@ -995,7 +995,7 @@ class ScaleLatentsInvocation(BaseInvocation):
     title="Image to Latents",
     tags=["latents", "image", "vae", "i2l"],
     category="latents",
-    version="1.0.1",
+    version="1.0.2",
 )
 class ImageToLatentsInvocation(BaseInvocation):
     """Encodes an image into latents."""
@@ -1094,7 +1094,7 @@ class ImageToLatentsInvocation(BaseInvocation):
     title="Blend Latents",
     tags=["latents", "blend"],
     category="latents",
-    version="1.0.1",
+    version="1.0.2",
 )
 class BlendLatentsInvocation(BaseInvocation):
     """Blend two latents using a given alpha. Latents must have same size."""
@@ -1185,7 +1185,7 @@ class BlendLatentsInvocation(BaseInvocation):
     title="Crop Latents",
     tags=["latents", "crop"],
     category="latents",
-    version="1.0.1",
+    version="1.0.2",
 )
 # TODO(ryand): Named `CropLatentsCoreInvocation` to prevent a conflict with custom node `CropLatentsInvocation`.
 # Currently, if the class names conflict then 'GET /openapi.json' fails.
@@ -1246,7 +1246,7 @@ class IdealSizeOutput(BaseInvocationOutput):
     "ideal_size",
     title="Ideal Size",
     tags=["latents", "math", "ideal_size"],
-    version="1.0.2",
+    version="1.0.3",
 )
 class IdealSizeInvocation(BaseInvocation):
     """Calculates the ideal size for generation to avoid duplication"""

@@ -11,6 +11,7 @@ It is currently named model_install2.py, but will ultimately replace model_insta
 
 import argparse
 import curses
+import pathlib
 import sys
 import traceback
 import warnings
@@ -22,8 +23,9 @@ import npyscreen
 import torch
 from npyscreen import widget
 
-from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import get_config
 from invokeai.app.services.model_install import ModelInstallServiceBase
+from invokeai.backend.install.check_directories import validate_directories
 from invokeai.backend.install.install_helper import InstallHelper, InstallSelections, UnifiedModelInfo
 from invokeai.backend.model_manager import ModelType
 from invokeai.backend.util import choose_precision, choose_torch_device
@@ -41,8 +43,8 @@ from invokeai.frontend.install.widgets import (
 )
 
 warnings.filterwarnings("ignore", category=UserWarning)  # noqa: E402
-config = InvokeAIAppConfig.get_config()
-logger = InvokeAILogger.get_logger("ModelInstallService")
+config = get_config()
+logger = InvokeAILogger.get_logger("ModelInstallService", config=config)
 # logger.setLevel("WARNING")
 # logger.setLevel('DEBUG')
 
@@ -512,7 +514,6 @@ def list_models(installer: ModelInstallServiceBase, model_type: ModelType):
 def select_and_download_models(opt: Namespace) -> None:
     """Prompt user for install/delete selections and execute."""
     precision = "float32" if opt.full_precision else choose_precision(torch.device(choose_torch_device()))
-    # unsure how to avoid a typing complaint in the next line: config.precision is an enumerated Literal
     config.precision = precision
     install_helper = InstallHelper(config, logger)
     installer = install_helper.installer
@@ -594,21 +595,24 @@ def main() -> None:
     parser.add_argument(
         "--root_dir",
         dest="root",
-        type=str,
+        type=pathlib.Path,
         default=None,
         help="path to root of install directory",
     )
     opt = parser.parse_args()
 
-    invoke_args = []
-    if opt.root:
-        invoke_args.extend(["--root", opt.root])
+    invoke_args: dict[str, Any] = {}
     if opt.full_precision:
-        invoke_args.extend(["--precision", "float32"])
-    config.parse_args(invoke_args)
+        invoke_args["precision"] = "float32"
+    config.update_config(invoke_args)
+    if opt.root:
+        config.set_root(opt.root)
+
     logger = InvokeAILogger().get_logger(config=config)
 
-    if not config.models_path.exists():
+    try:
+        validate_directories(config)
+    except AssertionError:
         logger.info("Your InvokeAI root directory is not set up. Calling invokeai-configure.")
         sys.argv = ["invokeai_configure", "--yes", "--skip-sd-weights"]
         from invokeai.frontend.install.invokeai_configure import invokeai_configure

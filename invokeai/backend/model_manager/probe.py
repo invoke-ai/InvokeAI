@@ -132,11 +132,12 @@ class ModelProbe(object):
 
         format_type = ModelFormat.Diffusers if model_path.is_dir() else ModelFormat.Checkpoint
         model_info = None
-        model_type = None
-        if format_type is ModelFormat.Diffusers:
-            model_type = cls.get_model_type_from_folder(model_path)
-        else:
-            model_type = cls.get_model_type_from_checkpoint(model_path)
+        model_type = ModelType(fields["type"]) if "type" in fields and fields["type"] else None
+        if not model_type:
+            if format_type is ModelFormat.Diffusers:
+                model_type = cls.get_model_type_from_folder(model_path)
+            else:
+                model_type = cls.get_model_type_from_checkpoint(model_path)
         format_type = ModelFormat.ONNX if model_type == ModelType.ONNX else format_type
 
         probe_class = cls.PROBES[format_type].get(model_type)
@@ -156,7 +157,7 @@ class ModelProbe(object):
         fields["image_encoder_model_id"] = fields.get("image_encoder_model_id") or probe.get_image_encoder_model_id()
         fields["name"] = fields.get("name") or cls.get_model_name(model_path)
         fields["description"] = (
-            fields.get("description") or f"{fields['base'].value} {fields['type'].value} model {fields['name']}"
+            fields.get("description") or f"{fields['base'].value} {model_type.value} model {fields['name']}"
         )
         fields["format"] = fields.get("format") or probe.get_format()
         fields["hash"] = fields.get("hash") or ModelHash(algorithm=hash_algo).hash(model_path)

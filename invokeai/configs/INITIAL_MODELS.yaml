@@ -62,40 +62,72 @@ sd-1/main/trinart_stable_diffusion_v2:
    recommended: False
 sd-1/controlnet/qrcode_monster:
    source: monster-labs/control_v1p_sd15_qrcode_monster
+   description: Controlnet model that generates scannable creative QR codes
    subfolder: v2
 sd-1/controlnet/canny:
+   description: Controlnet weights trained on sd-1.5 with canny conditioning.
    source: lllyasviel/control_v11p_sd15_canny
    recommended: True
 sd-1/controlnet/inpaint:
    source: lllyasviel/control_v11p_sd15_inpaint
+   description: Controlnet weights trained on sd-1.5 with canny conditioning, inpaint version
 sd-1/controlnet/mlsd:
+   description: Controlnet weights trained on sd-1.5 with canny conditioning, MLSD version
    source: lllyasviel/control_v11p_sd15_mlsd
 sd-1/controlnet/depth:
+   description: Controlnet weights trained on sd-1.5 with depth conditioning
    source: lllyasviel/control_v11f1p_sd15_depth
    recommended: True
 sd-1/controlnet/normal_bae:
+   description: Controlnet weights trained on sd-1.5 with normalbae image conditioning
    source: lllyasviel/control_v11p_sd15_normalbae
 sd-1/controlnet/seg:
+   description: Controlnet weights trained on sd-1.5 with seg image conditioning
    source: lllyasviel/control_v11p_sd15_seg
 sd-1/controlnet/lineart:
+   description: Controlnet weights trained on sd-1.5 with lineart image conditioning
    source: lllyasviel/control_v11p_sd15_lineart
    recommended: True
 sd-1/controlnet/lineart_anime:
+   description: Controlnet weights trained on sd-1.5 with anime image conditioning
    source: lllyasviel/control_v11p_sd15s2_lineart_anime
 sd-1/controlnet/openpose:
+   description: Controlnet weights trained on sd-1.5 with openpose image conditioning
    source: lllyasviel/control_v11p_sd15_openpose
    recommended: True
 sd-1/controlnet/scribble:
    source: lllyasviel/control_v11p_sd15_scribble
+   description: Controlnet weights trained on sd-1.5 with scribble image conditioning
    recommended: False
 sd-1/controlnet/softedge:
    source: lllyasviel/control_v11p_sd15_softedge
+   description: Controlnet weights trained on sd-1.5 with soft edge conditioning
 sd-1/controlnet/shuffle:
    source: lllyasviel/control_v11e_sd15_shuffle
+   description: Controlnet weights trained on sd-1.5 with shuffle image conditioning
 sd-1/controlnet/tile:
    source: lllyasviel/control_v11f1e_sd15_tile
+   description: Controlnet weights trained on sd-1.5 with tiled image conditioning
 sd-1/controlnet/ip2p:
    source: lllyasviel/control_v11e_sd15_ip2p
+   description: Controlnet weights trained on sd-1.5 with ip2p conditioning.
+sdxl/controlnet/canny-sdxl:
+   description: Controlnet weights trained on sdxl-1.0 with canny conditioning.
+   source: diffusers/controlnet-canny-sdxl-1.0
+   recommended: True
+sdxl/controlnet/depth-sdxl:
+   description: Controlnet weights trained on sdxl-1.0 with depth conditioning.
+   source: diffusers/controlnet-depth-sdxl-1.0
+   recommended: True
+sdxl/controlnet/softedge-dexined-sdxl:
+   description: Controlnet weights trained on sdxl-1.0 with dexined soft edge preprocessing.
+   source: SargeZT/controlnet-sd-xl-1.0-softedge-dexined
+sdxl/controlnet/depth-16bit-zoe-sdxl:
+   description: Controlnet weights trained on sdxl-1.0 with Zoe's preprocessor (16 bits).
+   source: SargeZT/controlnet-sd-xl-1.0-depth-16bit-zoe
+sdxl/controlnet/depth-zoe-sdxl:
+   description: Controlnet weights trained on sdxl-1.0 with Zoe's preprocessor (32 bits).
+   source: diffusers/controlnet-zoe-depth-sdxl-1.0
 sd-1/t2i_adapter/canny-sd15:
    source: TencentARC/t2iadapter_canny_sd15v2
 sd-1/t2i_adapter/sketch-sd15:

@@ -1,15 +1,12 @@
 import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useProcessorNodeChanged } from 'features/controlAdapters/components/hooks/useProcessorNodeChanged';
-import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import { useGetDefaultForControlnetProcessor } from 'features/controlAdapters/hooks/useGetDefaultForControlnetProcessor';
 import type { RequiredDWOpenposeImageProcessorInvocation } from 'features/controlAdapters/store/types';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ProcessorWrapper from './common/ProcessorWrapper';
-
-const DEFAULTS = CONTROLNET_PROCESSORS.dw_openpose_image_processor
-  .default as RequiredDWOpenposeImageProcessorInvocation;
 
 type Props = {
   controlNetId: string;
@@ -22,6 +19,10 @@ const DWOpenposeProcessor = (props: Props) => {
   const { image_resolution, draw_body, draw_face, draw_hands } = processorNode;
   const processorChanged = useProcessorNodeChanged();
   const { t } = useTranslation();
+
+  const defaults = useGetDefaultForControlnetProcessor(
+    'dw_openpose_image_processor'
+  ) as RequiredDWOpenposeImageProcessorInvocation;
 
   const handleDrawBodyChanged = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -56,15 +57,15 @@ const DWOpenposeProcessor = (props: Props) => {
       <Flex sx={{ flexDir: 'row', gap: 6 }}>
         <FormControl isDisabled={!isEnabled} w="max-content">
           <FormLabel>{t('controlnet.body')}</FormLabel>
-          <Switch defaultChecked={DEFAULTS.draw_body} isChecked={draw_body} onChange={handleDrawBodyChanged} />
+          <Switch defaultChecked={defaults.draw_body} isChecked={draw_body} onChange={handleDrawBodyChanged} />
         </FormControl>
         <FormControl isDisabled={!isEnabled} w="max-content">
           <FormLabel>{t('controlnet.face')}</FormLabel>
-          <Switch defaultChecked={DEFAULTS.draw_face} isChecked={draw_face} onChange={handleDrawFaceChanged} />
+          <Switch defaultChecked={defaults.draw_face} isChecked={draw_face} onChange={handleDrawFaceChanged} />
         </FormControl>
         <FormControl isDisabled={!isEnabled} w="max-content">
           <FormLabel>{t('controlnet.hands')}</FormLabel>
-          <Switch defaultChecked={DEFAULTS.draw_hands} isChecked={draw_hands} onChange={handleDrawHandsChanged} />
+          <Switch defaultChecked={defaults.draw_hands} isChecked={draw_hands} onChange={handleDrawHandsChanged} />
         </FormControl>
       </Flex>
       <FormControl isDisabled={!isEnabled}>
@@ -72,7 +73,7 @@ const DWOpenposeProcessor = (props: Props) => {
         <CompositeSlider
           value={image_resolution}
           onChange={handleImageResolutionChanged}
-          defaultValue={DEFAULTS.image_resolution}
+          defaultValue={defaults.image_resolution}
           min={0}
           max={4096}
           marks
@@ -80,7 +81,7 @@ const DWOpenposeProcessor = (props: Props) => {
         <CompositeNumberInput
           value={image_resolution}
           onChange={handleImageResolutionChanged}
-          defaultValue={DEFAULTS.image_resolution}
+          defaultValue={defaults.image_resolution}
           min={0}
           max={4096}
         />

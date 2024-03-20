@@ -247,10 +247,11 @@ export const handlers = {
     recaller: recallers.refinerCFGScale,
   }),
   refinerModel: buildHandlers({
-    getLabel: () => t('sdxl.refinerModel'),
+    getLabel: () => t('sdxl.refinermodel'),
     parser: parsers.refinerModel,
     recaller: recallers.refinerModel,
     validator: validators.refinerModel,
+    renderValue: renderModelConfigValue,
   }),
   refinerNegativeAestheticScore: buildHandlers({
     getLabel: () => t('sdxl.posAestheticScore'),
@@ -268,12 +269,12 @@ export const handlers = {
     recaller: recallers.refinerScheduler,
   }),
   refinerStart: buildHandlers({
-    getLabel: () => t('sdxl.refiner_start'),
+    getLabel: () => t('sdxl.refinerStart'),
     parser: parsers.refinerStart,
     recaller: recallers.refinerStart,
   }),
   refinerSteps: buildHandlers({
-    getLabel: () => t('sdxl.refiner_steps'),
+    getLabel: () => t('sdxl.refinerSteps'),
     parser: parsers.refinerSteps,
     recaller: recallers.refinerSteps,
   }),

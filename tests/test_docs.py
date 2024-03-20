@@ -1,4 +1,5 @@
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from scripts.update_config_docstring import generate_config_docstrings
 
 
 def test_app_config_docstrings_are_current():
@@ -9,7 +10,7 @@ def test_app_config_docstrings_are_current():
 
     assert InvokeAIAppConfig.__doc__ is not None
 
-    generated_docstring = InvokeAIAppConfig.generate_docstrings()
+    generated_docstring = generate_config_docstrings()
 
     formatted_dunder_docstring = f'    """{InvokeAIAppConfig.__doc__.strip()}\n    """'
 

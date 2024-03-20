@@ -118,7 +118,7 @@ export const modelsApi = api.injectEndpoints({
           body: formData,
         };
       },
-      invalidatesTags: ['Model'],
+      invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
     }),
     installModel: build.mutation<InstallModelResponse, InstallModelArg>({
       query: ({ source, inplace = true }) => {
@@ -128,7 +128,7 @@ export const modelsApi = api.injectEndpoints({
           method: 'POST',
         };
       },
-      invalidatesTags: ['Model', 'ModelInstalls'],
+      invalidatesTags: ['ModelInstalls'],
     }),
     deleteModels: build.mutation<DeleteModelResponse, DeleteModelArg>({
       query: ({ key }) => {
@@ -137,7 +137,7 @@ export const modelsApi = api.injectEndpoints({
           method: 'DELETE',
         };
       },
-      invalidatesTags: ['Model'],
+      invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
     }),
     deleteModelImage: build.mutation<DeleteModelImageResponse, string>({
       query: (key) => {
@@ -146,7 +146,7 @@ export const modelsApi = api.injectEndpoints({
           method: 'DELETE',
         };
       },
-      invalidatesTags: ['Model'],
+      invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
     }),
     getModelImage: build.query<string, string>({
       query: (key) => buildModelsUrl(`i/${key}/image`),
@@ -158,12 +158,12 @@ export const modelsApi = api.injectEndpoints({
           method: 'PUT',
         };
       },
-      invalidatesTags: ['ModelConfig'],
+      invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
     }),
     getModelConfig: build.query<GetModelConfigResponse, string>({
       query: (key) => buildModelsUrl(`i/${key}`),
       providesTags: (result) => {
-        const tags: ApiTagDescription[] = ['Model'];
+        const tags: ApiTagDescription[] = [];
 
         if (result) {
           tags.push({ type: 'ModelConfig', id: result.key });
@@ -175,7 +175,7 @@ export const modelsApi = api.injectEndpoints({
     getModelConfigByAttrs: build.query<AnyModelConfig, GetByAttrsArg>({
       query: (arg) => buildModelsUrl(`get_by_attrs?${queryString.stringify(arg)}`),
       providesTags: (result) => {
-        const tags: ApiTagDescription[] = ['Model'];
+        const tags: ApiTagDescription[] = [];
 
         if (result) {
           tags.push({ type: 'ModelConfig', id: result.key });
@@ -192,7 +192,7 @@ export const modelsApi = api.injectEndpoints({
           method: 'PATCH',
         };
       },
-      invalidatesTags: ['Model'],
+      invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
     }),
     scanFolder: build.query<ScanFolderResponse, ScanFolderArg>({
       query: (arg) => {

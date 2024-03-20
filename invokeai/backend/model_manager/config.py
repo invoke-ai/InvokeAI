@@ -331,7 +331,7 @@ class IPAdapterConfig(ModelConfigBase):
         return Tag(f"{ModelType.IPAdapter.value}.{ModelFormat.InvokeAI.value}")
 
 
-class CLIPVisionDiffusersConfig(ModelConfigBase):
+class CLIPVisionDiffusersConfig(DiffusersConfigBase):
     """Model config for CLIPVision."""
 
     type: Literal[ModelType.CLIPVision] = ModelType.CLIPVision
@@ -342,7 +342,7 @@ class CLIPVisionDiffusersConfig(ModelConfigBase):
         return Tag(f"{ModelType.CLIPVision.value}.{ModelFormat.Diffusers.value}")
 
 
-class T2IAdapterConfig(ModelConfigBase, ControlAdapterConfigBase):
+class T2IAdapterConfig(DiffusersConfigBase, ControlAdapterConfigBase):
     """Model config for T2I."""
 
     type: Literal[ModelType.T2IAdapter] = ModelType.T2IAdapter

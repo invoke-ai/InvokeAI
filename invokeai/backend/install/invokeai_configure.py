@@ -6,7 +6,6 @@
 #
 # Coauthor: Kevin Turner http://github.com/keturn
 #
-import argparse
 import io
 import os
 import shutil
@@ -18,7 +17,7 @@ from argparse import Namespace
 from enum import Enum
 from pathlib import Path
 from shutil import copy, get_terminal_size, move
-from typing import Any, Optional, Set, Tuple, Type, get_args, get_type_hints
+from typing import Any, Optional, Tuple, Type, get_args, get_type_hints
 from urllib import request
 
 import npyscreen
@@ -29,15 +28,12 @@ from diffusers import ModelMixin
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from huggingface_hub import HfFolder
 from huggingface_hub import login as hf_hub_login
-from omegaconf import DictConfig, OmegaConf
-from pydantic.error_wrappers import ValidationError
 from tqdm import tqdm
 from transformers import AutoFeatureExtractor
 
-import invokeai.configs as configs
-from invokeai.app.services.config import InvokeAIAppConfig
+import invokeai.configs as model_configs
+from invokeai.app.services.config import InvokeAIAppConfig, get_config
 from invokeai.backend.install.install_helper import InstallHelper, InstallSelections
-from invokeai.backend.install.legacy_arg_parsing import legacy_parser
 from invokeai.backend.model_manager import ModelType
 from invokeai.backend.util import choose_precision, choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger
@@ -65,12 +61,7 @@ def get_literal_fields(field: str) -> Tuple[Any]:
 
 
 # --------------------------globals-----------------------
-
-config = InvokeAIAppConfig.get_config()
-
-Model_dir = "models"
-Default_config_file = config.model_conf_path
-SD_Configs = config.legacy_conf_path
+config = None
 
 PRECISION_CHOICES = get_literal_fields("precision")
 DEVICE_CHOICES = get_literal_fields("device")
@@ -104,7 +95,7 @@ class DummyWidgetValue(Enum):
 
 
 # --------------------------------------------
-def postscript(errors: Set[str]) -> None:
+def postscript(errors: set[str]) -> None:
     if not any(errors):
         message = f"""
 ** INVOKEAI INSTALLATION SUCCESSFUL **
@@ -195,7 +186,7 @@ def hf_download_from_pretrained(model_class: Type[ModelMixin], model_name: str, 
 
 
 # ---------------------------------------------
-def download_with_progress_bar(model_url: str, model_dest: str, label: str = "the"):
+def download_with_progress_bar(model_url: str, model_dest: str | Path, label: str = "the"):
     try:
         logger.info(f"Installing {label} model file {model_url}...")
         if not os.path.exists(model_dest):
@@ -292,7 +283,7 @@ class editOptsForm(CyclingForm, npyscreen.FormMultiPage):
 
     def create(self):
         program_opts = self.parentApp.program_opts
-        old_opts = self.parentApp.invokeai_opts
+        old_opts: InvokeAIAppConfig = self.parentApp.invokeai_opts
         first_time = not (config.root_path / "invokeai.yaml").exists()
         access_token = HfFolder.get_token()
         window_width, window_height = get_terminal_size()
@@ -466,7 +457,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         self.nextrely -= 1
         self.ram = self.add_widget_intelligent(
             npyscreen.Slider,
-            value=clip(old_opts.ram_cache_size, range=(3.0, MAX_RAM), step=0.5),
+            value=clip(old_opts.ram, range=(3.0, MAX_RAM), step=0.5),
             out_of=round(MAX_RAM),
             lowest=0.0,
             step=0.5,
@@ -486,7 +477,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
             self.nextrely -= 1
             self.vram = self.add_widget_intelligent(
                 npyscreen.Slider,
-                value=clip(old_opts.vram_cache_size, range=(0, MAX_VRAM), step=0.25),
+                value=clip(old_opts.vram, range=(0, MAX_VRAM), step=0.25),
                 out_of=round(MAX_VRAM * 2) / 2,
                 lowest=0.0,
                 relx=8,
@@ -521,7 +512,7 @@ Use cursor arrows to make a checkbox selection, and space to toggle.
         self.autoimport_dirs["autoimport_dir"] = self.add_widget_intelligent(
             FileBox,
             name="Optional folder to scan for new checkpoints, ControlNets, LoRAs and TI models",
-            value=str(config.root_path / config.autoimport_dir) if config.autoimport_dir else "",
+            value=str(config.autoimport_path),
             select_dir=True,
             must_exist=False,
             use_two_lines=False,
@@ -658,7 +649,7 @@ class EditOptApplication(npyscreen.NPSAppManaged):
             )
 
 
-def default_ramcache() -> float:
+def get_default_ram_cache_size() -> float:
     """Run a heuristic for the default RAM cache based on installed RAM."""
 
     # Note that on my 64 GB machine, psutil.virtual_memory().total gives 62 GB,
@@ -668,11 +659,12 @@ def default_ramcache() -> float:
     )  # 2.1 is just large enough for sd 1.5 ;-)
 
 
-def default_startup_options(init_file: Path) -> InvokeAIAppConfig:
-    opts = InvokeAIAppConfig.get_config()
-    opts.ram = default_ramcache()
-    opts.precision = "float32" if FORCE_FULL_PRECISION else choose_precision(torch.device(choose_torch_device()))
-    return opts
+def get_default_config() -> InvokeAIAppConfig:
+    """Builds a new config object, setting the ram and precision using the appropriate heuristic."""
+    config = InvokeAIAppConfig()
+    config.ram = get_default_ram_cache_size()
+    config.precision = "float32" if FORCE_FULL_PRECISION else choose_precision(torch.device(choose_torch_device()))
+    return config
 
 
 def default_user_selections(program_opts: Namespace, install_helper: InstallHelper) -> InstallSelections:
@@ -702,7 +694,7 @@ def initialize_rootdir(root: Path, yes_to_all: bool = False):
     for model_type in ModelType:
         Path(root, "autoimport", model_type.value).mkdir(parents=True, exist_ok=True)
 
-    configs_src = Path(configs.__path__[0])
+    configs_src = Path(model_configs.__path__[0])
     configs_dest = root / "configs"
     if not os.path.samefile(configs_src, configs_dest):
         shutil.copytree(configs_src, configs_dest, dirs_exist_ok=True)
@@ -713,18 +705,19 @@ def initialize_rootdir(root: Path, yes_to_all: bool = False):
 
 # -------------------------------------
 def run_console_ui(
-    program_opts: Namespace, initfile: Path, install_helper: InstallHelper
+    program_opts: Namespace, install_helper: InstallHelper
 ) -> Tuple[Optional[Namespace], Optional[InstallSelections]]:
-    first_time = not (config.root_path / "invokeai.yaml").exists()
-    invokeai_opts = default_startup_options(initfile) if first_time else config
-    invokeai_opts.root = program_opts.root
+    first_time = not config.init_file_path.exists()
+    config_opts = get_default_config() if first_time else config
+    if program_opts.root:
+        config_opts.set_root(Path(program_opts.root))
 
     if not set_min_terminal_size(MIN_COLS, MIN_LINES):
         raise WindowTooSmallException(
             "Could not increase terminal size. Try running again with a larger window or smaller font size."
         )
 
-    editApp = EditOptApplication(program_opts, invokeai_opts, install_helper)
+    editApp = EditOptApplication(program_opts, config_opts, install_helper)
     editApp.run()
     if editApp.user_cancelled:
         return (None, None)
@@ -733,170 +726,53 @@ def run_console_ui(
 
 
 # -------------------------------------
-def write_opts(opts: InvokeAIAppConfig, init_file: Path) -> None:
-    """
-    Update the invokeai.yaml file with values from current settings.
-    """
-    # this will load current settings
-    new_config = InvokeAIAppConfig.get_config()
-    new_config.root = config.root
-
-    for key, value in vars(opts).items():
-        if hasattr(new_config, key):
-            setattr(new_config, key, value)
-
-    with open(init_file, "w", encoding="utf-8") as file:
-        file.write(new_config.to_yaml())
-
-    if hasattr(opts, "hf_token") and opts.hf_token:
-        HfLogin(opts.hf_token)
-
-
-# -------------------------------------
 def default_output_dir() -> Path:
     return config.root_path / "outputs"
 
 
-# -------------------------------------
-def write_default_options(program_opts: Namespace, initfile: Path) -> None:
-    opt = default_startup_options(initfile)
-    write_opts(opt, initfile)
-
-
-# -------------------------------------
-# Here we bring in
-# the legacy Args object in order to parse
-# the old init file and write out the new
-# yaml format.
-def migrate_init_file(legacy_format: Path) -> None:
-    old = legacy_parser.parse_args([f"@{str(legacy_format)}"])
-    new = InvokeAIAppConfig.get_config()
-
-    for attr in InvokeAIAppConfig.model_fields.keys():
-        if hasattr(old, attr):
-            try:
-                setattr(new, attr, getattr(old, attr))
-            except ValidationError as e:
-                print(f"* Ignoring incompatible value for field {attr}:\n  {str(e)}")
-
-    # a few places where the field names have changed and we have to
-    # manually add in the new names/values
-    new.xformers_enabled = old.xformers
-    new.conf_path = old.conf
-    new.root = legacy_format.parent.resolve()
-
-    invokeai_yaml = legacy_format.parent / "invokeai.yaml"
-    with open(invokeai_yaml, "w", encoding="utf-8") as outfile:
-        outfile.write(new.to_yaml())
-
-    legacy_format.replace(legacy_format.parent / "invokeai.init.orig")
-
-
-# -------------------------------------
-def migrate_models(root: Path) -> None:
-    from invokeai.backend.install.migrate_to_3 import do_migrate
-
-    do_migrate(root, root)
-
-
-def migrate_if_needed(opt: Namespace, root: Path) -> bool:
+def is_v2_install(root: Path) -> bool:
     # We check for to see if the runtime directory is correctly initialized.
     old_init_file = root / "invokeai.init"
     new_init_file = root / "invokeai.yaml"
     old_hub = root / "models/hub"
-    migration_needed = (old_init_file.exists() and not new_init_file.exists()) and old_hub.exists()
-
-    if migration_needed:
-        if opt.yes_to_all or yes_or_no(
-            f"{str(config.root_path)} appears to be a 2.3 format root directory. Convert to version 3.0?"
-        ):
-            logger.info("** Migrating invokeai.init to invokeai.yaml")
-            migrate_init_file(old_init_file)
-            omegaconf = OmegaConf.load(new_init_file)
-            assert isinstance(omegaconf, DictConfig)
-            config.parse_args(argv=[], conf=omegaconf)
-
-            if old_hub.exists():
-                migrate_models(config.root_path)
-        else:
-            print("Cannot continue without conversion. Aborting.")
-
-    return migration_needed
+    is_v2 = (old_init_file.exists() and not new_init_file.exists()) and old_hub.exists()
+    return is_v2
 
 
 # -------------------------------------
-def main() -> None:
+def main(opt: Namespace) -> None:
     global FORCE_FULL_PRECISION  # FIXME
-    parser = argparse.ArgumentParser(description="InvokeAI model downloader")
-    parser.add_argument(
-        "--skip-sd-weights",
-        dest="skip_sd_weights",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help="skip downloading the large Stable Diffusion weight files",
-    )
-    parser.add_argument(
-        "--skip-support-models",
-        dest="skip_support_models",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help="skip downloading the support models",
-    )
-    parser.add_argument(
-        "--full-precision",
-        dest="full_precision",
-        action=argparse.BooleanOptionalAction,
-        type=bool,
-        default=False,
-        help="use 32-bit weights instead of faster 16-bit weights",
-    )
-    parser.add_argument(
-        "--yes",
-        "-y",
-        dest="yes_to_all",
-        action="store_true",
-        help='answer "yes" to all prompts',
-    )
-    parser.add_argument(
-        "--default_only",
-        action="store_true",
-        help="when --yes specified, only install the default model",
-    )
-    parser.add_argument(
-        "--config_file",
-        "-c",
-        dest="config_file",
-        type=str,
-        default=None,
-        help="path to configuration file to create",
-    )
-    parser.add_argument(
-        "--root_dir",
-        dest="root",
-        type=str,
-        default=None,
-        help="path to root of install directory",
-    )
-    opt = parser.parse_args()
-    invoke_args = []
-    if opt.root:
-        invoke_args.extend(["--root", opt.root])
+    global config
+
+    updates: dict[str, Any] = {}
+
+    config = get_config()
     if opt.full_precision:
-        invoke_args.extend(["--precision", "float32"])
-    config.parse_args(invoke_args)
+        updates["precision"] = "float32"
+
+    try:
+        # Attempt to read the config file into the config object
+        config.merge_from_file()
+    except FileNotFoundError:
+        # No config file, first time running the app
+        pass
+
+    config.update_config(updates)
     logger = InvokeAILogger().get_logger(config=config)
 
-    errors = set()
+    errors: set[str] = set()
     FORCE_FULL_PRECISION = opt.full_precision  # FIXME global
-    new_init_file = config.root_path / "invokeai.yaml"
+
+    # Before we write anything else, make a backup of the existing init file
+    new_init_file = config.init_file_path
     backup_init_file = new_init_file.with_suffix(".bak")
     if new_init_file.exists():
         copy(new_init_file, backup_init_file)
 
     try:
-        # if we do a root migration/upgrade, then we are keeping previous
-        # configuration and we are done.
-        if migrate_if_needed(opt, config.root_path):
+        # v2.3 -> v4.0.0 upgrade is no longer supported
+        if is_v2_install(config.root_path):
+            logger.error("Migration from v2.3 to v4.0.0 is no longer supported. Please install a fresh copy.")
             sys.exit(0)
 
         # run this unconditionally in case new directories need to be added
@@ -908,13 +784,20 @@ def main() -> None:
         models_to_download = default_user_selections(opt, install_helper)
 
         if opt.yes_to_all:
-            write_default_options(opt, new_init_file)
-            init_options = Namespace(precision="float32" if opt.full_precision else "float16")
-
+            # We will not show the UI - just write the default config to the file and move on to installing models.
+            get_default_config().write_file(new_init_file)
         else:
-            init_options, models_to_download = run_console_ui(opt, new_init_file, install_helper)
-            if init_options:
-                write_opts(init_options, new_init_file)
+            # Run the UI to get the user's options & model choices
+            user_opts, models_to_download = run_console_ui(opt, install_helper)
+            if user_opts:
+                # Create a dict of the user's opts, omitting any fields that are not config settings (like `hf_token`)
+                user_opts_dict = {k: v for k, v in vars(user_opts).items() if k in config.model_fields}
+                # Merge the user's opts back into the config object & write it
+                config.update_config(user_opts_dict)
+                config.write_file(config.init_file_path)
+
+                if hasattr(user_opts, "hf_token") and user_opts.hf_token:
+                    HfLogin(user_opts.hf_token)
             else:
                 logger.info('\n** CANCELLED AT USER\'S REQUEST. USE THE "invoke.sh" LAUNCHER TO RUN LATER **\n')
                 sys.exit(0)
@@ -927,7 +810,6 @@ def main() -> None:
 
         if opt.skip_sd_weights:
             logger.warning("Skipping diffusion weights download per user request")
-
         elif models_to_download:
             install_helper.add_or_delete(models_to_download)
 

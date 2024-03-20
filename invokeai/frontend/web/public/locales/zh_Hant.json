@@ -2,16 +2,12 @@
     "common": {
         "nodes": "節點",
         "img2img": "圖片轉圖片",
-        "statusError": "錯誤",
         "statusDisconnected": "已中斷連線",
-        "statusConnected": "已連線",
         "back": "返回",
         "load": "載入",
-        "close": "關閉",
         "settingsLabel": "設定",
         "upload": "上傳",
         "discordLabel": "Discord",
-        "nodesDesc": "使用Node生成圖像的系統正在開發中。敬請期待有關於這項功能的更新。",
         "reportBugLabel": "回報錯誤",
         "githubLabel": "GitHub",
         "hotkeysLabel": "快捷鍵",
@@ -21,18 +17,11 @@
         "txt2img": "文字轉圖片"
     },
     "accessibility": {
-        "modelSelect": "選擇模型",
         "invokeProgressBar": "Invoke 進度條",
         "uploadImage": "上傳圖片",
         "reset": "重設",
         "nextImage": "下一張圖片",
         "previousImage": "上一張圖片",
-        "flipHorizontally": "水平翻轉",
-        "useThisParameter": "使用此參數",
-        "zoomIn": "放大",
-        "zoomOut": "縮小",
-        "flipVertically": "垂直翻轉",
-        "modifyConfig": "修改配置",
         "menu": "選單"
     }
 }
