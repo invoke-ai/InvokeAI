@@ -26,7 +26,7 @@ driver).
 
 🖥️ **Download the latest installer .zip file here** : https://github.com/invoke-ai/InvokeAI/releases/latest
   
-- *Look for the file labelled "InvokeAI-installer-v3.X.X.zip" at the bottom of the page*
+- *Look for the file labelled "InvokeAI-installer-v4.X.X.zip" at the bottom of the page*
 - If you experience issues, read through the full [installation instructions](010_INSTALL_AUTOMATED.md) to make sure you have met all of the installation requirements. If you need more help, join the [Discord](discord.gg/invoke-ai) or create an issue on [Github](https://github.com/invoke-ai/InvokeAI).
 
 
