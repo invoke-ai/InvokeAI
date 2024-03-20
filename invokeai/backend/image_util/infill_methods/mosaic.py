@@ -6,7 +6,7 @@ from PIL import Image
 
 def infill_mosaic(
     image: Image.Image,
-    tile_shape: Tuple[int, int] = (64, 16),
+    tile_shape: Tuple[int, int] = (64, 64),
     min_color: Tuple[int, int, int, int] = (0, 0, 0, 0),
     max_color: Tuple[int, int, int, int] = (255, 255, 255, 0),
 ) -> Image.Image:
@@ -34,20 +34,24 @@ def infill_mosaic(
     tiles = []
     for _ in range(256):
         color = non_transparent_pixels[np.random.randint(len(non_transparent_pixels))]
-
         tile = np.zeros((tile_height, tile_width, 3), dtype=np.uint8)
         tile[:, :] = color
         tiles.append(tile)
 
     # Fill the transparent area with tiles
     filled_image = np.zeros((image.height, image.width, 3), dtype=np.uint8)
+
     for x in range(image.width):
         for y in range(image.height):
             tile = tiles[np.random.randint(len(tiles))]
-            filled_image[
-                y - (y % tile_height) : y - (y % tile_height) + tile_height,
-                x - (x % tile_width) : x - (x % tile_width) + tile_width,
-            ] = tile
+            try:
+                filled_image[
+                    y - (y % tile_height) : y - (y % tile_height) + tile_height,
+                    x - (x % tile_width) : x - (x % tile_width) + tile_width,
+                ] = tile
+            except ValueError:
+                # Need to handle edge cases - literally
+                pass
 
     filled_image = Image.fromarray(filled_image)  # Convert the filled tiles image to PIL
     image = Image.composite(
