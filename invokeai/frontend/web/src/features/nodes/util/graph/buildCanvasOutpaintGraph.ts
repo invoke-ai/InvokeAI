@@ -65,6 +65,10 @@ export const buildCanvasOutpaintGraph = async (
     infillTileSize,
     infillPatchmatchDownscaleSize,
     infillMethod,
+    infillMosaicTileWidth,
+    infillMosaicTileHeight,
+    infillMosaicMinColor,
+    infillMosaicMaxColor,
     clipSkip,
     seamlessXAxis,
     seamlessYAxis,
@@ -361,6 +365,10 @@ export const buildCanvasOutpaintGraph = async (
       type: 'infill_mosaic',
       id: INPAINT_INFILL,
       is_intermediate,
+      tile_width: infillMosaicTileWidth,
+      tile_height: infillMosaicTileHeight,
+      min_color: infillMosaicMinColor,
+      max_color: infillMosaicMaxColor,
     };
   }
 
