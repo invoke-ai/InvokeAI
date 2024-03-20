@@ -27,18 +27,9 @@ x-invokeai: &invokeai
         bind:
           create_host_path: true
       - ${HF_HOME:-~/.cache/huggingface}:${HF_HOME:-/invokeai/.cache/huggingface}
-      # - ${INVOKEAI_MODELS_DIR:-${INVOKEAI_ROOT:-/invokeai/models}}
-      # - ${INVOKEAI_MODELS_CONFIG_PATH:-${INVOKEAI_ROOT:-/invokeai/configs/models.yaml}}
     tty: true
     stdin_open: true
 
-    # # Example of running alternative commands/scripts in the container
-    # command:
-    #   - bash
-    #   - -c
-    #   - |
-    #     invokeai-model-install --yes --default-only --config_file ${INVOKEAI_ROOT}/config_custom.yaml
-    #     invokeai-nodes-web --host 0.0.0.0
 
 services:
   invokeai-nvidia:
