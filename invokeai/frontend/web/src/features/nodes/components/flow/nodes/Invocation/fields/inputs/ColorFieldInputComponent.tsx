@@ -55,9 +55,10 @@ const ColorFieldInputComponent = (props: FieldComponentProps<ColorFieldInputInst
           background: colorTokenToCssVar('base.700'),
           color: colorTokenToCssVar('base.100'),
           fontSize: 12,
-          paddingInlineStart: 4,
+          paddingInlineStart: 10,
           borderRadius: 4,
           paddingBlock: 4,
+          outline: 'none',
         }}
         className="nodrag"
         color={rgbaToHex(color)}
