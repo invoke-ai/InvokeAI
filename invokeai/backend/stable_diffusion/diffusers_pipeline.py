@@ -85,7 +85,7 @@ class AddsMaskGuidance:
     noise: torch.Tensor
     gradient_mask: bool
 
-    def __call__(self, latents: torch.Tensor, t: torch.Tensor, conditioning) -> torch.Tensor:
+    def __call__(self, latents: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
         return self.apply_mask(latents, t)
 
     def apply_mask(self, latents: torch.Tensor, t) -> torch.Tensor:
@@ -479,7 +479,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # one day we will expand this extension point, but for now it just does denoise masking
         for guidance in additional_guidance:
-            latents = guidance(latents, timestep, conditioning_data)
+            latents = guidance(latents, timestep)
 
         # TODO: should this scaling happen here or inside self._unet_forward?
         #     i.e. before or after passing it to InvokeAIDiffuserComponent
@@ -570,6 +570,18 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # compute the previous noisy sample x_t -> x_t-1
         step_output = self.scheduler.step(noise_pred, timestep, latents, **conditioning_data.scheduler_args)
+
+        # TODO: discuss injection point options. For now this is a patch to get progress images working with inpainting again.
+        for guidance in additional_guidance:
+            # apply the mask to any "denoised" or "pred_original_sample" fields
+            if hasattr(step_output, "denoised"):
+                step_output.pred_original_sample = guidance(step_output.denoised, self.scheduler.timesteps[-1])
+            elif hasattr(step_output, "pred_original_sample"):
+                step_output.pred_original_sample = guidance(
+                    step_output.pred_original_sample, self.scheduler.timesteps[-1]
+                )
+            else:
+                step_output.pred_original_sample = guidance(latents, self.scheduler.timesteps[-1])
 
         return step_output
 
