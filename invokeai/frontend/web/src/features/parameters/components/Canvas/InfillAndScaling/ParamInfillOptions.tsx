@@ -3,6 +3,7 @@ import { memo } from 'react';
 
 import ParamInfillPatchmatchDownscaleSize from './ParamInfillPatchmatchDownscaleSize';
 import ParamInfillTilesize from './ParamInfillTilesize';
+import ParamMosaicInfillOptions from './ParamMosaicInfillOptions';
 
 const ParamInfillOptions = () => {
   const infillMethod = useAppSelector((s) => s.generation.infillMethod);
@@ -12,6 +13,10 @@ const ParamInfillOptions = () => {
 
   if (infillMethod === 'patchmatch') {
     return <ParamInfillPatchmatchDownscaleSize />;
+  }
+
+  if (infillMethod === 'mosaic') {
+    return <ParamMosaicInfillOptions />;
   }
 
   return null;

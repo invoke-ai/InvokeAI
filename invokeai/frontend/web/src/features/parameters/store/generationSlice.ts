@@ -19,6 +19,7 @@ import type {
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { configChanged } from 'features/system/store/configSlice';
 import { clamp } from 'lodash-es';
+import type { RgbaColor } from 'react-colorful';
 import type { ImageDTO } from 'services/api/types';
 
 import type { GenerationState } from './types';
@@ -55,6 +56,10 @@ const initialGenerationState: GenerationState = {
   shouldUseCpuNoise: true,
   shouldShowAdvancedOptions: false,
   aspectRatio: { ...initialAspectRatioState },
+  infillMosaicTileWidth: 64,
+  infillMosaicTileHeight: 64,
+  infillMosaicMinColor: { r: 0, g: 0, b: 0, a: 1 },
+  infillMosaicMaxColor: { r: 255, g: 255, b: 255, a: 1 },
 };
 
 export const generationSlice = createSlice({
@@ -206,6 +211,18 @@ export const generationSlice = createSlice({
     aspectRatioChanged: (state, action: PayloadAction<AspectRatioState>) => {
       state.aspectRatio = action.payload;
     },
+    setInfillMosaicTileWidth: (state, action: PayloadAction<number>) => {
+      state.infillMosaicTileWidth = action.payload;
+    },
+    setInfillMosaicTileHeight: (state, action: PayloadAction<number>) => {
+      state.infillMosaicTileHeight = action.payload;
+    },
+    setInfillMosaicMinColor: (state, action: PayloadAction<RgbaColor>) => {
+      state.infillMosaicMinColor = action.payload;
+    },
+    setInfillMosaicMaxColor: (state, action: PayloadAction<RgbaColor>) => {
+      state.infillMosaicMaxColor = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(configChanged, (state, action) => {
@@ -264,6 +281,10 @@ export const {
   heightChanged,
   widthRecalled,
   heightRecalled,
+  setInfillMosaicTileWidth,
+  setInfillMosaicTileHeight,
+  setInfillMosaicMinColor,
+  setInfillMosaicMaxColor,
 } = generationSlice.actions;
 
 export const { selectOptimalDimension } = generationSlice.selectors;
