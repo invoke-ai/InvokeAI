@@ -19,7 +19,7 @@ x-invokeai: &invokeai
       - INVOKEAI_ROOT=${CONTAINER_INVOKEAI_ROOT:-/invokeai}
       - HF_HOME
     ports:
-      - "${INVOKEAI_PORT:-9090}:9090"
+      - "${INVOKEAI_PORT:-9090}:${INVOKEAI_PORT:-9090}"
     volumes:
       - type: bind
         source: ${HOST_INVOKEAI_ROOT:-${INVOKEAI_ROOT:-~/invokeai}}

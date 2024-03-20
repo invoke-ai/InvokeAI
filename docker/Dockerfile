@@ -94,6 +94,8 @@ RUN apt update && apt install -y --no-install-recommends \
 ENV INVOKEAI_SRC=/opt/invokeai
 ENV VIRTUAL_ENV=/opt/venv/invokeai
 ENV INVOKEAI_ROOT=/invokeai
+ENV INVOKEAI_HOST=0.0.0.0
+ENV INVOKEAI_PORT=9090
 ENV PATH="$VIRTUAL_ENV/bin:$INVOKEAI_SRC:$PATH"
 ENV CONTAINER_UID=${CONTAINER_UID:-1000}
 ENV CONTAINER_GID=${CONTAINER_GID:-1000}
@@ -118,4 +120,4 @@ RUN mkdir -p ${INVOKEAI_ROOT} && chown -R ${CONTAINER_UID}:${CONTAINER_GID} ${IN
 
 COPY docker/docker-entrypoint.sh ./
 ENTRYPOINT ["/opt/invokeai/docker-entrypoint.sh"]
-CMD ["invokeai-web", "--host", "0.0.0.0"]
+CMD ["invokeai-web"]
