@@ -365,6 +365,22 @@ export const buildCanvasSDXLOutpaintGraph = async (
     };
   }
 
+  if (infillMethod === 'mosaic') {
+    graph.nodes[INPAINT_INFILL] = {
+      type: 'infill_mosaic',
+      id: INPAINT_INFILL,
+      is_intermediate,
+    };
+  }
+
+  if (infillMethod === 'color') {
+    graph.nodes[INPAINT_INFILL] = {
+      type: 'infill_rgba',
+      id: INPAINT_INFILL,
+      is_intermediate,
+    };
+  }
+
   // Handle Scale Before Processing
   if (isUsingScaledDimensions) {
     const scaledWidth: number = scaledBoundingBoxDimensions.width;
