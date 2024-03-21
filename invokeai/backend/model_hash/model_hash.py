@@ -61,7 +61,7 @@ class ModelHash:
     """
 
     def __init__(
-        self, algorithm: HASHING_ALGORITHMS = "blake3", file_filter: Optional[Callable[[str], bool]] = None
+        self, algorithm: HASHING_ALGORITHMS = "blake3_single", file_filter: Optional[Callable[[str], bool]] = None
     ) -> None:
         self.algorithm: HASHING_ALGORITHMS = algorithm
         if algorithm == "blake3":
