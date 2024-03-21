@@ -146,11 +146,11 @@ class ModelProbe(object):
             raise InvalidModelConfigException(f"Unhandled combination of {format_type} and {model_type}")
 
         probe = probe_class(model_path)
-
+        model_path = probe.model_path
         fields["source_type"] = fields.get("source_type") or ModelSourceType.Path
         fields["source"] = fields.get("source") or model_path.as_posix()
         fields["key"] = fields.get("key", uuid_string())
-        fields["path"] = probe.model_path.as_posix() or model_path.as_posix()
+        fields["path"] = model_path.as_posix()
         fields["type"] = fields.get("type") or model_type
         fields["base"] = fields.get("base") or probe.get_base_type()
         fields["variant"] = fields.get("variant") or probe.get_variant_type()
