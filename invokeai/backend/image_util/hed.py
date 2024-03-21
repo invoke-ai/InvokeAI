@@ -1,4 +1,4 @@
-"""Adapted from https://github.com/lllyasviel/ControlNet (Apache-2.0 license)."""
+"""Adapted from https://github.com/huggingface/controlnet_aux (Apache-2.0 license)."""
 
 import cv2
 import numpy as np

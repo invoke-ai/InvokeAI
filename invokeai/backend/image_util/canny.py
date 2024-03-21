@@ -14,7 +14,7 @@ def get_canny_edges(
 ) -> Image.Image:
     """Returns the edges of an image using the Canny edge detection algorithm.
 
-    This function is adapted from https://github.com/lllyasviel/ControlNet.
+    Adapted from https://github.com/huggingface/controlnet_aux (Apache-2.0 license).
 
     Args:
         image: The input image.
