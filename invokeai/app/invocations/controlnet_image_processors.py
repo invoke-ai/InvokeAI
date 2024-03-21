@@ -9,7 +9,6 @@ import numpy as np
 from controlnet_aux import (
     ContentShuffleDetector,
     LeresDetector,
-    LineartAnimeDetector,
     MediapipeFaceDetector,
     MidasDetector,
     MLSDdetector,
@@ -41,6 +40,7 @@ from invokeai.backend.image_util.depth_anything import DepthAnythingDetector
 from invokeai.backend.image_util.dw_openpose import DWOpenposeDetector
 from invokeai.backend.image_util.hed import HEDProcessor
 from invokeai.backend.image_util.lineart import LineartProcessor
+from invokeai.backend.image_util.lineart_anime import LineartAnimeProcessor
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 
@@ -264,9 +264,9 @@ class LineartAnimeImageProcessorInvocation(ImageProcessorInvocation):
     detect_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.detect_res)
     image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
 
-    def run_processor(self, image):
-        processor = LineartAnimeDetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = processor(
+    def run_processor(self, image: Image.Image) -> Image.Image:
+        processor = LineartAnimeProcessor()
+        processed_image = processor.run(
             image,
             detect_resolution=self.detect_resolution,
             image_resolution=self.image_resolution,
