@@ -18,8 +18,6 @@ ENV INVOKEAI_SRC=/opt/invokeai
 ENV VIRTUAL_ENV=/opt/venv/invokeai
 
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-ARG TORCH_VERSION=2.1.2
-ARG TORCHVISION_VERSION=0.16.2
 ARG GPU_DRIVER=cuda
 ARG TARGETPLATFORM="linux/amd64"
 # unused but available
@@ -27,7 +25,12 @@ ARG BUILDPLATFORM
 
 WORKDIR ${INVOKEAI_SRC}
 
-# Install pytorch before all other pip packages
+COPY invokeai ./invokeai
+COPY pyproject.toml ./
+
+# Editable mode helps use the same image for development:
+# the local working copy can be bind-mounted into the image
+# at path defined by ${INVOKEAI_SRC}
 # NOTE: there are no pytorch builds for arm64 + cuda, only cpu
 # x86_64/CUDA is default
 RUN --mount=type=cache,target=/root/.cache/pip \
@@ -39,20 +42,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     else \
         extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cu121"; \
     fi &&\
-    pip install $extra_index_url_arg \
-        torch==$TORCH_VERSION \
-        torchvision==$TORCHVISION_VERSION
 
-# Install the local package.
-# Editable mode helps use the same image for development:
-# the local working copy can be bind-mounted into the image
-# at path defined by ${INVOKEAI_SRC}
-COPY invokeai ./invokeai
-COPY pyproject.toml ./
-RUN --mount=type=cache,target=/root/.cache/pip \
     # xformers + triton fails to install on arm64
     if [ "$GPU_DRIVER" = "cuda" ] && [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
-        pip install -e ".[xformers]"; \
+        pip install $extra_index_url_arg -e ".[xformers]"; \
     else \
         pip install $extra_index_url_arg -e "."; \
     fi
@@ -101,6 +94,8 @@ RUN apt update && apt install -y --no-install-recommends \
 ENV INVOKEAI_SRC=/opt/invokeai
 ENV VIRTUAL_ENV=/opt/venv/invokeai
 ENV INVOKEAI_ROOT=/invokeai
+ENV INVOKEAI_HOST=0.0.0.0
+ENV INVOKEAI_PORT=9090
 ENV PATH="$VIRTUAL_ENV/bin:$INVOKEAI_SRC:$PATH"
 ENV CONTAINER_UID=${CONTAINER_UID:-1000}
 ENV CONTAINER_GID=${CONTAINER_GID:-1000}
@@ -125,4 +120,4 @@ RUN mkdir -p ${INVOKEAI_ROOT} && chown -R ${CONTAINER_UID}:${CONTAINER_GID} ${IN
 
 COPY docker/docker-entrypoint.sh ./
 ENTRYPOINT ["/opt/invokeai/docker-entrypoint.sh"]
-CMD ["invokeai-web", "--host", "0.0.0.0"]
+CMD ["invokeai-web"]
