@@ -733,12 +733,13 @@ class ModelInstallService(ModelInstallServiceBase):
         install_job._install_tmpdir = tmpdir
         assert install_job.total_bytes is not None  # to avoid type checking complaints in the loop below
 
-        self._logger.info(f"Queuing {source} for downloading")
+        files_string = "file" if len(remote_files) == 1 else "file"
+        self._logger.info(f"Queuing model install: {source} ({len(remote_files)} {files_string})")
         self._logger.debug(f"remote_files={remote_files}")
         for model_file in remote_files:
             url = model_file.url
             path = root / model_file.path.relative_to(subfolder)
-            self._logger.info(f"Downloading {url} => {path}")
+            self._logger.debug(f"Downloading {url} => {path}")
             install_job.total_bytes += model_file.size
             assert hasattr(source, "access_token")
             dest = tmpdir / path.parent
@@ -774,7 +775,7 @@ class ModelInstallService(ModelInstallServiceBase):
     # Callbacks are executed by the download queue in a separate thread
     # ------------------------------------------------------------------
     def _download_started_callback(self, download_job: DownloadJob) -> None:
-        self._logger.info(f"{download_job.source}: model download started")
+        self._logger.info(f"Model download started: {download_job.source}")
         with self._lock:
             install_job = self._download_cache[download_job.source]
             install_job.status = InstallStatus.DOWNLOADING
@@ -800,7 +801,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 self._signal_job_downloading(install_job)
 
     def _download_complete_callback(self, download_job: DownloadJob) -> None:
-        self._logger.info(f"{download_job.source}: model download complete")
+        self._logger.info(f"Model download complete: {download_job.source}")
         with self._lock:
             install_job = self._download_cache[download_job.source]
 
@@ -833,7 +834,7 @@ class ModelInstallService(ModelInstallServiceBase):
             if not install_job:
                 return
             self._downloads_changed_event.set()
-            self._logger.warning(f"{download_job.source}: model download cancelled")
+            self._logger.warning(f"Model download canceled: {download_job.source}")
             # if install job has already registered an error, then do not replace its status with cancelled
             if not install_job.errored:
                 install_job.cancel()
@@ -857,7 +858,7 @@ class ModelInstallService(ModelInstallServiceBase):
     # ------------------------------------------------------------------------------------------------
     def _signal_job_running(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.RUNNING
-        self._logger.info(f"{job.source}: model installation started")
+        self._logger.info(f"Model install started: {job.source}")
         if self._event_bus:
             self._event_bus.emit_model_install_running(str(job.source))
 
@@ -885,16 +886,15 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _signal_job_downloads_done(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.DOWNLOADS_DONE
-        self._logger.info(f"{job.source}: all parts of this model are downloaded")
+        self._logger.info(f"Model download complete: {job.source}")
         if self._event_bus:
             self._event_bus.emit_model_install_downloads_done(str(job.source))
 
     def _signal_job_completed(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.COMPLETED
         assert job.config_out
-        self._logger.info(
-            f"{job.source}: model installation completed. {job.local_path} registered key {job.config_out.key}"
-        )
+        self._logger.info(f"Model install complete: {job.source}")
+        self._logger.debug(f"{job.local_path} registered key {job.config_out.key}")
         if self._event_bus:
             assert job.local_path is not None
             assert job.config_out is not None
@@ -902,7 +902,7 @@ class ModelInstallService(ModelInstallServiceBase):
             self._event_bus.emit_model_install_completed(str(job.source), key, id=job.id)
 
     def _signal_job_errored(self, job: ModelInstallJob) -> None:
-        self._logger.info(f"{job.source}: model installation encountered an exception: {job.error_type}\n{job.error}")
+        self._logger.info(f"Model install error: {job.source}, {job.error_type}\n{job.error}")
         if self._event_bus:
             error_type = job.error_type
             error = job.error
@@ -911,7 +911,7 @@ class ModelInstallService(ModelInstallServiceBase):
             self._event_bus.emit_model_install_error(str(job.source), error_type, error, id=job.id)
 
     def _signal_job_cancelled(self, job: ModelInstallJob) -> None:
-        self._logger.info(f"{job.source}: model installation was cancelled")
+        self._logger.info(f"Model install canceled: {job.source}")
         if self._event_bus:
             self._event_bus.emit_model_install_cancelled(str(job.source), id=job.id)
 
