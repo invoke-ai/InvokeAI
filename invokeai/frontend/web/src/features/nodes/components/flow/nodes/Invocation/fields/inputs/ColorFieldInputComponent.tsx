@@ -61,7 +61,7 @@ const ColorFieldInputComponent = (props: FieldComponentProps<ColorFieldInputInst
           outline: 'none',
         }}
         className="nodrag"
-        color={rgbaToHex(color)}
+        color={rgbaToHex(color, true)}
         onChange={handleValueChanged}
         prefixed
         alpha

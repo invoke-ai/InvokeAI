@@ -1,11 +1,11 @@
 import type { RgbaColor } from 'react-colorful';
 
-export function rgbaToHex(color: RgbaColor): string {
+export function rgbaToHex(color: RgbaColor, alpha: boolean = false): string {
   const hex = ((1 << 24) + (color.r << 16) + (color.g << 8) + color.b).toString(16).slice(1);
   const alphaHex = Math.round(color.a * 255)
     .toString(16)
     .padStart(2, '0');
-  return `#${hex}${alphaHex}`;
+  return alpha ? `#${hex}${alphaHex}` : `#${hex}`;
 }
 
 export function hexToRGBA(hex: string, alpha: number) {
