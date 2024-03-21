@@ -119,21 +119,21 @@ The provided token will be added as a `Bearer` token to the network requests to 
 
 #### Model Hashing
 
-Models are hashed during installation, providing a stable identifier for models across all platforms. The default algorithm is `blake3`, with a multi-threaded implementation.
-
-If your models are stored on a spinning hard drive, we suggest using `blake3_single`, the single-threaded implementation. The hashes are the same, but it's much faster on spinning disks.
+Models are hashed during installation, providing a stable identifier for models across all platforms. Hashing is a one-time operation.
 
 ```yaml
-hashing_algorithm: blake3_single
+hashing_algorithm: blake3_single # default value
 ```
 
-Model hashing is a one-time operation, but it may take a couple minutes to hash a large model collection. You may opt out of model hashing entirely by setting the algorithm to `random`.
+You might want to change this setting, depending on your system:
 
-```yaml
-hashing_algorithm: random
-```
+- `blake3_single` (default): Single-threaded - best for spinning HDDs, still OK for SSDs
+- `blake3_multi`: Parallelized, memory-mapped implementation - best for SSDs, terrible for spinning disks
+- `random`: Skip hashing entirely - fastest but of course no hash
 
-Most common algorithms are supported, like `md5`, `sha256`, and `sha512`. These are typically much, much slower than `blake3`.
+During the first startup after upgrading to v4, all of your models will be hashed. This can take a few minutes.
+
+Most common algorithms are supported, like `md5`, `sha256`, and `sha512`. These are typically much, much slower than either of the BLAKE3 variants.
 
 #### Path Settings
 

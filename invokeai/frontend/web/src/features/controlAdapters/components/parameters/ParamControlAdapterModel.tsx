@@ -1,17 +1,27 @@
-import { CustomSelect, FormControl } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui-library';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useModelCustomSelect } from 'common/hooks/useModelCustomSelect';
+import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterModel } from 'features/controlAdapters/hooks/useControlAdapterModel';
 import { useControlAdapterModels } from 'features/controlAdapters/hooks/useControlAdapterModels';
 import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
 import { controlAdapterModelChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
+import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { memo, useCallback, useMemo } from 'react';
-import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
+import { useTranslation } from 'react-i18next';
+import type {
+  AnyModelConfig,
+  ControlNetModelConfig,
+  IPAdapterModelConfig,
+  T2IAdapterModelConfig,
+} from 'services/api/types';
 
 type ParamControlAdapterModelProps = {
   id: string;
 };
+
+const selectMainModel = createMemoizedSelector(selectGenerationSlice, (generation) => generation.model);
 
 const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   const isEnabled = useControlAdapterIsEnabled(id);
@@ -19,6 +29,8 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   const { modelConfig } = useControlAdapterModel(id);
   const dispatch = useAppDispatch();
   const currentBaseModel = useAppSelector((s) => s.generation.model?.base);
+  const mainModel = useAppSelector(selectMainModel);
+  const { t } = useTranslation();
 
   const [modelConfigs, { isLoading }] = useControlAdapterModels(controlAdapterType);
 
@@ -42,24 +54,35 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
     [controlAdapterType, modelConfig]
   );
 
-  const { items, selectedItem, onChange, placeholder } = useModelCustomSelect({
+  const getIsDisabled = useCallback(
+    (model: AnyModelConfig): boolean => {
+      const isCompatible = currentBaseModel === model.base;
+      const hasMainModel = Boolean(currentBaseModel);
+      return !hasMainModel || !isCompatible;
+    },
+    [currentBaseModel]
+  );
+
+  const { options, value, onChange, noOptionsMessage } = useGroupedModelCombobox({
     modelConfigs,
-    isLoading,
-    selectedModel,
     onChange: _onChange,
-    modelFilter: (model) => model.base === currentBaseModel,
+    selectedModel,
+    getIsDisabled,
+    isLoading,
   });
 
   return (
-    <FormControl isDisabled={!items.length || !isEnabled} isInvalid={!selectedItem || !items.length}>
-      <CustomSelect
-        key={items.length}
-        selectedItem={selectedItem}
-        placeholder={placeholder}
-        items={items}
-        onChange={onChange}
-      />
-    </FormControl>
+    <Tooltip label={value?.description}>
+      <FormControl isDisabled={!isEnabled} isInvalid={!value || mainModel?.base !== modelConfig?.base}>
+        <Combobox
+          options={options}
+          placeholder={t('controlnet.selectModel')}
+          value={value}
+          onChange={onChange}
+          noOptionsMessage={noOptionsMessage}
+        />
+      </FormControl>
+    </Tooltip>
   );
 };
 
