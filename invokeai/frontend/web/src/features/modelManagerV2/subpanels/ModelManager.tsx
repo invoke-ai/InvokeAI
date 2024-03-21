@@ -1,5 +1,6 @@
 import { Button, Flex, Heading, Spacer } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { HFToken } from 'features/modelManagerV2/components/HFToken';
 import { SyncModelsButton } from 'features/modelManagerV2/components/SyncModels/SyncModelsButton';
 import { setSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { useCallback } from 'react';
@@ -27,6 +28,7 @@ export const ModelManager = () => {
         </Button>
       </Flex>
       <Flex flexDir="column" layerStyle="second" p={4} gap={4} borderRadius="base" w="full" h="full">
+        <HFToken />
         <ModelListNavigation />
         <ModelList />
       </Flex>

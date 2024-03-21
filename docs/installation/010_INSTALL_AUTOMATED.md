@@ -122,9 +122,9 @@ experimental versions later.
     [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest),
     and look for a file named:
 
-    - InvokeAI-installer-v3.X.X.zip
+    - InvokeAI-installer-v4.X.X.zip
 
-    where "3.X.X" is the latest released version. The file is located
+    where "4.X.X" is the latest released version. The file is located
     at the very bottom of the release page, under **Assets**.
 
 4.  **Unpack the installer**: Unpack the zip file into a convenient directory. This will create a new
@@ -199,136 +199,7 @@ experimental versions later.
     ![initial-settings-screenshot](../assets/installer-walkthrough/settings-form.png)
     </figure>
 
-10. **Post-install Configuration**: After installation completes, the
-    installer will launch the configuration form, which will guide you
-    through the first-time process of adjusting some of InvokeAI's
-    startup settings. To move around this form use ctrl-N for
-    &lt;N&gt;ext and ctrl-P for &lt;P&gt;revious, or use &lt;tab&gt;
-    and shift-&lt;tab&gt; to move forward and back. Once you are in a
-    multi-checkbox field use the up and down cursor keys to select the
-    item you want, and &lt;space&gt; to toggle it on and off.  Within
-    a directory field, pressing &lt;tab&gt; will provide autocomplete
-    options.
-
-    Generally the defaults are fine, and you can come back to this screen at
-    any time to tweak your system. Here are the options you can adjust:
-
-    - ***HuggingFace Access Token***
-      InvokeAI has the ability to download embedded styles and subjects
-      from the HuggingFace Concept Library on-demand. However, some of
-      the concept library files are password protected. To make download
-      smoother, you can set up an account at huggingface.co, obtain an
-      access token, and paste it into this field. Note that you paste
-      to this screen using ctrl-shift-V
-
-    - ***Free GPU memory after each generation***
-        This is useful for low-memory machines and helps minimize the
-	amount of GPU VRAM used by InvokeAI.
-
-    - ***Enable xformers support if available***
-        If the xformers library was successfully installed, this will activate
-	it to reduce memory consumption and increase rendering speed noticeably.
-	Note that xformers has the side effect of generating slightly different
-	images even when presented with the same seed and other settings.
-
-    - ***Force CPU to be used on GPU systems***
-        This will use the (slow) CPU rather than the accelerated GPU. This
-	can be used to generate images on systems that don't have a compatible
-	GPU.
-
-    - ***Precision***
-        This controls whether to use float32 or float16 arithmetic.
-	float16 uses less memory but is also slightly less accurate.
-	Ordinarily the right arithmetic is picked automatically ("auto"),
-	but you may have to use float32 to get images on certain systems
-	and graphics cards. The "autocast" option is deprecated and
-	shouldn't be used unless you are asked to by a member of the team.
-
-    - **Size of the RAM cache used for fast model switching***
-        This allows you to keep models in memory and switch rapidly among
-	them rather than having them load from disk each time. This slider
-	controls how many models to keep loaded at once. A typical SD-1 or SD-2 model
-	uses 2-3 GB of memory. A typical SDXL model uses 6-7 GB. Providing more
-	RAM will allow more models to be co-resident.
-
-    - ***Output directory for images***
-      This is the path to a directory in which InvokeAI will store all its
-      generated images.
-
-    - ***Autoimport Folder***
-      This is the directory in which you can place models you have
-	  downloaded and wish to load into InvokeAI. You can place a variety
-	  of models in this directory, including diffusers folders, .ckpt files,
-	  .safetensors files, as well as LoRAs, ControlNet and Textual Inversion
-	  files (both folder and file versions). To help organize this folder,
-	  you can create several levels of subfolders and drop your models into
-      whichever ones you want.
-	
-    - ***LICENSE***     
-
-    At the bottom of the screen you will see a checkbox for accepting
-    the CreativeML Responsible AI Licenses. You need to accept the license
-    in order to download Stable Diffusion models from the next screen.
-
-    _You can come back to the startup options form_ as many times as you like.
-    From the `invoke.sh` or `invoke.bat` launcher, select option (6) to relaunch
-    this script. On the command line, it is named `invokeai-configure`.
-
-11. **Downloading Models**: After you press `[NEXT]` on the screen, you will be taken
-    to another screen that prompts you to download a series of starter models. The ones
-    we recommend are preselected for you, but you are encouraged to use the checkboxes to
-    pick and choose.
-    You will probably wish to download `autoencoder-840000` for use with models that
-    were trained with an older version of the Stability VAE.
-
-    <figure markdown>
-    ![select-models-screenshot](../assets/installer-walkthrough/installing-models.png)
-    </figure>
-    
-    Below the preselected list of starter models is a large text field which you can use
-    to specify a series of models to import. You can specify models in a variety of formats,
-    each separated by a space or newline. The formats accepted are:
-
-    - The path to a .ckpt or .safetensors file. On most systems, you can drag a file from
-      the file browser to the textfield to automatically paste the path. Be sure to remove
-      extraneous quotation marks and other things that come along for the ride.
-
-    - The path to a directory containing a combination of `.ckpt` and `.safetensors` files.
-      The directory will be scanned from top to bottom (including subfolders) and any
-      file that can be imported will be.
-
-    - A URL pointing to a `.ckpt` or `.safetensors` file. You can cut
-      and paste directly from a web page, or simply drag the link from the web page
-      or navigation bar. (You can also use ctrl-shift-V to paste into this field)
-      The file will be downloaded and installed.
-      
-    - The HuggingFace repository ID (repo_id) for a `diffusers` model. These IDs have
-       the format _author_name/model_name_, as in `andite/anything-v4.0`
-      
-    - The path to a local directory containing a `diffusers`
-      model. These directories always have the file `model_index.json`
-      at their top level.
-
-    _Select a directory for models to import_ You may select a local
-    directory for autoimporting at startup time. If you select this
-    option, the directory you choose will be scanned for new
-    .ckpt/.safetensors files each time InvokeAI starts up, and any new
-    files will be automatically imported and made available for your
-    use.
-
-    _Convert imported models into diffusers_ When legacy checkpoint
-    files are imported, you may select to use them unmodified (the
-    default) or to convert them into `diffusers` models. The latter
-    load much faster and have slightly better rendering performance,
-    but not all checkpoint files can be converted. Note that Stable Diffusion
-    Version 2.X files are **only** supported in `diffusers` format and will
-    be converted regardless.
-     
-     _You can come back to the model install form_ as many times as you like.
-     From the `invoke.sh` or `invoke.bat` launcher, select option (5) to relaunch
-     this script. On the command line, it is named `invokeai-model-install`.
-
-12. **Running InvokeAI for the first time**: The script will now exit and you'll be ready to generate some images. Look
+10. **Running InvokeAI for the first time**: The script will now exit and you'll be ready to generate some images. Look
     for the directory `invokeai` installed in the location you chose at the
     beginning of the install session. Look for a shell script named `invoke.sh`
     (Linux/Mac) or `invoke.bat` (Windows). Launch the script by double-clicking
@@ -349,14 +220,14 @@ experimental versions later.
       http://localhost:9090. Click on this link to open up a browser
       and start exploring InvokeAI's features.
 
-12. **InvokeAI Options**: You can launch InvokeAI with several different command-line arguments that
-    customize its behavior. For example, you can change the location of the
+12. **InvokeAI Options**: You can configure using the `invokeai.yaml` config file.
+    For example, you can change the location of the
     image output directory or balance memory usage vs performance. See
     [Configuration](../features/CONFIGURATION.md) for a full list of the options.
 
     - To set defaults that will take effect every time you launch InvokeAI,
       use a text editor (e.g. Notepad) to exit the file
-      `invokeai\invokeai.init`. It contains a variety of examples that you can
+      `invokeai\invokeai.yaml`. It contains a variety of examples that you can
       follow to add and modify launch options.
 
     - The launcher script also offers you an option labeled "open the developer
@@ -394,7 +265,6 @@ rm .\.venv -r -force
 python -mvenv .venv
 .\.venv\Scripts\activate
 pip install invokeai
-invokeai-configure --yes --root .
 ```
 
 If you see anything marked as an error during this process please stop
@@ -426,16 +296,10 @@ error messages:
 This failure mode occurs when there is a network glitch during
 downloading the very large SDXL model.
 
-To address this, first go to the Web Model Manager and delete the
-Stable-Diffusion-XL-base-1.X model. Then navigate to HuggingFace and
-manually download the .safetensors version of the model. The 1.0
-version is located at
-https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/tree/main
-and the file is named `sd_xl_base_1.0.safetensors`.
-
-Save this file to disk and then reenter the Model Manager. Navigate to
-Import Models->Add Model, then type (or drag-and-drop) the path to the
-.safetensors file. Press "Add Model".
+To address this, first go to the Model Manager and delete the
+Stable-Diffusion-XL-base-1.X model. Then, click the HuggingFace tab,
+ paste the Repo ID stabilityai/stable-diffusion-xl-base-1.0 and install
+ the model.
 
 ### _Package dependency conflicts_
 
@@ -488,15 +352,7 @@ download models, etc), but this doesn't fix the problem.
 
 This issue is often caused by a misconfigured configuration directive in the
 `invokeai\invokeai.init` initialization file that contains startup settings. The
-easiest way to fix the problem is to move the file out of the way and re-run
-`invokeai-configure`. Enter the developer's console (option 3 of the launcher
-script) and run this command:
-
-```cmd
-invokeai-configure --root=.
-```
-
-Note the dot (.) after `--root`. It is part of the command.
+easiest way to fix the problem is to move the file out of the way and restart the app.
 
 _If none of these maneuvers fixes the problem_ then please report the problem to
 the [InvokeAI Issues](https://github.com/invoke-ai/InvokeAI/issues) section, or
@@ -565,16 +421,4 @@ This distribution is changing rapidly, and we add new features
 regularly. Releases are announced at
 http://github.com/invoke-ai/InvokeAI/releases, and at
 https://pypi.org/project/InvokeAI/ To update to the latest released
-version (recommended), follow these steps:
-
-1. Start the `invoke.sh`/`invoke.bat` launch script from within the
-   `invokeai` root directory.
-
-2. Choose menu item (10) "Update InvokeAI".
-
-3. This will launch a menu that gives you the option of:
-
-   1. Updating to the latest official release;
-   2. Updating to the bleeding-edge development version; or
-   3. Manually entering the tag or branch name of a version of
-      InvokeAI you wish to try out.
+version (recommended), download the latest release and run the installer.

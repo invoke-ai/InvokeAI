@@ -12,6 +12,7 @@ export const tagTypes = [
   'Board',
   'BoardImagesTotal',
   'BoardAssetsTotal',
+  'HFTokenStatus',
   'Image',
   'ImageNameList',
   'ImageList',

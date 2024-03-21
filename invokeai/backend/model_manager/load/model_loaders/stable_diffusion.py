@@ -76,7 +76,6 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         assert isinstance(config, MainCheckpointConfig)
         base = config.base
 
-        config_file = config.config_path
         prediction_type = config.prediction_type.value
         upcast_attention = config.upcast_attention
         image_size = (
@@ -92,7 +91,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             model_path,
             output_path,
             model_type=self.model_base_to_model_type[base],
-            original_config_file=self._app_config.root_path / config_file,
+            original_config_file=config.config_path,
             extract_ema=True,
             from_safetensors=model_path.suffix == ".safetensors",
             precision=self._torch_dtype,

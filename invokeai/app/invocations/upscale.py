@@ -11,6 +11,7 @@ from pydantic import ConfigDict
 from invokeai.app.invocations.fields import ImageField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.download_with_progress import download_with_progress_bar
 from invokeai.backend.image_util.basicsr.rrdbnet_arch import RRDBNet
 from invokeai.backend.image_util.realesrgan.realesrgan import RealESRGAN
 from invokeai.backend.util.devices import choose_torch_device
@@ -26,6 +27,13 @@ ESRGAN_MODELS = Literal[
     "ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
     "RealESRGAN_x2plus.pth",
 ]
+
+ESRGAN_MODEL_URLS: dict[str, str] = {
+    "RealESRGAN_x4plus.pth": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+    "RealESRGAN_x4plus_anime_6B.pth": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth",
+    "ESRGAN_SRx4_DF2KOST_official.pth": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
+    "RealESRGAN_x2plus.pth": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth",
+}
 
 if choose_torch_device() == torch.device("mps"):
     from torch import mps
@@ -45,7 +53,6 @@ class ESRGANInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
-        models_path = context.config.get().models_path
 
         rrdbnet_model = None
         netscale = None
@@ -92,11 +99,16 @@ class ESRGANInvocation(BaseInvocation, WithMetadata, WithBoard):
             context.logger.error(msg)
             raise ValueError(msg)
 
-        esrgan_model_path = Path(f"core/upscaling/realesrgan/{self.model_name}")
+        esrgan_model_path = Path(context.config.get().models_path, f"core/upscaling/realesrgan/{self.model_name}")
+
+        # Downloads the ESRGAN model if it doesn't already exist
+        download_with_progress_bar(
+            name=self.model_name, url=ESRGAN_MODEL_URLS[self.model_name], dest_path=esrgan_model_path
+        )
 
         upscaler = RealESRGAN(
             scale=netscale,
-            model_path=models_path / esrgan_model_path,
+            model_path=esrgan_model_path,
             model=rrdbnet_model,
             half=False,
             tile=self.tile_size,

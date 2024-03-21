@@ -1,12 +1,16 @@
 # Copyright (c) 2023 Lincoln D. Stein
 """FastAPI route for model configuration records."""
 
+import contextlib
 import io
 import pathlib
 import shutil
 import traceback
+from copy import deepcopy
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
+import huggingface_hub
 from fastapi import Body, Path, Query, Response, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
@@ -21,6 +25,7 @@ from invokeai.app.services.model_records import (
     UnknownModelException,
 )
 from invokeai.app.services.model_records.model_records_base import DuplicateModelException, ModelRecordChanges
+from invokeai.app.util.suppress_output import SuppressOutput
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
@@ -32,6 +37,7 @@ from invokeai.backend.model_manager.config import (
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
 from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
 from invokeai.backend.model_manager.search import ModelSearch
+from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel
 
 from ..dependencies import ApiDependencies
 
@@ -780,3 +786,69 @@ async def convert_model(
 #     except ValueError as e:
 #         raise HTTPException(status_code=400, detail=str(e))
 #     return response
+
+
+@model_manager_router.get("/starter_models", operation_id="get_starter_models", response_model=list[StarterModel])
+async def get_starter_models() -> list[StarterModel]:
+    installed_models = ApiDependencies.invoker.services.model_manager.store.search_by_attr()
+    installed_model_sources = {m.source for m in installed_models}
+    starter_models = deepcopy(STARTER_MODELS)
+    for model in starter_models:
+        if model.source in installed_model_sources:
+            model.is_installed = True
+        # Remove already-installed dependencies
+        missing_deps: list[str] = []
+        for dep in model.dependencies or []:
+            if dep not in installed_model_sources:
+                missing_deps.append(dep)
+        model.dependencies = missing_deps
+
+    return starter_models
+
+
+class HFTokenStatus(str, Enum):
+    VALID = "valid"
+    INVALID = "invalid"
+    UNKNOWN = "unknown"
+
+
+class HFTokenHelper:
+    @classmethod
+    def get_status(cls) -> HFTokenStatus:
+        try:
+            if huggingface_hub.get_token_permission(huggingface_hub.get_token()):
+                # Valid token!
+                return HFTokenStatus.VALID
+            # No token set
+            return HFTokenStatus.INVALID
+        except Exception:
+            return HFTokenStatus.UNKNOWN
+
+    @classmethod
+    def set_token(cls, token: str) -> HFTokenStatus:
+        with SuppressOutput(), contextlib.suppress(Exception):
+            huggingface_hub.login(token=token, add_to_git_credential=False)
+        return cls.get_status()
+
+
+@model_manager_router.get("/hf_login", operation_id="get_hf_login_status", response_model=HFTokenStatus)
+async def get_hf_login_status() -> HFTokenStatus:
+    token_status = HFTokenHelper.get_status()
+
+    if token_status is HFTokenStatus.UNKNOWN:
+        ApiDependencies.invoker.services.logger.warning("Unable to verify HF token")
+
+    return token_status
+
+
+@model_manager_router.post("/hf_login", operation_id="do_hf_login", response_model=HFTokenStatus)
+async def do_hf_login(
+    token: str = Body(description="Hugging Face token to use for login", embed=True),
+) -> HFTokenStatus:
+    HFTokenHelper.set_token(token)
+    token_status = HFTokenHelper.get_status()
+
+    if token_status is HFTokenStatus.UNKNOWN:
+        ApiDependencies.invoker.services.logger.warning("Unable to verify HF token")
+
+    return token_status

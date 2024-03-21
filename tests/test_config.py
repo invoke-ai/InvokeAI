@@ -9,14 +9,14 @@ from pydantic import ValidationError
 from invokeai.app.services.config.config_default import InvokeAIAppConfig, get_config, load_and_migrate_config
 
 v4_config = """
-schema_version: 4
+schema_version: 4.0.0
 
 host: "192.168.1.1"
 port: 8080
 """
 
 invalid_v5_config = """
-schema_version: 5
+schema_version: 5.0.0
 
 host: "192.168.1.1"
 port: 8080
@@ -170,7 +170,7 @@ def test_set_and_resolve_paths():
     """Test setting root and resolving paths based on it."""
     with TemporaryDirectory() as tmpdir:
         config = InvokeAIAppConfig()
-        config.set_root(Path(tmpdir))
+        config._root = Path(tmpdir)
         assert config.models_path == Path(tmpdir).resolve() / "models"
         assert config.db_path == Path(tmpdir).resolve() / "databases" / "invokeai.db"
 

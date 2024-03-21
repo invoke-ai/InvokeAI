@@ -59,48 +59,23 @@ do_choice() {
         ;;
     2)
         clear
-        printf "Textual inversion training\n"
-        invokeai-ti --gui $PARAMS
-        ;;
-    3)
-        clear
-        printf "Merge models (diffusers type only)\n"
-        invokeai-merge --gui $PARAMS
-        ;;
-    4)
-        clear
-        printf "Download and install models\n"
-        invokeai-model-install --root ${INVOKEAI_ROOT}
-        ;;
-    5)
-        clear
-        printf "Change InvokeAI startup options\n"
-        invokeai-configure --root ${INVOKEAI_ROOT} --skip-sd-weights --skip-support-models
-        ;;
-    6)
-        clear
-        printf "Re-run the configure script to fix a broken install or to complete a major upgrade\n"
-        invokeai-configure --root ${INVOKEAI_ROOT} --yes --default_only --skip-sd-weights
-        ;;
-    7)
-        clear
         printf "Open the developer console\n"
         file_name=$(basename "${BASH_SOURCE[0]}")
         bash --init-file "$file_name"
         ;;
-    8)
+    3)
         clear
         printf "UPDATING FROM WITHIN THE APP IS BEING DEPRECATED\n"
         printf "Please download the installer from https://github.com/invoke-ai/InvokeAI/releases/latest and run it to update your installation.\n"
         sleep 4
         python -m invokeai.frontend.install.invokeai_update
         ;;
-    9)
+    4)
         clear
         printf "Running the db maintenance script\n"
         invokeai-db-maintenance --root ${INVOKEAI_ROOT}
         ;;
-    10)
+    5)
         clear
         printf "Command-line help\n"
         invokeai-web --help
@@ -118,15 +93,10 @@ do_choice() {
 do_dialog() {
     options=(
         1 "Generate images with a browser-based interface"
-        2 "Textual inversion training"
-        3 "Merge models (diffusers type only)"
-        4 "Download and install models"
-        5 "Change InvokeAI startup options"
-        6 "Re-run the configure script to fix a broken install or to complete a major upgrade"
-        7 "Open the developer console"
-        8 "Update InvokeAI (DEPRECATED - please use the installer)"
-	9 "Run the InvokeAI image database maintenance script"
-	10 "Command-line help"
+        2 "Open the developer console"
+        3 "Update InvokeAI (DEPRECATED - please use the installer)"
+        4 "Run the InvokeAI image database maintenance script"
+        5 "Command-line help"
     )
 
     choice=$(dialog --clear \
@@ -151,15 +121,10 @@ do_line_input() {
     printf " ** For a more attractive experience, please install the 'dialog' utility using your package manager. **\n\n"
     printf "What would you like to do?\n"
     printf "1: Generate images using the browser-based interface\n"
-    printf "2: Run textual inversion training\n"
-    printf "3: Merge models (diffusers type only)\n"
-    printf "4: Download and install models\n"
-    printf "5: Change InvokeAI startup options\n"
-    printf "6: Re-run the configure script to fix a broken install\n"
-    printf "7: Open the developer console\n"
-    printf "8: Update InvokeAI\n"
-    printf "9: Run the InvokeAI image database maintenance script\n"
-    printf "10: Command-line help\n"
+    printf "2: Open the developer console\n"
+    printf "3: Update InvokeAI\n"
+    printf "4: Run the InvokeAI image database maintenance script\n"
+    printf "5: Command-line help\n"
     printf "Q: Quit\n\n"
     read -p "Please enter 1-10, Q: [1] " yn
     choice=${yn:='1'}

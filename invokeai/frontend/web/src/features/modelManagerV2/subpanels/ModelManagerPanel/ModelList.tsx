@@ -1,7 +1,8 @@
-import { Flex, Spinner, Text } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   useControlNetModels,
   useEmbeddingModels,
@@ -13,10 +14,12 @@ import {
 } from 'services/api/hooks/modelsByType';
 import type { AnyModelConfig, ModelType } from 'services/api/types';
 
+import { FetchingModelsLoader } from './FetchingModelsLoader';
 import { ModelListWrapper } from './ModelListWrapper';
 
 const ModelList = () => {
   const { searchTerm, filteredModelType } = useAppSelector((s) => s.modelmanagerV2);
+  const { t } = useTranslation();
 
   const [mainModels, { isLoading: isLoadingMainModels }] = useMainModels();
   const filteredMainModels = useMemo(
@@ -66,18 +69,22 @@ const ModelList = () => {
         {/* Main Model List */}
         {isLoadingMainModels && <FetchingModelsLoader loadingMessage="Loading Main Models..." />}
         {!isLoadingMainModels && filteredMainModels.length > 0 && (
-          <ModelListWrapper title="Main" modelList={filteredMainModels} key="main" />
+          <ModelListWrapper title={t('modelManager.main')} modelList={filteredMainModels} key="main" />
         )}
         {/* LoRAs List */}
         {isLoadingLoRAModels && <FetchingModelsLoader loadingMessage="Loading LoRAs..." />}
         {!isLoadingLoRAModels && filteredLoRAModels.length > 0 && (
-          <ModelListWrapper title="LoRA" modelList={filteredLoRAModels} key="loras" />
+          <ModelListWrapper title={t('modelManager.loraModels')} modelList={filteredLoRAModels} key="loras" />
         )}
 
         {/* TI List */}
-        {isLoadingEmbeddingModels && <FetchingModelsLoader loadingMessage="Loading Embeddings..." />}
+        {isLoadingEmbeddingModels && <FetchingModelsLoader loadingMessage="Loading Textual Inversions..." />}
         {!isLoadingEmbeddingModels && filteredEmbeddingModels.length > 0 && (
-          <ModelListWrapper title="Embedding" modelList={filteredEmbeddingModels} key="textual-inversions" />
+          <ModelListWrapper
+            title={t('modelManager.textualInversions')}
+            modelList={filteredEmbeddingModels}
+            key="textual-inversions"
+          />
         )}
 
         {/* VAE List */}
@@ -94,12 +101,16 @@ const ModelList = () => {
         {/* IP Adapter List */}
         {isLoadingIPAdapterModels && <FetchingModelsLoader loadingMessage="Loading IP Adapters..." />}
         {!isLoadingIPAdapterModels && filteredIPAdapterModels.length > 0 && (
-          <ModelListWrapper title="IP Adapter" modelList={filteredIPAdapterModels} key="ip-adapters" />
+          <ModelListWrapper
+            title={t('modelManager.ipAdapters')}
+            modelList={filteredIPAdapterModels}
+            key="ip-adapters"
+          />
         )}
         {/* T2I Adapters List */}
         {isLoadingT2IAdapterModels && <FetchingModelsLoader loadingMessage="Loading T2I Adapters..." />}
         {!isLoadingT2IAdapterModels && filteredT2IAdapterModels.length > 0 && (
-          <ModelListWrapper title="T2I Adapter" modelList={filteredT2IAdapterModels} key="t2i-adapters" />
+          <ModelListWrapper title={t('common.t2iAdapter')} modelList={filteredT2IAdapterModels} key="t2i-adapters" />
         )}
       </Flex>
     </ScrollableContent>
@@ -120,16 +131,3 @@ const modelsFilter = <T extends AnyModelConfig>(
     return matchesFilter && matchesType;
   });
 };
-
-const FetchingModelsLoader = memo(({ loadingMessage }: { loadingMessage?: string }) => {
-  return (
-    <Flex flexDirection="column" gap={4} borderRadius="base" p={4} bg="base.800">
-      <Flex justifyContent="center" alignItems="center" flexDirection="column" p={4} gap={8}>
-        <Spinner />
-        <Text variant="subtext">{loadingMessage ? loadingMessage : 'Fetching...'}</Text>
-      </Flex>
-    </Flex>
-  );
-});
-
-FetchingModelsLoader.displayName = 'FetchingModelsLoader';

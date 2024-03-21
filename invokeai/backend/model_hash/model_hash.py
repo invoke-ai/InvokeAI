@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Callable, Literal, Optional, Union
 
 from blake3 import blake3
+from tqdm import tqdm
 
 from invokeai.app.util.misc import uuid_string
 
@@ -94,7 +95,14 @@ class ModelHash:
         # blake3_single is a single-threaded version of blake3, prefix should still be "blake3:"
         prefix = self._get_prefix(self.algorithm)
         if model_path.is_file():
-            return prefix + self._hash_file(model_path)
+            hash_ = None
+            # To give a similar user experience for single files and directories, we use a progress bar even for single files
+            pbar = tqdm([model_path], desc=f"Hashing {model_path.name}", unit="file")
+            for component in pbar:
+                pbar.set_description(f"Hashing {component.name}")
+                hash_ = prefix + self._hash_file(model_path)
+            assert hash_ is not None
+            return hash_
         elif model_path.is_dir():
             return prefix + self._hash_dir(model_path)
         else:
@@ -112,7 +120,9 @@ class ModelHash:
         model_component_paths = self._get_file_paths(dir, self._file_filter)
 
         component_hashes: list[str] = []
-        for component in sorted(model_component_paths):
+        pbar = tqdm(sorted(model_component_paths), desc=f"Hashing {dir.name}", unit="file")
+        for component in pbar:
+            pbar.set_description(f"Hashing {component.name}")
             component_hashes.append(self._hash_file(component))
 
         # BLAKE3 is cryptographically secure. We may as well fall back on a secure algorithm

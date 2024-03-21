@@ -10,10 +10,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal, Optional
 
+import psutil
 import yaml
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+import invokeai.configs as model_configs
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
@@ -29,7 +31,25 @@ ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
 ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
-CONFIG_SCHEMA_VERSION = 4
+CONFIG_SCHEMA_VERSION = "4.0.0"
+
+
+def get_default_ram_cache_size() -> float:
+    """Run a heuristic for the default RAM cache based on installed RAM."""
+
+    # On some machines, psutil.virtual_memory().total gives a value that is slightly less than the actual RAM, so the
+    # limits are set slightly lower than than what we expect the actual RAM to be.
+
+    GB = 1024**3
+    max_ram = psutil.virtual_memory().total / GB
+
+    if max_ram >= 60:
+        return 15.0
+    if max_ram >= 30:
+        return 7.5
+    if max_ram >= 14:
+        return 4.0
+    return 2.1  # 2.1 is just large enough for sd 1.5 ;-)
 
 
 class URLRegexTokenPair(BaseModel):
@@ -63,7 +83,6 @@ class InvokeAIAppConfig(BaseSettings):
         ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.
         log_tokenization: Enable logging of parsed prompt tokens.
         patchmatch: Enable patchmatch inpaint code.
-        ignore_missing_core_models: Ignore missing core models on startup. If `True`, the app will attempt to download missing models on startup.
         autoimport_dir: Path to a directory of models files to be imported on startup.
         models_dir: Path to the models directory.
         convert_cache_dir: Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.
@@ -101,11 +120,13 @@ class InvokeAIAppConfig(BaseSettings):
     """
 
     _root: Optional[Path] = PrivateAttr(default=None)
+    _config_file: Optional[Path] = PrivateAttr(default=None)
 
     # fmt: off
 
     # INTERNAL
-    schema_version:                 int = Field(default=CONFIG_SCHEMA_VERSION, description="Schema version of the config file. This is not a user-configurable setting.")
+    schema_version:                 str = Field(default=CONFIG_SCHEMA_VERSION, description="Schema version of the config file. This is not a user-configurable setting.")
+    # This is only used during v3 models.yaml migration
     legacy_models_yaml_path: Optional[Path] = Field(default=None,           description="Path to the legacy models.yaml file. This is not a user-configurable setting.")
 
     # WEB
@@ -121,13 +142,12 @@ class InvokeAIAppConfig(BaseSettings):
     # MISC FEATURES
     log_tokenization:              bool = Field(default=False,              description="Enable logging of parsed prompt tokens.")
     patchmatch:                    bool = Field(default=True,               description="Enable patchmatch inpaint code.")
-    ignore_missing_core_models:    bool = Field(default=False,              description="Ignore missing core models on startup. If `True`, the app will attempt to download missing models on startup.")
 
     # PATHS
     autoimport_dir:                Path = Field(default=Path("autoimport"), description="Path to a directory of models files to be imported on startup.")
     models_dir:                    Path = Field(default=Path("models"),     description="Path to the models directory.")
     convert_cache_dir:             Path = Field(default=Path("models/.cache"), description="Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.")
-    legacy_conf_dir:               Path = Field(default=Path("configs/stable-diffusion"), description="Path to directory of legacy checkpoint config files.")
+    legacy_conf_dir:               Path = Field(default=Path("configs"), description="Path to directory of legacy checkpoint config files.")
     db_dir:                        Path = Field(default=Path("databases"),  description="Path to InvokeAI databases directory.")
     outputs_dir:                   Path = Field(default=Path("outputs"),    description="Path to directory for outputs.")
     custom_nodes_dir:              Path = Field(default=Path("nodes"),      description="Path to directory for custom nodes.")
@@ -147,7 +167,7 @@ class InvokeAIAppConfig(BaseSettings):
     profiles_dir:                  Path = Field(default=Path("profiles"),   description="Path to profiles output directory.")
 
     # CACHE
-    ram:                          float = Field(default=DEFAULT_RAM_CACHE, gt=0, description="Maximum memory amount used by memory model cache for rapid switching (GB).")
+    ram:                          float = Field(default_factory=get_default_ram_cache_size, gt=0, description="Maximum memory amount used by memory model cache for rapid switching (GB).")
     vram:                         float = Field(default=DEFAULT_VRAM_CACHE, ge=0, description="Amount of VRAM reserved for model storage (GB).")
     convert_cache:                float = Field(default=DEFAULT_CONVERT_CACHE, ge=0, description="Maximum size of on-disk converted models cache (GB).")
     lazy_offload:                  bool = Field(default=True,               description="Keep models in VRAM until their space is needed.")
@@ -202,7 +222,7 @@ class InvokeAIAppConfig(BaseSettings):
             if new_value != current_value:
                 setattr(self, field_name, new_value)
 
-    def write_file(self, dest_path: Path) -> None:
+    def write_file(self, dest_path: Path, as_example: bool = False) -> None:
         """Write the current configuration to file. This will overwrite the existing file.
 
         A `meta` stanza is added to the top of the file, containing metadata about the config file. This is not stored in the config object.
@@ -210,45 +230,30 @@ class InvokeAIAppConfig(BaseSettings):
         Args:
             dest_path: Path to write the config to.
         """
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
         with open(dest_path, "w") as file:
-            # Meta fields should be written in a separate stanza
+            # Meta fields should be written in a separate stanza - skip legacy_models_yaml_path
             meta_dict = self.model_dump(mode="json", include={"schema_version"})
-            # Only include the legacy_models_yaml_path if it's set
-            if self.legacy_models_yaml_path:
-                meta_dict.update(self.model_dump(mode="json", include={"legacy_models_yaml_path"}))
 
             # User settings
             config_dict = self.model_dump(
                 mode="json",
-                exclude_unset=True,
-                exclude_defaults=True,
+                exclude_unset=False if as_example else True,
+                exclude_defaults=False if as_example else True,
+                exclude_none=True if as_example else False,
                 exclude={"schema_version", "legacy_models_yaml_path"},
             )
 
+            if as_example:
+                file.write(
+                    "# This is an example file with default and example settings. Use the values here as a baseline.\n\n"
+                )
             file.write("# Internal metadata - do not edit:\n")
             file.write(yaml.dump(meta_dict, sort_keys=False))
             file.write("\n")
-            file.write("# Put user settings here:\n")
+            file.write("# Put user settings here - see https://invoke-ai.github.io/InvokeAI/features/CONFIGURATION/:\n")
             if len(config_dict) > 0:
                 file.write(yaml.dump(config_dict, sort_keys=False))
-
-    def merge_from_file(self, source_path: Optional[Path] = None) -> None:
-        """Read the config from the `invokeai.yaml` file, migrating it if necessary and merging it into the singleton config.
-
-        This function will write to the `invokeai.yaml` file if the config is migrated.
-
-        Args:
-            source_path: Path to the config file. If not provided, the default path is used.
-        """
-        path = source_path or self.init_file_path
-        config_from_file = load_and_migrate_config(path)
-        # Clobbering here will overwrite any settings that were set via environment variables
-        self.update_config(config_from_file, clobber=False)
-
-    def set_root(self, root: Path) -> None:
-        """Set the runtime root directory. This is typically set using a CLI arg."""
-        assert isinstance(root, Path)
-        self._root = root
 
     def _resolve(self, partial_path: Path) -> Path:
         return (self.root_path / partial_path).resolve()
@@ -264,9 +269,9 @@ class InvokeAIAppConfig(BaseSettings):
         return root.resolve()
 
     @property
-    def init_file_path(self) -> Path:
+    def config_file_path(self) -> Path:
         """Path to invokeai.yaml, resolved to an absolute path.."""
-        resolved_path = self._resolve(INIT_FILE)
+        resolved_path = self._resolve(self._config_file or INIT_FILE)
         assert resolved_path is not None
         return resolved_path
 
@@ -351,6 +356,14 @@ def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
                 parsed_config_dict["vram"] = v
             if k == "conf_path":
                 parsed_config_dict["legacy_models_yaml_path"] = v
+            if k == "legacy_conf_dir":
+                # The old default for this was "configs/stable-diffusion". If if the incoming config has that as the value, we won't set it.
+                # Else if the path ends in "stable-diffusion", we assume the parent is the new correct path.
+                # Else we do not attempt to migrate this setting
+                if v != "configs/stable-diffusion":
+                    parsed_config_dict["legacy_conf_dir"] = v
+                elif Path(v).name == "stable-diffusion":
+                    parsed_config_dict["legacy_conf_dir"] = str(Path(v).parent)
             elif k in InvokeAIAppConfig.model_fields:
                 # skip unknown fields
                 parsed_config_dict[k] = v
@@ -378,7 +391,8 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
         # This is a v3 config file, attempt to migrate it
         shutil.copy(config_path, config_path.with_suffix(".yaml.bak"))
         try:
-            config = migrate_v3_config_dict(loaded_config_dict)
+            # This could be the wrong shape, but we will catch all exceptions below
+            config = migrate_v3_config_dict(loaded_config_dict)  # pyright: ignore [reportUnknownArgumentType]
         except Exception as e:
             shutil.copy(config_path.with_suffix(".yaml.bak"), config_path)
             raise RuntimeError(f"Failed to load and migrate v3 config file {config_path}: {e}") from e
@@ -400,32 +414,50 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
 
 @lru_cache(maxsize=1)
 def get_config() -> InvokeAIAppConfig:
-    """Return the global singleton app config.
+    """Get the global singleton app config.
 
-    When called, this function will parse the CLI args and merge in config from the `invokeai.yaml` config file.
+    When first called, this function:
+    - Creates a config object. `pydantic-settings` handles merging of settings from environment variables, but not the init file.
+    - Retrieves any provided CLI args from the InvokeAIArgs class. It does not _parse_ the CLI args; that is done in the main entrypoint.
+    - Sets the root dir, if provided via CLI args.
+    - Logs in to HF if there is no valid token already.
+    - Copies all legacy configs to the legacy conf dir (needed for conversion from ckpt to diffusers).
+    - Reads and merges in settings from the config file if it exists, else writes out a default config file.
+
+    On subsequent calls, the object is returned from the cache.
     """
     config = InvokeAIAppConfig()
 
     args = InvokeAIArgs.args
 
-    # CLI args trump environment variables
+    # This flag serves as a proxy for whether the config was retrieved in the context of the full application or not.
+    # If it is False, we should just return a default config and not set the root, log in to HF, etc.
+    if not InvokeAIArgs.did_parse:
+        return config
+
+    # Set CLI args
     if root := getattr(args, "root", None):
-        config.set_root(Path(root))
-    if ignore_missing_core_models := getattr(args, "ignore_missing_core_models", None):
-        config.ignore_missing_core_models = ignore_missing_core_models
+        config._root = Path(root)
+    if config_file := getattr(args, "config_file", None):
+        config._config_file = Path(config_file)
 
-    # TODO(psyche): This shouldn't be wrapped in a try/catch. The configuration script imports a number of classes
-    # from throughout the app, which in turn call get_config(). At that time, there may not be a config file to
-    # read from, and this raises.
-    #
-    # Once we move all* model installation to the web app, the configure script will not be reaching into the main app
-    # and we can make this an unhandled error, which feels correct.
-    #
-    # *all user-facing models. Core model installation will still be handled by the configure/install script.
+    # Create the example file from a deep copy, with some extra values provided
+    example_config = config.model_copy(deep=True)
+    example_config.remote_api_tokens = [
+        URLRegexTokenPair(url_regex="cool-models.com", token="my_secret_token"),
+        URLRegexTokenPair(url_regex="nifty-models.com", token="some_other_token"),
+    ]
+    example_config.write_file(config.config_file_path.with_suffix(".example.yaml"), as_example=True)
 
-    try:
-        config.merge_from_file()
-    except FileNotFoundError:
-        pass
+    # Copy all legacy configs - We know `__path__[0]` is correct here
+    configs_src = Path(model_configs.__path__[0])  # pyright: ignore [reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
+    shutil.copytree(configs_src, config.legacy_conf_path, dirs_exist_ok=True)
+
+    if config.config_file_path.exists():
+        incoming_config = load_and_migrate_config(config.config_file_path)
+        # Clobbering here will overwrite any settings that were set via environment variables
+        config.update_config(incoming_config, clobber=False)
+    else:
+        config.write_file(config.config_file_path)
 
     return config
