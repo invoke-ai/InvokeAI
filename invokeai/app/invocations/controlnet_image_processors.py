@@ -10,7 +10,6 @@ from controlnet_aux import (
     ContentShuffleDetector,
     LeresDetector,
     LineartAnimeDetector,
-    LineartDetector,
     MediapipeFaceDetector,
     MidasDetector,
     MLSDdetector,
@@ -41,6 +40,7 @@ from invokeai.backend.image_util.canny import get_canny_edges
 from invokeai.backend.image_util.depth_anything import DepthAnythingDetector
 from invokeai.backend.image_util.dw_openpose import DWOpenposeDetector
 from invokeai.backend.image_util.hed import HEDProcessor
+from invokeai.backend.image_util.lineart import LineartProcessor
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 
@@ -243,9 +243,9 @@ class LineartImageProcessorInvocation(ImageProcessorInvocation):
     image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
     coarse: bool = InputField(default=False, description="Whether to use coarse mode")
 
-    def run_processor(self, image):
-        lineart_processor = LineartDetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = lineart_processor(
+    def run_processor(self, image: Image.Image) -> Image.Image:
+        lineart_processor = LineartProcessor()
+        processed_image = lineart_processor.run(
             image, detect_resolution=self.detect_resolution, image_resolution=self.image_resolution, coarse=self.coarse
         )
         return processed_image
