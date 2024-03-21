@@ -26,7 +26,7 @@ class DoubleConvBlock(torch.nn.Module):
                 in_channels=input_channel, out_channels=output_channel, kernel_size=(3, 3), stride=(1, 1), padding=1
             )
         )
-        for i in range(1, layer_number):
+        for _i in range(1, layer_number):
             self.convs.append(
                 torch.nn.Conv2d(
                     in_channels=output_channel,
