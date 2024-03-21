@@ -425,11 +425,11 @@ class ModelInstallService(ModelInstallServiceBase):
         self._running = True
 
     def _install_next_item(self) -> None:
-        self._logger.info(f"Installer thread {threading.get_ident()} starting")
+        self._logger.debug(f"Installer thread {threading.get_ident()} starting")
         while True:
             if self._stop_event.is_set():
                 break
-            self._logger.info(f"Installer thread {threading.get_ident()} running")
+            self._logger.debug(f"Installer thread {threading.get_ident()} polling")
             try:
                 job = self._install_queue.get(timeout=1)
             except Empty:
