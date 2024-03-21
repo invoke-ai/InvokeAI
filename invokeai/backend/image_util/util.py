@@ -100,7 +100,7 @@ def normalize_image_channel_count(image: np.ndarray) -> np.ndarray:
     If the image has 1 channel, a third empty channel will be added.
     If the image has 4 channels, the alpha channel will be used to blend the image with a white background.
 
-    This function is adapted from https://github.com/lllyasviel/ControlNet.
+    Adapted from https://github.com/huggingface/controlnet_aux (Apache-2.0 license).
 
     Args:
         image: The input image.
@@ -131,7 +131,7 @@ def normalize_image_channel_count(image: np.ndarray) -> np.ndarray:
 def fit_image_to_resolution(input_image: np.ndarray, resolution: int) -> np.ndarray:
     """Resizes an image, fitting it to the given resolution.
 
-    This function is adapted from https://github.com/lllyasviel/ControlNet.
+    Adapted from https://github.com/huggingface/controlnet_aux (Apache-2.0 license).
 
     Args:
         input_image: The input image.
@@ -190,7 +190,7 @@ def safe_step(x: np.ndarray, step: int = 2) -> np.ndarray:
 
     I don't fully understand the purpose of this function, but it appears to be normalizing/quantizing the array.
 
-    This function is adapted from https://github.com/lllyasviel/ControlNet.
+    Adapted from https://github.com/huggingface/controlnet_aux (Apache-2.0 license).
 
     Args:
         x: The input array.
