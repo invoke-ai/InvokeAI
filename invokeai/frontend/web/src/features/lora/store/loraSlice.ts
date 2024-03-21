@@ -18,12 +18,12 @@ export const defaultLoRAConfig: Pick<LoRA, 'weight' | 'isEnabled'> = {
 };
 
 type LoraState = {
-  _version: 1;
+  _version: 2;
   loras: Record<string, LoRA>;
 };
 
 const initialLoraState: LoraState = {
-  _version: 1,
+  _version: 2,
   loras: {},
 };
 
@@ -71,6 +71,10 @@ export const selectLoraSlice = (state: RootState) => state.lora;
 const migrateLoRAState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
+  }
+  if (state._version === 1) {
+    // Model type has changed, so we need to reset the state - too risky to migrate
+    state = cloneDeep(initialLoraState);
   }
   return state;
 };

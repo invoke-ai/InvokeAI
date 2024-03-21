@@ -9,7 +9,7 @@ import type {
 } from 'features/parameters/types/parameterSchemas';
 
 type SDXLState = {
-  _version: 1;
+  _version: 2;
   positiveStylePrompt: ParameterPositiveStylePromptSDXL;
   negativeStylePrompt: ParameterNegativeStylePromptSDXL;
   shouldConcatSDXLStylePrompt: boolean;
@@ -23,7 +23,7 @@ type SDXLState = {
 };
 
 const initialSDXLState: SDXLState = {
-  _version: 1,
+  _version: 2,
   positiveStylePrompt: '',
   negativeStylePrompt: '',
   shouldConcatSDXLStylePrompt: true,
@@ -92,6 +92,11 @@ export const selectSdxlSlice = (state: RootState) => state.sdxl;
 const migrateSDXLState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
+  }
+  if (state._version === 1) {
+    // Model type has changed, so we need to reset the state - too risky to migrate
+    state._version = 2;
+    state.refinerModel = null;
   }
   return state;
 };
