@@ -233,10 +233,6 @@ def invoke_api() -> None:
             else:
                 return port
 
-    from invokeai.backend.install.check_directories import check_directories
-
-    check_directories(app_config)  # note, may exit with an exception if root not set up
-
     if app_config.dev_reload:
         try:
             import jurigged

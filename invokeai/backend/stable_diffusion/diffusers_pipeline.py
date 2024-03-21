@@ -25,8 +25,8 @@ from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.ip_adapter.unet_patcher import UNetPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
-
-from ..util import auto_detect_slice_size, normalize_device
+from invokeai.backend.util.attention import auto_detect_slice_size
+from invokeai.backend.util.devices import normalize_device
 
 
 @dataclass

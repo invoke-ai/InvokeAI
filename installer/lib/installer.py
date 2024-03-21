@@ -149,9 +149,6 @@ class Installer:
         # install the launch/update scripts into the runtime directory
         self.instance.install_user_scripts()
 
-        # run through the configuration flow
-        self.instance.configure()
-
 
 class InvokeAiInstance:
     """
@@ -241,53 +238,6 @@ class InvokeAiInstance:
                 "Could not install InvokeAI. Please try downloading the latest version of the installer and install again."
             )
             sys.exit(1)
-
-    def configure(self):
-        """
-        Configure the InvokeAI runtime directory
-        """
-
-        auto_install = False
-        # set sys.argv to a consistent state
-        new_argv = [sys.argv[0]]
-        for i in range(1, len(sys.argv)):
-            el = sys.argv[i]
-            if el in ["-r", "--root"]:
-                new_argv.append(el)
-                new_argv.append(sys.argv[i + 1])
-            elif el in ["-y", "--yes", "--yes-to-all"]:
-                auto_install = True
-        sys.argv = new_argv
-
-        import messages
-        import requests  # to catch download exceptions
-
-        auto_install = auto_install or messages.user_wants_auto_configuration()
-        if auto_install:
-            sys.argv.append("--yes")
-        else:
-            messages.introduction()
-
-        from invokeai.frontend.install.invokeai_configure import invokeai_configure
-
-        # NOTE: currently the config script does its own arg parsing! this means the command-line switches
-        # from the installer will also automatically propagate down to the config script.
-        # this may change in the future with config refactoring!
-        succeeded = False
-        try:
-            invokeai_configure()
-            succeeded = True
-        except requests.exceptions.ConnectionError as e:
-            print(f"\nA network error was encountered during configuration and download: {str(e)}")
-        except OSError as e:
-            print(f"\nAn OS error was encountered during configuration and download: {str(e)}")
-        except Exception as e:
-            print(f"\nA problem was encountered during the configuration and download steps: {str(e)}")
-        finally:
-            if not succeeded:
-                print('To try again, find the "invokeai" directory, run the script "invoke.sh" or "invoke.bat"')
-                print("and choose option 7 to fix a broken install, optionally followed by option 5 to install models.")
-                print("Alternatively you can relaunch the installer.")
 
     def install_user_scripts(self):
         """

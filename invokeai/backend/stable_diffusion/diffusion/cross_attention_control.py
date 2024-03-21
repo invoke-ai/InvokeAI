@@ -11,7 +11,7 @@ from compel.cross_attention_control import Arguments
 from diffusers.models.attention_processor import Attention, SlicedAttnProcessor
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 
-from ...util import torch_dtype
+from invokeai.backend.util.devices import torch_dtype
 
 
 class CrossAttentionType(enum.Enum):

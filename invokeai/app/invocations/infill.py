@@ -9,6 +9,7 @@ from PIL import Image, ImageOps
 from invokeai.app.invocations.fields import ColorField, ImageField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.download_with_progress import download_with_progress_bar
 from invokeai.app.util.misc import SEED_MAX
 from invokeai.backend.image_util.cv2_inpaint import cv2_inpaint
 from invokeai.backend.image_util.lama import LaMA
@@ -216,6 +217,13 @@ class LaMaInfillInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
+
+        # Downloads the LaMa model if it doesn't already exist
+        download_with_progress_bar(
+            name="LaMa Inpainting Model",
+            url="https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt",
+            dest_path=context.config.get().models_path / "core/misc/lama/lama.pt",
+        )
 
         infilled = infill_lama(image.copy())
 

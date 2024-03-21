@@ -309,6 +309,10 @@ class ModelInstallService(ModelInstallServiceBase):
             self._app_config.legacy_models_yaml_path or self._app_config.root_path / "configs" / "models.yaml"
         )
 
+        # The old path may be relative to the root path
+        if not legacy_models_yaml_path.exists():
+            legacy_models_yaml_path = Path(self._app_config.root_path, legacy_models_yaml_path)
+
         if legacy_models_yaml_path.exists():
             legacy_models_yaml = yaml.safe_load(legacy_models_yaml_path.read_text())
 
@@ -348,7 +352,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         # Remove `legacy_models_yaml_path` from the config file - we are done with it either way
         self._app_config.legacy_models_yaml_path = None
-        self._app_config.write_file(self._app_config.init_file_path)
+        self._app_config.write_file(self._app_config.config_file_path)
 
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
         self._cached_model_paths = {Path(x.path).resolve() for x in self.record_store.all_models()}
@@ -615,7 +619,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         info.path = model_path.as_posix()
 
-        # add 'main' specific fields
+        # Checkpoints have a config file needed for conversion - resolve this to an absolute path
         if isinstance(info, CheckpointConfigBase):
             legacy_conf = (self.app_config.legacy_conf_path / info.config_path).resolve()
             info.config_path = legacy_conf.as_posix()
