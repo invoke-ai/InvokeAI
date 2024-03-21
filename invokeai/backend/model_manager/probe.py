@@ -114,7 +114,7 @@ class ModelProbe(object):
 
     @classmethod
     def probe(
-        cls, model_path: Path, fields: Optional[Dict[str, Any]] = None, hash_algo: HASHING_ALGORITHMS = "blake3"
+        cls, model_path: Path, fields: Optional[Dict[str, Any]] = None, hash_algo: HASHING_ALGORITHMS = "blake3_single"
     ) -> AnyModelConfig:
         """
         Probe the model at model_path and return its configuration record.
