@@ -12,10 +12,10 @@ from huggingface_hub import hf_hub_download
 from PIL import Image
 
 from invokeai.backend.image_util.util import (
-    fit_image_to_resolution,
     normalize_image_channel_count,
     np_to_pil,
     pil_to_np,
+    resize_image_to_resolution,
 )
 
 
@@ -173,7 +173,7 @@ class LineartAnimeProcessor:
         np_image = pil_to_np(input_image)
 
         np_image = normalize_image_channel_count(np_image)
-        np_image = fit_image_to_resolution(np_image, detect_resolution)
+        np_image = resize_image_to_resolution(np_image, detect_resolution)
 
         H, W, C = np_image.shape
         Hn = 256 * int(np.ceil(float(H) / 256.0))
@@ -194,7 +194,7 @@ class LineartAnimeProcessor:
 
         detected_map = normalize_image_channel_count(detected_map)
 
-        img = fit_image_to_resolution(np_image, image_resolution)
+        img = resize_image_to_resolution(np_image, image_resolution)
         H, W, C = img.shape
 
         detected_map = cv2.resize(detected_map, (W, H), interpolation=cv2.INTER_LINEAR)

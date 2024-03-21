@@ -8,11 +8,11 @@ from huggingface_hub import hf_hub_download
 from PIL import Image
 
 from invokeai.backend.image_util.util import (
-    fit_image_to_resolution,
     non_maximum_suppression,
     normalize_image_channel_count,
     np_to_pil,
     pil_to_np,
+    resize_image_to_resolution,
     safe_step,
 )
 
@@ -109,7 +109,7 @@ class HEDProcessor:
         device = next(iter(self.network.parameters())).device
         np_image = pil_to_np(input_image)
         np_image = normalize_image_channel_count(np_image)
-        np_image = fit_image_to_resolution(np_image, detect_resolution)
+        np_image = resize_image_to_resolution(np_image, detect_resolution)
 
         assert np_image.ndim == 3
         height, width, _channels = np_image.shape
@@ -128,7 +128,7 @@ class HEDProcessor:
         detected_map = edge
         detected_map = normalize_image_channel_count(detected_map)
 
-        img = fit_image_to_resolution(np_image, image_resolution)
+        img = resize_image_to_resolution(np_image, image_resolution)
         height, width, _channels = img.shape
 
         detected_map = cv2.resize(detected_map, (width, height), interpolation=cv2.INTER_LINEAR)

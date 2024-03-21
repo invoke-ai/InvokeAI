@@ -3,9 +3,9 @@ from PIL import Image
 
 from invokeai.backend.image_util.util import (
     cv2_to_pil,
-    fit_image_to_resolution,
     normalize_image_channel_count,
     pil_to_cv2,
+    resize_image_to_resolution,
 )
 
 
@@ -32,10 +32,10 @@ def get_canny_edges(
 
     np_image = pil_to_cv2(image)
     np_image = normalize_image_channel_count(np_image)
-    np_image = fit_image_to_resolution(np_image, detect_resolution)
+    np_image = resize_image_to_resolution(np_image, detect_resolution)
 
     edge_map = cv2.Canny(np_image, low_threshold, high_threshold)
     edge_map = normalize_image_channel_count(edge_map)
-    edge_map = fit_image_to_resolution(edge_map, image_resolution)
+    edge_map = resize_image_to_resolution(edge_map, image_resolution)
 
     return cv2_to_pil(edge_map)
