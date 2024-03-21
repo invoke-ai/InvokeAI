@@ -644,18 +644,15 @@ class VaeFolderProbe(FolderProbeBase):
         return name
 
 
-class TextualInversionFolderProbe(FolderProbeBase):
-    def get_format(self) -> ModelFormat:
-        return ModelFormat.EmbeddingFolder
-
-    def get_base_type(self) -> BaseModelType:
-        files = os.scandir(self.model_path)
+class TextualInversionFolderProbe(TextualInversionCheckpointProbe):
+    def __init__(self, model_path: Path):
+        files = os.scandir(model_path)
         files = [Path(f.path) for f in files if f.is_file() and f.name.endswith((".ckpt", ".pt", ".pth", ".bin", ".safetensors"))]
         if len(files) != 1:
             raise InvalidModelConfigException(
-                f"Unable to determine base type for {self.model_path}: expected exactly one valid model file, found {[f.name for f in files]}."
+                f"Unable to determine base type for {model_path}: expected exactly one valid model file, found {[f.name for f in files]}."
             )
-        return TextualInversionCheckpointProbe(files.pop()).get_base_type()
+        super().__init__(model_path)
 
 
 class ONNXFolderProbe(PipelineFolderProbe):
@@ -701,19 +698,16 @@ class ControlNetFolderProbe(FolderProbeBase):
         return base_model
 
 
-class LoRAFolderProbe(FolderProbeBase):
-    def get_base_type(self) -> BaseModelType:
-        model_file = None
-        files = os.scandir(self.model_path)
+class LoRAFolderProbe(LoRACheckpointProbe):
+    def __init__(self, model_path: Path):
+        files = os.scandir(model_path)
         files = [Path(f.path) for f in files if f.is_file() and f.name.endswith((".bin", ".safetensors"))]
         if len(files) != 1:
             raise InvalidModelConfigException(
-                f"Unable to determine base type for {self.model_path}: expected exactly one valid model file, found {[f.name for f in files]}."
+                f"Unable to determine base type for lora {model_path}: expected exactly one valid model file, found {[f.name for f in files]}."
             )
         model_file = files.pop()
-        if not model_file:
-            raise InvalidModelConfigException("Unknown LoRA format encountered")
-        return LoRACheckpointProbe(model_file).get_base_type()
+        super().__init__(model_file)
 
 
 class IPAdapterFolderProbe(FolderProbeBase):
