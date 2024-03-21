@@ -128,7 +128,7 @@ def normalize_image_channel_count(image: np.ndarray) -> np.ndarray:
     raise ValueError("Invalid number of channels.")
 
 
-def fit_image_to_resolution(input_image: np.ndarray, resolution: int) -> np.ndarray:
+def resize_image_to_resolution(input_image: np.ndarray, resolution: int) -> np.ndarray:
     """Resizes an image, fitting it to the given resolution.
 
     Adapted from https://github.com/huggingface/controlnet_aux (Apache-2.0 license).
