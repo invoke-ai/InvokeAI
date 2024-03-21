@@ -7,7 +7,6 @@ from typing import Dict, List, Literal, Union
 import cv2
 import numpy as np
 from controlnet_aux import (
-    CannyDetector,
     ContentShuffleDetector,
     HEDdetector,
     LeresDetector,
@@ -39,6 +38,7 @@ from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.image_util.canny import get_canny_edges
 from invokeai.backend.image_util.depth_anything import DepthAnythingDetector
 from invokeai.backend.image_util.dw_openpose import DWOpenposeDetector
 
@@ -189,14 +189,13 @@ class CannyImageProcessorInvocation(ImageProcessorInvocation):
         # Keep alpha channel for Canny processing to detect edges of transparent areas
         return context.images.get_pil(self.image.image_name, "RGBA")
 
-    def run_processor(self, image):
-        canny_processor = CannyDetector()
-        processed_image = canny_processor(
+    def run_processor(self, image: Image.Image) -> Image.Image:
+        processed_image = get_canny_edges(
             image,
             self.low_threshold,
             self.high_threshold,
-            image_resolution=self.image_resolution,
             detect_resolution=self.detect_resolution,
+            image_resolution=self.image_resolution,
         )
         return processed_image
 
