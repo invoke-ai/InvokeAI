@@ -122,18 +122,18 @@ The provided token will be added as a `Bearer` token to the network requests to 
 Models are hashed during installation, providing a stable identifier for models across all platforms. Hashing is a one-time operation.
 
 ```yaml
-hashing_algorithm: blake3_single
+hashing_algorithm: blake3_single # default value
 ```
 
 You might want to change this setting, depending on your system:
 
 - `blake3_single` (default): Single-threaded - best for spinning HDDs, still OK for SSDs
-- `blake3`: Parallelized, memory-mapped implementation - best for SSDs, terrible for spinning disks
+- `blake3_multi`: Parallelized, memory-mapped implementation - best for SSDs, terrible for spinning disks
 - `random`: Skip hashing entirely - fastest but of course no hash
 
 During the first startup after upgrading to v4, all of your models will be hashed. This can take a few minutes.
 
-Most common algorithms are supported, like `md5`, `sha256`, and `sha512`. These are typically much, much slower than `blake3`.
+Most common algorithms are supported, like `md5`, `sha256`, and `sha512`. These are typically much, much slower than either of the BLAKE3 variants.
 
 #### Path Settings
 
