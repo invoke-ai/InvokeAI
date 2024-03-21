@@ -51,6 +51,7 @@ def session() -> Session:
     return sess
 
 
+@pytest.mark.timeout(timeout=20, method="thread")
 def test_basic_queue_download(tmp_path: Path, session: Session) -> None:
     events = set()
 
@@ -80,6 +81,7 @@ def test_basic_queue_download(tmp_path: Path, session: Session) -> None:
     queue.stop()
 
 
+@pytest.mark.timeout(timeout=20, method="thread")
 def test_errors(tmp_path: Path, session: Session) -> None:
     queue = DownloadQueueService(
         requests_session=session,
@@ -101,6 +103,7 @@ def test_errors(tmp_path: Path, session: Session) -> None:
     queue.stop()
 
 
+@pytest.mark.timeout(timeout=20, method="thread")
 def test_event_bus(tmp_path: Path, session: Session) -> None:
     event_bus = TestEventService()
 
@@ -136,6 +139,7 @@ def test_event_bus(tmp_path: Path, session: Session) -> None:
     queue.stop()
 
 
+@pytest.mark.timeout(timeout=20, method="thread")
 def test_broken_callbacks(tmp_path: Path, session: Session, capsys) -> None:
     queue = DownloadQueueService(
         requests_session=session,
