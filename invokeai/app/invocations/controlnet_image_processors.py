@@ -8,7 +8,6 @@ import cv2
 import numpy as np
 from controlnet_aux import (
     ContentShuffleDetector,
-    HEDdetector,
     LeresDetector,
     LineartAnimeDetector,
     LineartDetector,
@@ -41,6 +40,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.canny import get_canny_edges
 from invokeai.backend.image_util.depth_anything import DepthAnythingDetector
 from invokeai.backend.image_util.dw_openpose import DWOpenposeDetector
+from invokeai.backend.image_util.hed import HEDProcessor
 
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 
@@ -216,9 +216,9 @@ class HedImageProcessorInvocation(ImageProcessorInvocation):
     # safe: bool = InputField(default=False, description=FieldDescriptions.safe_mode)
     scribble: bool = InputField(default=False, description=FieldDescriptions.scribble_mode)
 
-    def run_processor(self, image):
-        hed_processor = HEDdetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = hed_processor(
+    def run_processor(self, image: Image.Image) -> Image.Image:
+        hed_processor = HEDProcessor()
+        processed_image = hed_processor.run(
             image,
             detect_resolution=self.detect_resolution,
             image_resolution=self.image_resolution,
