@@ -2,13 +2,11 @@
 
 import os
 import shutil
-import time
 from pathlib import Path
 from typing import Any, Dict, List
 
 import pytest
 from pydantic import BaseModel
-from pytest import FixtureRequest
 from requests.sessions import Session
 from requests_testadapter import TestAdapter, TestSession
 
@@ -99,15 +97,11 @@ def mm2_app_config(mm2_root_dir: Path) -> InvokeAIAppConfig:
 
 
 @pytest.fixture
-def mm2_download_queue(mm2_session: Session, request: FixtureRequest) -> DownloadQueueServiceBase:
+def mm2_download_queue(mm2_session: Session) -> DownloadQueueServiceBase:
     download_queue = DownloadQueueService(requests_session=mm2_session)
     download_queue.start()
-
-    def stop_queue() -> None:
-        download_queue.stop()
-
-    request.addfinalizer(stop_queue)
-    return download_queue
+    yield download_queue
+    download_queue.stop()
 
 
 @pytest.fixture
@@ -130,7 +124,6 @@ def mm2_installer(
     mm2_app_config: InvokeAIAppConfig,
     mm2_download_queue: DownloadQueueServiceBase,
     mm2_session: Session,
-    request: FixtureRequest,
 ) -> ModelInstallServiceBase:
     logger = InvokeAILogger.get_logger()
     db = create_mock_sqlite_database(mm2_app_config, logger)
@@ -145,13 +138,8 @@ def mm2_installer(
         session=mm2_session,
     )
     installer.start()
-
-    def stop_installer() -> None:
-        installer.stop()
-        time.sleep(0.1)  # avoid error message from the logger when it is closed before thread prints final message
-
-    request.addfinalizer(stop_installer)
-    return installer
+    yield installer
+    installer.stop()
 
 
 @pytest.fixture
