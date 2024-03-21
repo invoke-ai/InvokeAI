@@ -527,7 +527,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     installed.update(self.scan_directory(models_dir))
             self._logger.info(f"{len(installed)} new models registered; {len(defunct_models)} unregistered")
 
-    def _sync_model_path(self, key: str) -> AnyModelConfig:
+    def sync_model_path(self, key: str) -> AnyModelConfig:
         """
         Move model into the location indicated by its basetype, type and name.
 
@@ -542,13 +542,10 @@ class ModelInstallService(ModelInstallServiceBase):
         old_path = Path(model.path)
         models_dir = self.app_config.models_path
 
-        try:
-            old_path.relative_to(models_dir)
+        if not old_path.is_relative_to(models_dir):
             return model
-        except ValueError:
-            pass
 
-        new_path = models_dir / model.base.value / model.type.value / old_path.name
+        new_path = models_dir / model.base.value / model.type.value / model.name
 
         if old_path == new_path or new_path.exists() and old_path == new_path.resolve():
             return model
@@ -560,11 +557,11 @@ class ModelInstallService(ModelInstallServiceBase):
         return model
 
     def _scan_register(self, model: Path) -> bool:
-        if model in self._cached_model_paths:
+        if model.resolve() in self._cached_model_paths:
             return True
         try:
             id = self.register_path(model)
-            self._sync_model_path(id)  # possibly move it to right place in `models`
+            self.sync_model_path(id)  # possibly move it to right place in `models`
             self._logger.info(f"Registered {model.name} with id {id}")
             self._models_installed.add(id)
         except DuplicateModelException:
