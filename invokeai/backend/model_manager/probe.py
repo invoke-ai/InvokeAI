@@ -150,7 +150,7 @@ class ModelProbe(object):
         fields["source_type"] = fields.get("source_type") or ModelSourceType.Path
         fields["source"] = fields.get("source") or model_path.as_posix()
         fields["key"] = fields.get("key", uuid_string())
-        fields["path"] = model_path.as_posix()
+        fields["path"] = probe.model_path.as_posix() or model_path.as_posix()
         fields["type"] = fields.get("type") or model_type
         fields["base"] = fields.get("base") or probe.get_base_type()
         fields["variant"] = fields.get("variant") or probe.get_variant_type()
@@ -652,7 +652,7 @@ class TextualInversionFolderProbe(TextualInversionCheckpointProbe):
             raise InvalidModelConfigException(
                 f"Unable to determine base type for {model_path}: expected exactly one valid model file, found {[f.name for f in files]}."
             )
-        super().__init__(model_path)
+        super().__init__(files.pop())
 
 
 class ONNXFolderProbe(PipelineFolderProbe):
