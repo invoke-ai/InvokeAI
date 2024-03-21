@@ -15,7 +15,7 @@ type Props = {
 
 const MidasDepthProcessor = (props: Props) => {
   const { controlNetId, processorNode, isEnabled } = props;
-  const { a_mult, bg_th, image_resolution } = processorNode;
+  const { a_mult, bg_th, image_resolution, detect_resolution } = processorNode;
   const processorChanged = useProcessorNodeChanged();
   const { t } = useTranslation();
 
@@ -40,6 +40,13 @@ const MidasDepthProcessor = (props: Props) => {
   const handleImageResolutionChanged = useCallback(
     (v: number) => {
       processorChanged(controlNetId, { image_resolution: v });
+    },
+    [controlNetId, processorChanged]
+  );
+
+  const handleDetectResolutionChanged = useCallback(
+    (v: number) => {
+      processorChanged(controlNetId, { detect_resolution: v });
     },
     [controlNetId, processorChanged]
   );
@@ -100,6 +107,24 @@ const MidasDepthProcessor = (props: Props) => {
           value={image_resolution}
           onChange={handleImageResolutionChanged}
           defaultValue={defaults.image_resolution}
+          min={0}
+          max={4096}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.detectResolution')}</FormLabel>
+        <CompositeSlider
+          value={detect_resolution}
+          onChange={handleDetectResolutionChanged}
+          defaultValue={defaults.detect_resolution}
+          min={0}
+          max={4096}
+          marks
+        />
+        <CompositeNumberInput
+          value={detect_resolution}
+          onChange={handleDetectResolutionChanged}
+          defaultValue={defaults.detect_resolution}
           min={0}
           max={4096}
         />
