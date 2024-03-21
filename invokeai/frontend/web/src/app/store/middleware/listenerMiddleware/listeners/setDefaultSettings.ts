@@ -1,14 +1,14 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { setDefaultSettings } from 'features/parameters/store/actions';
 import {
-  heightChanged,
+  heightRecalled,
   setCfgRescaleMultiplier,
   setCfgScale,
   setScheduler,
   setSteps,
   vaePrecisionChanged,
   vaeSelected,
-  widthChanged,
+  widthRecalled,
 } from 'features/parameters/store/generationSlice';
 import {
   isParameterCFGRescaleMultiplier,
@@ -100,13 +100,13 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
 
         if (width) {
           if (isParameterWidth(width)) {
-            dispatch(widthChanged(width));
+            dispatch(widthRecalled(width));
           }
         }
 
         if (height) {
           if (isParameterHeight(height)) {
-            dispatch(heightChanged(height));
+            dispatch(heightRecalled(height));
           }
         }
 
