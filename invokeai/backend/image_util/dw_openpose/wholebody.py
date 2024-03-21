@@ -24,7 +24,7 @@ DWPOSE_MODELS = {
     },
 }
 
-config = get_config
+config = get_config()
 
 
 class Wholebody:
