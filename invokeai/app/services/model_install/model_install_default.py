@@ -2,6 +2,7 @@
 
 import os
 import re
+import signal
 import threading
 import time
 from hashlib import sha256
@@ -112,6 +113,18 @@ class ModelInstallService(ModelInstallServiceBase):
     # makes the installer harder to use outside the web app
     def start(self, invoker: Optional[Invoker] = None) -> None:
         """Start the installer thread."""
+
+        # Yes, this is weird. When the installer thread is running, the
+        # thread masks the ^C signal. When we receive a
+        # sigINT, we stop the thread, reset sigINT, and send a new
+        # sigINT to the parent process.
+        def sigint_handler(signum, frame):
+            self.stop()
+            signal.signal(signal.SIGINT, signal.SIG_DFL)
+            signal.raise_signal(signal.SIGINT)
+
+        signal.signal(signal.SIGINT, sigint_handler)
+
         with self._lock:
             if self._running:
                 raise Exception("Attempt to start the installer service twice")
@@ -122,15 +135,16 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def stop(self, invoker: Optional[Invoker] = None) -> None:
         """Stop the installer thread; after this the object can be deleted and garbage collected."""
-        with self._lock:
-            if not self._running:
-                raise Exception("Attempt to stop the install service before it was started")
-            self._stop_event.set()
-            self._clear_pending_jobs()
-            self._download_cache.clear()
-            assert self._install_thread is not None
-            self._install_thread.join()
-            self._running = False
+        # do manual acquire() so as to receive signals
+        if not self._running:
+            raise Exception("Attempt to stop the install service before it was started")
+        self._logger.debug("calling stop_event.set()")
+        self._stop_event.set()
+        self._clear_pending_jobs()
+        self._download_cache.clear()
+        assert self._install_thread is not None
+        self._install_thread.join()
+        self._running = False
 
     def _clear_pending_jobs(self) -> None:
         for job in self.list_jobs():
