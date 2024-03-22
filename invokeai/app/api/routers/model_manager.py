@@ -38,7 +38,7 @@ from invokeai.backend.model_manager.config import (
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
 from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
 from invokeai.backend.model_manager.search import ModelSearch
-from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel
+from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel, StarterModelWithoutDependencies
 
 from ..dependencies import ApiDependencies
 
@@ -800,9 +800,9 @@ async def get_starter_models() -> list[StarterModel]:
         if model.source in installed_model_sources:
             model.is_installed = True
         # Remove already-installed dependencies
-        missing_deps: list[str] = []
+        missing_deps: list[StarterModelWithoutDependencies] = []
         for dep in model.dependencies or []:
-            if dep not in installed_model_sources:
+            if dep.source not in installed_model_sources:
                 missing_deps.append(dep)
         model.dependencies = missing_deps
 
