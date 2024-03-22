@@ -350,9 +350,8 @@ class ModelInstallService(ModelInstallServiceBase):
             # Rename `models.yaml` to `models.yaml.bak` to prevent re-migration
             legacy_models_yaml_path.rename(legacy_models_yaml_path.with_suffix(".yaml.bak"))
 
-        # Remove `legacy_models_yaml_path` from the config file - we are done with it either way
+        # Unset the path - we are done with it either way
         self._app_config.legacy_models_yaml_path = None
-        self._app_config.write_file(self._app_config.config_file_path)
 
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
         self._cached_model_paths = {Path(x.path).resolve() for x in self.record_store.all_models()}
