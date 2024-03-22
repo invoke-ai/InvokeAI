@@ -114,7 +114,7 @@ class ModelProbe(object):
 
     @classmethod
     def probe(
-        cls, model_path: Path, fields: Optional[Dict[str, Any]] = None, hash_algo: HASHING_ALGORITHMS = "blake3"
+        cls, model_path: Path, fields: Optional[Dict[str, Any]] = None, hash_algo: HASHING_ALGORITHMS = "blake3_single"
     ) -> AnyModelConfig:
         """
         Probe the model at model_path and return its configuration record.
@@ -178,13 +178,14 @@ class ModelProbe(object):
             fields["type"] in [ModelType.Main, ModelType.ControlNet, ModelType.VAE]
             and fields["format"] is ModelFormat.Checkpoint
         ):
-            fields["config_path"] = cls._get_checkpoint_config_path(
+            ckpt_config_path = cls._get_checkpoint_config_path(
                 model_path,
                 model_type=fields["type"],
                 base_type=fields["base"],
                 variant_type=fields["variant"],
                 prediction_type=fields["prediction_type"],
-            ).as_posix()
+            )
+            fields["config_path"] = str(ckpt_config_path)
 
         # additional fields needed for main non-checkpoint models
         elif fields["type"] == ModelType.Main and fields["format"] in [
@@ -226,8 +227,8 @@ class ModelProbe(object):
             elif any(key.startswith(v) for v in {"lora_te_", "lora_unet_"}):
                 return ModelType.LoRA
             elif any(key.endswith(v) for v in {"to_k_lora.up.weight", "to_q_lora.down.weight"}):
-                return ModelType.LoRA
-            elif any(key.startswith(v) for v in {"control_model", "input_blocks"}):
+                return ModelType.Lora
+            elif any(key.startswith(v) for v in {"controlnet", "control_model", "input_blocks"}):
                 return ModelType.ControlNet
             elif key in {"emb_params", "string_to_param"}:
                 return ModelType.TextualInversion
@@ -298,23 +299,23 @@ class ModelProbe(object):
             config_file = LEGACY_CONFIGS[base_type][variant_type]
             if isinstance(config_file, dict):  # need another tier for sd-2.x models
                 config_file = config_file[prediction_type]
+            config_file = f"stable-diffusion/{config_file}"
         elif model_type is ModelType.ControlNet:
             config_file = (
-                "../controlnet/cldm_v15.yaml"
+                "controlnet/cldm_v15.yaml"
                 if base_type is BaseModelType.StableDiffusion1
-                else "../controlnet/cldm_v21.yaml"
+                else "controlnet/cldm_v21.yaml"
             )
         elif model_type is ModelType.VAE:
             config_file = (
-                "../stable-diffusion/v1-inference.yaml"
+                "stable-diffusion/v1-inference.yaml"
                 if base_type is BaseModelType.StableDiffusion1
-                else "../stable-diffusion/v2-inference.yaml"
+                else "stable-diffusion/v2-inference.yaml"
             )
         else:
             raise InvalidModelConfigException(
                 f"{model_path}: Unrecognized combination of model_type={model_type}, base_type={base_type}"
             )
-        assert isinstance(config_file, str)
         return Path(config_file)
 
     @classmethod
@@ -507,15 +508,22 @@ class ControlNetCheckpointProbe(CheckpointProbeBase):
         checkpoint = self.checkpoint
         for key_name in (
             "control_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight",
+            "controlnet_mid_block.bias",
             "input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight",
+            "down_blocks.1.attentions.0.transformer_blocks.0.attn2.to_k.weight",
         ):
             if key_name not in checkpoint:
                 continue
-            if checkpoint[key_name].shape[-1] == 768:
+            width = checkpoint[key_name].shape[-1]
+            if width == 768:
                 return BaseModelType.StableDiffusion1
-            elif checkpoint[key_name].shape[-1] == 1024:
+            elif width == 1024:
                 return BaseModelType.StableDiffusion2
-        raise InvalidModelConfigException("{self.model_path}: Unable to determine base type")
+            elif width == 2048:
+                return BaseModelType.StableDiffusionXL
+            elif width == 1280:
+                return BaseModelType.StableDiffusionXL
+        raise InvalidModelConfigException(f"{self.model_path}: Unable to determine base type")
 
 
 class IPAdapterCheckpointProbe(CheckpointProbeBase):

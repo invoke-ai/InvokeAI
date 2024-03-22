@@ -12,7 +12,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from .baseinvocation import BaseInvocation, invocation
 
 
-@invocation("add", title="Add Integers", tags=["math", "add"], category="math", version="1.0.0")
+@invocation("add", title="Add Integers", tags=["math", "add"], category="math", version="1.0.1")
 class AddInvocation(BaseInvocation):
     """Adds two numbers"""
 
@@ -23,7 +23,7 @@ class AddInvocation(BaseInvocation):
         return IntegerOutput(value=self.a + self.b)
 
 
-@invocation("sub", title="Subtract Integers", tags=["math", "subtract"], category="math", version="1.0.0")
+@invocation("sub", title="Subtract Integers", tags=["math", "subtract"], category="math", version="1.0.1")
 class SubtractInvocation(BaseInvocation):
     """Subtracts two numbers"""
 
@@ -34,7 +34,7 @@ class SubtractInvocation(BaseInvocation):
         return IntegerOutput(value=self.a - self.b)
 
 
-@invocation("mul", title="Multiply Integers", tags=["math", "multiply"], category="math", version="1.0.0")
+@invocation("mul", title="Multiply Integers", tags=["math", "multiply"], category="math", version="1.0.1")
 class MultiplyInvocation(BaseInvocation):
     """Multiplies two numbers"""
 
@@ -45,7 +45,7 @@ class MultiplyInvocation(BaseInvocation):
         return IntegerOutput(value=self.a * self.b)
 
 
-@invocation("div", title="Divide Integers", tags=["math", "divide"], category="math", version="1.0.0")
+@invocation("div", title="Divide Integers", tags=["math", "divide"], category="math", version="1.0.1")
 class DivideInvocation(BaseInvocation):
     """Divides two numbers"""
 
@@ -61,7 +61,7 @@ class DivideInvocation(BaseInvocation):
     title="Random Integer",
     tags=["math", "random"],
     category="math",
-    version="1.0.0",
+    version="1.0.1",
     use_cache=False,
 )
 class RandomIntInvocation(BaseInvocation):
@@ -100,7 +100,7 @@ class RandomFloatInvocation(BaseInvocation):
     title="Float To Integer",
     tags=["math", "round", "integer", "float", "convert"],
     category="math",
-    version="1.0.0",
+    version="1.0.1",
 )
 class FloatToIntegerInvocation(BaseInvocation):
     """Rounds a float number to (a multiple of) an integer."""
@@ -122,7 +122,7 @@ class FloatToIntegerInvocation(BaseInvocation):
             return IntegerOutput(value=int(self.value / self.multiple) * self.multiple)
 
 
-@invocation("round_float", title="Round Float", tags=["math", "round"], category="math", version="1.0.0")
+@invocation("round_float", title="Round Float", tags=["math", "round"], category="math", version="1.0.1")
 class RoundInvocation(BaseInvocation):
     """Rounds a float to a specified number of decimal places."""
 
@@ -176,7 +176,7 @@ INTEGER_OPERATIONS_LABELS = {
         "max",
     ],
     category="math",
-    version="1.0.0",
+    version="1.0.1",
 )
 class IntegerMathInvocation(BaseInvocation):
     """Performs integer math."""
@@ -250,7 +250,7 @@ FLOAT_OPERATIONS_LABELS = {
     title="Float Math",
     tags=["math", "float", "add", "subtract", "multiply", "divide", "power", "root", "absolute value", "min", "max"],
     category="math",
-    version="1.0.0",
+    version="1.0.1",
 )
 class FloatMathInvocation(BaseInvocation):
     """Performs floating point math."""

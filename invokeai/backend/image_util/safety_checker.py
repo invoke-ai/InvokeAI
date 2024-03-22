@@ -4,6 +4,8 @@ wraps the safety_checker model. It respects the global "nsfw_checker"
 configuration variable, that allows the checker to be supressed.
 """
 
+from pathlib import Path
+
 import numpy as np
 from diffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
 from PIL import Image
@@ -34,22 +36,21 @@ class SafetyChecker:
         try:
             cls.safety_checker = StableDiffusionSafetyChecker.from_pretrained(get_config().models_path / CHECKER_PATH)
             cls.feature_extractor = AutoFeatureExtractor.from_pretrained(get_config().models_path / CHECKER_PATH)
-            logger.info("NSFW checker initialized")
         except Exception as e:
             logger.warning(f"Could not load NSFW checker: {str(e)}")
         cls.tried_load = True
 
     @classmethod
     def safety_checker_available(cls) -> bool:
-        cls._load_safety_checker()
-        return cls.safety_checker is not None
+        return Path(get_config().models_path, CHECKER_PATH).exists()
 
     @classmethod
     def has_nsfw_concept(cls, image: Image.Image) -> bool:
-        if not cls.safety_checker_available():
+        if not cls.safety_checker_available() and cls.tried_load:
             return False
-        assert cls.safety_checker is not None
-        assert cls.feature_extractor is not None
+        cls._load_safety_checker()
+        if cls.safety_checker is None or cls.feature_extractor is None:
+            return False
         device = choose_torch_device()
         features = cls.feature_extractor([image], return_tensors="pt")
         features.to(device)

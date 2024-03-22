@@ -13,7 +13,7 @@ from .baseinvocation import BaseInvocation, invocation
 from .fields import InputField, WithBoard, WithMetadata
 
 
-@invocation("cv_inpaint", title="OpenCV Inpaint", tags=["opencv", "inpaint"], category="inpaint", version="1.2.1")
+@invocation("cv_inpaint", title="OpenCV Inpaint", tags=["opencv", "inpaint"], category="inpaint", version="1.3.1")
 class CvInpaintInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Simple inpaint using opencv."""
 

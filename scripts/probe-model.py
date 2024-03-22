@@ -20,8 +20,8 @@ parser.add_argument(
 parser.add_argument(
     "--hash_algo",
     type=str,
-    default="blake3",
-    help=f"Hashing algorithm to use (default: blake3), one of: {algos}",
+    default="blake3_single",
+    help=f"Hashing algorithm to use (default: blake3_single), one of: {algos}",
 )
 args = parser.parse_args()
 

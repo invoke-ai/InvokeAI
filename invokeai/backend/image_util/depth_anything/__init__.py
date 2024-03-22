@@ -10,11 +10,11 @@ from PIL import Image
 from torchvision.transforms import Compose
 
 from invokeai.app.services.config.config_default import get_config
+from invokeai.app.util.download_with_progress import download_with_progress_bar
 from invokeai.backend.image_util.depth_anything.model.dpt import DPT_DINOv2
 from invokeai.backend.image_util.depth_anything.utilities.util import NormalizeImage, PrepareForNet, Resize
 from invokeai.backend.util.devices import choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger
-from invokeai.backend.util.util import download_with_progress_bar
 
 config = get_config()
 logger = InvokeAILogger.get_logger(config=config)
@@ -59,9 +59,12 @@ class DepthAnythingDetector:
         self.device = choose_torch_device()
 
     def load_model(self, model_size: Literal["large", "base", "small"] = "small"):
-        DEPTH_ANYTHING_MODEL_PATH = pathlib.Path(config.models_path / DEPTH_ANYTHING_MODELS[model_size]["local"])
-        if not DEPTH_ANYTHING_MODEL_PATH.exists():
-            download_with_progress_bar(DEPTH_ANYTHING_MODELS[model_size]["url"], DEPTH_ANYTHING_MODEL_PATH)
+        DEPTH_ANYTHING_MODEL_PATH = config.models_path / DEPTH_ANYTHING_MODELS[model_size]["local"]
+        download_with_progress_bar(
+            pathlib.Path(DEPTH_ANYTHING_MODELS[model_size]["url"]).name,
+            DEPTH_ANYTHING_MODELS[model_size]["url"],
+            DEPTH_ANYTHING_MODEL_PATH,
+        )
 
         if not self.model or model_size != self.model_size:
             del self.model

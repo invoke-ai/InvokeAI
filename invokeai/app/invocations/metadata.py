@@ -84,7 +84,7 @@ class MetadataItemOutput(BaseInvocationOutput):
     item: MetadataItemField = OutputField(description="Metadata Item")
 
 
-@invocation("metadata_item", title="Metadata Item", tags=["metadata"], category="metadata", version="1.0.0")
+@invocation("metadata_item", title="Metadata Item", tags=["metadata"], category="metadata", version="1.0.1")
 class MetadataItemInvocation(BaseInvocation):
     """Used to create an arbitrary metadata item. Provide "label" and make a connection to "value" to store that data as the value."""
 
@@ -100,7 +100,7 @@ class MetadataOutput(BaseInvocationOutput):
     metadata: MetadataField = OutputField(description="Metadata Dict")
 
 
-@invocation("metadata", title="Metadata", tags=["metadata"], category="metadata", version="1.0.0")
+@invocation("metadata", title="Metadata", tags=["metadata"], category="metadata", version="1.0.1")
 class MetadataInvocation(BaseInvocation):
     """Takes a MetadataItem or collection of MetadataItems and outputs a MetadataDict."""
 
@@ -121,7 +121,7 @@ class MetadataInvocation(BaseInvocation):
         return MetadataOutput(metadata=MetadataField.model_validate(data))
 
 
-@invocation("merge_metadata", title="Metadata Merge", tags=["metadata"], category="metadata", version="1.0.0")
+@invocation("merge_metadata", title="Metadata Merge", tags=["metadata"], category="metadata", version="1.0.1")
 class MergeMetadataInvocation(BaseInvocation):
     """Merged a collection of MetadataDict into a single MetadataDict."""
 
@@ -140,7 +140,7 @@ GENERATION_MODES = Literal[
 ]
 
 
-@invocation("core_metadata", title="Core Metadata", tags=["metadata"], category="metadata", version="1.1.1")
+@invocation("core_metadata", title="Core Metadata", tags=["metadata"], category="metadata", version="2.0.0")
 class CoreMetadataInvocation(BaseInvocation):
     """Collects core generation metadata into a MetadataField"""
 

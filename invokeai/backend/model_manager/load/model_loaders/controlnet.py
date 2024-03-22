@@ -35,8 +35,6 @@ class ControlNetLoader(GenericDiffusersLoader):
 
     def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Path) -> Path:
         assert isinstance(config, CheckpointConfigBase)
-        config_file = config.config_path
-
         image_size = (
             512
             if config.base == BaseModelType.StableDiffusion1
@@ -46,7 +44,7 @@ class ControlNetLoader(GenericDiffusersLoader):
         )
 
         self._logger.info(f"Converting {model_path} to diffusers format")
-        with open(self._app_config.root_path / config_file, "r") as config_stream:
+        with open(self._app_config.root_path / config.config_path, "r") as config_stream:
             convert_controlnet_to_diffusers(
                 model_path,
                 output_path,

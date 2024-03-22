@@ -433,7 +433,21 @@
         "scanPlaceholder": "Путь к локальной папке",
         "simpleModelPlaceholder": "URL или путь к локальному файлу или папке diffusers",
         "urlOrLocalPath": "URL или локальный путь",
-        "urlOrLocalPathHelper": "URL-адреса должны указывать на один файл. Локальные пути могут указывать на один файл или папку для одной модели диффузоров."
+        "urlOrLocalPathHelper": "URL-адреса должны указывать на один файл. Локальные пути могут указывать на один файл или папку для одной модели диффузоров.",
+        "hfToken": "Токен HuggingFace",
+        "hfTokenInvalid": "Недействительный или отсутствующий HF-токен",
+        "hfTokenInvalidErrorMessage2": "Обновите его в . ",
+        "hfTokenUnableToVerify": "Невозможно проверить HF-токен",
+        "hfTokenSaved": "HF-токен сохранен",
+        "starterModels": "Стартовые модели",
+        "textualInversions": "Текстовые инверсии",
+        "hfTokenHelperText": "Для использования моделей контрольных точек требуется токен HF. Нажмите здесь, чтобы создать или получить свой токен.",
+        "hfTokenInvalidErrorMessage": "Недействительный или отсутствующий HuggingFace токен.",
+        "hfTokenUnableToVerifyErrorMessage": "Невозможно проверить токен HuggingFace. Вероятно, это связано с сетевой ошибкой. Пожалуйста, повторите попытку позже.",
+        "loraModels": "LoRAs",
+        "main": "Основные",
+        "noModelsInstalled": "Нет установленных моделей",
+        "noModelsInstalledDesc1": "Установите модели с помощью"
     },
     "parameters": {
         "images": "Изображения",
@@ -1395,7 +1409,8 @@
         "loading": "Загрузка...",
         "steps": "Шаги",
         "posStylePrompt": "Запрос стиля",
-        "freePromptStyle": "Ручной запрос стиля"
+        "freePromptStyle": "Ручной запрос стиля",
+        "refinerSteps": "Шаги доработчика"
     },
     "invocationCache": {
         "useCache": "Использовать кэш",
@@ -1437,7 +1452,18 @@
         "newWorkflowCreated": "Создан новый рабочий процесс",
         "saveWorkflowToProject": "Сохранить рабочий процесс в проект",
         "workflowCleared": "Рабочий процесс очищен",
-        "noWorkflows": "Нет рабочих процессов"
+        "noWorkflows": "Нет рабочих процессов",
+        "opened": "Открыто",
+        "updated": "Обновлено",
+        "noUserWorkflows": "Нет рабочих процессов пользователя",
+        "ascending": "Восходящий",
+        "created": "Создано",
+        "descending": "Спуск",
+        "userWorkflows": "Мои рабочие процессы",
+        "projectWorkflows": "Рабочие процессы проекта",
+        "defaultWorkflows": "Стандартные рабочие процессы",
+        "name": "Имя",
+        "noRecentWorkflows": "Нет последних рабочих процессов"
     },
     "hrf": {
         "enableHrf": "Включить исправление высокого разрешения",

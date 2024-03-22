@@ -8,35 +8,28 @@ x-invokeai: &invokeai
       context: ..
       dockerfile: docker/Dockerfile
 
-    # variables without a default will automatically inherit from the host environment
-    environment:
-      - INVOKEAI_ROOT
-      - HF_HOME
-
     # Create a .env file in the same directory as this docker-compose.yml file
     # and populate it with environment variables. See .env.sample
     env_file:
       - .env
 
+    # variables without a default will automatically inherit from the host environment
+    environment:
+      # if set, CONTAINER_INVOKEAI_ROOT will override the Invoke runtime directory location *inside* the container
+      - INVOKEAI_ROOT=${CONTAINER_INVOKEAI_ROOT:-/invokeai}
+      - HF_HOME
     ports:
-      - "${INVOKEAI_PORT:-9090}:9090"
+      - "${INVOKEAI_PORT:-9090}:${INVOKEAI_PORT:-9090}"
     volumes:
       - type: bind
         source: ${HOST_INVOKEAI_ROOT:-${INVOKEAI_ROOT:-~/invokeai}}
-        target: ${INVOKEAI_ROOT:-/invokeai}
+        target: ${CONTAINER_INVOKEAI_ROOT:-/invokeai}
+        bind:
+          create_host_path: true
       - ${HF_HOME:-~/.cache/huggingface}:${HF_HOME:-/invokeai/.cache/huggingface}
-      # - ${INVOKEAI_MODELS_DIR:-${INVOKEAI_ROOT:-/invokeai/models}}
-      # - ${INVOKEAI_MODELS_CONFIG_PATH:-${INVOKEAI_ROOT:-/invokeai/configs/models.yaml}}
     tty: true
     stdin_open: true
 
-    # # Example of running alternative commands/scripts in the container
-    # command:
-    #   - bash
-    #   - -c
-    #   - |
-    #     invokeai-model-install --yes --default-only --config_file ${INVOKEAI_ROOT}/config_custom.yaml
-    #     invokeai-nodes-web --host 0.0.0.0
 
 services:
   invokeai-nvidia:

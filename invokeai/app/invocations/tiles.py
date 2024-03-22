@@ -39,7 +39,7 @@ class CalculateImageTilesOutput(BaseInvocationOutput):
     title="Calculate Image Tiles",
     tags=["tiles"],
     category="tiles",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Beta,
 )
 class CalculateImageTilesInvocation(BaseInvocation):
@@ -73,7 +73,7 @@ class CalculateImageTilesInvocation(BaseInvocation):
     title="Calculate Image Tiles Even Split",
     tags=["tiles"],
     category="tiles",
-    version="1.1.0",
+    version="1.1.1",
     classification=Classification.Beta,
 )
 class CalculateImageTilesEvenSplitInvocation(BaseInvocation):
@@ -116,7 +116,7 @@ class CalculateImageTilesEvenSplitInvocation(BaseInvocation):
     title="Calculate Image Tiles Minimum Overlap",
     tags=["tiles"],
     category="tiles",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Beta,
 )
 class CalculateImageTilesMinimumOverlapInvocation(BaseInvocation):
@@ -167,7 +167,7 @@ class TileToPropertiesOutput(BaseInvocationOutput):
     title="Tile to Properties",
     tags=["tiles"],
     category="tiles",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Beta,
 )
 class TileToPropertiesInvocation(BaseInvocation):
@@ -200,7 +200,7 @@ class PairTileImageOutput(BaseInvocationOutput):
     title="Pair Tile with Image",
     tags=["tiles"],
     category="tiles",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Beta,
 )
 class PairTileImageInvocation(BaseInvocation):
@@ -229,7 +229,7 @@ BLEND_MODES = Literal["Linear", "Seam"]
     title="Merge Tiles to Image",
     tags=["tiles"],
     category="tiles",
-    version="1.1.0",
+    version="1.1.1",
     classification=Classification.Beta,
 )
 class MergeTilesToImageInvocation(BaseInvocation, WithMetadata, WithBoard):

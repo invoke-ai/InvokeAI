@@ -48,6 +48,7 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
       low_threshold: 100,
       high_threshold: 200,
       image_resolution: baseModel === 'sdxl' ? 1024 : 512,
+      detect_resolution: baseModel === 'sdxl' ? 1024 : 512,
     }),
   },
   color_map_image_processor: {
@@ -158,6 +159,7 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
       max_faces: 1,
       min_confidence: 0.5,
       image_resolution: baseModel === 'sdxl' ? 1024 : 512,
+      detect_resolution: baseModel === 'sdxl' ? 1024 : 512,
     }),
   },
   midas_depth_image_processor: {
@@ -174,6 +176,7 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
       a_mult: 2,
       bg_th: 0.1,
       image_resolution: baseModel === 'sdxl' ? 1024 : 512,
+      detect_resolution: baseModel === 'sdxl' ? 1024 : 512,
     }),
   },
   mlsd_image_processor: {

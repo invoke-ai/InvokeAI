@@ -16,7 +16,7 @@ test_cases: list[tuple[HASHING_ALGORITHMS, str]] = [
         "sha512",
         "sha512:c4a10476b21e00042f638ad5755c561d91f2bb599d3504d25409495e1c7eda94543332a1a90fbb4efdaf9ee462c33e0336b5eae4acfb1fa0b186af452dd67dc6",
     ),
-    ("blake3", "blake3:ce3f0c5f3c05d119f4a5dcaf209b50d3149046a0d3a9adee9fed4c83cad6b4d0"),
+    ("blake3_multi", "blake3:ce3f0c5f3c05d119f4a5dcaf209b50d3149046a0d3a9adee9fed4c83cad6b4d0"),
     ("blake3_single", "blake3:ce3f0c5f3c05d119f4a5dcaf209b50d3149046a0d3a9adee9fed4c83cad6b4d0"),
 ]
 
@@ -29,7 +29,7 @@ def test_model_hash_hashes_file(tmp_path: Path, algorithm: HASHING_ALGORITHMS, e
     assert hash_ == expected_hash
 
 
-@pytest.mark.parametrize("algorithm", ["md5", "sha1", "sha256", "sha512", "blake3", "blake3_single"])
+@pytest.mark.parametrize("algorithm", ["md5", "sha1", "sha256", "sha512", "blake3_multi", "blake3_single"])
 def test_model_hash_hashes_dir(tmp_path: Path, algorithm: HASHING_ALGORITHMS):
     model_hash = ModelHash(algorithm)
     files = [Path(tmp_path, f"{i}.bin") for i in range(5)]
@@ -58,7 +58,7 @@ def test_model_hash_hashes_dir(tmp_path: Path, algorithm: HASHING_ALGORITHMS):
         ("sha1", "sha1:"),
         ("sha256", "sha256:"),
         ("sha512", "sha512:"),
-        ("blake3", "blake3:"),
+        ("blake3_multi", "blake3:"),
         ("blake3_single", "blake3:"),
     ],
 )
@@ -67,7 +67,7 @@ def test_model_hash_gets_prefix(algorithm: HASHING_ALGORITHMS, expected_prefix: 
 
 
 def test_model_hash_blake3_matches_blake3_single(tmp_path: Path):
-    model_hash = ModelHash("blake3")
+    model_hash = ModelHash("blake3_multi")
     model_hash_simple = ModelHash("blake3_single")
 
     file = tmp_path / "test.bin"
