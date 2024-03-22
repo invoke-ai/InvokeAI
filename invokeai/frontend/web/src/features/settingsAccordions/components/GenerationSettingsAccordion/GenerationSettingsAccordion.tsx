@@ -69,7 +69,7 @@ export const GenerationSettingsAccordion = memo(() => {
             <LoRAList />
           </Flex>
         </Flex>
-        <Expander isOpen={isOpenExpander} onToggle={onToggleExpander}>
+        <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} flexDir="column" pb={4}>
             <FormControlGroup formLabelProps={formLabelProps}>
               <ParamScheduler />

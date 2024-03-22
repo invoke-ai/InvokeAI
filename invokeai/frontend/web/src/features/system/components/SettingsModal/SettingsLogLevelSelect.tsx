@@ -26,7 +26,7 @@ export const SettingsLogLevelSelect = memo(() => {
   );
   return (
     <FormControl isDisabled={!shouldLogToConsole}>
-      <FormLabel>{t('common.languagePickerLabel')}</FormLabel>
+      <FormLabel>{t('common.loglevel')}</FormLabel>
       <Combobox value={value} options={options} onChange={onChange} />
     </FormControl>
   );
