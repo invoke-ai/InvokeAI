@@ -135,7 +135,6 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def stop(self, invoker: Optional[Invoker] = None) -> None:
         """Stop the installer thread; after this the object can be deleted and garbage collected."""
-        # do manual acquire() so as to receive signals
         if not self._running:
             raise Exception("Attempt to stop the install service before it was started")
         self._logger.debug("calling stop_event.set()")
