@@ -227,7 +227,7 @@ class ModelProbe(object):
             elif any(key.startswith(v) for v in {"lora_te_", "lora_unet_"}):
                 return ModelType.LoRA
             elif any(key.endswith(v) for v in {"to_k_lora.up.weight", "to_q_lora.down.weight"}):
-                return ModelType.Lora
+                return ModelType.LoRA
             elif any(key.startswith(v) for v in {"controlnet", "control_model", "input_blocks"}):
                 return ModelType.ControlNet
             elif key in {"emb_params", "string_to_param"}:
