@@ -390,10 +390,10 @@ class ModelInstallService(ModelInstallServiceBase):
     def unconditionally_delete(self, key: str) -> None:  # noqa D102
         model = self.record_store.get_model(key)
         model_path = self.app_config.models_path / model.path
-        if model_path.is_dir():
-            rmtree(model_path)
-        else:
+        if model_path.is_file() or model_path.is_symlink():
             model_path.unlink()
+        elif model_path.is_dir():
+            rmtree(model_path)
         self.unregister(key)
 
     def download_and_cache(
