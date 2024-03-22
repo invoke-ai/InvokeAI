@@ -1,9 +1,8 @@
 {
-  "_version": 1,
   "name": "Face Detailer with IP-Adapter & Canny (See Note in Details)",
   "author": "kosmoskatten",
   "description": "A workflow to add detail to and improve faces. This workflow is most effective when used with a model that creates realistic outputs. ",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "contact": "invoke@invoke.ai",
   "tags": "face detailer, IP-Adapter, Canny",
   "notes": "Set this image as the blur mask: https://i.imgur.com/Gxi61zP.png",
@@ -27,11 +26,19 @@
     {
       "nodeId": "c59e815c-1f3a-4e2b-b6b8-66f4b005e955",
       "fieldName": "image"
+    },
+    {
+      "nodeId": "f60b6161-8f26-42f6-89ff-545e6011e501",
+      "fieldName": "control_model"
+    },
+    {
+      "nodeId": "22b750db-b85e-486b-b278-ac983e329813",
+      "fieldName": "ip_adapter_model"
     }
   ],
   "meta": {
     "category": "default",
-    "version": "2.0.0"
+    "version": "3.0.0"
   },
   "nodes": [
     {
@@ -39,2353 +46,1019 @@
       "type": "invocation",
       "data": {
         "id": "44f2c190-eb03-460d-8d11-a94d13b33f19",
-        "type": "compel",
-        "label": "",
-        "isOpen": true,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.0.0",
+        "version": "1.1.1",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "compel",
         "inputs": {
           "prompt": {
-            "id": "916b229a-38e1-45a2-a433-cca97495b143",
             "name": "prompt",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "StringField"
-            },
             "value": ""
           },
           "clip": {
-            "id": "ae9aeb1a-4ebd-4bc3-b6e6-a8c9adca01f6",
             "name": "clip",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ClipField"
-            }
+            "label": ""
           }
         },
-        "outputs": {
-          "conditioning": {
-            "id": "4d59bad1-99a9-43e2-bdb4-7a0f3dd5b787",
-            "name": "conditioning",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ConditioningField"
-            }
-          }
-        }
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 2575,
         "y": -250
-      },
-      "width": 320,
-      "height": 195
+      }
     },
     {
       "id": "c59e815c-1f3a-4e2b-b6b8-66f4b005e955",
       "type": "invocation",
       "data": {
         "id": "c59e815c-1f3a-4e2b-b6b8-66f4b005e955",
-        "type": "img_resize",
-        "label": "",
-        "isOpen": true,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.2.0",
+        "version": "1.2.2",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "img_resize",
         "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
           "metadata": {
-            "id": "48ff6f70-380c-4e19-acf7-91063cfff8a8",
             "name": "metadata",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "MetadataField"
-            }
+            "label": ""
           },
           "image": {
-            "id": "2a348a03-07a3-4a97-93c8-46051045b32f",
             "name": "image",
-            "fieldKind": "input",
-            "label": "Blur Mask",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
+            "label": "Blur Mask (see notes!)"
           },
           "width": {
-            "id": "6b95969c-ca73-4b54-815d-7aae305a67bd",
             "name": "width",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            },
             "value": 512
           },
           "height": {
-            "id": "af83c526-c730-4a34-8f73-80f443fecc05",
             "name": "height",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            },
             "value": 512
           },
           "resample_mode": {
-            "id": "43f7d6b5-ebe0-43c4-bf5d-8fb7fdc40a3f",
             "name": "resample_mode",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "EnumField"
-            },
             "value": "lanczos"
           }
         },
-        "outputs": {
-          "image": {
-            "id": "e492b013-615d-4dfd-b0d8-7df7b5ba9a9d",
-            "name": "image",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
-          },
-          "width": {
-            "id": "05f829b3-c253-495a-b1ad-9906c0833e49",
-            "name": "width",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          },
-          "height": {
-            "id": "65d5d662-2527-4f3c-8a87-0a7d9d4486de",
-            "name": "height",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          }
-        }
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 4423.179487179487,
         "y": 482.66666666666674
-      },
-      "width": 320,
-      "height": 347
+      }
     },
     {
       "id": "2c9bc2a6-6c03-4861-aad4-db884a7682f8",
       "type": "invocation",
       "data": {
         "id": "2c9bc2a6-6c03-4861-aad4-db884a7682f8",
-        "type": "image",
-        "label": "",
-        "isOpen": true,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.0.0",
+        "version": "1.0.2",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "image",
         "inputs": {
           "image": {
-            "id": "729c571b-d5a0-4b53-8f50-5e11eb744f66",
             "name": "image",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
+            "label": ""
           }
         },
-        "outputs": {
-          "image": {
-            "id": "3632a144-58d6-4447-bafc-e4f7d6ca96bf",
-            "name": "image",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
-          },
-          "width": {
-            "id": "30faefcc-81a1-445b-a3fe-0110ceb56772",
-            "name": "width",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          },
-          "height": {
-            "id": "d173d225-849a-4498-a75d-ba17210dbd3e",
-            "name": "height",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          }
-        }
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 2050,
         "y": -75
-      },
-      "width": 320,
-      "height": 165
+      }
     },
     {
       "id": "9ae34718-a17d-401d-9859-086896c29fca",
       "type": "invocation",
       "data": {
         "id": "9ae34718-a17d-401d-9859-086896c29fca",
-        "type": "face_off",
-        "label": "",
-        "isOpen": true,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.2.0",
+        "version": "1.2.2",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "face_off",
         "inputs": {
           "metadata": {
-            "id": "0144d549-b04a-49c2-993f-9ecb2695191a",
             "name": "metadata",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "MetadataField"
-            }
+            "label": ""
           },
           "image": {
-            "id": "9c580dec-a958-43a4-9aa0-7ab9491c56a0",
             "name": "image",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
+            "label": ""
           },
           "face_id": {
-            "id": "1ee762e1-810f-46f7-a591-ecd28abff85b",
             "name": "face_id",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            },
             "value": 0
           },
           "minimum_confidence": {
-            "id": "74d2bae8-7ac5-4f8f-afb7-1efc76ed72a0",
             "name": "minimum_confidence",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            },
             "value": 0.5
           },
           "x_offset": {
-            "id": "f1c1489d-cbbb-45d2-ba94-e150fc5ce24d",
             "name": "x_offset",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            },
             "value": 0
           },
           "y_offset": {
-            "id": "6621377a-7e29-4841-aa47-aa7d438662f9",
             "name": "y_offset",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            },
             "value": 0
           },
           "padding": {
-            "id": "0414c830-1be8-48cd-b0c8-6de10b099029",
             "name": "padding",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            },
             "value": 64
           },
           "chunk": {
-            "id": "22eba30a-c68a-4e5f-8f97-315830959b04",
             "name": "chunk",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "BooleanField"
-            },
             "value": false
           }
         },
-        "outputs": {
-          "image": {
-            "id": "7d8fa807-0e9c-4d6a-a85a-388bd0cb5166",
-            "name": "image",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
-          },
-          "width": {
-            "id": "048361ca-314c-44a4-8b6e-ca4917e3468f",
-            "name": "width",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          },
-          "height": {
-            "id": "7b721071-63e5-4d54-9607-9fa2192163a8",
-            "name": "height",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          },
-          "mask": {
-            "id": "a9c6194a-3dbd-4b18-af04-a85a9498f04e",
-            "name": "mask",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
-          },
-          "x": {
-            "id": "d072582c-2db5-430b-9e50-b50277baa7d5",
-            "name": "x",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          },
-          "y": {
-            "id": "40624813-e55d-42d7-bc14-dea48ccfd9c8",
-            "name": "y",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          }
-        }
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 2575,
         "y": 200
-      },
-      "width": 320,
-      "height": 569
+      }
     },
     {
       "id": "50a8db6a-3796-4522-8547-53275efa4e7d",
       "type": "invocation",
       "data": {
         "id": "50a8db6a-3796-4522-8547-53275efa4e7d",
-        "type": "img_resize",
-        "label": "",
-        "isOpen": false,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.2.0",
+        "version": "1.2.2",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "img_resize",
         "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
           "metadata": {
-            "id": "6bf91925-e22e-4bcb-90e4-f8ac32ddff36",
             "name": "metadata",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "MetadataField"
-            }
+            "label": ""
           },
           "image": {
-            "id": "65af3f4e-7a89-4df4-8ba9-377af1701d16",
             "name": "image",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
+            "label": ""
           },
           "width": {
-            "id": "1f036fee-77f3-480f-b690-089b27616ab8",
             "name": "width",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            },
             "value": 512
           },
           "height": {
-            "id": "0c703b6e-e91a-4cd7-8b9e-b97865f76793",
             "name": "height",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            },
             "value": 512
           },
           "resample_mode": {
-            "id": "ed77cf71-94cb-4da4-b536-75cb7aad8e54",
             "name": "resample_mode",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "EnumField"
-            },
             "value": "lanczos"
           }
         },
-        "outputs": {
-          "image": {
-            "id": "0d9e437b-6a08-45e1-9a55-ef03ae28e616",
-            "name": "image",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
-          },
-          "width": {
-            "id": "7c56c704-b4e5-410f-bb62-cd441ddb454f",
-            "name": "width",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          },
-          "height": {
-            "id": "45e12e17-7f25-46bd-a804-4384ec6b98cc",
-            "name": "height",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          }
-        }
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 3000,
         "y": 0
-      },
-      "width": 320,
-      "height": 24
+      }
     },
     {
       "id": "de8b1a48-a2e4-42ca-90bb-66058bffd534",
       "type": "invocation",
       "data": {
         "id": "de8b1a48-a2e4-42ca-90bb-66058bffd534",
-        "type": "i2l",
-        "label": "",
-        "isOpen": false,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.0.0",
+        "version": "1.0.2",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "i2l",
         "inputs": {
           "image": {
-            "id": "6c4d2827-4995-49d4-94ce-0ba0541d8839",
             "name": "image",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
+            "label": ""
           },
           "vae": {
-            "id": "9d6e3ab6-b6a4-45ac-ad75-0a96efba4c2f",
             "name": "vae",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "VaeField"
-            }
+            "label": ""
           },
           "tiled": {
-            "id": "9c258141-a75d-4ffd-bce5-f3fb3d90b720",
             "name": "tiled",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "BooleanField"
-            },
             "value": false
           },
           "fp32": {
-            "id": "2235cc48-53c9-4e8a-a74a-ed41c61f2993",
             "name": "fp32",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "BooleanField"
-            },
             "value": true
           }
         },
-        "outputs": {
-          "latents": {
-            "id": "8eb9293f-8f43-4c0c-b0fb-8c4db1200f87",
-            "name": "latents",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "LatentsField"
-            }
-          },
-          "width": {
-            "id": "ce493959-d308-423c-b0f5-db05912e0318",
-            "name": "width",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          },
-          "height": {
-            "id": "827bf290-94fb-455f-a970-f98ba8800eac",
-            "name": "height",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          }
-        }
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 3100,
         "y": -275
-      },
-      "width": 320,
-      "height": 24
+      }
     },
     {
       "id": "bd06261d-a74a-4d1f-8374-745ed6194bc2",
       "type": "invocation",
       "data": {
         "id": "bd06261d-a74a-4d1f-8374-745ed6194bc2",
-        "type": "denoise_latents",
-        "label": "",
-        "isOpen": true,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.5.1",
+        "version": "1.5.3",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "denoise_latents",
         "inputs": {
           "positive_conditioning": {
-            "id": "673e4094-448b-4c59-ab05-d05b29b3e07f",
             "name": "positive_conditioning",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ConditioningField"
-            }
+            "label": ""
           },
           "negative_conditioning": {
-            "id": "3b3bac27-7e8a-4c4e-8b5b-c5231125302a",
             "name": "negative_conditioning",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ConditioningField"
-            }
+            "label": ""
           },
           "noise": {
-            "id": "d7c20d11-fbfb-4613-ba58-bf00307e53be",
             "name": "noise",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "LatentsField"
-            }
+            "label": ""
           },
           "steps": {
-            "id": "e4af3bea-dae4-403f-8cec-6cb66fa888ce",
             "name": "steps",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            },
             "value": 40
           },
           "cfg_scale": {
-            "id": "9ec125bb-6819-4970-89fe-fe09e6b96885",
             "name": "cfg_scale",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": true,
-              "name": "FloatField"
-            },
             "value": 3
           },
           "denoising_start": {
-            "id": "7190b40d-9467-4238-b180-0d19065258e2",
             "name": "denoising_start",
-            "fieldKind": "input",
             "label": "Original Image Percent",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            },
             "value": 0.2
           },
           "denoising_end": {
-            "id": "c033f2d4-b60a-4a25-8a88-7852b556657a",
             "name": "denoising_end",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            },
             "value": 1
           },
           "scheduler": {
-            "id": "bb043b8a-a119-4b2a-bb88-8afb364bdcc1",
             "name": "scheduler",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "SchedulerField"
-            },
             "value": "dpmpp_2m_sde_k"
           },
           "unet": {
-            "id": "16d7688a-fc80-405c-aa55-a8ba2a1efecb",
             "name": "unet",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "UNetField"
-            }
+            "label": ""
           },
           "control": {
-            "id": "d0225ede-7d03-405d-b5b4-97c07d9b602b",
             "name": "control",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": true,
-              "name": "ControlField"
-            }
+            "label": ""
           },
           "ip_adapter": {
-            "id": "6fbe0a17-6b85-4d3e-835d-0e23d3040bf4",
             "name": "ip_adapter",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IPAdapterField"
-            }
+            "label": ""
           },
           "t2i_adapter": {
-            "id": "2e4e1e6e-0278-47e3-a464-1a51760a9411",
             "name": "t2i_adapter",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": true,
-              "name": "T2IAdapterField"
-            }
+            "label": ""
           },
           "cfg_rescale_multiplier": {
-            "id": "c9703a2e-4178-493c-90b9-81325a83a5ec",
             "name": "cfg_rescale_multiplier",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            },
             "value": 0
           },
           "latents": {
-            "id": "b2527e78-6f55-4274-aaa0-8fef1c928faa",
             "name": "latents",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "LatentsField"
-            }
+            "label": ""
           },
           "denoise_mask": {
-            "id": "cceec5a4-d3e9-4cff-a1e1-b5b62cb12588",
             "name": "denoise_mask",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "DenoiseMaskField"
-            }
+            "label": ""
           }
         },
-        "outputs": {
-          "latents": {
-            "id": "6eca0515-4357-40be-ac8d-f84eb927dc31",
-            "name": "latents",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "LatentsField"
-            }
-          },
-          "width": {
-            "id": "14453d1c-6202-4377-811c-88ac9c024e77",
-            "name": "width",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          },
-          "height": {
-            "id": "0e0e04dc-4158-4461-b0ba-6c6af16e863c",
-            "name": "height",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          }
-        }
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 4597.554345564559,
         "y": -265.6421598623905
-      },
-      "width": 320,
-      "height": 588
+      }
     },
     {
       "id": "35623411-ba3a-4eaa-91fd-1e0fda0a5b42",
       "type": "invocation",
       "data": {
         "id": "35623411-ba3a-4eaa-91fd-1e0fda0a5b42",
-        "type": "noise",
-        "label": "",
-        "isOpen": false,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.0.1",
+        "version": "1.0.2",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "noise",
         "inputs": {
           "seed": {
-            "id": "c6b5bc5e-ef09-4f9c-870e-1110a0f5017f",
             "name": "seed",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            },
             "value": 123451234
           },
           "width": {
-            "id": "7bdd24b6-4f14-4d0a-b8fc-9b24145b4ba9",
             "name": "width",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            },
             "value": 512
           },
           "height": {
-            "id": "dc15bf97-b8d5-49c6-999b-798b33679418",
             "name": "height",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            },
             "value": 512
           },
           "use_cpu": {
-            "id": "00626297-19dd-4989-9688-e8d527c9eacf",
             "name": "use_cpu",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "BooleanField"
-            },
             "value": true
           }
         },
-        "outputs": {
-          "noise": {
-            "id": "2915f8ae-0f6e-4f26-8541-0ebf477586b6",
-            "name": "noise",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "LatentsField"
-            }
-          },
-          "width": {
-            "id": "26587461-a24a-434d-9ae5-8d8f36fea221",
-            "name": "width",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          },
-          "height": {
-            "id": "335d08fc-8bf1-4393-8902-2c579f327b51",
-            "name": "height",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          }
-        }
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 4025,
         "y": -175
-      },
-      "width": 320,
-      "height": 24
+      }
     },
     {
       "id": "2224ed72-2453-4252-bd89-3085240e0b6f",
       "type": "invocation",
       "data": {
         "id": "2224ed72-2453-4252-bd89-3085240e0b6f",
-        "type": "l2i",
-        "label": "",
-        "isOpen": true,
-        "notes": "",
-        "isIntermediate": false,
-        "useCache": true,
-        "version": "1.2.0",
+        "version": "1.2.2",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "l2i",
         "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
           "metadata": {
-            "id": "2f077d6f-579e-4399-9986-3feabefa9ade",
             "name": "metadata",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "MetadataField"
-            }
+            "label": ""
           },
           "latents": {
-            "id": "568a1537-dc7c-44f5-8a87-3571b0528b85",
             "name": "latents",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "LatentsField"
-            }
+            "label": ""
           },
           "vae": {
-            "id": "392c3757-ad3a-46af-8d76-9724ca30aad8",
             "name": "vae",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "VaeField"
-            }
+            "label": ""
           },
           "tiled": {
-            "id": "90f98601-c05d-453e-878b-18e23cc222b4",
             "name": "tiled",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "BooleanField"
-            },
             "value": false
           },
           "fp32": {
-            "id": "6be5cad7-dd41-4f83-98e7-124a6ad1728d",
             "name": "fp32",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "BooleanField"
-            },
             "value": true
           }
         },
-        "outputs": {
-          "image": {
-            "id": "6f90a4f5-42dd-472a-8f30-403bcbc16531",
-            "name": "image",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
-          },
-          "width": {
-            "id": "4d1c8a66-35fc-40e9-a7a9-d8604a247d33",
-            "name": "width",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          },
-          "height": {
-            "id": "e668cfb3-aedc-4032-94c9-b8add1fbaacf",
-            "name": "height",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          }
-        }
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": true
       },
       "position": {
         "x": 4980.1395106966565,
         "y": -255.9158921745602
-      },
-      "width": 320,
-      "height": 224
+      }
     },
     {
       "id": "2974e5b3-3d41-4b6f-9953-cd21e8f3a323",
       "type": "invocation",
       "data": {
         "id": "2974e5b3-3d41-4b6f-9953-cd21e8f3a323",
-        "type": "lscale",
-        "label": "",
-        "isOpen": false,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.0.0",
+        "version": "1.0.2",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "lscale",
         "inputs": {
           "latents": {
-            "id": "79e8f073-ddc3-416e-b818-6ef8ec73cc07",
             "name": "latents",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "LatentsField"
-            }
+            "label": ""
           },
           "scale_factor": {
-            "id": "23f78d24-72df-4bde-8d3c-8593ce507205",
             "name": "scale_factor",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            },
             "value": 1.5
           },
           "mode": {
-            "id": "4ab30c38-57d3-480d-8b34-918887e92340",
             "name": "mode",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "EnumField"
-            },
             "value": "bilinear"
           },
           "antialias": {
-            "id": "22b39171-0003-44f0-9c04-d241581d2a39",
             "name": "antialias",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "BooleanField"
-            },
             "value": true
           }
         },
-        "outputs": {
-          "latents": {
-            "id": "f6d71aef-6251-4d51-afa8-f692a72bfd1f",
-            "name": "latents",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "LatentsField"
-            }
-          },
-          "width": {
-            "id": "8db4cf33-5489-4887-a5f6-5e926d959c40",
-            "name": "width",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          },
-          "height": {
-            "id": "74e1ec7c-50b6-4e97-a7b8-6602e6d78c08",
-            "name": "height",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          }
-        }
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 3075,
         "y": -175
-      },
-      "width": 320,
-      "height": 24
+      }
     },
     {
       "id": "a7d14545-aa09-4b96-bfc5-40c009af9110",
       "type": "invocation",
       "data": {
         "id": "a7d14545-aa09-4b96-bfc5-40c009af9110",
-        "type": "img_paste",
-        "label": "",
-        "isOpen": true,
-        "notes": "",
-        "isIntermediate": false,
-        "useCache": true,
-        "version": "1.2.0",
+        "version": "1.2.2",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "img_paste",
         "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
           "metadata": {
-            "id": "159f5a3c-4b47-46dd-b8fe-450455ee3dcf",
             "name": "metadata",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "MetadataField"
-            }
+            "label": ""
           },
           "base_image": {
-            "id": "445cfacf-5042-49ae-a63e-c19f21f90b1d",
             "name": "base_image",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
+            "label": ""
           },
           "image": {
-            "id": "c292948b-8efd-4f5c-909d-d902cfd1509a",
             "name": "image",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
+            "label": ""
           },
           "mask": {
-            "id": "8b7bc7e9-35b5-45bc-9b8c-e15e92ab4d74",
             "name": "mask",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
+            "label": ""
           },
           "x": {
-            "id": "0694ba58-07bc-470b-80b5-9c7a99b64607",
             "name": "x",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            },
             "value": 0
           },
           "y": {
-            "id": "40f8b20b-f804-4ec2-9622-285726f7665f",
             "name": "y",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            },
             "value": 0
           },
           "crop": {
-            "id": "8a09a132-c07e-4cfb-8ec2-7093dc063f99",
             "name": "crop",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "BooleanField"
-            },
             "value": false
           }
         },
-        "outputs": {
-          "image": {
-            "id": "4a96ec78-d4b6-435f-b5a3-6366cbfcfba7",
-            "name": "image",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
-          },
-          "width": {
-            "id": "c1ee69c7-6ca0-4604-abc9-b859f4178421",
-            "name": "width",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          },
-          "height": {
-            "id": "6c198681-5f16-4526-8e37-0bf000962acd",
-            "name": "height",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          }
-        }
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": true
       },
       "position": {
         "x": 6000,
         "y": -200
-      },
-      "width": 320,
-      "height": 431
+      }
     },
     {
       "id": "ff8c23dc-da7c-45b7-b5c9-d984b12f02ef",
       "type": "invocation",
       "data": {
         "id": "ff8c23dc-da7c-45b7-b5c9-d984b12f02ef",
-        "type": "img_resize",
-        "label": "",
-        "isOpen": true,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.2.0",
+        "version": "1.2.2",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "img_resize",
         "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
           "metadata": {
-            "id": "afbbb112-60e4-44c8-bdfd-30f48d58b236",
             "name": "metadata",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "MetadataField"
-            }
+            "label": ""
           },
           "image": {
-            "id": "2a348a03-07a3-4a97-93c8-46051045b32f",
             "name": "image",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
+            "label": ""
           },
           "width": {
-            "id": "6b95969c-ca73-4b54-815d-7aae305a67bd",
             "name": "width",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            },
             "value": 512
           },
           "height": {
-            "id": "af83c526-c730-4a34-8f73-80f443fecc05",
             "name": "height",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            },
             "value": 512
           },
           "resample_mode": {
-            "id": "43f7d6b5-ebe0-43c4-bf5d-8fb7fdc40a3f",
             "name": "resample_mode",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "EnumField"
-            },
             "value": "lanczos"
           }
         },
-        "outputs": {
-          "image": {
-            "id": "e492b013-615d-4dfd-b0d8-7df7b5ba9a9d",
-            "name": "image",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
-          },
-          "width": {
-            "id": "05f829b3-c253-495a-b1ad-9906c0833e49",
-            "name": "width",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          },
-          "height": {
-            "id": "65d5d662-2527-4f3c-8a87-0a7d9d4486de",
-            "name": "height",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          }
-        }
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 5500,
         "y": -225
-      },
-      "width": 320,
-      "height": 347
+      }
     },
     {
       "id": "cdfa5ab0-b3e2-43ed-85bb-2ac4aa83bc05",
       "type": "invocation",
       "data": {
         "id": "cdfa5ab0-b3e2-43ed-85bb-2ac4aa83bc05",
-        "type": "float",
-        "label": "",
-        "isOpen": false,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "float",
         "inputs": {
           "value": {
-            "id": "d5d8063d-44f6-4e20-b557-2f4ce093c7ef",
             "name": "value",
-            "fieldKind": "input",
             "label": "Orignal Image Percentage",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            },
             "value": 0.4
           }
         },
-        "outputs": {
-          "value": {
-            "id": "562416a4-0d75-48aa-835e-5e2d221dfbb7",
-            "name": "value",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            }
-          }
-        }
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 4025,
         "y": -75
-      },
-      "width": 320,
-      "height": 24
+      }
     },
     {
       "id": "64712037-92e8-483f-9f6e-87588539c1b8",
       "type": "invocation",
       "data": {
         "id": "64712037-92e8-483f-9f6e-87588539c1b8",
-        "type": "float",
-        "label": "CFG Main",
-        "isOpen": false,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "nodePack": "invokeai",
+        "label": "CFG Main",
+        "notes": "",
+        "type": "float",
         "inputs": {
           "value": {
-            "id": "750358d5-251d-4fe6-a673-2cde21995da2",
             "name": "value",
-            "fieldKind": "input",
             "label": "CFG Main",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            },
             "value": 6
           }
         },
-        "outputs": {
-          "value": {
-            "id": "eea7f6d2-92e4-4581-b555-64a44fda2be9",
-            "name": "value",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            }
-          }
-        }
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 4035.2678120778373,
         "y": 13.393127532980124
-      },
-      "width": 320,
-      "height": 24
+      }
     },
     {
       "id": "c865f39f-f830-4ed7-88a5-e935cfe050a9",
       "type": "invocation",
       "data": {
         "id": "c865f39f-f830-4ed7-88a5-e935cfe050a9",
-        "type": "rand_int",
-        "label": "",
-        "isOpen": false,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": false,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "rand_int",
         "inputs": {
           "low": {
-            "id": "31e29709-9f19-45b0-a2de-fdee29a50393",
             "name": "low",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            },
             "value": 0
           },
           "high": {
-            "id": "d47d875c-509d-4fa3-9112-e335d3144a17",
             "name": "high",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            },
             "value": 2147483647
           }
         },
-        "outputs": {
-          "value": {
-            "id": "15b8d1ea-d2ac-4b3a-9619-57bba9a6da75",
-            "name": "value",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          }
-        }
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": false
       },
       "position": {
         "x": 4025,
         "y": -275
-      },
-      "width": 320,
-      "height": 24
+      }
     },
     {
       "id": "f4d15b64-c4a6-42a5-90fc-e4ed07a0ca65",
       "type": "invocation",
       "data": {
         "id": "f4d15b64-c4a6-42a5-90fc-e4ed07a0ca65",
-        "type": "compel",
-        "label": "",
-        "isOpen": true,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.0.0",
+        "version": "1.1.1",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "compel",
         "inputs": {
           "prompt": {
-            "id": "916b229a-38e1-45a2-a433-cca97495b143",
             "name": "prompt",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "StringField"
-            },
             "value": ""
           },
           "clip": {
-            "id": "ae9aeb1a-4ebd-4bc3-b6e6-a8c9adca01f6",
             "name": "clip",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ClipField"
-            }
+            "label": ""
           }
         },
-        "outputs": {
-          "conditioning": {
-            "id": "4d59bad1-99a9-43e2-bdb4-7a0f3dd5b787",
-            "name": "conditioning",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ConditioningField"
-            }
-          }
-        }
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 2550,
         "y": -525
-      },
-      "width": 320,
-      "height": 195
+      }
     },
     {
       "id": "22b750db-b85e-486b-b278-ac983e329813",
       "type": "invocation",
       "data": {
         "id": "22b750db-b85e-486b-b278-ac983e329813",
-        "type": "ip_adapter",
-        "label": "",
-        "isOpen": true,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.1.1",
+        "version": "1.2.2",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "ip_adapter",
         "inputs": {
           "image": {
-            "id": "088a126c-ab1d-4c7a-879a-c1eea09eac8e",
             "name": "image",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
+            "label": ""
           },
           "ip_adapter_model": {
-            "id": "f2ac529f-f778-4a12-af12-0c7e449de17a",
             "name": "ip_adapter_model",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IPAdapterModelField"
-            },
+            "label": "IP-Adapter Model (select IP Adapter Face)",
             "value": {
-              "model_name": "ip_adapter_plus_face_sd15",
-              "base_model": "sd-1"
+              "key": "1cc210bb-4d0a-4312-b36c-b5d46c43768e",
+              "hash": "blake3:3d669dffa7471b357b4df088b99ffb6bf4d4383d5e0ef1de5ec1c89728a3d5a5",
+              "name": "ip_adapter_sd15",
+              "base": "sd-1",
+              "type": "ip_adapter"
             }
           },
           "weight": {
-            "id": "ddb4a7cb-607d-47e8-b46b-cc1be27ebde0",
             "name": "weight",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            },
             "value": 0.5
           },
           "begin_step_percent": {
-            "id": "1807371f-b56c-4777-baa2-de71e21f0b80",
             "name": "begin_step_percent",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            },
             "value": 0
           },
           "end_step_percent": {
-            "id": "4ea8e4dc-9cd7-445e-9b32-8934c652381b",
             "name": "end_step_percent",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            },
             "value": 0.8
           }
         },
-        "outputs": {
-          "ip_adapter": {
-            "id": "739b5fed-d813-4611-8f87-1dded25a7619",
-            "name": "ip_adapter",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IPAdapterField"
-            }
-          }
-        }
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 3575,
         "y": -200
-      },
-      "width": 320,
-      "height": 318
+      }
     },
     {
       "id": "f60b6161-8f26-42f6-89ff-545e6011e501",
       "type": "invocation",
       "data": {
         "id": "f60b6161-8f26-42f6-89ff-545e6011e501",
-        "type": "controlnet",
-        "label": "",
-        "isOpen": true,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
         "version": "1.1.1",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "controlnet",
         "inputs": {
           "image": {
-            "id": "96434c75-abd8-4b73-ab82-0b358e4735bf",
             "name": "image",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
+            "label": ""
           },
           "control_model": {
-            "id": "21551ac2-ee50-4fe8-b06c-5be00680fb5c",
             "name": "control_model",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ControlNetModelField"
-            },
+            "label": "Control Model (select canny)",
             "value": {
-              "model_name": "canny",
-              "base_model": "sd-1"
+              "key": "5bdaacf7-a7a3-4fb8-b394-cc0ffbb8941d",
+              "hash": "blake3:260c7f8e10aefea9868cfc68d89970e91033bd37132b14b903e70ee05ebf530e",
+              "name": "sd-controlnet-canny",
+              "base": "sd-1",
+              "type": "controlnet"
             }
           },
           "control_weight": {
-            "id": "1dacac0a-b985-4bdf-b4b5-b960f4cff6ed",
             "name": "control_weight",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": true,
-              "name": "FloatField"
-            },
             "value": 0.5
           },
           "begin_step_percent": {
-            "id": "b2a3f128-7fc1-4c12-acc8-540f013c856b",
             "name": "begin_step_percent",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            },
             "value": 0
           },
           "end_step_percent": {
-            "id": "0e701834-f7ba-4a6e-b9cb-6d4aff5dacd8",
             "name": "end_step_percent",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            },
             "value": 0.5
           },
           "control_mode": {
-            "id": "f9a5f038-ae80-4b6e-8a48-362a2c858299",
             "name": "control_mode",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "EnumField"
-            },
             "value": "balanced"
           },
           "resize_mode": {
-            "id": "5369dd44-a708-4b66-8182-fea814d2a0ae",
             "name": "resize_mode",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "EnumField"
-            },
             "value": "just_resize"
           }
         },
-        "outputs": {
-          "control": {
-            "id": "f470a1af-7b68-4849-a144-02bc345fd810",
-            "name": "control",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ControlField"
-            }
-          }
-        }
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 3950,
         "y": 150
-      },
-      "width": 320,
-      "height": 426
+      }
     },
     {
       "id": "8fe598c6-d447-44fa-a165-4975af77d080",
       "type": "invocation",
       "data": {
         "id": "8fe598c6-d447-44fa-a165-4975af77d080",
-        "type": "canny_image_processor",
-        "label": "",
-        "isOpen": true,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.2.0",
+        "version": "1.3.2",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "canny_image_processor",
         "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
           "metadata": {
-            "id": "855f4575-309a-4810-bd02-7c4a04e0efc8",
             "name": "metadata",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "MetadataField"
-            }
+            "label": ""
           },
           "image": {
-            "id": "7d2695fa-a617-431a-bc0e-69ac7c061651",
             "name": "image",
-            "fieldKind": "input",
+            "label": ""
+          },
+          "detect_resolution": {
+            "name": "detect_resolution",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
+            "value": 512
+          },
+          "image_resolution": {
+            "name": "image_resolution",
+            "label": "",
+            "value": 512
           },
           "low_threshold": {
-            "id": "ceb37a49-c989-4afa-abbf-49b6e52ef663",
             "name": "low_threshold",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            },
             "value": 100
           },
           "high_threshold": {
-            "id": "6ec118f8-ca6c-4be7-9951-6eee58afbc1b",
             "name": "high_threshold",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            },
             "value": 200
           }
         },
-        "outputs": {
-          "image": {
-            "id": "264bcaaf-d185-43ce-9e1a-b6f707140c0c",
-            "name": "image",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
-          },
-          "width": {
-            "id": "0d374d8e-d5c7-49be-9057-443e32e45048",
-            "name": "width",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          },
-          "height": {
-            "id": "fa892b68-6135-4598-a765-e79cd5c6e3f6",
-            "name": "height",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          }
-        }
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 3519.4131037388597,
         "y": 576.7946795840575
-      },
-      "width": 320,
-      "height": 293
+      }
     },
     {
       "id": "4bd4ae80-567f-4366-b8c6-3bb06f4fb46a",
       "type": "invocation",
       "data": {
         "id": "4bd4ae80-567f-4366-b8c6-3bb06f4fb46a",
-        "type": "img_scale",
-        "label": "",
-        "isOpen": true,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.2.0",
+        "version": "1.2.2",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "img_scale",
         "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
           "metadata": {
-            "id": "46fc750e-7dda-4145-8f72-be88fb93f351",
             "name": "metadata",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "MetadataField"
-            }
+            "label": ""
           },
           "image": {
-            "id": "f7f41bb3-9a5a-4022-b671-0acc2819f7c3",
             "name": "image",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
+            "label": ""
           },
           "scale_factor": {
-            "id": "1ae95574-f725-4cbc-bb78-4c9db240f78a",
             "name": "scale_factor",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            },
             "value": 1.5
           },
           "resample_mode": {
-            "id": "0756e37d-3d01-4c2c-9364-58e8978b04a2",
             "name": "resample_mode",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "EnumField"
-            },
             "value": "bicubic"
           }
         },
-        "outputs": {
-          "image": {
-            "id": "2729e697-cacc-4874-94bf-3aee5c18b5f9",
-            "name": "image",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
-          },
-          "width": {
-            "id": "d9551981-cbd3-419a-bcb9-5b50600e8c18",
-            "name": "width",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          },
-          "height": {
-            "id": "3355c99e-cdc6-473b-a7c6-a9d1dcc941e5",
-            "name": "height",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          }
-        }
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 3079.916484101321,
         "y": 151.0148192064986
-      },
-      "width": 320,
-      "height": 295
+      }
     },
     {
       "id": "381d5b6a-f044-48b0-bc07-6138fbfa8dfc",
       "type": "invocation",
       "data": {
         "id": "381d5b6a-f044-48b0-bc07-6138fbfa8dfc",
-        "type": "mask_combine",
-        "label": "",
-        "isOpen": true,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.2.0",
+        "version": "1.2.2",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "mask_combine",
         "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
           "metadata": {
-            "id": "061ea794-2494-429e-bfdd-5fbd2c7eeb99",
             "name": "metadata",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "MetadataField"
-            }
+            "label": ""
           },
           "mask1": {
-            "id": "446c6c99-9cb5-4035-a452-ab586ef4ede9",
             "name": "mask1",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
+            "label": ""
           },
           "mask2": {
-            "id": "ebbe37b8-8bf3-4520-b6f5-631fe2d05d66",
             "name": "mask2",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
+            "label": ""
           }
         },
-        "outputs": {
-          "image": {
-            "id": "7c33cfae-ea9a-4572-91ca-40fc4112369f",
-            "name": "image",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
-          },
-          "width": {
-            "id": "7410c10c-3060-44a9-b399-43555c3e1156",
-            "name": "width",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          },
-          "height": {
-            "id": "3eb74c96-ae3e-4091-b027-703428244fdf",
-            "name": "height",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          }
-        }
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 5450,
         "y": 250
-      },
-      "width": 320,
-      "height": 238
+      }
     },
     {
       "id": "77da4e4d-5778-4469-8449-ffed03d54bdb",
       "type": "invocation",
       "data": {
         "id": "77da4e4d-5778-4469-8449-ffed03d54bdb",
-        "type": "img_blur",
-        "label": "",
-        "isOpen": true,
-        "notes": "",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.2.0",
+        "version": "1.2.2",
         "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "img_blur",
         "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
           "metadata": {
-            "id": "755d4fa2-a520-4837-a3da-65e1f479e6e6",
             "name": "metadata",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "MetadataField"
-            }
+            "label": ""
           },
           "image": {
-            "id": "a4786d7d-9593-4f5f-830b-d94bb0e42bca",
             "name": "image",
-            "fieldKind": "input",
-            "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
+            "label": ""
           },
           "radius": {
-            "id": "e1c9afa0-4d41-4664-b560-e1e85f467267",
             "name": "radius",
-            "fieldKind": "input",
             "label": "Mask Blue",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            },
             "value": 150
           },
           "blur_type": {
-            "id": "f6231886-0981-444b-bd26-24674f87e7cb",
             "name": "blur_type",
-            "fieldKind": "input",
             "label": "",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "EnumField"
-            },
             "value": "gaussian"
           }
         },
-        "outputs": {
-          "image": {
-            "id": "20c7bcfc-269d-4119-8b45-6c59dd4005d7",
-            "name": "image",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "ImageField"
-            }
-          },
-          "width": {
-            "id": "37e228ef-cb59-4477-b18f-343609d7bb4e",
-            "name": "width",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          },
-          "height": {
-            "id": "2de6080e-8bc3-42cd-bb8a-afd72f082df4",
-            "name": "height",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "IntegerField"
-            }
-          }
-        }
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 5000,
         "y": 300
-      },
-      "width": 320,
-      "height": 295
+      }
     },
     {
       "id": "f0de6c44-4515-4f79-bcc0-dee111bcfe31",
       "type": "invocation",
       "data": {
         "id": "f0de6c44-4515-4f79-bcc0-dee111bcfe31",
-        "type": "float",
-        "label": "Face Detail Scale",
-        "isOpen": false,
-        "notes": "The image is cropped to the face and scaled to 512x512. This value can scale even more. Best result with value between 1-2.\n\n1 = 512\n2 = 1024\n\n",
-        "isIntermediate": true,
-        "useCache": true,
-        "version": "1.0.0",
+        "version": "1.0.1",
         "nodePack": "invokeai",
+        "label": "Face Detail Scale",
+        "notes": "The image is cropped to the face and scaled to 512x512. This value can scale even more. Best result with value between 1-2.\n\n1 = 512\n2 = 1024\n\n",
+        "type": "float",
         "inputs": {
           "value": {
-            "id": "9b51a26f-af3c-4caa-940a-5183234b1ed7",
             "name": "value",
-            "fieldKind": "input",
             "label": "Face Detail Scale",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            },
             "value": 1.5
           }
         },
-        "outputs": {
-          "value": {
-            "id": "c7c87b77-c149-4e9c-8ed1-beb1ba013055",
-            "name": "value",
-            "fieldKind": "output",
-            "type": {
-              "isCollection": false,
-              "isCollectionOrScalar": false,
-              "name": "FloatField"
-            }
-          }
-        }
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 2578.2364832140506,
         "y": 78.7948456497351
-      },
-      "width": 320,
-      "height": 24
+      }
     },
     {
       "id": "c6359181-6479-40ec-bf3a-b7e8451683b8",
       "type": "invocation",
       "data": {
         "id": "c6359181-6479-40ec-bf3a-b7e8451683b8",
-        "type": "main_model_loader",
-        "version": "1.0.0",
+        "version": "1.0.2",
         "label": "",
         "notes": "",
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true,
+        "type": "main_model_loader",
         "inputs": {
           "model": {
-            "id": "055b0ebf-3dd6-4f49-99cb-e99b7272736e",
             "name": "model",
-            "type": {
-              "name": "MainModelField",
-              "isCollection": false,
-              "isCollectionOrScalar": false
-            },
-            "label": "",
-            "fieldKind": "input"
+            "label": ""
           }
         },
-        "outputs": {
-          "vae": {
-            "id": "8326ee8e-4b2c-4209-be86-44c3014b7400",
-            "name": "vae",
-            "type": {
-              "name": "VaeField",
-              "isCollection": false,
-              "isCollectionOrScalar": false
-            },
-            "fieldKind": "output"
-          },
-          "clip": {
-            "id": "ccce5429-6295-434e-b054-d8965ecbd88f",
-            "name": "clip",
-            "type": {
-              "name": "ClipField",
-              "isCollection": false,
-              "isCollectionOrScalar": false
-            },
-            "fieldKind": "output"
-          },
-          "unet": {
-            "id": "1b410439-dd40-4ac5-ae3f-7f8cfcf42043",
-            "name": "unet",
-            "type": {
-              "name": "UNetField",
-              "isCollection": false,
-              "isCollectionOrScalar": false
-            },
-            "fieldKind": "output"
-          }
-        }
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
       },
       "position": {
         "x": 2031.5518710051792,
         "y": -492.1742944307074
-      },
-      "width": 320,
-      "height": 168
+      }
     }
   ],
   "edges": [
