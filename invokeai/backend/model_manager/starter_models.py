@@ -107,14 +107,6 @@ STARTER_MODELS: list[StarterModel] = [
         dependencies=[sdxl_fp16_vae_fix],
     ),
     StarterModel(
-        name="Proteus",
-        base=BaseModelType.StableDiffusionXL,
-        source="dataautogpt3/Proteus-RunDiffusion",
-        description="Diverse model with a unique prompting system. Use CLIP Skip 2.",
-        type=ModelType.Main,
-        dependencies=[sdxl_fp16_vae_fix],
-    ),
-    StarterModel(
         name="Dreamshaper XL v2 Turbo",
         base=BaseModelType.StableDiffusionXL,
         source="Lykon/dreamshaper-xl-v2-turbo",
