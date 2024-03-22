@@ -73,7 +73,7 @@ export const ImageSettingsAccordion = memo(() => {
   });
   const { isOpen: isOpenExpander, onToggle: onToggleExpander } = useExpanderToggle({
     id: 'image-settings-advanced',
-    defaultIsOpen: false,
+    defaultIsOpen: false
   });
 
   return (
@@ -85,7 +85,7 @@ export const ImageSettingsAccordion = memo(() => {
     >
       <Flex px={4} pt={4} w="full" h="full" flexDir="column">
         {activeTabName === 'unifiedCanvas' ? <ImageSizeCanvas /> : <ImageSizeLinear />}
-        <Expander isOpen={isOpenExpander} onToggle={onToggleExpander}>
+        <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">
             <Flex gap={4} alignItems="center">
               <ParamSeedNumberInput />

@@ -46,7 +46,8 @@
             "title": "Image"
         },
         "advanced": {
-            "title": "Advanced"
+            "title": "Advanced",
+            "options": "$t(accordions.advanced.title) Options"
         },
         "control": {
             "title": "Control"
@@ -100,6 +101,7 @@
         "load": "Load",
         "loading": "Loading",
         "localSystem": "Local System",
+        "loglevel": "Log Level",
         "learnMore": "Learn More",
         "modelManager": "Model Manager",
         "nodeEditor": "Node Editor",
