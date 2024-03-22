@@ -1,6 +1,9 @@
 import asyncio
 import mimetypes
+import os
+import signal
 import socket
+import sys
 from contextlib import asynccontextmanager
 from inspect import signature
 from pathlib import Path
@@ -223,6 +226,27 @@ app.mount(
 
 
 def invoke_api() -> None:
+    class InterruptWatcher:
+        def __init__(self):
+            self.child = os.fork()
+            if self.child == 0:
+                return
+            else:
+                self.watch()
+
+        def watch(self) -> None:
+            try:
+                os.wait()
+            except KeyboardInterrupt:
+                self.kill()
+            sys.exit()
+
+        def kill(self) -> None:
+            try:
+                os.kill(self.child, signal.SIGKILL)
+            except OSError:
+                pass
+
     def find_port(port: int) -> int:
         """Find a port not in use starting at given port"""
         # Taken from https://waylonwalker.com/python-find-available-port/, thanks Waylon!
@@ -232,6 +256,8 @@ def invoke_api() -> None:
                 return find_port(port=port + 1)
             else:
                 return port
+
+    InterruptWatcher()
 
     if app_config.dev_reload:
         try:
