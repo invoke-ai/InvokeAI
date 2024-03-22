@@ -21,10 +21,11 @@ from typing_extensions import Annotated
 
 from invokeai.app.services.model_install import ModelInstallJob
 from invokeai.app.services.model_records import (
+    DuplicateModelException,
     InvalidModelException,
+    ModelRecordChanges,
     UnknownModelException,
 )
-from invokeai.app.services.model_records.model_records_base import DuplicateModelException, ModelRecordChanges
 from invokeai.app.util.suppress_output import SuppressOutput
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
@@ -309,8 +310,10 @@ async def update_model_record(
     """Update a model's config."""
     logger = ApiDependencies.invoker.services.logger
     record_store = ApiDependencies.invoker.services.model_manager.store
+    installer = ApiDependencies.invoker.services.model_manager.install
     try:
-        model_response: AnyModelConfig = record_store.update_model(key, changes=changes)
+        record_store.update_model(key, changes=changes)
+        model_response: AnyModelConfig = installer.sync_model_path(key)
         logger.info(f"Updated model: {key}")
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))

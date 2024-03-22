@@ -20,7 +20,7 @@ from invokeai.app.services.model_install import (
     ModelInstallServiceBase,
     URLModelSource,
 )
-from invokeai.app.services.model_records import UnknownModelException
+from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
 from invokeai.backend.model_manager.config import BaseModelType, InvalidModelConfigException, ModelFormat, ModelType
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 
@@ -80,6 +80,18 @@ def test_install(
     assert Path(model_record.path).is_absolute()
     assert Path(model_record.path).exists()
     assert model_record.source == embedding_file.as_posix()
+
+
+def test_rename(
+    mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    store = mm2_installer.record_store
+    key = mm2_installer.install_path(embedding_file)
+    model_record = store.get_model(key)
+    assert model_record.path.endswith("sd-1/embedding/test_embedding.safetensors")
+    store.update_model(key, ModelRecordChanges(name="new_name.safetensors", base=BaseModelType("sd-2")))
+    new_model_record = mm2_installer.sync_model_path(key)
+    assert new_model_record.path.endswith("sd-2/embedding/new_name.safetensors")
 
 
 @pytest.mark.parametrize(

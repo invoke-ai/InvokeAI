@@ -469,6 +469,19 @@ class ModelInstallServiceBase(ABC):
         """Synchronize models on disk to those in the model record database."""
 
     @abstractmethod
+    def sync_model_path(self, key: str) -> AnyModelConfig:
+        """
+        Move model into the location indicated by its basetype, type and name.
+
+        Call this after updating a model's attributes in order to move
+        the model's path into the location indicated by its basetype, type and
+        name. Applies only to models whose paths are within the root `models_dir`
+        directory.
+
+        May raise an UnknownModelException.
+        """
+
+    @abstractmethod
     def download_and_cache(self, source: Union[str, AnyHttpUrl], access_token: Optional[str] = None) -> Path:
         """
         Download the model file located at source to the models cache and return its Path.
