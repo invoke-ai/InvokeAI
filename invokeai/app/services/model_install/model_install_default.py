@@ -538,13 +538,13 @@ class ModelInstallService(ModelInstallServiceBase):
         May raise an UnknownModelException.
         """
         model = self.record_store.get_model(key)
-        old_path = Path(model.path)
-        models_dir = self.app_config.models_path
+        old_path = Path(model.path).resolve()
+        models_dir = self.app_config.models_path.resolve()
 
         if not old_path.is_relative_to(models_dir):
             return model
 
-        new_path = models_dir / model.base.value / model.type.value / model.name
+        new_path = (models_dir / model.base.value / model.type.value / model.name).with_suffix(old_path.suffix)
 
         if old_path == new_path or new_path.exists() and old_path == new_path.resolve():
             return model
