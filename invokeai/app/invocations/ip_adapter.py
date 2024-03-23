@@ -88,6 +88,7 @@ class IPAdapterInvocation(BaseInvocation):
         # Lookup the CLIP Vision encoder that is intended to be used with the IP-Adapter model.
         ip_adapter_info = context.models.get_config(self.ip_adapter_model.key)
         assert isinstance(ip_adapter_info, (IPAdapterDiffusersConfig, IPAdapterCheckpointConfig))
+
         image_encoder_model_id = (
             ip_adapter_info.image_encoder_model_id
             if isinstance(ip_adapter_info, IPAdapterDiffusersConfig)
@@ -95,6 +96,7 @@ class IPAdapterInvocation(BaseInvocation):
         )
         image_encoder_model_name = image_encoder_model_id.split("/")[-1].strip()
         image_encoder_model = self._get_image_encoder(context, image_encoder_model_name)
+
         return IPAdapterOutput(
             ip_adapter=IPAdapterField(
                 image=self.image,
