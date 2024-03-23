@@ -91,7 +91,7 @@ class IPAdapterInvocation(BaseInvocation):
         image_encoder_model_id = (
             ip_adapter_info.image_encoder_model_id
             if isinstance(ip_adapter_info, IPAdapterDiffusersConfig)
-            else "InvokeAI/ip_adapter_sd_image_encoder"
+            else "ip_adapter_sd_image_encoder"
         )
         image_encoder_model_name = image_encoder_model_id.split("/")[-1].strip()
         image_encoder_model = self._get_image_encoder(context, image_encoder_model_name)
