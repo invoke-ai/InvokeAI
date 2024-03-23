@@ -655,6 +655,7 @@
         "install": "Install",
         "installAll": "Install All",
         "installRepo": "Install Repo",
+        "ipAdapters": "IP Adapters",
         "load": "Load",
         "localOnly": "local only",
         "manual": "Manual",

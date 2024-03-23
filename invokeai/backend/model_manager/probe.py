@@ -9,23 +9,16 @@ from picklescan.scanner import scan_file_path
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.util.misc import uuid_string
-from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
+from invokeai.backend.model_hash.model_hash import (HASHING_ALGORITHMS,
+                                                    ModelHash)
 from invokeai.backend.util.util import SilenceWarnings
 
-from .config import (
-    AnyModelConfig,
-    BaseModelType,
-    ControlAdapterDefaultSettings,
-    InvalidModelConfigException,
-    MainModelDefaultSettings,
-    ModelConfigFactory,
-    ModelFormat,
-    ModelRepoVariant,
-    ModelSourceType,
-    ModelType,
-    ModelVariantType,
-    SchedulerPredictionType,
-)
+from .config import (AnyModelConfig, BaseModelType,
+                     ControlAdapterDefaultSettings,
+                     InvalidModelConfigException, MainModelDefaultSettings,
+                     ModelConfigFactory, ModelFormat, ModelRepoVariant,
+                     ModelSourceType, ModelType, ModelVariantType,
+                     SchedulerPredictionType)
 from .util.model_util import lora_token_vector_length, read_checkpoint_meta
 
 CkptType = Dict[str | int, Any]
@@ -536,7 +529,6 @@ class IPAdapterCheckpointProbe(CheckpointProbeBase):
             if not key.startswith(("image_proj.", "ip_adapter.")):
                 continue
             cross_attention_dim = checkpoint["ip_adapter.1.to_k_ip.weight"].shape[-1]
-            print(cross_attention_dim)
             if cross_attention_dim == 768:
                 return BaseModelType.StableDiffusion1
             elif cross_attention_dim == 1024:
