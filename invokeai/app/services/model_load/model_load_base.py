@@ -38,3 +38,8 @@ class ModelLoadServiceBase(ABC):
     @abstractmethod
     def convert_cache(self) -> ModelConvertCacheBase:
         """Return the checkpoint convert cache used by this loader."""
+
+    @property
+    @abstractmethod
+    def gpu_count(self) -> int:
+        """Return the number of GPUs we are configured to use."""

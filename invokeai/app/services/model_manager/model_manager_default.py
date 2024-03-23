@@ -1,12 +1,13 @@
 # Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Team
 """Implementation of ModelManagerServiceBase."""
 
+from typing import Optional, Set
+
 import torch
 from typing_extensions import Self
 
 from invokeai.app.services.invoker import Invoker
 from invokeai.backend.model_manager.load import ModelCache, ModelConvertCache, ModelLoaderRegistry
-from invokeai.backend.util.devices import choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger
 
 from ..config import InvokeAIAppConfig
@@ -67,7 +68,7 @@ class ModelManagerService(ModelManagerServiceBase):
         model_record_service: ModelRecordServiceBase,
         download_queue: DownloadQueueServiceBase,
         events: EventServiceBase,
-        execution_device: torch.device = choose_torch_device(),
+        execution_devices: Optional[Set[torch.device]] = None,
     ) -> Self:
         """
         Construct the model manager service instance.
@@ -81,7 +82,7 @@ class ModelManagerService(ModelManagerServiceBase):
             max_cache_size=app_config.ram,
             max_vram_cache_size=app_config.vram,
             logger=logger,
-            execution_device=execution_device,
+            execution_devices=execution_devices,
         )
         convert_cache = ModelConvertCache(cache_path=app_config.convert_cache_path, max_size=app_config.convert_cache)
         loader = ModelLoadService(

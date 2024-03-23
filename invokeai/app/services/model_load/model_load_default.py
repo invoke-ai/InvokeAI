@@ -39,12 +39,18 @@ class ModelLoadService(ModelLoadServiceBase):
         self._registry = registry
 
     def start(self, invoker: Invoker) -> None:
+        """Start the service."""
         self._invoker = invoker
 
     @property
     def ram_cache(self) -> ModelCacheBase[AnyModel]:
         """Return the RAM cache used by this loader."""
         return self._ram_cache
+
+    @property
+    def gpu_count(self) -> int:
+        """Return the number of GPUs available for our uses."""
+        return len(self._ram_cache.execution_devices)
 
     @property
     def convert_cache(self) -> ModelConvertCacheBase:
