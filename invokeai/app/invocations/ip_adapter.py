@@ -4,18 +4,19 @@ from typing import List, Union
 from pydantic import BaseModel, Field, field_validator, model_validator
 from typing_extensions import Self
 
-from invokeai.app.invocations.baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    invocation,
-    invocation_output,
-)
+from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, IPAdapterConfig, ModelType
+from invokeai.backend.model_manager.config import (
+    AnyModelConfig,
+    BaseModelType,
+    IPAdapterCheckpointConfig,
+    IPAdapterDiffusersConfig,
+    ModelType,
+)
 
 
 class IPAdapterField(BaseModel):
@@ -86,8 +87,12 @@ class IPAdapterInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> IPAdapterOutput:
         # Lookup the CLIP Vision encoder that is intended to be used with the IP-Adapter model.
         ip_adapter_info = context.models.get_config(self.ip_adapter_model.key)
-        assert isinstance(ip_adapter_info, IPAdapterConfig)
-        image_encoder_model_id = ip_adapter_info.image_encoder_model_id
+        assert isinstance(ip_adapter_info, (IPAdapterDiffusersConfig, IPAdapterCheckpointConfig))
+        image_encoder_model_id = (
+            ip_adapter_info.image_encoder_model_id
+            if isinstance(ip_adapter_info, IPAdapterDiffusersConfig)
+            else "InvokeAI/ip_adapter_sd_image_encoder"
+        )
         image_encoder_model_name = image_encoder_model_id.split("/")[-1].strip()
         image_encoder_model = self._get_image_encoder(context, image_encoder_model_name)
         return IPAdapterOutput(

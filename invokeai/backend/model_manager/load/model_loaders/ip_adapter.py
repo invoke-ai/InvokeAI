@@ -7,19 +7,13 @@ from typing import Optional
 import torch
 
 from invokeai.backend.ip_adapter.ip_adapter import build_ip_adapter
-from invokeai.backend.model_manager import (
-    AnyModel,
-    AnyModelConfig,
-    BaseModelType,
-    ModelFormat,
-    ModelType,
-    SubModelType,
-)
+from invokeai.backend.model_manager import AnyModel, AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.model_manager.load import ModelLoader, ModelLoaderRegistry
 from invokeai.backend.raw_model import RawModel
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.IPAdapter, format=ModelFormat.InvokeAI)
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.IPAdapter, format=ModelFormat.Checkpoint)
 class IPAdapterInvokeAILoader(ModelLoader):
     """Class to load IP Adapter diffusers models."""
 
@@ -32,7 +26,7 @@ class IPAdapterInvokeAILoader(ModelLoader):
             raise ValueError("There are no submodels in an IP-Adapter model.")
         model_path = Path(config.path)
         model: RawModel = build_ip_adapter(
-            ip_adapter_ckpt_path=str(model_path / "ip_adapter.bin"),
+            ip_adapter_ckpt_path=str(model_path),
             device=torch.device("cpu"),
             dtype=self._torch_dtype,
         )
