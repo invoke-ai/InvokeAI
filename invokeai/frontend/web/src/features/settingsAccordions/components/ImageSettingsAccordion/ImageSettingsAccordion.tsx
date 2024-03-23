@@ -73,7 +73,7 @@ export const ImageSettingsAccordion = memo(() => {
   });
   const { isOpen: isOpenExpander, onToggle: onToggleExpander } = useExpanderToggle({
     id: 'image-settings-advanced',
-    defaultIsOpen: false
+    defaultIsOpen: false,
   });
 
   return (
