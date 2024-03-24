@@ -9,7 +9,12 @@ run() {
   local profile=""
 
   touch .env
-  build_args=$(awk '$1 ~ /=[^$]/ && $0 !~ /^#/ {print "--build-arg " $0 " "}' .env) &&
+  while IFS='=' read -r key value; do
+    if [[ ! $key =~ ^# && ! -z $value ]]; then
+      build_args+=" --build-arg $key=$value"
+      export "$key=$value"
+    fi
+  done < .env
   profile="$(awk -F '=' '/GPU_DRIVER/ {print $2}' .env)"
 
   [[ -z "$profile" ]] && profile="nvidia"
