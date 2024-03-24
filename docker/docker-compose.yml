@@ -32,7 +32,7 @@ x-invokeai: &invokeai
     labels: []
 
 services:
-  invokeai-nvidia:
+  invokeai-cuda:
     <<: *invokeai
     deploy:
       resources:
