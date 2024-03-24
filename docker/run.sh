@@ -30,7 +30,9 @@ run() {
   unset build_args
 
   printf "%s\n" "starting service $service_name"
-  docker compose --profile "$profile" up -d "$service_name"
+  # `touch compose.override.yaml` in case user doesn't use it
+  touch compose.override.yaml
+  docker compose --profile "$profile" -f docker-compose.yml -f compose.override.yaml up -d "$service_name"
   docker compose logs -f
 }
 
