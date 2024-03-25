@@ -33,7 +33,8 @@ if [[ -v "PUBLIC_KEY" ]] && [[ ! -d "${HOME}/.ssh" ]]; then
     service ssh start
 fi
 
-
+mkdir -p "${INVOKEAI_ROOT}"
+chown --recursive ${USER} "${INVOKEAI_ROOT}"
 cd "${INVOKEAI_ROOT}"
 
 # Run the CMD as the Container User (not root).

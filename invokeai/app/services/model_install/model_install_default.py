@@ -2,6 +2,7 @@
 
 import os
 import re
+import signal
 import threading
 import time
 from hashlib import sha256
@@ -34,6 +35,7 @@ from invokeai.backend.model_manager.config import (
 from invokeai.backend.model_manager.metadata import (
     AnyModelRepoMetadata,
     HuggingFaceMetadataFetch,
+    ModelMetadataFetchBase,
     ModelMetadataWithFiles,
     RemoteModelFile,
 )
@@ -92,6 +94,7 @@ class ModelInstallService(ModelInstallServiceBase):
         self._download_cache: Dict[AnyHttpUrl, ModelInstallJob] = {}
         self._running = False
         self._session = session
+        self._install_thread: Optional[threading.Thread] = None
         self._next_job_id = 0
 
     @property
@@ -110,6 +113,18 @@ class ModelInstallService(ModelInstallServiceBase):
     # makes the installer harder to use outside the web app
     def start(self, invoker: Optional[Invoker] = None) -> None:
         """Start the installer thread."""
+
+        # Yes, this is weird. When the installer thread is running, the
+        # thread masks the ^C signal. When we receive a
+        # sigINT, we stop the thread, reset sigINT, and send a new
+        # sigINT to the parent process.
+        def sigint_handler(signum, frame):
+            self.stop()
+            signal.signal(signal.SIGINT, signal.SIG_DFL)
+            signal.raise_signal(signal.SIGINT)
+
+        signal.signal(signal.SIGINT, sigint_handler)
+
         with self._lock:
             if self._running:
                 raise Exception("Attempt to start the installer service twice")
@@ -120,13 +135,15 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def stop(self, invoker: Optional[Invoker] = None) -> None:
         """Stop the installer thread; after this the object can be deleted and garbage collected."""
-        with self._lock:
-            if not self._running:
-                raise Exception("Attempt to stop the install service before it was started")
-            self._stop_event.set()
-            self._clear_pending_jobs()
-            self._download_cache.clear()
-            self._running = False
+        if not self._running:
+            raise Exception("Attempt to stop the install service before it was started")
+        self._logger.debug("calling stop_event.set()")
+        self._stop_event.set()
+        self._clear_pending_jobs()
+        self._download_cache.clear()
+        assert self._install_thread is not None
+        self._install_thread.join()
+        self._running = False
 
     def _clear_pending_jobs(self) -> None:
         for job in self.list_jobs():
@@ -275,6 +292,7 @@ class ModelInstallService(ModelInstallServiceBase):
             if timeout > 0 and time.time() - start > timeout:
                 raise TimeoutError("Timeout exceeded")
         self._install_queue.join()
+
         return self._install_jobs
 
     def cancel_job(self, job: ModelInstallJob) -> None:
@@ -345,9 +363,8 @@ class ModelInstallService(ModelInstallServiceBase):
             # Rename `models.yaml` to `models.yaml.bak` to prevent re-migration
             legacy_models_yaml_path.rename(legacy_models_yaml_path.with_suffix(".yaml.bak"))
 
-        # Remove `legacy_models_yaml_path` from the config file - we are done with it either way
+        # Unset the path - we are done with it either way
         self._app_config.legacy_models_yaml_path = None
-        self._app_config.write_file(self._app_config.config_file_path)
 
     def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
         self._cached_model_paths = {Path(x.path).resolve() for x in self.record_store.all_models()}
@@ -373,10 +390,10 @@ class ModelInstallService(ModelInstallServiceBase):
     def unconditionally_delete(self, key: str) -> None:  # noqa D102
         model = self.record_store.get_model(key)
         model_path = self.app_config.models_path / model.path
-        if model_path.is_dir():
-            rmtree(model_path)
-        else:
+        if model_path.is_file() or model_path.is_symlink():
             model_path.unlink()
+        elif model_path.is_dir():
+            rmtree(model_path)
         self.unregister(key)
 
     def download_and_cache(
@@ -415,15 +432,16 @@ class ModelInstallService(ModelInstallServiceBase):
     # Internal functions that manage the installer threads
     # --------------------------------------------------------------------------------------------
     def _start_installer_thread(self) -> None:
-        threading.Thread(target=self._install_next_item, daemon=True).start()
+        self._install_thread = threading.Thread(target=self._install_next_item, daemon=True)
+        self._install_thread.start()
         self._running = True
 
     def _install_next_item(self) -> None:
-        done = False
-        while not done:
+        self._logger.debug(f"Installer thread {threading.get_ident()} starting")
+        while True:
             if self._stop_event.is_set():
-                done = True
-                continue
+                break
+            self._logger.debug(f"Installer thread {threading.get_ident()} polling")
             try:
                 job = self._install_queue.get(timeout=1)
             except Empty:
@@ -436,39 +454,14 @@ class ModelInstallService(ModelInstallServiceBase):
                 elif job.errored:
                     self._signal_job_errored(job)
 
-                elif (
-                    job.waiting or job.downloads_done
-                ):  # local jobs will be in waiting state, remote jobs will be downloading state
-                    job.total_bytes = self._stat_size(job.local_path)
-                    job.bytes = job.total_bytes
-                    self._signal_job_running(job)
-                    job.config_in["source"] = str(job.source)
-                    job.config_in["source_type"] = MODEL_SOURCE_TO_TYPE_MAP[job.source.__class__]
-                    # enter the metadata, if there is any
-                    if isinstance(job.source_metadata, (HuggingFaceMetadata)):
-                        job.config_in["source_api_response"] = job.source_metadata.api_response
-
-                    if job.inplace:
-                        key = self.register_path(job.local_path, job.config_in)
-                    else:
-                        key = self.install_path(job.local_path, job.config_in)
-                    job.config_out = self.record_store.get_model(key)
-                    self._signal_job_completed(job)
+                elif job.waiting or job.downloads_done:
+                    self._register_or_install(job)
 
             except InvalidModelConfigException as excp:
-                if any(x.content_type is not None and "text/html" in x.content_type for x in job.download_parts):
-                    job.set_error(
-                        InvalidModelConfigException(
-                            f"At least one file in {job.local_path} is an HTML page, not a model. This can happen when an access token is required to download."
-                        )
-                    )
-                else:
-                    job.set_error(excp)
-                self._signal_job_errored(job)
+                self._set_error(job, excp)
 
             except (OSError, DuplicateModelException) as excp:
-                job.set_error(excp)
-                self._signal_job_errored(job)
+                self._set_error(job, excp)
 
             finally:
                 # if this is an install of a remote file, then clean up the temporary directory
@@ -476,6 +469,36 @@ class ModelInstallService(ModelInstallServiceBase):
                     rmtree(job._install_tmpdir)
                 self._install_completed_event.set()
                 self._install_queue.task_done()
+        self._logger.info(f"Installer thread {threading.get_ident()} exiting")
+
+    def _register_or_install(self, job: ModelInstallJob) -> None:
+        # local jobs will be in waiting state, remote jobs will be downloading state
+        job.total_bytes = self._stat_size(job.local_path)
+        job.bytes = job.total_bytes
+        self._signal_job_running(job)
+        job.config_in["source"] = str(job.source)
+        job.config_in["source_type"] = MODEL_SOURCE_TO_TYPE_MAP[job.source.__class__]
+        # enter the metadata, if there is any
+        if isinstance(job.source_metadata, (HuggingFaceMetadata)):
+            job.config_in["source_api_response"] = job.source_metadata.api_response
+
+        if job.inplace:
+            key = self.register_path(job.local_path, job.config_in)
+        else:
+            key = self.install_path(job.local_path, job.config_in)
+        job.config_out = self.record_store.get_model(key)
+        self._signal_job_completed(job)
+
+    def _set_error(self, job: ModelInstallJob, excp: Exception) -> None:
+        if any(x.content_type is not None and "text/html" in x.content_type for x in job.download_parts):
+            job.set_error(
+                InvalidModelConfigException(
+                    f"At least one file in {job.local_path} is an HTML page, not a model. This can happen when an access token is required to download."
+                )
+            )
+        else:
+            job.set_error(excp)
+        self._signal_job_errored(job)
 
     # --------------------------------------------------------------------------------------------
     # Internal functions that manage the models directory
@@ -516,7 +539,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     installed.update(self.scan_directory(models_dir))
             self._logger.info(f"{len(installed)} new models registered; {len(defunct_models)} unregistered")
 
-    def _sync_model_path(self, key: str) -> AnyModelConfig:
+    def sync_model_path(self, key: str) -> AnyModelConfig:
         """
         Move model into the location indicated by its basetype, type and name.
 
@@ -528,16 +551,13 @@ class ModelInstallService(ModelInstallServiceBase):
         May raise an UnknownModelException.
         """
         model = self.record_store.get_model(key)
-        old_path = Path(model.path)
-        models_dir = self.app_config.models_path
+        old_path = Path(model.path).resolve()
+        models_dir = self.app_config.models_path.resolve()
 
-        try:
-            old_path.relative_to(models_dir)
+        if not old_path.is_relative_to(models_dir):
             return model
-        except ValueError:
-            pass
 
-        new_path = models_dir / model.base.value / model.type.value / old_path.name
+        new_path = (models_dir / model.base.value / model.type.value / model.name).with_suffix(old_path.suffix)
 
         if old_path == new_path or new_path.exists() and old_path == new_path.resolve():
             return model
@@ -549,11 +569,11 @@ class ModelInstallService(ModelInstallServiceBase):
         return model
 
     def _scan_register(self, model: Path) -> bool:
-        if model in self._cached_model_paths:
+        if model.resolve() in self._cached_model_paths:
             return True
         try:
             id = self.register_path(model)
-            self._sync_model_path(id)  # possibly move it to right place in `models`
+            self.sync_model_path(id)  # possibly move it to right place in `models`
             self._logger.info(f"Registered {model.name} with id {id}")
             self._models_installed.add(id)
         except DuplicateModelException:
@@ -722,12 +742,13 @@ class ModelInstallService(ModelInstallServiceBase):
         install_job._install_tmpdir = tmpdir
         assert install_job.total_bytes is not None  # to avoid type checking complaints in the loop below
 
-        self._logger.info(f"Queuing {source} for downloading")
+        files_string = "file" if len(remote_files) == 1 else "file"
+        self._logger.info(f"Queuing model install: {source} ({len(remote_files)} {files_string})")
         self._logger.debug(f"remote_files={remote_files}")
         for model_file in remote_files:
             url = model_file.url
             path = root / model_file.path.relative_to(subfolder)
-            self._logger.info(f"Downloading {url} => {path}")
+            self._logger.debug(f"Downloading {url} => {path}")
             install_job.total_bytes += model_file.size
             assert hasattr(source, "access_token")
             dest = tmpdir / path.parent
@@ -763,7 +784,7 @@ class ModelInstallService(ModelInstallServiceBase):
     # Callbacks are executed by the download queue in a separate thread
     # ------------------------------------------------------------------
     def _download_started_callback(self, download_job: DownloadJob) -> None:
-        self._logger.info(f"{download_job.source}: model download started")
+        self._logger.info(f"Model download started: {download_job.source}")
         with self._lock:
             install_job = self._download_cache[download_job.source]
             install_job.status = InstallStatus.DOWNLOADING
@@ -789,7 +810,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 self._signal_job_downloading(install_job)
 
     def _download_complete_callback(self, download_job: DownloadJob) -> None:
-        self._logger.info(f"{download_job.source}: model download complete")
+        self._logger.info(f"Model download complete: {download_job.source}")
         with self._lock:
             install_job = self._download_cache[download_job.source]
 
@@ -822,7 +843,7 @@ class ModelInstallService(ModelInstallServiceBase):
             if not install_job:
                 return
             self._downloads_changed_event.set()
-            self._logger.warning(f"{download_job.source}: model download cancelled")
+            self._logger.warning(f"Model download canceled: {download_job.source}")
             # if install job has already registered an error, then do not replace its status with cancelled
             if not install_job.errored:
                 install_job.cancel()
@@ -846,7 +867,7 @@ class ModelInstallService(ModelInstallServiceBase):
     # ------------------------------------------------------------------------------------------------
     def _signal_job_running(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.RUNNING
-        self._logger.info(f"{job.source}: model installation started")
+        self._logger.info(f"Model install started: {job.source}")
         if self._event_bus:
             self._event_bus.emit_model_install_running(str(job.source))
 
@@ -874,16 +895,15 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _signal_job_downloads_done(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.DOWNLOADS_DONE
-        self._logger.info(f"{job.source}: all parts of this model are downloaded")
+        self._logger.info(f"Model download complete: {job.source}")
         if self._event_bus:
             self._event_bus.emit_model_install_downloads_done(str(job.source))
 
     def _signal_job_completed(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.COMPLETED
         assert job.config_out
-        self._logger.info(
-            f"{job.source}: model installation completed. {job.local_path} registered key {job.config_out.key}"
-        )
+        self._logger.info(f"Model install complete: {job.source}")
+        self._logger.debug(f"{job.local_path} registered key {job.config_out.key}")
         if self._event_bus:
             assert job.local_path is not None
             assert job.config_out is not None
@@ -891,7 +911,7 @@ class ModelInstallService(ModelInstallServiceBase):
             self._event_bus.emit_model_install_completed(str(job.source), key, id=job.id)
 
     def _signal_job_errored(self, job: ModelInstallJob) -> None:
-        self._logger.info(f"{job.source}: model installation encountered an exception: {job.error_type}\n{job.error}")
+        self._logger.info(f"Model install error: {job.source}, {job.error_type}\n{job.error}")
         if self._event_bus:
             error_type = job.error_type
             error = job.error
@@ -900,12 +920,12 @@ class ModelInstallService(ModelInstallServiceBase):
             self._event_bus.emit_model_install_error(str(job.source), error_type, error, id=job.id)
 
     def _signal_job_cancelled(self, job: ModelInstallJob) -> None:
-        self._logger.info(f"{job.source}: model installation was cancelled")
+        self._logger.info(f"Model install canceled: {job.source}")
         if self._event_bus:
             self._event_bus.emit_model_install_cancelled(str(job.source), id=job.id)
 
     @staticmethod
-    def get_fetcher_from_url(url: str):
+    def get_fetcher_from_url(url: str) -> ModelMetadataFetchBase:
         if re.match(r"^https?://huggingface.co/[^/]+/[^/]+$", url.lower()):
             return HuggingFaceMetadataFetch
         raise ValueError(f"Unsupported model source: '{url}'")

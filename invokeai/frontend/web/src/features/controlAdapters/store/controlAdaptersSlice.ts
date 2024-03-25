@@ -37,10 +37,10 @@ export const {
 } = caAdapterSelectors;
 
 const initialControlAdaptersState: ControlAdaptersState = caAdapter.getInitialState<{
-  _version: 1;
+  _version: 2;
   pendingControlImages: string[];
 }>({
-  _version: 1,
+  _version: 2,
   pendingControlImages: [],
 });
 
@@ -404,6 +404,9 @@ export const selectControlAdaptersSlice = (state: RootState) => state.controlAda
 const migrateControlAdaptersState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
+  }
+  if (state._version === 1) {
+    state = cloneDeep(initialControlAdaptersState);
   }
   return state;
 };

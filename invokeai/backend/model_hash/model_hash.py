@@ -6,10 +6,14 @@ from pathlib import Path
 from typing import Callable, Literal, Optional, Union
 
 from blake3 import blake3
+from tqdm import tqdm
 
 from invokeai.app.util.misc import uuid_string
 
 HASHING_ALGORITHMS = Literal[
+    "blake3_multi",
+    "blake3_single",
+    "random",
     "md5",
     "sha1",
     "sha224",
@@ -24,9 +28,6 @@ HASHING_ALGORITHMS = Literal[
     "sha3_512",
     "shake_128",
     "shake_256",
-    "blake3",
-    "blake3_single",
-    "random",
 ]
 MODEL_FILE_EXTENSIONS = (".ckpt", ".safetensors", ".bin", ".pt", ".pth")
 
@@ -60,10 +61,10 @@ class ModelHash:
     """
 
     def __init__(
-        self, algorithm: HASHING_ALGORITHMS = "blake3", file_filter: Optional[Callable[[str], bool]] = None
+        self, algorithm: HASHING_ALGORITHMS = "blake3_single", file_filter: Optional[Callable[[str], bool]] = None
     ) -> None:
         self.algorithm: HASHING_ALGORITHMS = algorithm
-        if algorithm == "blake3":
+        if algorithm == "blake3_multi":
             self._hash_file = self._blake3
         elif algorithm == "blake3_single":
             self._hash_file = self._blake3_single
@@ -94,7 +95,14 @@ class ModelHash:
         # blake3_single is a single-threaded version of blake3, prefix should still be "blake3:"
         prefix = self._get_prefix(self.algorithm)
         if model_path.is_file():
-            return prefix + self._hash_file(model_path)
+            hash_ = None
+            # To give a similar user experience for single files and directories, we use a progress bar even for single files
+            pbar = tqdm([model_path], desc=f"Hashing {model_path.name}", unit="file")
+            for component in pbar:
+                pbar.set_description(f"Hashing {component.name}")
+                hash_ = prefix + self._hash_file(model_path)
+            assert hash_ is not None
+            return hash_
         elif model_path.is_dir():
             return prefix + self._hash_dir(model_path)
         else:
@@ -112,7 +120,9 @@ class ModelHash:
         model_component_paths = self._get_file_paths(dir, self._file_filter)
 
         component_hashes: list[str] = []
-        for component in sorted(model_component_paths):
+        pbar = tqdm(sorted(model_component_paths), desc=f"Hashing {dir.name}", unit="file")
+        for component in pbar:
+            pbar.set_description(f"Hashing {component.name}")
             component_hashes.append(self._hash_file(component))
 
         # BLAKE3 is cryptographically secure. We may as well fall back on a secure algorithm
@@ -216,4 +226,4 @@ class ModelHash:
     def _get_prefix(algorithm: HASHING_ALGORITHMS) -> str:
         """Return the prefix for the given algorithm, e.g. \"blake3:\" or \"md5:\"."""
         # blake3_single is a single-threaded version of blake3, prefix should still be "blake3:"
-        return "blake3:" if algorithm == "blake3_single" else f"{algorithm}:"
+        return "blake3:" if algorithm == "blake3_single" or algorithm == "blake3_multi" else f"{algorithm}:"

@@ -21,10 +21,11 @@ from typing_extensions import Annotated
 
 from invokeai.app.services.model_install import ModelInstallJob
 from invokeai.app.services.model_records import (
+    DuplicateModelException,
     InvalidModelException,
+    ModelRecordChanges,
     UnknownModelException,
 )
-from invokeai.app.services.model_records.model_records_base import DuplicateModelException, ModelRecordChanges
 from invokeai.app.util.suppress_output import SuppressOutput
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
@@ -37,7 +38,7 @@ from invokeai.backend.model_manager.config import (
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
 from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
 from invokeai.backend.model_manager.search import ModelSearch
-from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel
+from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel, StarterModelWithoutDependencies
 
 from ..dependencies import ApiDependencies
 
@@ -309,8 +310,10 @@ async def update_model_record(
     """Update a model's config."""
     logger = ApiDependencies.invoker.services.logger
     record_store = ApiDependencies.invoker.services.model_manager.store
+    installer = ApiDependencies.invoker.services.model_manager.install
     try:
-        model_response: AnyModelConfig = record_store.update_model(key, changes=changes)
+        record_store.update_model(key, changes=changes)
+        model_response: AnyModelConfig = installer.sync_model_path(key)
         logger.info(f"Updated model: {key}")
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -797,9 +800,9 @@ async def get_starter_models() -> list[StarterModel]:
         if model.source in installed_model_sources:
             model.is_installed = True
         # Remove already-installed dependencies
-        missing_deps: list[str] = []
+        missing_deps: list[StarterModelWithoutDependencies] = []
         for dep in model.dependencies or []:
-            if dep not in installed_model_sources:
+            if dep.source not in installed_model_sources:
                 missing_deps.append(dep)
         model.dependencies = missing_deps
 

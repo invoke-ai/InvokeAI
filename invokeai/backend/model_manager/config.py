@@ -146,10 +146,14 @@ class MainModelDefaultSettings(BaseModel):
     width: int | None = Field(default=None, multiple_of=8, ge=64, description="Default width for this model")
     height: int | None = Field(default=None, multiple_of=8, ge=64, description="Default height for this model")
 
+    model_config = ConfigDict(extra="forbid")
+
 
 class ControlAdapterDefaultSettings(BaseModel):
     # This could be narrowed to controlnet processor nodes, but they change. Leaving this a string is safer.
     preprocessor: str | None
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class ModelConfigBase(BaseModel):

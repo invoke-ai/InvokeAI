@@ -5,6 +5,7 @@ Test the model installer
 import platform
 import uuid
 from pathlib import Path
+from typing import Any, Dict
 
 import pytest
 from pydantic import ValidationError
@@ -19,7 +20,7 @@ from invokeai.app.services.model_install import (
     ModelInstallServiceBase,
     URLModelSource,
 )
-from invokeai.app.services.model_records import UnknownModelException
+from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
 from invokeai.backend.model_manager.config import BaseModelType, InvalidModelConfigException, ModelFormat, ModelType
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 
@@ -79,6 +80,18 @@ def test_install(
     assert Path(model_record.path).is_absolute()
     assert Path(model_record.path).exists()
     assert model_record.source == embedding_file.as_posix()
+
+
+def test_rename(
+    mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    store = mm2_installer.record_store
+    key = mm2_installer.install_path(embedding_file)
+    model_record = store.get_model(key)
+    assert model_record.path.endswith("sd-1/embedding/test_embedding.safetensors")
+    store.update_model(key, ModelRecordChanges(name="new_name.safetensors", base=BaseModelType("sd-2")))
+    new_model_record = mm2_installer.sync_model_path(key)
+    assert new_model_record.path.endswith("sd-2/embedding/new_name.safetensors")
 
 
 @pytest.mark.parametrize(
@@ -276,48 +289,48 @@ def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: In
 
 
 # TODO: Fix bug in model install causing jobs to get installed multiple times then uncomment this test
-# @pytest.mark.parametrize(
-#     "model_params",
-#     [
-#         # SDXL, Lora
-#         {
-#             "repo_id": "InvokeAI-test/textual_inversion_tests::learned_embeds-steps-1000.safetensors",
-#             "name": "test_lora",
-#             "type": "embedding",
-#         },
-#         # SDXL, Lora - incorrect type
-#         {
-#             "repo_id": "InvokeAI-test/textual_inversion_tests::learned_embeds-steps-1000.safetensors",
-#             "name": "test_lora",
-#             "type": "lora",
-#         },
-#     ],
-# )
-# @pytest.mark.timeout(timeout=40, method="thread")
-# def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, model_params: Dict[str, str]):
-#     """Test whether or not type is respected on configs when passed to heuristic import."""
-#     assert "name" in model_params and "type" in model_params
-#     config1: Dict[str, Any] = {
-#         "name": f"{model_params['name']}_1",
-#         "type": model_params["type"],
-#         "hash": "placeholder1",
-#     }
-#     config2: Dict[str, Any] = {
-#         "name": f"{model_params['name']}_2",
-#         "type": ModelType(model_params["type"]),
-#         "hash": "placeholder2",
-#     }
-#     assert "repo_id" in model_params
-#     install_job1 = mm2_installer.heuristic_import(source=model_params["repo_id"], config=config1)
-#     mm2_installer.wait_for_job(install_job1, timeout=20)
-#     if model_params["type"] != "embedding":
-#         assert install_job1.errored
-#         assert install_job1.error_type == "InvalidModelConfigException"
-#         return
-#     assert install_job1.complete
-#     assert install_job1.config_out if model_params["type"] == "embedding" else not install_job1.config_out
+@pytest.mark.parametrize(
+    "model_params",
+    [
+        # SDXL, Lora
+        {
+            "repo_id": "InvokeAI-test/textual_inversion_tests::learned_embeds-steps-1000.safetensors",
+            "name": "test_lora",
+            "type": "embedding",
+        },
+        # SDXL, Lora - incorrect type
+        {
+            "repo_id": "InvokeAI-test/textual_inversion_tests::learned_embeds-steps-1000.safetensors",
+            "name": "test_lora",
+            "type": "lora",
+        },
+    ],
+)
+@pytest.mark.timeout(timeout=40, method="thread")
+def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, model_params: Dict[str, str]):
+    """Test whether or not type is respected on configs when passed to heuristic import."""
+    assert "name" in model_params and "type" in model_params
+    config1: Dict[str, Any] = {
+        "name": f"{model_params['name']}_1",
+        "type": model_params["type"],
+        "hash": "placeholder1",
+    }
+    config2: Dict[str, Any] = {
+        "name": f"{model_params['name']}_2",
+        "type": ModelType(model_params["type"]),
+        "hash": "placeholder2",
+    }
+    assert "repo_id" in model_params
+    install_job1 = mm2_installer.heuristic_import(source=model_params["repo_id"], config=config1)
+    mm2_installer.wait_for_job(install_job1, timeout=20)
+    if model_params["type"] != "embedding":
+        assert install_job1.errored
+        assert install_job1.error_type == "InvalidModelConfigException"
+        return
+    assert install_job1.complete
+    assert install_job1.config_out if model_params["type"] == "embedding" else not install_job1.config_out
 
-#     install_job2 = mm2_installer.heuristic_import(source=model_params["repo_id"], config=config2)
-#     mm2_installer.wait_for_job(install_job2, timeout=20)
-#     assert install_job2.complete
-#     assert install_job2.config_out if model_params["type"] == "embedding" else not install_job2.config_out
+    install_job2 = mm2_installer.heuristic_import(source=model_params["repo_id"], config=config2)
+    mm2_installer.wait_for_job(install_job2, timeout=20)
+    assert install_job2.complete
+    assert install_job2.config_out if model_params["type"] == "embedding" else not install_job2.config_out

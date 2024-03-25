@@ -91,7 +91,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             model_path,
             output_path,
             model_type=self.model_base_to_model_type[base],
-            original_config_file=config.config_path,
+            original_config_file=self._app_config.root_path / config.config_path,
             extract_ema=True,
             from_safetensors=model_path.suffix == ".safetensors",
             precision=self._torch_dtype,

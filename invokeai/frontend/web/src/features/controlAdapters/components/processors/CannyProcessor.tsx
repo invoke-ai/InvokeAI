@@ -15,7 +15,7 @@ type CannyProcessorProps = {
 
 const CannyProcessor = (props: CannyProcessorProps) => {
   const { controlNetId, processorNode, isEnabled } = props;
-  const { low_threshold, high_threshold, image_resolution } = processorNode;
+  const { low_threshold, high_threshold, image_resolution, detect_resolution } = processorNode;
   const processorChanged = useProcessorNodeChanged();
   const { t } = useTranslation();
   const defaults = useGetDefaultForControlnetProcessor(
@@ -39,6 +39,13 @@ const CannyProcessor = (props: CannyProcessorProps) => {
   const handleImageResolutionChanged = useCallback(
     (v: number) => {
       processorChanged(controlNetId, { image_resolution: v });
+    },
+    [controlNetId, processorChanged]
+  );
+
+  const handleDetectResolutionChanged = useCallback(
+    (v: number) => {
+      processorChanged(controlNetId, { detect_resolution: v });
     },
     [controlNetId, processorChanged]
   );
@@ -93,6 +100,24 @@ const CannyProcessor = (props: CannyProcessorProps) => {
           value={image_resolution}
           onChange={handleImageResolutionChanged}
           defaultValue={defaults.image_resolution}
+          min={0}
+          max={4096}
+        />
+      </FormControl>
+      <FormControl isDisabled={!isEnabled}>
+        <FormLabel>{t('controlnet.detectResolution')}</FormLabel>
+        <CompositeSlider
+          value={detect_resolution}
+          onChange={handleDetectResolutionChanged}
+          defaultValue={defaults.detect_resolution}
+          min={0}
+          max={4096}
+          marks
+        />
+        <CompositeNumberInput
+          value={detect_resolution}
+          onChange={handleDetectResolutionChanged}
+          defaultValue={defaults.detect_resolution}
           min={0}
           max={4096}
         />

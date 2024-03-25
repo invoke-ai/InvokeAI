@@ -24,7 +24,7 @@ import type { ImageDTO } from 'services/api/types';
 import type { GenerationState } from './types';
 
 const initialGenerationState: GenerationState = {
-  _version: 1,
+  _version: 2,
   cfgScale: 7.5,
   cfgRescaleMultiplier: 0,
   height: 512,
@@ -275,6 +275,11 @@ const migrateGenerationState = (state: any): GenerationState => {
   if (!('_version' in state)) {
     state._version = 1;
     state.aspectRatio = initialAspectRatioState;
+  }
+  if (state._version === 1) {
+    // The signature of the model has changed, so we need to reset it
+    state._version = 2;
+    state.model = null;
   }
   return state;
 };
