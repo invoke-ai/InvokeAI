@@ -28,7 +28,7 @@ from .config import (
 )
 from .util.model_util import lora_token_vector_length, read_checkpoint_meta
 
-CkptType = Dict[str, Any]
+CkptType = Dict[str | int, Any]
 
 LEGACY_CONFIGS: Dict[BaseModelType, Dict[ModelVariantType, Union[str, Dict[SchedulerPredictionType, str]]]] = {
     BaseModelType.StableDiffusion1: {
@@ -219,7 +219,7 @@ class ModelProbe(object):
         ckpt = checkpoint if checkpoint else read_checkpoint_meta(model_path, scan=True)
         ckpt = ckpt.get("state_dict", ckpt)
 
-        for key in ckpt.keys():
+        for key in [str(k) for k in ckpt.keys()]:
             if any(key.startswith(v) for v in {"cond_stage_model.", "first_stage_model.", "model.diffusion_model."}):
                 return ModelType.Main
             elif any(key.startswith(v) for v in {"encoder.conv_in", "decoder.conv_in"}):
