@@ -83,7 +83,7 @@ do_line_input() {
     printf "4: Run the InvokeAI image database maintenance script\n"
     printf "5: Command-line help\n"
     printf "Q: Quit\n\n"
-    read -p "Please enter 1-10, Q: [1] " yn
+    read -p "Please enter 1-5, Q: [1] " yn
     choice=${yn:='1'}
     do_choice $choice
     clear
