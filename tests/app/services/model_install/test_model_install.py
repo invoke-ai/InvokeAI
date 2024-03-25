@@ -293,6 +293,7 @@ def test_other_error_during_install(
 ) -> None:
     def raise_runtime_error(*args, **kwargs):
         raise RuntimeError("Test error")
+
     monkeypatch.setattr(
         "invokeai.app.services.model_install.model_install_default.ModelInstallService._register_or_install",
         raise_runtime_error,
