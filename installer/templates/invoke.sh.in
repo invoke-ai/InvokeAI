@@ -72,8 +72,6 @@ for arg in "$@"; do
     fi
 done
 
-echo $MALLOC_MMAP_THRESHOLD_
-
 # Primary function for the case statement to determine user input
 do_choice() {
     case $1 in
