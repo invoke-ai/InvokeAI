@@ -25,7 +25,7 @@ cd "$scriptdir"
 export INVOKEAI_ROOT="$scriptdir"
 PARAMS=$@
 
-# Set required env var for torch on mac MPS
+# This setting allows torch to fall back to CPU for operations that are not supported by MPS on macOS.
 if [ "$(uname -s)" == "Darwin" ]; then
     export PYTORCH_ENABLE_MPS_FALLBACK=1
 fi
