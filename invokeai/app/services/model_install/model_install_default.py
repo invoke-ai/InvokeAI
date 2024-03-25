@@ -910,7 +910,7 @@ class ModelInstallService(ModelInstallServiceBase):
             self._event_bus.emit_model_install_completed(str(job.source), key, id=job.id)
 
     def _signal_job_errored(self, job: ModelInstallJob) -> None:
-        self._logger.info(f"Model install error: {job.source}, {job.error_type}\n{job.error}")
+        self._logger.error(f"Model install error: {job.source}\n{job.error_type}: {job.error}")
         if self._event_bus:
             error_type = job.error_type
             error = job.error
