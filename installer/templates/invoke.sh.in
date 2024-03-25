@@ -46,7 +46,7 @@ if [ "$(uname -s)" == "Darwin" ]; then
     export PYTORCH_ENABLE_MPS_FALLBACK=1
 fi
 
-# Avoid glibc memory fragmentation. See #6007, #4784 and invokeai/backend/model_management/README.md for details.
+# Avoid glibc memory fragmentation. See #6007, #4784 and docs/features/CONFIGURATION.md for details.
 # Some systems may need this to be set to a different value, so we may override this via command-line argument below.
 export MALLOC_MMAP_THRESHOLD_=1048576 # 1MB
 
