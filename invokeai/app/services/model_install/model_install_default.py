@@ -457,11 +457,10 @@ class ModelInstallService(ModelInstallServiceBase):
                 elif job.waiting or job.downloads_done:
                     self._register_or_install(job)
 
-            except InvalidModelConfigException as excp:
-                self._set_error(job, excp)
-
-            except (OSError, DuplicateModelException) as excp:
-                self._set_error(job, excp)
+            except Exception as e:
+                # Expected errors include InvalidModelConfigException, DuplicateModelException, OSError, but we must
+                # gracefully handle _any_ error here.
+                self._set_error(job, e)
 
             finally:
                 # if this is an install of a remote file, then clean up the temporary directory
