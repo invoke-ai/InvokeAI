@@ -46,8 +46,33 @@ if [ "$(uname -s)" == "Darwin" ]; then
     export PYTORCH_ENABLE_MPS_FALLBACK=1
 fi
 
-# Avoid glibc memory fragmentation. See invokeai/backend/model_management/README.md for details.
-export MALLOC_MMAP_THRESHOLD_=1048576
+# Avoid glibc memory fragmentation. See #6007, #4784 and invokeai/backend/model_management/README.md for details.
+# Some systems may need this to be set to a different value, so we may override this via command-line argument below.
+export MALLOC_MMAP_THRESHOLD_=1048576 # 1MB
+
+# This will be passed on to `invokeai-web`
+PARAMS=()
+
+# Parse command-line arguments
+for arg in "$@"; do
+    if [[ $arg == --malloc_threshold=* ]]; then
+        # Re-set MALLOC_MMAP_THRESHOLD_ from the argument if provided
+        value="${arg#*=}"
+        if [[ $value == "unset" ]]; then
+            unset MALLOC_MMAP_THRESHOLD_
+        elif [[ $value =~ ^[0-9]+$ ]]; then
+            export MALLOC_MMAP_THRESHOLD_="$value"
+        else
+            echo "Invalid value for --malloc_threshold. Please provide a valid positive integer or 'unset'."
+            exit 1
+        fi
+    else
+        # Add other arguments to PARAMS
+        PARAMS+=("$arg")
+    fi
+done
+
+echo $MALLOC_MMAP_THRESHOLD_
 
 # Primary function for the case statement to determine user input
 do_choice() {
@@ -55,7 +80,7 @@ do_choice() {
     1)
         clear
         printf "Generate images with a browser-based interface\n"
-        invokeai-web $PARAMS
+        invokeai-web "${PARAMS[@]}"
         ;;
     2)
         clear
