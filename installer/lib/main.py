@@ -44,6 +44,14 @@ if __name__ == "__main__":
         default=None,
     )
 
+    parser.add_argument(
+        "--wheel",
+        dest="wheel",
+        help="Specifies a wheel for the InvokeAI package. Used for troubleshooting or testing prereleases.",
+        type=Path,
+        default=None,
+    )
+
     args = parser.parse_args()
 
     inst = Installer()
