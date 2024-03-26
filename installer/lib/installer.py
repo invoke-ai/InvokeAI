@@ -36,7 +36,7 @@ class Installer:
         self.bootstrap()
         self.available_releases = get_github_releases()
 
-    def mktemp_venv(self) -> TemporaryDirectory:
+    def mktemp_venv(self) -> TemporaryDirectory[str]:
         """
         Creates a temporary virtual environment for the installer itself
 
@@ -58,7 +58,7 @@ class Installer:
 
         return venv_dir
 
-    def bootstrap(self, verbose: bool = False) -> TemporaryDirectory | None:
+    def bootstrap(self, verbose: bool = False) -> TemporaryDirectory[str] | None:
         """
         Bootstrap the installer venv with packages required at install time
         """
@@ -87,7 +87,7 @@ class Installer:
         except subprocess.CalledProcessError as e:
             print(e)
 
-    def app_venv(self, venv_parent) -> Path:
+    def app_venv(self, venv_parent: Path) -> Path:
         """
         Create a virtualenv for the InvokeAI installation
         """
@@ -106,7 +106,11 @@ class Installer:
         return venv_dir
 
     def install(
-        self, version=None, root: str = "~/invokeai", yes_to_all=False, find_links: Optional[Path] = None
+        self,
+        root: str = "~/invokeai",
+        yes_to_all: bool = False,
+        version: Optional[str] = None,
+        find_links: Optional[str] = None,
     ) -> None:
         """
         Install the InvokeAI application into the given runtime path
@@ -118,7 +122,7 @@ class Installer:
         :param yes: Accept defaults to all questions
         :type yes: bool
         :param find_links: A local directory to search for requirement wheels before going to remote indexes
-        :type find_links: Path
+        :type find_links: str
         """
 
         import messages
@@ -178,7 +182,12 @@ class InvokeAiInstance:
 
         return (self.runtime, self.venv)
 
-    def install(self, extra_index_url=None, optional_modules=None, find_links=None):
+    def install(
+        self,
+        extra_index_url: Optional[str] = None,
+        optional_modules: Optional[str] = None,
+        find_links: Optional[str] = None,
+    ):
         """
         Install the package from PyPi.
 
@@ -213,7 +222,7 @@ class InvokeAiInstance:
 
         messages.simple_banner("Installing the InvokeAI Application :art:")
 
-        from plumbum import FG, ProcessExecutionError, local  # type: ignore
+        from plumbum import FG, ProcessExecutionError, local
 
         pip = local[self.pip]
 
@@ -320,7 +329,7 @@ def set_sys_path(venv_path: Path) -> None:
     sys.path.append(str(Path(venv_path, lib, "site-packages").expanduser().resolve()))
 
 
-def get_github_releases() -> tuple[list, list] | None:
+def get_github_releases() -> tuple[list[str], list[str]] | None:
     """
     Query Github for published (pre-)release versions.
     Return a tuple where the first element is a list of stable releases and the second element is a list of pre-releases.
@@ -331,7 +340,8 @@ def get_github_releases() -> tuple[list, list] | None:
 
     ## get latest releases using github api
     url = "https://api.github.com/repos/invoke-ai/InvokeAI/releases"
-    releases, pre_releases = [], []
+    releases: list[str] = []
+    pre_releases: list[str] = []
     try:
         res = requests.get(url)
         res.raise_for_status()
