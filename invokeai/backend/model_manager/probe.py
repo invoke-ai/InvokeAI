@@ -147,6 +147,7 @@ class ModelProbe(object):
 
         probe = probe_class(model_path)
         model_path = probe.model_path
+        format_type = probe.get_format()
         fields["source_type"] = fields.get("source_type") or ModelSourceType.Path
         fields["source"] = fields.get("source") or model_path.as_posix()
         fields["key"] = fields.get("key", uuid_string())
@@ -160,7 +161,8 @@ class ModelProbe(object):
         fields["description"] = (
             fields.get("description") or f"{fields['base'].value} {model_type.value} model {fields['name']}"
         )
-        fields["format"] = fields.get("format") or probe.get_format()
+        fields["format"] = fields.get("format") or format_type
+
         fields["hash"] = fields.get("hash") or ModelHash(algorithm=hash_algo).hash(model_path)
 
         fields["default_settings"] = fields.get("default_settings")
