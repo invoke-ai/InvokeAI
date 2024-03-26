@@ -126,7 +126,6 @@ dependencies = [
 
 [project.scripts]
 "invokeai-web" = "invokeai.app.run_app:run_app"
-"invokeai-update" = "invokeai.frontend.install.invokeai_update:main"
 "invokeai-import-images" = "invokeai.frontend.install.import_images:main"
 "invokeai-db-maintenance" = "invokeai.backend.util.db_maintenance:main"
 
