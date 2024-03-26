@@ -7,6 +7,7 @@ import os
 import platform
 from enum import Enum
 from pathlib import Path
+from typing import Optional
 
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import FuzzyWordCompleter, PathCompleter
@@ -36,7 +37,7 @@ else:
     console = Console(style=Style(color="grey74", bgcolor="grey19"))
 
 
-def welcome(available_releases: tuple | None = None) -> None:
+def welcome(available_releases: tuple[list[str], list[str]] | None = None) -> None:
     @group()
     def text():
         if (platform_specific := _platform_specific_help()) is not None:
@@ -72,7 +73,7 @@ def welcome(available_releases: tuple | None = None) -> None:
     console.line()
 
 
-def choose_version(available_releases: tuple | None = None) -> str:
+def choose_version(available_releases: tuple[list[str], list[str]] | None = None) -> str:
     """
     Prompt the user to choose an Invoke version to install
     """
@@ -114,7 +115,7 @@ def confirm_install(dest: Path) -> bool:
     return dest_confirmed
 
 
-def dest_path(dest=None) -> Path | None:
+def dest_path(dest: Optional[str | Path] = None) -> Path | None:
     """
     Prompt the user for the destination path and create the path
 
