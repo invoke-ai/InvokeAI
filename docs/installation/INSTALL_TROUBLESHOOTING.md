@@ -106,6 +106,10 @@ A workaround is to tune memory allocation with an environment variable:
 MALLOC_MMAP_THRESHOLD_=1048576
 ```
 
+!!! warning "Speed vs Memory Tradeoff"
+
+    Your generations may be slower overall when setting this environment variable.
+
 !!! info "Possibly dependent on `libc` implementation"
 
     It's not known if this issue occurs with other `libc` implementations such as `musl`.
