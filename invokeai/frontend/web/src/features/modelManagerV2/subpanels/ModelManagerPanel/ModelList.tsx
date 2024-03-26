@@ -101,11 +101,7 @@ const ModelList = () => {
         {/* IP Adapter List */}
         {isLoadingIPAdapterModels && <FetchingModelsLoader loadingMessage="Loading IP Adapters..." />}
         {!isLoadingIPAdapterModels && filteredIPAdapterModels.length > 0 && (
-          <ModelListWrapper
-            title={t('common.ipAdapter')}
-            modelList={filteredIPAdapterModels}
-            key="ip-adapters"
-          />
+          <ModelListWrapper title={t('common.ipAdapter')} modelList={filteredIPAdapterModels} key="ip-adapters" />
         )}
         {/* T2I Adapters List */}
         {isLoadingT2IAdapterModels && <FetchingModelsLoader loadingMessage="Loading T2I Adapters..." />}
