@@ -122,17 +122,13 @@ class Installer:
         find_links: Optional[str] = None,
         wheel: Optional[Path] = None,
     ) -> None:
-        """
-        Install the InvokeAI application into the given runtime path
+        """Install the InvokeAI application into the given runtime path
 
-        :param root: Destination path for the installation
-        :type root: str
-        :param version: InvokeAI version to install
-        :type version: str
-        :param yes: Accept defaults to all questions
-        :type yes: bool
-        :param find_links: A local directory to search for requirement wheels before going to remote indexes
-        :type find_links: str
+        Args:
+            root: Destination path for the installation
+            yes_to_all: Accept defaults to all questions
+            find_links: A local directory to search for requirement wheels before going to remote indexes
+            wheel: A wheel file to install
         """
 
         import messages
@@ -198,17 +194,13 @@ class InvokeAiInstance:
         find_links: Optional[str] = None,
         wheel: Optional[Path] = None,
     ):
-        """
-        Install the package from PyPi.
+        """Install the package from PyPi or a wheel, if provided.
 
-        :param extra_index_url: the "--extra-index-url ..." line for pip to look in extra indexes.
-        :type extra_index_url: str
-
-        :param optional_modules: optional modules to install using "[module1,module2]" format.
-        :type optional_modules: str
-
-        :param find_links: path to a directory containing wheels to be searched prior to going to the internet
-        :type find_links: Path
+        Args:
+            extra_index_url: the "--extra-index-url ..." line for pip to look in extra indexes.
+            optional_modules: optional modules to install using "[module1,module2]" format.
+            find_links: path to a directory containing wheels to be searched prior to going to the internet
+            wheel: a wheel file to install
         """
 
         import messages
@@ -246,7 +238,7 @@ class InvokeAiInstance:
             find_links,
             "--extra-index-url" if extra_index_url is not None else None,
             extra_index_url,
-            pre_flag if not wheel else None,
+            pre_flag if not wheel else None,  # Ignore the flag if we are installing a wheel
         ]
 
         try:
