@@ -14,6 +14,10 @@ After unzipping the installer, you should have a `InvokeAI-Installer` folder wit
 
 ## Running the Installer
 
+!!! tip
+
+    Windows users should first double-click the `WinLongPathsEnabled.reg` file to prevent a failed installation due to long file paths.
+
 Double-click the install script:
 
 === "Windows"
