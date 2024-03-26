@@ -68,14 +68,14 @@ The models are large, VRAM is expensive, and you may find yourself
 faced with Out of Memory errors when generating images. Here are some
 tips to reduce the problem:
 
-### 4 GB of VRAM
+<h3>4 GB of VRAM</h3>
 
 This should be adequate for 512x512 pixel images using Stable Diffusion 1.5
 and derived models, provided that you do not use the NSFW checker. It won't be loaded unless you go into the UI settings and turn it on.
 
 If you are on a CUDA-enabled GPU, we will automatically use xformers or torch-sdp to reduce VRAM requirements, though you can explicitly configure this. See the [configuration docs].
 
-### 6 GB of VRAM
+<h3>6 GB of VRAM</h3>
 
 This is a border case. Using the SD 1.5 series you should be able to
 generate images up to 640x640 with the NSFW checker enabled, and up to
@@ -87,10 +87,44 @@ alter how the PyTorch machine learning library manages memory. See
 <https://pytorch.org/docs/stable/notes/cuda.html#memory-management> for
 a list of these tweaks.
 
-### 12 GB of VRAM
+<h3>12 GB of VRAM</h3>
 
 This should be sufficient to generate larger images up to about 1280x1280.
 
 [create an issue]: https://github.com/invoke-ai/InvokeAI/issues
 [discord]: https://discord.gg/ZmtBAhwWhy
 [configuration docs]: ../features/CONFIGURATION.md
+
+## Memory Leak (Linux)
+
+If you notice a memory leak, it could be caused to memory fragmentation as models are loaded and/or moved from CPU to GPU.
+
+A workaround is to tune memory allocation with an environment variable:
+
+```bash
+# Force blocks >1MB to be allocated with `mmap` so that they are released to the system immediately when they are freed.
+MALLOC_MMAP_THRESHOLD_=1048576
+```
+
+!!! info "Possibly dependent on `libc` implementation"
+
+    It's not known if this issue occurs with other `libc` implementations such as `musl`.
+
+    If you encounter this issue and your system uses a different implementation, please try this environment variable and let us know if it fixes the issue.
+
+<h3>Detailed Discussion</h3>
+
+Python (and PyTorch) relies on the memory allocator from the C Standard Library (`libc`). On linux, with the GNU C Standard Library implementation (`glibc`), our memory access patterns have been observed to cause severe memory fragmentation.
+
+This fragmentation results in large amounts of memory that has been freed but can't be released back to the OS. Loading models from disk and moving them between CPU/CUDA seem to be the operations that contribute most to the fragmentation.
+
+This memory fragmentation issue can result in OOM crashes during frequent model switching, even if `ram` (the max RAM cache size) is set to a reasonable value (e.g. a OOM crash with `ram=16` on a system with 32GB of RAM).
+
+This problem may also exist on other OSes, and other `libc` implementations. But, at the time of writing, it has only been investigated on linux with `glibc`.
+
+To better understand how the `glibc` memory allocator works, see these references:
+
+- Basics: <https://www.gnu.org/software/libc/manual/html_node/The-GNU-Allocator.html>
+- Details: <https://sourceware.org/glibc/wiki/MallocInternals>
+
+Note the differences between memory allocated as chunks in an arena vs. memory allocated with `mmap`. Under `glibc`'s default configuration, most model tensors get allocated as chunks in an arena making them vulnerable to the problem of fragmentation.

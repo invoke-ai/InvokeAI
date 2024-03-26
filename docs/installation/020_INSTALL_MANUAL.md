@@ -137,10 +137,6 @@ Before you start, go through the [installation requirements].
         recommended if your virtual environment is located outside of
         your runtime directory.
 
-    !!! tip
-
-        On Linux, it is recommended to run invokeai with the following env var: `MALLOC_MMAP_THRESHOLD_=1048576`. For example: `MALLOC_MMAP_THRESHOLD_=1048576 invokeai --web`. This helps to prevent memory fragmentation that can lead to memory accumulation over time. This env var is set automatically when running via `invoke.sh`.
-
 ## Unsupported Conda Install
 
 Congratulations, you found the "secret" Conda installation instructions. If you really **really** want to use Conda with InvokeAI, you can do so using this unsupported recipe:
