@@ -34,7 +34,7 @@ Stable-Diffusion-XL-base-1.X model. Then, click the HuggingFace tab,
 paste the Repo ID stabilityai/stable-diffusion-xl-base-1.0 and install
 the model.
 
-### Package dependency conflicts
+## Package dependency conflicts
 
 If you have previously installed InvokeAI or another Stable Diffusion
 package, the installer may occasionally pick up outdated libraries and
@@ -43,7 +43,7 @@ library conflicts.
 
 To resolve this, re-install the application as described above.
 
-### InvokeAI runs extremely slowly on Linux or Windows systems
+## InvokeAI runs extremely slowly on Linux or Windows systems
 
 The most frequent cause of this problem is when the installation
 process installed the CPU-only version of the torch machine-learning
@@ -54,7 +54,7 @@ this is what happened.
 
 To resolve this, re-install the application as described above. Be sure to select the correct GPU device.
 
-### Invalid configuration file
+## Invalid configuration file
 
 Everything seems to install ok, you get a `ValidationError` when starting up the app.
 
@@ -62,20 +62,20 @@ This is caused by an invalid setting in the `invokeai.yaml` configuration file. 
 
 Check the [configuration docs] for more detail about the settings and how to specify them.
 
-### Out of Memory Issues
+## Out of Memory Issues
 
 The models are large, VRAM is expensive, and you may find yourself
 faced with Out of Memory errors when generating images. Here are some
 tips to reduce the problem:
 
-#### 4 GB of VRAM
+### 4 GB of VRAM
 
 This should be adequate for 512x512 pixel images using Stable Diffusion 1.5
 and derived models, provided that you do not use the NSFW checker. It won't be loaded unless you go into the UI settings and turn it on.
 
 If you are on a CUDA-enabled GPU, we will automatically use xformers or torch-sdp to reduce VRAM requirements, though you can explicitly configure this. See the [configuration docs].
 
-#### 6 GB of VRAM
+### 6 GB of VRAM
 
 This is a border case. Using the SD 1.5 series you should be able to
 generate images up to 640x640 with the NSFW checker enabled, and up to
@@ -87,7 +87,7 @@ alter how the PyTorch machine learning library manages memory. See
 <https://pytorch.org/docs/stable/notes/cuda.html#memory-management> for
 a list of these tweaks.
 
-#### 12 GB of VRAM
+### 12 GB of VRAM
 
 This should be sufficient to generate larger images up to about 1280x1280.
 
