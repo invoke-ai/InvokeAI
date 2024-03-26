@@ -171,6 +171,7 @@ const GalleryImage = (props: HoverableImageProps) => {
                 borderTopEndRadius="base"
                 borderBottomStartRadius="base"
                 sx={badgeSx}
+                pointerEvents={isSelected ? 'auto': 'none'}
               >{`${imageDTO.width}x${imageDTO.height}`}</Text>
             )}
             <IAIDndImageIcon onClick={toggleStarredState} icon={starIcon} tooltip={starTooltip} />

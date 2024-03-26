@@ -102,7 +102,7 @@ const ModelList = () => {
         {isLoadingIPAdapterModels && <FetchingModelsLoader loadingMessage="Loading IP Adapters..." />}
         {!isLoadingIPAdapterModels && filteredIPAdapterModels.length > 0 && (
           <ModelListWrapper
-            title={t('modelManager.ipAdapters')}
+            title={t('common.ipAdapter')}
             modelList={filteredIPAdapterModels}
             key="ip-adapters"
           />
