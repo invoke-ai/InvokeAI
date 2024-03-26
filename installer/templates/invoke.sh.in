@@ -49,17 +49,10 @@ do_choice() {
         ;;
     3)
         clear
-        printf "UPDATING FROM WITHIN THE APP IS BEING DEPRECATED\n"
-        printf "Please download the installer from https://github.com/invoke-ai/InvokeAI/releases/latest and run it to update your installation.\n"
-        sleep 4
-        python -m invokeai.frontend.install.invokeai_update
-        ;;
-    4)
-        clear
         printf "Running the db maintenance script\n"
         invokeai-db-maintenance --root ${INVOKEAI_ROOT}
         ;;
-    5)
+    4)
         clear
         printf "Command-line help\n"
         invokeai-web --help
@@ -79,11 +72,11 @@ do_line_input() {
     printf "What would you like to do?\n"
     printf "1: Generate images using the browser-based interface\n"
     printf "2: Open the developer console\n"
-    printf "3: Update InvokeAI\n"
-    printf "4: Run the InvokeAI image database maintenance script\n"
-    printf "5: Command-line help\n"
+    printf "3: Run the InvokeAI image database maintenance script\n"
+    printf "4: Command-line help\n"
     printf "Q: Quit\n\n"
-    read -p "Please enter 1-5, Q: [1] " yn
+    printf "To update, download and run the installer from https://github.com/invoke-ai/InvokeAI/releases/latest.\n\n"
+    read -p "Please enter 1-4, Q: [1] " yn
     choice=${yn:='1'}
     do_choice $choice
     clear
