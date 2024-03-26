@@ -20,13 +20,6 @@ from rich.style import Style
 from rich.syntax import Syntax
 from rich.text import Text
 
-"""
-INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/refs/tags/${INVOKEAI_VERSION}.zip
-INSTRUCTIONS=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/
-TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting
-"""
-
-
 OS = platform.uname().system
 ARCH = platform.uname().machine
 
