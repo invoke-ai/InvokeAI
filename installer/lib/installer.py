@@ -119,7 +119,6 @@ class Installer:
         self,
         root: str = "~/invokeai",
         yes_to_all: bool = False,
-        version: Optional[str] = None,
         find_links: Optional[str] = None,
         wheel: Optional[Path] = None,
     ) -> None:
