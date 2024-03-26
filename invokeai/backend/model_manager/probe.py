@@ -649,7 +649,11 @@ class VaeFolderProbe(FolderProbeBase):
 class TextualInversionFolderProbe(TextualInversionCheckpointProbe):
     def __init__(self, model_path: Path):
         files = os.scandir(model_path)
-        files = [Path(f.path) for f in files if f.is_file() and f.name.endswith((".ckpt", ".pt", ".pth", ".bin", ".safetensors"))]
+        files = [
+            Path(f.path)
+            for f in files
+            if f.is_file() and f.name.endswith((".ckpt", ".pt", ".pth", ".bin", ".safetensors"))
+        ]
         if len(files) != 1:
             raise InvalidModelConfigException(
                 f"Unable to determine base type for {model_path}: expected exactly one valid model file, found {[f.name for f in files]}."
