@@ -154,7 +154,7 @@ Mac and Linux machines, and runs on GPU cards with as little as 4 GB of RAM.
 
 Please check out our **[:material-frequently-asked-questions:
 Troubleshooting
-Guide](installation/010_INSTALL_AUTOMATED.md#troubleshooting)** to
+Guide](installation/INSTALL_TROUBLESHOOTING/)** to
 get solutions for common installation problems and other issues.
 
 ## :octicons-repo-push-24: Contributing
