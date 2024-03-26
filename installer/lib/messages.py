@@ -73,6 +73,33 @@ def welcome(available_releases: tuple[list[str], list[str]] | None = None) -> No
     console.line()
 
 
+def installing_from_wheel(wheel_filename: str) -> None:
+    """Display a message about installing from a wheel"""
+
+    @group()
+    def text():
+        yield Text.from_markup(f"You are installing from a wheel file: [bold]{wheel_filename}\n")
+        yield Text.from_markup(
+            "[bold orange3]If you are not sure why you are doing this, you should cancel and install InvokeAI normally."
+        )
+
+    console.print(
+        Panel(
+            title="Installing from Wheel",
+            renderable=text(),
+            box=box.DOUBLE,
+            expand=True,
+            padding=(1, 2),
+        )
+    )
+
+    should_proceed = Confirm.ask("Do you want to proceed?")
+
+    if not should_proceed:
+        console.print("Installation cancelled.")
+        exit()
+
+
 def choose_version(available_releases: tuple[list[str], list[str]] | None = None) -> str:
     """
     Prompt the user to choose an Invoke version to install

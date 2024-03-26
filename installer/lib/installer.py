@@ -5,6 +5,7 @@ InvokeAI installer script
 
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -20,6 +21,15 @@ BOOTSTRAP_VENV_PREFIX = "invokeai-installer-tmp"
 OS = platform.uname().system
 ARCH = platform.uname().machine
 VERSION = "latest"
+
+
+def get_version_from_wheel_filename(wheel_filename: str) -> str:
+    match = re.search(r"-(\d+\.\d+\.\d+)", wheel_filename)
+    if match:
+        version = match.group(1)
+        return version
+    else:
+        raise ValueError(f"Could not extract version from wheel filename: {wheel_filename}")
 
 
 class Installer:
@@ -111,6 +121,7 @@ class Installer:
         yes_to_all: bool = False,
         version: Optional[str] = None,
         find_links: Optional[str] = None,
+        wheel: Optional[Path] = None,
     ) -> None:
         """
         Install the InvokeAI application into the given runtime path
@@ -127,9 +138,12 @@ class Installer:
 
         import messages
 
-        messages.welcome(self.available_releases)
-
-        version = messages.choose_version(self.available_releases)
+        if wheel:
+            messages.installing_from_wheel(wheel.name)
+            version = get_version_from_wheel_filename(wheel.name)
+        else:
+            messages.welcome(self.available_releases)
+            version = messages.choose_version(self.available_releases)
 
         auto_dest = Path(os.environ.get("INVOKEAI_ROOT", root)).expanduser().resolve()
         destination = auto_dest if yes_to_all else messages.dest_path(root)
@@ -144,11 +158,7 @@ class Installer:
 
         # install dependencies and the InvokeAI application
         (extra_index_url, optional_modules) = get_torch_source() if not yes_to_all else (None, None)
-        self.instance.install(
-            extra_index_url,
-            optional_modules,
-            find_links,
-        )
+        self.instance.install(extra_index_url, optional_modules, find_links, wheel)
 
         # install the launch/update scripts into the runtime directory
         self.instance.install_user_scripts()
@@ -187,6 +197,7 @@ class InvokeAiInstance:
         extra_index_url: Optional[str] = None,
         optional_modules: Optional[str] = None,
         find_links: Optional[str] = None,
+        wheel: Optional[Path] = None,
     ):
         """
         Install the package from PyPi.
@@ -231,12 +242,12 @@ class InvokeAiInstance:
             "--require-virtualenv",
             "--force-reinstall",
             "--use-pep517",
-            str(src),
+            str(src) if not wheel else str(wheel),
             "--find-links" if find_links is not None else None,
             find_links,
             "--extra-index-url" if extra_index_url is not None else None,
             extra_index_url,
-            pre_flag,
+            pre_flag if not wheel else None,
         ]
 
         try:
