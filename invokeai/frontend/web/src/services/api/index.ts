@@ -6,7 +6,7 @@ import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $projectId } from 'app/store/nanostores/projectId';
 
-export const tagTypes = [
+const tagTypes = [
   'AppVersion',
   'AppConfig',
   'Board',
