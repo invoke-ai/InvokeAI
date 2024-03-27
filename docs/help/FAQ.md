@@ -61,6 +61,30 @@ During a zip file installation or an update, installation stops with an error li
 
 To resolve this, re-install the application as described above.
 
+## HuggingFace install failed due to invalid access token
+
+Some HuggingFace models require you to authenticate using an [access token].
+
+Invoke doesn't manage this token for you, but it's easy to set it up:
+
+- Follow the instructions in the link above to create an access token. Copy it.
+- Run the launcher script.
+- Select option 2 (developer console).
+- Paste the following command:
+
+  ```sh
+  python -c "import huggingface_hub; huggingface_hub.login()"
+  ```
+
+- Paste your access token when prompted and press Enter. You won't see anything when you paste it.
+- Type `n` if prompted about git credentials.
+
+If you get an error, try the command again - maybe the token didn't paste correctly.
+
+Once your token is set, start Invoke and try downloading the model again. The installer will automatically use the access token.
+
+If the install still fails, you may not have access to the model.
+
 ## Stable Diffusion XL generation fails after trying to load UNet
 
 InvokeAI is working in other respects, but when trying to generate
@@ -170,3 +194,4 @@ Note the differences between memory allocated as chunks in an arena vs. memory a
 [create an issue]: https://github.com/invoke-ai/InvokeAI/issues
 [discord]: https://discord.gg/ZmtBAhwWhy
 [configuration docs]: ../features/CONFIGURATION.md
+[access token]: https://huggingface.co/docs/hub/security-tokens#how-to-manage-user-access-tokens
