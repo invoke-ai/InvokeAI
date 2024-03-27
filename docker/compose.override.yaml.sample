@@ -1,0 +1,9 @@
+services:
+  invokeai-cuda:
+    restart: unless-stopped
+    labels:
+    - traefik.enable=true
+    - traefik.http.routers.invokeai-cuda.rule=Host(`invokeai.example.com`)
+    - traefik.http.routers.invokeai-cuda.entrypoints=websecure
+    - traefik.http.middlewares.invokeai-cuda-ipwhitelist.ipwhitelist.sourcerange=0.0.0.0/0
+    - traefik.http.routers.invokeai-cuda.middlewares=invokeai-cuda-ipwhitelist
