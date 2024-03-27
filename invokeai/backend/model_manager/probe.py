@@ -37,7 +37,6 @@ LEGACY_CONFIGS: Dict[BaseModelType, Dict[ModelVariantType, Union[str, Dict[Sched
             SchedulerPredictionType.VPrediction: "v1-inference-v.yaml",
         },
         ModelVariantType.Inpaint: "v1-inpainting-inference.yaml",
-        ModelVariantType.Depth: "v2-midas-inference.yaml",
     },
     BaseModelType.StableDiffusion2: {
         ModelVariantType.Normal: {
@@ -48,6 +47,7 @@ LEGACY_CONFIGS: Dict[BaseModelType, Dict[ModelVariantType, Union[str, Dict[Sched
             SchedulerPredictionType.Epsilon: "v2-inpainting-inference.yaml",
             SchedulerPredictionType.VPrediction: "v2-inpainting-inference-v.yaml",
         },
+        ModelVariantType.Depth: "v2-midas-inference.yaml",
     },
     BaseModelType.StableDiffusionXL: {
         ModelVariantType.Normal: "sd_xl_base.yaml",
