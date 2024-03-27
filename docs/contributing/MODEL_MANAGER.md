@@ -840,22 +840,6 @@ and directories at regular intervals when the size of the cache
 exceeds the value specified in Invoke's `convert_cache` configuration
 variable.
 
-#### List[str]=installer.scan_directory(scan_dir: Path, install: bool)
-
-This method will recursively scan the directory indicated in
-`scan_dir` for new models and either install them in the models
-directory or register them in place, depending on the setting of
-`install` (default False).
-
-The return value is the list of keys of the new installed/registered
-models.
-
-#### installer.sync_to_config()
-
-This method synchronizes models in the models directory and autoimport
-directory to those in the `ModelConfigRecordService` database. New
-models are registered and orphan models are unregistered.
-
 #### installer.start(invoker)
 
 The `start` method is called by the API intialization routines when
