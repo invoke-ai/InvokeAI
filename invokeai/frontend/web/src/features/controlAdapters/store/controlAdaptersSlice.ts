@@ -13,6 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { controlAdapterImageProcessed } from './actions';
 import { CONTROLNET_PROCESSORS } from './constants';
 import type {
+  CLIPVisionModel,
   ControlAdapterConfig,
   ControlAdapterProcessorType,
   ControlAdaptersState,
@@ -243,6 +244,13 @@ export const controlAdaptersSlice = createSlice({
       }
       caAdapter.updateOne(state, { id, changes: { controlMode } });
     },
+    controlAdapterCLIPVisionModelChanged: (
+      state,
+      action: PayloadAction<{ id: string; clipVisionModel: CLIPVisionModel }>
+    ) => {
+      const { id, clipVisionModel } = action.payload;
+      caAdapter.updateOne(state, { id, changes: { clipVisionModel } });
+    },
     controlAdapterResizeModeChanged: (
       state,
       action: PayloadAction<{
@@ -380,6 +388,7 @@ export const {
   controlAdapterProcessedImageChanged,
   controlAdapterIsEnabledChanged,
   controlAdapterModelChanged,
+  controlAdapterCLIPVisionModelChanged,
   controlAdapterWeightChanged,
   controlAdapterBeginStepPctChanged,
   controlAdapterEndStepPctChanged,
