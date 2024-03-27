@@ -324,6 +324,7 @@ export const isSDXLMainModelFieldInputTemplate = (val: unknown): val is SDXLMain
 const zSDXLRefinerModelFieldType = zFieldTypeBase.extend({
   name: z.literal('SDXLRefinerModelField'),
 });
+/** @alias */ // tells knip to ignore this duplicate export
 export const zSDXLRefinerModelFieldValue = zMainModelFieldValue; // TODO: Narrow to SDXL Refiner models only.
 const zSDXLRefinerModelFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zSDXLRefinerModelFieldValue,

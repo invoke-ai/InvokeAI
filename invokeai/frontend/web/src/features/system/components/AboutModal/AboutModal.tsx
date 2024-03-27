@@ -21,6 +21,7 @@ import {
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { discordLink, githubLink, websiteLink } from 'features/system/store/constants';
 import { map } from 'lodash-es';
+/** @knipignore */
 import InvokeLogoYellow from 'public/assets/images/invoke-tag-lrg.svg';
 import type { ReactElement } from 'react';
 import { cloneElement, memo, useCallback } from 'react';
