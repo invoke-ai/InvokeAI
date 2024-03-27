@@ -592,25 +592,6 @@ async def prune_model_install_jobs() -> Response:
     return Response(status_code=204)
 
 
-@model_manager_router.patch(
-    "/sync",
-    operation_id="sync_models_to_config",
-    responses={
-        204: {"description": "Model config record database resynced with files on disk"},
-        400: {"description": "Bad request"},
-    },
-)
-async def sync_models_to_config() -> Response:
-    """
-    Traverse the models and autoimport directories.
-
-    Model files without a corresponding
-    record in the database are added. Orphan records without a models file are deleted.
-    """
-    ApiDependencies.invoker.services.model_manager.install.sync_to_config()
-    return Response(status_code=204)
-
-
 @model_manager_router.put(
     "/convert/{key}",
     operation_id="convert_model",

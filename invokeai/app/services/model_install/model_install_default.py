@@ -10,7 +10,7 @@ from pathlib import Path
 from queue import Empty, Queue
 from shutil import copyfile, copytree, move, rmtree
 from tempfile import mkdtemp
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Union
 
 import yaml
 from huggingface_hub import HfFolder
@@ -25,12 +25,10 @@ from invokeai.app.services.model_records import DuplicateModelException, ModelRe
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
-    BaseModelType,
     CheckpointConfigBase,
     InvalidModelConfigException,
     ModelRepoVariant,
     ModelSourceType,
-    ModelType,
 )
 from invokeai.backend.model_manager.metadata import (
     AnyModelRepoMetadata,
@@ -42,7 +40,7 @@ from invokeai.backend.model_manager.metadata import (
 from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata
 from invokeai.backend.model_manager.probe import ModelProbe
 from invokeai.backend.model_manager.search import ModelSearch
-from invokeai.backend.util import Chdir, InvokeAILogger
+from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.devices import choose_precision, choose_torch_device
 
 from .model_install_base import (
@@ -84,8 +82,6 @@ class ModelInstallService(ModelInstallServiceBase):
         self._logger = InvokeAILogger.get_logger(name=self.__class__.__name__)
         self._install_jobs: List[ModelInstallJob] = []
         self._install_queue: Queue[ModelInstallJob] = Queue()
-        self._cached_model_paths: Set[Path] = set()
-        self._models_installed: Set[str] = set()
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         self._downloads_changed_event = threading.Event()
@@ -131,7 +127,16 @@ class ModelInstallService(ModelInstallServiceBase):
             self._start_installer_thread()
             self._remove_dangling_install_dirs()
             self._migrate_yaml()
-            self.sync_to_config()
+            # In normal use, we do not want to scan the models directory - it should never have orphaned models.
+            # We should only do the scan when the flag is set (which should only be set when testing).
+            if self.app_config.scan_models_on_startup:
+                self._register_orphaned_models()
+
+            # Check all models' paths and confirm they exist. A model could be missing if it was installed on a volume
+            # that isn't currently mounted. In this case, we don't want to delete the model from the database, but we do
+            # want to alert the user.
+            for model in self._scan_for_missing_models():
+                self._logger.warning(f"Missing model file: {model.name} at {model.path}")
 
     def stop(self, invoker: Optional[Invoker] = None) -> None:
         """Stop the installer thread; after this the object can be deleted and garbage collected."""
@@ -306,15 +311,6 @@ class ModelInstallService(ModelInstallServiceBase):
         unfinished_jobs = [x for x in self._install_jobs if not x.in_terminal_state]
         self._install_jobs = unfinished_jobs
 
-    def sync_to_config(self) -> None:
-        """Synchronize models on disk to those in the config record store database."""
-        self._scan_models_directory()
-        if self._app_config.autoimport_path:
-            self._logger.info("Scanning autoimport directory for new models")
-            installed = self.scan_directory(self._app_config.autoimport_path)
-            self._logger.info(f"{len(installed)} new models registered")
-        self._logger.info("Model installer (re)initialized")
-
     def _migrate_yaml(self) -> None:
         db_models = self.record_store.all_models()
 
@@ -365,14 +361,6 @@ class ModelInstallService(ModelInstallServiceBase):
 
         # Unset the path - we are done with it either way
         self._app_config.legacy_models_yaml_path = None
-
-    def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:  # noqa D102
-        self._cached_model_paths = {Path(x.path).resolve() for x in self.record_store.all_models()}
-        callback = self._scan_install if install else self._scan_register
-        search = ModelSearch(on_model_found=callback)
-        self._models_installed.clear()
-        search.search(scan_dir)
-        return list(self._models_installed)
 
     def unregister(self, key: str) -> None:  # noqa D102
         self.record_store.del_model(key)
@@ -509,34 +497,44 @@ class ModelInstallService(ModelInstallServiceBase):
             self._logger.info(f"Removing dangling temporary directory {tmpdir}")
             rmtree(tmpdir)
 
-    def _scan_models_directory(self) -> None:
+    def _scan_for_missing_models(self) -> list[AnyModelConfig]:
+        """Scan the models directory for missing models and return a list of them."""
+        missing_models: list[AnyModelConfig] = []
+        for x in self.record_store.all_models():
+            if not Path(x.path).resolve().exists():
+                missing_models.append(x)
+        return missing_models
+
+    def _register_orphaned_models(self) -> None:
+        """Scan the invoke-managed models directory for orphaned models and registers them.
+
+        This is typically only used during testing with a new DB or when using the memory DB, because those are the
+        only situations in which we may have orphaned models in the models directory.
         """
-        Scan the models directory for new and missing models.
 
-        New models will be added to the storage backend. Missing models
-        will be deleted.
-        """
-        defunct_models = set()
-        installed = set()
+        installed_model_paths = {Path(x.path).resolve() for x in self.record_store.all_models()}
 
-        with Chdir(self._app_config.models_path):
-            self._logger.info("Checking for models that have been moved or deleted from disk")
-            for model_config in self.record_store.all_models():
-                path = Path(model_config.path)
-                if not path.exists():
-                    self._logger.info(f"{model_config.name}: path {path.as_posix()} no longer exists. Unregistering")
-                    defunct_models.add(model_config.key)
-            for key in defunct_models:
-                self.unregister(key)
+        # The bool returned by this callback determines if the model is added to the list of models found by the search
+        def on_model_found(model_path: Path) -> bool:
+            resolved_path = model_path.resolve()
+            # Already registered models should be in the list of found models, but not re-registered.
+            if resolved_path in installed_model_paths:
+                return True
+            # Skip core models entirely - these aren't registered with the model manager.
+            if str(resolved_path).startswith(str(self.app_config.models_path / "core")):
+                return False
+            try:
+                model_id = self.register_path(model_path)
+                self._logger.info(f"Registered {model_path.name} with id {model_id}")
+            except DuplicateModelException:
+                # In case a duplicate models sneaks by, we will ignore this error - we "found" the model
+                pass
+            return True
 
-            self._logger.info(f"Scanning {self._app_config.models_path} for new and orphaned models")
-            for cur_base_model in BaseModelType:
-                for cur_model_type in ModelType:
-                    models_dir = self._app_config.models_path / Path(cur_base_model.value, cur_model_type.value)
-                    if not models_dir.exists():
-                        continue
-                    installed.update(self.scan_directory(models_dir))
-            self._logger.info(f"{len(installed)} new models registered; {len(defunct_models)} unregistered")
+        self._logger.info(f"Scanning {self._app_config.models_path} for orphaned models")
+        search = ModelSearch(on_model_found=on_model_found)
+        found_models = search.search(self._app_config.models_path)
+        self._logger.info(f"{len(found_models)} new models registered")
 
     def sync_model_path(self, key: str) -> AnyModelConfig:
         """
@@ -566,29 +564,6 @@ class ModelInstallService(ModelInstallServiceBase):
         model.path = new_path.as_posix()
         self.record_store.update_model(key, ModelRecordChanges(path=model.path))
         return model
-
-    def _scan_register(self, model: Path) -> bool:
-        if model.resolve() in self._cached_model_paths:
-            return True
-        try:
-            id = self.register_path(model)
-            self.sync_model_path(id)  # possibly move it to right place in `models`
-            self._logger.info(f"Registered {model.name} with id {id}")
-            self._models_installed.add(id)
-        except DuplicateModelException:
-            pass
-        return True
-
-    def _scan_install(self, model: Path) -> bool:
-        if model in self._cached_model_paths:
-            return True
-        try:
-            id = self.install_path(model)
-            self._logger.info(f"Installed {model} with id {id}")
-            self._models_installed.add(id)
-        except DuplicateModelException:
-            pass
-        return True
 
     def _copy_model(self, old_path: Path, new_path: Path) -> Path:
         if old_path == new_path:
