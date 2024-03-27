@@ -418,6 +418,7 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
     else:
         # Attempt to load as a v4 config file
         try:
+            # Meta is not included in the model fields, so we need to validate it separately
             config = InvokeAIAppConfig.model_validate(loaded_config_dict)
             assert (
                 config.schema_version == CONFIG_SCHEMA_VERSION
