@@ -137,15 +137,7 @@ Most common algorithms are supported, like `md5`, `sha256`, and `sha512`. These 
 
 #### Path Settings
 
-These options set the paths of various directories and files used by
-InvokeAI. Relative paths are interpreted relative to the root directory, so
-if root is `/home/fred/invokeai` and the path is
-`autoimport/main`, then the corresponding directory will be located at
-`/home/fred/invokeai/autoimport/main`.
-
-Note that the autoimport directory will be searched recursively,
-allowing you to organize the models into folders and subfolders in any
-way you wish.
+These options set the paths of various directories and files used by InvokeAI. Any user-defined paths should be absolute paths.
 
 #### Logging
 

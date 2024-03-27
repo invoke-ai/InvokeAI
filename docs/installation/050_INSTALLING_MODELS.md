@@ -45,11 +45,3 @@ In this situation, you may need to provide some additional information to identi
     Say you have a repo ID `monster-labs/control_v1p_sd15_qrcode_monster`, and the model you want is inside the `v2` subfolder.
 
     Add `:v2` to the repo ID and use that when installing the model: `monster-labs/control_v1p_sd15_qrcode_monster:v2`
-
-## Autoimport
-
-In the InvokeAI root directory you will find an `autoimport` directory. On startup, any models in this directory will be installed and copied into the Invoke-managed models directory.
-
-The location of the autoimport directories are controlled by settings in `invokeai.yaml`. See [Configuration](../features/CONFIGURATION.md).
-
-[set up in the config file]: ../features/CONFIGURATION.md#model-marketplace-api-keys

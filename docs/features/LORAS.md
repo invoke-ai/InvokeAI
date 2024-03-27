@@ -20,10 +20,7 @@ are applied to generate imagery. LoRAs may be supplied with a
 simply apply their effect without being triggered.
 
 LoRAs are typically stored in .safetensors files, which are the most
-secure way to store and transmit these types of weights. You may
-install any number of `.safetensors` LoRA files simply by copying them
-into the `autoimport/lora` directory of the corresponding InvokeAI models
-directory (usually `invokeai` in your home directory).
+secure way to store and transmit these types of weights.
 
 To use these when generating, open the LoRA menu item in the options
 panel, select the LoRAs you want to apply and ensure that they have
