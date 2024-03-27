@@ -7,10 +7,11 @@
     PR introduces a schema change.
 
     If you don't need persistent backend storage, you can use an ephemeral in-memory database by setting
-    `use_memory_db: true` under `Path:` in your `invokeai.yaml` file.
+    `use_memory_db: true` in your `invokeai.yaml` file. You'll also want to set `scan_models_on_startup: true`
+    so that your models are registered on startup.
 
     If this is untenable, you should run the application via the official installer or a manual install of the
-    python package from pypi. These releases will not break your database.
+    python package from PyPI. These releases will not break your database.
 
 If you have an interest in how InvokeAI works, or you would like to add features or bugfixes, you are encouraged to install the source code for InvokeAI.
 
@@ -22,6 +23,7 @@ If you have an interest in how InvokeAI works, or you would like to add features
 
 1. [Fork and clone] the [InvokeAI repo].
 1. Follow the [manual installation] docs to create a new virtual environment for the development install.
+   - When installing the InvokeAI package, add `-e` to the command so you get an [editable install].
 1. Install the [frontend dev toolchain] and do a production build of the UI as described.
 1. You can now run the app as described in the [manual installation] docs.
 
@@ -31,3 +33,4 @@ As described in the [frontend dev toolchain] docs, you can run the UI using a de
 [InvokeAI repo]: https://github.com/invoke-ai/InvokeAI
 [frontend dev toolchain]: ../contributing/frontend/OVERVIEW.md
 [manual installation]: installation/020_INSTALL_MANUAL.md
+[editable install]: https://pip.pypa.io/en/latest/cli/pip_install/#cmdoption-e
