@@ -24,7 +24,7 @@
     "build": "pnpm run lint && vite build",
     "typegen": "node scripts/typegen.js",
     "preview": "vite preview",
-    "lint:knip": "knip",
+    "lint:knip": "knip --tags=-@knipignore",
     "lint:dpdm": "dpdm --no-warning --no-tree --transform --exit-code circular:1 src/main.tsx",
     "lint:eslint": "eslint --max-warnings=0 .",
     "lint:prettier": "prettier --check .",
