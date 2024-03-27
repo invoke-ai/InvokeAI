@@ -14,11 +14,17 @@ from invokeai.backend.model_manager import (
     SchedulerPredictionType,
     SubModelType,
 )
-from invokeai.backend.model_manager.config import CheckpointConfigBase, MainCheckpointConfig
+from invokeai.backend.model_manager.config import CheckpointConfigBase, MainCheckpointConfig, ModelVariantType
 from invokeai.backend.model_manager.convert_ckpt_to_diffusers import convert_ckpt_to_diffusers
 
 from .. import ModelLoaderRegistry
 from .generic_diffusers import GenericDiffusersLoader
+
+VARIANT_TO_IN_CHANNEL_MAP = {
+    ModelVariantType.Normal: 4,
+    ModelVariantType.Depth: 5,
+    ModelVariantType.Inpaint: 9,
+}
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Main, format=ModelFormat.Diffusers)
@@ -87,6 +93,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         )
 
         self._logger.info(f"Converting {model_path} to diffusers format")
+
         convert_ckpt_to_diffusers(
             model_path,
             output_path,
@@ -99,5 +106,6 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             image_size=image_size,
             upcast_attention=upcast_attention,
             load_safety_checker=False,
+            num_in_channels=VARIANT_TO_IN_CHANNEL_MAP[config.variant],
         )
         return output_path

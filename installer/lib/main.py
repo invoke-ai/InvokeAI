@@ -30,16 +30,17 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--version",
-        dest="version",
-        help="Version of InvokeAI to install. Default to the latest stable release. A special 'pre' value will install the latest published pre-release version.",
+        "--find-links",
+        dest="find_links",
+        help="Specifies a directory of local wheel files to be searched prior to searching the online repositories.",
+        type=Path,
         default=None,
     )
 
     parser.add_argument(
-        "--find-links",
-        dest="find_links",
-        help="Specifies a directory of local wheel files to be searched prior to searching the online repositories.",
+        "--wheel",
+        dest="wheel",
+        help="Specifies a wheel for the InvokeAI package. Used for troubleshooting or testing prereleases.",
         type=Path,
         default=None,
     )

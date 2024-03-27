@@ -288,6 +288,25 @@ def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: In
     assert job.error_traceback.startswith("Traceback")
 
 
+def test_other_error_during_install(
+    monkeypatch: pytest.MonkeyPatch, mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    def raise_runtime_error(*args, **kwargs):
+        raise RuntimeError("Test error")
+
+    monkeypatch.setattr(
+        "invokeai.app.services.model_install.model_install_default.ModelInstallService._register_or_install",
+        raise_runtime_error,
+    )
+    source = LocalModelSource(path=Path("tests/data/embedding/test_embedding.safetensors"))
+    job = mm2_installer.import_model(source)
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.status == InstallStatus.ERROR
+    assert job.errored
+    assert job.error_type == "RuntimeError"
+    assert job.error == "Test error"
+
+
 # TODO: Fix bug in model install causing jobs to get installed multiple times then uncomment this test
 @pytest.mark.parametrize(
     "model_params",

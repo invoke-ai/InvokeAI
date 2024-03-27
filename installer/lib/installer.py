@@ -5,6 +5,7 @@ InvokeAI installer script
 
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -22,6 +23,15 @@ ARCH = platform.uname().machine
 VERSION = "latest"
 
 
+def get_version_from_wheel_filename(wheel_filename: str) -> str:
+    match = re.search(r"-(\d+\.\d+\.\d+)", wheel_filename)
+    if match:
+        version = match.group(1)
+        return version
+    else:
+        raise ValueError(f"Could not extract version from wheel filename: {wheel_filename}")
+
+
 class Installer:
     """
     Deploys an InvokeAI installation into a given path
@@ -36,7 +46,7 @@ class Installer:
         self.bootstrap()
         self.available_releases = get_github_releases()
 
-    def mktemp_venv(self) -> TemporaryDirectory:
+    def mktemp_venv(self) -> TemporaryDirectory[str]:
         """
         Creates a temporary virtual environment for the installer itself
 
@@ -58,7 +68,7 @@ class Installer:
 
         return venv_dir
 
-    def bootstrap(self, verbose: bool = False) -> TemporaryDirectory | None:
+    def bootstrap(self, verbose: bool = False) -> TemporaryDirectory[str] | None:
         """
         Bootstrap the installer venv with packages required at install time
         """
@@ -87,7 +97,7 @@ class Installer:
         except subprocess.CalledProcessError as e:
             print(e)
 
-    def app_venv(self, venv_parent) -> Path:
+    def app_venv(self, venv_parent: Path) -> Path:
         """
         Create a virtualenv for the InvokeAI installation
         """
@@ -106,26 +116,29 @@ class Installer:
         return venv_dir
 
     def install(
-        self, version=None, root: str = "~/invokeai", yes_to_all=False, find_links: Optional[Path] = None
+        self,
+        root: str = "~/invokeai",
+        yes_to_all: bool = False,
+        find_links: Optional[str] = None,
+        wheel: Optional[Path] = None,
     ) -> None:
-        """
-        Install the InvokeAI application into the given runtime path
+        """Install the InvokeAI application into the given runtime path
 
-        :param root: Destination path for the installation
-        :type root: str
-        :param version: InvokeAI version to install
-        :type version: str
-        :param yes: Accept defaults to all questions
-        :type yes: bool
-        :param find_links: A local directory to search for requirement wheels before going to remote indexes
-        :type find_links: Path
+        Args:
+            root: Destination path for the installation
+            yes_to_all: Accept defaults to all questions
+            find_links: A local directory to search for requirement wheels before going to remote indexes
+            wheel: A wheel file to install
         """
 
         import messages
 
-        messages.welcome(self.available_releases)
-
-        version = messages.choose_version(self.available_releases)
+        if wheel:
+            messages.installing_from_wheel(wheel.name)
+            version = get_version_from_wheel_filename(wheel.name)
+        else:
+            messages.welcome(self.available_releases)
+            version = messages.choose_version(self.available_releases)
 
         auto_dest = Path(os.environ.get("INVOKEAI_ROOT", root)).expanduser().resolve()
         destination = auto_dest if yes_to_all else messages.dest_path(root)
@@ -140,11 +153,7 @@ class Installer:
 
         # install dependencies and the InvokeAI application
         (extra_index_url, optional_modules) = get_torch_source() if not yes_to_all else (None, None)
-        self.instance.install(
-            extra_index_url,
-            optional_modules,
-            find_links,
-        )
+        self.instance.install(extra_index_url, optional_modules, find_links, wheel)
 
         # install the launch/update scripts into the runtime directory
         self.instance.install_user_scripts()
@@ -178,18 +187,20 @@ class InvokeAiInstance:
 
         return (self.runtime, self.venv)
 
-    def install(self, extra_index_url=None, optional_modules=None, find_links=None):
-        """
-        Install the package from PyPi.
+    def install(
+        self,
+        extra_index_url: Optional[str] = None,
+        optional_modules: Optional[str] = None,
+        find_links: Optional[str] = None,
+        wheel: Optional[Path] = None,
+    ):
+        """Install the package from PyPi or a wheel, if provided.
 
-        :param extra_index_url: the "--extra-index-url ..." line for pip to look in extra indexes.
-        :type extra_index_url: str
-
-        :param optional_modules: optional modules to install using "[module1,module2]" format.
-        :type optional_modules: str
-
-        :param find_links: path to a directory containing wheels to be searched prior to going to the internet
-        :type find_links: Path
+        Args:
+            extra_index_url: the "--extra-index-url ..." line for pip to look in extra indexes.
+            optional_modules: optional modules to install using "[module1,module2]" format.
+            find_links: path to a directory containing wheels to be searched prior to going to the internet
+            wheel: a wheel file to install
         """
 
         import messages
@@ -213,7 +224,7 @@ class InvokeAiInstance:
 
         messages.simple_banner("Installing the InvokeAI Application :art:")
 
-        from plumbum import FG, ProcessExecutionError, local  # type: ignore
+        from plumbum import FG, ProcessExecutionError, local
 
         pip = local[self.pip]
 
@@ -222,12 +233,12 @@ class InvokeAiInstance:
             "--require-virtualenv",
             "--force-reinstall",
             "--use-pep517",
-            str(src),
+            str(src) if not wheel else str(wheel),
             "--find-links" if find_links is not None else None,
             find_links,
             "--extra-index-url" if extra_index_url is not None else None,
             extra_index_url,
-            pre_flag,
+            pre_flag if not wheel else None,  # Ignore the flag if we are installing a wheel
         ]
 
         try:
@@ -320,7 +331,7 @@ def set_sys_path(venv_path: Path) -> None:
     sys.path.append(str(Path(venv_path, lib, "site-packages").expanduser().resolve()))
 
 
-def get_github_releases() -> tuple[list, list] | None:
+def get_github_releases() -> tuple[list[str], list[str]] | None:
     """
     Query Github for published (pre-)release versions.
     Return a tuple where the first element is a list of stable releases and the second element is a list of pre-releases.
@@ -331,7 +342,8 @@ def get_github_releases() -> tuple[list, list] | None:
 
     ## get latest releases using github api
     url = "https://api.github.com/repos/invoke-ai/InvokeAI/releases"
-    releases, pre_releases = [], []
+    releases: list[str] = []
+    pre_releases: list[str] = []
     try:
         res = requests.get(url)
         res.raise_for_status()
