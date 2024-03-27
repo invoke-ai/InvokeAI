@@ -73,7 +73,7 @@ const WorkflowLibraryList = () => {
   }, [projectId, ORDER_BY_OPTIONS]);
 
   const [order_by, setOrderBy] = useState<WorkflowRecordOrderBy>(orderByOptions[0]?.value as WorkflowRecordOrderBy);
-  const [direction, setDirection] = useState<SQLiteDirection>('ASC');
+  const [direction, setDirection] = useState<SQLiteDirection>('DESC');
   const [debouncedQuery] = useDebounce(query, 500);
 
   const queryArg = useMemo<Parameters<typeof useListWorkflowsQuery>[0]>(() => {
