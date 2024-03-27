@@ -83,7 +83,6 @@ class InvokeAIAppConfig(BaseSettings):
         ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.
         log_tokenization: Enable logging of parsed prompt tokens.
         patchmatch: Enable patchmatch inpaint code.
-        autoimport_dir: Path to a directory of models files to be imported on startup.
         models_dir: Path to the models directory.
         convert_cache_dir: Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.
         legacy_conf_dir: Path to directory of legacy checkpoint config files.
@@ -117,6 +116,7 @@ class InvokeAIAppConfig(BaseSettings):
         node_cache_size: How many cached nodes to keep in memory.
         hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`
         remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.
+        scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.
     """
 
     _root: Optional[Path] = PrivateAttr(default=None)
@@ -144,7 +144,6 @@ class InvokeAIAppConfig(BaseSettings):
     patchmatch:                    bool = Field(default=True,               description="Enable patchmatch inpaint code.")
 
     # PATHS
-    autoimport_dir:                Path = Field(default=Path("autoimport"), description="Path to a directory of models files to be imported on startup.")
     models_dir:                    Path = Field(default=Path("models"),     description="Path to the models directory.")
     convert_cache_dir:             Path = Field(default=Path("models/.cache"), description="Path to the converted models cache directory. When loading a non-diffusers model, it will be converted and store on disk at this location.")
     legacy_conf_dir:               Path = Field(default=Path("configs"), description="Path to directory of legacy checkpoint config files.")
@@ -193,6 +192,7 @@ class InvokeAIAppConfig(BaseSettings):
     # MODEL INSTALL
     hashing_algorithm: HASHING_ALGORITHMS = Field(default="blake3_single",  description="Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.")
     remote_api_tokens: Optional[list[URLRegexTokenPair]] = Field(default=None, description="List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.")
+    scan_models_on_startup:        bool = Field(default=False,              description="Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.")
 
     # fmt: on
 
@@ -274,11 +274,6 @@ class InvokeAIAppConfig(BaseSettings):
         resolved_path = self._resolve(self._config_file or INIT_FILE)
         assert resolved_path is not None
         return resolved_path
-
-    @property
-    def autoimport_path(self) -> Path:
-        """Path to the autoimports directory, resolved to an absolute path.."""
-        return self._resolve(self.autoimport_dir)
 
     @property
     def outputs_path(self) -> Optional[Path]:
@@ -423,7 +418,6 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
     else:
         # Attempt to load as a v4 config file
         try:
-            # Meta is not included in the model fields, so we need to validate it separately
             config = InvokeAIAppConfig.model_validate(loaded_config_dict)
             assert (
                 config.schema_version == CONFIG_SCHEMA_VERSION
