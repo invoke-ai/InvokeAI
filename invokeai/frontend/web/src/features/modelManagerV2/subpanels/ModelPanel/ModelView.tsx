@@ -53,7 +53,7 @@ export const ModelView = () => {
             </>
           )}
 
-          {data.type === 'ip_adapter' && (
+          {data.type === 'ip_adapter' && data.format === 'invokeai' && (
             <Flex gap={2}>
               <ModelAttrView label={t('modelManager.imageEncoderModelId')} value={data.image_encoder_model_id} />
             </Flex>
