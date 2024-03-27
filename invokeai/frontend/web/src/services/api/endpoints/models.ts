@@ -197,15 +197,6 @@ export const modelsApi = api.injectEndpoints({
       },
       serializeQueryArgs: ({ queryArgs }) => `${queryArgs.name}.${queryArgs.base}.${queryArgs.type}`,
     }),
-    syncModels: build.mutation<void, void>({
-      query: () => {
-        return {
-          url: buildModelsUrl('sync'),
-          method: 'PATCH',
-        };
-      },
-      invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
-    }),
     scanFolder: build.query<ScanFolderResponse, ScanFolderArg>({
       query: (arg) => {
         const folderQueryStr = arg ? queryString.stringify(arg, {}) : '';
@@ -303,7 +294,6 @@ export const {
   useUpdateModelImageMutation,
   useInstallModelMutation,
   useConvertModelMutation,
-  useSyncModelsMutation,
   useLazyScanFolderQuery,
   useLazyGetHuggingFaceModelsQuery,
   useListModelInstallsQuery,

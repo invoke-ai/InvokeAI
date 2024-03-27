@@ -7,7 +7,7 @@
 **How can I download models? Can I use models I already have downloaded?**
 
 - Models can be downloaded through the model manager, or through option [4] in the invoke.bat/invoke.sh launcher script. To download a model through the Model Manager, use the HuggingFace Repo ID by pressing the “Copy” button next to the repository name. Alternatively, to download a model from CivitAi, use the download link in the Model Manager.
-- Models that are already downloaded can be used by creating a symlink to the model location in the `autoimport` folder or by using the Model Manger’s “Scan for Models” function.
+- Models that are already downloaded can be installed using the Model Manager’s `Scan Folder` function.
 
 **My images are taking a long time to generate. How can I speed up generation?** 
 
