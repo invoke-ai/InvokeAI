@@ -217,6 +217,7 @@
         "saveControlImage": "Save Control Image",
         "scribble": "scribble",
         "selectModel": "Select a model",
+        "selectCLIPVisionModel": "Select a CLIP Vision model",
         "setControlImageDimensions": "Set Control Image Dimensions To W/H",
         "showAdvanced": "Show Advanced",
         "small": "Small",
