@@ -1,7 +1,6 @@
 import { Combobox, Flex, FormControl } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import { SyncModelsIconButton } from 'features/modelManagerV2/components/SyncModels/SyncModelsIconButton';
 import { fieldRefinerModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type {
   SDXLRefinerModelFieldInputInstance,
@@ -52,7 +51,6 @@ const RefinerModelFieldInputComponent = (props: Props) => {
           noOptionsMessage={noOptionsMessage}
         />
       </FormControl>
-      <SyncModelsIconButton className="nodrag" />
     </Flex>
   );
 };

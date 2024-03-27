@@ -1,7 +1,6 @@
 import { Combobox, Flex, FormControl } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import { SyncModelsIconButton } from 'features/modelManagerV2/components/SyncModels/SyncModelsIconButton';
 import { fieldVaeModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type { VAEModelFieldInputInstance, VAEModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
@@ -49,7 +48,6 @@ const VAEModelFieldInputComponent = (props: Props) => {
           noOptionsMessage={noOptionsMessage}
         />
       </FormControl>
-      <SyncModelsIconButton className="nodrag" />
     </Flex>
   );
 };
