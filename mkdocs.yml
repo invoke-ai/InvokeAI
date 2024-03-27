@@ -124,7 +124,6 @@ nav:
       - Manual Install: 'installation/020_INSTALL_MANUAL.md'
       - Developer Install: 'installation/INSTALL_DEVELOPMENT.md'
       - Docker: 'installation/040_INSTALL_DOCKER.md'
-      - Troubleshooting: 'installation/INSTALL_TROUBLESHOOTING.md'
       - Installing Models: 'installation/050_INSTALLING_MODELS.md'
       - Installing PyPatchMatch: 'installation/060_INSTALL_PATCHMATCH.md'
   - Workflows & Nodes:
@@ -182,7 +181,7 @@ nav:
       - Tutorials: 'contributing/contribution_guides/tutorials.md'
   - Help:
       - Getting Started: 'help/gettingStartedWithAI.md'
-      - FAQs: 'help/FAQ.md'
+      - FAQ: 'help/FAQ.md'
       - Diffusion Overview: 'help/diffusion.md'
       - Sampler Convergence: 'help/SAMPLER_CONVERGENCE.md'
   - Other:

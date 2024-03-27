@@ -2,7 +2,7 @@
 
 Before installing, review the [installation requirements] to ensure your system is set up properly.
 
-See the [installation troubleshooting] guide for frequently-encountered installation issues.
+See the [FAQ] for frequently-encountered installation issues.
 
 If you need more help, join our [discord] or [create an issue].
 
@@ -35,7 +35,7 @@ See the [docker installation guide].
 [developer install guide]: INSTALL_DEVELOPMENT.md
 [docker installation guide]: 040_INSTALL_DOCKER.md
 [installation guide]: 010_INSTALL_AUTOMATED.md
-[installation troubleshooting]: INSTALL_TROUBLESHOOTING.md
+[FAQ]: ../help/FAQ.md
 [discord]: discord.gg/invoke-ai
 [create an issue]: https://github.com/invoke-ai/InvokeAI/issues
 [installation requirements]: INSTALL_REQUIREMENTS.md

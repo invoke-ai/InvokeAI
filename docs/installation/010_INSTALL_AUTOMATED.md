@@ -94,10 +94,10 @@ Updating is exactly the same as installing - download the latest installer, choo
 
 ## Installation Issues
 
-If you have installation issues, please review the [installation troubleshooting] docs. You can also [create an issue] or ask for help on [discord].
+If you have installation issues, please review the [FAQ]. You can also [create an issue] or ask for help on [discord].
 
 [installation requirements]: INSTALLATION.md#installation-requirements
-[installation troubleshooting]: INSTALL_TROUBLESHOOTING.md
+[FAQ]: ../help/FAQ.md
 [install some models]: 050_INSTALLING_MODELS.md
 [configuration docs]: ../features/CONFIGURATION.md
 [latest release]: https://github.com/invoke-ai/InvokeAI/releases/latest
