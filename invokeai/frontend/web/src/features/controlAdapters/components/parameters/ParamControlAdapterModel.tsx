@@ -102,9 +102,13 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   );
 
   return (
-    <Tooltip label={value?.description}>
-      <Flex flexDirection="row" gap={2}>
-        <FormControl isDisabled={!isEnabled} isInvalid={!value || mainModel?.base !== modelConfig?.base}>
+    <Flex sx={{ gap: 2 }}>
+      <Tooltip label={value?.description}>
+        <FormControl
+          isDisabled={!isEnabled}
+          isInvalid={!value || mainModel?.base !== modelConfig?.base}
+          sx={{ width: '100%' }}
+        >
           <Combobox
             options={options}
             placeholder={t('controlnet.selectModel')}
@@ -113,18 +117,22 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
             noOptionsMessage={noOptionsMessage}
           />
         </FormControl>
-        {modelConfig?.type === 'ip_adapter' && modelConfig.format === 'checkpoint' && (
-          <FormControl isDisabled={!isEnabled} isInvalid={!value || mainModel?.base !== modelConfig?.base}>
-            <Combobox
-              options={clipVisionOptions}
-              placeholder={t('controlnet.selectCLIPVisionModel')}
-              value={clipVisionModel}
-              onChange={onCLIPVisionModelChange}
-            />
-          </FormControl>
-        )}
-      </Flex>
-    </Tooltip>
+      </Tooltip>
+      {modelConfig?.type === 'ip_adapter' && modelConfig.format === 'checkpoint' && (
+        <FormControl
+          isDisabled={!isEnabled}
+          isInvalid={!value || mainModel?.base !== modelConfig?.base}
+          sx={{ width: 'max-content', minWidth: 28 }}
+        >
+          <Combobox
+            options={clipVisionOptions}
+            placeholder={t('controlnet.selectCLIPVisionModel')}
+            value={clipVisionModel}
+            onChange={onCLIPVisionModelChange}
+          />
+        </FormControl>
+      )}
+    </Flex>
   );
 };
 

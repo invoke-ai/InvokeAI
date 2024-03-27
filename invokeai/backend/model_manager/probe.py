@@ -9,16 +9,23 @@ from picklescan.scanner import scan_file_path
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.util.misc import uuid_string
-from invokeai.backend.model_hash.model_hash import (HASHING_ALGORITHMS,
-                                                    ModelHash)
+from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
 from invokeai.backend.util.util import SilenceWarnings
 
-from .config import (AnyModelConfig, BaseModelType,
-                     ControlAdapterDefaultSettings,
-                     InvalidModelConfigException, MainModelDefaultSettings,
-                     ModelConfigFactory, ModelFormat, ModelRepoVariant,
-                     ModelSourceType, ModelType, ModelVariantType,
-                     SchedulerPredictionType)
+from .config import (
+    AnyModelConfig,
+    BaseModelType,
+    ControlAdapterDefaultSettings,
+    InvalidModelConfigException,
+    MainModelDefaultSettings,
+    ModelConfigFactory,
+    ModelFormat,
+    ModelRepoVariant,
+    ModelSourceType,
+    ModelType,
+    ModelVariantType,
+    SchedulerPredictionType,
+)
 from .util.model_util import lora_token_vector_length, read_checkpoint_meta
 
 CkptType = Dict[str | int, Any]
