@@ -455,20 +455,6 @@ class ModelInstallServiceBase(ABC):
         """
 
     @abstractmethod
-    def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:
-        """
-        Recursively scan directory for new models and register or install them.
-
-        :param scan_dir: Path to the directory to scan.
-        :param install: Install if True, otherwise register in place.
-        :returns list of IDs: Returns list of IDs of models registered/installed
-        """
-
-    @abstractmethod
-    def sync_to_config(self) -> None:
-        """Synchronize models on disk to those in the model record database."""
-
-    @abstractmethod
     def sync_model_path(self, key: str) -> AnyModelConfig:
         """
         Move model into the location indicated by its basetype, type and name.
