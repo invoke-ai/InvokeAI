@@ -48,9 +48,8 @@ class ModelSearch:
 
     Usage:
         search = ModelSearch()
-        search.model_found = lambda path : 'anime' in path.as_posix()
-        found = search.list_models(['/tmp/models1','/tmp/models2'])
-        # returns all models that have 'anime' in the path
+        search.on_model_found = lambda path : 'anime' in path.as_posix()
+        found = search.search(Path('/tmp/models1'))
     """
 
     def __init__(
