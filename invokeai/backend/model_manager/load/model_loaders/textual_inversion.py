@@ -2,14 +2,13 @@
 """Class for TI model loading in InvokeAI."""
 
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,
     BaseModelType,
     ModelFormat,
-    ModelRepoVariant,
     ModelType,
     SubModelType,
 )
@@ -27,22 +26,19 @@ class TextualInversionLoader(ModelLoader):
 
     def _load_model(
         self,
-        model_path: Path,
-        model_variant: Optional[ModelRepoVariant] = None,
+        config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
         if submodel_type is not None:
             raise ValueError("There are no submodels in a TI model.")
         model = TextualInversionModelRaw.from_checkpoint(
-            file_path=model_path,
+            file_path=self._get_model_path(config),
             dtype=self._torch_dtype,
         )
         return model
 
     # override
-    def _get_model_path(
-        self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None
-    ) -> Tuple[Path, AnyModelConfig, Optional[SubModelType]]:
+    def _get_model_path(self, config: AnyModelConfig) -> Path:
         model_path = self._app_config.models_path / config.path
 
         if config.format == ModelFormat.EmbeddingFolder:
@@ -53,4 +49,4 @@ class TextualInversionLoader(ModelLoader):
         if not path.exists():
             raise OSError(f"The embedding file at {path} was not found")
 
-        return path, config, submodel_type
+        return path

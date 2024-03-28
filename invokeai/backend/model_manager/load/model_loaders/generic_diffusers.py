@@ -10,10 +10,10 @@ from diffusers.models.modeling_utils import ModelMixin
 
 from invokeai.backend.model_manager import (
     AnyModel,
+    AnyModelConfig,
     BaseModelType,
     InvalidModelConfigException,
     ModelFormat,
-    ModelRepoVariant,
     ModelType,
     SubModelType,
 )
@@ -28,14 +28,15 @@ class GenericDiffusersLoader(ModelLoader):
 
     def _load_model(
         self,
-        model_path: Path,
-        model_variant: Optional[ModelRepoVariant] = None,
+        config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
+        model_path = self._get_model_path(config)
         model_class = self.get_hf_load_class(model_path)
         if submodel_type is not None:
             raise Exception(f"There are no submodels in models of type {model_class}")
-        variant = model_variant.value if model_variant else None
+        repo_variant = getattr(config, "repo_variant", None)
+        variant = repo_variant.value if repo_variant else None
         try:
             result: AnyModel = model_class.from_pretrained(model_path, torch_dtype=self._torch_dtype, variant=variant)
         except OSError as e:

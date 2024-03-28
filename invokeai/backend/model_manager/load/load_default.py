@@ -3,14 +3,13 @@
 
 from logging import Logger
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,
     InvalidModelConfigException,
-    ModelRepoVariant,
     SubModelType,
 )
 from invokeai.backend.model_manager.config import DiffusersConfigBase, ModelType
@@ -54,7 +53,7 @@ class ModelLoader(ModelLoaderBase):
         if model_config.type is ModelType.Main and not submodel_type:
             raise InvalidModelConfigException("submodel_type is required when loading a main model")
 
-        model_path, model_config, submodel_type = self._get_model_path(model_config, submodel_type)
+        model_path = self._get_model_path(model_config)
 
         if not model_path.exists():
             raise InvalidModelConfigException(f"Files for model '{model_config.name}' not found at {model_path}")
@@ -63,12 +62,9 @@ class ModelLoader(ModelLoaderBase):
         locker = self._load_if_needed(model_config, model_path, submodel_type)
         return LoadedModel(config=model_config, _locker=locker)
 
-    def _get_model_path(
-        self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None
-    ) -> Tuple[Path, AnyModelConfig, Optional[SubModelType]]:
+    def _get_model_path(self, config: AnyModelConfig) -> Path:
         model_base = self._app_config.models_path
-        result = (model_base / config.path).resolve(), config, submodel_type
-        return result
+        return (model_base / config.path).resolve()
 
     def _convert_if_needed(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
@@ -93,12 +89,11 @@ class ModelLoader(ModelLoaderBase):
         except IndexError:
             pass
 
-        model_variant = getattr(config, "repo_variant", None)
         self._ram_cache.make_room(self.get_size_fs(config, model_path, submodel_type))
 
         # This is where the model is actually loaded!
         with skip_torch_weight_init():
-            loaded_model = self._load_model(model_path, model_variant=model_variant, submodel_type=submodel_type)
+            loaded_model = self._load_model(config, submodel_type=submodel_type)
 
         self._ram_cache.put(
             config.key,
@@ -130,8 +125,7 @@ class ModelLoader(ModelLoaderBase):
     # This needs to be implemented in the subclass
     def _load_model(
         self,
-        model_path: Path,
-        model_variant: Optional[ModelRepoVariant] = None,
+        config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
         raise NotImplementedError

@@ -9,7 +9,6 @@ from invokeai.backend.model_manager import (
     AnyModelConfig,
     BaseModelType,
     ModelFormat,
-    ModelRepoVariant,
     ModelType,
     SchedulerPredictionType,
     SubModelType,
@@ -41,14 +40,15 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
 
     def _load_model(
         self,
-        model_path: Path,
-        model_variant: Optional[ModelRepoVariant] = None,
+        config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
         if not submodel_type is not None:
             raise Exception("A submodel type must be provided when loading main pipelines.")
+        model_path = self._get_model_path(config)
         load_class = self.get_hf_load_class(model_path, submodel_type)
-        variant = model_variant.value if model_variant else None
+        repo_variant = getattr(config, "repo_variant", None)
+        variant = repo_variant.value if repo_variant else None
         model_path = model_path / submodel_type.value
         try:
             result: AnyModel = load_class.from_pretrained(
