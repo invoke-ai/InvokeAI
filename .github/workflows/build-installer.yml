@@ -41,5 +41,5 @@ jobs:
       - name: upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.create_installer.outputs.INSTALLER_FILENAME }}
+          name: installer
           path: ${{ steps.create_installer.outputs.INSTALLER_PATH }}
