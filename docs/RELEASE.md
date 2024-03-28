@@ -61,11 +61,21 @@ This sets up both python and frontend dependencies and builds the python package
 
 #### Sanity Check & Smoke Test
 
-At this point, the release workflow pauses as the remaining publish jobs require approval.
+At this point, the release workflow pauses as the remaining publish jobs require approval. Time to test the installer.
 
-A maintainer should go to the **Summary** tab of the workflow, download the installer and test it. Ensure the app loads and generates.
+Because the installer pulls from PyPI, and we haven't published to PyPI yet, you will need to install from the wheel:
 
-> The same wheel file is bundled in the installer and in the `dist` artifact, which is uploaded to PyPI. You should end up with the exactly the same installation of the `invokeai` package from any of these methods.
+- Download and unzip `dist.zip` and the installer from the **Summary** tab of the workflow
+- Run the installer script using the `--wheel` CLI arg, pointing at the wheel:
+
+  ```sh
+  ./install.sh --wheel ../InvokeAI-4.0.0rc6-py3-none-any.whl
+  ```
+
+- Install to a temporary directory so you get the new user experience
+- Download a model and generate
+
+> The same wheel file is bundled in the installer and in the `dist` artifact, which is uploaded to PyPI. You should end up with the exactly the same installation as if the installer got the wheel from PyPI.
 
 #### PyPI Publish Jobs
 
