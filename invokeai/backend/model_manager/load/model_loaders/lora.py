@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.lora import LoRAModelRaw
+from invokeai.backend.lora_model_raw import LoRAModelRaw
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,
@@ -51,7 +51,6 @@ class LoRALoader(ModelLoader):
         model = LoRAModelRaw.from_checkpoint(
             file_path=model_path,
             dtype=self._torch_dtype,
-            base_model=self._model_base,
         )
         return model
 

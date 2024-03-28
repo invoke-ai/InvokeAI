@@ -17,7 +17,7 @@ from invokeai.backend.model_manager import AnyModel
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
 
-from .lora import LoRAModelRaw
+from .lora_model_raw import LoRAModelRaw
 from .textual_inversion import TextualInversionManager, TextualInversionModelRaw
 
 """

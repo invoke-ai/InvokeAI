@@ -9,7 +9,8 @@ from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
 from invokeai.app.invocations.primitives import ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.ti_utils import generate_ti_list
-from invokeai.backend.lora import LoRAModelRaw
+from invokeai.backend.lora_model_patcher import LoraModelPatcher
+from invokeai.backend.lora_model_raw import LoRAModelRaw
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
@@ -80,7 +81,8 @@ class CompelInvocation(BaseInvocation):
             ),
             text_encoder_info as text_encoder,
             # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
-            ModelPatcher.apply_lora_text_encoder(text_encoder, _lora_loader()),
+            # ModelPatcher.apply_lora_text_encoder(text_encoder, _lora_loader()),
+            LoraModelPatcher.apply_lora_to_text_encoder(text_encoder, _lora_loader(), "text_encoder"),
             # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
             ModelPatcher.apply_clip_skip(text_encoder_model, self.clip.skipped_layers),
         ):
@@ -181,7 +183,8 @@ class SDXLPromptInvocationBase:
             ),
             text_encoder_info as text_encoder,
             # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
-            ModelPatcher.apply_lora(text_encoder, _lora_loader(), lora_prefix),
+            # ModelPatcher.apply_lora(text_encoder, _lora_loader(), lora_prefix),
+            LoraModelPatcher.apply_lora_to_text_encoder(text_encoder, _lora_loader(), lora_prefix),
             # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
             ModelPatcher.apply_clip_skip(text_encoder_model, clip_field.skipped_layers),
         ):
@@ -259,15 +262,15 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
         c1, c1_pooled, ec1 = self.run_clip_compel(
-            context, self.clip, self.prompt, False, "lora_te1_", zero_on_empty=True
+            context, self.clip, self.prompt, False, "text_encoder", zero_on_empty=True
         )
         if self.style.strip() == "":
             c2, c2_pooled, ec2 = self.run_clip_compel(
-                context, self.clip2, self.prompt, True, "lora_te2_", zero_on_empty=True
+                context, self.clip2, self.prompt, True, "text_encoder_2", zero_on_empty=True
             )
         else:
             c2, c2_pooled, ec2 = self.run_clip_compel(
-                context, self.clip2, self.style, True, "lora_te2_", zero_on_empty=True
+                context, self.clip2, self.style, True, "text_encoder_2", zero_on_empty=True
             )
 
         original_size = (self.original_height, self.original_width)
