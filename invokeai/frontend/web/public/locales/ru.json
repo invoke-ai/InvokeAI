@@ -75,7 +75,8 @@
         "copy": "Копировать",
         "localSystem": "Локальная система",
         "aboutDesc": "Используя Invoke для работы? Проверьте это:",
-        "add": "Добавить"
+        "add": "Добавить",
+        "loglevel": "Уровень логов"
     },
     "gallery": {
         "galleryImageSize": "Размер изображений",
@@ -1505,7 +1506,8 @@
             "title": "Генерация"
         },
         "advanced": {
-            "title": "Расширенные"
+            "title": "Расширенные",
+            "options": "Опции $t(accordions.advanced.title)"
         },
         "image": {
             "title": "Изображение"
