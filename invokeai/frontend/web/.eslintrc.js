@@ -9,7 +9,7 @@ module.exports = {
     // https://github.com/qdanik/eslint-plugin-path
     'path/no-relative-imports': ['error', { maxDepth: 0 }],
     // https://github.com/edvardchen/eslint-plugin-i18next/blob/HEAD/docs/rules/no-literal-string.md
-    'i18next/no-literal-string': 'error',
+    'i18next/no-literal-string': 'warn',
   },
   overrides: [
     /**

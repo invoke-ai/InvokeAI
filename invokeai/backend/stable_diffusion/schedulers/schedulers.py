@@ -14,6 +14,8 @@ from diffusers import (
     LMSDiscreteScheduler,
     PNDMScheduler,
     UniPCMultistepScheduler,
+    EDMDPMSolverMultistepScheduler,
+    EDMEulerScheduler
 )
 
 SCHEDULER_MAP = {
@@ -32,7 +34,7 @@ SCHEDULER_MAP = {
     "kdpm_2_a": (KDPM2AncestralDiscreteScheduler, {}),
     "dpmpp_2s": (DPMSolverSinglestepScheduler, {"use_karras_sigmas": False}),
     "dpmpp_2s_k": (DPMSolverSinglestepScheduler, {"use_karras_sigmas": True}),
-    "dpmpp_2m": (DPMSolverMultistepScheduler, {"use_karras_sigmas": False}),
+    "dpmpp_2m": (DPMSolverMultistepScheduler, {"use_karras_sigmas": False, "euler_at_final": True}),
     "dpmpp_2m_k": (DPMSolverMultistepScheduler, {"use_karras_sigmas": True}),
     "dpmpp_2m_sde": (DPMSolverMultistepScheduler, {"use_karras_sigmas": False, "algorithm_type": "sde-dpmsolver++"}),
     "dpmpp_2m_sde_k": (DPMSolverMultistepScheduler, {"use_karras_sigmas": True, "algorithm_type": "sde-dpmsolver++"}),
@@ -40,4 +42,6 @@ SCHEDULER_MAP = {
     "dpmpp_sde_k": (DPMSolverSDEScheduler, {"use_karras_sigmas": True, "noise_sampler_seed": 0}),
     "unipc": (UniPCMultistepScheduler, {"cpu_only": True}),
     "lcm": (LCMScheduler, {}),
+    "edm_euler": (EDMEulerScheduler, {}),
+    "edm_dpmpp_2m": (EDMDPMSolverMultistepScheduler, {}),
 }
