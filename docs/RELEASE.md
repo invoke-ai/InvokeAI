@@ -77,6 +77,18 @@ Because the installer pulls from PyPI, and we haven't published to PyPI yet, you
 
 > The same wheel file is bundled in the installer and in the `dist` artifact, which is uploaded to PyPI. You should end up with the exactly the same installation as if the installer got the wheel from PyPI.
 
+##### Something isn't right
+
+If testing reveals any issues, no worries. Cancel the workflow, which will cancel the pending publish jobs (you didn't approve them prematurely, right?).
+
+Now you can start from the top:
+
+- Fix the issues and PR the fixes per usual
+- Get the PR approved and merged per usual
+- Switch to `main` and pull in the fixes
+- Run `make tag-release` to move the tag to `HEAD` (which has the fixes) and kick off the release workflow again
+- Re-do the sanity check
+
 #### PyPI Publish Jobs
 
 The publish jobs will run if any of the previous jobs fail.
@@ -90,6 +102,12 @@ Both jobs require a maintainer to approve them from the workflow's **Summary** t
 - Click **Approve and deploy**
 
 > **If the version already exists on PyPI, the publish jobs will fail.** PyPI only allows a given version to be published once - you cannot change it. If version published on PyPI has a problem, you'll need to "fail forward" by bumping the app version and publishing a followup release.
+
+##### Failing PyPI Publish
+
+Check the [python infrastructure status page] for incidents.
+
+If there are no incidents, contact @hipsterusername or @lstein, who have owner access to GH and PyPI, to see if access has expired or something like that.
 
 #### `publish-testpypi` Job
 
@@ -152,3 +170,4 @@ This functionality is available as a fallback in case something goes wonky. Typi
 [trusted publishers]: https://docs.pypi.org/trusted-publishers/
 [samuelcolvin/check-python-version]: https://github.com/samuelcolvin/check-python-version
 [manually]: #manual-release
+[python infrastructure status page]: https://status.python.org/
