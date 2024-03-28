@@ -174,6 +174,7 @@ Join the community on Discord:
 """
         print(message)
 
+
 class InvokeAiInstance:
     """
     Manages an installed instance of InvokeAI, comprising a virtual environment and a runtime directory.
