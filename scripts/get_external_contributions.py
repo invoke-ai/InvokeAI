@@ -1,8 +1,10 @@
+import re
 from argparse import ArgumentParser, RawTextHelpFormatter
 from typing import Any
 
 import requests
 from attr import dataclass
+from tqdm import tqdm
 
 
 def get_author(commit: dict[str, Any]) -> str:
@@ -40,11 +42,27 @@ def fetch_commits_between_tags(
     org_name: str, repo_name: str, from_ref: str, to_ref: str, token: str
 ) -> list[CommitInfo]:
     """Fetches all commits between two tags in a GitHub repository."""
-    compare_url = f"https://api.github.com/repos/{org_name}/{repo_name}/compare/{from_ref}...{to_ref}"
+
+    commit_info: list[CommitInfo] = []
     headers = {"Authorization": f"token {token}"} if token else None
-    response = requests.get(compare_url, headers=headers)
-    commits = response.json()["commits"]
-    return [CommitInfo.from_data(c) for c in commits]
+
+    # Get the total number of pages w/ an intial request - a bit hacky but it works...
+    response = requests.get(
+        f"https://api.github.com/repos/{org_name}/{repo_name}/compare/{from_ref}...{to_ref}?page=1&per_page=100",
+        headers=headers,
+    )
+    last_page_match = re.search(r'page=(\d+)&per_page=\d+>; rel="last"', response.headers["Link"])
+    last_page = int(last_page_match.group(1)) if last_page_match else 1
+
+    pbar = tqdm(range(1, last_page + 1), desc="Fetching commits", unit="page", leave=False)
+
+    for page in pbar:
+        compare_url = f"https://api.github.com/repos/{org_name}/{repo_name}/compare/{from_ref}...{to_ref}?page={page}&per_page=100"
+        response = requests.get(compare_url, headers=headers)
+        commits = response.json()["commits"]
+        commit_info.extend([CommitInfo.from_data(c) for c in commits])
+
+    return commit_info
 
 
 def main():
