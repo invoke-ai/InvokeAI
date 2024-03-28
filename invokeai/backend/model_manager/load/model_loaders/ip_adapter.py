@@ -1,6 +1,7 @@
 # Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Class for IP Adapter model loading in InvokeAI."""
 
+from pathlib import Path
 from typing import Optional
 
 import torch
@@ -29,7 +30,7 @@ class IPAdapterInvokeAILoader(ModelLoader):
     ) -> AnyModel:
         if submodel_type is not None:
             raise ValueError("There are no submodels in an IP-Adapter model.")
-        model_path = self._get_model_path(config)
+        model_path = Path(config.path)
         model: RawModel = build_ip_adapter(
             ip_adapter_ckpt_path=str(model_path / "ip_adapter.bin"),
             device=torch.device("cpu"),

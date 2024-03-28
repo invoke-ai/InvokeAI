@@ -32,7 +32,7 @@ class TextualInversionLoader(ModelLoader):
         if submodel_type is not None:
             raise ValueError("There are no submodels in a TI model.")
         model = TextualInversionModelRaw.from_checkpoint(
-            file_path=self._get_model_path(config),
+            file_path=config.path,
             dtype=self._torch_dtype,
         )
         return model

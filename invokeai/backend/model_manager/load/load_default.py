@@ -90,6 +90,7 @@ class ModelLoader(ModelLoaderBase):
             pass
 
         self._ram_cache.make_room(self.get_size_fs(config, model_path, submodel_type))
+        config.path = model_path.as_posix()
 
         # This is where the model is actually loaded!
         with skip_torch_weight_init():

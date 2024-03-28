@@ -45,7 +45,7 @@ class LoRALoader(ModelLoader):
     ) -> AnyModel:
         if submodel_type is not None:
             raise ValueError("There are no submodels in a LoRA model.")
-        model_path = self._get_model_path(config)
+        model_path = Path(config.path)
         assert self._model_base is not None
         model = LoRAModelRaw.from_checkpoint(
             file_path=model_path,

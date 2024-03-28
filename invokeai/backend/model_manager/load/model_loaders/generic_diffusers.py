@@ -31,7 +31,7 @@ class GenericDiffusersLoader(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        model_path = self._get_model_path(config)
+        model_path = Path(config.path)
         model_class = self.get_hf_load_class(model_path)
         if submodel_type is not None:
             raise Exception(f"There are no submodels in models of type {model_class}")
