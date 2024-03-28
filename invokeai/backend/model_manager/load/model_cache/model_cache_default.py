@@ -162,7 +162,8 @@ class ModelCache(ModelCacheBase[AnyModel]):
     ) -> None:
         """Store model under key and optional submodel_type."""
         key = self._make_cache_key(key, submodel_type)
-        assert key not in self._cached_models
+        if key in self._cached_models:
+            return
         self.make_room(size)
         cache_record = CacheRecord(key, model, size)
         self._cached_models[key] = cache_record
