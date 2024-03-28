@@ -31,6 +31,9 @@ class ConfigMapper:
     YAML_FILENAME = "invokeai.yaml"
     DATABASE_FILENAME = "invokeai.db"
 
+    DEFAULT_OUTDIR = "outputs"
+    DEFAULT_DB_DIR = "databases"
+
     database_path = None
     database_backup_dir = None
     outputs_path = None
@@ -50,12 +53,18 @@ class ConfigMapper:
     def __load_from_root_config(self, invoke_root):
         """Validate a yaml path exists, confirm the user wants to use it and load config."""
         yaml_path = os.path.join(invoke_root, self.YAML_FILENAME)
+        if not os.path.exists(yaml_path):
+            print(f"Unable to find invokeai.yaml at {yaml_path}!")
+            return False
         if os.path.exists(yaml_path):
             db_dir, outdir = self.__load_paths_from_yaml_file(yaml_path)
 
-            if db_dir is None or outdir is None:
-                print("The invokeai.yaml file was found but is missing the db_dir and/or outdir setting!")
-                return False
+            if db_dir is None:
+                db_dir = self.DEFAULT_DB_DIR
+                print(f"The invokeai.yaml file was found but is missing the db_dir setting! Defaulting to {db_dir}")
+            if outdir is None:
+                outdir = self.DEFAULT_OUTDIR
+                print(f"The invokeai.yaml file was found but is missing the outdir setting! Defaulting to {outdir}")
 
             if os.path.isabs(db_dir):
                 self.database_path = os.path.join(db_dir, self.DATABASE_FILENAME)
