@@ -4,7 +4,7 @@
         "reportBugLabel": "Fehler melden",
         "settingsLabel": "Einstellungen",
         "img2img": "Bild zu Bild",
-        "nodes": "Knoten Editor",
+        "nodes": "Arbeitsabläufe",
         "upload": "Hochladen",
         "load": "Laden",
         "statusDisconnected": "Getrennt",
@@ -74,7 +74,8 @@
         "updated": "Aktualisiert",
         "copy": "Kopieren",
         "aboutHeading": "Nutzen Sie Ihre kreative Energie",
-        "toResolve": "Lösen"
+        "toResolve": "Lösen",
+        "add": "Hinzufügen"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
@@ -104,11 +105,16 @@
         "dropToUpload": "$t(gallery.drop) zum hochladen",
         "dropOrUpload": "$t(gallery.drop) oder hochladen",
         "drop": "Ablegen",
-        "problemDeletingImages": "Problem beim Löschen der Bilder"
+        "problemDeletingImages": "Problem beim Löschen der Bilder",
+        "bulkDownloadRequested": "Download vorbereiten",
+        "bulkDownloadRequestedDesc": "Dein Download wird vorbereitet. Dies kann ein paar Momente dauern.",
+        "bulkDownloadRequestFailed": "Problem beim Download vorbereiten",
+        "bulkDownloadFailed": "Download fehlgeschlagen",
+        "alwaysShowImageSizeBadge": "Zeige immer Bilder Größe Abzeichen"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tastenkürzel",
-        "appHotkeys": "App-Tastenkombinationen",
+        "appHotkeys": "App",
         "generalHotkeys": "Allgemein",
         "galleryHotkeys": "Galerie",
         "unifiedCanvasHotkeys": "Leinwand",
@@ -757,7 +763,9 @@
         "scheduler": "Planer",
         "noRecallParameters": "Es wurden keine Parameter zum Abrufen gefunden",
         "recallParameters": "Parameter wiederherstellen",
-        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)"
+        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
+        "allPrompts": "Alle Prompts",
+        "imageDimensions": "Bilder Auslösungen"
     },
     "popovers": {
         "noiseUseCPU": {
@@ -1068,5 +1076,10 @@
     },
     "dynamicPrompts": {
         "showDynamicPrompts": "Dynamische Prompts anzeigen"
+    },
+    "prompt": {
+        "noMatchingTriggers": "Keine passenden Auslöser",
+        "addPromptTrigger": "Auslöse Text hinzufügen",
+        "compatibleEmbeddings": "Kompatible Einbettungen"
     }
 }
