@@ -501,7 +501,7 @@ class ModelInstallService(ModelInstallServiceBase):
         """Scan the models directory for missing models and return a list of them."""
         missing_models: list[AnyModelConfig] = []
         for x in self.record_store.all_models():
-            if not Path(x.path).resolve().exists():
+            if not (self._app_config.models_path / x.path).resolve().exists():
                 missing_models.append(x)
         return missing_models
 

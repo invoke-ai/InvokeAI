@@ -58,43 +58,28 @@ class ModelLoader(ModelLoaderBase):
         if not model_path.exists():
             raise InvalidModelConfigException(f"Files for model '{model_config.name}' not found at {model_path}")
 
-        model_path = self._convert_if_needed(model_config, model_path, submodel_type)
-        locker = self._load_if_needed(model_config, model_path, submodel_type)
+        with skip_torch_weight_init():
+            locker = self._convert_and_load(model_config, model_path, submodel_type)
         return LoadedModel(config=model_config, _locker=locker)
 
     def _get_model_path(self, config: AnyModelConfig) -> Path:
         model_base = self._app_config.models_path
         return (model_base / config.path).resolve()
 
-    def _convert_if_needed(
-        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
-    ) -> Path:
-        cache_path: Path = self._convert_cache.cache_path(config.key)
-
-        if not self._needs_conversion(config, model_path, cache_path):
-            return cache_path if cache_path.exists() else model_path
-
-        self._convert_cache.make_room(self.get_size_fs(config, model_path, submodel_type))
-        return self._convert_model(config, model_path, cache_path)
-
-    def _needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool:
-        return False
-
-    def _load_if_needed(
+    def _convert_and_load(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> ModelLockerBase:
-        # TO DO: This is not thread safe!
         try:
             return self._ram_cache.get(config.key, submodel_type)
         except IndexError:
             pass
 
-        self._ram_cache.make_room(self.get_size_fs(config, model_path, submodel_type))
-        config.path = model_path.as_posix()
-
-        # This is where the model is actually loaded!
-        with skip_torch_weight_init():
-            loaded_model = self._load_model(config, submodel_type=submodel_type)
+        cache_path: Path = self._convert_cache.cache_path(config.key)
+        if self._needs_conversion(config, model_path, cache_path):
+            loaded_model = self._do_convert(config, model_path, cache_path, submodel_type)
+        else:
+            config.path = str(cache_path) if cache_path.exists() else str(self._get_model_path(config))
+            loaded_model = self._load_model(config, submodel_type)
 
         self._ram_cache.put(
             config.key,
@@ -119,8 +104,33 @@ class ModelLoader(ModelLoaderBase):
             variant=config.repo_variant if isinstance(config, DiffusersConfigBase) else None,
         )
 
+    def _do_convert(
+        self, config: AnyModelConfig, model_path: Path, cache_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> AnyModel:
+        if self._convert_cache.max_size <= 0:  # no caching
+            pipeline = self._convert_model(config, model_path)
+            if submodel_type:
+                for subtype in SubModelType:
+                    if subtype == submodel_type:
+                        continue
+                    # cache other parts of the model so that we don't re-convert
+                    if submodel := getattr(pipeline, subtype.value, None):
+                        self._ram_cache.put(
+                            config.key, submodel_type=subtype, model=submodel, size=calc_model_size_by_data(submodel)
+                        )
+            loaded_model = getattr(pipeline, submodel_type.value) if submodel_type else pipeline
+        else:
+            self._convert_model(config, model_path, cache_path)
+            config.path = cache_path.as_posix()
+            loaded_model = self._load_model(config, submodel_type)
+
+        return loaded_model
+
+    def _needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool:
+        return False
+
     # This needs to be implemented in subclasses that handle checkpoints
-    def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Path) -> Path:
+    def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Optional[Path] = None) -> AnyModel:
         raise NotImplementedError
 
     # This needs to be implemented in the subclass

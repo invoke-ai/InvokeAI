@@ -78,7 +78,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         else:
             return True
 
-    def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Path) -> Path:
+    def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Optional[Path] = None) -> AnyModel:
         assert isinstance(config, MainCheckpointConfig)
         base = config.base
 
@@ -94,7 +94,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
 
         self._logger.info(f"Converting {model_path} to diffusers format")
 
-        convert_ckpt_to_diffusers(
+        loaded_model = convert_ckpt_to_diffusers(
             model_path,
             output_path,
             model_type=self.model_base_to_model_type[base],
@@ -108,4 +108,4 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             load_safety_checker=False,
             num_in_channels=VARIANT_TO_IN_CHANNEL_MAP[config.variant],
         )
-        return output_path
+        return loaded_model
