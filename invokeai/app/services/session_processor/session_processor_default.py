@@ -70,13 +70,18 @@ class DefaultSessionProcessor(SessionProcessorBase):
     async def _on_queue_event(self, event: FastAPIEvent) -> None:
         event_name = event[1]["event"]
 
-
-        if event_name == "session_canceled" and self._queue_item\
-              and self._queue_item.item_id == event[1]["data"]["queue_item_id"]:
+        if (
+            event_name == "session_canceled"
+            and self._queue_item
+            and self._queue_item.item_id == event[1]["data"]["queue_item_id"]
+        ):
             self._cancel_event.set()
             self._poll_now()
-        elif event_name == "queue_cleared" and self._queue_item\
-              and self._queue_item.queue_id == event[1]["data"]["queue_id"]:
+        elif (
+            event_name == "queue_cleared"
+            and self._queue_item
+            and self._queue_item.queue_id == event[1]["data"]["queue_id"]
+        ):
             self._cancel_event.set()
             self._poll_now()
         elif event_name == "batch_enqueued":
