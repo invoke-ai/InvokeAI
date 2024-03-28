@@ -120,11 +120,13 @@ Publishes the distribution on the production PyPI index, using the `pypi` GitHub
 Once the release is published to PyPI, it's time to publish the GitHub release.
 
 1. [Draft a new release] on GitHub, choosing the tag that triggered the release.
-2. Write the release notes, describing important changes. The **Generate release notes** button automatically inserts the changelog and new contributors, and you can copy/paste the intro from previous releases.
-3. Upload the zip file created in **`build`** job into the Assets section of the release notes. You can also upload the zip into the body of the release notes, since it can be hard for users to find the Assets section.
-4. Check the **Set as a pre-release** and **Create a discussion for this release** checkboxes at the bottom of the release page.
-5. Publish the pre-release.
-6. Announce the pre-release in Discord.
+1. Write the release notes, describing important changes. The **Generate release notes** button automatically inserts the changelog and new contributors, and you can copy/paste the intro from previous releases.
+1. Use `scripts/get_external_contributions.py` to get a list of external contributions to shout out in the release notes.
+1. Upload the zip file created in **`build`** job into the Assets section of the release notes.
+1. Check **Set as a pre-release** if it's a pre-release.
+1. Check **Create a discussion for this release**.
+1. Publish the release.
+1. Announce the release in Discord.
 
 > **TODO** Workflows can create a GitHub release from a template and upload release assets. One popular action to handle this is [ncipollo/release-action]. A future enhancement to the release process could set this up.
 
