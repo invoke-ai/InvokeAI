@@ -327,7 +327,7 @@ class IPAdapterBaseConfig(ModelConfigBase):
     type: Literal[ModelType.IPAdapter] = ModelType.IPAdapter
 
 
-class IPAdapterDiffusersConfig(IPAdapterBaseConfig):
+class IPAdapterInvokeAIConfig(IPAdapterBaseConfig):
     """Model config for IP Adapter diffusers format models."""
 
     image_encoder_model_id: str
@@ -403,7 +403,7 @@ AnyModelConfig = Annotated[
         Annotated[LoRADiffusersConfig, LoRADiffusersConfig.get_tag()],
         Annotated[TextualInversionFileConfig, TextualInversionFileConfig.get_tag()],
         Annotated[TextualInversionFolderConfig, TextualInversionFolderConfig.get_tag()],
-        Annotated[IPAdapterDiffusersConfig, IPAdapterDiffusersConfig.get_tag()],
+        Annotated[IPAdapterInvokeAIConfig, IPAdapterInvokeAIConfig.get_tag()],
         Annotated[IPAdapterCheckpointConfig, IPAdapterCheckpointConfig.get_tag()],
         Annotated[T2IAdapterConfig, T2IAdapterConfig.get_tag()],
         Annotated[CLIPVisionDiffusersConfig, CLIPVisionDiffusersConfig.get_tag()],
