@@ -17,6 +17,8 @@ from typing import Optional, Tuple
 SUPPORTED_PYTHON = ">=3.10.0,<=3.11.100"
 INSTALLER_REQS = ["rich", "semver", "requests", "plumbum", "prompt-toolkit"]
 BOOTSTRAP_VENV_PREFIX = "invokeai-installer-tmp"
+DOCS_URL = "https://invoke-ai.github.io/InvokeAI/"
+DISCORD_URL = "https://discord.gg/ZmtBAhwWhy"
 
 OS = platform.uname().system
 ARCH = platform.uname().machine
@@ -157,6 +159,20 @@ class Installer:
 
         # install the launch/update scripts into the runtime directory
         self.instance.install_user_scripts()
+
+        message = f"""
+*** Installation Successful ***
+
+To start the application, run:
+    {destination}/invoke.{"bat" if sys.platform == "win32" else "sh"}
+
+For more information, troubleshooting and support, visit our docs at:
+    {DOCS_URL}
+
+Join the community on Discord:
+    {DISCORD_URL}
+"""
+        print(message)
 
 
 class InvokeAiInstance:

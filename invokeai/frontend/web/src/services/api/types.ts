@@ -118,10 +118,6 @@ export const isTIModelConfig = (config: AnyModelConfig): config is MainModelConf
 export type ModelInstallJob = S['ModelInstallJob'];
 export type ModelInstallStatus = S['InstallStatus'];
 
-export type HFModelSource = S['HFModelSource'];
-export type LocalModelSource = S['LocalModelSource'];
-export type URLModelSource = S['URLModelSource'];
-
 // Graphs
 export type Graph = S['Graph'];
 export type NonNullableGraph = O.Required<Graph, 'nodes' | 'edges'>;

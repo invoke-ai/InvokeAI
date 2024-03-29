@@ -5,7 +5,6 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
-import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { setBoundingBoxDimensions } from 'features/canvas/store/canvasSlice';
 import { useControlAdapterControlImage } from 'features/controlAdapters/hooks/useControlAdapterControlImage';
 import { useControlAdapterProcessedControlImage } from 'features/controlAdapters/hooks/useControlAdapterProcessedControlImage';
@@ -15,6 +14,7 @@ import {
   selectControlAdaptersSlice,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
+import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
 import { heightChanged, selectOptimalDimension, widthChanged } from 'features/parameters/store/generationSlice';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
@@ -92,12 +92,13 @@ const ControlAdapterImagePreview = ({ isSmall, id }: Props) => {
       return;
     }
 
-    const width = roundToMultiple(controlImage.width, 8);
-    const height = roundToMultiple(controlImage.height, 8);
-
     if (activeTabName === 'unifiedCanvas') {
-      dispatch(setBoundingBoxDimensions({ width, height }, optimalDimension));
+      dispatch(setBoundingBoxDimensions({ width: controlImage.width, height: controlImage.height }, optimalDimension));
     } else {
+      const { width, height } = calculateNewSize(
+        controlImage.width / controlImage.height,
+        optimalDimension * optimalDimension
+      );
       dispatch(widthChanged(width));
       dispatch(heightChanged(height));
     }
