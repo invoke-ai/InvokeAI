@@ -368,11 +368,13 @@ class ModelInstallService(ModelInstallServiceBase):
     def delete(self, key: str) -> None:  # noqa D102
         """Unregister the model. Delete its files only if they are within our models directory."""
         model = self.record_store.get_model(key)
-        models_dir = self.app_config.models_path
-        model_path = models_dir / Path(model.path)  # handle legacy relative model paths
-        if model_path.is_relative_to(models_dir):
+        model_path = self.app_config.models_path / model.path
+
+        if model_path.is_relative_to(self.app_config.models_path):
+            # If the models is in the Invoke-managed models dir, we delete it
             self.unconditionally_delete(key)
         else:
+            # Else we only unregister it, leaving the file in place
             self.unregister(key)
 
     def unconditionally_delete(self, key: str) -> None:  # noqa D102
@@ -500,9 +502,9 @@ class ModelInstallService(ModelInstallServiceBase):
     def _scan_for_missing_models(self) -> list[AnyModelConfig]:
         """Scan the models directory for missing models and return a list of them."""
         missing_models: list[AnyModelConfig] = []
-        for x in self.record_store.all_models():
-            if not Path(x.path).resolve().exists():
-                missing_models.append(x)
+        for model_config in self.record_store.all_models():
+            if not (self.app_config.models_path / model_config.path).resolve().exists():
+                missing_models.append(model_config)
         return missing_models
 
     def _register_orphaned_models(self) -> None:
@@ -548,10 +550,11 @@ class ModelInstallService(ModelInstallServiceBase):
         May raise an UnknownModelException.
         """
         model = self.record_store.get_model(key)
-        old_path = Path(model.path).resolve()
-        models_dir = self.app_config.models_path.resolve()
+        models_dir = self.app_config.models_path
+        old_path = self.app_config.models_path / model.path
 
         if not old_path.is_relative_to(models_dir):
+            # The model is not in the models directory - we don't need to move it.
             return model
 
         new_path = (models_dir / model.base.value / model.type.value / model.name).with_suffix(old_path.suffix)
@@ -561,7 +564,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
         self._logger.info(f"Moving {model.name} to {new_path}.")
         new_path = self._move_model(old_path, new_path)
-        model.path = new_path.as_posix()
+        model.path = new_path.relative_to(models_dir).as_posix()
         self.record_store.update_model(key, ModelRecordChanges(path=model.path))
         return model
 
@@ -600,12 +603,19 @@ class ModelInstallService(ModelInstallServiceBase):
 
         model_path = model_path.resolve()
 
+        # Models in the Invoke-managed models dir should use relative paths.
+        if model_path.is_relative_to(self.app_config.models_path):
+            model_path = model_path.relative_to(self.app_config.models_path)
+
         info.path = model_path.as_posix()
 
-        # Checkpoints have a config file needed for conversion - resolve this to an absolute path
         if isinstance(info, CheckpointConfigBase):
-            legacy_conf = (self.app_config.legacy_conf_path / info.config_path).resolve()
-            info.config_path = legacy_conf.as_posix()
+            # Checkpoints have a config file needed for conversion. Same handling as the model weights - if it's in the
+            # invoke-managed legacy config dir, we use a relative path.
+            legacy_config_path = Path(info.config_path).resolve()
+            if legacy_config_path.is_relative_to(self.app_config.legacy_conf_path):
+                legacy_config_path = legacy_config_path.relative_to(self.app_config.legacy_conf_path)
+            info.config_path = legacy_config_path.as_posix()
         self.record_store.add_model(info)
         return info.key
 
