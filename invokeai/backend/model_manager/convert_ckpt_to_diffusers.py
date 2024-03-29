@@ -3,7 +3,7 @@
 """Conversion script for the Stable Diffusion checkpoints."""
 
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 import torch
 from diffusers import AutoencoderKL
@@ -14,6 +14,8 @@ from diffusers.pipelines.stable_diffusion.convert_from_ckpt import (
     download_from_original_stable_diffusion_ckpt,
 )
 from omegaconf import DictConfig
+
+from . import AnyModel
 
 
 def convert_ldm_vae_to_diffusers(
@@ -33,11 +35,11 @@ def convert_ldm_vae_to_diffusers(
 
 def convert_ckpt_to_diffusers(
     checkpoint_path: str | Path,
-    dump_path: str | Path,
+    dump_path: Optional[str | Path] = None,
     precision: torch.dtype = torch.float16,
     use_safetensors: bool = True,
     **kwargs,
-):
+) -> AnyModel:
     """
     Takes all the arguments of download_from_original_stable_diffusion_ckpt(),
     and in addition a path-like object indicating the location of the desired diffusers
@@ -47,18 +49,20 @@ def convert_ckpt_to_diffusers(
     pipe = pipe.to(precision)
 
     # TO DO: save correct repo variant
-    pipe.save_pretrained(
-        dump_path,
-        safe_serialization=use_safetensors,
-    )
+    if dump_path:
+        pipe.save_pretrained(
+            dump_path,
+            safe_serialization=use_safetensors,
+        )
+    return pipe
 
 
 def convert_controlnet_to_diffusers(
     checkpoint_path: Path,
-    dump_path: Path,
+    dump_path: Optional[Path] = None,
     precision: torch.dtype = torch.float16,
     **kwargs,
-):
+) -> AnyModel:
     """
     Takes all the arguments of download_controlnet_from_original_ckpt(),
     and in addition a path-like object indicating the location of the desired diffusers
@@ -68,4 +72,6 @@ def convert_controlnet_to_diffusers(
     pipe = pipe.to(precision)
 
     # TO DO: save correct repo variant
-    pipe.save_pretrained(dump_path, safe_serialization=True)
+    if dump_path:
+        pipe.save_pretrained(dump_path, safe_serialization=True)
+    return pipe

@@ -614,8 +614,8 @@ async def convert_model(
     The return value is the model configuration for the converted model.
     """
     model_manager = ApiDependencies.invoker.services.model_manager
+    loader = model_manager.load
     logger = ApiDependencies.invoker.services.logger
-    loader = ApiDependencies.invoker.services.model_manager.load
     store = ApiDependencies.invoker.services.model_manager.store
     installer = ApiDependencies.invoker.services.model_manager.install
 
@@ -630,7 +630,13 @@ async def convert_model(
         raise HTTPException(400, f"The model with key {key} is not a main checkpoint model.")
 
     # loading the model will convert it into a cached diffusers file
-    model_manager.load.load_model(model_config, submodel_type=SubModelType.Scheduler)
+    try:
+        cc_size = loader.convert_cache.max_size
+        if cc_size == 0:  # temporary set the convert cache to a positive number so that cached model is written
+            loader._convert_cache.max_size = 1.0
+        loader.load_model(model_config, submodel_type=SubModelType.Scheduler)
+    finally:
+        loader._convert_cache.max_size = cc_size
 
     # Get the path of the converted model from the loader
     cache_path = loader.convert_cache.cache_path(key)
