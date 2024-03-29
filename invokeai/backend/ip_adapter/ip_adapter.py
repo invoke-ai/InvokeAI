@@ -146,9 +146,12 @@ class IPAdapter(RawModel):
     def get_image_embeds(self, pil_image: List[Image.Image], image_encoder: CLIPVisionModelWithProjection):
         clip_image = self._clip_image_processor(images=pil_image, return_tensors="pt").pixel_values
         clip_image_embeds = image_encoder(clip_image.to(self.device, dtype=self.dtype)).image_embeds
-        image_prompt_embeds = self._image_proj_model(clip_image_embeds)
-        uncond_image_prompt_embeds = self._image_proj_model(torch.zeros_like(clip_image_embeds))
-        return image_prompt_embeds, uncond_image_prompt_embeds
+        try:
+            image_prompt_embeds = self._image_proj_model(clip_image_embeds)
+            uncond_image_prompt_embeds = self._image_proj_model(torch.zeros_like(clip_image_embeds))
+            return image_prompt_embeds, uncond_image_prompt_embeds
+        except RuntimeError:
+            raise RuntimeError("Selected CLIP Vision Model is incompatible with the current IP Adapter")
 
 
 class IPAdapterPlus(IPAdapter):
@@ -169,12 +172,15 @@ class IPAdapterPlus(IPAdapter):
         clip_image = self._clip_image_processor(images=pil_image, return_tensors="pt").pixel_values
         clip_image = clip_image.to(self.device, dtype=self.dtype)
         clip_image_embeds = image_encoder(clip_image, output_hidden_states=True).hidden_states[-2]
-        image_prompt_embeds = self._image_proj_model(clip_image_embeds)
         uncond_clip_image_embeds = image_encoder(torch.zeros_like(clip_image), output_hidden_states=True).hidden_states[
             -2
         ]
-        uncond_image_prompt_embeds = self._image_proj_model(uncond_clip_image_embeds)
-        return image_prompt_embeds, uncond_image_prompt_embeds
+        try:
+            image_prompt_embeds = self._image_proj_model(clip_image_embeds)
+            uncond_image_prompt_embeds = self._image_proj_model(uncond_clip_image_embeds)
+            return image_prompt_embeds, uncond_image_prompt_embeds
+        except RuntimeError:
+            raise RuntimeError("Selected CLIP Vision Model is incompatible with the current IP Adapter")
 
 
 class IPAdapterFull(IPAdapterPlus):
