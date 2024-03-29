@@ -612,7 +612,7 @@ class ModelInstallService(ModelInstallServiceBase):
         if isinstance(info, CheckpointConfigBase):
             # Checkpoints have a config file needed for conversion. Same handling as the model weights - if it's in the
             # invoke-managed legacy config dir, we use a relative path.
-            legacy_config_path = Path(info.config_path).resolve()
+            legacy_config_path = self.app_config.legacy_conf_path / info.config_path
             if legacy_config_path.is_relative_to(self.app_config.legacy_conf_path):
                 legacy_config_path = legacy_config_path.relative_to(self.app_config.legacy_conf_path)
             info.config_path = legacy_config_path.as_posix()
