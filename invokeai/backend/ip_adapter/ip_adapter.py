@@ -214,6 +214,8 @@ def load_ip_adapter_tensors(ip_adapter_ckpt_path: str, device: str) -> IPAdapter
                 state_dict["image_proj"][key.replace("image_proj.", "")] = model.get_tensor(key)
             elif key.startswith("ip_adapter."):
                 state_dict["ip_adapter"][key.replace("ip_adapter.", "")] = model.get_tensor(key)
+            else:
+                raise RuntimeError(f"Encountered unexpected IP Adapter state dict key: '{key}'.")
     else:
         ip_adapter_diffusers_checkpoint_path = ip_adapter_ckpt_path + "/ip_adapter.bin"
         state_dict = torch.load(ip_adapter_diffusers_checkpoint_path, map_location="cpu")
