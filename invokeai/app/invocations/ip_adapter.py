@@ -65,8 +65,10 @@ class IPAdapterInvocation(BaseInvocation):
         ui_order=-1,
         ui_type=UIType.IPAdapterModel,
     )
-    clip_vision_model: Literal["ViT-H", "ViT-G"] = InputField(
-        description="CLIP Vision model to use", default="ViT-H", ui_order=2
+    clip_vision_model: Literal["auto", "ViT-H", "ViT-G"] = InputField(
+        description="CLIP Vision model to use. Overrides model settings. Mandatory for checkpoint models.",
+        default="auto",
+        ui_order=2,
     )
     weight: Union[float, List[float]] = InputField(
         default=1, description="The weight given to the IP-Adapter", title="Weight"
@@ -94,9 +96,14 @@ class IPAdapterInvocation(BaseInvocation):
         ip_adapter_info = context.models.get_config(self.ip_adapter_model.key)
         assert isinstance(ip_adapter_info, (IPAdapterInvokeAIConfig, IPAdapterCheckpointConfig))
 
-        if isinstance(ip_adapter_info, IPAdapterInvokeAIConfig):
-            image_encoder_model_id = ip_adapter_info.image_encoder_model_id
-            image_encoder_model_name = image_encoder_model_id.split("/")[-1].strip()
+        if self.clip_vision_model == "auto":
+            if isinstance(ip_adapter_info, IPAdapterInvokeAIConfig):
+                image_encoder_model_id = ip_adapter_info.image_encoder_model_id
+                image_encoder_model_name = image_encoder_model_id.split("/")[-1].strip()
+            else:
+                raise RuntimeError(
+                    "You need to set the appropriate CLIP Vision model for checkpoint IP Adapter models."
+                )
         else:
             image_encoder_model_name = CLIP_VISION_MODEL_MAP[self.clip_vision_model]
 
