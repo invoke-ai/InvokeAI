@@ -13,7 +13,12 @@ from invokeai.backend.model_manager import (
     SchedulerPredictionType,
     SubModelType,
 )
-from invokeai.backend.model_manager.config import CheckpointConfigBase, MainCheckpointConfig, ModelVariantType
+from invokeai.backend.model_manager.config import (
+    CheckpointConfigBase,
+    DiffusersConfigBase,
+    MainCheckpointConfig,
+    ModelVariantType,
+)
 from invokeai.backend.model_manager.convert_ckpt_to_diffusers import convert_ckpt_to_diffusers
 
 from .. import ModelLoaderRegistry
@@ -47,7 +52,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             raise Exception("A submodel type must be provided when loading main pipelines.")
         model_path = Path(config.path)
         load_class = self.get_hf_load_class(model_path, submodel_type)
-        repo_variant = getattr(config, "repo_variant", None)
+        repo_variant = config.repo_variant if isinstance(config, DiffusersConfigBase) else None
         variant = repo_variant.value if repo_variant else None
         model_path = model_path / submodel_type.value
         try:

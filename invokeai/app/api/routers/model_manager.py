@@ -631,7 +631,7 @@ async def convert_model(
 
     # loading the model will convert it into a cached diffusers file
     try:
-        cc_size = loader._convert_cache.max_size
+        cc_size = loader.convert_cache.max_size
         if cc_size == 0:  # temporary set the convert cache to a positive number so that cached model is written
             loader._convert_cache.max_size = 1.0
         loader.load_model(model_config, submodel_type=SubModelType.Scheduler)

@@ -62,6 +62,16 @@ class ModelLoader(ModelLoaderBase):
             locker = self._convert_and_load(model_config, model_path, submodel_type)
         return LoadedModel(config=model_config, _locker=locker)
 
+    @property
+    def convert_cache(self) -> ModelConvertCacheBase:
+        """Return the convert cache associated with this loader."""
+        return self._convert_cache
+
+    @property
+    def ram_cache(self) -> ModelCacheBase[AnyModel]:
+        """Return the ram cache associated with this loader."""
+        return self._ram_cache
+
     def _get_model_path(self, config: AnyModelConfig) -> Path:
         model_base = self._app_config.models_path
         return (model_base / config.path).resolve()
