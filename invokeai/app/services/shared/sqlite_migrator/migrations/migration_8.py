@@ -27,8 +27,9 @@ class Migration8Callback:
         change was reverted. To smooth over the revert for our tests, we can migrate the paths back to relative.
         """
 
-        models_dir = self._app_config.models_path
-        legacy_conf_dir = self._app_config.legacy_conf_path
+        models_path = self._app_config.models_path
+        legacy_conf_path = self._app_config.legacy_conf_path
+        legacy_conf_dir = self._app_config.legacy_conf_dir
 
         stmt = """---sql
         SELECT
@@ -42,8 +43,8 @@ class Migration8Callback:
 
         for model_id, model_path, model_config_path in all_models:
             # If the model path is inside the models directory, update it to be relative to the models directory.
-            if model_path.startswith(str(models_dir)):
-                new_path = Path(model_path).relative_to(models_dir)
+            if model_path.startswith(str(models_path)):
+                new_path = Path(model_path).relative_to(models_path)
                 cursor.execute(
                     """--sql
                     UPDATE models
@@ -54,16 +55,22 @@ class Migration8Callback:
                 )
             # If the model has a legacy config path and it is inside the legacy conf directory, update it to be
             # relative to the legacy conf directory.
-            if model_config_path and model_config_path.startswith(str(legacy_conf_dir)):
-                new_config_path = Path(model_config_path).relative_to(legacy_conf_dir)
-                cursor.execute(
-                    """--sql
-                    UPDATE models
-                    SET config = json_set(config, '$.config_path', ?)
-                    WHERE id = ?;
-                    """,
-                    (str(new_config_path), model_id),
-                )
+            if model_config_path:
+                if model_config_path.startswith(str(legacy_conf_path)):  # for absolute version
+                    new_config_path = Path(model_config_path).relative_to(legacy_conf_path)
+                elif model_config_path.startswith(str(legacy_conf_dir)):  # for incorrect root-relative version
+                    new_config_path = Path(*Path(model_config_path).parts[1:])
+                else:
+                    new_config_path = None
+                if new_config_path:
+                    cursor.execute(
+                        """--sql
+                        UPDATE models
+                        SET config = json_set(config, '$.config_path', ?)
+                        WHERE id = ?;
+                        """,
+                        (str(new_config_path), model_id),
+                    )
 
 
 def build_migration_8(app_config: InvokeAIAppConfig) -> Migration:
