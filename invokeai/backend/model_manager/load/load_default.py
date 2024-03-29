@@ -117,24 +117,19 @@ class ModelLoader(ModelLoaderBase):
     def _do_convert(
         self, config: AnyModelConfig, model_path: Path, cache_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> AnyModel:
-        if self._convert_cache.max_size <= 0:  # no caching
-            pipeline = self._convert_model(config, model_path)
-            if submodel_type:
-                for subtype in SubModelType:
-                    if subtype == submodel_type:
-                        continue
-                    # cache other parts of the model so that we don't re-convert
-                    if submodel := getattr(pipeline, subtype.value, None):
-                        self._ram_cache.put(
-                            config.key, submodel_type=subtype, model=submodel, size=calc_model_size_by_data(submodel)
-                        )
-            loaded_model = getattr(pipeline, submodel_type.value) if submodel_type else pipeline
-        else:
-            self._convert_model(config, model_path, cache_path)
-            config.path = cache_path.as_posix()
-            loaded_model = self._load_model(config, submodel_type)
-
-        return loaded_model
+        self.convert_cache.make_room(calc_model_size_by_fs(model_path))
+        pipeline = self._convert_model(config, model_path, cache_path if self.convert_cache.max_size > 0 else None)
+        if submodel_type:
+            # Proactively load the various submodels into the RAM cache so that we don't have to re-convert
+            # the entire pipeline every time a new submodel is needed.
+            for subtype in SubModelType:
+                if subtype == submodel_type:
+                    continue
+                if submodel := getattr(pipeline, subtype.value, None):
+                    self._ram_cache.put(
+                        config.key, submodel_type=subtype, model=submodel, size=calc_model_size_by_data(submodel)
+                    )
+        return getattr(pipeline, submodel_type.value) if submodel_type else pipeline
 
     def _needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool:
         return False
