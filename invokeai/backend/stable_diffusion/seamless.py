@@ -28,6 +28,10 @@ def _conv_forward_asymmetric(self, input, weight, bias):
 
 @contextmanager
 def set_seamless(model: Union[UNet2DConditionModel, AutoencoderKL, AutoencoderTiny], seamless_axes: List[str]):
+    if not seamless_axes:
+        yield
+        return
+
     # Callable: (input: Tensor, weight: Tensor, bias: Optional[Tensor]) -> Tensor
     to_restore: list[tuple[nn.Conv2d | nn.ConvTranspose2d, Callable]] = []
     try:
