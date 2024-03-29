@@ -11,7 +11,7 @@ class Migration7Callback:
     def _drop_old_models_tables(self, cursor: sqlite3.Cursor) -> None:
         """Drops the old model_records, model_metadata, model_tags and tags tables."""
 
-        tables = ["model_records", "model_metadata", "model_tags", "tags"]
+        tables = ["model_config", "model_metadata", "model_tags", "tags"]
 
         for table in tables:
             cursor.execute(f"DROP TABLE IF EXISTS {table};")
