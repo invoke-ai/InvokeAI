@@ -514,7 +514,9 @@ class ModelInstallService(ModelInstallServiceBase):
         only situations in which we may have orphaned models in the models directory.
         """
 
-        installed_model_paths = {Path(x.path).resolve() for x in self.record_store.all_models()}
+        installed_model_paths = {
+            (self._app_config.models_path / x.path).resolve() for x in self.record_store.all_models()
+        }
 
         # The bool returned by this callback determines if the model is added to the list of models found by the search
         def on_model_found(model_path: Path) -> bool:
