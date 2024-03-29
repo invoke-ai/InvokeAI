@@ -348,8 +348,13 @@ class ModelInstallService(ModelInstallServiceBase):
                     config: dict[str, Any] = {}
                     config["name"] = model_name
                     config["description"] = stanza.get("description")
-                    config["config_path"] = stanza.get("config")
-
+                    legacy_config_path = stanza.get("config")
+                    if legacy_config_path:
+                        # In v3, these paths were relative to the root. Migrate them to be relative to the legacy_conf_dir.
+                        legacy_config_path: Path = self._app_config.root_path / legacy_config_path
+                        if legacy_config_path.is_relative_to(self._app_config.legacy_conf_path):
+                            legacy_config_path = legacy_config_path.relative_to(self._app_config.legacy_conf_path)
+                        config["config_path"] = str(legacy_config_path)
                     try:
                         id = self.register_path(model_path=model_path, config=config)
                         self._logger.info(f"Migrated {model_name} with id {id}")
