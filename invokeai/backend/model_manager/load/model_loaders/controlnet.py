@@ -46,8 +46,8 @@ class ControlNetLoader(GenericDiffusersLoader):
         )
 
         self._logger.info(f"Converting {model_path} to diffusers format")
-        with open(self._app_config.root_path / config.config_path, "r") as config_stream:
-            result = convert_controlnet_to_diffusers(
+        with open(self._app_config.legacy_conf_path / config.config_path, "r") as config_stream:
+            convert_controlnet_to_diffusers(
                 model_path,
                 output_path,
                 original_config_file=config_stream,

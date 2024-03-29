@@ -44,7 +44,7 @@ class VAELoader(GenericDiffusersLoader):
             raise Exception(f"VAE conversion not supported for model type: {config.base}")
         else:
             assert isinstance(config, CheckpointConfigBase)
-            config_file = self._app_config.root_path / config.config_path
+            config_file = self._app_config.legacy_conf_path / config.config_path
 
         if model_path.suffix == ".safetensors":
             checkpoint = safetensors_load_file(model_path, device="cpu")
