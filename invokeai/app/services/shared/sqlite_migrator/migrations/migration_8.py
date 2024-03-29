@@ -43,7 +43,7 @@ class Migration8Callback:
 
         for model_id, model_path, model_config_path in all_models:
             # If the model path is inside the models directory, update it to be relative to the models directory.
-            if model_path.startswith(str(models_path)):
+            if Path(model_path).is_relative_to(models_path):
                 new_path = Path(model_path).relative_to(models_path)
                 cursor.execute(
                     """--sql
@@ -54,11 +54,12 @@ class Migration8Callback:
                     (str(new_path), model_id),
                 )
             # If the model has a legacy config path and it is inside the legacy conf directory, update it to be
-            # relative to the legacy conf directory.
+            # relative to the legacy conf directory. This also fixes up cases in which the config path was
+            # incorrectly relativized to the root directory. It will now be relativized to the legacy conf directory.
             if model_config_path:
-                if model_config_path.startswith(str(legacy_conf_path)):  # for absolute version
+                if Path(model_config_path).is_relative_to(legacy_conf_path):
                     new_config_path = Path(model_config_path).relative_to(legacy_conf_path)
-                elif model_config_path.startswith(str(legacy_conf_dir)):  # for incorrect root-relative version
+                elif Path(model_config_path).is_relative_to(legacy_conf_dir):
                     new_config_path = Path(*Path(model_config_path).parts[1:])
                 else:
                     new_config_path = None
