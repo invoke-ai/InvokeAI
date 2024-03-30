@@ -69,6 +69,7 @@ export const buildCanvasOutpaintGraph = async (
     infillMosaicTileHeight,
     infillMosaicMinColor,
     infillMosaicMaxColor,
+    infillColorValue,
     clipSkip,
     seamlessXAxis,
     seamlessYAxis,
@@ -376,6 +377,7 @@ export const buildCanvasOutpaintGraph = async (
     graph.nodes[INPAINT_INFILL] = {
       type: 'infill_rgba',
       id: INPAINT_INFILL,
+      color: infillColorValue,
       is_intermediate,
     };
   }

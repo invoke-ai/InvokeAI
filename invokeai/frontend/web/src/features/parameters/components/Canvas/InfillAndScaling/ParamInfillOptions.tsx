@@ -1,9 +1,10 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo } from 'react';
 
+import ParamInfillColorOptions from './ParamInfillColorOptions';
+import ParamInfillMosaicOptions from './ParamInfillMosaicOptions';
 import ParamInfillPatchmatchDownscaleSize from './ParamInfillPatchmatchDownscaleSize';
 import ParamInfillTilesize from './ParamInfillTilesize';
-import ParamMosaicInfillOptions from './ParamMosaicInfillOptions';
 
 const ParamInfillOptions = () => {
   const infillMethod = useAppSelector((s) => s.generation.infillMethod);
@@ -16,7 +17,11 @@ const ParamInfillOptions = () => {
   }
 
   if (infillMethod === 'mosaic') {
-    return <ParamMosaicInfillOptions />;
+    return <ParamInfillMosaicOptions />;
+  }
+
+  if (infillMethod === 'color') {
+    return <ParamInfillColorOptions />;
   }
 
   return null;

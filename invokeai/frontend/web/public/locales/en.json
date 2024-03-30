@@ -891,6 +891,7 @@
         "infillMosaicTileHeight": "Tile Height",
         "infillMosaicMinColor": "Min Color",
         "infillMosaicMaxColor": "Max Color",
+        "infillColorValue": "Fill Color",
         "info": "Info",
         "invoke": {
             "addingImagesTo": "Adding images to",

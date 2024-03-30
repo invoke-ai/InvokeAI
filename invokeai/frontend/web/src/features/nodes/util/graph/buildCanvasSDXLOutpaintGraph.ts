@@ -70,6 +70,7 @@ export const buildCanvasSDXLOutpaintGraph = async (
     infillMosaicTileHeight,
     infillMosaicMinColor,
     infillMosaicMaxColor,
+    infillColorValue,
     seamlessXAxis,
     seamlessYAxis,
     canvasCoherenceMode,
@@ -386,6 +387,7 @@ export const buildCanvasSDXLOutpaintGraph = async (
       type: 'infill_rgba',
       id: INPAINT_INFILL,
       is_intermediate,
+      color: infillColorValue,
     };
   }
 
