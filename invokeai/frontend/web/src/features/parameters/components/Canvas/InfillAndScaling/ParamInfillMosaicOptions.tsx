@@ -13,7 +13,7 @@ import { memo, useCallback, useMemo } from 'react';
 import type { RgbaColor } from 'react-colorful';
 import { useTranslation } from 'react-i18next';
 
-const ParamMosaicInfillTileSize = () => {
+const ParamInfillMosaicTileSize = () => {
   const dispatch = useAppDispatch();
 
   const selector = useMemo(
@@ -124,4 +124,4 @@ const ParamMosaicInfillTileSize = () => {
   );
 };
 
-export default memo(ParamMosaicInfillTileSize);
+export default memo(ParamInfillMosaicTileSize);
