@@ -121,9 +121,15 @@ class DefaultSessionProcessor(SessionProcessorBase):
                 poll_now_event.clear()
                 # Middle processor try block; any unhandled exception is a non-fatal processor error
                 try:
-                    # Get the next session to process
-                    self._queue_item = self._invoker.services.session_queue.dequeue()
-                    if self._queue_item is not None and resume_event.is_set():
+                    # If we are paused, wait for resume event
+                    if resume_event.is_set():
+                        # Get the next session to process
+                        self._queue_item = self._invoker.services.session_queue.dequeue()
+
+                        if self._queue_item is None:
+                            # Empty queue, wait for next polling interval or event to try again
+                            continue
+
                         self._invoker.services.logger.debug(f"Executing queue item {self._queue_item.item_id}")
                         cancel_event.clear()
 
