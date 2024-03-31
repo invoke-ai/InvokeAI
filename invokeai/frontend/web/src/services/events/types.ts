@@ -14,14 +14,21 @@ export type InvocationErrorEvent = S['InvocationErrorEvent'];
 export type ProgressImage = InvocationDenoiseProgressEvent['progress_image'];
 
 export type ModelInstallDownloadProgressEvent = S['ModelInstallDownloadProgressEvent'];
+export type ModelInstallDownloadsCompleteEvent = S['ModelInstallDownloadsCompleteEvent'];
 export type ModelInstallCompleteEvent = S['ModelInstallCompleteEvent'];
 export type ModelInstallErrorEvent = S['ModelInstallErrorEvent'];
 export type ModelInstallStartedEvent = S['ModelInstallStartedEvent'];
 export type ModelInstallCancelledEvent = S['ModelInstallCancelledEvent'];
 
-type SessionStartedEvent = S['SessionStartedEvent'];
+export type DownloadStartedEvent = S['DownloadStartedEvent'];
+export type DownloadProgressEvent = S['DownloadProgressEvent'];
+export type DownloadCompleteEvent = S['DownloadCompleteEvent'];
+export type DownloadCancelledEvent = S['DownloadCancelledEvent'];
+export type DownloadErrorEvent = S['DownloadErrorEvent'];
+
+export type SessionStartedEvent = S['SessionStartedEvent'];
 export type SessionCompleteEvent = S['SessionCompleteEvent'];
-type SessionCanceledEvent = S['SessionCanceledEvent'];
+export type SessionCanceledEvent = S['SessionCanceledEvent'];
 
 export type QueueItemStatusChangedEvent = S['QueueItemStatusChangedEvent'];
 
@@ -46,9 +53,15 @@ export type ServerToClientEvents = {
   session_started: (payload: SessionStartedEvent) => void;
   session_complete: (payload: SessionCompleteEvent) => void;
   session_canceled: (payload: SessionCanceledEvent) => void;
+  download_started: (payload: DownloadStartedEvent) => void;
+  download_progress: (payload: DownloadProgressEvent) => void;
+  download_complete: (payload: DownloadCompleteEvent) => void;
+  download_cancelled: (payload: DownloadCancelledEvent) => void;
+  download_error: (payload: DownloadErrorEvent) => void;
   model_load_started: (payload: ModelLoadStartedEvent) => void;
   model_install_started: (payload: ModelInstallStartedEvent) => void;
   model_install_download_progress: (payload: ModelInstallDownloadProgressEvent) => void;
+  model_install_downloads_complete: (payload: ModelInstallDownloadsCompleteEvent) => void;
   model_install_complete: (payload: ModelInstallCompleteEvent) => void;
   model_install_error: (payload: ModelInstallErrorEvent) => void;
   model_install_cancelled: (payload: ModelInstallCancelledEvent) => void;
