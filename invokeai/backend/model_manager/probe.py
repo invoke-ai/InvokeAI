@@ -28,7 +28,7 @@ from .config import (
 )
 from .util.model_util import lora_token_vector_length, read_checkpoint_meta
 
-CkptType = Dict[str, Any]
+CkptType = Dict[str | int, Any]
 
 LEGACY_CONFIGS: Dict[BaseModelType, Dict[ModelVariantType, Union[str, Dict[SchedulerPredictionType, str]]]] = {
     BaseModelType.StableDiffusion1: {
@@ -37,7 +37,6 @@ LEGACY_CONFIGS: Dict[BaseModelType, Dict[ModelVariantType, Union[str, Dict[Sched
             SchedulerPredictionType.VPrediction: "v1-inference-v.yaml",
         },
         ModelVariantType.Inpaint: "v1-inpainting-inference.yaml",
-        ModelVariantType.Depth: "v2-midas-inference.yaml",
     },
     BaseModelType.StableDiffusion2: {
         ModelVariantType.Normal: {
@@ -48,6 +47,7 @@ LEGACY_CONFIGS: Dict[BaseModelType, Dict[ModelVariantType, Union[str, Dict[Sched
             SchedulerPredictionType.Epsilon: "v2-inpainting-inference.yaml",
             SchedulerPredictionType.VPrediction: "v2-inpainting-inference-v.yaml",
         },
+        ModelVariantType.Depth: "v2-midas-inference.yaml",
     },
     BaseModelType.StableDiffusionXL: {
         ModelVariantType.Normal: "sd_xl_base.yaml",
@@ -219,7 +219,7 @@ class ModelProbe(object):
         ckpt = checkpoint if checkpoint else read_checkpoint_meta(model_path, scan=True)
         ckpt = ckpt.get("state_dict", ckpt)
 
-        for key in ckpt.keys():
+        for key in [str(k) for k in ckpt.keys()]:
             if any(key.startswith(v) for v in {"cond_stage_model.", "first_stage_model.", "model.diffusion_model."}):
                 return ModelType.Main
             elif any(key.startswith(v) for v in {"encoder.conv_in", "decoder.conv_in"}):
@@ -227,7 +227,7 @@ class ModelProbe(object):
             elif any(key.startswith(v) for v in {"lora_te_", "lora_unet_"}):
                 return ModelType.LoRA
             elif any(key.endswith(v) for v in {"to_k_lora.up.weight", "to_q_lora.down.weight"}):
-                return ModelType.Lora
+                return ModelType.LoRA
             elif any(key.startswith(v) for v in {"controlnet", "control_model", "input_blocks"}):
                 return ModelType.ControlNet
             elif key in {"emb_params", "string_to_param"}:

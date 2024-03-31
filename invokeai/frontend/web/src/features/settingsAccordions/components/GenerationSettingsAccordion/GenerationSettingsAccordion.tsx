@@ -6,7 +6,6 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
 import { selectLoraSlice } from 'features/lora/store/loraSlice';
-import { SyncModelsIconButton } from 'features/modelManagerV2/components/SyncModels/SyncModelsIconButton';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
@@ -60,7 +59,6 @@ export const GenerationSettingsAccordion = memo(() => {
             <ParamMainModelSelect />
             <Flex>
               <UseDefaultSettingsButton />
-              <SyncModelsIconButton />
               <NavigateToModelManagerButton />
             </Flex>
           </Flex>
@@ -69,7 +67,7 @@ export const GenerationSettingsAccordion = memo(() => {
             <LoRAList />
           </Flex>
         </Flex>
-        <Expander isOpen={isOpenExpander} onToggle={onToggleExpander}>
+        <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} flexDir="column" pb={4}>
             <FormControlGroup formLabelProps={formLabelProps}>
               <ParamScheduler />

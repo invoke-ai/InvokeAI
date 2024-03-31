@@ -27,15 +27,6 @@ type GetModelConfigsResponse = NonNullable<
   paths['/api/v2/models/']['get']['responses']['200']['content']['application/json']
 >;
 
-type GetHFTokenStatusResponse =
-  paths['/api/v2/models/hf_login']['get']['responses']['200']['content']['application/json'];
-type SetHFTokenResponse = NonNullable<
-  paths['/api/v2/models/hf_login']['post']['responses']['200']['content']['application/json']
->;
-type SetHFTokenArg = NonNullable<
-  paths['/api/v2/models/hf_login']['post']['requestBody']['content']['application/json']
->;
-
 export type GetStarterModelsResponse =
   paths['/api/v2/models/starter_models']['get']['responses']['200']['content']['application/json'];
 
@@ -197,15 +188,6 @@ export const modelsApi = api.injectEndpoints({
       },
       serializeQueryArgs: ({ queryArgs }) => `${queryArgs.name}.${queryArgs.base}.${queryArgs.type}`,
     }),
-    syncModels: build.mutation<void, void>({
-      query: () => {
-        return {
-          url: buildModelsUrl('sync'),
-          method: 'PATCH',
-        };
-      },
-      invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
-    }),
     scanFolder: build.query<ScanFolderResponse, ScanFolderArg>({
       query: (arg) => {
         const folderQueryStr = arg ? queryString.stringify(arg, {}) : '';
@@ -275,22 +257,6 @@ export const modelsApi = api.injectEndpoints({
       query: () => buildModelsUrl('starter_models'),
       providesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
     }),
-    getHFTokenStatus: build.query<GetHFTokenStatusResponse, void>({
-      query: () => buildModelsUrl('hf_login'),
-      providesTags: ['HFTokenStatus'],
-    }),
-    setHFToken: build.mutation<SetHFTokenResponse, SetHFTokenArg>({
-      query: (body) => ({ url: buildModelsUrl('hf_login'), method: 'POST', body }),
-      invalidatesTags: ['HFTokenStatus'],
-      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
-        try {
-          const { data } = await queryFulfilled;
-          dispatch(modelsApi.util.updateQueryData('getHFTokenStatus', undefined, () => data));
-        } catch {
-          // no-op
-        }
-      },
-    }),
   }),
 });
 
@@ -303,13 +269,10 @@ export const {
   useUpdateModelImageMutation,
   useInstallModelMutation,
   useConvertModelMutation,
-  useSyncModelsMutation,
   useLazyScanFolderQuery,
   useLazyGetHuggingFaceModelsQuery,
   useListModelInstallsQuery,
   useCancelModelInstallMutation,
   usePruneCompletedModelInstallsMutation,
   useGetStarterModelsQuery,
-  useGetHFTokenStatusQuery,
-  useSetHFTokenMutation,
 } = modelsApi;

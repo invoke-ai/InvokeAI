@@ -1,7 +1,5 @@
-import { Button, Flex, Heading, Spacer } from '@invoke-ai/ui-library';
+import { Button, Flex, Heading } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { HFToken } from 'features/modelManagerV2/components/HFToken';
-import { SyncModelsButton } from 'features/modelManagerV2/components/SyncModels/SyncModelsButton';
 import { setSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,14 +19,11 @@ export const ModelManager = () => {
     <Flex flexDir="column" layerStyle="first" p={4} gap={4} borderRadius="base" w="50%" h="full">
       <Flex w="full" gap={4} justifyContent="space-between" alignItems="center">
         <Heading fontSize="xl">{t('common.modelManager')}</Heading>
-        <Spacer />
-        <SyncModelsButton size="sm" />
         <Button size="sm" colorScheme="invokeYellow" leftIcon={<PiPlusBold />} onClick={handleClickAddModel}>
           {t('modelManager.addModels')}
         </Button>
       </Flex>
       <Flex flexDir="column" layerStyle="second" p={4} gap={4} borderRadius="base" w="full" h="full">
-        <HFToken />
         <ModelListNavigation />
         <ModelList />
       </Flex>

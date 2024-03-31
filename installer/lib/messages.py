@@ -7,6 +7,7 @@ import os
 import platform
 from enum import Enum
 from pathlib import Path
+from typing import Optional
 
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import FuzzyWordCompleter, PathCompleter
@@ -19,13 +20,6 @@ from rich.style import Style
 from rich.syntax import Syntax
 from rich.text import Text
 
-"""
-INVOKE_AI_SRC=https://github.com/invoke-ai/InvokeAI/archive/refs/tags/${INVOKEAI_VERSION}.zip
-INSTRUCTIONS=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/
-TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOMATED/#troubleshooting
-"""
-
-
 OS = platform.uname().system
 ARCH = platform.uname().machine
 
@@ -36,7 +30,7 @@ else:
     console = Console(style=Style(color="grey74", bgcolor="grey19"))
 
 
-def welcome(available_releases: tuple | None = None) -> None:
+def welcome(available_releases: tuple[list[str], list[str]] | None = None) -> None:
     @group()
     def text():
         if (platform_specific := _platform_specific_help()) is not None:
@@ -72,7 +66,34 @@ def welcome(available_releases: tuple | None = None) -> None:
     console.line()
 
 
-def choose_version(available_releases: tuple | None = None) -> str:
+def installing_from_wheel(wheel_filename: str) -> None:
+    """Display a message about installing from a wheel"""
+
+    @group()
+    def text():
+        yield Text.from_markup(f"You are installing from a wheel file: [bold]{wheel_filename}\n")
+        yield Text.from_markup(
+            "[bold orange3]If you are not sure why you are doing this, you should cancel and install InvokeAI normally."
+        )
+
+    console.print(
+        Panel(
+            title="Installing from Wheel",
+            renderable=text(),
+            box=box.DOUBLE,
+            expand=True,
+            padding=(1, 2),
+        )
+    )
+
+    should_proceed = Confirm.ask("Do you want to proceed?")
+
+    if not should_proceed:
+        console.print("Installation cancelled.")
+        exit()
+
+
+def choose_version(available_releases: tuple[list[str], list[str]] | None = None) -> str:
     """
     Prompt the user to choose an Invoke version to install
     """
@@ -114,7 +135,7 @@ def confirm_install(dest: Path) -> bool:
     return dest_confirmed
 
 
-def dest_path(dest=None) -> Path | None:
+def dest_path(dest: Optional[str | Path] = None) -> Path | None:
     """
     Prompt the user for the destination path and create the path
 

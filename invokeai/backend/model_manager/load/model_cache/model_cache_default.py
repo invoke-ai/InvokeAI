@@ -130,6 +130,11 @@ class ModelCache(ModelCacheBase[AnyModel]):
         """Return the cap on cache size."""
         return self._max_cache_size
 
+    @max_cache_size.setter
+    def max_cache_size(self, value: float) -> None:
+        """Set the cap on cache size."""
+        self._max_cache_size = value
+
     @property
     def stats(self) -> Optional[CacheStats]:
         """Return collected CacheStats object."""
@@ -166,9 +171,10 @@ class ModelCache(ModelCacheBase[AnyModel]):
         """Store model under key and optional submodel_type."""
         with self._lock:
             key = self._make_cache_key(key, submodel_type)
-            assert key not in self._cached_models
-
-            cache_record = CacheRecord(key=key, model=model, size=size)
+            if key in self._cached_models:
+                return
+            self.make_room(size)
+            cache_record = CacheRecord(key, model, size)
             self._cached_models[key] = cache_record
             self._cache_stack.append(key)
 
@@ -334,6 +340,8 @@ class ModelCache(ModelCacheBase[AnyModel]):
             #
             # Keep in mind that gc is only responsible for handling reference cycles. Most objects should be cleaned up
             # immediately when their reference count hits 0.
+            if self.stats:
+                self.stats.cleared = models_cleared
             gc.collect()
 
         torch.cuda.empty_cache()

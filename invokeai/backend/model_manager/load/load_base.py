@@ -82,3 +82,15 @@ class ModelLoaderBase(ABC):
     ) -> int:
         """Return size in bytes of the model, calculated before loading."""
         pass
+
+    @property
+    @abstractmethod
+    def convert_cache(self) -> ModelConvertCacheBase:
+        """Return the convert cache associated with this loader."""
+        pass
+
+    @property
+    @abstractmethod
+    def ram_cache(self) -> ModelCacheBase[AnyModel]:
+        """Return the ram cache associated with this loader."""
+        pass

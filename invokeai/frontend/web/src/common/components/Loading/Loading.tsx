@@ -1,4 +1,5 @@
 import { Flex, Image, Spinner } from '@invoke-ai/ui-library';
+/** @knipignore */
 import InvokeLogoWhite from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { memo } from 'react';
 

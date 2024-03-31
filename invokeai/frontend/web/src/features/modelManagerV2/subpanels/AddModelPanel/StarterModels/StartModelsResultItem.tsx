@@ -18,7 +18,7 @@ export const StarterModelsResultItem = ({ result }: Props) => {
   const allSources = useMemo(() => {
     const _allSources = [result.source];
     if (result.dependencies) {
-      _allSources.push(...result.dependencies);
+      _allSources.push(...result.dependencies.map((d) => d.source));
     }
     return _allSources;
   }, [result]);

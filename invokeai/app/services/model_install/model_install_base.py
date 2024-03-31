@@ -455,18 +455,17 @@ class ModelInstallServiceBase(ABC):
         """
 
     @abstractmethod
-    def scan_directory(self, scan_dir: Path, install: bool = False) -> List[str]:
+    def sync_model_path(self, key: str) -> AnyModelConfig:
         """
-        Recursively scan directory for new models and register or install them.
+        Move model into the location indicated by its basetype, type and name.
 
-        :param scan_dir: Path to the directory to scan.
-        :param install: Install if True, otherwise register in place.
-        :returns list of IDs: Returns list of IDs of models registered/installed
+        Call this after updating a model's attributes in order to move
+        the model's path into the location indicated by its basetype, type and
+        name. Applies only to models whose paths are within the root `models_dir`
+        directory.
+
+        May raise an UnknownModelException.
         """
-
-    @abstractmethod
-    def sync_to_config(self) -> None:
-        """Synchronize models on disk to those in the model record database."""
 
     @abstractmethod
     def download_and_cache(self, source: Union[str, AnyHttpUrl], access_token: Optional[str] = None) -> Path:

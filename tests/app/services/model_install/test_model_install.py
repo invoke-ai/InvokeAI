@@ -20,7 +20,7 @@ from invokeai.app.services.model_install import (
     ModelInstallServiceBase,
     URLModelSource,
 )
-from invokeai.app.services.model_records import UnknownModelException
+from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
 from invokeai.backend.model_manager.config import BaseModelType, InvalidModelConfigException, ModelFormat, ModelType
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 
@@ -43,8 +43,7 @@ def test_registration_meta(mm2_installer: ModelInstallServiceBase, embedding_fil
     assert model_record is not None
     assert model_record.name == "test_embedding"
     assert model_record.type == ModelType.TextualInversion
-    assert model_record.path.endswith(embedding_file.as_posix())
-    assert Path(model_record.path).is_absolute()
+    assert Path(model_record.path) == embedding_file
     assert Path(model_record.path).exists()
     assert model_record.base == BaseModelType("sd-1")
     assert model_record.description is not None
@@ -77,9 +76,20 @@ def test_install(
     key = mm2_installer.install_path(embedding_file)
     model_record = store.get_model(key)
     assert model_record.path.endswith("sd-1/embedding/test_embedding.safetensors")
-    assert Path(model_record.path).is_absolute()
-    assert Path(model_record.path).exists()
+    assert (mm2_app_config.models_path / model_record.path).exists()
     assert model_record.source == embedding_file.as_posix()
+
+
+def test_rename(
+    mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    store = mm2_installer.record_store
+    key = mm2_installer.install_path(embedding_file)
+    model_record = store.get_model(key)
+    assert model_record.path.endswith("sd-1/embedding/test_embedding.safetensors")
+    store.update_model(key, ModelRecordChanges(name="new_name.safetensors", base=BaseModelType("sd-2")))
+    new_model_record = mm2_installer.sync_model_path(key)
+    assert new_model_record.path.endswith("sd-2/embedding/new_name.safetensors")
 
 
 @pytest.mark.parametrize(
@@ -135,10 +145,7 @@ def test_background_install(
     model_record = mm2_installer.record_store.get_model(key)
     assert model_record is not None
     assert model_record.path.endswith(destination)
-    assert Path(model_record.path).is_absolute()
-    assert Path(model_record.path).exists()
-    assert model_record.key != "<NOKEY>"
-    assert Path(model_record.path).exists()
+    assert (mm2_app_config.models_path / model_record.path).exists()
 
     # see if metadata was properly passed through
     assert model_record.description == description
@@ -160,7 +167,7 @@ def test_not_inplace_install(
     assert job is not None
     assert job.config_out is not None
     assert Path(job.config_out.path) != embedding_file
-    assert Path(job.config_out.path).exists()
+    assert (mm2_app_config.models_path / job.config_out.path).exists()
 
 
 def test_inplace_install(
@@ -172,16 +179,21 @@ def test_inplace_install(
     assert job is not None
     assert job.config_out is not None
     assert Path(job.config_out.path) == embedding_file
+    assert Path(job.config_out.path).exists()
 
 
-def test_delete_install(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
+def test_delete_install(
+    mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
+) -> None:
     store = mm2_installer.record_store
     key = mm2_installer.install_path(embedding_file)
     model_record = store.get_model(key)
-    assert Path(model_record.path).exists()
+    assert (mm2_app_config.models_path / model_record.path).exists()
     assert embedding_file.exists()  # original should still be there after installation
     mm2_installer.delete(key)
-    assert not Path(model_record.path).exists()  # after deletion, installed copy should not exist
+    assert not (
+        mm2_app_config.models_path / model_record.path
+    ).exists()  # after deletion, installed copy should not exist
     assert embedding_file.exists()  # but original should still be there
     with pytest.raises(UnknownModelException):
         store.get_model(key)
@@ -220,7 +232,7 @@ def test_simple_download(mm2_installer: ModelInstallServiceBase, mm2_app_config:
 
     key = job.config_out.key
     model_record = store.get_model(key)
-    assert Path(model_record.path).exists()
+    assert (mm2_app_config.models_path / model_record.path).exists()
 
     assert len(bus.events) == 4
     event_names = [x.event_name for x in bus.events]
@@ -249,7 +261,7 @@ def test_huggingface_download(mm2_installer: ModelInstallServiceBase, mm2_app_co
 
     key = job.config_out.key
     model_record = store.get_model(key)
-    assert Path(model_record.path).exists()
+    assert (mm2_app_config.models_path / model_record.path).exists()
     assert model_record.type == ModelType.Main
     assert model_record.format == ModelFormat.Diffusers
 
@@ -274,6 +286,25 @@ def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: In
     assert job.error
     assert "NOT FOUND" in job.error
     assert job.error_traceback.startswith("Traceback")
+
+
+def test_other_error_during_install(
+    monkeypatch: pytest.MonkeyPatch, mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    def raise_runtime_error(*args, **kwargs):
+        raise RuntimeError("Test error")
+
+    monkeypatch.setattr(
+        "invokeai.app.services.model_install.model_install_default.ModelInstallService._register_or_install",
+        raise_runtime_error,
+    )
+    source = LocalModelSource(path=Path("tests/data/embedding/test_embedding.safetensors"))
+    job = mm2_installer.import_model(source)
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.status == InstallStatus.ERROR
+    assert job.errored
+    assert job.error_type == "RuntimeError"
+    assert job.error == "Test error"
 
 
 # TODO: Fix bug in model install causing jobs to get installed multiple times then uncomment this test

@@ -37,7 +37,7 @@ dependencies = [
   "clip_anytorch==2.5.2",       # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel==2.0.2",
   "controlnet-aux==0.0.7",
-  "diffusers[torch]==0.27.0",
+  "diffusers[torch]==0.27.2",
   "invisible-watermark==0.2.0", # needed to install SDXL base and refiner using their repo_ids
   "mediapipe==0.10.7",          # needed for "mediapipeface" controlnet model
   "numpy==1.26.4",              # >1.24.0 is needed to use the 'strict' argument to np.testing.assert_array_equal()
@@ -51,7 +51,7 @@ dependencies = [
   "torchmetrics==0.11.4",
   "torchsde==0.2.6",
   "torchvision==0.17.1",
-  "transformers==4.38.2",
+  "transformers==4.39.1",
 
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events==0.11.0",
@@ -126,7 +126,6 @@ dependencies = [
 
 [project.scripts]
 "invokeai-web" = "invokeai.app.run_app:run_app"
-"invokeai-update" = "invokeai.frontend.install.invokeai_update:main"
 "invokeai-import-images" = "invokeai.frontend.install.import_images:main"
 "invokeai-db-maintenance" = "invokeai.backend.util.db_maintenance:main"
 

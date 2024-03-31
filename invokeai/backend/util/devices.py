@@ -28,6 +28,11 @@ def choose_torch_device() -> torch.device:
         return torch.device(config.device)
 
 
+def get_torch_device_name() -> str:
+    device = choose_torch_device()
+    return torch.cuda.get_device_name(device) if device.type == "cuda" else device.type.upper()
+
+
 # We are in transition here from using a single global AppConfig to allowing multiple
 # configurations. It is strongly recommended to pass the app_config to this function.
 def choose_precision(

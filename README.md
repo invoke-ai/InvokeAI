@@ -395,9 +395,9 @@ For our latest changes, view our [Release
 Notes](https://github.com/invoke-ai/InvokeAI/releases) and the
 [CHANGELOG](docs/CHANGELOG.md).
 
-### Troubleshooting
+### Troubleshooting / FAQ
 
-Please check out our **[Troubleshooting Guide](https://invoke-ai.github.io/InvokeAI/installation/010_INSTALL_AUTOMATED/#troubleshooting)** to get solutions for common installation
+Please check out our **[FAQ](https://invoke-ai.github.io/InvokeAI/help/FAQ/)** to get solutions for common installation
 problems and other issues. For more help, please join our [Discord][discord link]
 
 ## Contributing

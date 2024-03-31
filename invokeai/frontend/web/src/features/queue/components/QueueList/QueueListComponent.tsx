@@ -1,11 +1,10 @@
-import { Flex, forwardRef } from '@invoke-ai/ui-library';
-import { memo } from 'react';
+import { Flex, forwardRef, typedMemo } from '@invoke-ai/ui-library';
 import type { Components } from 'react-virtuoso';
 import type { SessionQueueItemDTO } from 'services/api/types';
 
 import type { ListContext } from './types';
 
-const QueueListComponent: Components<SessionQueueItemDTO, ListContext>['List'] = memo(
+const QueueListComponent: Components<SessionQueueItemDTO, ListContext>['List'] = typedMemo(
   forwardRef((props, ref) => {
     return (
       <Flex {...props} ref={ref} flexDirection="column" gap={0.5}>
@@ -15,4 +14,6 @@ const QueueListComponent: Components<SessionQueueItemDTO, ListContext>['List'] =
   })
 );
 
-export default memo(QueueListComponent);
+QueueListComponent.displayName = 'QueueListComponent';
+
+export default QueueListComponent;

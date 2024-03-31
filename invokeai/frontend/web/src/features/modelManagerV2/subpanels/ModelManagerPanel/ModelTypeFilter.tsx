@@ -18,7 +18,7 @@ export const ModelTypeFilter = () => {
       controlnet: 'ControlNet',
       vae: 'VAE',
       t2i_adapter: t('common.t2iAdapter'),
-      ip_adapter: t('modelManager.ipAdapters'),
+      ip_adapter: t('common.ipAdapter'),
       clip_vision: 'Clip Vision',
     }),
     [t]

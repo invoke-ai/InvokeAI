@@ -18,7 +18,9 @@ from invokeai.app.services.model_records import (
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.backend.model_manager.config import (
     BaseModelType,
+    ControlAdapterDefaultSettings,
     MainDiffusersConfig,
+    MainModelDefaultSettings,
     ModelFormat,
     ModelSourceType,
     ModelType,
@@ -288,3 +290,12 @@ def test_filter_2(store: ModelRecordServiceBase):
         model_name="dup_name1",
     )
     assert len(matches) == 1
+
+
+def test_model_record_changes():
+    # This test guards against some unexpected behaviours from pydantic's union evaluation. See #6035
+    changes = ModelRecordChanges.model_validate({"default_settings": {"preprocessor": "value"}})
+    assert isinstance(changes.default_settings, ControlAdapterDefaultSettings)
+
+    changes = ModelRecordChanges.model_validate({"default_settings": {"vae": "value"}})
+    assert isinstance(changes.default_settings, MainModelDefaultSettings)

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import mimetypes
 import socket
 from contextlib import asynccontextmanager
@@ -6,6 +7,7 @@ from inspect import signature
 from pathlib import Path
 from typing import Any
 
+import torch
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,6 +28,7 @@ from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
+from invokeai.backend.util.devices import get_torch_device_name
 
 from ..backend.util.logging import InvokeAILogger
 from .api.dependencies import ApiDependencies
@@ -59,6 +62,9 @@ logger = InvokeAILogger.get_logger(config=app_config)
 # see https://github.com/invoke-ai/InvokeAI/discussions/3684#discussioncomment-6391352
 mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("text/css", ".css")
+
+torch_device_name = get_torch_device_name()
+logger.info(f"Using torch device: {torch_device_name}")
 
 
 @asynccontextmanager
@@ -222,6 +228,22 @@ app.mount(
 )  # docs favicon is in here
 
 
+def check_cudnn(logger: logging.Logger) -> None:
+    """Check for cuDNN issues that could be causing degraded performance."""
+    if torch.backends.cudnn.is_available():
+        try:
+            # Note: At the time of writing (torch 2.2.1), torch.backends.cudnn.version() only raises an error the first
+            # time it is called. Subsequent calls will return the version number without complaining about a mismatch.
+            cudnn_version = torch.backends.cudnn.version()
+            logger.info(f"cuDNN version: {cudnn_version}")
+        except RuntimeError as e:
+            logger.warning(
+                "Encountered a cuDNN version issue. This may result in degraded performance. This issue is usually "
+                "caused by an incompatible cuDNN version installed in your python environment, or on the host "
+                f"system. Full error message:\n{e}"
+            )
+
+
 def invoke_api() -> None:
     def find_port(port: int) -> int:
         """Find a port not in use starting at given port"""
@@ -247,6 +269,8 @@ def invoke_api() -> None:
     port = find_port(app_config.port)
     if port != app_config.port:
         logger.warn(f"Port {app_config.port} in use, using port {port}")
+
+    check_cudnn(logger)
 
     # Start our own event loop for eventing usage
     loop = asyncio.new_event_loop()

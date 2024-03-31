@@ -1,147 +1,154 @@
-from dataclasses import dataclass
 from typing import Optional
+
+from pydantic import BaseModel
 
 from invokeai.backend.model_manager.config import BaseModelType, ModelType
 
 
-@dataclass
-class StarterModel:
+class StarterModelWithoutDependencies(BaseModel):
     description: str
     source: str
     name: str
     base: BaseModelType
     type: ModelType
-    # Optional list of model source dependencies that need to be installed before this model can be used
-    dependencies: Optional[list[str]] = None
     is_installed: bool = False
 
+
+class StarterModel(StarterModelWithoutDependencies):
+    # Optional list of model source dependencies that need to be installed before this model can be used
+    dependencies: Optional[list[StarterModelWithoutDependencies]] = None
+
+
+sdxl_fp16_vae_fix = StarterModel(
+    name="sdxl-vae-fp16-fix",
+    base=BaseModelType.StableDiffusionXL,
+    source="madebyollin/sdxl-vae-fp16-fix",
+    description="SDXL VAE that works with FP16.",
+    type=ModelType.VAE,
+)
+
+ip_adapter_sd_image_encoder = StarterModel(
+    name="IP Adapter SD1.5 Image Encoder",
+    base=BaseModelType.StableDiffusion1,
+    source="InvokeAI/ip_adapter_sd_image_encoder",
+    description="IP Adapter SD Image Encoder",
+    type=ModelType.CLIPVision,
+)
+
+ip_adapter_sdxl_image_encoder = StarterModel(
+    name="IP Adapter SDXL Image Encoder",
+    base=BaseModelType.StableDiffusionXL,
+    source="InvokeAI/ip_adapter_sdxl_image_encoder",
+    description="IP Adapter SDXL Image Encoder",
+    type=ModelType.CLIPVision,
+)
+
+cyberrealistic_negative = StarterModel(
+    name="CyberRealistic Negative v3",
+    base=BaseModelType.StableDiffusion1,
+    source="https://huggingface.co/cyberdelia/CyberRealistic_Negative/resolve/main/CyberRealistic_Negative_v3.pt",
+    description="Negative embedding specifically for use with CyberRealistic.",
+    type=ModelType.TextualInversion,
+)
 
 # List of starter models, displayed on the frontend.
 # The order/sort of this list is not changed by the frontend - set it how you want it here.
 STARTER_MODELS: list[StarterModel] = [
     # region: Main
     StarterModel(
-        name="SD 1.5 (base)",
+        name="CyberRealistic v4.1",
         base=BaseModelType.StableDiffusion1,
-        source="runwayml/stable-diffusion-v1-5",
-        description="Stable Diffusion version 1.5 diffusers model (4.27 GB)",
+        source="https://huggingface.co/cyberdelia/CyberRealistic/resolve/main/CyberRealistic_V4.1_FP16.safetensors",
+        description="Photorealistic model. See other variants in HF repo 'cyberdelia/CyberRealistic'.",
+        type=ModelType.Main,
+        dependencies=[cyberrealistic_negative],
+    ),
+    StarterModel(
+        name="ReV Animated",
+        base=BaseModelType.StableDiffusion1,
+        source="stablediffusionapi/rev-animated",
+        description="Fantasy and anime style images.",
         type=ModelType.Main,
     ),
     StarterModel(
-        name="SD 1.5 (inpainting)",
+        name="Dreamshaper 8",
         base=BaseModelType.StableDiffusion1,
-        source="runwayml/stable-diffusion-inpainting",
-        description="RunwayML SD 1.5 model optimized for inpainting, diffusers version (4.27 GB)",
+        source="Lykon/dreamshaper-8",
+        description="Popular versatile model.",
         type=ModelType.Main,
     ),
     StarterModel(
-        name="Analog Diffusion",
+        name="Dreamshaper 8 (inpainting)",
         base=BaseModelType.StableDiffusion1,
-        source="wavymulder/Analog-Diffusion",
-        description="An SD-1.5 model trained on diverse analog photographs (2.13 GB)",
+        source="Lykon/dreamshaper-8-inpainting",
+        description="Inpainting version of Dreamshaper 8.",
         type=ModelType.Main,
     ),
     StarterModel(
         name="Deliberate v5",
         base=BaseModelType.StableDiffusion1,
         source="https://huggingface.co/XpucT/Deliberate/resolve/main/Deliberate_v5.safetensors",
-        description="Versatile model that produces detailed images up to 768px (4.27 GB)",
+        description="Popular versatile model",
         type=ModelType.Main,
     ),
     StarterModel(
-        name="Dungeons and Diffusion",
+        name="Deliberate v5 (inpainting)",
         base=BaseModelType.StableDiffusion1,
-        source="0xJustin/Dungeons-and-Diffusion",
-        description="Dungeons & Dragons characters (2.13 GB)",
+        source="https://huggingface.co/XpucT/Deliberate/resolve/main/Deliberate_v5-inpainting.safetensors",
+        description="Inpainting version of Deliberate v5.",
         type=ModelType.Main,
     ),
     StarterModel(
-        name="dreamlike photoreal v2",
-        base=BaseModelType.StableDiffusion1,
-        source="dreamlike-art/dreamlike-photoreal-2.0",
-        description="A photorealistic model trained on 768 pixel images based on SD 1.5 (2.13 GB)",
-        type=ModelType.Main,
-    ),
-    StarterModel(
-        name="Inkpunk Diffusion",
-        base=BaseModelType.StableDiffusion1,
-        source="Envvi/Inkpunk-Diffusion",
-        description='Stylized illustrations inspired by Gorillaz, FLCL and Shinkawa; prompt with "nvinkpunk" (4.27 GB)',
-        type=ModelType.Main,
-    ),
-    StarterModel(
-        name="OpenJourney",
-        base=BaseModelType.StableDiffusion1,
-        source="prompthero/openjourney",
-        description='An SD 1.5 model fine tuned on Midjourney; prompt with "mdjrny-v4 style" (2.13 GB)',
-        type=ModelType.Main,
-    ),
-    StarterModel(
-        name="seek.art MEGA",
-        base=BaseModelType.StableDiffusion1,
-        source="coreco/seek.art_MEGA",
-        description='A general use SD-1.5 "anything" model that supports multiple styles (2.1 GB)',
-        type=ModelType.Main,
-    ),
-    StarterModel(
-        name="TrinArt v2",
-        base=BaseModelType.StableDiffusion1,
-        source="naclbit/trinart_stable_diffusion_v2",
-        description="An SD-1.5 model finetuned with ~40K assorted high resolution manga/anime-style images (2.13 GB)",
-        type=ModelType.Main,
-    ),
-    StarterModel(
-        name="SD 2.1 (base)",
-        base=BaseModelType.StableDiffusion2,
-        source="stabilityai/stable-diffusion-2-1",
-        description="Stable Diffusion version 2.1 diffusers model, trained on 768 pixel images (5.21 GB)",
-        type=ModelType.Main,
-    ),
-    StarterModel(
-        name="SD 2.0 (inpainting)",
-        base=BaseModelType.StableDiffusion2,
-        source="stabilityai/stable-diffusion-2-inpainting",
-        description="Stable Diffusion version 2.0 inpainting model (5.21 GB)",
-        type=ModelType.Main,
-    ),
-    StarterModel(
-        name="SDXL (base)",
+        name="Juggernaut XL v9",
         base=BaseModelType.StableDiffusionXL,
-        source="stabilityai/stable-diffusion-xl-base-1.0",
-        description="Stable Diffusion XL base model (12 GB)",
+        source="RunDiffusion/Juggernaut-XL-v9",
+        description="Photograph-focused model.",
         type=ModelType.Main,
+        dependencies=[sdxl_fp16_vae_fix],
+    ),
+    StarterModel(
+        name="Dreamshaper XL v2 Turbo",
+        base=BaseModelType.StableDiffusionXL,
+        source="Lykon/dreamshaper-xl-v2-turbo",
+        description="For turbo, use CFG Scale 2, 4-8 steps, DPM++ SDE Karras. For non-turbo, use CFG Scale 6, 20-40 steps, DPM++ 2M SDE Karras.",
+        type=ModelType.Main,
+        dependencies=[sdxl_fp16_vae_fix],
     ),
     StarterModel(
         name="SDXL Refiner",
         base=BaseModelType.StableDiffusionXLRefiner,
         source="stabilityai/stable-diffusion-xl-refiner-1.0",
-        description="Stable Diffusion XL refiner model (12 GB)",
+        description="The OG Stable Diffusion XL refiner model.",
         type=ModelType.Main,
+        dependencies=[sdxl_fp16_vae_fix],
     ),
     # endregion
     # region VAE
-    StarterModel(
-        name="sdxl-vae-fp16-fix",
-        base=BaseModelType.StableDiffusionXL,
-        source="madebyollin/sdxl-vae-fp16-fix",
-        description="Version of the SDXL-1.0 VAE that works in half precision mode",
-        type=ModelType.VAE,
-    ),
+    sdxl_fp16_vae_fix,
     # endregion
     # region LoRA
     StarterModel(
-        name="FlatColor",
-        base=BaseModelType.StableDiffusion1,
-        source="https://civitai.com/models/6433/loraflatcolor",
-        description="A LoRA that generates scenery using solid blocks of color",
+        name="Alien Style",
+        base=BaseModelType.StableDiffusionXL,
+        source="https://huggingface.co/RalFinger/alien-style-lora-sdxl/resolve/main/alienzkin-sdxl.safetensors",
+        description="Futuristic, intricate alien styles. Trigger with 'alienzkin'.",
         type=ModelType.LoRA,
     ),
     StarterModel(
-        name="Ink scenery",
-        base=BaseModelType.StableDiffusion1,
-        source="https://civitai.com/api/download/models/83390",
-        description="Generate india ink-like landscapes",
+        name="Noodles Style",
+        base=BaseModelType.StableDiffusionXL,
+        source="https://huggingface.co/RalFinger/noodles-lora-sdxl/resolve/main/noodlez-sdxl.safetensors",
+        description="Never-ending, no-holds-barred, noodle nightmare. Trigger with 'noodlez'.",
         type=ModelType.LoRA,
+    ),
+    # endregion
+    # region TI
+    StarterModel(
+        name="EasyNegative",
+        base=BaseModelType.StableDiffusion1,
+        source="https://huggingface.co/embed/EasyNegative/resolve/main/EasyNegative.safetensors",
+        description="A textual inversion to use in the negative prompt to reduce bad anatomy",
+        type=ModelType.TextualInversion,
     ),
     # endregion
     # region IP Adapter
@@ -151,7 +158,7 @@ STARTER_MODELS: list[StarterModel] = [
         source="InvokeAI/ip_adapter_sd15",
         description="IP-Adapter for SD 1.5 models",
         type=ModelType.IPAdapter,
-        dependencies=["InvokeAI/ip_adapter_sd_image_encoder"],
+        dependencies=[ip_adapter_sd_image_encoder],
     ),
     StarterModel(
         name="IP Adapter Plus",
@@ -159,7 +166,7 @@ STARTER_MODELS: list[StarterModel] = [
         source="InvokeAI/ip_adapter_plus_sd15",
         description="Refined IP-Adapter for SD 1.5 models",
         type=ModelType.IPAdapter,
-        dependencies=["InvokeAI/ip_adapter_sd_image_encoder"],
+        dependencies=[ip_adapter_sd_image_encoder],
     ),
     StarterModel(
         name="IP Adapter Plus Face",
@@ -167,7 +174,7 @@ STARTER_MODELS: list[StarterModel] = [
         source="InvokeAI/ip_adapter_plus_face_sd15",
         description="Refined IP-Adapter for SD 1.5 models, adapted for faces",
         type=ModelType.IPAdapter,
-        dependencies=["InvokeAI/ip_adapter_sd_image_encoder"],
+        dependencies=[ip_adapter_sd_image_encoder],
     ),
     StarterModel(
         name="IP Adapter SDXL",
@@ -175,7 +182,7 @@ STARTER_MODELS: list[StarterModel] = [
         source="InvokeAI/ip_adapter_sdxl",
         description="IP-Adapter for SDXL models",
         type=ModelType.IPAdapter,
-        dependencies=["InvokeAI/ip_adapter_sdxl_image_encoder"],
+        dependencies=[ip_adapter_sdxl_image_encoder],
     ),
     # endregion
     # region ControlNet
@@ -376,15 +383,6 @@ STARTER_MODELS: list[StarterModel] = [
         source="TencentARC/t2i-adapter-sketch-sdxl-1.0",
         description="T2I Adapter weights trained on sdxl-1.0 with sketch conditioning.",
         type=ModelType.T2IAdapter,
-    ),
-    # endregion
-    # region TI
-    StarterModel(
-        name="EasyNegative",
-        base=BaseModelType.StableDiffusion1,
-        source="https://huggingface.co/embed/EasyNegative/resolve/main/EasyNegative.safetensors",
-        description="A textual inversion to use in the negative prompt to reduce bad anatomy",
-        type=ModelType.TextualInversion,
     ),
     # endregion
 ]
