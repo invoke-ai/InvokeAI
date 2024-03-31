@@ -9,6 +9,11 @@ import {
   socketBulkDownloadStarted,
   socketConnected,
   socketDisconnected,
+  socketDownloadCancelled,
+  socketDownloadComplete,
+  socketDownloadError,
+  socketDownloadProgress,
+  socketDownloadStarted,
   socketGeneratorProgress,
   socketGraphExecutionStateComplete,
   socketInvocationComplete,
@@ -17,11 +22,14 @@ import {
   socketModelInstallCancelled,
   socketModelInstallComplete,
   socketModelInstallDownloadProgress,
+  socketModelInstallDownloadsComplete,
   socketModelInstallError,
   socketModelInstallStarted,
   socketModelLoadComplete,
   socketModelLoadStarted,
   socketQueueItemStatusChanged,
+  socketSessionCanceled,
+  socketSessionStarted,
 } from 'services/events/actions';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
@@ -80,8 +88,16 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
     dispatch(socketInvocationComplete({ data }));
   });
 
+  socket.on('session_started', (data) => {
+    dispatch(socketSessionStarted({ data }));
+  });
+
   socket.on('session_complete', (data) => {
     dispatch(socketGraphExecutionStateComplete({ data }));
+  });
+
+  socket.on('session_canceled', (data) => {
+    dispatch(socketSessionCanceled({ data }));
   });
 
   socket.on('model_load_started', (data) => {
@@ -92,12 +108,36 @@ export const setEventListeners = (arg: SetEventListenersArg) => {
     dispatch(socketModelLoadComplete({ data }));
   });
 
+  socket.on('download_started', (data) => {
+    dispatch(socketDownloadStarted({ data }));
+  });
+
+  socket.on('download_progress', (data) => {
+    dispatch(socketDownloadProgress({ data }));
+  });
+
+  socket.on('download_complete', (data) => {
+    dispatch(socketDownloadComplete({ data }));
+  });
+
+  socket.on('download_cancelled', (data) => {
+    dispatch(socketDownloadCancelled({ data }));
+  });
+
+  socket.on('download_error', (data) => {
+    dispatch(socketDownloadError({ data }));
+  });
+
   socket.on('model_install_started', (data) => {
     dispatch(socketModelInstallStarted({ data }));
   });
 
   socket.on('model_install_download_progress', (data) => {
     dispatch(socketModelInstallDownloadProgress({ data }));
+  });
+
+  socket.on('model_install_downloads_complete', (data) => {
+    dispatch(socketModelInstallDownloadsComplete({ data }));
   });
 
   socket.on('model_install_complete', (data) => {
