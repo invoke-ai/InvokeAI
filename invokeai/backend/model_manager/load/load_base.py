@@ -28,8 +28,7 @@ class LoadedModel:
 
     def __enter__(self) -> AnyModel:
         """Context entry."""
-        self._locker.lock()
-        return self.model
+        return self._locker.lock()
 
     def __exit__(self, *args: Any, **kwargs: Any) -> None:
         """Context exit."""

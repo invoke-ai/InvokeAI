@@ -45,8 +45,8 @@ class CacheRecord(Generic[T]):
     """Elements of the cache."""
 
     key: str
-    model: T
     size: int
+    model: T
     loaded: bool = False
     _locks: int = 0
 
@@ -111,24 +111,8 @@ class ModelCacheBase(ABC, Generic[T]):
 
     @property
     @abstractmethod
-    def lazy_offloading(self) -> bool:
-        """Return true if the cache is configured to lazily offload models in VRAM."""
-        pass
-
-    @property
-    @abstractmethod
     def max_cache_size(self) -> float:
         """Return true if the cache is configured to lazily offload models in VRAM."""
-        pass
-
-    @abstractmethod
-    def offload_unlocked_models(self, size_required: int) -> None:
-        """Offload from VRAM any models not actively in use."""
-        pass
-
-    @abstractmethod
-    def move_model_to_device(self, cache_entry: CacheRecord[AnyModel], target_device: torch.device) -> None:
-        """Move model into the indicated device."""
         pass
 
     @property

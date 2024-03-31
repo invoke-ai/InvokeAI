@@ -58,65 +58,62 @@ class CompelInvocation(BaseInvocation):
         tokenizer_model = tokenizer_info.model
         assert isinstance(tokenizer_model, CLIPTokenizer)
         text_encoder_info = context.models.load(self.clip.text_encoder)
-        text_encoder_model = text_encoder_info.model
-        assert isinstance(text_encoder_model, CLIPTextModel)
 
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
             for lora in self.clip.loras:
                 lora_info = context.models.load(lora.lora)
                 assert isinstance(lora_info.model, LoRAModelRaw)
-                yield (lora_info.model, lora.weight)
+                with lora_info as model:
+                    yield (model, lora.weight)
                 del lora_info
             return
 
-        # loras = [(context.models.get(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
-
         ti_list = generate_ti_list(self.prompt, text_encoder_info.config.base, context)
 
-        with (
-            ModelPatcher.apply_ti(tokenizer_model, text_encoder_model, ti_list) as (
-                tokenizer,
-                ti_manager,
-            ),
-            text_encoder_info as text_encoder,
-            # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
-            ModelPatcher.apply_lora_text_encoder(text_encoder, _lora_loader()),
-            # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
-            ModelPatcher.apply_clip_skip(text_encoder_model, self.clip.skipped_layers),
-        ):
-            assert isinstance(text_encoder, CLIPTextModel)
-            compel = Compel(
-                tokenizer=tokenizer,
-                text_encoder=text_encoder,
-                textual_inversion_manager=ti_manager,
-                dtype_for_device_getter=torch_dtype,
-                truncate_long_prompts=False,
-            )
-
-            conjunction = Compel.parse_prompt_string(self.prompt)
-
-            if context.config.get().log_tokenization:
-                log_tokenization_for_conjunction(conjunction, tokenizer)
-
-            c, options = compel.build_conditioning_tensor_for_conjunction(conjunction)
-
-            ec = ExtraConditioningInfo(
-                tokens_count_including_eos_bos=get_max_token_count(tokenizer, conjunction),
-                cross_attention_control_args=options.get("cross_attention_control", None),
-            )
-
-        c = c.detach().to("cpu")
-
-        conditioning_data = ConditioningFieldData(
-            conditionings=[
-                BasicConditioningInfo(
-                    embeds=c,
-                    extra_conditioning=ec,
+        with text_encoder_info as text_encoder:
+            with (
+                ModelPatcher.apply_ti(tokenizer_model, text_encoder, ti_list) as (
+                    tokenizer,
+                    ti_manager,
+                ),
+                # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
+                ModelPatcher.apply_lora_text_encoder(text_encoder, _lora_loader()),
+                # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
+                ModelPatcher.apply_clip_skip(text_encoder, self.clip.skipped_layers),
+            ):
+                assert isinstance(text_encoder, CLIPTextModel)
+                compel = Compel(
+                    tokenizer=tokenizer,
+                    text_encoder=text_encoder,
+                    textual_inversion_manager=ti_manager,
+                    dtype_for_device_getter=torch_dtype,
+                    truncate_long_prompts=False,
                 )
-            ]
-        )
 
-        conditioning_name = context.conditioning.save(conditioning_data)
+                conjunction = Compel.parse_prompt_string(self.prompt)
+
+                if context.config.get().log_tokenization:
+                    log_tokenization_for_conjunction(conjunction, tokenizer)
+
+                c, options = compel.build_conditioning_tensor_for_conjunction(conjunction)
+
+                ec = ExtraConditioningInfo(
+                    tokens_count_including_eos_bos=get_max_token_count(tokenizer, conjunction),
+                    cross_attention_control_args=options.get("cross_attention_control", None),
+                )
+
+            c = c.detach().to("cpu")
+
+            conditioning_data = ConditioningFieldData(
+                conditionings=[
+                    BasicConditioningInfo(
+                        embeds=c,
+                        extra_conditioning=ec,
+                    )
+                ]
+            )
+
+            conditioning_name = context.conditioning.save(conditioning_data)
 
         return ConditioningOutput.build(conditioning_name)
 
@@ -137,8 +134,7 @@ class SDXLPromptInvocationBase:
         tokenizer_model = tokenizer_info.model
         assert isinstance(tokenizer_model, CLIPTokenizer)
         text_encoder_info = context.models.load(clip_field.text_encoder)
-        text_encoder_model = text_encoder_info.model
-        assert isinstance(text_encoder_model, (CLIPTextModel, CLIPTextModelWithProjection))
+        assert isinstance(text_encoder_info.model, (CLIPTextModel, CLIPTextModelWithProjection))
 
         # return zero on empty
         if prompt == "" and zero_on_empty:
@@ -174,55 +170,55 @@ class SDXLPromptInvocationBase:
 
         ti_list = generate_ti_list(prompt, text_encoder_info.config.base, context)
 
-        with (
-            ModelPatcher.apply_ti(tokenizer_model, text_encoder_model, ti_list) as (
-                tokenizer,
-                ti_manager,
-            ),
-            text_encoder_info as text_encoder,
-            # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
-            ModelPatcher.apply_lora(text_encoder, _lora_loader(), lora_prefix),
-            # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
-            ModelPatcher.apply_clip_skip(text_encoder_model, clip_field.skipped_layers),
-        ):
-            assert isinstance(text_encoder, (CLIPTextModel, CLIPTextModelWithProjection))
-            text_encoder = cast(CLIPTextModel, text_encoder)
-            compel = Compel(
-                tokenizer=tokenizer,
-                text_encoder=text_encoder,
-                textual_inversion_manager=ti_manager,
-                dtype_for_device_getter=torch_dtype,
-                truncate_long_prompts=False,  # TODO:
-                returned_embeddings_type=ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED,  # TODO: clip skip
-                requires_pooled=get_pooled,
-            )
+        with text_encoder_info as text_encoder:
+            with (
+                ModelPatcher.apply_ti(tokenizer_model, text_encoder, ti_list) as (
+                    tokenizer,
+                    ti_manager,
+                ),
+                # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
+                ModelPatcher.apply_lora(text_encoder, _lora_loader(), lora_prefix),
+                # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
+                ModelPatcher.apply_clip_skip(text_encoder, clip_field.skipped_layers),
+            ):
+                assert isinstance(text_encoder, (CLIPTextModel, CLIPTextModelWithProjection))
+                text_encoder = cast(CLIPTextModel, text_encoder)
+                compel = Compel(
+                    tokenizer=tokenizer,
+                    text_encoder=text_encoder,
+                    textual_inversion_manager=ti_manager,
+                    dtype_for_device_getter=torch_dtype,
+                    truncate_long_prompts=False,  # TODO:
+                    returned_embeddings_type=ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED,  # TODO: clip skip
+                    requires_pooled=get_pooled,
+                )
 
-            conjunction = Compel.parse_prompt_string(prompt)
+                conjunction = Compel.parse_prompt_string(prompt)
 
-            if context.config.get().log_tokenization:
-                # TODO: better logging for and syntax
-                log_tokenization_for_conjunction(conjunction, tokenizer)
+                if context.config.get().log_tokenization:
+                    # TODO: better logging for and syntax
+                    log_tokenization_for_conjunction(conjunction, tokenizer)
 
-            # TODO: ask for optimizations? to not run text_encoder twice
-            c, options = compel.build_conditioning_tensor_for_conjunction(conjunction)
-            if get_pooled:
-                c_pooled = compel.conditioning_provider.get_pooled_embeddings([prompt])
-            else:
-                c_pooled = None
+                # TODO: ask for optimizations? to not run text_encoder twice
+                c, options = compel.build_conditioning_tensor_for_conjunction(conjunction)
+                if get_pooled:
+                    c_pooled = compel.conditioning_provider.get_pooled_embeddings([prompt])
+                else:
+                    c_pooled = None
 
-            ec = ExtraConditioningInfo(
-                tokens_count_including_eos_bos=get_max_token_count(tokenizer, conjunction),
-                cross_attention_control_args=options.get("cross_attention_control", None),
-            )
+                ec = ExtraConditioningInfo(
+                    tokens_count_including_eos_bos=get_max_token_count(tokenizer, conjunction),
+                    cross_attention_control_args=options.get("cross_attention_control", None),
+                )
 
-        del tokenizer
-        del text_encoder
-        del tokenizer_info
-        del text_encoder_info
+            del tokenizer
+            del text_encoder
+            del tokenizer_info
+            del text_encoder_info
 
-        c = c.detach().to("cpu")
-        if c_pooled is not None:
-            c_pooled = c_pooled.detach().to("cpu")
+            c = c.detach().to("cpu")
+            if c_pooled is not None:
+                c_pooled = c_pooled.detach().to("cpu")
 
         return c, c_pooled, ec
 

@@ -1345,7 +1345,7 @@ from invokeai.app.services.model_load import ModelLoadService, ModelLoaderRegist
 
 config = InvokeAIAppConfig.get_config()
 ram_cache = ModelCache(
- max_cache_size=config.ram_cache_size, max_vram_cache_size=config.vram_cache_size, logger=logger
+ max_cache_size=config.ram_cache_size, logger=logger
 )
 convert_cache = ModelConvertCache(
  cache_path=config.models_convert_cache_path, max_size=config.convert_cache_size

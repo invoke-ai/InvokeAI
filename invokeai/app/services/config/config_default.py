@@ -23,7 +23,6 @@ INIT_FILE = Path("invokeai.yaml")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 DEFAULT_RAM_CACHE = 10.0
-DEFAULT_VRAM_CACHE = 0.25
 DEFAULT_CONVERT_CACHE = 20.0
 DEVICE = Literal["auto", "cpu", "cuda", "cuda:1", "mps"]
 PRECISION = Literal["auto", "float16", "bfloat16", "float32", "autocast"]
@@ -100,9 +99,7 @@ class InvokeAIAppConfig(BaseSettings):
         profile_prefix: An optional prefix for profile output files.
         profiles_dir: Path to profiles output directory.
         ram: Maximum memory amount used by memory model cache for rapid switching (GB).
-        vram: Amount of VRAM reserved for model storage (GB).
         convert_cache: Maximum size of on-disk converted models cache (GB).
-        lazy_offload: Keep models in VRAM until their space is needed.
         log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
         device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `cuda:1`, `mps`
         precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`, `autocast`
@@ -168,9 +165,7 @@ class InvokeAIAppConfig(BaseSettings):
 
     # CACHE
     ram:                          float = Field(default_factory=get_default_ram_cache_size, gt=0, description="Maximum memory amount used by memory model cache for rapid switching (GB).")
-    vram:                         float = Field(default=DEFAULT_VRAM_CACHE, ge=0, description="Amount of VRAM reserved for model storage (GB).")
     convert_cache:                float = Field(default=DEFAULT_CONVERT_CACHE, ge=0, description="Maximum size of on-disk converted models cache (GB).")
-    lazy_offload:                  bool = Field(default=True,               description="Keep models in VRAM until their space is needed.")
     log_memory_usage:              bool = Field(default=False,              description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.")
 
     # DEVICE
@@ -372,9 +367,6 @@ def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
             # `max_cache_size` was renamed to `ram` some time in v3, but both names were used
             if k == "max_cache_size" and "ram" not in category_dict:
                 parsed_config_dict["ram"] = v
-            # `max_vram_cache_size` was renamed to `vram` some time in v3, but both names were used
-            if k == "max_vram_cache_size" and "vram" not in category_dict:
-                parsed_config_dict["vram"] = v
             if k == "conf_path":
                 parsed_config_dict["legacy_models_yaml_path"] = v
             if k == "legacy_conf_dir":

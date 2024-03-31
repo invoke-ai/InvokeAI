@@ -19,9 +19,7 @@ context. Use like this:
 """
 
 import gc
-import math
 import sys
-import time
 from contextlib import suppress
 from logging import Logger
 from threading import BoundedSemaphore, Lock
@@ -30,7 +28,7 @@ from typing import Dict, List, Optional, Set
 import torch
 
 from invokeai.backend.model_manager import AnyModel, SubModelType
-from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
+from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot
 from invokeai.backend.util.devices import choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -43,9 +41,6 @@ if choose_torch_device() == torch.device("mps"):
 # Maximum size of the cache, in gigs
 # Default is roughly enough to hold three fp16 diffusers models in RAM simultaneously
 DEFAULT_MAX_CACHE_SIZE = 6.0
-
-# amount of GPU memory to hold in reserve for use by generations (GB)
-DEFAULT_MAX_VRAM_CACHE_SIZE = 2.75
 
 # actual size of a gig
 GIG = 1073741824
@@ -60,12 +55,10 @@ class ModelCache(ModelCacheBase[AnyModel]):
     def __init__(
         self,
         max_cache_size: float = DEFAULT_MAX_CACHE_SIZE,
-        max_vram_cache_size: float = DEFAULT_MAX_VRAM_CACHE_SIZE,
         storage_device: torch.device = torch.device("cpu"),
         execution_devices: Optional[Set[torch.device]] = None,
         precision: torch.dtype = torch.float16,
         sequential_offload: bool = False,
-        lazy_offloading: bool = True,
         sha_chunksize: int = 16777216,
         log_memory_usage: bool = False,
         logger: Optional[Logger] = None,
@@ -77,18 +70,14 @@ class ModelCache(ModelCacheBase[AnyModel]):
         :param execution_devices: Set of torch device to load active model into [calculated]
         :param storage_device: Torch device to save inactive model in [torch.device('cpu')]
         :param precision: Precision for loaded models [torch.float16]
-        :param lazy_offloading: Keep model in VRAM until another model needs to be loaded
         :param sequential_offload: Conserve VRAM by loading and unloading each stage of the pipeline sequentially
         :param log_memory_usage: If True, a memory snapshot will be captured before and after every model cache
             operation, and the result will be logged (at debug level). There is a time cost to capturing the memory
             snapshots, so it is recommended to disable this feature unless you are actively inspecting the model cache's
             behaviour.
         """
-        # allow lazy offloading only when vram cache enabled
-        self._lazy_offloading = lazy_offloading and max_vram_cache_size > 0
         self._precision: torch.dtype = precision
         self._max_cache_size: float = max_cache_size
-        self._max_vram_cache_size: float = max_vram_cache_size
         self._execution_devices: Set[torch.device] = execution_devices or self._get_execution_devices()
         self._storage_device: torch.device = storage_device
         self._logger = logger or InvokeAILogger.get_logger(self.__class__.__name__)
@@ -101,18 +90,13 @@ class ModelCache(ModelCacheBase[AnyModel]):
         self._lock = Lock()
         self._free_execution_device = BoundedSemaphore(len(self._execution_devices))
         self._busy_execution_devices: Set[torch.device] = set()
-        
+
         self.logger.info(f"Using rendering device(s) {[self._device_name(x) for x in self._execution_devices]}")
 
     @property
     def logger(self) -> Logger:
         """Return the logger used by the cache."""
         return self._logger
-
-    @property
-    def lazy_offloading(self) -> bool:
-        """Return true if the cache is configured to lazily offload models in VRAM."""
-        return self._lazy_offloading
 
     @property
     def storage_device(self) -> torch.device:
@@ -181,7 +165,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         key = self._make_cache_key(key, submodel_type)
         assert key not in self._cached_models
 
-        cache_record = CacheRecord(key, model, size)
+        cache_record = CacheRecord(key=key, model=model, size=size)
         self._cached_models[key] = cache_record
         self._cache_stack.append(key)
 
@@ -241,87 +225,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
             return f"{model_key}:{submodel_type.value}"
         else:
             return model_key
-
-    def offload_unlocked_models(self, size_required: int) -> None:
-        """Move any unused models from VRAM."""
-        reserved = self._max_vram_cache_size * GIG
-        vram_in_use = torch.cuda.memory_allocated() + size_required
-        self.logger.debug(f"{(vram_in_use/GIG):.2f}GB VRAM needed for models; max allowed={(reserved/GIG):.2f}GB")
-        for _, cache_entry in sorted(self._cached_models.items(), key=lambda x: x[1].size):
-            if vram_in_use <= reserved:
-                break
-            if not cache_entry.loaded:
-                continue
-            if not cache_entry.locked:
-                self.move_model_to_device(cache_entry, self.storage_device)
-                cache_entry.loaded = False
-                vram_in_use = torch.cuda.memory_allocated() + size_required
-                self.logger.debug(
-                    f"Removing {cache_entry.key} from VRAM to free {(cache_entry.size/GIG):.2f}GB; vram free = {(torch.cuda.memory_allocated()/GIG):.2f}GB"
-                )
-
-        torch.cuda.empty_cache()
-        if choose_torch_device() == torch.device("mps"):
-            mps.empty_cache()
-
-    def move_model_to_device(self, cache_entry: CacheRecord[AnyModel], target_device: torch.device) -> None:
-        """Move model into the indicated device.
-
-        :param cache_entry: The CacheRecord for the model
-        :param target_device: The torch.device to move the model into
-
-        May raise a torch.cuda.OutOfMemoryError
-        """
-        # These attributes are not in the base ModelMixin class but in various derived classes.
-        # Some models don't have these attributes, in which case they run in RAM/CPU.
-        self.logger.debug(f"Called to move {cache_entry.key} to {target_device}")
-        if not (hasattr(cache_entry.model, "device") and hasattr(cache_entry.model, "to")):
-            return
-
-        source_device = cache_entry.model.device
-
-        # Note: We compare device types only so that 'cuda' == 'cuda:0'.
-        # This would need to be revised to support multi-GPU.
-        if torch.device(source_device).type == torch.device(target_device).type:
-            return
-
-        # may raise an exception here if insufficient GPU VRAM
-        self._check_free_vram(target_device, cache_entry.size)
-
-        start_model_to_time = time.time()
-        snapshot_before = self._capture_memory_snapshot()
-        cache_entry.model.to(target_device)
-        snapshot_after = self._capture_memory_snapshot()
-        end_model_to_time = time.time()
-        self.logger.debug(
-            f"Moved model '{cache_entry.key}' from {source_device} to"
-            f" {target_device} in {(end_model_to_time-start_model_to_time):.2f}s."
-            f"Estimated model size: {(cache_entry.size/GIG):.3f} GB."
-            f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
-        )
-
-        if (
-            snapshot_before is not None
-            and snapshot_after is not None
-            and snapshot_before.vram is not None
-            and snapshot_after.vram is not None
-        ):
-            vram_change = abs(snapshot_before.vram - snapshot_after.vram)
-
-            # If the estimated model size does not match the change in VRAM, log a warning.
-            if not math.isclose(
-                vram_change,
-                cache_entry.size,
-                rel_tol=0.1,
-                abs_tol=10 * MB,
-            ):
-                self.logger.debug(
-                    f"Moving model '{cache_entry.key}' from {source_device} to"
-                    f" {target_device} caused an unexpected change in VRAM usage. The model's"
-                    " estimated size may be incorrect. Estimated model size:"
-                    f" {(cache_entry.size/GIG):.3f} GB.\n"
-                    f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
-                )
 
     def print_cuda_stats(self) -> None:
         """Log CUDA diagnostics."""
