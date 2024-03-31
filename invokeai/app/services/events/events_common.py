@@ -17,6 +17,7 @@ from invokeai.app.util.misc import get_timestamp
 from invokeai.backend.model_manager.config import AnyModelConfig, SubModelType
 
 if TYPE_CHECKING:
+    from invokeai.app.services.download.download_base import DownloadJob
     from invokeai.app.services.model_install.model_install_common import ModelInstallJob
 
 
@@ -338,8 +339,9 @@ class DownloadStartedEvent(DownloadEventBase):
     download_path: str = Field(description="The local path where the download is saved")
 
     @classmethod
-    def build(cls, source: str, download_path: str) -> "DownloadStartedEvent":
-        return cls(source=source, download_path=download_path)
+    def build(cls, job: "DownloadJob") -> "DownloadStartedEvent":
+        assert job.download_path
+        return cls(source=str(job.source), download_path=job.download_path.as_posix())
 
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
@@ -353,8 +355,14 @@ class DownloadProgressEvent(DownloadEventBase):
     total_bytes: int = Field(description="The total number of bytes to be downloaded")
 
     @classmethod
-    def build(cls, source: str, download_path: str, current_bytes: int, total_bytes: int) -> "DownloadProgressEvent":
-        return cls(source=source, download_path=download_path, current_bytes=current_bytes, total_bytes=total_bytes)
+    def build(cls, job: "DownloadJob") -> "DownloadProgressEvent":
+        assert job.download_path
+        return cls(
+            source=str(job.source),
+            download_path=job.download_path.as_posix(),
+            current_bytes=job.bytes,
+            total_bytes=job.total_bytes,
+        )
 
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
@@ -367,8 +375,9 @@ class DownloadCompleteEvent(DownloadEventBase):
     total_bytes: int = Field(description="The total number of bytes downloaded")
 
     @classmethod
-    def build(cls, source: str, download_path: str, total_bytes: int) -> "DownloadCompleteEvent":
-        return cls(source=source, download_path=download_path, total_bytes=total_bytes)
+    def build(cls, job: "DownloadJob") -> "DownloadCompleteEvent":
+        assert job.download_path
+        return cls(source=str(job.source), download_path=job.download_path.as_posix(), total_bytes=job.total_bytes)
 
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
@@ -378,8 +387,8 @@ class DownloadCancelledEvent(DownloadEventBase):
     __event_name__ = "download_cancelled"
 
     @classmethod
-    def build(cls, source: str) -> "DownloadCancelledEvent":
-        return cls(source=source)
+    def build(cls, job: "DownloadJob") -> "DownloadCancelledEvent":
+        return cls(source=str(job.source))
 
 
 @payload_schema.register  # pyright: ignore [reportUnknownMemberType]
@@ -392,8 +401,10 @@ class DownloadErrorEvent(DownloadEventBase):
     error: str = Field(description="The error message")
 
     @classmethod
-    def build(cls, source: str, error_type: str, error: str) -> "DownloadErrorEvent":
-        return cls(source=source, error_type=error_type, error=error)
+    def build(cls, job: "DownloadJob") -> "DownloadErrorEvent":
+        assert job.error_type
+        assert job.error
+        return cls(source=str(job.source), error_type=job.error_type, error=job.error)
 
 
 class ModelEventBase(EventBase):
