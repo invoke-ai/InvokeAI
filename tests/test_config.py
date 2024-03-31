@@ -92,7 +92,6 @@ def test_migrate_v3_config_from_file(tmp_path: Path, patch_rootdir: None):
     assert config.host == "192.168.1.1"
     assert config.port == 8080
     assert config.ram == 100
-    assert config.vram == 50
     assert config.legacy_models_yaml_path == Path("/custom/models.yaml")
     # This should be stripped out
     assert not hasattr(config, "esrgan")
