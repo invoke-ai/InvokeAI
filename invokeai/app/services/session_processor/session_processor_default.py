@@ -128,6 +128,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
                         if self._queue_item is None:
                             # Empty queue, wait for next polling interval or event to try again
+                            poll_now_event.wait(self._polling_interval)
                             continue
 
                         self._invoker.services.logger.debug(f"Executing queue item {self._queue_item.item_id}")
