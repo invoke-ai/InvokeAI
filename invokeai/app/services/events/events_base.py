@@ -35,6 +35,7 @@ from invokeai.app.services.events.events_common import (
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
+    from invokeai.app.services.download.download_base import DownloadJob
     from invokeai.app.services.events.events_common import EventBase
     from invokeai.app.services.model_install.model_install_common import ModelInstallJob
     from invokeai.app.services.session_processor.session_processor_common import ProgressImage
@@ -125,25 +126,25 @@ class EventServiceBase:
 
     # region Download
 
-    def emit_download_started(self, source: str, download_path: str) -> None:
+    def emit_download_started(self, job: "DownloadJob") -> None:
         """Emitted when a download is started"""
-        self.dispatch(DownloadStartedEvent.build(source, download_path))
+        self.dispatch(DownloadStartedEvent.build(job))
 
-    def emit_download_progress(self, source: str, download_path: str, current_bytes: int, total_bytes: int) -> None:
+    def emit_download_progress(self, job: "DownloadJob") -> None:
         """Emitted at intervals during a download"""
-        self.dispatch(DownloadProgressEvent.build(source, download_path, current_bytes, total_bytes))
+        self.dispatch(DownloadProgressEvent.build(job))
 
-    def emit_download_complete(self, source: str, download_path: str, total_bytes: int) -> None:
+    def emit_download_complete(self, job: "DownloadJob") -> None:
         """Emitted when a download is completed"""
-        self.dispatch(DownloadCompleteEvent.build(source, download_path, total_bytes))
+        self.dispatch(DownloadCompleteEvent.build(job))
 
-    def emit_download_cancelled(self, source: str) -> None:
+    def emit_download_cancelled(self, job: "DownloadJob") -> None:
         """Emitted when a download is cancelled"""
-        self.dispatch(DownloadCancelledEvent.build(source))
+        self.dispatch(DownloadCancelledEvent.build(job))
 
-    def emit_download_error(self, source: str, error_type: str, error: str) -> None:
+    def emit_download_error(self, job: "DownloadJob") -> None:
         """Emitted when a download encounters an error"""
-        self.dispatch(DownloadErrorEvent.build(source, error_type, error))
+        self.dispatch(DownloadErrorEvent.build(job))
 
     # endregion
 
