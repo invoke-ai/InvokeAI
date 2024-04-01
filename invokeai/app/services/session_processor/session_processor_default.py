@@ -157,7 +157,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     while self._invocation is not None and not cancel_event.is_set():
                         # get the source node id to provide to clients (the prepared node id is not as useful)
                         source_invocation_id = self._queue_item.session.prepared_source_mapping[self._invocation.id]
-
                         self._invoker.services.events.emit_invocation_started(self._queue_item, self._invocation)
 
                         # Innermost processor try block; any unhandled exception is an invocation error & will fail the graph
@@ -185,13 +184,12 @@ class DefaultSessionProcessor(SessionProcessorBase):
                                 # Save outputs and history
                                 self._queue_item.session.complete(self._invocation.id, outputs)
 
-                                # Dispatch invocation complete event
                                 self._invoker.services.events.emit_invocation_complete(
                                     self._queue_item, self._invocation, outputs
                                 )
 
                         except KeyboardInterrupt:
-                            # TODO(MM2): Create an event for this
+                            # TODO(MM2): I don't think this is ever raised...
                             pass
 
                         except CanceledException:
@@ -217,7 +215,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
                             )
                             self._invoker.services.logger.error(error)
 
-                            # Send error event
                             self._invoker.services.events.emit_invocation_error(
                                 queue_item=self._queue_item,
                                 invocation=self._invocation,
@@ -230,7 +227,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
                         # The session is complete if the all invocations are complete or there was an error
                         if self._queue_item.session.is_complete() or cancel_event.is_set():
-                            # Send complete event
                             self._invoker.services.events.emit_session_complete(self._queue_item)
                             # If we are profiling, stop the profiler and dump the profile & stats
                             if self._profiler:
