@@ -64,6 +64,6 @@ class VAELoader(GenericDiffusersLoader):
             vae_config=ckpt_config,
             image_size=512,
             precision=self._torch_dtype,
+            dump_path=output_path,
         )
-        vae_model.save_pretrained(output_path, safe_serialization=True)
         return vae_model
