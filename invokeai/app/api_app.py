@@ -5,7 +5,7 @@ import socket
 from contextlib import asynccontextmanager
 from inspect import signature
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import torch
 import uvicorn
@@ -17,8 +17,6 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
-from fastapi_events.registry.payload_schema import registry as fastapi_events_registry
-from pydantic import BaseModel
 from pydantic.json_schema import models_json_schema
 from torch.backends.mps import is_available as is_mps_available
 
@@ -29,6 +27,7 @@ import invokeai.frontend.web as web_dir
 from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.events.events_common import EventBase
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.backend.util.devices import TorchDevice
 
@@ -185,15 +184,13 @@ def custom_openapi() -> dict[str, Any]:
         invoker_schema["class"] = "invocation"
 
     # Add all pydantic event schemas registered with fastapi-events
-    for payload in fastapi_events_registry.data.values():
-        json_schema = cast(BaseModel, payload).model_json_schema(
-            mode="serialization", ref_template="#/components/schemas/{model}"
-        )
+    for event in EventBase.get_events():
+        json_schema = event.model_json_schema(mode="serialization", ref_template="#/components/schemas/{model}")
         if "$defs" in json_schema:
             for schema_key, schema in json_schema["$defs"].items():
                 openapi_schema["components"]["schemas"][schema_key] = schema
             del json_schema["$defs"]
-        openapi_schema["components"]["schemas"][payload.__name__] = json_schema
+        openapi_schema["components"]["schemas"][event.__name__] = json_schema
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema
