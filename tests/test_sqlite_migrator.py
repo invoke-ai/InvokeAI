@@ -250,6 +250,32 @@ def test_migrator_runs_all_migrations_file(logger: Logger) -> None:
         db.conn.close()
 
 
+def test_migrator_backs_up_db(logger: Logger) -> None:
+    with TemporaryDirectory() as tempdir:
+        original_db_path = Path(tempdir) / "invokeai.db"
+        db = SqliteDatabase(db_path=original_db_path, logger=logger, verbose=False)
+        # Write some data to the db to test for successful backup
+        temp_cursor = db.conn.cursor()
+        temp_cursor.execute("CREATE TABLE test (id INTEGER PRIMARY KEY);")
+        db.conn.commit()
+        # Set up the migrator
+        migrator = SqliteMigrator(db=db)
+        migrations = [Migration(from_version=i, to_version=i + 1, callback=create_migrate(i)) for i in range(0, 3)]
+        for migration in migrations:
+            migrator.register_migration(migration)
+        migrator.run_migrations()
+        # Must manually close else we get an error on Windows
+        db.conn.close()
+        assert original_db_path.exists()
+        # We should have a backup file when we migrated a file db
+        assert migrator._backup_path
+        # Check that the test table exists as a proxy for successful backup
+        with closing(sqlite3.connect(migrator._backup_path)) as backup_db_conn:
+            backup_db_cursor = backup_db_conn.cursor()
+            backup_db_cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='test';")
+            assert backup_db_cursor.fetchone() is not None
+
+
 def test_migrator_makes_no_changes_on_failed_migration(
     migrator: SqliteMigrator, migration_no_op: Migration, failing_migrate_callback: MigrateCallback
 ) -> None:
