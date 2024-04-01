@@ -46,8 +46,6 @@ import { addInvocationStartedEventListener } from 'app/store/middleware/listener
 import { addModelInstallEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketModelInstall';
 import { addModelLoadEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketModelLoad';
 import { addSocketQueueItemStatusChangedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketQueueItemStatusChanged';
-import { addSocketSubscribedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketSubscribed';
-import { addSocketUnsubscribedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketUnsubscribed';
 import { addStagingAreaImageSavedListener } from 'app/store/middleware/listenerMiddleware/listeners/stagingAreaImageSaved';
 import { addUpdateAllNodesRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/updateAllNodesRequested';
 import { addUpscaleRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/upscaleRequested';
@@ -107,8 +105,6 @@ addInvocationErrorEventListener(startAppListening);
 addInvocationStartedEventListener(startAppListening);
 addSocketConnectedEventListener(startAppListening);
 addSocketDisconnectedEventListener(startAppListening);
-addSocketSubscribedEventListener(startAppListening);
-addSocketUnsubscribedEventListener(startAppListening);
 addModelLoadEventListener(startAppListening);
 addModelInstallEventListener(startAppListening);
 addSocketQueueItemStatusChangedEventListener(startAppListening);
