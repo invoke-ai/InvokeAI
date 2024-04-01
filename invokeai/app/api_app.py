@@ -184,7 +184,7 @@ def custom_openapi() -> dict[str, Any]:
         invoker_schema["class"] = "invocation"
 
     # Add all pydantic event schemas registered with fastapi-events
-    for event in EventBase.get_events():
+    for event in sorted(EventBase.get_events(), key=lambda e: e.__name__):
         json_schema = event.model_json_schema(mode="serialization", ref_template="#/components/schemas/{model}")
         if "$defs" in json_schema:
             for schema_key, schema in json_schema["$defs"].items():
