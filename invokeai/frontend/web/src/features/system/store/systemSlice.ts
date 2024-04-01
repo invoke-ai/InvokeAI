@@ -107,12 +107,12 @@ export const systemSlice = createSlice({
      * Generator Progress
      */
     builder.addCase(socketGeneratorProgress, (state, action) => {
-      const { step, total_steps, progress_image, session_id, batch_id } = action.payload.data;
+      const { step, total_steps, progress_image, session_id, batch_id, percentage } = action.payload.data;
 
       state.denoiseProgress = {
         step,
         total_steps,
-        percentage: step / total_steps,
+        percentage,
         progress_image,
         session_id,
         batch_id,
