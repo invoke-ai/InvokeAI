@@ -65,4 +65,4 @@ class VAELoader(GenericDiffusersLoader):
             precision=self._torch_dtype,
         )
         vae_model.save_pretrained(output_path, safe_serialization=True)
-        return output_path
+        return vae_model
