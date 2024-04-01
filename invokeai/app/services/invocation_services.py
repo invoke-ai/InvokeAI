@@ -24,7 +24,6 @@ if TYPE_CHECKING:
     from .image_records.image_records_base import ImageRecordStorageBase
     from .images.images_base import ImageServiceABC
     from .invocation_cache.invocation_cache_base import InvocationCacheBase
-    from .invocation_stats.invocation_stats_base import InvocationStatsServiceBase
     from .model_images.model_images_base import ModelImageFileStorageBase
     from .model_manager.model_manager_base import ModelManagerServiceBase
     from .names.names_base import NameServiceBase
@@ -53,7 +52,6 @@ class InvocationServices:
         model_images: "ModelImageFileStorageBase",
         model_manager: "ModelManagerServiceBase",
         download_queue: "DownloadQueueServiceBase",
-        performance_statistics: "InvocationStatsServiceBase",
         session_queue: "SessionQueueBase",
         session_processor: "SessionProcessorBase",
         invocation_cache: "InvocationCacheBase",
@@ -77,7 +75,6 @@ class InvocationServices:
         self.model_images = model_images
         self.model_manager = model_manager
         self.download_queue = download_queue
-        self.performance_statistics = performance_statistics
         self.session_queue = session_queue
         self.session_processor = session_processor
         self.invocation_cache = invocation_cache

@@ -749,7 +749,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     mask = mask.to(device=unet.device, dtype=unet.dtype)
                 if masked_latents is not None:
                     masked_latents = masked_latents.to(device=unet.device, dtype=unet.dtype)
-
                 scheduler = get_scheduler(
                     context=context,
                     scheduler_info=self.unet.scheduler,

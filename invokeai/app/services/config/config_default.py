@@ -24,7 +24,7 @@ DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 DEFAULT_RAM_CACHE = 10.0
 DEFAULT_CONVERT_CACHE = 20.0
-DEVICE = Literal["auto", "cpu", "cuda", "cuda:1", "mps"]
+DEVICE = Literal["auto", "cpu", "cuda:0", "cuda:1", "cuda:2", "cuda:3", "cuda:4", "cuda:5", "mps"]
 PRECISION = Literal["auto", "float16", "bfloat16", "float32", "autocast"]
 ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
 ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
@@ -169,6 +169,7 @@ class InvokeAIAppConfig(BaseSettings):
 
     # DEVICE
     device:                      DEVICE = Field(default="auto",             description="Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.")
+    devices:      Optional[list[DEVICE]] = Field(default=None,              description="List of execution devices; will override default device selected.")
     precision:                PRECISION = Field(default="auto",             description="Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.")
 
     # GENERATION
@@ -178,6 +179,7 @@ class InvokeAIAppConfig(BaseSettings):
     force_tiled_decode:            bool = Field(default=False,              description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).")
     pil_compress_level:             int = Field(default=1,                  description="The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.")
     max_queue_size:                 int = Field(default=10000, gt=0,        description="Maximum number of items in the session queue.")
+    max_threads:                    int = Field(default=4,                  description="Maximum number of session queue execution threads.")
 
     # NODES
     allow_nodes:    Optional[list[str]] = Field(default=None,               description="List of nodes to allow. Omit to allow all.")

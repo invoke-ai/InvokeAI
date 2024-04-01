@@ -23,7 +23,6 @@ from ..services.image_records.image_records_sqlite import SqliteImageRecordStora
 from ..services.images.images_default import ImageService
 from ..services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 from ..services.invocation_services import InvocationServices
-from ..services.invocation_stats.invocation_stats_default import InvocationStatsService
 from ..services.invoker import Invoker
 from ..services.model_images.model_images_default import ModelImageFileStorageDisk
 from ..services.model_manager.model_manager_default import ModelManagerService
@@ -102,7 +101,6 @@ class ApiDependencies:
             events=events,
         )
         names = SimpleNameService()
-        performance_statistics = InvocationStatsService()
         session_processor = DefaultSessionProcessor()
         session_queue = SqliteSessionQueue(db=db)
         urls = LocalUrlService()
@@ -125,7 +123,6 @@ class ApiDependencies:
             model_manager=model_manager,
             download_queue=download_queue_service,
             names=names,
-            performance_statistics=performance_statistics,
             session_processor=session_processor,
             session_queue=session_queue,
             urls=urls,
