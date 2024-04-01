@@ -39,8 +39,8 @@ class InfillImageProcessorInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     @abstractmethod
     def infill(self, image: Image.Image) -> Image.Image:
-        """Abstract to perform various infilling techniques"""
-        return image
+        """Infill the image with the specified method"""
+        pass
 
     def load_image(self, context: InvocationContext) -> tuple[Image.Image, bool]:
         """Process the image to have an alpha channel before being infilled"""
@@ -110,7 +110,6 @@ class InfillPatchMatchInvocation(InfillImageProcessorInvocation):
     resample_mode: PIL_RESAMPLING_MODES = InputField(default="bicubic", description="The resampling mode")
 
     def infill(self, image: Image.Image):
-
         resample_mode = PIL_RESAMPLING_MAP[self.resample_mode]
 
         width = int(image.width / self.downscale)
