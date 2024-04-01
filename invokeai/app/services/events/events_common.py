@@ -1,3 +1,4 @@
+from math import floor
 from typing import TYPE_CHECKING, Any, Coroutine, Optional, Protocol, TypeAlias, TypeVar
 
 from fastapi_events.handlers.local import local_handler
@@ -14,6 +15,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
 )
 from invokeai.app.util.misc import get_timestamp
 from invokeai.backend.model_manager.config import AnyModelConfig, SubModelType
+from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
 if TYPE_CHECKING:
     from invokeai.app.services.download.download_base import DownloadJob
@@ -68,7 +70,8 @@ def register_events(events: set[type[TEvent]], func: FastAPIEventFunc) -> None:
     :param func: The function to handle the events
     """
     for event in events:
-        local_handler.register(event_name=event.__event_name__, _func=func)
+        assert hasattr(event, "__event_name__")
+        local_handler.register(event_name=event.__event_name__, _func=func)  # pyright: ignore [reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
 
 
 class QueueEventBase(EventBase):
@@ -128,16 +131,20 @@ class InvocationDenoiseProgressEvent(InvocationEventBase):
     progress_image: ProgressImage = Field(description="The progress image sent at each step during processing")
     step: int = Field(description="The current step of the invocation")
     total_steps: int = Field(description="The total number of steps in the invocation")
+    order: int = Field(description="The order of the invocation in the session")
+    percentage: float = Field(description="The percentage of completion of the invocation")
 
     @classmethod
     def build(
         cls,
         queue_item: SessionQueueItem,
         invocation: BaseInvocation,
-        step: int,
-        total_steps: int,
+        intermediate_state: PipelineIntermediateState,
         progress_image: ProgressImage,
     ) -> "InvocationDenoiseProgressEvent":
+        step = intermediate_state.step
+        total_steps = intermediate_state.total_steps
+        order = intermediate_state.order
         return cls(
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
@@ -149,7 +156,19 @@ class InvocationDenoiseProgressEvent(InvocationEventBase):
             progress_image=progress_image,
             step=step,
             total_steps=total_steps,
+            order=order,
+            percentage=cls.calc_percentage(step, total_steps, order),
         )
+
+    @staticmethod
+    def calc_percentage(step: int, total_steps: int, scheduler_order: float) -> float:
+        """Calculate the percentage of completion of denoising."""
+        if total_steps == 0:
+            return 0.0
+        if scheduler_order == 2:
+            return floor((step + 1 + 1) / 2) / floor((total_steps + 1) / 2)
+        # order == 1
+        return (step + 1 + 1) / (total_steps + 1)
 
 
 class InvocationCompleteEvent(InvocationEventBase):
