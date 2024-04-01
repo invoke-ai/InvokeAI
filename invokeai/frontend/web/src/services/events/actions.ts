@@ -33,12 +33,6 @@ export const socketConnected = createAction('socket/socketConnected');
 
 export const socketDisconnected = createAction('socket/socketDisconnected');
 
-export const socketSubscribedSession = createAction<{
-  sessionId: string;
-}>('socket/socketSubscribedSession');
-
-export const socketUnsubscribedSession = createAction<{ sessionId: string }>('socket/socketUnsubscribedSession');
-
 export const socketInvocationStarted = createAction<{
   data: InvocationStartedEvent;
 }>('socket/socketInvocationStarted');
