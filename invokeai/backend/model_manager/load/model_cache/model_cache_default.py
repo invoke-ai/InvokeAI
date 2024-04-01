@@ -30,14 +30,10 @@ import torch
 
 from invokeai.backend.model_manager import AnyModel, SubModelType
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot
-from invokeai.backend.util.devices import choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger
 
 from .model_cache_base import CacheRecord, CacheStats, ModelCacheBase, ModelLockerBase
 from .model_locker import ModelLocker
-
-if choose_torch_device() == torch.device("mps"):
-    from torch import mps
 
 # Maximum size of the cache, in gigs
 # Default is roughly enough to hold three fp16 diffusers models in RAM simultaneously
@@ -130,6 +126,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         assigned = [x for x, tid in self._execution_devices.items() if current_thread == tid]
         if not assigned:
             raise ValueError("No GPU has been reserved for the use of thread {current_thread}")
+        print(f'DEBUG: TID={current_thread}; owns {assigned[0]}')
         return assigned[0]
 
     @contextmanager
@@ -155,15 +152,16 @@ class ModelCache(ModelCacheBase[AnyModel]):
             self._free_execution_device.acquire(timeout=timeout)
             with self._device_lock:
                 free_device = [x for x, tid in self._execution_devices.items() if tid == 0]
-                print(f"DEBUG: execution devices = {self._execution_devices}")
                 self._execution_devices[free_device[0]] = current_thread
                 device = free_device[0]
 
         # we are outside the lock region now
+        print(f'DEBUG: RESERVED {device} for TID {current_thread}')
         try:
             yield device
         finally:
             with self._device_lock:
+                print(f'DEBUG: RELEASED {device} for TID {current_thread}')
                 self._execution_devices[device] = 0
                 self._free_execution_device.release()
                 torch.cuda.empty_cache()
@@ -386,11 +384,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
             if self.stats:
                 self.stats.cleared = models_cleared
             gc.collect()
-
-        torch.cuda.empty_cache()
-        if choose_torch_device() == torch.device("mps"):
-            mps.empty_cache()
-
         self.logger.debug(f"After making room: cached_models={len(self._cached_models)}")
 
     def _check_free_vram(self, target_device: torch.device, needed_size: int) -> None:
@@ -406,12 +399,12 @@ class ModelCache(ModelCacheBase[AnyModel]):
     @staticmethod
     def _get_execution_devices(devices: Optional[Set[torch.device]] = None) -> Set[torch.device]:
         if not devices:
-            default_device = choose_torch_device()
-            if default_device != torch.device("cuda"):
-                devices = {default_device}
-            else:
-                # we get here if the default device is cuda, and return each of the cuda devices.
+            if torch.cuda.is_available():
                 devices = {torch.device(f"cuda:{x}") for x in range(0, torch.cuda.device_count())}
+            elif torch.backends.mps.is_available():
+                devices = {torch.device('mps')}
+            else:
+                devices = {torch.device('cpu')}
         return devices
 
     @staticmethod

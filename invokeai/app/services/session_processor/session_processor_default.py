@@ -175,7 +175,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
                 session = self._session_worker_queue.get()
                 if self._cancel_event.is_set():
                     if session.item_id in self._sessions_to_cancel:
-                        print("DEBUG: CANCEL")
                         continue
 
                 if profiler is not None:
@@ -183,7 +182,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
                 # reserve a GPU for this session - may block
                 with self._invoker.services.model_manager.load.ram_cache.reserve_execution_device() as gpu:
-                    print(f"DEBUG: session {session.item_id} has reserved gpu {gpu}")
 
                     # Prepare invocations and take the first
                     with self._process_lock:

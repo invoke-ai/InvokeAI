@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from typing import Any, Callable, Optional, Union
 
 import torch
+import threading
 from diffusers import UNet2DConditionModel
 from typing_extensions import TypeAlias
 
@@ -288,6 +289,8 @@ class InvokeAIDiffuserComponent:
             unconditioning, encoder_attention_mask = _pad_conditioning(unconditioning, max_len, encoder_attention_mask)
             conditioning, encoder_attention_mask = _pad_conditioning(conditioning, max_len, encoder_attention_mask)
 
+        if unconditioning.device != conditioning.device:
+            print(f'DEBUG: TID={threading.current_thread().ident}: Unconditioning device = {unconditioning.device}, conditioning device={conditioning.device}')
         return torch.cat([unconditioning, conditioning]), encoder_attention_mask
 
     # methods below are called from do_diffusion_step and should be considered private to this class.

@@ -12,28 +12,26 @@ from invokeai.app.services.config.config_default import get_config
 CPU_DEVICE = torch.device("cpu")
 CUDA_DEVICE = torch.device("cuda")
 MPS_DEVICE = torch.device("mps")
-
+RAM_CACHE = None   # horrible hack
 
 def choose_torch_device() -> torch.device:
     """Convenience routine for guessing which GPU device to run model on."""
-    # """Temporarily modified to use the model manager's get_execution_device()"""
-    # try:
-    #     from invokeai.app.api.dependencies import ApiDependencies
-    #     model_manager = ApiDependencies.invoker.services.model_manager
-    #     device = model_manager.load.ram_cache.acquire_execution_device()
-    #     print(f'DEBUG choose_torch_device returning {device}')
-    #     return device
-    # except Exception:
-    config = get_config()
-    if config.device == "auto":
-        if torch.cuda.is_available():
-            return torch.device("cuda")
-        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-            return torch.device("mps")
+    """Temporarily modified to use the model manager's get_execution_device()"""
+    global RAM_CACHE
+    try:
+        device = RAM_CACHE.get_execution_device()
+        return device
+    except (ValueError, AttributeError):
+        config = get_config()
+        if config.device == "auto":
+            if torch.cuda.is_available():
+                return torch.device("cuda")
+            if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                return torch.device("mps")
+            else:
+                return CPU_DEVICE
         else:
-            return CPU_DEVICE
-    else:
-        return torch.device(config.device)
+            return torch.device(config.device)
 
 
 def get_torch_device_name() -> str:

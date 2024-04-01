@@ -1,5 +1,6 @@
 from queue import Queue
 from typing import TYPE_CHECKING, Optional, TypeVar
+import threading
 
 from invokeai.app.services.object_serializer.object_serializer_base import ObjectSerializerBase
 
@@ -18,8 +19,8 @@ class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
     def __init__(self, underlying_storage: ObjectSerializerBase[T], max_cache_size: int = 20):
         super().__init__()
         self._underlying_storage = underlying_storage
-        self._cache: dict[str, T] = {}
-        self._cache_ids = Queue[str]()
+        self._cache: dict[int, dict[str, T]] = {}
+        self._cache_ids: dict[int, Queue[str]] = {}
         self._max_cache_size = max_cache_size
 
     def start(self, invoker: "Invoker") -> None:
@@ -54,12 +55,27 @@ class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
             del self._cache[name]
         self._on_deleted(name)
 
+    def _get_tid_cache(self) -> dict[str, T]:
+        tid = threading.current_thread().ident
+        if tid not in self._cache:
+            self._cache[tid] = {}
+        return self._cache[tid]
+
+    def _get_tid_cache_ids(self) -> Queue[str]:
+        tid = threading.current_thread().ident
+        if tid not in self._cache_ids:
+            self._cache_ids[tid] = Queue[str]()
+        return self._cache_ids[tid]
+
     def _get_cache(self, name: str) -> Optional[T]:
-        return None if name not in self._cache else self._cache[name]
+        cache = self._get_tid_cache()
+        return None if name not in cache else cache[name]
 
     def _set_cache(self, name: str, data: T):
-        if name not in self._cache:
-            self._cache[name] = data
-            self._cache_ids.put(name)
-            if self._cache_ids.qsize() > self._max_cache_size:
-                self._cache.pop(self._cache_ids.get())
+        cache = self._get_tid_cache()
+        if name not in cache:
+            cache[name] = data
+            cache_ids = self._get_tid_cache_ids()
+            cache_ids.put(name)
+            if cache_ids.qsize() > self._max_cache_size:
+                cache.pop(cache_ids.get())

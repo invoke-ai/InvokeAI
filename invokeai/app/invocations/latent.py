@@ -4,7 +4,7 @@ import math
 from contextlib import ExitStack
 from functools import singledispatchmethod
 from typing import Any, Iterator, List, Literal, Optional, Tuple, Union
-
+import threading
 import einops
 import numpy as np
 import numpy.typing as npt
@@ -393,6 +393,11 @@ class DenoiseLatentsInvocation(BaseInvocation):
             # flip all bits to have noise different from initial
             generator=torch.Generator(device=unet.device).manual_seed(seed ^ 0xFFFFFFFF),
         )
+
+        if conditioning_data.unconditioned_embeddings.embeds.device != conditioning_data.text_embeddings.embeds.device:
+            print(f'DEBUG; ERROR uc={conditioning_data.unconditioned_embeddings.embeds.device} c={conditioning_data.text_embeddings.embeds.device} unet={unet.device}, tid={threading.current_thread().ident}')
+
+
         return conditioning_data
 
     def create_pipeline(
