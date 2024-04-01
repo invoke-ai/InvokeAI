@@ -8,9 +8,10 @@ model will be cleared and (re)loaded from disk when next needed.
 """
 
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from logging import Logger
-from typing import Dict, Generic, Optional, Set, TypeVar
+from typing import Dict, Generator, Generic, Optional, Set, TypeVar
 
 import torch
 
@@ -93,20 +94,23 @@ class ModelCacheBase(ABC, Generic[T]):
         """Return the set of available execution devices."""
         pass
 
+    @contextmanager
     @abstractmethod
-    def acquire_execution_device(self, timeout: int = 0) -> torch.device:
-        """
-        Pick the next available execution device.
-
-        If all devices are currently engaged (locked), then
-        block until timeout seconds have passed and raise a
-        TimeoutError if no devices are available.
-        """
+    def reserve_execution_device(self, timeout: int = 0) -> Generator[torch.device, None, None]:
+        """Reserve an execution device (GPU) under the current thread id."""
         pass
 
     @abstractmethod
-    def release_execution_device(self, device: torch.device) -> None:
-        """Release a previously-acquired execution device."""
+    def get_execution_device(self) -> torch.device:
+        """
+        Return an execution device that has been reserved for current thread.
+
+        Note that reservations are done using the current thread's TID.
+        It would be better to do this using the session ID, but that involves
+        too many detailed changes to model manager calls.
+
+        May generate a ValueError if no GPU has been reserved.
+        """
         pass
 
     @property

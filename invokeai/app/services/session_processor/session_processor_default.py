@@ -181,47 +181,51 @@ class DefaultSessionProcessor(SessionProcessorBase):
                 if profiler is not None:
                     profiler.start(profile_id=session.session_id)
 
-                # Prepare invocations and take the first
-                with self._process_lock:
-                    invocation = session.session.next()
+                # reserve a GPU for this session - may block
+                with self._invoker.services.model_manager.load.ram_cache.reserve_execution_device() as gpu:
+                    print(f"DEBUG: session {session.item_id} has reserved gpu {gpu}")
 
-                # Loop over invocations until the session is complete or canceled
-                while invocation is not None:
-                    if self._stop_event.is_set():
-                        break
-                    self._resume_event.wait()
+                    # Prepare invocations and take the first
+                    with self._process_lock:
+                        invocation = session.session.next()
 
-                    self._process_next_invocation(session, invocation, stats_service)
+                    # Loop over invocations until the session is complete or canceled
+                    while invocation is not None:
+                        if self._stop_event.is_set():
+                            break
+                        self._resume_event.wait()
 
-                    # The session is complete if all invocations are complete or there was an error
-                    if session.session.is_complete():
-                        # Send complete event
-                        self._invoker.services.events.emit_graph_execution_complete(
-                            queue_batch_id=session.batch_id,
-                            queue_item_id=session.item_id,
-                            queue_id=session.queue_id,
-                            graph_execution_state_id=session.session.id,
-                        )
-                        # Log stats
-                        # We'll get a GESStatsNotFoundError if we try to log stats for an untracked graph, but in the processor
-                        # we don't care about that - suppress the error.
-                        with suppress(GESStatsNotFoundError):
-                            stats_service.log_stats(session.session.id)
-                            stats_service.reset_stats()
+                        self._process_next_invocation(session, invocation, stats_service)
 
-                        # If we are profiling, stop the profiler and dump the profile & stats
-                        if self._profiler:
-                            profile_path = self._profiler.stop()
-                            stats_path = profile_path.with_suffix(".json")
-                            stats_service.dump_stats(
-                                graph_execution_state_id=session.session.id, output_path=stats_path
+                        # The session is complete if all invocations are complete or there was an error
+                        if session.session.is_complete():
+                            # Send complete event
+                            self._invoker.services.events.emit_graph_execution_complete(
+                                queue_batch_id=session.batch_id,
+                                queue_item_id=session.item_id,
+                                queue_id=session.queue_id,
+                                graph_execution_state_id=session.session.id,
                             )
-                        self._queue_items.remove(session.item_id)
-                        invocation = None
-                    else:
-                        # Prepare the next invocation
-                        with self._process_lock:
-                            invocation = session.session.next()
+                            # Log stats
+                            # We'll get a GESStatsNotFoundError if we try to log stats for an untracked graph, but in the processor
+                            # we don't care about that - suppress the error.
+                            with suppress(GESStatsNotFoundError):
+                                stats_service.log_stats(session.session.id)
+                                stats_service.reset_stats()
+
+                            # If we are profiling, stop the profiler and dump the profile & stats
+                            if self._profiler:
+                                profile_path = self._profiler.stop()
+                                stats_path = profile_path.with_suffix(".json")
+                                stats_service.dump_stats(
+                                    graph_execution_state_id=session.session.id, output_path=stats_path
+                                )
+                            self._queue_items.remove(session.item_id)
+                            invocation = None
+                        else:
+                            # Prepare the next invocation
+                            with self._process_lock:
+                                invocation = session.session.next()
 
             except Exception:
                 # Non-fatal error in processor

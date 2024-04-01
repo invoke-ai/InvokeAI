@@ -100,7 +100,8 @@ class InvokeAIAppConfig(BaseSettings):
         ram: Maximum memory amount used by memory model cache for rapid switching (GB).
         convert_cache: Maximum size of on-disk converted models cache (GB).
         log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
-        device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `cuda:1`, `mps`
+        device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda:0`, `cuda:1`, `cuda:2`, `cuda:3`, `cuda:4`, `cuda:5`, `mps`
+        devices: List of execution devices; will override default device selected.
         precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`, `autocast`
         sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
         attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
@@ -108,6 +109,7 @@ class InvokeAIAppConfig(BaseSettings):
         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
         max_queue_size: Maximum number of items in the session queue.
+        max_threads: Maximum number of session queue execution threads.
         allow_nodes: List of nodes to allow. Omit to allow all.
         deny_nodes: List of nodes to deny. Omit to deny none.
         node_cache_size: How many cached nodes to keep in memory.

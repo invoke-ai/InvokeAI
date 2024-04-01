@@ -21,13 +21,12 @@ context. Use like this:
 import gc
 import sys
 import threading
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from logging import Logger
-from threading import BoundedSemaphore, Lock
-from typing import Dict, List, Optional, Set
+from threading import BoundedSemaphore
+from typing import Dict, Generator, List, Optional, Set
 
 import torch
-from pydantic import BaseModel
 
 from invokeai.backend.model_manager import AnyModel, SubModelType
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot
@@ -49,26 +48,6 @@ GIG = 1073741824
 
 # Size of a MB in bytes.
 MB = 2**20
-
-
-# GPU device can only be used by one thread at a time.
-# The refcount indicates the number of models stored
-# in it.
-class GPUDeviceStatus(BaseModel):
-    """Track of which threads are using the GPU(s) on this system."""
-
-    device: torch.device
-    thread_id: int = 0
-    refcount: int = 0
-
-    class Config:
-        """Configure the base model."""
-
-        arbitrary_types_allowed = True
-
-    def __hash__(self) -> int:
-        """Allow to be added to a set."""
-        return hash(str(torch.device))
 
 
 class ModelCache(ModelCacheBase[AnyModel]):
@@ -100,9 +79,8 @@ class ModelCache(ModelCacheBase[AnyModel]):
         """
         self._precision: torch.dtype = precision
         self._max_cache_size: float = max_cache_size
-        self._execution_devices: Set[GPUDeviceStatus] = self._get_execution_devices(execution_devices)
         self._storage_device: torch.device = storage_device
-        self._lock = threading.Lock()
+        self._ram_lock = threading.Lock()
         self._logger = logger or InvokeAILogger.get_logger(self.__class__.__name__)
         self._log_memory_usage = log_memory_usage
         self._stats: Optional[CacheStats] = None
@@ -110,11 +88,15 @@ class ModelCache(ModelCacheBase[AnyModel]):
         self._cached_models: Dict[str, CacheRecord[AnyModel]] = {}
         self._cache_stack: List[str] = []
 
-        self._lock = Lock()
+        # device to thread id
+        self._device_lock = threading.Lock()
+        self._execution_devices: Dict[torch.device, int] = {
+            x: 0 for x in execution_devices or self._get_execution_devices()
+        }
         self._free_execution_device = BoundedSemaphore(len(self._execution_devices))
 
         self.logger.info(
-            f"Using rendering device(s): {', '.join(sorted([str(x.device) for x in self._execution_devices]))}"
+            f"Using rendering device(s): {', '.join(sorted([str(x) for x in self._execution_devices.keys()]))}"
         )
 
     @property
@@ -130,34 +112,61 @@ class ModelCache(ModelCacheBase[AnyModel]):
     @property
     def execution_devices(self) -> Set[torch.device]:
         """Return the set of available execution devices."""
-        return {x.device for x in self._execution_devices}
+        devices = self._execution_devices.keys()
+        return set(devices)
 
-    def acquire_execution_device(self, timeout: int = 0) -> torch.device:
-        """Acquire and return an execution device (e.g. "cuda" for VRAM)."""
+    def get_execution_device(self) -> torch.device:
+        """
+        Return an execution device that has been reserved for current thread.
+
+        Note that reservations are done using the current thread's TID.
+        It would be better to do this using the session ID, but that involves
+        too many detailed changes to model manager calls.
+
+        May generate a ValueError if no GPU has been reserved.
+        """
         current_thread = threading.current_thread().ident
         assert current_thread is not None
+        assigned = [x for x, tid in self._execution_devices.items() if current_thread == tid]
+        if not assigned:
+            raise ValueError("No GPU has been reserved for the use of thread {current_thread}")
+        return assigned[0]
 
-        # first try to assign a device that is already executing on this thread
-        if claimed_devices := [x for x in self._execution_devices if x.thread_id == current_thread]:
-            claimed_devices[0].refcount += 1
-            return claimed_devices[0].device
-        else:
-            # this thread is not currently using any gpu. Wait for a free one
+    @contextmanager
+    def reserve_execution_device(self, timeout: Optional[int] = None) -> Generator[torch.device, None, None]:
+        """Reserve an execution device (e.g. GPU) for exclusive use by a generation thread.
+
+        Note that the reservation is done using the current thread's TID.
+        It would be better to do this using the session ID, but that involves
+        too many detailed changes to model manager calls.
+        """
+        device = None
+        with self._device_lock:
+            current_thread = threading.current_thread().ident
+            assert current_thread is not None
+
+            # look for a device that has already been assigned to this thread
+            assigned = [x for x, tid in self._execution_devices.items() if current_thread == tid]
+            if assigned:
+                device = assigned[0]
+
+        # no device already assigned. Get one.
+        if device is None:
             self._free_execution_device.acquire(timeout=timeout)
-            unclaimed_devices = [x for x in self._execution_devices if x.refcount == 0]
-            unclaimed_devices[0].thread_id = current_thread
-            unclaimed_devices[0].refcount += 1
-            return unclaimed_devices[0].device
+            with self._device_lock:
+                free_device = [x for x, tid in self._execution_devices.items() if tid == 0]
+                print(f"DEBUG: execution devices = {self._execution_devices}")
+                self._execution_devices[free_device[0]] = current_thread
+                device = free_device[0]
 
-    def release_execution_device(self, device: torch.device) -> None:
-        """Mark this execution device as unused."""
-        current_thread = threading.current_thread().ident
-        for x in self._execution_devices:
-            if x.thread_id == current_thread and x.device == device:
-                x.refcount -= 1
-                if x.refcount == 0:
-                    x.thread_id = 0
-                    self._free_execution_device.release()
+        # we are outside the lock region now
+        try:
+            yield device
+        finally:
+            with self._device_lock:
+                self._execution_devices[device] = 0
+                self._free_execution_device.release()
+                torch.cuda.empty_cache()
 
     @property
     def max_cache_size(self) -> float:
@@ -203,7 +212,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         submodel_type: Optional[SubModelType] = None,
     ) -> None:
         """Store model under key and optional submodel_type."""
-        with self._lock:
+        with self._ram_lock:
             key = self._make_cache_key(key, submodel_type)
             if key in self._cached_models:
                 return
@@ -228,7 +237,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
 
         This may raise an IndexError if the model is not in the cache.
         """
-        with self._lock:
+        with self._ram_lock:
             key = self._make_cache_key(key, submodel_type)
             if key in self._cached_models:
                 if self.stats:
@@ -395,7 +404,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
             raise torch.cuda.OutOfMemoryError
 
     @staticmethod
-    def _get_execution_devices(devices: Optional[Set[torch.device]] = None) -> Set[GPUDeviceStatus]:
+    def _get_execution_devices(devices: Optional[Set[torch.device]] = None) -> Set[torch.device]:
         if not devices:
             default_device = choose_torch_device()
             if default_device != torch.device("cuda"):
@@ -403,7 +412,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
             else:
                 # we get here if the default device is cuda, and return each of the cuda devices.
                 devices = {torch.device(f"cuda:{x}") for x in range(0, torch.cuda.device_count())}
-        return {GPUDeviceStatus(device=x) for x in devices}
+        return devices
 
     @staticmethod
     def _device_name(device: torch.device) -> str:

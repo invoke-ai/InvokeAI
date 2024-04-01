@@ -15,7 +15,15 @@ MPS_DEVICE = torch.device("mps")
 
 
 def choose_torch_device() -> torch.device:
-    """Convenience routine for guessing which GPU device to run model on"""
+    """Convenience routine for guessing which GPU device to run model on."""
+    # """Temporarily modified to use the model manager's get_execution_device()"""
+    # try:
+    #     from invokeai.app.api.dependencies import ApiDependencies
+    #     model_manager = ApiDependencies.invoker.services.model_manager
+    #     device = model_manager.load.ram_cache.acquire_execution_device()
+    #     print(f'DEBUG choose_torch_device returning {device}')
+    #     return device
+    # except Exception:
     config = get_config()
     if config.device == "auto":
         if torch.cuda.is_available():

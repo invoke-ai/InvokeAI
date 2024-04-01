@@ -56,8 +56,8 @@ class ModelLocker(ModelLockerBase):
         self._cache_entry.lock()
 
         try:
-            # We wait for a gpu to be free - may raise a TimeoutError
-            self._execution_device = self._cache.acquire_execution_device(MAX_GPU_WAIT)
+            # We wait for a gpu to be free - may raise a ValueError
+            self._execution_device = self._cache.get_execution_device()
             self._cache.logger.debug(f"Locking {self._cache_entry.key} in {self._execution_device}")
             model_in_gpu = copy.deepcopy(self._cache_entry.model)
             if hasattr(model_in_gpu, "to"):
@@ -77,14 +77,5 @@ class ModelLocker(ModelLockerBase):
         """Call upon exit from context."""
         if not hasattr(self.model, "to"):
             return
-
         self._cache_entry.unlock()
-        if self._execution_device:
-            self._cache.release_execution_device(self._execution_device)
-
-        try:
-            torch.cuda.empty_cache()
-            torch.mps.empty_cache()
-        except Exception:
-            pass
         self._cache.print_cuda_stats()
