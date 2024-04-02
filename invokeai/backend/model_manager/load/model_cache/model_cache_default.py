@@ -429,4 +429,8 @@ class ModelCache(ModelCacheBase[AnyModel]):
         )
         free_mem, _ = torch.cuda.mem_get_info(torch.device(vram_device))
         if needed_size > free_mem:
-            raise torch.cuda.OutOfMemoryError
+            needed_gb = round(needed_size / GIG, 2)
+            free_gb = round(free_mem / GIG, 2)
+            raise torch.cuda.OutOfMemoryError(
+                f"Insufficient VRAM to load model, requested {needed_gb}GB but only had {free_gb}GB free"
+            )
