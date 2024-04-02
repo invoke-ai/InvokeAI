@@ -373,13 +373,16 @@ def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
             if k == "conf_path":
                 parsed_config_dict["legacy_models_yaml_path"] = v
             if k == "legacy_conf_dir":
-                # The old default for this was "configs/stable-diffusion". If if the incoming config has that as the value, we won't set it.
-                # Else if the path ends in "stable-diffusion", we assume the parent is the new correct path.
-                # Else we do not attempt to migrate this setting
-                if v != "configs/stable-diffusion":
-                    parsed_config_dict["legacy_conf_dir"] = v
+                # The old default for this was "configs/stable-diffusion" ("configs\stable-diffusion" on Windows).
+                if v == "configs/stable-diffusion" or v == "configs\\stable-diffusion":
+                    # If if the incoming config has the default value, skip
+                    continue
                 elif Path(v).name == "stable-diffusion":
+                    # Else if the path ends in "stable-diffusion", we assume the parent is the new correct path.
                     parsed_config_dict["legacy_conf_dir"] = str(Path(v).parent)
+                else:
+                    # Else we do not attempt to migrate this setting
+                    parsed_config_dict["legacy_conf_dir"] = v
             elif k in InvokeAIAppConfig.model_fields:
                 # skip unknown fields
                 parsed_config_dict[k] = v
