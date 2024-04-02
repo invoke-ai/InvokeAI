@@ -1,8 +1,9 @@
+import { deepClone } from 'common/util/deepClone';
 import { satisfies } from 'compare-versions';
 import { NodeUpdateError } from 'features/nodes/types/error';
 import type { InvocationNode, InvocationTemplate } from 'features/nodes/types/invocation';
 import { zParsedSemver } from 'features/nodes/types/semver';
-import { cloneDeep, defaultsDeep, keys, pick } from 'lodash-es';
+import { defaultsDeep, keys, pick } from 'lodash-es';
 
 import { buildInvocationNode } from './buildInvocationNode';
 
@@ -50,7 +51,7 @@ export const updateNode = (node: InvocationNode, template: InvocationTemplate): 
   // The updateability of a node, via semver comparison, relies on the this kind of recursive merge
   // being valid. We rely on the template's major version to be majorly incremented if this kind of
   // merge would result in an invalid node.
-  const clone = cloneDeep(node);
+  const clone = deepClone(node);
   clone.data.version = template.version;
   defaultsDeep(clone, defaults); // mutates!
 

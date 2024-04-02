@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import calculateCoordinates from 'features/canvas/util/calculateCoordinates';
 import calculateScale from 'features/canvas/util/calculateScale';
@@ -13,7 +14,7 @@ import { modelChanged } from 'features/parameters/store/generationSlice';
 import type { PayloadActionWithOptimalDimension } from 'features/parameters/store/types';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect, Vector2d } from 'konva/lib/types';
-import { clamp, cloneDeep } from 'lodash-es';
+import { clamp } from 'lodash-es';
 import type { RgbaColor } from 'react-colorful';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { ImageDTO } from 'services/api/types';
@@ -166,7 +167,7 @@ export const canvasSlice = createSlice({
         pushToPrevLayerStates(state);
 
         state.layerState = {
-          ...cloneDeep(initialLayerState),
+          ...deepClone(initialLayerState),
           objects: [
             {
               kind: 'image',
@@ -277,7 +278,7 @@ export const canvasSlice = createSlice({
     discardStagedImages: (state) => {
       pushToPrevLayerStates(state);
 
-      state.layerState.stagingArea = cloneDeep(cloneDeep(initialLayerState)).stagingArea;
+      state.layerState.stagingArea = deepClone(initialLayerState.stagingArea);
 
       state.futureLayerStates = [];
       state.shouldShowStagingOutline = true;
@@ -414,7 +415,7 @@ export const canvasSlice = createSlice({
     },
     resetCanvas: (state) => {
       pushToPrevLayerStates(state);
-      state.layerState = cloneDeep(initialLayerState);
+      state.layerState = deepClone(initialLayerState);
       state.futureLayerStates = [];
       state.batchIds = [];
       state.boundingBoxCoordinates = {
@@ -517,7 +518,7 @@ export const canvasSlice = createSlice({
           ...imageToCommit,
         });
       }
-      state.layerState.stagingArea = cloneDeep(initialLayerState).stagingArea;
+      state.layerState.stagingArea = deepClone(initialLayerState.stagingArea);
 
       state.futureLayerStates = [];
       state.shouldShowStagingOutline = true;
@@ -709,14 +710,14 @@ export const canvasPersistConfig: PersistConfig<CanvasState> = {
 };
 
 const pushToPrevLayerStates = (state: CanvasState) => {
-  state.pastLayerStates.push(cloneDeep(state.layerState));
+  state.pastLayerStates.push(deepClone(state.layerState));
   if (state.pastLayerStates.length > MAX_HISTORY) {
     state.pastLayerStates = state.pastLayerStates.slice(-MAX_HISTORY);
   }
 };
 
 const pushToFutureLayerStates = (state: CanvasState) => {
-  state.futureLayerStates.unshift(cloneDeep(state.layerState));
+  state.futureLayerStates.unshift(deepClone(state.layerState));
   if (state.futureLayerStates.length > MAX_HISTORY) {
     state.futureLayerStates = state.futureLayerStates.slice(0, MAX_HISTORY);
   }
