@@ -121,7 +121,7 @@ export const canvasSlice = createSlice({
       state.brushSize = action.payload;
     },
     clearMask: (state) => {
-      state.pastLayerStates.push(cloneDeep(state.layerState));
+      pushToPrevLayerStates(state);
       state.layerState.objects = state.layerState.objects.filter((obj) => !isCanvasMaskLine(obj));
       state.futureLayerStates = [];
       state.shouldPreserveMaskedArea = false;
@@ -163,7 +163,7 @@ export const canvasSlice = createSlice({
         state.boundingBoxDimensions = newBoundingBoxDimensions;
         state.boundingBoxCoordinates = newBoundingBoxCoordinates;
 
-        state.pastLayerStates.push(cloneDeep(state.layerState));
+        pushToPrevLayerStates(state);
 
         state.layerState = {
           ...cloneDeep(initialLayerState),
@@ -261,11 +261,7 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      state.pastLayerStates.push(cloneDeep(state.layerState));
-
-      if (state.pastLayerStates.length > MAX_HISTORY) {
-        state.pastLayerStates.shift();
-      }
+      pushToPrevLayerStates(state);
 
       state.layerState.stagingArea.images.push({
         kind: 'image',
@@ -279,11 +275,7 @@ export const canvasSlice = createSlice({
       state.futureLayerStates = [];
     },
     discardStagedImages: (state) => {
-      state.pastLayerStates.push(cloneDeep(state.layerState));
-
-      if (state.pastLayerStates.length > MAX_HISTORY) {
-        state.pastLayerStates.shift();
-      }
+      pushToPrevLayerStates(state);
 
       state.layerState.stagingArea = cloneDeep(cloneDeep(initialLayerState)).stagingArea;
 
@@ -294,11 +286,7 @@ export const canvasSlice = createSlice({
     },
     discardStagedImage: (state) => {
       const { images, selectedImageIndex } = state.layerState.stagingArea;
-      state.pastLayerStates.push(cloneDeep(state.layerState));
-
-      if (state.pastLayerStates.length > MAX_HISTORY) {
-        state.pastLayerStates.shift();
-      }
+      pushToPrevLayerStates(state);
 
       if (!images.length) {
         return;
@@ -320,11 +308,7 @@ export const canvasSlice = createSlice({
     addFillRect: (state) => {
       const { boundingBoxCoordinates, boundingBoxDimensions, brushColor } = state;
 
-      state.pastLayerStates.push(cloneDeep(state.layerState));
-
-      if (state.pastLayerStates.length > MAX_HISTORY) {
-        state.pastLayerStates.shift();
-      }
+      pushToPrevLayerStates(state);
 
       state.layerState.objects.push({
         kind: 'fillRect',
@@ -339,11 +323,7 @@ export const canvasSlice = createSlice({
     addEraseRect: (state) => {
       const { boundingBoxCoordinates, boundingBoxDimensions } = state;
 
-      state.pastLayerStates.push(cloneDeep(state.layerState));
-
-      if (state.pastLayerStates.length > MAX_HISTORY) {
-        state.pastLayerStates.shift();
-      }
+      pushToPrevLayerStates(state);
 
       state.layerState.objects.push({
         kind: 'eraseRect',
@@ -367,11 +347,7 @@ export const canvasSlice = createSlice({
       // set & then spread this to only conditionally add the "color" key
       const newColor = layer === 'base' && tool === 'brush' ? { color: brushColor } : {};
 
-      state.pastLayerStates.push(cloneDeep(state.layerState));
-
-      if (state.pastLayerStates.length > MAX_HISTORY) {
-        state.pastLayerStates.shift();
-      }
+      pushToPrevLayerStates(state);
 
       const newLine: CanvasMaskLine | CanvasBaseLine = {
         kind: 'line',
@@ -409,11 +385,7 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      state.futureLayerStates.unshift(cloneDeep(state.layerState));
-
-      if (state.futureLayerStates.length > MAX_HISTORY) {
-        state.futureLayerStates.pop();
-      }
+      pushToFutureLayerStates(state);
 
       state.layerState = targetState;
     },
@@ -424,11 +396,7 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      state.pastLayerStates.push(cloneDeep(state.layerState));
-
-      if (state.pastLayerStates.length > MAX_HISTORY) {
-        state.pastLayerStates.shift();
-      }
+      pushToPrevLayerStates(state);
 
       state.layerState = targetState;
     },
@@ -445,7 +413,7 @@ export const canvasSlice = createSlice({
       state.shouldShowIntermediates = action.payload;
     },
     resetCanvas: (state) => {
-      state.pastLayerStates.push(cloneDeep(state.layerState));
+      pushToPrevLayerStates(state);
       state.layerState = cloneDeep(initialLayerState);
       state.futureLayerStates = [];
       state.batchIds = [];
@@ -540,11 +508,7 @@ export const canvasSlice = createSlice({
 
       const { images, selectedImageIndex } = state.layerState.stagingArea;
 
-      state.pastLayerStates.push(cloneDeep(state.layerState));
-
-      if (state.pastLayerStates.length > MAX_HISTORY) {
-        state.pastLayerStates.shift();
-      }
+      pushToPrevLayerStates(state);
 
       const imageToCommit = images[selectedImageIndex];
 
@@ -623,7 +587,7 @@ export const canvasSlice = createSlice({
       };
     },
     setMergedCanvas: (state, action: PayloadAction<CanvasImage>) => {
-      state.pastLayerStates.push(cloneDeep(state.layerState));
+      pushToPrevLayerStates(state);
 
       state.futureLayerStates = [];
 
@@ -742,4 +706,18 @@ export const canvasPersistConfig: PersistConfig<CanvasState> = {
   initialState: initialCanvasState,
   migrate: migrateCanvasState,
   persistDenylist: [],
+};
+
+const pushToPrevLayerStates = (state: CanvasState) => {
+  state.pastLayerStates.push(cloneDeep(state.layerState));
+  if (state.pastLayerStates.length > MAX_HISTORY) {
+    state.pastLayerStates = state.pastLayerStates.slice(-MAX_HISTORY);
+  }
+};
+
+const pushToFutureLayerStates = (state: CanvasState) => {
+  state.futureLayerStates.unshift(cloneDeep(state.layerState));
+  if (state.futureLayerStates.length > MAX_HISTORY) {
+    state.futureLayerStates = state.futureLayerStates.slice(0, MAX_HISTORY);
+  }
 };
