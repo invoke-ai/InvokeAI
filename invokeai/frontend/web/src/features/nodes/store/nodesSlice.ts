@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { deepClone } from 'common/util/deepClone';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
@@ -44,7 +45,7 @@ import {
 } from 'features/nodes/types/field';
 import type { AnyNode, InvocationTemplate, NodeExecutionState } from 'features/nodes/types/invocation';
 import { isInvocationNode, isNotesNode, zNodeStatus } from 'features/nodes/types/invocation';
-import { cloneDeep, forEach } from 'lodash-es';
+import { forEach } from 'lodash-es';
 import type {
   Connection,
   Edge,
@@ -571,8 +572,23 @@ export const nodesSlice = createSlice({
       );
     },
     selectionCopied: (state) => {
-      state.nodesToCopy = state.nodes.filter((n) => n.selected).map(cloneDeep);
-      state.edgesToCopy = state.edges.filter((e) => e.selected).map(cloneDeep);
+      const nodesToCopy: AnyNode[] = [];
+      const edgesToCopy: Edge[] = [];
+
+      for (const node of state.nodes) {
+        if (node.selected) {
+          nodesToCopy.push(deepClone(node));
+        }
+      }
+
+      for (const edge of state.edges) {
+        if (edge.selected) {
+          edgesToCopy.push(deepClone(edge));
+        }
+      }
+
+      state.nodesToCopy = nodesToCopy;
+      state.edgesToCopy = edgesToCopy;
 
       if (state.nodesToCopy.length > 0) {
         const averagePosition = { x: 0, y: 0 };
@@ -594,11 +610,21 @@ export const nodesSlice = createSlice({
     },
     selectionPasted: (state, action: PayloadAction<{ cursorPosition?: XYPosition }>) => {
       const { cursorPosition } = action.payload;
-      const newNodes = state.nodesToCopy.map(cloneDeep);
+      const newNodes: AnyNode[] = [];
+
+      for (const node of state.nodesToCopy) {
+        newNodes.push(deepClone(node));
+      }
+
       const oldNodeIds = newNodes.map((n) => n.data.id);
-      const newEdges = state.edgesToCopy
-        .filter((e) => oldNodeIds.includes(e.source) && oldNodeIds.includes(e.target))
-        .map(cloneDeep);
+
+      const newEdges: Edge[] = [];
+
+      for (const edge of state.edgesToCopy) {
+        if (oldNodeIds.includes(edge.source) && oldNodeIds.includes(edge.target)) {
+          newEdges.push(deepClone(edge));
+        }
+      }
 
       newEdges.forEach((e) => (e.selected = true));
 

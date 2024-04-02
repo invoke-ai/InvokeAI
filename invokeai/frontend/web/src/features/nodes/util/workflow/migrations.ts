@@ -1,4 +1,5 @@
 import { $store } from 'app/store/nanostores/store';
+import { deepClone } from 'common/util/deepClone';
 import { WorkflowMigrationError, WorkflowVersionError } from 'features/nodes/types/error';
 import type { FieldType } from 'features/nodes/types/field';
 import type { InvocationNodeData } from 'features/nodes/types/invocation';
@@ -11,7 +12,7 @@ import { zWorkflowV2 } from 'features/nodes/types/v2/workflow';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { zWorkflowV3 } from 'features/nodes/types/workflow';
 import { t } from 'i18next';
-import { cloneDeep, forEach } from 'lodash-es';
+import { forEach } from 'lodash-es';
 import { z } from 'zod';
 
 /**
@@ -89,7 +90,7 @@ export const parseAndMigrateWorkflow = (data: unknown): WorkflowV3 => {
     throw new WorkflowVersionError(t('nodes.unableToGetWorkflowVersion'));
   }
 
-  let workflow = cloneDeep(data) as WorkflowV1 | WorkflowV2 | WorkflowV3;
+  let workflow = deepClone(data) as WorkflowV1 | WorkflowV2 | WorkflowV3;
 
   if (workflow.meta.version === '1.0.0') {
     const v1 = zWorkflowV1.parse(workflow);
