@@ -37,7 +37,7 @@ import { CANVAS_GRID_SIZE_FINE } from './constants';
 /**
  * The maximum history length to keep in the past/future layer states.
  */
-const MAX_HISTORY = 128;
+const MAX_HISTORY = 100;
 
 const initialLayerState: CanvasLayerState = {
   objects: [],
