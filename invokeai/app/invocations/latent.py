@@ -58,6 +58,7 @@ from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData, IPAdapterConditioningInfo
 from invokeai.backend.util.silence_warnings import SilenceWarnings
+from invokeai.backend.stable_diffusion.diffusers_pipeline import AddsMaskGuidance
 
 from ...backend.stable_diffusion.diffusers_pipeline import (
     ControlNetData,
@@ -666,20 +667,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         return num_inference_steps, timesteps, init_timestep
 
-    def prep_inpaint_mask(
-        self, context: InvocationContext, latents: torch.Tensor
-    ) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor], bool]:
-        if self.denoise_mask is None:
-            return None, None, False
-
-        mask = context.tensors.load(self.denoise_mask.mask_name)
-        mask = tv_resize(mask, latents.shape[-2:], T.InterpolationMode.BILINEAR, antialias=False)
-        if self.denoise_mask.masked_latents_name is not None:
-            masked_latents = context.tensors.load(self.denoise_mask.masked_latents_name)
-        else:
-            masked_latents = torch.where(mask < 0.5, 0.0, latents)
-
-        return 1 - mask, masked_latents, self.denoise_mask.gradient
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
@@ -705,8 +692,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
             if seed is None:
                 seed = 0
-
-            mask, masked_latents, gradient_mask = self.prep_inpaint_mask(context, latents)
 
             # TODO(ryand): I have hard-coded `do_classifier_free_guidance=True` to mirror the behaviour of ControlNets,
             # below. Investigate whether this is appropriate.
@@ -744,11 +729,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 assert isinstance(unet, UNet2DConditionModel)
                 latents = latents.to(device=unet.device, dtype=unet.dtype)
                 if noise is not None:
-                    noise = noise.to(device=unet.device, dtype=unet.dtype)
-                if mask is not None:
-                    mask = mask.to(device=unet.device, dtype=unet.dtype)
-                if masked_latents is not None:
-                    masked_latents = masked_latents.to(device=unet.device, dtype=unet.dtype)
+                    noise = noise.to(device=unet.device, dtype=unet.dtype)                
 
                 scheduler = get_scheduler(
                     context=context,
@@ -759,6 +740,27 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
                 pipeline = self.create_pipeline(unet, scheduler)
                 conditioning_data = self.get_conditioning_data(context, scheduler, unet, seed)
+
+                # TODO: Do this with a handler that initializes multiple abstracted guidance modules
+                additional_guidance = []
+                if self.denoise_mask is not None:
+                    mask = context.tensors.load(self.denoise_mask.mask_name)
+                    if self.denoise_mask.masked_latents_name is not None:
+                        masked_latents = context.tensors.load(self.denoise_mask.masked_latents_name)
+                    else:
+                        masked_latents = None
+                    mask_guidance_handler = AddsMaskGuidance(
+                        orig_latents=latents.clone(),
+                        mask=mask, 
+                        masked_latents=masked_latents, #can be None
+                        scheduler=scheduler,
+                        noise=noise, #can be None
+                        gradient_mask=self.denoise_mask.gradient, 
+                        unet_type=self.unet.unet.base,
+                        inpaint_model=unet.conv_in.in_channels == 9,
+                        seed=seed)
+                    
+                    additional_guidance.append(mask_guidance_handler)
 
                 controlnet_data = self.prep_control_data(
                     context=context,
@@ -790,9 +792,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     init_timestep=init_timestep,
                     noise=noise,
                     seed=seed,
-                    mask=mask,
-                    masked_latents=masked_latents,
-                    gradient_mask=gradient_mask,
+                    additional_guidance=additional_guidance,
                     num_inference_steps=num_inference_steps,
                     conditioning_data=conditioning_data,
                     control_data=controlnet_data,
