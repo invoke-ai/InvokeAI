@@ -2,10 +2,11 @@ import type { PayloadAction, Update } from '@reduxjs/toolkit';
 import { createEntityAdapter, createSlice, isAnyOf } from '@reduxjs/toolkit';
 import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { deepClone } from 'common/util/deepClone';
 import { buildControlAdapter } from 'features/controlAdapters/util/buildControlAdapter';
 import { buildControlAdapterProcessor } from 'features/controlAdapters/util/buildControlAdapterProcessor';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { cloneDeep, merge, uniq } from 'lodash-es';
+import { merge, uniq } from 'lodash-es';
 import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { socketInvocationError } from 'services/events/actions';
 import { v4 as uuidv4 } from 'uuid';
@@ -114,7 +115,7 @@ export const controlAdaptersSlice = createSlice({
         if (!controlAdapter) {
           return;
         }
-        const newControlAdapter = merge(cloneDeep(controlAdapter), {
+        const newControlAdapter = merge(deepClone(controlAdapter), {
           id: newId,
           isEnabled: true,
         });
@@ -270,7 +271,7 @@ export const controlAdaptersSlice = createSlice({
         return;
       }
 
-      const processorNode = merge(cloneDeep(cn.processorNode), params);
+      const processorNode = merge(deepClone(cn.processorNode), params);
 
       caAdapter.updateOne(state, {
         id,
@@ -293,7 +294,7 @@ export const controlAdaptersSlice = createSlice({
         return;
       }
 
-      const processorNode = cloneDeep(
+      const processorNode = deepClone(
         CONTROLNET_PROCESSORS[processorType].buildDefaults(cn.model?.base)
       ) as RequiredControlAdapterProcessorNode;
 
@@ -333,7 +334,7 @@ export const controlAdaptersSlice = createSlice({
       caAdapter.updateOne(state, update);
     },
     controlAdaptersReset: () => {
-      return cloneDeep(initialControlAdaptersState);
+      return deepClone(initialControlAdaptersState);
     },
     pendingControlImagesCleared: (state) => {
       state.pendingControlImages = [];
@@ -406,7 +407,7 @@ const migrateControlAdaptersState = (state: any): any => {
     state._version = 1;
   }
   if (state._version === 1) {
-    state = cloneDeep(initialControlAdaptersState);
+    state = deepClone(initialControlAdaptersState);
   }
   return state;
 };

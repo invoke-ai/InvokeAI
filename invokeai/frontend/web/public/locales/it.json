@@ -73,7 +73,8 @@
         "ai": "ia",
         "file": "File",
         "toResolve": "Da risolvere",
-        "add": "Aggiungi"
+        "add": "Aggiungi",
+        "loglevel": "Livello di log"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -934,7 +935,9 @@
         "base": "Base",
         "lineart": "Linea",
         "controlnet": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.controlNet))",
-        "mediapipeFace": "Mediapipe Volto"
+        "mediapipeFace": "Mediapipe Volto",
+        "ip_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.ipAdapter))",
+        "t2i_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.t2iAdapter))"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -1490,7 +1493,8 @@
             "title": "Generazione"
         },
         "advanced": {
-            "title": "Avanzate"
+            "title": "Avanzate",
+            "options": "Opzioni $t(accordions.advanced.title)"
         },
         "image": {
             "title": "Immagine"

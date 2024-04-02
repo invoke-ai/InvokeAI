@@ -1,4 +1,6 @@
 import sqlite3
+from contextlib import closing
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -32,6 +34,7 @@ class SqliteMigrator:
         self._db = db
         self._logger = db.logger
         self._migration_set = MigrationSet()
+        self._backup_path: Optional[Path] = None
 
     def register_migration(self, migration: Migration) -> None:
         """Registers a migration."""
@@ -55,6 +58,18 @@ class SqliteMigrator:
                 return False
 
             self._logger.info("Database update needed")
+
+            # Make a backup of the db if it needs to be updated and is a file db
+            if self._db.db_path is not None:
+                timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+                self._backup_path = self._db.db_path.parent / f"{self._db.db_path.stem}_backup_{timestamp}.db"
+                self._logger.info(f"Backing up database to {str(self._backup_path)}")
+                # Use SQLite to do the backup
+                with closing(sqlite3.connect(self._backup_path)) as backup_conn:
+                    self._db.conn.backup(backup_conn)
+            else:
+                self._logger.info("Using in-memory database, no backup needed")
+
             next_migration = self._migration_set.get(from_version=self._get_current_version(cursor))
             while next_migration is not None:
                 self._run_migration(next_migration)
