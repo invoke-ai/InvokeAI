@@ -81,7 +81,7 @@ def are_like_tensors(a: torch.Tensor, b: object) -> bool:
 @dataclass
 class AddsMaskGuidance:
     orig_latents: torch.Tensor
-    mask: torch.Tensor | None # 0 is masked, 1 is unmasked
+    mask: torch.Tensor # 0 is masked, 1 is unmasked
     masked_latents: torch.Tensor | None
     scheduler: SchedulerMixin
     noise: torch.Tensor | None
@@ -92,8 +92,6 @@ class AddsMaskGuidance:
 
     def __post_init__(self):
         """Align internal data and create noise if necessary"""
-        if self.mask is None:
-            return # nothing to do
         self.mask = tv_resize(self.mask, self.orig_latents.shape[-2:])
         self.mask = self.mask.to(device=self.orig_latents.device, dtype=self.orig_latents.dtype)
         if self.noise is None:
@@ -107,12 +105,10 @@ class AddsMaskGuidance:
     def mask_from_timestep(self, t: torch.Tensor) -> torch.Tensor:
         """Create a mask based on the current timestep"""
         if self.inpaint_model:
-            print("inpaint mask used")
             mask_bool = self.mask < 1
             floored_mask = torch.where(mask_bool, 0, 1)
             return floored_mask
         elif self.gradient_mask:
-            print("gradient mask used")
             threshhold = (t.item()) / self.scheduler.config.num_train_timesteps
             mask_bool = self.mask < 1 - threshhold
             timestep_mask = torch.where(mask_bool, 0, 1)
@@ -123,12 +119,13 @@ class AddsMaskGuidance:
         
     def modify_latents_before_scaling(self, latents: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
         """Replace unmasked region with original latents. Called before the scheduler scales the latent values."""
-        if self.mask is None:
-            return latents # nothing to do
+        if self.inpaint_model:
+            return latents # skip this stage
         
         #expand to match batch size if necessary
         batch_size = latents.size(0)
-        mask = einops.repeat(self.mask, "b c h w -> (repeat b) c h w", repeat=batch_size)
+        mask = self.mask_from_timestep(t).to(device=latents.device, dtype=latents.dtype)
+        mask = einops.repeat(mask, "b c h w -> (repeat b) c h w", repeat=batch_size)
         if t.dim() == 0:
             t = einops.repeat(t, "-> batch", batch=batch_size)
 
@@ -139,13 +136,19 @@ class AddsMaskGuidance:
         masked_input = torch.lerp(latents, noised_latents, mask)
         return masked_input
 
+    def shrink_mask(self, mask: torch.Tensor, n_operations: int) -> torch.Tensor:
+        kernel = torch.ones(1, 1, 3, 3).to(device=mask.device, dtype=mask.dtype)
+        for _ in range(n_operations):
+            mask = torch.nn.functional.conv2d(mask, kernel, padding=1).clamp(0, 1)
+        return mask
+
     def modify_latents_before_noise_prediction(self, latents: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
         """Expand latents with information needed by inpaint model"""
-        if self.mask is None or not self.inpaint_model:
-            return latents # nothing to do
+        if not self.inpaint_model:
+            return latents # skip this stage
         
         mask = self.mask_from_timestep(t).to(device=latents.device, dtype=latents.dtype)
-        if True: #self.masked_latents is None:
+        if self.masked_latents is None:
             #latent values for a black region after VAE encode
             if self.unet_type == "sd-1":
                 latent_zeros = [0.78857421875, -0.638671875, 0.576171875, 0.12213134765625]
@@ -159,14 +162,10 @@ class AddsMaskGuidance:
             
             # replace masked region with specified values
             mask_values = torch.tensor(latent_zeros).view(1, 4, 1, 1).expand_as(latents).to(device=latents.device, dtype=latents.dtype)
-            masked_latents = self.scheduler.scale_model_input(torch.where(mask == 0, mask_values, self.orig_latents), t)
+            small_mask = self.shrink_mask(mask, 1) #make the synthetic mask fill in the masked_latents smaller than the mask channel
+            masked_latents = self.scheduler.scale_model_input(torch.where(small_mask == 0, mask_values, self.orig_latents), t)
         else:
             masked_latents = self.scheduler.scale_model_input(self.masked_latents,t)
-            mlsize = self.masked_latents.size()
-            print(self.masked_latents[0, 0, mlsize[2]//2 + 3, mlsize[3]//2 + 3].item())
-            print(self.masked_latents[0, 1, mlsize[2]//2 + 3, mlsize[3]//2 + 3].item())
-            print(self.masked_latents[0, 2, mlsize[2]//2 + 3, mlsize[3]//2 + 3].item())
-            print(self.masked_latents[0, 3, mlsize[2]//2 + 3, mlsize[3]//2 + 3].item())
 
 
         masked_latents = einops.repeat(masked_latents, "b c h w -> (repeat b) c h w", repeat=latents.size(0))
@@ -175,10 +174,7 @@ class AddsMaskGuidance:
         return model_input
     
     def modify_result_before_callback(self, step_output, t) -> torch.Tensor:
-        """Fix preview images to show the original image in the unmasked region"""
-        if self.mask is None:
-            return step_output # nothing to do
-        
+        """Fix preview images to show the original image in the unmasked region"""        
         if hasattr(step_output, "denoised"): #LCM Sampler
             prediction = step_output.denoised
         elif hasattr(step_output, "pred_original_sample"): #Samplers with final predictions
@@ -194,10 +190,11 @@ class AddsMaskGuidance:
     
     def modify_latents_after_denoising(self, latents: torch.Tensor) -> torch.Tensor:
         """Apply original unmasked to denoised latents"""
-        if self.mask is None:
-            return latents
         if self.inpaint_model:
-            mask = self.mask
+            if self.masked_latents is None:
+                mask = self.shrink_mask(self.mask, 1)
+            else:
+                return latents
         else:
             mask = self.mask_from_timestep(torch.Tensor([0]))
         mask = einops.repeat(mask, "b c h w -> (repeat b) c h w", repeat=latents.size(0))
