@@ -40,7 +40,6 @@ export const zSchedulerField = z.enum([
   'euler_a',
   'kdpm_2_a',
   'lcm',
-  'tcd',
 ]);
 // #endregion
 
