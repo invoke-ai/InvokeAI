@@ -56,9 +56,9 @@ from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import BaseModelType, LoadedModel
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless
+from invokeai.backend.stable_diffusion.diffusers_pipeline import AddsMaskGuidance
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData, IPAdapterConditioningInfo
 from invokeai.backend.util.silence_warnings import SilenceWarnings
-from invokeai.backend.stable_diffusion.diffusers_pipeline import AddsMaskGuidance
 
 from ...backend.stable_diffusion.diffusers_pipeline import (
     ControlNetData,
@@ -729,7 +729,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 assert isinstance(unet, UNet2DConditionModel)
                 latents = latents.to(device=unet.device, dtype=unet.dtype)
                 if noise is not None:
-                    noise = noise.to(device=unet.device, dtype=unet.dtype)                
+                    noise = noise.to(device=unet.device, dtype=unet.dtype)
 
                 scheduler = get_scheduler(
                     context=context,
@@ -751,15 +751,15 @@ class DenoiseLatentsInvocation(BaseInvocation):
                         masked_latents = None
                     mask_guidance_handler = AddsMaskGuidance(
                         orig_latents=latents.clone(),
-                        mask=mask, 
+                        mask=mask,
                         masked_latents=masked_latents, #can be None
                         scheduler=scheduler,
                         noise=noise, #can be None
-                        gradient_mask=self.denoise_mask.gradient, 
+                        gradient_mask=self.denoise_mask.gradient,
                         unet_type=self.unet.unet.base,
                         inpaint_model=unet.conv_in.in_channels == 9,
                         seed=seed)
-                    
+
                     additional_guidance.append(mask_guidance_handler)
 
                 controlnet_data = self.prep_control_data(

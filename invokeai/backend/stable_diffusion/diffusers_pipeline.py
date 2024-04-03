@@ -18,6 +18,7 @@ from diffusers.schedulers import KarrasDiffusionSchedulers
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
 from diffusers.utils.import_utils import is_xformers_available
 from pydantic import Field
+from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from invokeai.app.services.config.config_default import get_config
@@ -27,7 +28,6 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from invokeai.backend.util.attention import auto_detect_slice_size
 from invokeai.backend.util.devices import normalize_device
-from torchvision.transforms.functional import resize as tv_resize
 
 
 @dataclass
@@ -116,12 +116,12 @@ class AddsMaskGuidance:
         else:
             print("normal mask used")
             return self.mask.clone()
-        
+
     def modify_latents_before_scaling(self, latents: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
         """Replace unmasked region with original latents. Called before the scheduler scales the latent values."""
         if self.inpaint_model:
             return latents # skip this stage
-        
+
         #expand to match batch size if necessary
         batch_size = latents.size(0)
         mask = self.mask_from_timestep(t).to(device=latents.device, dtype=latents.dtype)
@@ -146,7 +146,7 @@ class AddsMaskGuidance:
         """Expand latents with information needed by inpaint model"""
         if not self.inpaint_model:
             return latents # skip this stage
-        
+
         mask = self.mask_from_timestep(t).to(device=latents.device, dtype=latents.dtype)
         if self.masked_latents is None:
             #latent values for a black region after VAE encode
@@ -159,7 +159,7 @@ class AddsMaskGuidance:
                 latent_zeros = [-0.578125, 0.501953125, 0.59326171875, -0.393798828125]
             else:
                 raise ValueError(f"Unet type {self.unet_type} not supported as an inpaint model. Where did you get this?")
-            
+
             # replace masked region with specified values
             mask_values = torch.tensor(latent_zeros).view(1, 4, 1, 1).expand_as(latents).to(device=latents.device, dtype=latents.dtype)
             small_mask = self.shrink_mask(mask, 1) #make the synthetic mask fill in the masked_latents smaller than the mask channel
@@ -172,9 +172,9 @@ class AddsMaskGuidance:
         mask = einops.repeat(mask, "b c h w -> (repeat b) c h w", repeat=latents.size(0))
         model_input = torch.cat([latents, 1 - mask, masked_latents], dim=1).to(dtype=latents.dtype, device=latents.device)
         return model_input
-    
+
     def modify_result_before_callback(self, step_output, t) -> torch.Tensor:
-        """Fix preview images to show the original image in the unmasked region"""        
+        """Fix preview images to show the original image in the unmasked region"""
         if hasattr(step_output, "denoised"): #LCM Sampler
             prediction = step_output.denoised
         elif hasattr(step_output, "pred_original_sample"): #Samplers with final predictions
@@ -187,7 +187,7 @@ class AddsMaskGuidance:
         step_output.pred_original_sample = torch.lerp(prediction, self.orig_latents.to(dtype=prediction.dtype), mask.to(dtype=prediction.dtype))
 
         return step_output
-    
+
     def modify_latents_after_denoising(self, latents: torch.Tensor) -> torch.Tensor:
         """Apply original unmasked to denoised latents"""
         if self.inpaint_model:
@@ -416,31 +416,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if noise is not None:
             # latents = noise * self.scheduler.init_noise_sigma # it's like in t2l according to diffusers
             latents = self.scheduler.add_noise(latents, noise, batched_t)
-
-        # if mask is not None:
-        #     # if no noise provided, noisify unmasked area based on seed(or 0 as fallback)
-        #     if noise is None:
-        #         noise = torch.randn(
-        #             orig_latents.shape,
-        #             dtype=torch.float32,
-        #             device="cpu",
-        #             generator=torch.Generator(device="cpu").manual_seed(seed or 0),
-        #         ).to(device=orig_latents.device, dtype=orig_latents.dtype)
-
-        #         latents = self.scheduler.add_noise(latents, noise, batched_t)
-        #         latents = torch.lerp(
-        #             orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype)
-        #         )
-
-        #     if is_inpainting_model(self.unet):
-        #         if masked_latents is None:
-        #             raise Exception("Source image required for inpaint mask when inpaint model used!")
-
-        #         self.invokeai_diffuser.model_forward_callback = AddsMaskLatents(
-        #             self._unet_forward, mask, masked_latents
-        #         )
-        #     else:
-        #         additional_guidance.append(AddsMaskGuidance(mask, orig_latents, self.scheduler, noise, gradient_mask))
 
         try:
             latents = self.generate_latents_from_embeddings(
@@ -685,17 +660,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         **kwargs,
     ):
         """predict the noise residual"""
-        if is_inpainting_model(self.unet) and latents.size(1) == 4:
-            # Pad out normal non-inpainting inputs for an inpainting model.
-            # FIXME: There are too many layers of functions and we have too many different ways of
-            #     overriding things! This should get handled in a way more consistent with the other
-            #     use of AddsMaskLatents.
-            latents = AddsMaskLatents(
-                self._unet_forward,
-                mask=torch.ones_like(latents[:1, :1], device=latents.device, dtype=latents.dtype),
-                initial_image_latents=torch.zeros_like(latents[:1], device=latents.device, dtype=latents.dtype),
-            ).add_mask_channels(latents)
-
         # First three args should be positional, not keywords, so torch hooks can see them.
         return self.unet(
             latents,
