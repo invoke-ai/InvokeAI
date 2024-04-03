@@ -117,10 +117,14 @@ async def list_model_records(
         found_models.extend(
             record_store.search_by_attr(model_type=model_type, model_name=model_name, model_format=model_format)
         )
-    for model in found_models:
+
+    models_path = ApiDependencies.invoker.services.configuration.models_path
+    existant_models = [m for m in found_models if (models_path / m.path).exists()]
+
+    for model in existant_models:
         cover_image = ApiDependencies.invoker.services.model_images.get_url(model.key)
         model.cover_image = cover_image
-    return ModelsList(models=found_models)
+    return ModelsList(models=existant_models)
 
 
 @model_manager_router.get(
