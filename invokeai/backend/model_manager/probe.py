@@ -323,7 +323,7 @@ class ModelProbe(object):
         with SilenceWarnings():
             if model_path.suffix.endswith((".ckpt", ".pt", ".pth", ".bin")):
                 cls._scan_model(model_path.name, model_path)
-                model = torch.load(model_path)
+                model = torch.load(model_path, map_location="cpu")
                 assert isinstance(model, dict)
                 return model
             else:
