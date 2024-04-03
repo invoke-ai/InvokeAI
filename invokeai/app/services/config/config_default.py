@@ -317,11 +317,10 @@ class InvokeAIAppConfig(BaseSettings):
     @staticmethod
     def find_root() -> Path:
         """Choose the runtime root directory when not specified on command line or init file."""
-        venv = Path(os.environ.get("VIRTUAL_ENV") or ".")
         if os.environ.get("INVOKEAI_ROOT"):
             root = Path(os.environ["INVOKEAI_ROOT"])
-        elif any((venv.parent / x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE]):
-            root = (venv.parent).resolve()
+        elif venv := os.environ.get("VIRTUAL_ENV", None):
+            root = Path(venv).parent.resolve()
         else:
             root = Path("~/invokeai").expanduser().resolve()
         return root
