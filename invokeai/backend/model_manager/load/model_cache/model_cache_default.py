@@ -68,6 +68,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         sha_chunksize: int = 16777216,
         log_memory_usage: bool = False,
         logger: Optional[Logger] = None,
+        disable_memory_check: bool = False,
     ):
         """
         Initialize the model RAM cache.
@@ -82,6 +83,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
             operation, and the result will be logged (at debug level). There is a time cost to capturing the memory
             snapshots, so it is recommended to disable this feature unless you are actively inspecting the model cache's
             behaviour.
+        :param disable_memory_check: If True disable the check for insufficient VRAM when loading a model.
         """
         # allow lazy offloading only when vram cache enabled
         self._lazy_offloading = lazy_offloading and max_vram_cache_size > 0
@@ -93,6 +95,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         self._logger = logger or InvokeAILogger.get_logger(self.__class__.__name__)
         self._log_memory_usage = log_memory_usage
         self._stats: Optional[CacheStats] = None
+        self._disable_memory_check = disable_memory_check
 
         self._cached_models: Dict[str, CacheRecord[AnyModel]] = {}
         self._cache_stack: List[str] = []
@@ -270,7 +273,10 @@ class ModelCache(ModelCacheBase[AnyModel]):
             return
 
         # may raise an exception here if insufficient GPU VRAM
-        self._check_free_vram(target_device, cache_entry.size)
+        if self._disable_memory_check:
+            self.logger.warning("VRAM memory check disabled. Unpredictable behavior may result.")
+        else:
+            self._check_free_vram(target_device, cache_entry.size)
 
         start_model_to_time = time.time()
         snapshot_before = self._capture_memory_snapshot()

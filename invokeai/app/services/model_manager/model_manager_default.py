@@ -82,6 +82,7 @@ class ModelManagerService(ModelManagerServiceBase):
             max_vram_cache_size=app_config.vram,
             logger=logger,
             execution_device=execution_device,
+            disable_memory_check=app_config.disable_vram_check,
         )
         convert_cache = ModelConvertCache(cache_path=app_config.convert_cache_path, max_size=app_config.convert_cache)
         loader = ModelLoadService(
