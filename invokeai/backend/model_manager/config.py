@@ -323,16 +323,29 @@ class MainDiffusersConfig(DiffusersConfigBase, MainConfigBase):
         return Tag(f"{ModelType.Main.value}.{ModelFormat.Diffusers.value}")
 
 
-class IPAdapterConfig(ModelConfigBase):
-    """Model config for IP Adaptor format models."""
-
+class IPAdapterBaseConfig(ModelConfigBase):
     type: Literal[ModelType.IPAdapter] = ModelType.IPAdapter
+
+
+class IPAdapterInvokeAIConfig(IPAdapterBaseConfig):
+    """Model config for IP Adapter diffusers format models."""
+
     image_encoder_model_id: str
     format: Literal[ModelFormat.InvokeAI]
 
     @staticmethod
     def get_tag() -> Tag:
         return Tag(f"{ModelType.IPAdapter.value}.{ModelFormat.InvokeAI.value}")
+
+
+class IPAdapterCheckpointConfig(IPAdapterBaseConfig):
+    """Model config for IP Adapter checkpoint format models."""
+
+    format: Literal[ModelFormat.Checkpoint]
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.IPAdapter.value}.{ModelFormat.Checkpoint.value}")
 
 
 class CLIPVisionDiffusersConfig(DiffusersConfigBase):
@@ -390,7 +403,8 @@ AnyModelConfig = Annotated[
         Annotated[LoRADiffusersConfig, LoRADiffusersConfig.get_tag()],
         Annotated[TextualInversionFileConfig, TextualInversionFileConfig.get_tag()],
         Annotated[TextualInversionFolderConfig, TextualInversionFolderConfig.get_tag()],
-        Annotated[IPAdapterConfig, IPAdapterConfig.get_tag()],
+        Annotated[IPAdapterInvokeAIConfig, IPAdapterInvokeAIConfig.get_tag()],
+        Annotated[IPAdapterCheckpointConfig, IPAdapterCheckpointConfig.get_tag()],
         Annotated[T2IAdapterConfig, T2IAdapterConfig.get_tag()],
         Annotated[CLIPVisionDiffusersConfig, CLIPVisionDiffusersConfig.get_tag()],
     ],

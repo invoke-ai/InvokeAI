@@ -46,7 +46,7 @@ export type LoRAModelConfig = S['LoRADiffusersConfig'] | S['LoRALyCORISConfig'];
 // TODO(MM2): Can we rename this from Vae -> VAE
 export type VAEModelConfig = S['VAECheckpointConfig'] | S['VAEDiffusersConfig'];
 export type ControlNetModelConfig = S['ControlNetDiffusersConfig'] | S['ControlNetCheckpointConfig'];
-export type IPAdapterModelConfig = S['IPAdapterConfig'];
+export type IPAdapterModelConfig = S['IPAdapterInvokeAIConfig'] | S['IPAdapterCheckpointConfig'];
 export type T2IAdapterModelConfig = S['T2IAdapterConfig'];
 type TextualInversionModelConfig = S['TextualInversionFileConfig'] | S['TextualInversionFolderConfig'];
 type DiffusersModelConfig = S['MainDiffusersConfig'];
