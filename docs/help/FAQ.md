@@ -18,6 +18,22 @@ Note that any releases marked as _pre-release_ are in a beta state. You may expe
 
 The Model Manager tab in the UI provides a few ways to install models, including using your already-downloaded models. You'll see a popup directing you there on first startup. For more information, see the [model install docs].
 
+## Missing models after updating to v4
+
+If you find some models are missing after updating to v4, it's likely they weren't correctly registered before the update and didn't get picked up in the migration.
+
+You can use the `Scan Folder` tab in the Model Manager UI to fix this. The models will either be in the old, now-unused `autoimport` folder, or your `models` folder.
+
+- Find and copy your install's old `autoimport` folder path, install the main install folder.
+- Go to the Model Manager and click `Scan Folder`.
+- Paste the path and scan.
+- IMPORTANT: Uncheck `Inplace install`.
+- Click `Install All` to install all found models, or just install the models you want.
+
+Next, find and copy your install's `models` folder path (this could be your custom models folder path, or the `models` folder inside the main install folder).
+
+Follow the same steps to scan and import the missing models.
+
 ## Slow generation
 
 - Check the [system requirements] to ensure that your system is capable of generating images.
