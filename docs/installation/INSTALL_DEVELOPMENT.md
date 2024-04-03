@@ -32,5 +32,5 @@ As described in the [frontend dev toolchain] docs, you can run the UI using a de
 [Fork and clone]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo
 [InvokeAI repo]: https://github.com/invoke-ai/InvokeAI
 [frontend dev toolchain]: ../contributing/frontend/OVERVIEW.md
-[manual installation]: installation/020_INSTALL_MANUAL.md
+[manual installation]: ./020_INSTALL_MANUAL.md
 [editable install]: https://pip.pypa.io/en/latest/cli/pip_install/#cmdoption-e
