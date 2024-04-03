@@ -564,7 +564,7 @@ class ModelInstallService(ModelInstallServiceBase):
             # The model is not in the models directory - we don't need to move it.
             return model
 
-        new_path = (models_dir / model.base.value / model.type.value / model.name).with_suffix(old_path.suffix)
+        new_path = models_dir / model.base.value / model.type.value / old_path.name
 
         if old_path == new_path or new_path.exists() and old_path == new_path.resolve():
             return model
