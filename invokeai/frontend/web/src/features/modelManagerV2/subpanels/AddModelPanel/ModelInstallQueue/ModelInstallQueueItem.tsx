@@ -87,6 +87,10 @@ export const ModelInstallQueueItem = (props: ModelListItemProps) => {
   }, [installJob.source]);
 
   const progressValue = useMemo(() => {
+    if (installJob.status === 'completed' || installJob.status === 'error' || installJob.status === 'cancelled') {
+      return 100;
+    }
+
     if (isNil(installJob.bytes) || isNil(installJob.total_bytes)) {
       return null;
     }
@@ -96,7 +100,7 @@ export const ModelInstallQueueItem = (props: ModelListItemProps) => {
     }
 
     return (installJob.bytes / installJob.total_bytes) * 100;
-  }, [installJob.bytes, installJob.total_bytes]);
+  }, [installJob.bytes, installJob.status, installJob.total_bytes]);
 
   return (
     <Flex gap={3} w="full" alignItems="center">
