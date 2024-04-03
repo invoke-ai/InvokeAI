@@ -87,9 +87,11 @@ def test_rename(
     key = mm2_installer.install_path(embedding_file)
     model_record = store.get_model(key)
     assert model_record.path.endswith("sd-1/embedding/test_embedding.safetensors")
-    store.update_model(key, ModelRecordChanges(name="new_name.safetensors", base=BaseModelType("sd-2")))
+    store.update_model(key, ModelRecordChanges(name="new model name", base=BaseModelType("sd-2")))
     new_model_record = mm2_installer.sync_model_path(key)
-    assert new_model_record.path.endswith("sd-2/embedding/new_name.safetensors")
+    # Renaming the model record shouldn't rename the file
+    assert new_model_record.name == "new model name"
+    assert new_model_record.path.endswith("sd-2/embedding/test_embedding.safetensors")
 
 
 @pytest.mark.parametrize(
