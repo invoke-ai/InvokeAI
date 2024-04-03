@@ -209,7 +209,7 @@ class IPAdapterPlusXL(IPAdapterPlus):
 def load_ip_adapter_tensors(ip_adapter_ckpt_path: pathlib.Path, device: str) -> IPAdapterStateDict:
     state_dict: IPAdapterStateDict = {"ip_adapter": {}, "image_proj": {}}
 
-    if ip_adapter_ckpt_path.stem == "safetensors":
+    if ip_adapter_ckpt_path.suffix == ".safetensors":
         model = safetensors.torch.load_file(ip_adapter_ckpt_path, device=device)
         for key in model.keys():
             if key.startswith("image_proj."):
