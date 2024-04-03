@@ -40,11 +40,11 @@ Before you start, go through the [installation requirements].
 
 1. Enter the root (invokeai) directory and create a virtual Python environment within it named `.venv`.
 
-    !!! info "Virtual Environment Location"
+    !!! warning "Virtual Environment Location"
 
         While you may create the virtual environment anywhere in the file system, we recommend that you create it within the root directory as shown here. This allows the application to automatically detect its data directories.
 
-        If you choose a different location for the venv, then you must set the `INVOKEAI_ROOT` environment variable or pass the directory using the `--root` CLI arg.
+        If you choose a different location for the venv, then you _must_ set the `INVOKEAI_ROOT` environment variable or specify the root directory using the `--root` CLI arg.
 
     ```terminal
     cd $INVOKEAI_ROOT
@@ -126,16 +126,9 @@ Before you start, go through the [installation requirements].
 
     Run `invokeai-web` to start the UI. You must activate the virtual environment before running the app.
 
-    If the virtual environment you selected is NOT inside `INVOKEAI_ROOT`, then you must specify the path to the root directory by adding
-    `--root_dir \path\to\invokeai`.
+    !!! warning
 
-    !!! tip
-
-        You can permanently set the location of the runtime directory
-        by setting the environment variable `INVOKEAI_ROOT` to the
-        path of the directory. As mentioned previously, this is
-        recommended if your virtual environment is located outside of
-        your runtime directory.
+        If the virtual environment is _not_ inside the root directory, then you _must_ specify the path to the root directory with `--root_dir \path\to\invokeai` or the `INVOKEAI_ROOT` environment variable.
 
 ## Unsupported Conda Install
 
