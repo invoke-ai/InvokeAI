@@ -11,7 +11,6 @@ from PIL import Image
 from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
 from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionWeights
-from invokeai.backend.util.devices import choose_torch_device
 
 from ..raw_model import RawModel
 from .resampler import Resampler
