@@ -13,8 +13,8 @@ from diffusers import (
     LCMScheduler,
     LMSDiscreteScheduler,
     PNDMScheduler,
-    UniPCMultistepScheduler,
     TCDScheduler,
+    UniPCMultistepScheduler,
 )
 
 SCHEDULER_MAP = {
