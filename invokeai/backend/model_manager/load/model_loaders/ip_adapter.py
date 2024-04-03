@@ -14,6 +14,7 @@ from invokeai.backend.raw_model import RawModel
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.IPAdapter, format=ModelFormat.InvokeAI)
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.IPAdapter, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.IPAdapter, format=ModelFormat.Checkpoint)
 class IPAdapterInvokeAILoader(ModelLoader):
     """Class to load IP Adapter diffusers models."""
 
