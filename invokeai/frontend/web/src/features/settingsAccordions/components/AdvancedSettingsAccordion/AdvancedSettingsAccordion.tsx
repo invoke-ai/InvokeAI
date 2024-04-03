@@ -61,7 +61,7 @@ export const AdvancedSettingsAccordion = memo(() => {
 
   return (
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
-      <Flex gap={4} alignItems="center" p={4} flexDir="column">
+      <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
         <Flex gap={4} w="full">
           <ParamVAEModelSelect />
           <ParamVAEPrecision />
