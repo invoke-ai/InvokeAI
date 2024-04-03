@@ -41,5 +41,5 @@ SCHEDULER_MAP = {
     "dpmpp_sde_k": (DPMSolverSDEScheduler, {"use_karras_sigmas": True, "noise_sampler_seed": 0}),
     "unipc": (UniPCMultistepScheduler, {"cpu_only": True}),
     "lcm": (LCMScheduler, {}),
-    "TCD": (TCDScheduler, {}),
+    "tcd": (TCDScheduler, {}),
 }
