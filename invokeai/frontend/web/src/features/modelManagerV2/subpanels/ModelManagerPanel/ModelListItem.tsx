@@ -90,11 +90,13 @@ const ModelListItem = (props: ModelListItemProps) => {
       cursor="pointer"
       onClick={handleSelectModel}
     >
-      <Flex gap={2} w="full" h="full">
+      <Flex gap={2} w="full" h="full" minW={0}>
         <ModelImage image_url={model.cover_image} />
-        <Flex gap={1} alignItems="flex-start" flexDir="column" w="full">
+        <Flex gap={1} alignItems="flex-start" flexDir="column" w="full" minW={0}>
           <Flex gap={2} w="full" alignItems="flex-start">
-            <Text fontWeight="semibold">{model.name}</Text>
+            <Text fontWeight="semibold" noOfLines={1} wordBreak="break-all">
+              {model.name}
+            </Text>
             <Spacer />
           </Flex>
           <Text variant="subtext" noOfLines={1}>
