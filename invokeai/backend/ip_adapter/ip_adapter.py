@@ -152,8 +152,8 @@ class IPAdapter(RawModel):
             image_prompt_embeds = self._image_proj_model(clip_image_embeds)
             uncond_image_prompt_embeds = self._image_proj_model(torch.zeros_like(clip_image_embeds))
             return image_prompt_embeds, uncond_image_prompt_embeds
-        except RuntimeError:
-            raise RuntimeError("Selected CLIP Vision Model is incompatible with the current IP Adapter")
+        except RuntimeError as e:
+            raise RuntimeError("Selected CLIP Vision Model is incompatible with the current IP Adapter") from e
 
 
 class IPAdapterPlus(IPAdapter):
@@ -181,8 +181,8 @@ class IPAdapterPlus(IPAdapter):
             image_prompt_embeds = self._image_proj_model(clip_image_embeds)
             uncond_image_prompt_embeds = self._image_proj_model(uncond_clip_image_embeds)
             return image_prompt_embeds, uncond_image_prompt_embeds
-        except RuntimeError:
-            raise RuntimeError("Selected CLIP Vision Model is incompatible with the current IP Adapter")
+        except RuntimeError as e:
+            raise RuntimeError("Selected CLIP Vision Model is incompatible with the current IP Adapter") from e
 
 
 class IPAdapterFull(IPAdapterPlus):
