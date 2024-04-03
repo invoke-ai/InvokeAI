@@ -372,6 +372,7 @@ const parseIPAdapter: MetadataParseFunc<IPAdapterConfigMetadata> = async (metada
     type: 'ip_adapter',
     isEnabled: true,
     model: zModelIdentifierField.parse(ipAdapterModel),
+    clipVisionModel: 'ViT-H',
     controlImage: image?.image_name ?? null,
     weight: weight ?? initialIPAdapter.weight,
     beginStepPct: begin_step_percent ?? initialIPAdapter.beginStepPct,
