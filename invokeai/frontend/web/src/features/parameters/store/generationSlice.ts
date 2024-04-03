@@ -280,6 +280,7 @@ const migrateGenerationState = (state: any): GenerationState => {
     // The signature of the model has changed, so we need to reset it
     state._version = 2;
     state.model = null;
+    state.canvasCoherenceMode = initialGenerationState.canvasCoherenceMode;
   }
   return state;
 };

@@ -98,6 +98,32 @@ def test_migrate_v3_config_from_file(tmp_path: Path, patch_rootdir: None):
     assert not hasattr(config, "esrgan")
 
 
+@pytest.mark.parametrize(
+    "legacy_conf_dir,expected_value,expected_is_set",
+    [
+        # not set, expected value is the default value
+        ("configs/stable-diffusion", Path("configs"), False),
+        # not set, expected value is the default value
+        ("configs\\stable-diffusion", Path("configs"), False),
+        # set, best-effort resolution of the path
+        ("partial_custom_path/stable-diffusion", Path("partial_custom_path"), True),
+        # set, exact path
+        ("full/custom/path", Path("full/custom/path"), True),
+    ],
+)
+def test_migrate_v3_legacy_conf_dir_defaults(
+    tmp_path: Path, patch_rootdir: None, legacy_conf_dir: str, expected_value: Path, expected_is_set: bool
+):
+    """Test reading configuration from a file."""
+    config_content = f"InvokeAI:\n    Paths:\n        legacy_conf_dir: {legacy_conf_dir}"
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text(config_content)
+
+    config = load_and_migrate_config(temp_config_file)
+    assert config.legacy_conf_dir == expected_value
+    assert ("legacy_conf_dir" in config.model_fields_set) is expected_is_set
+
+
 def test_migrate_v3_backup(tmp_path: Path, patch_rootdir: None):
     """Test the backup of the config file."""
     temp_config_file = tmp_path / "temp_invokeai.yaml"

@@ -19,10 +19,19 @@ class ModelConvertCache(ModelConvertCacheBase):
         self._cache_path = cache_path
         self._max_size = max_size
 
+        # adjust cache size at startup in case it has been changed
+        if self._cache_path.exists():
+            self.make_room(0.0)
+
     @property
     def max_size(self) -> float:
         """Return the maximum size of this cache directory (GB)."""
         return self._max_size
+
+    @max_size.setter
+    def max_size(self, value: float) -> None:
+        """Set the maximum size of this cache directory (GB)."""
+        self._max_size = value
 
     def cache_path(self, key: str) -> Path:
         """Return the path for a model with the indicated key."""

@@ -2,8 +2,10 @@
 """Class for ControlNet model loading in InvokeAI."""
 
 from pathlib import Path
+from typing import Optional
 
 from invokeai.backend.model_manager import (
+    AnyModel,
     AnyModelConfig,
     BaseModelType,
     ModelFormat,
@@ -33,7 +35,7 @@ class ControlNetLoader(GenericDiffusersLoader):
         else:
             return True
 
-    def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Path) -> Path:
+    def _convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Optional[Path] = None) -> AnyModel:
         assert isinstance(config, CheckpointConfigBase)
         image_size = (
             512
@@ -44,8 +46,8 @@ class ControlNetLoader(GenericDiffusersLoader):
         )
 
         self._logger.info(f"Converting {model_path} to diffusers format")
-        with open(self._app_config.root_path / config.config_path, "r") as config_stream:
-            convert_controlnet_to_diffusers(
+        with open(self._app_config.legacy_conf_path / config.config_path, "r") as config_stream:
+            result = convert_controlnet_to_diffusers(
                 model_path,
                 output_path,
                 original_config_file=config_stream,
@@ -53,4 +55,4 @@ class ControlNetLoader(GenericDiffusersLoader):
                 precision=self._torch_dtype,
                 from_safetensors=model_path.suffix == ".safetensors",
             )
-        return output_path
+        return result
