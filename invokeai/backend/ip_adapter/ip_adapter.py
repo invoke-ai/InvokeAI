@@ -1,6 +1,7 @@
 # copied from https://github.com/tencent-ailab/IP-Adapter (Apache License 2.0)
 #   and modified as needed
 
+import pathlib
 from typing import List, Optional, TypedDict, Union
 
 import safetensors
@@ -10,7 +11,6 @@ from PIL import Image
 from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
 from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionWeights
-from invokeai.backend.util.devices import choose_torch_device
 
 from ..raw_model import RawModel
 from .resampler import Resampler
@@ -206,10 +206,10 @@ class IPAdapterPlusXL(IPAdapterPlus):
         ).to(self.device, dtype=self.dtype)
 
 
-def load_ip_adapter_tensors(ip_adapter_ckpt_path: str, device: str) -> IPAdapterStateDict:
+def load_ip_adapter_tensors(ip_adapter_ckpt_path: pathlib.Path, device: str) -> IPAdapterStateDict:
     state_dict: IPAdapterStateDict = {"ip_adapter": {}, "image_proj": {}}
 
-    if ip_adapter_ckpt_path.endswith("safetensors"):
+    if ip_adapter_ckpt_path.stem == "safetensors":
         model = safetensors.torch.load_file(ip_adapter_ckpt_path, device=device)
         for key in model.keys():
             if key.startswith("image_proj."):
@@ -219,14 +219,14 @@ def load_ip_adapter_tensors(ip_adapter_ckpt_path: str, device: str) -> IPAdapter
             else:
                 raise RuntimeError(f"Encountered unexpected IP Adapter state dict key: '{key}'.")
     else:
-        ip_adapter_diffusers_checkpoint_path = ip_adapter_ckpt_path + "/ip_adapter.bin"
+        ip_adapter_diffusers_checkpoint_path = ip_adapter_ckpt_path / "ip_adapter.bin"
         state_dict = torch.load(ip_adapter_diffusers_checkpoint_path, map_location="cpu")
 
     return state_dict
 
 
 def build_ip_adapter(
-    ip_adapter_ckpt_path: str, device: torch.device, dtype: torch.dtype = torch.float16
+    ip_adapter_ckpt_path: pathlib.Path, device: torch.device, dtype: torch.dtype = torch.float16
 ) -> Union[IPAdapter, IPAdapterPlus, IPAdapterPlusXL, IPAdapterPlus]:
     state_dict = load_ip_adapter_tensors(ip_adapter_ckpt_path, device.type)
 

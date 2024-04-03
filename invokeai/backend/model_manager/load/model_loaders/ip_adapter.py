@@ -26,7 +26,7 @@ class IPAdapterInvokeAILoader(ModelLoader):
             raise ValueError("There are no submodels in an IP-Adapter model.")
         model_path = Path(config.path)
         model: RawModel = build_ip_adapter(
-            ip_adapter_ckpt_path=str(model_path),
+            ip_adapter_ckpt_path=model_path,
             device=torch.device("cpu"),
             dtype=self._torch_dtype,
         )
