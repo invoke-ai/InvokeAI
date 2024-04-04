@@ -544,6 +544,10 @@ class LoRAModelRaw(RawModel):  # (torch.nn.Module):
         for layer_key, values in state_dict.items():
             layer = layer_cls(layer_key, values)
 
+            # TODO(ryand): This .to() call causes an implicit CUDA sync point in a tight loop. This is very slow (even
+            # slower than loading the weights from disk). We should ideally only be copying the weights once - right
+            # before they are used. Or, if we want to do this here, then setting non_blocking = True would probably
+            # help.
             layer.to(device=device, dtype=dtype)
             model.layers[layer_key] = layer
         return model
