@@ -1254,7 +1254,7 @@ class IdealSizeInvocation(BaseInvocation):
         return tuple((x - x % multiple_of) for x in args)
 
     def invoke(self, context: InvocationContext) -> IdealSizeOutput:
-        unet_config = context.models.get_config(**self.unet.unet.model_dump())
+        unet_config = context.models.get_config(self.unet.unet.key)
         aspect = self.width / self.height
         dimension: float = 512
         if unet_config.base == BaseModelType.StableDiffusion2:
