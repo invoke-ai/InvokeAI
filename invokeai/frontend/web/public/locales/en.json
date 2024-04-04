@@ -1044,7 +1044,7 @@
         "parameterNotSet": "{{parameter}} not set",
         "parameterSet": "{{parameter}} set",
         "parametersNotSet": "Parameters Not Set",
-        "parametersSet": "Parameters Set",
+        "parametersSet": "Parameters",
         "problemCopyingCanvas": "Problem Copying Canvas",
         "problemCopyingCanvasDesc": "Unable to export base layer",
         "problemCopyingImage": "Unable to Copy Image",
