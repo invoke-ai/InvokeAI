@@ -20,6 +20,7 @@ import type {
   ParameterHeight,
   ParameterHRFEnabled,
   ParameterHRFMethod,
+  ParameterInitialImage,
   ParameterModel,
   ParameterNegativePrompt,
   ParameterNegativeStylePromptSDXL,
@@ -134,6 +135,9 @@ const parseCFGRescaleMultiplier: MetadataParseFunc<ParameterCFGRescaleMultiplier
 
 const parseScheduler: MetadataParseFunc<ParameterScheduler> = (metadata) =>
   getProperty(metadata, 'scheduler', isParameterScheduler);
+
+const parseInitialImage: MetadataParseFunc<ParameterInitialImage> = (metadata) =>
+  getProperty(metadata, 'init_image', isString);
 
 const parseWidth: MetadataParseFunc<ParameterWidth> = (metadata) => getProperty(metadata, 'width', isParameterWidth);
 
@@ -402,6 +406,7 @@ export const parsers = {
   cfgScale: parseCFGScale,
   cfgRescaleMultiplier: parseCFGRescaleMultiplier,
   scheduler: parseScheduler,
+  initialImage: parseInitialImage,
   width: parseWidth,
   height: parseHeight,
   steps: parseSteps,

@@ -17,6 +17,7 @@ import type {
 import { modelSelected } from 'features/parameters/store/actions';
 import {
   heightRecalled,
+  initialImageChanged,
   setCfgRescaleMultiplier,
   setCfgScale,
   setImg2imgStrength,
@@ -34,6 +35,7 @@ import type {
   ParameterHeight,
   ParameterHRFEnabled,
   ParameterHRFMethod,
+  ParameterInitialImage,
   ParameterModel,
   ParameterNegativePrompt,
   ParameterNegativeStylePromptSDXL,
@@ -61,6 +63,7 @@ import {
   setRefinerStart,
   setRefinerSteps,
 } from 'features/sdxl/store/sdxlSlice';
+import type { ImageDTO } from 'services/api/types';
 
 const recallPositivePrompt: MetadataRecallFunc<ParameterPositivePrompt> = (positivePrompt) => {
   getStore().dispatch(setPositivePrompt(positivePrompt));
@@ -92,6 +95,13 @@ const recallCFGRescaleMultiplier: MetadataRecallFunc<ParameterCFGRescaleMultipli
 
 const recallScheduler: MetadataRecallFunc<ParameterScheduler> = (scheduler) => {
   getStore().dispatch(setScheduler(scheduler));
+};
+
+const recallInitialImage: MetadataRecallFunc<ParameterInitialImage> = (initialImage) => {
+  const image = {
+    image_name: initialImage,
+  };
+  getStore().dispatch(initialImageChanged(image as ImageDTO));
 };
 
 const recallWidth: MetadataRecallFunc<ParameterWidth> = (width) => {
@@ -235,6 +245,7 @@ export const recallers = {
   cfgScale: recallCFGScale,
   cfgRescaleMultiplier: recallCFGRescaleMultiplier,
   scheduler: recallScheduler,
+  initialImage: recallInitialImage,
   width: recallWidth,
   height: recallHeight,
   steps: recallSteps,
