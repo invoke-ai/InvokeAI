@@ -544,12 +544,8 @@ class LoRAModelRaw(RawModel):  # (torch.nn.Module):
         for layer_key, values in state_dict.items():
             layer = layer_cls(layer_key, values)
 
-            # lower memory consumption by removing already parsed layer values
-            state_dict[layer_key].clear()
-
             layer.to(device=device, dtype=dtype)
             model.layers[layer_key] = layer
-
         return model
 
     @staticmethod
