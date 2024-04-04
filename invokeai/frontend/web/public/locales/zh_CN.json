@@ -583,7 +583,8 @@
         "next": "下一张",
         "accept": "接受",
         "discardAll": "放弃所有",
-        "antialiasing": "抗锯齿",
+        "antialiasing": "抗锯齿",        
+        "initialFitImageSize": "初始适应图片大小",
         "showResultsOn": "显示结果 (开)",
         "showResultsOff": "显示结果 (关)",
         "saveMask": "保存 $t(unifiedCanvas.mask)"

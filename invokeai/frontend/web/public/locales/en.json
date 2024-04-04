@@ -1423,6 +1423,7 @@
         "eraseBoundingBox": "Erase Bounding Box",
         "eraser": "Eraser",
         "fillBoundingBox": "Fill Bounding Box",
+        "initialFitImageSize": "Fit Image Size on Drop",
         "invertBrushSizeScrollDirection": "Invert Scroll for Brush Size",
         "layer": "Layer",
         "limitStrokesToBox": "Limit Strokes to Box",
