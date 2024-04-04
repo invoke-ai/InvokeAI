@@ -289,11 +289,18 @@ export const canvasSlice = createSlice({
       const { images, selectedImageIndex } = state.layerState.stagingArea;
       pushToPrevLayerStates(state);
 
-      if (!images.length) {
-        return;
-      }
-
       images.splice(selectedImageIndex, 1);
+
+      if (images.length === 0) {
+        pushToPrevLayerStates(state);
+
+        state.layerState.stagingArea = deepClone(initialLayerState.stagingArea);
+
+        state.futureLayerStates = [];
+        state.shouldShowStagingOutline = true;
+        state.shouldShowStagingImage = true;
+        state.batchIds = [];
+      }
 
       if (selectedImageIndex >= images.length) {
         state.layerState.stagingArea.selectedImageIndex = images.length - 1;
