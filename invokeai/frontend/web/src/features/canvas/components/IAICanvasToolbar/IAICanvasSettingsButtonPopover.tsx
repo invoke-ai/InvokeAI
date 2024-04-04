@@ -49,7 +49,7 @@ const IAICanvasSettingsButtonPopover = () => {
   const shouldSnapToGrid = useAppSelector((s) => s.canvas.shouldSnapToGrid);
   const shouldRestrictStrokesToBox = useAppSelector((s) => s.canvas.shouldRestrictStrokesToBox);
   const shouldAntialias = useAppSelector((s) => s.canvas.shouldAntialias);
-  const sholdFitImageSize = useAppSelector((s) => s.canvas.shouldFitImageSize);
+  const shouldFitImageSize = useAppSelector((s) => s.canvas.shouldFitImageSize);
 
   useHotkeys(
     ['n'],
@@ -104,7 +104,7 @@ const IAICanvasSettingsButtonPopover = () => {
     (e: ChangeEvent<HTMLInputElement>) => dispatch(setShouldAntialias(e.target.checked)),
     [dispatch]
   );
-  const handleChangeSholdFitImageSize = useCallback(
+  const handleChangeShouldFitImageSize = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => dispatch(setShouldFitImageSize(e.target.checked)),
     [dispatch]
   );
@@ -173,7 +173,7 @@ const IAICanvasSettingsButtonPopover = () => {
               </FormControl>
               <FormControl>
                 <FormLabel>{t('unifiedCanvas.initialFitImageSize')}</FormLabel>
-                <Checkbox isChecked={sholdFitImageSize} onChange={handleChangeSholdFitImageSize} />
+                <Checkbox isChecked={shouldFitImageSize} onChange={handleChangeShouldFitImageSize} />
               </FormControl>
             </FormControlGroup>
             <ClearCanvasHistoryButtonModal />
