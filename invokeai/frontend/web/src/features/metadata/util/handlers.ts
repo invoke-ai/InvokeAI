@@ -189,6 +189,11 @@ export const handlers = {
     recaller: recallers.cfgScale,
   }),
   height: buildHandlers({ getLabel: () => t('metadata.height'), parser: parsers.height, recaller: recallers.height }),
+  initialImage: buildHandlers({
+    getLabel: () => t('metadata.initImage'),
+    parser: parsers.initialImage,
+    recaller: recallers.initialImage,
+  }),
   negativePrompt: buildHandlers({
     getLabel: () => t('metadata.negativePrompt'),
     parser: parsers.negativePrompt,
