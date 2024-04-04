@@ -95,9 +95,8 @@ class InfillTileInvocation(InfillImageProcessorInvocation):
     )
 
     def infill(self, image: Image.Image):
-        infilled = infill_tile(image, seed=self.seed, tile_size=self.tile_size)
-        infilled.paste(image, (0, 0), image.split()[-1])
-        return infilled
+        output = infill_tile(image, seed=self.seed, tile_size=self.tile_size)
+        return output.infilled
 
 
 @invocation(
