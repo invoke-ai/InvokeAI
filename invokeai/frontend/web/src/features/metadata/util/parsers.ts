@@ -43,6 +43,7 @@ import {
   isParameterHeight,
   isParameterHRFEnabled,
   isParameterHRFMethod,
+  isParameterInitialImage,
   isParameterLoRAWeight,
   isParameterNegativePrompt,
   isParameterNegativeStylePromptSDXL,
@@ -137,7 +138,7 @@ const parseScheduler: MetadataParseFunc<ParameterScheduler> = (metadata) =>
   getProperty(metadata, 'scheduler', isParameterScheduler);
 
 const parseInitialImage: MetadataParseFunc<ParameterInitialImage> = (metadata) =>
-  getProperty(metadata, 'init_image', isString);
+  getProperty(metadata, 'init_image', isParameterInitialImage);
 
 const parseWidth: MetadataParseFunc<ParameterWidth> = (metadata) => getProperty(metadata, 'width', isParameterWidth);
 
