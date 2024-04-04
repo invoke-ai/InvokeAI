@@ -148,10 +148,16 @@ export const canvasSlice = createSlice({
         const { stageDimensions, shouldFitImageSize } = state;
 
         const newBoundingBoxDimensions = shouldFitImageSize
-          ? { width, height }
+          ? {
+              width: roundDownToMultiple(width, CANVAS_GRID_SIZE_FINE),
+              height: roundDownToMultiple(height, CANVAS_GRID_SIZE_FINE),
+            }
           : {
               width: roundDownToMultiple(clamp(width, CANVAS_GRID_SIZE_FINE, optimalDimension), CANVAS_GRID_SIZE_FINE),
-              height: roundDownToMultiple(clamp(height, CANVAS_GRID_SIZE_FINE, optimalDimension), CANVAS_GRID_SIZE_FINE),
+              height: roundDownToMultiple(
+                clamp(height, CANVAS_GRID_SIZE_FINE, optimalDimension),
+                CANVAS_GRID_SIZE_FINE
+              ),
             };
 
         const newBoundingBoxCoordinates = {
