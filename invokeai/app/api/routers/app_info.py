@@ -100,7 +100,7 @@ async def get_app_deps() -> AppDependencyVersions:
 
 @app_router.get("/config", operation_id="get_config", status_code=200, response_model=AppConfig)
 async def get_config() -> AppConfig:
-    infill_methods = ["tile", "lama", "cv2", "color", "mosaic"]
+    infill_methods = ["tile", "lama", "cv2", "color"]  # TODO: add mosaic back
     if PatchMatch.patchmatch_available():
         infill_methods.append("patchmatch")
 
