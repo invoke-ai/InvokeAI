@@ -22,9 +22,9 @@ logger = InvokeAILogger.get_logger()
 
 
 def get_infill_methods():
-    methods = Literal["tile", "color", "lama", "cv2", "mosaic"]
+    methods = Literal["tile", "color", "lama", "cv2"]  # TODO: add mosaic back
     if PatchMatch.patchmatch_available():
-        methods = Literal["patchmatch", "tile", "color", "lama", "cv2", "mosaic"]
+        methods = Literal["patchmatch", "tile", "color", "lama", "cv2"]  # TODO: add mosaic back
     return methods
 
 
@@ -145,9 +145,9 @@ class CV2InfillInvocation(InfillImageProcessorInvocation):
         return cv2_inpaint(image)
 
 
-@invocation(
-    "infill_mosaic", title="Mosaic Infill", tags=["image", "inpaint", "outpaint"], category="inpaint", version="1.0.0"
-)
+# @invocation(
+#     "infill_mosaic", title="Mosaic Infill", tags=["image", "inpaint", "outpaint"], category="inpaint", version="1.0.0"
+# )
 class MosaicInfillInvocation(InfillImageProcessorInvocation):
     """Infills transparent areas of an image with a mosaic pattern drawing colors from the rest of the image"""
 
