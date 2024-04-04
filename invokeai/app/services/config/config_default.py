@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import locale
 import os
 import re
 import shutil
@@ -401,7 +402,7 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
         An instance of `InvokeAIAppConfig` with the loaded and migrated settings.
     """
     assert config_path.suffix == ".yaml"
-    with open(config_path) as file:
+    with open(config_path, "rt", encoding=locale.getpreferredencoding()) as file:
         loaded_config_dict = yaml.safe_load(file)
 
     assert isinstance(loaded_config_dict, dict)
