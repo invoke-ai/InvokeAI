@@ -684,6 +684,7 @@
         "noModelsInstalled": "No Models Installed",
         "noModelsInstalledDesc1": "Install models with the",
         "noModelSelected": "No Model Selected",
+        "noMatchingModels": "No matching Models",
         "none": "none",
         "path": "Path",
         "pathToConfig": "Path To Config",
