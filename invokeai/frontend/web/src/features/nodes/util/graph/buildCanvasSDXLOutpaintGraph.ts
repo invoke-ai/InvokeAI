@@ -66,10 +66,10 @@ export const buildCanvasSDXLOutpaintGraph = async (
     infillTileSize,
     infillPatchmatchDownscaleSize,
     infillMethod,
-    infillMosaicTileWidth,
-    infillMosaicTileHeight,
-    infillMosaicMinColor,
-    infillMosaicMaxColor,
+    // infillMosaicTileWidth,
+    // infillMosaicTileHeight,
+    // infillMosaicMinColor,
+    // infillMosaicMaxColor,
     infillColorValue,
     seamlessXAxis,
     seamlessYAxis,
@@ -370,17 +370,18 @@ export const buildCanvasSDXLOutpaintGraph = async (
     };
   }
 
-  if (infillMethod === 'mosaic') {
-    graph.nodes[INPAINT_INFILL] = {
-      type: 'infill_mosaic',
-      id: INPAINT_INFILL,
-      is_intermediate,
-      tile_width: infillMosaicTileWidth,
-      tile_height: infillMosaicTileHeight,
-      min_color: infillMosaicMinColor,
-      max_color: infillMosaicMaxColor,
-    };
-  }
+  // TODO: add mosaic back
+  // if (infillMethod === 'mosaic') {
+  //   graph.nodes[INPAINT_INFILL] = {
+  //     type: 'infill_mosaic',
+  //     id: INPAINT_INFILL,
+  //     is_intermediate,
+  //     tile_width: infillMosaicTileWidth,
+  //     tile_height: infillMosaicTileHeight,
+  //     min_color: infillMosaicMinColor,
+  //     max_color: infillMosaicMaxColor,
+  //   };
+  // }
 
   if (infillMethod === 'color') {
     graph.nodes[INPAINT_INFILL] = {
