@@ -21,6 +21,10 @@ import { workflowPersistConfig, workflowSlice } from 'features/nodes/store/workf
 import { generationPersistConfig, generationSlice } from 'features/parameters/store/generationSlice';
 import { postprocessingPersistConfig, postprocessingSlice } from 'features/parameters/store/postprocessingSlice';
 import { queueSlice } from 'features/queue/store/queueSlice';
+import {
+  regionalPromptsPersistConfig,
+  regionalPromptsSlice,
+} from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { sdxlPersistConfig, sdxlSlice } from 'features/sdxl/store/sdxlSlice';
 import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';
@@ -59,6 +63,7 @@ const allReducers = {
   [queueSlice.name]: queueSlice.reducer,
   [workflowSlice.name]: workflowSlice.reducer,
   [hrfSlice.name]: hrfSlice.reducer,
+  [regionalPromptsSlice.name]: regionalPromptsSlice.reducer,
   [api.reducerPath]: api.reducer,
 };
 
@@ -103,6 +108,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [loraPersistConfig.name]: loraPersistConfig,
   [modelManagerV2PersistConfig.name]: modelManagerV2PersistConfig,
   [hrfPersistConfig.name]: hrfPersistConfig,
+  [regionalPromptsPersistConfig.name]: regionalPromptsPersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {
