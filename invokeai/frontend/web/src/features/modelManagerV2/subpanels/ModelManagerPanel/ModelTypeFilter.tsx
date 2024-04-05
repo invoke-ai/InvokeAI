@@ -13,6 +13,7 @@ export const ModelTypeFilter = () => {
   const MODEL_TYPE_LABELS: Record<FilterableModelType, string> = useMemo(
     () => ({
       main: t('modelManager.main'),
+      refiner: t('sdxl.refiner'),
       lora: 'LoRA',
       embedding: t('modelManager.textualInversions'),
       controlnet: 'ControlNet',
