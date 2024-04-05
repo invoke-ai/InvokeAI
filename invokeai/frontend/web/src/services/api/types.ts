@@ -144,6 +144,7 @@ export type CanvasPasteBackInvocation = S['CanvasPasteBackInvocation'];
 export type NoiseInvocation = S['NoiseInvocation'];
 export type DenoiseLatentsInvocation = S['DenoiseLatentsInvocation'];
 export type SDXLLoRALoaderInvocation = S['SDXLLoRALoaderInvocation'];
+export type CLIPVisionModelLoaderInvocation = S['CLIPVisionModelLoaderInvocation'];
 export type ImageToLatentsInvocation = S['ImageToLatentsInvocation'];
 export type LatentsToImageInvocation = S['LatentsToImageInvocation'];
 export type LoRALoaderInvocation = S['LoRALoaderInvocation'];

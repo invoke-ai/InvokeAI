@@ -34,6 +34,7 @@ export const MASK_RESIZE_UP = 'mask_resize_up';
 export const MASK_RESIZE_DOWN = 'mask_resize_down';
 export const CONTROL_NET_COLLECT = 'control_net_collect';
 export const IP_ADAPTER_COLLECT = 'ip_adapter_collect';
+export const CLIP_VISION_MODEL_LOADER = 'clip_vision_model_loader';
 export const T2I_ADAPTER_COLLECT = 't2i_adapter_collect';
 export const METADATA = 'core_metadata';
 export const ESRGAN = 'esrgan';

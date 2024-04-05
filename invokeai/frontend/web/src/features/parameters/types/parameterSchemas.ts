@@ -106,6 +106,11 @@ export const zParameterVAEModel = zModelIdentifierField;
 export type ParameterVAEModel = z.infer<typeof zParameterVAEModel>;
 // #endregion
 
+// #region CLIP Vision Model
+const zParameterCLIPVisionModel = zModelIdentifierField;
+export type ParameterCLIPVisionModel = z.infer<typeof zParameterCLIPVisionModel>;
+// #endregion
+
 // #region LoRA Model
 const zParameterLoRAModel = zModelIdentifierField;
 export type ParameterLoRAModel = z.infer<typeof zParameterLoRAModel>;

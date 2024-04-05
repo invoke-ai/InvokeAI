@@ -3,6 +3,7 @@ import { selectValidIPAdapters } from 'features/controlAdapters/store/controlAda
 import type { IPAdapterConfig } from 'features/controlAdapters/store/types';
 import type { ImageField } from 'features/nodes/types/common';
 import type {
+  CLIPVisionModelLoaderInvocation,
   CollectInvocation,
   CoreMetadataInvocation,
   IPAdapterInvocation,
@@ -34,6 +35,7 @@ export const addIPAdapterToLinearGraph = async (
       is_intermediate: true,
     };
     graph.nodes[IP_ADAPTER_COLLECT] = ipAdapterCollectNode;
+
     graph.edges.push({
       source: { node_id: IP_ADAPTER_COLLECT, field: 'collection' },
       destination: {
@@ -50,7 +52,20 @@ export const addIPAdapterToLinearGraph = async (
       }
       const { id, weight, model, clipVisionModel, beginStepPct, endStepPct, controlImage } = ipAdapter;
 
+      if (!clipVisionModel) {
+        return;
+      }
+
       assert(controlImage, 'IP Adapter image is required');
+
+      const clipVisionNode: CLIPVisionModelLoaderInvocation = {
+        id: `clip_vision_model_loader_${id}`,
+        type: 'clip_vision_model_loader',
+        is_intermediate: true,
+        clip_vision_model: clipVisionModel,
+      };
+
+      graph.nodes[clipVisionNode.id] = clipVisionNode;
 
       const ipAdapterNode: IPAdapterInvocation = {
         id: `ip_adapter_${id}`,
@@ -58,7 +73,6 @@ export const addIPAdapterToLinearGraph = async (
         is_intermediate: true,
         weight: weight,
         ip_adapter_model: model,
-        clip_vision_model: clipVisionModel,
         begin_step_percent: beginStepPct,
         end_step_percent: endStepPct,
         image: {
@@ -69,6 +83,11 @@ export const addIPAdapterToLinearGraph = async (
       graph.nodes[ipAdapterNode.id] = ipAdapterNode;
 
       ipAdapterMetdata.push(buildIPAdapterMetadata(ipAdapter));
+
+      graph.edges.push({
+        source: { node_id: clipVisionNode.id, field: 'clip_vision' },
+        destination: { node_id: ipAdapterNode.id, field: 'clip_vision' },
+      });
 
       graph.edges.push({
         source: { node_id: ipAdapterNode.id, field: 'ip_adapter' },
@@ -87,6 +106,7 @@ const buildIPAdapterMetadata = (ipAdapter: IPAdapterConfig): S['IPAdapterMetadat
   const { controlImage, beginStepPct, endStepPct, model, clipVisionModel, weight } = ipAdapter;
 
   assert(model, 'IP Adapter model is required');
+  assert(clipVisionModel, 'CLIP Vision model is required');
 
   let image: ImageField | null = null;
 

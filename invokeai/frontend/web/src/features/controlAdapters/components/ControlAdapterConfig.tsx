@@ -2,12 +2,14 @@ import { Box, Flex, FormControl, FormLabel, Icon, IconButton, Switch } from '@in
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ParamControlAdapterModel from 'features/controlAdapters/components/parameters/ParamControlAdapterModel';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
+import { useControlAdapterModel } from 'features/controlAdapters/hooks/useControlAdapterModel';
 import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
 import {
   controlAdapterDuplicated,
   controlAdapterIsEnabledChanged,
   controlAdapterRemoved,
 } from 'features/controlAdapters/store/controlAdaptersSlice';
+import ParamCLIPVisionModelSelect from 'features/parameters/components/CLIPVisionModel/ParamCLIPVisionModelSelect';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -28,6 +30,7 @@ import ParamControlAdapterWeight from './parameters/ParamControlAdapterWeight';
 const ControlAdapterConfig = (props: { id: string; number: number }) => {
   const { id, number } = props;
   const controlAdapterType = useControlAdapterType(id);
+  const { modelConfig } = useControlAdapterModel(id);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -108,6 +111,8 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
           }
         />
       </Flex>
+
+      {modelConfig?.type === 'ip_adapter' && <ParamCLIPVisionModelSelect id={id} />}
 
       <Flex w="full" flexDir="column" gap={4}>
         <Flex gap={8} w="full" alignItems="center">

@@ -1,5 +1,6 @@
 import type { EntityState } from '@reduxjs/toolkit';
 import type {
+  ParameterCLIPVisionModel,
   ParameterControlNetModel,
   ParameterIPAdapterModel,
   ParameterT2IAdapterModel,
@@ -243,15 +244,13 @@ export type T2IAdapterConfig = {
   shouldAutoConfig: boolean;
 };
 
-export type CLIPVisionModel = 'ViT-H' | 'ViT-G';
-
 export type IPAdapterConfig = {
   type: 'ip_adapter';
   id: string;
   isEnabled: boolean;
   controlImage: string | null;
   model: ParameterIPAdapterModel | null;
-  clipVisionModel: CLIPVisionModel;
+  clipVisionModel: ParameterCLIPVisionModel | null;
   weight: number;
   beginStepPct: number;
   endStepPct: number;

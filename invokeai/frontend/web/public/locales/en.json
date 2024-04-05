@@ -616,6 +616,7 @@
         "availableModels": "Available Models",
         "baseModel": "Base Model",
         "cancel": "Cancel",
+        "clipVisionModel": "CLIP Vision",
         "config": "Config",
         "convert": "Convert",
         "convertingModelBegin": "Converting Model. Please wait.",

@@ -6,6 +6,7 @@ import { deepClone } from 'common/util/deepClone';
 import { buildControlAdapter } from 'features/controlAdapters/util/buildControlAdapter';
 import { buildControlAdapterProcessor } from 'features/controlAdapters/util/buildControlAdapterProcessor';
 import { zModelIdentifierField } from 'features/nodes/types/common';
+import type { ParameterCLIPVisionModel } from 'features/parameters/types/parameterSchemas';
 import { merge, uniq } from 'lodash-es';
 import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { socketInvocationError } from 'services/events/actions';
@@ -14,7 +15,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { controlAdapterImageProcessed } from './actions';
 import { CONTROLNET_PROCESSORS } from './constants';
 import type {
-  CLIPVisionModel,
   ControlAdapterConfig,
   ControlAdapterProcessorType,
   ControlAdaptersState,
@@ -247,7 +247,7 @@ export const controlAdaptersSlice = createSlice({
     },
     controlAdapterCLIPVisionModelChanged: (
       state,
-      action: PayloadAction<{ id: string; clipVisionModel: CLIPVisionModel }>
+      action: PayloadAction<{ id: string; clipVisionModel: ParameterCLIPVisionModel | null }>
     ) => {
       const { id, clipVisionModel } = action.payload;
       caAdapter.updateOne(state, { id, changes: { clipVisionModel } });
