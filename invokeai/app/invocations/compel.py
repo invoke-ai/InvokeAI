@@ -10,6 +10,7 @@ from invokeai.app.invocations.primitives import ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.ti_utils import generate_ti_list
 from invokeai.backend.lora.lora_model import LoRAModelRaw
+from invokeai.backend.lora.lora_model_patcher import LoraModelPatcher
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
@@ -80,7 +81,7 @@ class CompelInvocation(BaseInvocation):
             ),
             text_encoder_info as text_encoder,
             # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
-            ModelPatcher.apply_lora_text_encoder(text_encoder, _lora_loader()),
+            LoraModelPatcher.apply_lora_text_encoder(text_encoder, _lora_loader()),
             # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
             ModelPatcher.apply_clip_skip(text_encoder_model, self.clip.skipped_layers),
         ):
@@ -181,7 +182,7 @@ class SDXLPromptInvocationBase:
             ),
             text_encoder_info as text_encoder,
             # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
-            ModelPatcher.apply_lora(text_encoder, _lora_loader(), lora_prefix),
+            LoraModelPatcher.apply_lora(text_encoder, _lora_loader(), lora_prefix),
             # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
             ModelPatcher.apply_clip_skip(text_encoder_model, clip_field.skipped_layers),
         ):

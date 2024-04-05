@@ -49,6 +49,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
 from invokeai.backend.lora.lora_model import LoRAModelRaw
+from invokeai.backend.lora.lora_model_patcher import LoraModelPatcher
 from invokeai.backend.model_manager import BaseModelType, LoadedModel
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless
@@ -730,7 +731,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 set_seamless(unet_info.model, self.unet.seamless_axes),  # FIXME
                 unet_info as unet,
                 # Apply the LoRA after unet has been moved to its target device for faster patching.
-                ModelPatcher.apply_lora_unet(unet, _lora_loader()),
+                LoraModelPatcher.apply_lora_unet(unet, _lora_loader()),
             ):
                 assert isinstance(unet, UNet2DConditionModel)
                 latents = latents.to(device=unet.device, dtype=unet.dtype)
