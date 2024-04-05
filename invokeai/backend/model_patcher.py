@@ -13,11 +13,11 @@ from diffusers import OnnxRuntimeModel, UNet2DConditionModel
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
 from invokeai.app.shared.models import FreeUConfig
+from invokeai.backend.lora.lora_model import LoRAModelRaw
 from invokeai.backend.model_manager.any_model_type import AnyModel
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
 
-from .lora import LoRAModelRaw
 from .textual_inversion import TextualInversionManager, TextualInversionModelRaw
 
 """

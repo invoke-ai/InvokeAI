@@ -5,7 +5,8 @@
 import pytest
 import torch
 
-from invokeai.backend.lora import LoRALayer, LoRAModelRaw
+from invokeai.backend.lora.lora_layer import LoRALayer
+from invokeai.backend.lora.lora_model import LoRAModelRaw
 from invokeai.backend.model_patcher import ModelPatcher
 
 
