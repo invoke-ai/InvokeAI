@@ -9,8 +9,9 @@ from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
 from invokeai.app.invocations.primitives import ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.ti_utils import generate_ti_list
-from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_patcher import ModelPatcher
+from invokeai.backend.peft.peft_model import PeftModel
+from invokeai.backend.peft.peft_model_patcher import PeftModelPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     ConditioningFieldData,
@@ -61,15 +62,12 @@ class CompelInvocation(BaseInvocation):
         text_encoder_model = text_encoder_info.model
         assert isinstance(text_encoder_model, CLIPTextModel)
 
-        def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
+        def _lora_loader() -> Iterator[Tuple[PeftModel, float]]:
             for lora in self.clip.loras:
                 lora_info = context.models.load(lora.lora)
-                assert isinstance(lora_info.model, LoRAModelRaw)
+                assert isinstance(lora_info.model, PeftModel)
                 yield (lora_info.model, lora.weight)
                 del lora_info
-            return
-
-        # loras = [(context.models.get(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
 
         ti_list = generate_ti_list(self.prompt, text_encoder_info.config.base, context)
 
@@ -80,7 +78,7 @@ class CompelInvocation(BaseInvocation):
             ),
             text_encoder_info as text_encoder,
             # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
-            ModelPatcher.apply_lora_text_encoder(text_encoder, _lora_loader()),
+            PeftModelPatcher.apply_peft_patch(text_encoder, _lora_loader(), "text_encoder"),
             # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
             ModelPatcher.apply_clip_skip(text_encoder_model, self.clip.skipped_layers),
         ):
@@ -161,16 +159,13 @@ class SDXLPromptInvocationBase:
                 c_pooled = None
             return c, c_pooled, None
 
-        def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
+        def _lora_loader() -> Iterator[Tuple[PeftModel, float]]:
             for lora in clip_field.loras:
                 lora_info = context.models.load(lora.lora)
                 lora_model = lora_info.model
-                assert isinstance(lora_model, LoRAModelRaw)
+                assert isinstance(lora_model, PeftModel)
                 yield (lora_model, lora.weight)
                 del lora_info
-            return
-
-        # loras = [(context.models.get(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
 
         ti_list = generate_ti_list(prompt, text_encoder_info.config.base, context)
 
@@ -181,7 +176,7 @@ class SDXLPromptInvocationBase:
             ),
             text_encoder_info as text_encoder,
             # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
-            ModelPatcher.apply_lora(text_encoder, _lora_loader(), lora_prefix),
+            PeftModelPatcher.apply_peft_patch(text_encoder, _lora_loader(), lora_prefix),
             # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
             ModelPatcher.apply_clip_skip(text_encoder_model, clip_field.skipped_layers),
         ):
@@ -259,15 +254,15 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
         c1, c1_pooled, ec1 = self.run_clip_compel(
-            context, self.clip, self.prompt, False, "lora_te1_", zero_on_empty=True
+            context, self.clip, self.prompt, False, "text_encoder", zero_on_empty=True
         )
         if self.style.strip() == "":
             c2, c2_pooled, ec2 = self.run_clip_compel(
-                context, self.clip2, self.prompt, True, "lora_te2_", zero_on_empty=True
+                context, self.clip2, self.prompt, True, "text_encoder_2", zero_on_empty=True
             )
         else:
             c2, c2_pooled, ec2 = self.run_clip_compel(
-                context, self.clip2, self.style, True, "lora_te2_", zero_on_empty=True
+                context, self.clip2, self.style, True, "text_encoder_2", zero_on_empty=True
             )
 
         original_size = (self.original_height, self.original_width)

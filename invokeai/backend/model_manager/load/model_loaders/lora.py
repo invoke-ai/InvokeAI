@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Optional
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import (
     AnyModelConfig,
     BaseModelType,
@@ -17,6 +16,7 @@ from invokeai.backend.model_manager import (
 from invokeai.backend.model_manager.any_model_type import AnyModel
 from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
+from invokeai.backend.peft.peft_model import PeftModel
 
 from .. import ModelLoader, ModelLoaderRegistry
 
@@ -47,7 +47,7 @@ class LoRALoader(ModelLoader):
             raise ValueError("There are no submodels in a LoRA model.")
         model_path = Path(config.path)
         assert self._model_base is not None
-        model = LoRAModelRaw.from_checkpoint(
+        model = PeftModel.from_checkpoint(
             file_path=model_path,
             dtype=self._torch_dtype,
             base_model=self._model_base,
