@@ -27,6 +27,7 @@ from invokeai.app.invocations.fields import (
     OutputField,
     UIComponent,
     UIType,
+    WithBoard,
     WithMetadata,
     WithWorkflow,
 )
@@ -105,6 +106,7 @@ __all__ = [
     "OutputField",
     "UIComponent",
     "UIType",
+    "WithBoard",
     "WithMetadata",
     "WithWorkflow",
     # invokeai.app.invocations.latent
