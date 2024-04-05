@@ -40,6 +40,25 @@ Follow the same steps to scan and import the missing models.
 - Check the `ram` setting in `invokeai.yaml`. This setting tells Invoke how much of your system RAM can be used to cache models. Having this too high or too low can slow things down. That said, it's generally safest to not set this at all and instead let Invoke manage it.
 - Check the `vram` setting in `invokeai.yaml`. This setting tells Invoke how much of your GPU VRAM can be used to cache models. Counter-intuitively, if this setting is too high, Invoke will need to do a lot of shuffling of models as it juggles the VRAM cache and the currently-loaded model. The default value of 0.25 is generally works well for GPUs without 16GB or more VRAM. Even on a 24GB card, the default works well.
 - Check that your generations are happening on your GPU (if you have one). InvokeAI will log what is being used for generation upon startup. If your GPU isn't used, re-install to ensure the correct versions of torch get installed.
+- If you are on Windows, you may have exceeded your GPU's VRAM capacity and are using slower [shared GPU memory](#shared-gpu-memory-windows). There's a guide to opt out of this behaviour in the linked FAQ entry.
+
+## Shared GPU Memory (Windows)
+
+!!! tip "Nvidia GPUs with driver 536.40"
+
+    This only applies to current Nvidia cards with driver 536.40 or later, released in June 2023.
+
+When the GPU doesn't have enough VRAM for a task, Windows is able to allocate some of its CPU RAM to the GPU. This is much slower than VRAM, but it does allow the system to generate when it otherwise might no have enough VRAM.
+
+When shared GPU memory is used, generation slows down dramatically - but at least it doesn't crash.
+
+If you'd like to opt out of this behavior and instead get an error when you exceed your GPU's VRAM, follow [this guide from Nvidia](https://nvidia.custhelp.com/app/answers/detail/a_id/5490).
+
+Here's how to get the python path required in the linked guide:
+
+- Run `invoke.bat`.
+- Select option 2 for developer console.
+- At least one python path will be printed. Copy the path that includes your invoke installation directory (typically the first).
 
 ## Installer cannot find python (Windows)
 
