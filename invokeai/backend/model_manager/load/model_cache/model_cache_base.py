@@ -117,7 +117,7 @@ class ModelCacheBase(ABC, Generic[T]):
 
     @property
     @abstractmethod
-    def stats(self) -> CacheStats:
+    def stats(self) -> Optional[CacheStats]:
         """Return collected CacheStats object."""
         pass
 
