@@ -421,13 +421,20 @@ class ModelCache(ModelCacheBase[AnyModel]):
 
         self.logger.debug(f"After making room: cached_models={len(self._cached_models)}")
 
+    def _free_vram(self, device: torch.device) -> int:
+        vram_device = (  # mem_get_info() needs an indexed device
+            device if device.index is not None else torch.device(str(device), index=0)
+        )
+        free_mem, _ = torch.cuda.mem_get_info(vram_device)
+        for _, cache_entry in self._cached_models.items():
+            if cache_entry.loaded and not cache_entry.locked:
+                free_mem += cache_entry.size
+        return free_mem
+
     def _check_free_vram(self, target_device: torch.device, needed_size: int) -> None:
         if target_device.type != "cuda":
             return
-        vram_device = (  # mem_get_info() needs an indexed device
-            target_device if target_device.index is not None else torch.device(str(target_device), index=0)
-        )
-        free_mem, _ = torch.cuda.mem_get_info(torch.device(vram_device))
+        free_mem = self._free_vram(target_device)
         if needed_size > free_mem:
             needed_gb = round(needed_size / GIG, 2)
             free_gb = round(free_mem / GIG, 2)
