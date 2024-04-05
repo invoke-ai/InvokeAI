@@ -410,6 +410,6 @@ export const parseAndRecallAllMetadata = async (metadata: unknown, skip: (keyof 
       })
   );
   if (results.some((result) => result.status === 'fulfilled')) {
-    parameterSetToast(t('toast.parametersSet'));
+    parameterSetToast(t('toast.parameters'));
   }
 };

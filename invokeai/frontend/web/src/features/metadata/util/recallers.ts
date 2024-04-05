@@ -63,7 +63,7 @@ import {
   setRefinerStart,
   setRefinerSteps,
 } from 'features/sdxl/store/sdxlSlice';
-import type { ImageDTO } from 'services/api/types';
+import { imagesApi } from 'services/api/endpoints/images';
 
 const recallPositivePrompt: MetadataRecallFunc<ParameterPositivePrompt> = (positivePrompt) => {
   getStore().dispatch(setPositivePrompt(positivePrompt));
@@ -97,11 +97,11 @@ const recallScheduler: MetadataRecallFunc<ParameterScheduler> = (scheduler) => {
   getStore().dispatch(setScheduler(scheduler));
 };
 
-const recallInitialImage: MetadataRecallFunc<ParameterInitialImage> = (initialImage) => {
-  const image = {
-    image_name: initialImage,
-  };
-  getStore().dispatch(initialImageChanged(image as ImageDTO));
+const recallInitialImage: MetadataRecallFunc<ParameterInitialImage> = async (initialImage) => {
+  const imageDTORequest = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(initialImage));
+  const imageDTO = await imageDTORequest.unwrap();
+  imageDTORequest.unsubscribe();
+  getStore().dispatch(initialImageChanged(imageDTO));
 };
 
 const recallWidth: MetadataRecallFunc<ParameterWidth> = (width) => {
