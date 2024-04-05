@@ -2,6 +2,7 @@ import { FieldParseError } from 'features/nodes/types/error';
 import type {
   BoardFieldInputTemplate,
   BooleanFieldInputTemplate,
+  CLIPVisionModelFieldInputTemplate,
   ColorFieldInputTemplate,
   ControlNetModelFieldInputTemplate,
   EnumFieldInputTemplate,
@@ -237,6 +238,25 @@ const buildVAEModelFieldInputTemplate: FieldInputTemplateBuilder<VAEModelFieldIn
   return template;
 };
 
+const buildCLIPVisionModelFieldInputTemplate: FieldInputTemplateBuilder<CLIPVisionModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  isCollection,
+  isCollectionOrScalar,
+}) => {
+  const template: CLIPVisionModelFieldInputTemplate = {
+    ...baseField,
+    type: {
+      name: 'CLIPVisionModelField',
+      isCollection,
+      isCollectionOrScalar,
+    },
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildLoRAModelFieldInputTemplate: FieldInputTemplateBuilder<LoRAModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -452,6 +472,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   StringField: buildStringFieldInputTemplate,
   T2IAdapterModelField: buildT2IAdapterModelFieldInputTemplate,
   VAEModelField: buildVAEModelFieldInputTemplate,
+  CLIPVisionModelField: buildCLIPVisionModelFieldInputTemplate,
 };
 
 export const buildFieldInputTemplate = (

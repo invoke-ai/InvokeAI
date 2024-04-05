@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import {
   zBoardField,
+  zCLIPVisionModelField,
   zColorField,
   zControlNetModelField,
   zImageField,
@@ -231,6 +232,20 @@ const zVAEModelFieldOutputInstance = zFieldOutputInstanceBase.extend({
 });
 // #endregion
 
+// #region CLIPVisionModelField
+const zCLIPVisionModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('CLIPVisionModelField'),
+});
+const zCLIPVisionModelFieldValue = zCLIPVisionModelField.optional();
+const zCLIPVisionModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  type: zCLIPVisionModelFieldType,
+  value: zCLIPVisionModelFieldValue,
+});
+const zCLIPVisionModelFieldOutputInstance = zFieldOutputInstanceBase.extend({
+  type: zCLIPVisionModelFieldType,
+});
+// #endregion
+
 // #region LoRAModelField
 const zLoRAModelFieldType = zFieldTypeBase.extend({
   name: z.literal('LoRAModelField'),
@@ -357,6 +372,7 @@ const zStatefulFieldInputInstance = z.union([
   zSDXLMainModelFieldInputInstance,
   zSDXLRefinerModelFieldInputInstance,
   zVAEModelFieldInputInstance,
+  zCLIPVisionModelFieldInputInstance,
   zLoRAModelFieldInputInstance,
   zControlNetModelFieldInputInstance,
   zIPAdapterModelFieldInputInstance,
@@ -381,6 +397,7 @@ const zStatefulFieldOutputInstance = z.union([
   zSDXLMainModelFieldOutputInstance,
   zSDXLRefinerModelFieldOutputInstance,
   zVAEModelFieldOutputInstance,
+  zCLIPVisionModelFieldOutputInstance,
   zLoRAModelFieldOutputInstance,
   zControlNetModelFieldOutputInstance,
   zIPAdapterModelFieldOutputInstance,

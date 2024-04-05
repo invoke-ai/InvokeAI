@@ -48,6 +48,7 @@ class UIType(str, Enum, metaclass=MetaEnum):
     ControlNetModel = "ControlNetModelField"
     IPAdapterModel = "IPAdapterModelField"
     T2IAdapterModel = "T2IAdapterModelField"
+    CLIPVisionModel = "CLIPVisionModelField"
     # endregion
 
     # region Misc Field Types
@@ -134,6 +135,7 @@ class FieldDescriptions:
     sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
     sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
     onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
+    clip_vision_model = "CLIP Vision Model to load"
     lora_weight = "The weight at which the LoRA is applied to each model"
     compel_prompt = "Prompt to be parsed by Compel to create a conditioning tensor"
     raw_prompt = "Raw prompt text (no parsing)"

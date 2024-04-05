@@ -7,6 +7,7 @@ import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
   BoardFieldValue,
   BooleanFieldValue,
+  CLIPVisionModelFieldValue,
   ColorFieldValue,
   ControlNetModelFieldValue,
   EnumFieldValue,
@@ -27,6 +28,7 @@ import type {
 import {
   zBoardFieldValue,
   zBooleanFieldValue,
+  zCLIPVisionModelFieldValue,
   zColorFieldValue,
   zControlNetModelFieldValue,
   zEnumFieldValue,
@@ -508,6 +510,9 @@ export const nodesSlice = createSlice({
     },
     fieldVaeModelValueChanged: (state, action: FieldValueAction<VAEModelFieldValue>) => {
       fieldValueReducer(state, action, zVAEModelFieldValue);
+    },
+    fieldCLIPVisionModelValueChanged: (state, action: FieldValueAction<CLIPVisionModelFieldValue>) => {
+      fieldValueReducer(state, action, zCLIPVisionModelFieldValue);
     },
     fieldLoRAModelValueChanged: (state, action: FieldValueAction<LoRAModelFieldValue>) => {
       fieldValueReducer(state, action, zLoRAModelFieldValue);

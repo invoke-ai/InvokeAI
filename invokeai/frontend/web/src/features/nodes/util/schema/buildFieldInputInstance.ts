@@ -18,6 +18,7 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   StringField: '',
   T2IAdapterModelField: undefined,
   VAEModelField: undefined,
+  CLIPVisionModelField: undefined,
   ControlNetModelField: undefined,
 };
 

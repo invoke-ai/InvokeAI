@@ -5,6 +5,7 @@ import type { FilterableModelType } from 'features/modelManagerV2/store/modelMan
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  useCLIPVisionModels,
   useControlNetModels,
   useEmbeddingModels,
   useIPAdapterModels,
@@ -71,6 +72,12 @@ const ModelList = () => {
     [vaeModels, searchTerm, filteredModelType]
   );
 
+  const [clipVisionModels, { isLoading: isLoadingCLIPVisionModels }] = useCLIPVisionModels();
+  const filteredCLIPVisionModels = useMemo(
+    () => modelsFilter(clipVisionModels, searchTerm, filteredModelType),
+    [clipVisionModels, searchTerm, filteredModelType]
+  );
+
   const totalFilteredModels = useMemo(() => {
     return (
       filteredMainModels.length +
@@ -80,7 +87,8 @@ const ModelList = () => {
       filteredControlNetModels.length +
       filteredT2IAdapterModels.length +
       filteredIPAdapterModels.length +
-      filteredVAEModels.length
+      filteredVAEModels.length +
+      filteredCLIPVisionModels.length
     );
   }, [
     filteredControlNetModels.length,
@@ -91,6 +99,7 @@ const ModelList = () => {
     filteredRefinerModels.length,
     filteredT2IAdapterModels.length,
     filteredVAEModels.length,
+    filteredCLIPVisionModels.length,
   ]);
 
   return (
@@ -126,6 +135,12 @@ const ModelList = () => {
         {isLoadingVAEModels && <FetchingModelsLoader loadingMessage="Loading VAEs..." />}
         {!isLoadingVAEModels && filteredVAEModels.length > 0 && (
           <ModelListWrapper title="VAE" modelList={filteredVAEModels} key="vae" />
+        )}
+
+        {/* CLIP Vision List */}
+        {isLoadingCLIPVisionModels && <FetchingModelsLoader loadingMessage="Loading CLIP Vision Models..." />}
+        {!isLoadingCLIPVisionModels && filteredCLIPVisionModels.length > 0 && (
+          <ModelListWrapper title="CLIP Vision" modelList={filteredCLIPVisionModels} key="clip_vision" />
         )}
 
         {/* Controlnet List */}

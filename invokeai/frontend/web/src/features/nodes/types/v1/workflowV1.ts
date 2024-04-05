@@ -49,6 +49,7 @@ const zFieldTypeV1 = z.enum([
   'BooleanCollection',
   'BooleanPolymorphic',
   'ClipField',
+  'CLIPVisionField',
   'Collection',
   'CollectionItem',
   'ColorCollection',
@@ -331,7 +332,7 @@ const zT2IAdapterCollectionInputFieldValue = zInputFieldValueBase.extend({
   value: z.array(zT2IAdapterField).optional(),
 });
 
-const zModelType = z.enum(['onnx', 'main', 'vae', 'lora', 'controlnet', 'embedding']);
+const zModelType = z.enum(['onnx', 'main', 'vae', 'lora', 'controlnet', 'embedding', 'clip_vision']);
 
 const zSubModelType = z.enum([
   'unet',
@@ -387,6 +388,15 @@ const zVaeInputFieldValue = zInputFieldValueBase.extend({
   value: zVaeField.optional(),
 });
 
+const zCLIPVisionField = z.object({
+  vae: zModelInfo,
+});
+
+const zCLIPVisionInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('CLIPVisionField'),
+  value: zCLIPVisionField.optional(),
+});
+
 const zImageInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('ImageField'),
   value: zImageField.optional(),
@@ -427,6 +437,13 @@ const zVaeModelField = zModelIdentifier;
 const zVaeModelInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('VaeModelField'),
   value: zVaeModelField.optional(),
+});
+
+const zCLIPVisionModelField = zModelIdentifier;
+
+const zCLIPVisionModelInputFieldValue = zInputFieldValueBase.extend({
+  type: z.literal('CLIPVisionModelField'),
+  value: zCLIPVisionModelField.optional(),
 });
 
 const zLoRAModelField = zModelIdentifier;
@@ -583,6 +600,8 @@ const zInputFieldValue = z.discriminatedUnion('type', [
   zUNetInputFieldValue,
   zVaeInputFieldValue,
   zVaeModelInputFieldValue,
+  zCLIPVisionInputFieldValue,
+  zCLIPVisionModelInputFieldValue,
   zMetadataItemInputFieldValue,
   zMetadataItemCollectionInputFieldValue,
   zMetadataItemPolymorphicInputFieldValue,

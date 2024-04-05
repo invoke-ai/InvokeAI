@@ -5,6 +5,8 @@ import {
   isBoardFieldInputTemplate,
   isBooleanFieldInputInstance,
   isBooleanFieldInputTemplate,
+  isCLIPVisionModelFieldInputInstance,
+  isCLIPVisionModelFieldInputTemplate,
   isColorFieldInputInstance,
   isColorFieldInputTemplate,
   isControlNetModelFieldInputInstance,
@@ -40,6 +42,7 @@ import { memo } from 'react';
 
 import BoardFieldInputComponent from './inputs/BoardFieldInputComponent';
 import BooleanFieldInputComponent from './inputs/BooleanFieldInputComponent';
+import CLIPVisionModelFieldInputComponent from './inputs/CLIPVisionModelFieldInputComponent';
 import ColorFieldInputComponent from './inputs/ColorFieldInputComponent';
 import ControlNetModelFieldInputComponent from './inputs/ControlNetModelFieldInputComponent';
 import EnumFieldInputComponent from './inputs/EnumFieldInputComponent';
@@ -101,6 +104,10 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
 
   if (isVAEModelFieldInputInstance(fieldInstance) && isVAEModelFieldInputTemplate(fieldTemplate)) {
     return <VAEModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+  }
+
+  if (isCLIPVisionModelFieldInputInstance(fieldInstance) && isCLIPVisionModelFieldInputTemplate(fieldTemplate)) {
+    return <CLIPVisionModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
   if (isLoRAModelFieldInputInstance(fieldInstance) && isLoRAModelFieldInputTemplate(fieldTemplate)) {

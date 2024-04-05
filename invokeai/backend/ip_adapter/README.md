@@ -33,7 +33,7 @@ The weights in `ip_adapter.bin` are stored in a nested dict, which is not suppor
 
 ## InvokeAI Hosted IP-Adapters
 
-Image Encoders:
+CLIP Vision Image Encoders:
 - [InvokeAI/ip_adapter_sd_image_encoder](https://huggingface.co/InvokeAI/ip_adapter_sd_image_encoder)
 - [InvokeAI/ip_adapter_sdxl_image_encoder](https://huggingface.co/InvokeAI/ip_adapter_sdxl_image_encoder)
 

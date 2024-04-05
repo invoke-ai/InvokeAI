@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { modelConfigsAdapterSelectors, useGetModelConfigsQuery } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import {
+  isCLIPVisionModelConfig,
   isControlNetModelConfig,
   isIPAdapterModelConfig,
   isLoRAModelConfig,
@@ -40,3 +41,4 @@ export const useT2IAdapterModels = buildModelsHook(isT2IAdapterModelConfig);
 export const useIPAdapterModels = buildModelsHook(isIPAdapterModelConfig);
 export const useEmbeddingModels = buildModelsHook(isTIModelConfig);
 export const useVAEModels = buildModelsHook(isVAEModelConfig);
+export const useCLIPVisionModels = buildModelsHook(isCLIPVisionModelConfig);

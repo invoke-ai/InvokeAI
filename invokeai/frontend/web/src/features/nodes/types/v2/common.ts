@@ -59,6 +59,7 @@ export const zMainModelField = z.object({
 });
 
 export const zVAEModelField = zModelIdentifier;
+export const zCLIPVisionModelField = zModelIdentifier;
 export const zLoRAModelField = zModelIdentifier;
 export const zControlNetModelField = zModelIdentifier;
 export const zIPAdapterModelField = zModelIdentifier;

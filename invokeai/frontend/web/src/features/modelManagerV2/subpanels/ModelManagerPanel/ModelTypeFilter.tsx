@@ -20,7 +20,7 @@ export const ModelTypeFilter = () => {
       vae: 'VAE',
       t2i_adapter: t('common.t2iAdapter'),
       ip_adapter: t('common.ipAdapter'),
-      clip_vision: 'Clip Vision',
+      clip_vision: 'CLIP Vision',
     }),
     [t]
   );

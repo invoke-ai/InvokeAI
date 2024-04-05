@@ -8,12 +8,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelType, SubModelType
 
-from .baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    invocation,
-    invocation_output,
-)
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 
 
 class ModelIdentifierField(BaseModel):
@@ -63,6 +58,10 @@ class CLIPField(BaseModel):
 class VAEField(BaseModel):
     vae: ModelIdentifierField = Field(description="Info to load vae submodel")
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')
+
+
+class CLIPVisionField(BaseModel):
+    clip_vision: ModelIdentifierField = Field(description="Info to load clip vision model")
 
 
 @invocation_output("unet_output")
@@ -368,3 +367,28 @@ class FreeUInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> UNetOutput:
         self.unet.freeu_config = FreeUConfig(s1=self.s1, s2=self.s2, b1=self.b1, b2=self.b2)
         return UNetOutput(unet=self.unet)
+
+
+@invocation_output("clip_vision_output")
+class CLIPVisionOutput(BaseInvocationOutput):
+    """Output for CLIP Vision Model Loader"""
+
+    clip_vision: CLIPVisionField = OutputField(description=FieldDescriptions.clip_vision_model, title="CLIP Vision")
+
+
+@invocation("clip_vision_model_loader", title="CLIP Vision Model", category="clip", version="1.0.0")
+class CLIPVisionModelLoaderInvocation(BaseInvocation):
+    """Loads the specified CLIP Vision Model"""
+
+    clip_vision_model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.clip_vision_model,
+        input=Input.Direct,
+        title="CLIP Vision",
+        ui_type=UIType.CLIPVisionModel,
+    )
+
+    def invoke(self, context: InvocationContext) -> CLIPVisionOutput:
+        if not context.models.exists(self.clip_vision_model.key):
+            raise Exception(f"Unknown model {self.clip_vision_model.key}")
+
+        return CLIPVisionOutput(clip_vision=CLIPVisionField(clip_vision=self.clip_vision_model))

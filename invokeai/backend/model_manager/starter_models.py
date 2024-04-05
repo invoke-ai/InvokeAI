@@ -27,19 +27,19 @@ sdxl_fp16_vae_fix = StarterModel(
     type=ModelType.VAE,
 )
 
-ip_adapter_sd_image_encoder = StarterModel(
+vit_h_clip_vision_model = StarterModel(
     name="IP Adapter SD1.5 Image Encoder",
-    base=BaseModelType.StableDiffusion1,
+    base=BaseModelType.Any,
     source="InvokeAI/ip_adapter_sd_image_encoder",
-    description="IP Adapter SD Image Encoder",
+    description="ViT-H CLIP Vision Model",
     type=ModelType.CLIPVision,
 )
 
-ip_adapter_sdxl_image_encoder = StarterModel(
+vit_g_clip_vision_model = StarterModel(
     name="IP Adapter SDXL Image Encoder",
-    base=BaseModelType.StableDiffusionXL,
+    base=BaseModelType.Any,
     source="InvokeAI/ip_adapter_sdxl_image_encoder",
-    description="IP Adapter SDXL Image Encoder",
+    description="ViT-G CLIP Vision Model",
     type=ModelType.CLIPVision,
 )
 
@@ -158,7 +158,7 @@ STARTER_MODELS: list[StarterModel] = [
         source="InvokeAI/ip_adapter_sd15",
         description="IP-Adapter for SD 1.5 models",
         type=ModelType.IPAdapter,
-        dependencies=[ip_adapter_sd_image_encoder],
+        dependencies=[vit_h_clip_vision_model],
     ),
     StarterModel(
         name="IP Adapter Plus",
@@ -166,7 +166,7 @@ STARTER_MODELS: list[StarterModel] = [
         source="InvokeAI/ip_adapter_plus_sd15",
         description="Refined IP-Adapter for SD 1.5 models",
         type=ModelType.IPAdapter,
-        dependencies=[ip_adapter_sd_image_encoder],
+        dependencies=[vit_h_clip_vision_model],
     ),
     StarterModel(
         name="IP Adapter Plus Face",
@@ -174,7 +174,7 @@ STARTER_MODELS: list[StarterModel] = [
         source="InvokeAI/ip_adapter_plus_face_sd15",
         description="Refined IP-Adapter for SD 1.5 models, adapted for faces",
         type=ModelType.IPAdapter,
-        dependencies=[ip_adapter_sd_image_encoder],
+        dependencies=[vit_h_clip_vision_model],
     ),
     StarterModel(
         name="IP Adapter SDXL",
@@ -182,7 +182,23 @@ STARTER_MODELS: list[StarterModel] = [
         source="InvokeAI/ip_adapter_sdxl",
         description="IP-Adapter for SDXL models",
         type=ModelType.IPAdapter,
-        dependencies=[ip_adapter_sdxl_image_encoder],
+        dependencies=[vit_g_clip_vision_model],
+    ),
+    # endregion
+    # region CLIP Vision
+    StarterModel(
+        name="ViT-H",
+        base=BaseModelType.Any,
+        source="InvokeAI/ip_adapter_sd_image_encoder",
+        description="CLIP Vision model generally used with ViT-H based IP Adapter Models",
+        type=ModelType.CLIPVision,
+    ),
+    StarterModel(
+        name="ViT-G",
+        base=BaseModelType.Any,
+        source="InvokeAI/ip_adapter_sdxl_image_encoder",
+        description="CLIP Vision model generally used with ViT-G based IP Adapter Models",
+        type=ModelType.CLIPVision,
     ),
     # endregion
     # region ControlNet

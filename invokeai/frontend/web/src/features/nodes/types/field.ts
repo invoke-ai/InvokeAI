@@ -369,6 +369,30 @@ export const isVAEModelFieldInputTemplate = (val: unknown): val is VAEModelField
   zVAEModelFieldInputTemplate.safeParse(val).success;
 // #endregion
 
+// #region CLIPVisionModelField
+const zCLIPVisionModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('CLIPVisionModelField'),
+});
+export const zCLIPVisionModelFieldValue = zModelIdentifierField.optional();
+const zCLIPVisionModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zCLIPVisionModelFieldValue,
+});
+const zCLIPVisionModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zCLIPVisionModelFieldType,
+  default: zCLIPVisionModelFieldValue,
+});
+const zCLIPVisionModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zCLIPVisionModelFieldType,
+});
+export type CLIPVisionModelFieldValue = z.infer<typeof zCLIPVisionModelFieldValue>;
+export type CLIPVisionModelFieldInputInstance = z.infer<typeof zCLIPVisionModelFieldInputInstance>;
+export type CLIPVisionModelFieldInputTemplate = z.infer<typeof zCLIPVisionModelFieldInputTemplate>;
+export const isCLIPVisionModelFieldInputInstance = (val: unknown): val is CLIPVisionModelFieldInputInstance =>
+  zCLIPVisionModelFieldInputInstance.safeParse(val).success;
+export const isCLIPVisionModelFieldInputTemplate = (val: unknown): val is CLIPVisionModelFieldInputTemplate =>
+  zCLIPVisionModelFieldInputTemplate.safeParse(val).success;
+// #endregion
+
 // #region LoRAModelField
 const zLoRAModelFieldType = zFieldTypeBase.extend({
   name: z.literal('LoRAModelField'),
@@ -548,6 +572,7 @@ const zStatefulFieldType = z.union([
   zSDXLMainModelFieldType,
   zSDXLRefinerModelFieldType,
   zVAEModelFieldType,
+  zCLIPVisionModelFieldType,
   zLoRAModelFieldType,
   zControlNetModelFieldType,
   zIPAdapterModelFieldType,
@@ -576,6 +601,7 @@ export const zStatefulFieldValue = z.union([
   zSDXLMainModelFieldValue,
   zSDXLRefinerModelFieldValue,
   zVAEModelFieldValue,
+  zCLIPVisionModelFieldValue,
   zLoRAModelFieldValue,
   zControlNetModelFieldValue,
   zIPAdapterModelFieldValue,
@@ -602,6 +628,7 @@ const zStatefulFieldInputInstance = z.union([
   zSDXLMainModelFieldInputInstance,
   zSDXLRefinerModelFieldInputInstance,
   zVAEModelFieldInputInstance,
+  zCLIPVisionModelFieldInputInstance,
   zLoRAModelFieldInputInstance,
   zControlNetModelFieldInputInstance,
   zIPAdapterModelFieldInputInstance,
@@ -629,6 +656,7 @@ const zStatefulFieldInputTemplate = z.union([
   zSDXLMainModelFieldInputTemplate,
   zSDXLRefinerModelFieldInputTemplate,
   zVAEModelFieldInputTemplate,
+  zCLIPVisionModelFieldInputTemplate,
   zLoRAModelFieldInputTemplate,
   zControlNetModelFieldInputTemplate,
   zIPAdapterModelFieldInputTemplate,
@@ -657,6 +685,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zSDXLMainModelFieldOutputTemplate,
   zSDXLRefinerModelFieldOutputTemplate,
   zVAEModelFieldOutputTemplate,
+  zCLIPVisionModelFieldOutputTemplate,
   zLoRAModelFieldOutputTemplate,
   zControlNetModelFieldOutputTemplate,
   zIPAdapterModelFieldOutputTemplate,
