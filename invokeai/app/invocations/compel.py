@@ -78,7 +78,7 @@ class CompelInvocation(BaseInvocation):
             ),
             text_encoder_info as text_encoder,
             # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
-            PeftModelPatcher.apply_peft_patch(text_encoder, _lora_loader(), "text_encoder"),
+            PeftModelPatcher.apply_peft_model_to_text_encoder(text_encoder, _lora_loader(), "text_encoder"),
             # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
             ModelPatcher.apply_clip_skip(text_encoder_model, self.clip.skipped_layers),
         ):
@@ -176,7 +176,7 @@ class SDXLPromptInvocationBase:
             ),
             text_encoder_info as text_encoder,
             # Apply the LoRA after text_encoder has been moved to its target device for faster patching.
-            PeftModelPatcher.apply_peft_patch(text_encoder, _lora_loader(), lora_prefix),
+            PeftModelPatcher.apply_peft_model_to_text_encoder(text_encoder, _lora_loader(), lora_prefix),
             # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
             ModelPatcher.apply_clip_skip(text_encoder_model, clip_field.skipped_layers),
         ):

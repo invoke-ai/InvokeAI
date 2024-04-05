@@ -48,9 +48,10 @@ from invokeai.app.invocations.t2i_adapter import T2IAdapterField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
-from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import BaseModelType, LoadedModel
 from invokeai.backend.model_patcher import ModelPatcher
+from invokeai.backend.peft.peft_model import PeftModel
+from invokeai.backend.peft.peft_model_patcher import PeftModelPatcher
 from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData, IPAdapterConditioningInfo
 from invokeai.backend.util.silence_warnings import SilenceWarnings
@@ -714,13 +715,12 @@ class DenoiseLatentsInvocation(BaseInvocation):
             def step_callback(state: PipelineIntermediateState) -> None:
                 context.util.sd_step_callback(state, unet_config.base)
 
-            def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
+            def _lora_loader() -> Iterator[Tuple[PeftModel, float]]:
                 for lora in self.unet.loras:
                     lora_info = context.models.load(lora.lora)
-                    assert isinstance(lora_info.model, LoRAModelRaw)
+                    assert isinstance(lora_info.model, PeftModel)
                     yield (lora_info.model, lora.weight)
                     del lora_info
-                return
 
             unet_info = context.models.load(self.unet.unet)
             assert isinstance(unet_info.model, UNet2DConditionModel)
@@ -730,7 +730,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 set_seamless(unet_info.model, self.unet.seamless_axes),  # FIXME
                 unet_info as unet,
                 # Apply the LoRA after unet has been moved to its target device for faster patching.
-                ModelPatcher.apply_lora_unet(unet, _lora_loader()),
+                PeftModelPatcher.apply_peft_model_to_unet(unet, _lora_loader()),
             ):
                 assert isinstance(unet, UNet2DConditionModel)
                 latents = latents.to(device=unet.device, dtype=unet.dtype)
