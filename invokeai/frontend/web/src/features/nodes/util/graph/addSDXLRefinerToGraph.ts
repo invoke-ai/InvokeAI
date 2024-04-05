@@ -1,16 +1,15 @@
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import {
-  type CreateDenoiseMaskInvocation,
-  type ImageDTO,
-  isRefinerMainModelModelConfig,
-  type NonNullableGraph,
-  type SeamlessModeInvocation,
+import type {
+  CreateGradientMaskInvocation,
+  ImageDTO,
+  NonNullableGraph,
+  SeamlessModeInvocation,
 } from 'services/api/types';
+import { isRefinerMainModelModelConfig } from 'services/api/types';
 
 import {
   CANVAS_OUTPUT,
-  INPAINT_IMAGE_RESIZE_UP,
   LATENTS_TO_IMAGE,
   MASK_COMBINE,
   MASK_RESIZE_UP,
@@ -47,14 +46,14 @@ export const addSDXLRefinerToGraph = async (
     refinerStart,
   } = state.sdxl;
 
+  const { canvasCoherenceEdgeSize, canvasCoherenceMinDenoise, canvasCoherenceMode } = state.generation;
+
   if (!refinerModel) {
     return;
   }
 
-  const { seamlessXAxis, seamlessYAxis, vaePrecision } = state.generation;
+  const { seamlessXAxis, seamlessYAxis } = state.generation;
   const { boundingBoxScaleMethod } = state.canvas;
-
-  const fp32 = vaePrecision === 'fp32';
 
   const isUsingScaledDimensions = ['auto', 'manual'].includes(boundingBoxScaleMethod);
   const modelConfig = await fetchModelConfigWithTypeGuard(refinerModel.key, isRefinerMainModelModelConfig);
@@ -215,29 +214,13 @@ export const addSDXLRefinerToGraph = async (
 
   if (graph.id === SDXL_CANVAS_INPAINT_GRAPH || graph.id === SDXL_CANVAS_OUTPAINT_GRAPH) {
     graph.nodes[SDXL_REFINER_INPAINT_CREATE_MASK] = {
-      type: 'create_denoise_mask',
+      type: 'create_gradient_mask',
       id: SDXL_REFINER_INPAINT_CREATE_MASK,
       is_intermediate: true,
-      fp32,
+      edge_radius: canvasCoherenceEdgeSize,
+      coherence_mode: canvasCoherenceMode,
+      minimum_denoise: canvasCoherenceMinDenoise,
     };
-
-    if (isUsingScaledDimensions) {
-      graph.edges.push({
-        source: {
-          node_id: INPAINT_IMAGE_RESIZE_UP,
-          field: 'image',
-        },
-        destination: {
-          node_id: SDXL_REFINER_INPAINT_CREATE_MASK,
-          field: 'image',
-        },
-      });
-    } else {
-      graph.nodes[SDXL_REFINER_INPAINT_CREATE_MASK] = {
-        ...(graph.nodes[SDXL_REFINER_INPAINT_CREATE_MASK] as CreateDenoiseMaskInvocation),
-        image: canvasInitImage,
-      };
-    }
 
     if (graph.id === SDXL_CANVAS_INPAINT_GRAPH) {
       if (isUsingScaledDimensions) {
@@ -253,7 +236,7 @@ export const addSDXLRefinerToGraph = async (
         });
       } else {
         graph.nodes[SDXL_REFINER_INPAINT_CREATE_MASK] = {
-          ...(graph.nodes[SDXL_REFINER_INPAINT_CREATE_MASK] as CreateDenoiseMaskInvocation),
+          ...(graph.nodes[SDXL_REFINER_INPAINT_CREATE_MASK] as CreateGradientMaskInvocation),
           mask: canvasMaskImage,
         };
       }

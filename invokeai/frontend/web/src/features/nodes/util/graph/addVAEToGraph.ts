@@ -17,7 +17,6 @@ import {
   SDXL_CANVAS_OUTPAINT_GRAPH,
   SDXL_CANVAS_TEXT_TO_IMAGE_GRAPH,
   SDXL_IMAGE_TO_IMAGE_GRAPH,
-  SDXL_REFINER_INPAINT_CREATE_MASK,
   SDXL_REFINER_SEAMLESS,
   SDXL_TEXT_TO_IMAGE_GRAPH,
   SEAMLESS,
@@ -164,27 +163,6 @@ export const addVAEToGraph = async (
         },
       }
     );
-  }
-
-  if (refinerModel) {
-    if (graph.id === SDXL_CANVAS_INPAINT_GRAPH || graph.id === SDXL_CANVAS_OUTPAINT_GRAPH) {
-      graph.edges.push({
-        source: {
-          node_id: isSeamlessEnabled
-            ? isUsingRefiner
-              ? SDXL_REFINER_SEAMLESS
-              : SEAMLESS
-            : isAutoVae
-              ? modelLoaderNodeId
-              : VAE_LOADER,
-          field: 'vae',
-        },
-        destination: {
-          node_id: SDXL_REFINER_INPAINT_CREATE_MASK,
-          field: 'vae',
-        },
-      });
-    }
   }
 
   if (vae) {
