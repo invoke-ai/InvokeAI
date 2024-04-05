@@ -1,6 +1,5 @@
 import bisect
-
-import torch
+from typing import TypeVar
 
 
 def make_sdxl_unet_conversion_map() -> list[tuple[str, str]]:
@@ -97,7 +96,10 @@ SDXL_UNET_STABILITY_TO_DIFFUSERS_MAP = {
 }
 
 
-def convert_sdxl_keys_to_diffusers_format(state_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+T = TypeVar("T")
+
+
+def convert_sdxl_keys_to_diffusers_format(state_dict: dict[str, T]) -> dict[str, T]:
     """Convert the keys of an SDXL LoRA state_dict to diffusers format.
 
     The input state_dict can be in either Stability AI format or diffusers format. If the state_dict is already in
@@ -124,7 +126,7 @@ def convert_sdxl_keys_to_diffusers_format(state_dict: dict[str, torch.Tensor]) -
     stability_unet_keys = list(SDXL_UNET_STABILITY_TO_DIFFUSERS_MAP)
     stability_unet_keys.sort()
 
-    new_state_dict: dict[str, torch.Tensor] = {}
+    new_state_dict: dict[str, T] = {}
     for full_key, value in state_dict.items():
         if full_key.startswith("lora_unet_"):
             search_key = full_key.replace("lora_unet_", "")
