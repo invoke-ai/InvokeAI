@@ -1,4 +1,3 @@
-import bisect
 from pathlib import Path
 from typing import Dict, Optional, Union
 
@@ -11,7 +10,7 @@ from invokeai.backend.lora.ia3_layer import IA3Layer
 from invokeai.backend.lora.loha_layer import LoHALayer
 from invokeai.backend.lora.lokr_layer import LoKRLayer
 from invokeai.backend.lora.lora_layer import LoRALayer
-from invokeai.backend.lora.sdxl_state_dict_utils import SDXL_UNET_STABILITY_TO_DIFFUSERS_MAP
+from invokeai.backend.lora.sdxl_state_dict_utils import convert_sdxl_keys_to_diffusers_format
 from invokeai.backend.model_manager import BaseModelType
 
 AnyLoRALayer = Union[LoRALayer, LoHALayer, LoKRLayer, FullLayer, IA3Layer]
@@ -47,64 +46,6 @@ class LoRAModelRaw(torch.nn.Module):
         return model_size
 
     @classmethod
-    def _convert_sdxl_keys_to_diffusers_format(cls, state_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        """Convert the keys of an SDXL LoRA state_dict to diffusers format.
-
-        The input state_dict can be in either Stability AI format or diffusers format. If the state_dict is already in
-        diffusers format, then this function will have no effect.
-
-        This function is adapted from:
-        https://github.com/bmaltais/kohya_ss/blob/2accb1305979ba62f5077a23aabac23b4c37e935/networks/lora_diffusers.py#L385-L409
-
-        Args:
-            state_dict (Dict[str, Tensor]): The SDXL LoRA state_dict.
-
-        Raises:
-            ValueError: If state_dict contains an unrecognized key, or not all keys could be converted.
-
-        Returns:
-            Dict[str, Tensor]: The diffusers-format state_dict.
-        """
-        converted_count = 0  # The number of Stability AI keys converted to diffusers format.
-        not_converted_count = 0  # The number of keys that were not converted.
-
-        # Get a sorted list of Stability AI UNet keys so that we can efficiently search for keys with matching prefixes.
-        # For example, we want to efficiently find `input_blocks_4_1` in the list when searching for
-        # `input_blocks_4_1_proj_in`.
-        stability_unet_keys = list(SDXL_UNET_STABILITY_TO_DIFFUSERS_MAP)
-        stability_unet_keys.sort()
-
-        new_state_dict = {}
-        for full_key, value in state_dict.items():
-            if full_key.startswith("lora_unet_"):
-                search_key = full_key.replace("lora_unet_", "")
-                # Use bisect to find the key in stability_unet_keys that *may* match the search_key's prefix.
-                position = bisect.bisect_right(stability_unet_keys, search_key)
-                map_key = stability_unet_keys[position - 1]
-                # Now, check if the map_key *actually* matches the search_key.
-                if search_key.startswith(map_key):
-                    new_key = full_key.replace(map_key, SDXL_UNET_STABILITY_TO_DIFFUSERS_MAP[map_key])
-                    new_state_dict[new_key] = value
-                    converted_count += 1
-                else:
-                    new_state_dict[full_key] = value
-                    not_converted_count += 1
-            elif full_key.startswith("lora_te1_") or full_key.startswith("lora_te2_"):
-                # The CLIP text encoders have the same keys in both Stability AI and diffusers formats.
-                new_state_dict[full_key] = value
-                continue
-            else:
-                raise ValueError(f"Unrecognized SDXL LoRA key prefix: '{full_key}'.")
-
-        if converted_count > 0 and not_converted_count > 0:
-            raise ValueError(
-                f"The SDXL LoRA could only be partially converted to diffusers format. converted={converted_count},"
-                f" not_converted={not_converted_count}"
-            )
-
-        return new_state_dict
-
-    @classmethod
     def from_checkpoint(
         cls,
         file_path: Union[str, Path],
@@ -131,7 +72,7 @@ class LoRAModelRaw(torch.nn.Module):
         state_dict = cls._group_state(sd)
 
         if base_model == BaseModelType.StableDiffusionXL:
-            state_dict = cls._convert_sdxl_keys_to_diffusers_format(state_dict)
+            state_dict = convert_sdxl_keys_to_diffusers_format(state_dict)
 
         for layer_key, values in state_dict.items():
             # lora and locon
