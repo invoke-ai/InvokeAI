@@ -35,7 +35,6 @@ import type {
   ParameterHeight,
   ParameterHRFEnabled,
   ParameterHRFMethod,
-  ParameterInitialImage,
   ParameterModel,
   ParameterNegativePrompt,
   ParameterNegativeStylePromptSDXL,
@@ -63,7 +62,7 @@ import {
   setRefinerStart,
   setRefinerSteps,
 } from 'features/sdxl/store/sdxlSlice';
-import { imagesApi } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
 
 const recallPositivePrompt: MetadataRecallFunc<ParameterPositivePrompt> = (positivePrompt) => {
   getStore().dispatch(setPositivePrompt(positivePrompt));
@@ -97,10 +96,7 @@ const recallScheduler: MetadataRecallFunc<ParameterScheduler> = (scheduler) => {
   getStore().dispatch(setScheduler(scheduler));
 };
 
-const recallInitialImage: MetadataRecallFunc<ParameterInitialImage> = async (initialImage) => {
-  const imageDTORequest = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(initialImage));
-  const imageDTO = await imageDTORequest.unwrap();
-  imageDTORequest.unsubscribe();
+const recallInitialImage: MetadataRecallFunc<ImageDTO> = async (imageDTO) => {
   getStore().dispatch(initialImageChanged(imageDTO));
 };
 

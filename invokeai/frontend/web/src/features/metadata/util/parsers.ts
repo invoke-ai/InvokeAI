@@ -1,3 +1,4 @@
+import { getStore } from 'app/store/nanostores/store';
 import {
   initialControlNet,
   initialIPAdapter,
@@ -20,7 +21,6 @@ import type {
   ParameterHeight,
   ParameterHRFEnabled,
   ParameterHRFMethod,
-  ParameterInitialImage,
   ParameterModel,
   ParameterNegativePrompt,
   ParameterNegativeStylePromptSDXL,
@@ -59,6 +59,8 @@ import {
   isParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
 import { get, isArray, isString } from 'lodash-es';
+import { imagesApi } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
 import {
   isControlNetModelConfig,
   isIPAdapterModelConfig,
@@ -137,8 +139,13 @@ const parseCFGRescaleMultiplier: MetadataParseFunc<ParameterCFGRescaleMultiplier
 const parseScheduler: MetadataParseFunc<ParameterScheduler> = (metadata) =>
   getProperty(metadata, 'scheduler', isParameterScheduler);
 
-const parseInitialImage: MetadataParseFunc<ParameterInitialImage> = (metadata) =>
-  getProperty(metadata, 'init_image', isParameterInitialImage);
+const parseInitialImage: MetadataParseFunc<ImageDTO> = async (metadata) => {
+  const imageName = await getProperty(metadata, 'init_image', isParameterInitialImage);
+  const imageDTORequest = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(imageName));
+  const imageDTO = await imageDTORequest.unwrap();
+  imageDTORequest.unsubscribe();
+  return imageDTO;
+};
 
 const parseWidth: MetadataParseFunc<ParameterWidth> = (metadata) => getProperty(metadata, 'width', isParameterWidth);
 

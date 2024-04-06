@@ -193,6 +193,7 @@ export const handlers = {
     getLabel: () => t('metadata.initImage'),
     parser: parsers.initialImage,
     recaller: recallers.initialImage,
+    renderValue: async (imageDTO) => imageDTO.image_name,
   }),
   negativePrompt: buildHandlers({
     getLabel: () => t('metadata.negativePrompt'),
