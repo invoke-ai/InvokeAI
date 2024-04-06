@@ -291,7 +291,6 @@
         "canvasMerged": "تم دمج الخط",
         "sentToImageToImage": "تم إرسال إلى صورة إلى صورة",
         "sentToUnifiedCanvas": "تم إرسال إلى لوحة موحدة",
-        "parametersSet": "تم تعيين المعلمات",
         "parametersNotSet": "لم يتم تعيين المعلمات",
         "metadataLoadFailed": "فشل تحميل البيانات الوصفية"
     },
