@@ -51,7 +51,7 @@ export type T2IAdapterModelConfig = S['T2IAdapterConfig'];
 type TextualInversionModelConfig = S['TextualInversionFileConfig'] | S['TextualInversionFolderConfig'];
 type DiffusersModelConfig = S['MainDiffusersConfig'];
 type CheckpointModelConfig = S['MainCheckpointConfig'];
-export type CLIPVisionModelConfig = S['CLIPVisionDiffusersConfig'];
+export type CLIPVisionModelConfig = S['CLIPVisionDiffusersConfig'] | S['CLIPVisionCheckpointConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
   | LoRAModelConfig

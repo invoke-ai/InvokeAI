@@ -25,7 +25,10 @@ class ImageProjModel(torch.nn.Module):
     """Image Projection Model"""
 
     def __init__(
-        self, cross_attention_dim: int = 1024, clip_embeddings_dim: int = 1024, clip_extra_context_tokens: int = 4
+        self,
+        cross_attention_dim: int = 1024,
+        clip_embeddings_dim: int = 1024,
+        clip_extra_context_tokens: int = 4,
     ):
         super().__init__()
 
@@ -149,8 +152,10 @@ class IPAdapter(RawModel):
         clip_image = self._clip_image_processor(images=pil_image, return_tensors="pt").pixel_values
         clip_image_embeds = image_encoder(clip_image.to(self.device, dtype=self.dtype)).image_embeds
         try:
-            image_prompt_embeds = self._image_proj_model(clip_image_embeds)
-            uncond_image_prompt_embeds = self._image_proj_model(torch.zeros_like(clip_image_embeds))
+            image_prompt_embeds = self._image_proj_model(clip_image_embeds.to(device=self.device, dtype=self.dtype))
+            uncond_image_prompt_embeds = self._image_proj_model(
+                torch.zeros_like(clip_image_embeds.to(device=self.device, dtype=self.dtype))
+            )
             return image_prompt_embeds, uncond_image_prompt_embeds
         except RuntimeError as e:
             raise RuntimeError("Selected CLIP Vision Model is incompatible with the current IP Adapter") from e
@@ -178,8 +183,10 @@ class IPAdapterPlus(IPAdapter):
             -2
         ]
         try:
-            image_prompt_embeds = self._image_proj_model(clip_image_embeds)
-            uncond_image_prompt_embeds = self._image_proj_model(uncond_clip_image_embeds)
+            image_prompt_embeds = self._image_proj_model(clip_image_embeds.to(device=self.device, dtype=self.dtype))
+            uncond_image_prompt_embeds = self._image_proj_model(
+                uncond_clip_image_embeds.to(device=self.device, dtype=self.dtype)
+            )
             return image_prompt_embeds, uncond_image_prompt_embeds
         except RuntimeError as e:
             raise RuntimeError("Selected CLIP Vision Model is incompatible with the current IP Adapter") from e

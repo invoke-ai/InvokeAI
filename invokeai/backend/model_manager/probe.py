@@ -9,23 +9,16 @@ from picklescan.scanner import scan_file_path
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.util.misc import uuid_string
-from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
+from invokeai.backend.model_hash.model_hash import (HASHING_ALGORITHMS,
+                                                    ModelHash)
 from invokeai.backend.util.util import SilenceWarnings
 
-from .config import (
-    AnyModelConfig,
-    BaseModelType,
-    ControlAdapterDefaultSettings,
-    InvalidModelConfigException,
-    MainModelDefaultSettings,
-    ModelConfigFactory,
-    ModelFormat,
-    ModelRepoVariant,
-    ModelSourceType,
-    ModelType,
-    ModelVariantType,
-    SchedulerPredictionType,
-)
+from .config import (AnyModelConfig, BaseModelType,
+                     ControlAdapterDefaultSettings,
+                     InvalidModelConfigException, MainModelDefaultSettings,
+                     ModelConfigFactory, ModelFormat, ModelRepoVariant,
+                     ModelSourceType, ModelType, ModelVariantType,
+                     SchedulerPredictionType)
 from .util.model_util import lora_token_vector_length, read_checkpoint_meta
 
 CkptType = Dict[str | int, Any]
@@ -232,6 +225,8 @@ class ModelProbe(object):
                 return ModelType.ControlNet
             elif any(key.startswith(v) for v in {"image_proj.", "ip_adapter."}):
                 return ModelType.IPAdapter
+            elif any(key.startswith(v) for v in {"vision_model."}):
+                return ModelType.CLIPVision
             elif key in {"emb_params", "string_to_param"}:
                 return ModelType.TextualInversion
         else:
@@ -550,8 +545,15 @@ class IPAdapterCheckpointProbe(CheckpointProbeBase):
 
 
 class CLIPVisionCheckpointProbe(CheckpointProbeBase):
+    """Class for probing CLIPVision Checkpoint Models"""
+
     def get_base_type(self) -> BaseModelType:
-        raise NotImplementedError()
+        checkpoint = self.checkpoint
+        for key in checkpoint.keys():
+            if not key.startswith(("vision_model.")):
+                continue
+            return BaseModelType.Any
+        raise InvalidModelConfigException(f"{self.model_path}: Unable to determine base type")
 
 
 class T2IAdapterCheckpointProbe(CheckpointProbeBase):
@@ -707,9 +709,7 @@ class ControlNetFolderProbe(FolderProbeBase):
             else (
                 BaseModelType.StableDiffusion2
                 if dimension == 1024
-                else BaseModelType.StableDiffusionXL
-                if dimension == 2048
-                else None
+                else BaseModelType.StableDiffusionXL if dimension == 2048 else None
             )
         )
         if not base_model:

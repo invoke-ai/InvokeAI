@@ -331,7 +331,7 @@ class IPAdapterInvokeAIConfig(IPAdapterBaseConfig):
     """Model config for IP Adapter diffusers format models."""
 
     image_encoder_model_id: str
-    format: Literal[ModelFormat.InvokeAI]
+    format: Literal[ModelFormat.InvokeAI] = ModelFormat.InvokeAI
 
     @staticmethod
     def get_tag() -> Tag:
@@ -341,18 +341,31 @@ class IPAdapterInvokeAIConfig(IPAdapterBaseConfig):
 class IPAdapterCheckpointConfig(IPAdapterBaseConfig):
     """Model config for IP Adapter checkpoint format models."""
 
-    format: Literal[ModelFormat.Checkpoint]
+    format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
 
     @staticmethod
     def get_tag() -> Tag:
         return Tag(f"{ModelType.IPAdapter.value}.{ModelFormat.Checkpoint.value}")
 
 
-class CLIPVisionDiffusersConfig(DiffusersConfigBase):
+class CLIPVisionBaseConfig(ModelConfigBase):
+    type: Literal[ModelType.CLIPVision] = ModelType.CLIPVision
+
+
+class CLIPVisionCheckpointConfig(CLIPVisionBaseConfig):
     """Model config for CLIPVision."""
 
-    type: Literal[ModelType.CLIPVision] = ModelType.CLIPVision
-    format: Literal[ModelFormat.Diffusers]
+    format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.CLIPVision.value}.{ModelFormat.Checkpoint.value}")
+
+
+class CLIPVisionDiffusersConfig(CLIPVisionBaseConfig):
+    """Model config for CLIPVision."""
+
+    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
     @staticmethod
     def get_tag() -> Tag:
@@ -363,7 +376,7 @@ class T2IAdapterConfig(DiffusersConfigBase, ControlAdapterConfigBase):
     """Model config for T2I."""
 
     type: Literal[ModelType.T2IAdapter] = ModelType.T2IAdapter
-    format: Literal[ModelFormat.Diffusers]
+    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
     @staticmethod
     def get_tag() -> Tag:
@@ -407,6 +420,7 @@ AnyModelConfig = Annotated[
         Annotated[IPAdapterCheckpointConfig, IPAdapterCheckpointConfig.get_tag()],
         Annotated[T2IAdapterConfig, T2IAdapterConfig.get_tag()],
         Annotated[CLIPVisionDiffusersConfig, CLIPVisionDiffusersConfig.get_tag()],
+        Annotated[CLIPVisionCheckpointConfig, CLIPVisionCheckpointConfig.get_tag()],
     ],
     Discriminator(get_model_discriminator_value),
 ]
