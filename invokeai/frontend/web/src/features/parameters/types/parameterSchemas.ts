@@ -126,13 +126,6 @@ const zParameterT2IAdapterModel = zModelIdentifierField;
 export type ParameterT2IAdapterModel = z.infer<typeof zParameterT2IAdapterModel>;
 // #endregion
 
-// #region I2I Initial Image
-const zParameterInitialImage = z.string();
-export type ParameterInitialImage = z.infer<typeof zParameterInitialImage>;
-export const isParameterInitialImage = (val: unknown): val is ParameterInitialImage =>
-  zParameterInitialImage.safeParse(val).success;
-// #endregion
-
 // #region Strength (l2l strength)
 const zParameterStrength = z.number().min(0).max(1);
 export type ParameterStrength = z.infer<typeof zParameterStrength>;
