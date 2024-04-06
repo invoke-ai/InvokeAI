@@ -43,7 +43,6 @@ import {
   isParameterHeight,
   isParameterHRFEnabled,
   isParameterHRFMethod,
-  isParameterInitialImage,
   isParameterLoRAWeight,
   isParameterNegativePrompt,
   isParameterNegativeStylePromptSDXL,
@@ -140,7 +139,7 @@ const parseScheduler: MetadataParseFunc<ParameterScheduler> = (metadata) =>
   getProperty(metadata, 'scheduler', isParameterScheduler);
 
 const parseInitialImage: MetadataParseFunc<ImageDTO> = async (metadata) => {
-  const imageName = await getProperty(metadata, 'init_image', isParameterInitialImage);
+  const imageName = await getProperty(metadata, 'init_image', isString);
   const imageDTORequest = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(imageName));
   const imageDTO = await imageDTORequest.unwrap();
   imageDTORequest.unsubscribe();
