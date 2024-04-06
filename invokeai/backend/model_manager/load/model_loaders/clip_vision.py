@@ -1,5 +1,5 @@
 import pathlib
-from typing import Optional
+from typing import Optional, TypedDict
 
 import safetensors.torch
 from transformers import CLIPVisionConfig, CLIPVisionModelWithProjection
@@ -9,7 +9,25 @@ from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.util.devices import choose_torch_device
 
-CLIP_VISION_STANDARD_CONFIG = {
+
+class CLIPVisionConfigParams(TypedDict):
+    hidden_size: int
+    intermediate_size: int
+    projection_dim: int
+    num_hidden_layers: int
+    num_attention_heads: int
+    num_channels: int
+    image_size: int
+    patch_size: int
+    hidden_act: str
+    layer_norm_eps: float
+    attention_dropout: float
+    initializer_range: float
+    initializer_factor: float
+    torch_dtype: str
+
+
+CLIP_VISION_STANDARD_CONFIG: CLIPVisionConfigParams = {
     "hidden_size": 768,
     "intermediate_size": 3072,
     "projection_dim": 512,
@@ -27,31 +45,27 @@ CLIP_VISION_STANDARD_CONFIG = {
 }
 
 
-CLIP_VISION_VIT_H_CONFIG = {
+CLIP_VISION_VIT_H_CONFIG: CLIPVisionConfigParams = {
     **CLIP_VISION_STANDARD_CONFIG,
-    **{
-        "hidden_size": 1280,
-        "intermediate_size": 5120,
-        "projection_dim": 1024,
-        "num_hidden_layers": 32,
-        "num_attention_heads": 16,
-        "patch_size": 14,
-        "hidden_act": "gelu",
-        "layer_norm_eps": 1e-05,
-    },
+    "hidden_size": 1280,
+    "intermediate_size": 5120,
+    "projection_dim": 1024,
+    "num_hidden_layers": 32,
+    "num_attention_heads": 16,
+    "patch_size": 14,
+    "hidden_act": "gelu",
+    "layer_norm_eps": 1e-05,
 }
 
-CLIP_VISION_VIT_G_CONFIG = {
+CLIP_VISION_VIT_G_CONFIG: CLIPVisionConfigParams = {
     **CLIP_VISION_STANDARD_CONFIG,
-    **{
-        "hidden_size": 1664,
-        "intermediate_size": 8192,
-        "projection_dim": 1280,
-        "num_hidden_layers": 48,
-        "num_attention_heads": 16,
-        "patch_size": 14,
-        "hidden_act": "gelu",
-    },
+    "hidden_size": 1664,
+    "intermediate_size": 8192,
+    "projection_dim": 1280,
+    "num_hidden_layers": 48,
+    "num_attention_heads": 16,
+    "patch_size": 14,
+    "hidden_act": "gelu",
 }
 
 
