@@ -84,7 +84,7 @@ class ModelManagerService(ModelManagerServiceBase):
             max_vram_cache_size=app_config.vram,
             lazy_offloading=app_config.lazy_offload,
             logger=logger,
-            execution_device=execution_device or TorchDeviceSelect(app_config).choose_torch_device(),
+            execution_device=execution_device or TorchDeviceSelect().choose_torch_device(),
         )
         convert_cache = ModelConvertCache(cache_path=app_config.convert_cache_path, max_size=app_config.convert_cache)
         loader = ModelLoadService(

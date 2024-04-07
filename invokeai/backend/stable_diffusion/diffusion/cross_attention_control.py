@@ -11,7 +11,7 @@ from compel.cross_attention_control import Arguments
 from diffusers.models.attention_processor import Attention, SlicedAttnProcessor
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 
-from invokeai.backend.util.devices import torch_dtype
+from invokeai.backend.util.devices import TorchDeviceSelect
 
 
 class CrossAttentionType(enum.Enum):
@@ -62,7 +62,7 @@ def setup_cross_attention_control_attention_processors(unet: UNet2DConditionMode
     # urgh. should this be hardcoded?
     max_length = 77
     # mask=1 means use base prompt attention, mask=0 means use edited prompt attention
-    mask = torch.zeros(max_length, dtype=torch_dtype(device))
+    mask = torch.zeros(max_length, dtype=TorchDeviceSelect(context).choose_torch_dtype(device))
     indices_target = torch.arange(max_length, dtype=torch.long)
     indices = torch.arange(max_length, dtype=torch.long)
     for name, a0, a1, b0, b1 in context.arguments.edit_opcodes:
