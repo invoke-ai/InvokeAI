@@ -44,8 +44,20 @@ def test_device_dtype_override(device_dtype_pair):
 
 
 def test_normalize():
-    assert TorchDeviceSelect.normalize("cuda") == torch.device("cuda:0") if TorchDeviceSelect.has_cuda else torch.device('cuda')
-    assert TorchDeviceSelect.normalize("cuda:0") == torch.device("cuda:0") if TorchDeviceSelect.has_cuda else torch.device('cuda')
-    assert TorchDeviceSelect.normalize("cuda:1") == torch.device("cuda:1") if TorchDeviceSelect.has_cuda else torch.device('cuda')
+    assert (
+        TorchDeviceSelect.normalize("cuda") == torch.device("cuda:0")
+        if TorchDeviceSelect.has_cuda
+        else torch.device("cuda")
+    )
+    assert (
+        TorchDeviceSelect.normalize("cuda:0") == torch.device("cuda:0")
+        if TorchDeviceSelect.has_cuda
+        else torch.device("cuda")
+    )
+    assert (
+        TorchDeviceSelect.normalize("cuda:1") == torch.device("cuda:1")
+        if TorchDeviceSelect.has_cuda
+        else torch.device("cuda")
+    )
     assert TorchDeviceSelect.normalize("mps") == torch.device("mps")
     assert TorchDeviceSelect.normalize("cpu") == torch.device("cpu")
