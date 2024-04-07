@@ -2,7 +2,7 @@
 Initialization file for invokeai.backend.util
 """
 
-from .devices import choose_precision, choose_torch_device
+from .devices import TorchDeviceSelect
 from .logging import InvokeAILogger
 from .util import GIG, Chdir, directory_size
 
@@ -11,6 +11,5 @@ __all__ = [
     "directory_size",
     "Chdir",
     "InvokeAILogger",
-    "choose_precision",
-    "choose_torch_device",
+    "TorchDeviceSelect",
 ]

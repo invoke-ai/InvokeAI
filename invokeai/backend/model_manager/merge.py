@@ -17,7 +17,6 @@ from diffusers.utils import logging as dlogging
 
 from invokeai.app.services.model_install import ModelInstallServiceBase
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
-from invokeai.backend.util.devices import choose_torch_device, torch_dtype
 
 from . import (
     AnyModelConfig,
@@ -43,6 +42,7 @@ class ModelMerger(object):
         Initialize a ModelMerger object with the model installer.
         """
         self._installer = installer
+        self._dtype = installer.app_config
 
     def merge_diffusion_models(
         self,
@@ -68,7 +68,7 @@ class ModelMerger(object):
             warnings.simplefilter("ignore")
             verbosity = dlogging.get_verbosity()
             dlogging.set_verbosity_error()
-            dtype = torch.float16 if variant == "fp16" else torch_dtype(choose_torch_device())
+            dtype = torch.float16 if variant == "fp16" else self._dtype
 
             # Note that checkpoint_merger will not work with downloaded HuggingFace fp16 models
             # until upstream https://github.com/huggingface/diffusers/pull/6670 is merged and released.
@@ -151,7 +151,7 @@ class ModelMerger(object):
         dump_path.mkdir(parents=True, exist_ok=True)
         dump_path = dump_path / merged_model_name
 
-        dtype = torch.float16 if variant == "fp16" else torch_dtype(choose_torch_device())
+        dtype = torch.float16 if variant == "fp16" else self._dtype
         merged_pipe.save_pretrained(dump_path.as_posix(), safe_serialization=True, torch_dtype=dtype, variant=variant)
 
         # register model and get its unique key

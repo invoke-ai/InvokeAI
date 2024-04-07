@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
 
 from PIL.Image import Image
-from torch import Tensor
+from torch import Tensor, torch
 
 from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import MetadataField, WithBoard, WithMetadata
@@ -413,6 +413,19 @@ class ModelsInterface(InvocationContextInterface):
             model_type=type,
             model_format=format,
         )
+
+    def get_free_device(self) -> torch.device:
+        """Return a free GPU for accelerated torch operations.
+        Args:
+           none
+
+        Returns:
+           A torch.dtype object.
+
+        Will raise a NotImplementedError until the multi-GPU support
+        PR is merged.
+        """
+        return self._services.model_manager.load.ram_cache.get_execution_device()
 
 
 class ConfigInterface(InvocationContextInterface):

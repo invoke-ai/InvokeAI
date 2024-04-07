@@ -9,7 +9,7 @@ from invokeai.app.invocations.fields import FieldDescriptions, InputField, Laten
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
 
-from ...backend.util.devices import choose_torch_device, torch_dtype
+from ...backend.util.devices import TorchDeviceSelect
 from .baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -46,7 +46,7 @@ def get_noise(
             height // downsampling_factor,
             width // downsampling_factor,
         ],
-        dtype=torch_dtype(device),
+        dtype=TorchDeviceSelect().choose_torch_dtype(device),
         device=noise_device_type,
         generator=generator,
     ).to("cpu")
@@ -118,7 +118,7 @@ class NoiseInvocation(BaseInvocation):
         noise = get_noise(
             width=self.width,
             height=self.height,
-            device=choose_torch_device(),
+            device=TorchDeviceSelect(context).choose_torch_device(),
             seed=self.seed,
             use_cpu=self.use_cpu,
         )
