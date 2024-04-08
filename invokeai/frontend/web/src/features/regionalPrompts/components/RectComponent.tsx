@@ -1,13 +1,15 @@
-import { rgbaColorToString } from 'features/canvas/util/colorToString';
+import { rgbColorToString } from 'features/canvas/util/colorToString';
 import { useTransform } from 'features/regionalPrompts/hooks/useTransform';
 import type { FillRectObject } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import type { RgbColor } from 'react-colorful';
 import { Rect } from 'react-konva';
 
 type Props = {
   rect: FillRectObject;
+  color: RgbColor;
 };
 
-export const RectComponent = ({ rect }: Props) => {
+export const RectComponent = ({ rect, color }: Props) => {
   const { shapeRef } = useTransform(rect);
 
   return (
@@ -18,8 +20,8 @@ export const RectComponent = ({ rect }: Props) => {
       y={rect.y}
       width={rect.width}
       height={rect.height}
-      fill={rgbaColorToString(rect.color)}
-      draggable
+      fill={rgbColorToString(color)}
+      listening={false}
     />
   );
 };
