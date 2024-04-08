@@ -380,7 +380,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
             mask = cond.mask
             if mask is not None:
-                mask = context.tensors.load(mask.mask_name)
+                mask = context.tensors.load(mask.tensor_name)
             text_embeddings_masks.append(mask)
 
         return text_embeddings, text_embeddings_masks
