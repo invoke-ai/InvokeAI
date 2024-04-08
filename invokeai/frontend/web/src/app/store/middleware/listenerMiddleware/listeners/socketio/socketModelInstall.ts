@@ -43,6 +43,7 @@ export const addModelInstallEventListener = (startAppListening: AppStartListenin
         })
       );
       dispatch(api.util.invalidateTags([{ type: 'ModelConfig', id: LIST_TAG }]));
+      dispatch(api.util.invalidateTags([{ type: 'ModelScanFolderResults', id: LIST_TAG }]));
     },
   });
 

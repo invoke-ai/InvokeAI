@@ -87,9 +87,9 @@ export const Model = () => {
     <Flex flexDir="column" gap={4}>
       <Flex alignItems="flex-start" gap={4}>
         <ModelImageUpload model_key={selectedModelKey} model_image={data.cover_image} />
-        <Flex flexDir="column" gap={1} flexGrow={1}>
+        <Flex flexDir="column" gap={1} flexGrow={1} minW={0}>
           <Flex gap={2}>
-            <Heading as="h2" fontSize="lg">
+            <Heading as="h2" fontSize="lg" noOfLines={1} wordBreak="break-all">
               {data.name}
             </Heading>
             <Spacer />
@@ -114,7 +114,7 @@ export const Model = () => {
             )}
           </Flex>
           {data.source && (
-            <Text variant="subtext">
+            <Text variant="subtext" noOfLines={1} wordBreak="break-all">
               {t('modelManager.source')}: {data?.source}
             </Text>
           )}

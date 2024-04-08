@@ -207,10 +207,8 @@ def dest_path(dest: Optional[str | Path] = None) -> Path | None:
 
 class GpuType(Enum):
     CUDA = "cuda"
-    CUDA_AND_DML = "cuda_and_dml"
     ROCM = "rocm"
     CPU = "cpu"
-    AUTODETECT = "autodetect"
 
 
 def select_gpu() -> GpuType:
@@ -226,10 +224,6 @@ def select_gpu() -> GpuType:
         "an [gold1 b]NVIDIA[/] GPU (using CUDA™)",
         GpuType.CUDA,
     )
-    nvidia_with_dml = (
-        "an [gold1 b]NVIDIA[/] GPU (using CUDA™, and DirectML™ for ONNX) -- ALPHA",
-        GpuType.CUDA_AND_DML,
-    )
     amd = (
         "an [gold1 b]AMD[/] GPU (using ROCm™)",
         GpuType.ROCM,
@@ -238,26 +232,18 @@ def select_gpu() -> GpuType:
         "Do not install any GPU support, use CPU for generation (slow)",
         GpuType.CPU,
     )
-    autodetect = (
-        "I'm not sure what to choose",
-        GpuType.AUTODETECT,
-    )
 
     options = []
     if OS == "Windows":
-        options = [nvidia, nvidia_with_dml, cpu]
+        options = [nvidia, cpu]
     if OS == "Linux":
         options = [nvidia, amd, cpu]
     elif OS == "Darwin":
         options = [cpu]
-        # future CoreML?
 
     if len(options) == 1:
         print(f'Your platform [gold1]{OS}-{ARCH}[/] only supports the "{options[0][1]}" driver. Proceeding with that.')
         return options[0][1]
-
-    # "I don't know" is always added the last option
-    options.append(autodetect)  # type: ignore
 
     options = {str(i): opt for i, opt in enumerate(options, 1)}
 
@@ -291,11 +277,6 @@ def select_gpu() -> GpuType:
             lambda n: n in options.keys(), error_message="Please select one the above options"
         ),
     )
-
-    if options[choice][1] is GpuType.AUTODETECT:
-        console.print(
-            "No problem. We will install CUDA support first :crossed_fingers: If Invoke does not detect a GPU, please re-run the installer and select one of the other GPU types."
-        )
 
     return options[choice][1]
 

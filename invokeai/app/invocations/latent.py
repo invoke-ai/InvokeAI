@@ -44,11 +44,7 @@ from invokeai.app.invocations.fields import (
     WithMetadata,
 )
 from invokeai.app.invocations.ip_adapter import IPAdapterField
-from invokeai.app.invocations.primitives import (
-    DenoiseMaskOutput,
-    ImageOutput,
-    LatentsOutput,
-)
+from invokeai.app.invocations.primitives import DenoiseMaskOutput, ImageOutput, LatentsOutput
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import prepare_control_image
@@ -76,12 +72,7 @@ from ...backend.stable_diffusion.diffusers_pipeline import (
 )
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from ...backend.util.devices import choose_precision, choose_torch_device
-from .baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    invocation,
-    invocation_output,
-)
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 from .controlnet_image_processors import ControlField
 from .model import ModelIdentifierField, UNetField, VAEField
 
@@ -1423,7 +1414,7 @@ class IdealSizeInvocation(BaseInvocation):
         return tuple((x - x % multiple_of) for x in args)
 
     def invoke(self, context: InvocationContext) -> IdealSizeOutput:
-        unet_config = context.models.get_config(**self.unet.unet.model_dump())
+        unet_config = context.models.get_config(self.unet.unet.key)
         aspect = self.width / self.height
         dimension: float = 512
         if unet_config.base == BaseModelType.StableDiffusion2:

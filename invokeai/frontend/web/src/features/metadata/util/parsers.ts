@@ -1,3 +1,4 @@
+import { getStore } from 'app/store/nanostores/store';
 import {
   initialControlNet,
   initialIPAdapter,
@@ -57,6 +58,8 @@ import {
   isParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
 import { get, isArray, isString } from 'lodash-es';
+import { imagesApi } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
 import {
   isControlNetModelConfig,
   isIPAdapterModelConfig,
@@ -134,6 +137,14 @@ const parseCFGRescaleMultiplier: MetadataParseFunc<ParameterCFGRescaleMultiplier
 
 const parseScheduler: MetadataParseFunc<ParameterScheduler> = (metadata) =>
   getProperty(metadata, 'scheduler', isParameterScheduler);
+
+const parseInitialImage: MetadataParseFunc<ImageDTO> = async (metadata) => {
+  const imageName = await getProperty(metadata, 'init_image', isString);
+  const imageDTORequest = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(imageName));
+  const imageDTO = await imageDTORequest.unwrap();
+  imageDTORequest.unsubscribe();
+  return imageDTO;
+};
 
 const parseWidth: MetadataParseFunc<ParameterWidth> = (metadata) => getProperty(metadata, 'width', isParameterWidth);
 
@@ -372,6 +383,7 @@ const parseIPAdapter: MetadataParseFunc<IPAdapterConfigMetadata> = async (metada
     type: 'ip_adapter',
     isEnabled: true,
     model: zModelIdentifierField.parse(ipAdapterModel),
+    clipVisionModel: 'ViT-H',
     controlImage: image?.image_name ?? null,
     weight: weight ?? initialIPAdapter.weight,
     beginStepPct: begin_step_percent ?? initialIPAdapter.beginStepPct,
@@ -401,6 +413,7 @@ export const parsers = {
   cfgScale: parseCFGScale,
   cfgRescaleMultiplier: parseCFGRescaleMultiplier,
   scheduler: parseScheduler,
+  initialImage: parseInitialImage,
   width: parseWidth,
   height: parseHeight,
   steps: parseSteps,

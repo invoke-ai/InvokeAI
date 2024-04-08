@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import locale
 import os
 import re
 import shutil
@@ -317,11 +318,10 @@ class InvokeAIAppConfig(BaseSettings):
     @staticmethod
     def find_root() -> Path:
         """Choose the runtime root directory when not specified on command line or init file."""
-        venv = Path(os.environ.get("VIRTUAL_ENV") or ".")
         if os.environ.get("INVOKEAI_ROOT"):
             root = Path(os.environ["INVOKEAI_ROOT"])
-        elif any((venv.parent / x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE]):
-            root = (venv.parent).resolve()
+        elif venv := os.environ.get("VIRTUAL_ENV", None):
+            root = Path(venv).parent.resolve()
         else:
             root = Path("~/invokeai").expanduser().resolve()
         return root
@@ -402,7 +402,7 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
         An instance of `InvokeAIAppConfig` with the loaded and migrated settings.
     """
     assert config_path.suffix == ".yaml"
-    with open(config_path) as file:
+    with open(config_path, "rt", encoding=locale.getpreferredencoding()) as file:
         loaded_config_dict = yaml.safe_load(file)
 
     assert isinstance(loaded_config_dict, dict)

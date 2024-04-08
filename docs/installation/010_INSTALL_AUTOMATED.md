@@ -44,7 +44,7 @@ The installation process is simple, with a few prompts:
 
 - Select the version to install. Unless you have a specific reason to install a specific version, select the default (the latest version).
 - Select location for the install. Be sure you have enough space in this folder for the base application, as described in the [installation requirements].
-- Select a GPU device. If you are unsure, you can let the installer figure it out.
+- Select a GPU device.
 
 !!! info "Slow Installation"
 

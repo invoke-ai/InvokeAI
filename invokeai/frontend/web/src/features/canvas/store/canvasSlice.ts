@@ -66,6 +66,7 @@ const initialCanvasState: CanvasState = {
   shouldAutoSave: false,
   shouldCropToBoundingBoxOnSave: false,
   shouldDarkenOutsideBoundingBox: false,
+  shouldFitImageSize: true,
   shouldInvertBrushSizeScrollDirection: false,
   shouldLockBoundingBox: false,
   shouldPreserveMaskedArea: false,
@@ -144,12 +145,20 @@ export const canvasSlice = createSlice({
       reducer: (state, action: PayloadActionWithOptimalDimension<ImageDTO>) => {
         const { width, height, image_name } = action.payload;
         const { optimalDimension } = action.meta;
-        const { stageDimensions } = state;
+        const { stageDimensions, shouldFitImageSize } = state;
 
-        const newBoundingBoxDimensions = {
-          width: roundDownToMultiple(clamp(width, CANVAS_GRID_SIZE_FINE, optimalDimension), CANVAS_GRID_SIZE_FINE),
-          height: roundDownToMultiple(clamp(height, CANVAS_GRID_SIZE_FINE, optimalDimension), CANVAS_GRID_SIZE_FINE),
-        };
+        const newBoundingBoxDimensions = shouldFitImageSize
+          ? {
+              width: roundDownToMultiple(width, CANVAS_GRID_SIZE_FINE),
+              height: roundDownToMultiple(height, CANVAS_GRID_SIZE_FINE),
+            }
+          : {
+              width: roundDownToMultiple(clamp(width, CANVAS_GRID_SIZE_FINE, optimalDimension), CANVAS_GRID_SIZE_FINE),
+              height: roundDownToMultiple(
+                clamp(height, CANVAS_GRID_SIZE_FINE, optimalDimension),
+                CANVAS_GRID_SIZE_FINE
+              ),
+            };
 
         const newBoundingBoxCoordinates = {
           x: roundToMultiple(width / 2 - newBoundingBoxDimensions.width / 2, CANVAS_GRID_SIZE_FINE),
@@ -289,11 +298,18 @@ export const canvasSlice = createSlice({
       const { images, selectedImageIndex } = state.layerState.stagingArea;
       pushToPrevLayerStates(state);
 
-      if (!images.length) {
-        return;
-      }
-
       images.splice(selectedImageIndex, 1);
+
+      if (images.length === 0) {
+        pushToPrevLayerStates(state);
+
+        state.layerState.stagingArea = deepClone(initialLayerState.stagingArea);
+
+        state.futureLayerStates = [];
+        state.shouldShowStagingOutline = true;
+        state.shouldShowStagingImage = true;
+        state.batchIds = [];
+      }
 
       if (selectedImageIndex >= images.length) {
         state.layerState.stagingArea.selectedImageIndex = images.length - 1;
@@ -575,6 +591,9 @@ export const canvasSlice = createSlice({
     setShouldAntialias: (state, action: PayloadAction<boolean>) => {
       state.shouldAntialias = action.payload;
     },
+    setShouldFitImageSize: (state, action: PayloadAction<boolean>) => {
+      state.shouldFitImageSize = action.payload;
+    },
     setShouldCropToBoundingBoxOnSave: (state, action: PayloadAction<boolean>) => {
       state.shouldCropToBoundingBoxOnSave = action.payload;
     },
@@ -685,6 +704,7 @@ export const {
   setShouldRestrictStrokesToBox,
   stagingAreaInitialized,
   setShouldAntialias,
+  setShouldFitImageSize,
   canvasResized,
   canvasBatchIdAdded,
   canvasBatchIdsReset,

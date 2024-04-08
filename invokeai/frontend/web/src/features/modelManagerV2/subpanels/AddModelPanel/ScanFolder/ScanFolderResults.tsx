@@ -1,7 +1,10 @@
 import {
   Button,
+  Checkbox,
   Divider,
   Flex,
+  FormControl,
+  FormLabel,
   Heading,
   IconButton,
   Input,
@@ -12,7 +15,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { addToast } from 'features/system/store/systemSlice';
 import { makeToast } from 'features/system/util/makeToast';
-import type { ChangeEventHandler } from 'react';
+import type { ChangeEvent, ChangeEventHandler } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
@@ -28,7 +31,7 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
   const dispatch = useAppDispatch();
-
+  const [inplace, setInplace] = useState(true);
   const [installModel] = useInstallModelMutation();
 
   const filteredResults = useMemo(() => {
@@ -42,6 +45,10 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
     setSearchTerm(e.target.value.trim());
   }, []);
 
+  const onChangeInplace = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setInplace(e.target.checked);
+  }, []);
+
   const clearSearch = useCallback(() => {
     setSearchTerm('');
   }, []);
@@ -51,7 +58,7 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
       if (result.is_installed) {
         continue;
       }
-      installModel({ source: result.path })
+      installModel({ source: result.path, inplace })
         .unwrap()
         .then((_) => {
           dispatch(
@@ -76,7 +83,37 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
           }
         });
     }
-  }, [installModel, filteredResults, dispatch, t]);
+  }, [filteredResults, installModel, inplace, dispatch, t]);
+
+  const handleInstallOne = useCallback(
+    (source: string) => {
+      installModel({ source, inplace })
+        .unwrap()
+        .then((_) => {
+          dispatch(
+            addToast(
+              makeToast({
+                title: t('toast.modelAddedSimple'),
+                status: 'success',
+              })
+            )
+          );
+        })
+        .catch((error) => {
+          if (error) {
+            dispatch(
+              addToast(
+                makeToast({
+                  title: `${error.data.detail} `,
+                  status: 'error',
+                })
+              )
+            );
+          }
+        });
+    },
+    [installModel, inplace, dispatch, t]
+  );
 
   return (
     <>
@@ -85,6 +122,10 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
         <Flex justifyContent="space-between" alignItems="center">
           <Heading size="sm">{t('modelManager.scanResults')}</Heading>
           <Flex alignItems="center" gap={3}>
+            <FormControl w="min-content">
+              <FormLabel m={0}>{t('modelManager.inplaceInstall')}</FormLabel>
+              <Checkbox isChecked={inplace} onChange={onChangeInplace} size="md" />
+            </FormControl>
             <Button size="sm" onClick={handleAddAll} isDisabled={filteredResults.length === 0}>
               {t('modelManager.installAll')}
             </Button>
@@ -116,7 +157,7 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
           <ScrollableContent>
             <Flex flexDir="column" gap={3}>
               {filteredResults.map((result) => (
-                <ScanModelResultItem key={result.path} result={result} />
+                <ScanModelResultItem key={result.path} result={result} installModel={handleInstallOne} />
               ))}
             </Flex>
           </ScrollableContent>

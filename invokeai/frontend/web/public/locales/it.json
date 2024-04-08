@@ -366,7 +366,7 @@
         "modelConverted": "Modello convertito",
         "alpha": "Alpha",
         "convertToDiffusersHelpText1": "Questo modello verrà convertito nel formato 🧨 Diffusori.",
-        "convertToDiffusersHelpText3": "Il file Checkpoint su disco verrà eliminato se si trova nella cartella principale di InvokeAI. Se si trova invece in una posizione personalizzata, NON verrà eliminato.",
+        "convertToDiffusersHelpText3": "Il file del modello su disco verrà eliminato se si trova nella cartella principale di InvokeAI. Se si trova invece in una posizione personalizzata, NON verrà eliminato.",
         "v2_base": "v2 (512px)",
         "v2_768": "v2 (768px)",
         "none": "nessuno",
@@ -443,7 +443,8 @@
         "noModelsInstalled": "Nessun modello installato",
         "hfTokenInvalidErrorMessage2": "Aggiornalo in ",
         "main": "Principali",
-        "noModelsInstalledDesc1": "Installa i modelli con"
+        "noModelsInstalledDesc1": "Installa i modelli con",
+        "ipAdapters": "Adattatori IP"
     },
     "parameters": {
         "images": "Immagini",
@@ -568,7 +569,6 @@
         "canvasMerged": "Tela unita",
         "sentToImageToImage": "Inviato a Immagine a Immagine",
         "sentToUnifiedCanvas": "Inviato a Tela Unificata",
-        "parametersSet": "Parametri impostati",
         "parametersNotSet": "Parametri non impostati",
         "metadataLoadFailed": "Impossibile caricare i metadati",
         "serverError": "Errore del Server",
@@ -937,7 +937,8 @@
         "controlnet": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.controlNet))",
         "mediapipeFace": "Mediapipe Volto",
         "ip_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.ipAdapter))",
-        "t2i_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.t2iAdapter))"
+        "t2i_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.t2iAdapter))",
+        "selectCLIPVisionModel": "Seleziona un modello CLIP Vision"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",

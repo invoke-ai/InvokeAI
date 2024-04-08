@@ -3,6 +3,7 @@
 InvokeAI installer script
 """
 
+import locale
 import os
 import platform
 import re
@@ -316,7 +317,9 @@ def upgrade_pip(venv_path: Path) -> str | None:
     python = str(venv_path.expanduser().resolve() / python)
 
     try:
-        result = subprocess.check_output([python, "-m", "pip", "install", "--upgrade", "pip"]).decode()
+        result = subprocess.check_output([python, "-m", "pip", "install", "--upgrade", "pip"]).decode(
+            encoding=locale.getpreferredencoding()
+        )
     except subprocess.CalledProcessError as e:
         print(e)
         result = None
@@ -404,22 +407,29 @@ def get_torch_source() -> Tuple[str | None, str | None]:
     # device can be one of: "cuda", "rocm", "cpu", "cuda_and_dml, autodetect"
     device = select_gpu()
 
+    # The correct extra index URLs for torch are inconsistent, see https://pytorch.org/get-started/locally/#start-locally
+
     url = None
-    optional_modules = "[onnx]"
+    optional_modules: str | None = None
     if OS == "Linux":
         if device.value == "rocm":
             url = "https://download.pytorch.org/whl/rocm5.6"
         elif device.value == "cpu":
             url = "https://download.pytorch.org/whl/cpu"
-
+        elif device.value == "cuda":
+            # CUDA uses the default PyPi index
+            optional_modules = "[xformers,onnx-cuda]"
     elif OS == "Windows":
         if device.value == "cuda":
             url = "https://download.pytorch.org/whl/cu121"
             optional_modules = "[xformers,onnx-cuda]"
-        if device.value == "cuda_and_dml":
-            url = "https://download.pytorch.org/whl/cu121"
-            optional_modules = "[xformers,onnx-directml]"
+        elif device.value == "cpu":
+            # CPU  uses the default PyPi index, no optional modules
+            pass
+    elif OS == "Darwin":
+        # macOS uses the default PyPi index, no optional modules
+        pass
 
-    # in all other cases, Torch wheels should be coming from PyPi as of Torch 1.13
+    # Fall back to defaults
 
     return (url, optional_modules)
