@@ -56,7 +56,7 @@ dependencies = [
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events==0.11.0",
   "fastapi==0.110.0",
-  "huggingface-hub==0.21.4",
+  "huggingface-hub==0.22.2",
   "pydantic-settings==2.2.1",
   "pydantic==2.6.3",
   "python-socketio==5.11.1",
