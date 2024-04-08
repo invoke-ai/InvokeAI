@@ -61,6 +61,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     TextConditioningData,
     TextConditioningRegions,
 )
+from invokeai.backend.util.mask import to_standard_float_mask
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 from ...backend.stable_diffusion.diffusers_pipeline import (
@@ -386,24 +387,24 @@ class DenoiseLatentsInvocation(BaseInvocation):
         return text_embeddings, text_embeddings_masks
 
     def _preprocess_regional_prompt_mask(
-        self, mask: Optional[torch.Tensor], target_height: int, target_width: int
+        self, mask: Optional[torch.Tensor], target_height: int, target_width: int, dtype: torch.dtype
     ) -> torch.Tensor:
         """Preprocess a regional prompt mask to match the target height and width.
         If mask is None, returns a mask of all ones with the target height and width.
         If mask is not None, resizes the mask to the target height and width using 'nearest' interpolation.
 
         Returns:
-            torch.Tensor: The processed mask. dtype: torch.bool, shape: (1, 1, target_height, target_width).
+            torch.Tensor: The processed mask. shape: (1, 1, target_height, target_width).
         """
+
         if mask is None:
-            return torch.ones((1, 1, target_height, target_width), dtype=torch.bool)
+            return torch.ones((1, 1, target_height, target_width), dtype=dtype)
+
+        mask = to_standard_float_mask(mask, out_dtype=dtype)
 
         tf = torchvision.transforms.Resize(
             (target_height, target_width), interpolation=torchvision.transforms.InterpolationMode.NEAREST
         )
-
-        if len(mask.shape) != 3 or mask.shape[0] != 1:
-            raise ValueError(f"Invalid regional prompt mask shape: {mask.shape}. Expected shape (1, h, w).")
 
         # Add a batch dimension to the mask, because torchvision expects shape (batch, channels, h, w).
         mask = mask.unsqueeze(0)  # Shape: (1, h, w) -> (1, 1, h, w)
@@ -416,6 +417,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         masks: Optional[list[Optional[torch.Tensor]]],
         latent_height: int,
         latent_width: int,
+        dtype: torch.dtype,
     ) -> tuple[Union[BasicConditioningInfo, SDXLConditioningInfo], Optional[TextConditioningRegions]]:
         """Concatenate regional text embeddings into a single embedding and track the region masks accordingly."""
         if masks is None:
@@ -465,7 +467,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
                         start=cur_text_embedding_len, end=cur_text_embedding_len + text_embedding_info.embeds.shape[1]
                     )
                 )
-                processed_masks.append(self._preprocess_regional_prompt_mask(mask, latent_height, latent_width))
+                processed_masks.append(
+                    self._preprocess_regional_prompt_mask(mask, latent_height, latent_width, dtype=dtype)
+                )
 
             cur_text_embedding_len += text_embedding_info.embeds.shape[1]
 
@@ -524,12 +528,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
             masks=cond_text_embedding_masks,
             latent_height=latent_height,
             latent_width=latent_width,
+            dtype=unet.dtype,
         )
         uncond_text_embedding, uncond_regions = self._concat_regional_text_embeddings(
             text_conditionings=uncond_text_embeddings,
             masks=uncond_text_embedding_masks,
             latent_height=latent_height,
             latent_width=latent_width,
+            dtype=unet.dtype,
         )
 
         conditioning_data = TextConditioningData(

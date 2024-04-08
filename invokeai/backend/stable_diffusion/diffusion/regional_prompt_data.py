@@ -46,7 +46,6 @@ class RegionalPromptData:
         for batch_sample_regions in regions:
             batch_sample_masks_by_seq_len.append({})
 
-            # Convert the bool masks to float masks so that max pooling can be applied.
             batch_sample_masks = batch_sample_regions.masks.to(device=self._device, dtype=self._dtype)
 
             # Downsample the spatial dimensions by factors of 2 until max_downscale_factor is reached.
