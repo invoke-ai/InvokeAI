@@ -1,8 +1,11 @@
-import type { EntityState } from '@reduxjs/toolkit';
-import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
-import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import type { RgbaColor } from 'react-colorful';
+import type Konva from 'konva';
+import type { Vector2d } from 'konva/lib/types';
+import { atom } from 'nanostores';
+import type { RgbColor } from 'react-colorful';
+import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
 type LayerObjectBase = {
@@ -23,7 +26,6 @@ export type LineObject = LayerObjectBase & {
   kind: 'line';
   strokeWidth: number;
   points: number[];
-  color: RgbaColor;
 };
 
 export type FillRectObject = LayerObjectBase & {
@@ -32,84 +34,150 @@ export type FillRectObject = LayerObjectBase & {
   y: number;
   width: number;
   height: number;
-  color: RgbaColor;
 };
 
 export type LayerObject = ImageObject | LineObject | FillRectObject;
 
 export type PromptRegionLayer = {
   id: string;
-  objects: EntityState<LayerObject, string>;
+  kind: 'promptRegionLayer';
+  objects: LayerObject[];
   prompt: string;
+  color: RgbColor;
 };
 
-export const layersAdapter = createEntityAdapter<PromptRegionLayer, string>({
-  selectId: (layer) => layer.id,
-});
-export const layersSelectors = layersAdapter.getSelectors(undefined, getSelectorsOptions);
+export type Layer = PromptRegionLayer;
 
-export const layerObjectsAdapter = createEntityAdapter<LayerObject, string>({
-  selectId: (obj) => obj.id,
-});
-export const layerObjectsSelectors = layerObjectsAdapter.getSelectors(undefined, getSelectorsOptions);
+export type Tool = 'brush';
 
-const getMockState = () => {
-  // Mock data
-  const layer1ID = uuidv4();
-  const obj1ID = uuidv4();
-  const obj2ID = uuidv4();
-
-  const objectEntities: Record<string, LayerObject> = {
-    [obj1ID]: {
-      id: obj1ID,
-      kind: 'line',
-      isSelected: false,
-      color: { r: 255, g: 0, b: 0, a: 1 },
-      strokeWidth: 5,
-      points: [20, 20, 100, 100],
-    },
-    [obj2ID]: {
-      id: obj2ID,
-      kind: 'fillRect',
-      isSelected: false,
-      color: { r: 0, g: 255, b: 0, a: 1 },
-      x: 150,
-      y: 150,
-      width: 100,
-      height: 100,
-    },
-  };
-  const objectsInitialState = layerObjectsAdapter.getInitialState(undefined, objectEntities);
-  const entities: Record<string, PromptRegionLayer> = {
-    [layer1ID]: {
-      id: layer1ID,
-      prompt: 'strawberries',
-      objects: objectsInitialState,
-    },
-  };
-
-  return entities;
+export type RegionalPromptsState = {
+  _version: 1;
+  selectedLayer: string | null;
+  layers: PromptRegionLayer[];
+  brushSize: number;
 };
 
-export const initialRegionalPromptsState = layersAdapter.getInitialState(
-  { _version: 1, selectedID: null },
-  getMockState()
-);
+export const initialRegionalPromptsState: RegionalPromptsState = {
+  _version: 1,
+  selectedLayer: null,
+  brushSize: 40,
+  layers: [],
+};
 
-export type RegionalPromptsState = typeof initialRegionalPromptsState;
+const isLine = (obj: LayerObject): obj is LineObject => obj.kind === 'line';
 
 export const regionalPromptsSlice = createSlice({
   name: 'regionalPrompts',
   initialState: initialRegionalPromptsState,
   reducers: {
-    layerAdded: layersAdapter.addOne,
-    layerRemoved: layersAdapter.removeOne,
-    layerUpdated: layersAdapter.updateOne,
-    layersReset: layersAdapter.removeAll,
+    layerAdded: {
+      reducer: (state, action: PayloadAction<Layer['kind'], string, { id: string }>) => {
+        const newLayer = buildLayer(action.meta.id, action.payload, state.layers.length);
+        state.layers.push(newLayer);
+        state.selectedLayer = newLayer.id;
+      },
+      prepare: (payload: Layer['kind']) => ({ payload, meta: { id: uuidv4() } }),
+    },
+    layerSelected: (state, action: PayloadAction<string>) => {
+      state.selectedLayer = action.payload;
+    },
+    layerReset: (state, action: PayloadAction<string>) => {
+      const layer = state.layers.find((l) => l.id === action.payload);
+      if (!layer) {
+        return;
+      }
+      layer.objects = [];
+    },
+    layerDeleted: (state, action: PayloadAction<string>) => {
+      state.layers = state.layers.filter((l) => l.id !== action.payload);
+      state.selectedLayer = state.layers[0]?.id ?? null;
+    },
+    promptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string }>) => {
+      const { layerId, prompt } = action.payload;
+      const layer = state.layers.find((l) => l.id === layerId);
+      if (!layer) {
+        return;
+      }
+      layer.prompt = prompt;
+    },
+    promptRegionLayerColorChanged: (state, action: PayloadAction<{ layerId: string; color: RgbColor }>) => {
+      const { layerId, color } = action.payload;
+      const layer = state.layers.find((l) => l.id === layerId);
+      if (!layer || layer.kind !== 'promptRegionLayer') {
+        return;
+      }
+      layer.color = color;
+    },
+    lineAdded: {
+      reducer: (state, action: PayloadAction<number[], string, { id: string }>) => {
+        const selectedLayer = state.layers.find((l) => l.id === state.selectedLayer);
+        if (!selectedLayer || selectedLayer.kind !== 'promptRegionLayer') {
+          return;
+        }
+        selectedLayer.objects.push(buildLine(action.meta.id, action.payload, state.brushSize));
+      },
+      prepare: (payload: number[]) => ({ payload, meta: { id: uuidv4() } }),
+    },
+    pointsAdded: (state, action: PayloadAction<number[]>) => {
+      const selectedLayer = state.layers.find((l) => l.id === state.selectedLayer);
+      if (!selectedLayer || selectedLayer.kind !== 'promptRegionLayer') {
+        return;
+      }
+      const lastLine = selectedLayer.objects.findLast(isLine);
+      if (!lastLine) {
+        return;
+      }
+      lastLine.points.push(...action.payload);
+    },
+    brushSizeChanged: (state, action: PayloadAction<number>) => {
+      state.brushSize = action.payload;
+    },
   },
 });
 
-export const { layerAdded, layerRemoved, layerUpdated, layersReset } = regionalPromptsSlice.actions;
+const DEFAULT_COLORS = [
+  { r: 200, g: 0, b: 0 },
+  { r: 0, g: 200, b: 0 },
+  { r: 0, g: 0, b: 200 },
+  { r: 200, g: 200, b: 0 },
+  { r: 0, g: 200, b: 200 },
+  { r: 200, g: 0, b: 200 },
+];
+
+const buildLayer = (id: string, kind: Layer['kind'], layerCount: number) => {
+  if (kind === 'promptRegionLayer') {
+    const color = DEFAULT_COLORS[layerCount % DEFAULT_COLORS.length];
+    assert(color, 'Color not found');
+    return {
+      id,
+      kind,
+      prompt: '',
+      objects: [],
+      color,
+    };
+  }
+  assert(false, `Unknown layer kind: ${kind}`);
+};
+
+const buildLine = (id: string, points: number[], brushSize: number): LineObject => ({
+  isSelected: false,
+  kind: 'line',
+  id,
+  points,
+  strokeWidth: brushSize,
+});
+
+export const {
+  layerAdded,
+  layerSelected,
+  layerReset,
+  layerDeleted,
+  promptChanged,
+  lineAdded,
+  pointsAdded,
+  promptRegionLayerColorChanged,
+  brushSizeChanged,
+} = regionalPromptsSlice.actions;
 
 export const selectRegionalPromptsSlice = (state: RootState) => state.regionalPrompts;
 
@@ -124,3 +192,10 @@ export const regionalPromptsPersistConfig: PersistConfig<RegionalPromptsState> =
   migrate: migrateRegionalPromptsState,
   persistDenylist: [],
 };
+
+export const $isMouseDown = atom(false);
+export const $isMouseOver = atom(false);
+export const $isFocused = atom(false);
+export const $cursorPosition = atom<Vector2d | null>(null);
+export const $tool = atom<Tool>('brush');
+export const $stage = atom<Konva.Stage | null>(null);
