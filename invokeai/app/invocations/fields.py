@@ -203,10 +203,10 @@ class DenoiseMaskField(BaseModel):
     gradient: bool = Field(default=False, description="Used for gradient inpainting")
 
 
-class MaskField(BaseModel):
-    """A mask primitive field."""
+class TensorField(BaseModel):
+    """A tensor primitive field."""
 
-    mask_name: str = Field(description="The name of a spatial mask. dtype: bool, shape: (1, h, w).")
+    tensor_name: str = Field(description="The name of a tensor.")
 
 
 class LatentsField(BaseModel):
@@ -232,9 +232,9 @@ class ConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
-    mask: Optional[MaskField] = Field(
+    mask: Optional[TensorField] = Field(
         default=None,
-        description="The bool mask associated with this conditioning tensor. Excluded regions should be set to False, "
+        description="The mask associated with this conditioning tensor. Excluded regions should be set to False, "
         "included regions should be set to True.",
     )
 

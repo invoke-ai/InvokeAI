@@ -10,8 +10,8 @@ from invokeai.app.invocations.fields import (
     FieldDescriptions,
     Input,
     InputField,
-    MaskField,
     OutputField,
+    TensorField,
     UIComponent,
 )
 from invokeai.app.invocations.primitives import ConditioningOutput
@@ -59,7 +59,7 @@ class CompelInvocation(BaseInvocation):
         description=FieldDescriptions.clip,
         input=Input.Connection,
     )
-    mask: Optional[MaskField] = InputField(
+    mask: Optional[TensorField] = InputField(
         default=None, description="A mask defining the region that this conditioning prompt applies to."
     )
 
@@ -270,7 +270,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     target_height: int = InputField(default=1024, description="")
     clip: CLIPField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 1")
     clip2: CLIPField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 2")
-    mask: Optional[MaskField] = InputField(
+    mask: Optional[TensorField] = InputField(
         default=None, description="A mask defining the region that this conditioning prompt applies to."
     )
 
