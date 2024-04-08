@@ -90,8 +90,6 @@ class ExtractMasksAndPromptsInvocation(BaseInvocation):
         for pair in self.prompt_color_pairs:
             # TODO(ryand): Make this work for both RGB and RGBA images.
             mask = torch.all(image_as_tensor == torch.tensor(pair.color.tuple()), dim=-1)
-            # Add explicit channel dimension.
-            mask = mask.unsqueeze(0)
             mask_tensor_name = context.tensors.save(mask)
             prompt_mask_pairs.append(PromptMaskPair(prompt=pair.prompt, mask=TensorField(tensor_name=mask_tensor_name)))
         return ExtractMasksAndPromptsOutput(prompt_mask_pairs=prompt_mask_pairs)

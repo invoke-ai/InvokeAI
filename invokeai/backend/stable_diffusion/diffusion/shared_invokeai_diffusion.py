@@ -360,7 +360,7 @@ class InvokeAIDiffuserComponent:
                     # Create a dummy mask and range for text conditioning that doesn't have region masks.
                     _, _, h, w = x.shape
                     r = TextConditioningRegions(
-                        masks=torch.ones((1, 1, h, w), dtype=torch.bool),
+                        masks=torch.ones((1, 1, h, w), dtype=x.dtype),
                         ranges=[Range(start=0, end=c.embeds.shape[1])],
                     )
                 regions.append(r)
