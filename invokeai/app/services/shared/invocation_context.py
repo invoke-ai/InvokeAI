@@ -245,6 +245,18 @@ class ImagesInterface(InvocationContextInterface):
         """
         return self._services.images.get_dto(image_name)
 
+    def get_path(self, image_name: str, thumbnail: bool = False) -> Path:
+        """Gets the internal path to an image or thumbnail.
+
+        Args:
+            image_name: The name of the image to get the path of.
+            thumbnail: Get the path of the thumbnail instead of the full image
+
+        Returns:
+            The local path of the image or thumbnail.
+        """
+        return self._services.images.get_path(image_name, thumbnail)
+
 
 class TensorsInterface(InvocationContextInterface):
     def save(self, tensor: Tensor) -> str:
