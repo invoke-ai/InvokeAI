@@ -401,6 +401,11 @@ class DenoiseLatentsInvocation(BaseInvocation):
         tf = torchvision.transforms.Resize(
             (target_height, target_width), interpolation=torchvision.transforms.InterpolationMode.NEAREST
         )
+
+        if len(mask.shape) != 3 or mask.shape[0] != 1:
+            raise ValueError(f"Invalid regional prompt mask shape: {mask.shape}. Expected shape (1, h, w).")
+
+        # Add a batch dimension to the mask, because torchvision expects shape (batch, channels, h, w).
         mask = mask.unsqueeze(0)  # Shape: (1, h, w) -> (1, 1, h, w)
         resized_mask = tf(mask)
         return resized_mask
