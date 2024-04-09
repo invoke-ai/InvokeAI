@@ -1,7 +1,7 @@
 import { chakra } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { BrushPreview } from 'features/regionalPrompts/components/BrushPreview';
+import { BrushPreviewFill, BrushPreviewOutline } from 'features/regionalPrompts/components/BrushPreview';
 import { LineComponent } from 'features/regionalPrompts/components/LineComponent';
 import { RectComponent } from 'features/regionalPrompts/components/RectComponent';
 import {
@@ -10,13 +10,15 @@ import {
   useMouseLeave,
   useMouseMove,
   useMouseUp,
-} from 'features/regionalPrompts/hooks/useMouseDown';
+} from 'features/regionalPrompts/hooks/mouseEventHooks';
 import { $stage, selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import type Konva from 'konva';
 import { memo, useCallback, useRef } from 'react';
-import { Group, Layer, Stage } from 'react-konva';
+import { Layer, Stage } from 'react-konva';
 
-const selectLayers = createSelector(selectRegionalPromptsSlice, (regionalPrompts) => regionalPrompts.layers);
+const selectVisibleLayers = createSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
+  regionalPrompts.layers.filter((l) => l.isVisible)
+);
 
 const ChakraStage = chakra(Stage, {
   shouldForwardProp: (prop) => !['sx'].includes(prop),
@@ -27,7 +29,8 @@ const stageSx = {
 };
 
 export const RegionalPromptsStage: React.FC = memo(() => {
-  const layers = useAppSelector(selectLayers);
+  const layers = useAppSelector(selectVisibleLayers);
+  const selectedLayer = useAppSelector((s) => s.regionalPrompts.selectedLayer);
   const stageRef = useRef<Konva.Stage | null>(null);
   const onMouseDown = useMouseDown(stageRef);
   const onMouseUp = useMouseUp(stageRef);
@@ -52,23 +55,24 @@ export const RegionalPromptsStage: React.FC = memo(() => {
       tabIndex={-1}
       sx={stageSx}
     >
+      {layers.map((layer) => (
+        <Layer key={layer.id}>
+          {layer.objects.map((obj) => {
+            if (obj.kind === 'line') {
+              return <LineComponent key={obj.id} line={obj} color={layer.color} />;
+            }
+            if (obj.kind === 'fillRect') {
+              return <RectComponent key={obj.id} rect={obj} color={layer.color} />;
+            }
+          })}
+          {layer.id === selectedLayer && <BrushPreviewFill />}
+        </Layer>
+      ))}
       <Layer>
-        {layers.map((layer) => (
-          <Group key={layer.id}>
-            {layer.objects.map((obj) => {
-              if (obj.kind === 'line') {
-                return <LineComponent key={obj.id} line={obj} color={layer.color} />;
-              }
-              if (obj.kind === 'fillRect') {
-                return <RectComponent key={obj.id} rect={obj} color={layer.color} />;
-              }
-            })}
-          </Group>
-        ))}
-        <BrushPreview />
+        <BrushPreviewOutline />
       </Layer>
     </ChakraStage>
   );
 });
 
-RegionalPromptsStage.displayName = 'RegionalPromptingEditor';
+RegionalPromptsStage.displayName = 'RegionalPromptsStage';

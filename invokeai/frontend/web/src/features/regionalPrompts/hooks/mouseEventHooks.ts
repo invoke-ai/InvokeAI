@@ -33,7 +33,6 @@ export const useMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => 
       if (!stageRef.current) {
         return;
       }
-      console.log('Mouse down');
       const pos = syncCursorPos(stageRef.current);
       if (!pos) {
         return;
@@ -55,7 +54,6 @@ export const useMouseUp = (stageRef: MutableRefObject<Konva.Stage | null>) => {
       if (!stageRef.current) {
         return;
       }
-      console.log('Mouse up');
       if ($tool.get() === 'brush' && $isMouseDown.get()) {
         // Add another point to the last line.
         $isMouseDown.set(false);
@@ -78,7 +76,6 @@ export const useMouseMove = (stageRef: MutableRefObject<Konva.Stage | null>) => 
       if (!stageRef.current) {
         return;
       }
-      console.log('Mouse move');
       const pos = syncCursorPos(stageRef.current);
       if (!pos) {
         return;
@@ -98,7 +95,6 @@ export const useMouseLeave = (stageRef: MutableRefObject<Konva.Stage | null>) =>
       if (!stageRef.current) {
         return;
       }
-      console.log('Mouse leave');
       $isMouseOver.set(false);
       $isMouseDown.set(false);
       $cursorPosition.set(null);
@@ -115,7 +111,6 @@ export const useMouseEnter = (stageRef: MutableRefObject<Konva.Stage | null>) =>
       if (!stageRef.current) {
         return;
       }
-      console.log('Mouse enter');
       $isMouseOver.set(true);
       const pos = syncCursorPos(stageRef.current);
       if (!pos) {

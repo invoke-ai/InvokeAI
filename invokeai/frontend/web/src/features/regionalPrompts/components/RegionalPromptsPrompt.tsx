@@ -5,7 +5,7 @@ import { PromptOverlayButtonWrapper } from 'features/parameters/components/Promp
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
-import { useLayer } from 'features/regionalPrompts/hooks/useLayer';
+import { useLayerPrompt } from 'features/regionalPrompts/hooks/layerStateHooks';
 import { promptChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { SDXLConcatButton } from 'features/sdxl/components/SDXLPrompts/SDXLConcatButton';
 import { memo, useCallback, useRef } from 'react';
@@ -18,21 +18,21 @@ type Props = {
 };
 
 export const RegionalPromptsPrompt = memo((props: Props) => {
-  const layer = useLayer(props.layerId);
+  const prompt = useLayerPrompt(props.layerId);
   const dispatch = useAppDispatch();
   const baseModel = useAppSelector((s) => s.generation.model)?.base;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
-  const handleChange = useCallback(
+  const _onChange = useCallback(
     (v: string) => {
       dispatch(promptChanged({ layerId: props.layerId, prompt: v }));
     },
     [dispatch, props.layerId]
   );
   const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown, onFocus } = usePrompt({
-    prompt: layer.prompt,
-    textareaRef: textareaRef,
-    onChange: handleChange,
+    prompt,
+    textareaRef,
+    onChange: _onChange,
   });
   const focus: HotkeyCallback = useCallback(
     (e) => {
@@ -51,7 +51,7 @@ export const RegionalPromptsPrompt = memo((props: Props) => {
           id="prompt"
           name="prompt"
           ref={textareaRef}
-          value={layer.prompt}
+          value={prompt}
           placeholder={t('parameters.positivePromptPlaceholder')}
           onChange={onChange}
           minH={28}

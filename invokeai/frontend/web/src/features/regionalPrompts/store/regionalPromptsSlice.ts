@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { moveBackward, moveForward, moveToBack, moveToFront } from 'common/util/arrayUtils';
 import type Konva from 'konva';
 import type { Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
@@ -13,7 +14,7 @@ type LayerObjectBase = {
   isSelected: boolean;
 };
 
-export type ImageObject = LayerObjectBase & {
+type ImageObject = LayerObjectBase & {
   kind: 'image';
   imageName: string;
   x: number;
@@ -38,26 +39,30 @@ export type FillRectObject = LayerObjectBase & {
 
 export type LayerObject = ImageObject | LineObject | FillRectObject;
 
-export type PromptRegionLayer = {
+type LayerBase = {
   id: string;
+  isVisible: boolean;
+};
+
+type PromptRegionLayer = LayerBase & {
   kind: 'promptRegionLayer';
   objects: LayerObject[];
   prompt: string;
   color: RgbColor;
 };
 
-export type Layer = PromptRegionLayer;
+type Layer = PromptRegionLayer;
 
-export type Tool = 'brush';
+type Tool = 'brush';
 
-export type RegionalPromptsState = {
+type RegionalPromptsState = {
   _version: 1;
   selectedLayer: string | null;
   layers: PromptRegionLayer[];
   brushSize: number;
 };
 
-export const initialRegionalPromptsState: RegionalPromptsState = {
+const initialRegionalPromptsState: RegionalPromptsState = {
   _version: 1,
   selectedLayer: null,
   brushSize: 40,
@@ -73,13 +78,20 @@ export const regionalPromptsSlice = createSlice({
     layerAdded: {
       reducer: (state, action: PayloadAction<Layer['kind'], string, { id: string }>) => {
         const newLayer = buildLayer(action.meta.id, action.payload, state.layers.length);
-        state.layers.push(newLayer);
+        state.layers.unshift(newLayer);
         state.selectedLayer = newLayer.id;
       },
       prepare: (payload: Layer['kind']) => ({ payload, meta: { id: uuidv4() } }),
     },
     layerSelected: (state, action: PayloadAction<string>) => {
       state.selectedLayer = action.payload;
+    },
+    layerIsVisibleToggled: (state, action: PayloadAction<string>) => {
+      const layer = state.layers.find((l) => l.id === action.payload);
+      if (!layer) {
+        return;
+      }
+      layer.isVisible = !layer.isVisible;
     },
     layerReset: (state, action: PayloadAction<string>) => {
       const layer = state.layers.find((l) => l.id === action.payload);
@@ -91,6 +103,24 @@ export const regionalPromptsSlice = createSlice({
     layerDeleted: (state, action: PayloadAction<string>) => {
       state.layers = state.layers.filter((l) => l.id !== action.payload);
       state.selectedLayer = state.layers[0]?.id ?? null;
+    },
+    layerMovedForward: (state, action: PayloadAction<string>) => {
+      const cb = (l: Layer) => l.id === action.payload;
+      moveForward(state.layers, cb);
+    },
+    layerMovedToFront: (state, action: PayloadAction<string>) => {
+      const cb = (l: Layer) => l.id === action.payload;
+      // Because the layers are in reverse order, moving to the front is equivalent to moving to the back
+      moveToBack(state.layers, cb);
+    },
+    layerMovedBackward: (state, action: PayloadAction<string>) => {
+      const cb = (l: Layer) => l.id === action.payload;
+      moveBackward(state.layers, cb);
+    },
+    layerMovedToBack: (state, action: PayloadAction<string>) => {
+      const cb = (l: Layer) => l.id === action.payload;
+      // Because the layers are in reverse order, moving to the back is equivalent to moving to the front
+      moveToFront(state.layers, cb);
     },
     promptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string }>) => {
       const { layerId, prompt } = action.payload;
@@ -144,12 +174,13 @@ const DEFAULT_COLORS = [
   { r: 200, g: 0, b: 200 },
 ];
 
-const buildLayer = (id: string, kind: Layer['kind'], layerCount: number) => {
+const buildLayer = (id: string, kind: Layer['kind'], layerCount: number): Layer => {
   if (kind === 'promptRegionLayer') {
     const color = DEFAULT_COLORS[layerCount % DEFAULT_COLORS.length];
     assert(color, 'Color not found');
     return {
       id,
+      isVisible: true,
       kind,
       prompt: '',
       objects: [],
@@ -172,11 +203,16 @@ export const {
   layerSelected,
   layerReset,
   layerDeleted,
+  layerIsVisibleToggled,
   promptChanged,
   lineAdded,
   pointsAdded,
   promptRegionLayerColorChanged,
   brushSizeChanged,
+  layerMovedForward,
+  layerMovedToFront,
+  layerMovedBackward,
+  layerMovedToBack,
 } = regionalPromptsSlice.actions;
 
 export const selectRegionalPromptsSlice = (state: RootState) => state.regionalPrompts;
@@ -195,7 +231,6 @@ export const regionalPromptsPersistConfig: PersistConfig<RegionalPromptsState> =
 
 export const $isMouseDown = atom(false);
 export const $isMouseOver = atom(false);
-export const $isFocused = atom(false);
 export const $cursorPosition = atom<Vector2d | null>(null);
 export const $tool = atom<Tool>('brush');
 export const $stage = atom<Konva.Stage | null>(null);

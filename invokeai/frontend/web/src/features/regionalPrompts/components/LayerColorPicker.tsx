@@ -2,7 +2,7 @@ import { Popover, PopoverBody, PopoverContent, PopoverTrigger } from '@invoke-ai
 import { useAppDispatch } from 'app/store/storeHooks';
 import { ColorPreview } from 'common/components/ColorPreview';
 import RgbColorPicker from 'common/components/RgbColorPicker';
-import { useLayer } from 'features/regionalPrompts/hooks/useLayer';
+import { useLayer } from 'features/regionalPrompts/hooks/layerStateHooks';
 import { promptRegionLayerColorChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { useCallback } from 'react';
 import type { RgbColor } from 'react-colorful';
