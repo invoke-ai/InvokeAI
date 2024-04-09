@@ -426,14 +426,7 @@ export const buildCanvasSDXLInpaintGraph = async (
 
   // Add Refiner if enabled
   if (refinerModel) {
-    await addSDXLRefinerToGraph(
-      state,
-      graph,
-      SDXL_DENOISE_LATENTS,
-      modelLoaderNodeId,
-      canvasInitImage,
-      canvasMaskImage
-    );
+    await addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
     if (seamlessXAxis || seamlessYAxis) {
       modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
     }
