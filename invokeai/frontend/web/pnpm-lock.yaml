@@ -11,6 +11,9 @@ dependencies:
   '@chakra-ui/react-use-size':
     specifier: ^2.1.0
     version: 2.1.0(react@18.2.0)
+  '@dagrejs/dagre':
+    specifier: ^1.1.1
+    version: 1.1.1
   '@dagrejs/graphlib':
     specifier: ^2.2.1
     version: 2.2.1
@@ -3091,6 +3094,12 @@ packages:
     requiresBuild: true
     dev: true
     optional: true
+
+  /@dagrejs/dagre@1.1.1:
+    resolution: {integrity: sha512-AQfT6pffEuPE32weFzhS/u3UpX+bRXUARIXL7UqLaxz497cN8pjuBlX6axO4IIECE2gBV8eLFQkGCtKX5sDaUA==}
+    dependencies:
+      '@dagrejs/graphlib': 2.2.1
+    dev: false
 
   /@dagrejs/graphlib@2.2.1:
     resolution: {integrity: sha512-xJsN1v6OAxXk6jmNdM+OS/bBE8nDCwM0yDNprXR18ZNatL6to9ggod9+l2XtiLhXfLm0NkE7+Er/cpdlM+SkUA==}
