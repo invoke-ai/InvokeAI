@@ -133,7 +133,7 @@ export const buildCanvasSDXLInpaintGraph = async (
         id: INPAINT_CREATE_MASK,
         is_intermediate,
         coherence_mode: canvasCoherenceMode,
-        minimum_denoise: refinerModel ? Math.min(0.2, canvasCoherenceMinDenoise) : canvasCoherenceMinDenoise,
+        minimum_denoise: refinerModel ? Math.max(0.2, canvasCoherenceMinDenoise) : canvasCoherenceMinDenoise,
         edge_radius: canvasCoherenceEdgeSize,
       },
       [SDXL_DENOISE_LATENTS]: {

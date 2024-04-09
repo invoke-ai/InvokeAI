@@ -156,7 +156,7 @@ export const buildCanvasSDXLOutpaintGraph = async (
         is_intermediate,
         coherence_mode: canvasCoherenceMode,
         edge_radius: canvasCoherenceEdgeSize,
-        minimum_denoise: refinerModel ? Math.min(0.2, canvasCoherenceMinDenoise) : canvasCoherenceMinDenoise,
+        minimum_denoise: refinerModel ? Math.max(0.2, canvasCoherenceMinDenoise) : canvasCoherenceMinDenoise,
       },
       [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
