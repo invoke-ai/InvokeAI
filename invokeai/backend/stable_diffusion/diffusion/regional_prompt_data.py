@@ -61,9 +61,12 @@ class RegionalPromptData:
                 if downscale_factor <= max_downscale_factor:
                     # We use max pooling because we downscale to a pretty low resolution, so we don't want small prompt
                     # regions to be lost entirely.
+                    #
+                    # ceil_mode=True is set to mirror the downsampling behavior of SD and SDXL.
+                    #
                     # TODO(ryand): In the future, we may want to experiment with other downsampling methods (e.g.
                     # nearest interpolation), and could potentially use a weighted mask rather than a binary mask.
-                    batch_sample_masks = F.max_pool2d(batch_sample_masks, kernel_size=2, stride=2)
+                    batch_sample_masks = F.max_pool2d(batch_sample_masks, kernel_size=2, stride=2, ceil_mode=True)
 
         return batch_sample_masks_by_seq_len
 
