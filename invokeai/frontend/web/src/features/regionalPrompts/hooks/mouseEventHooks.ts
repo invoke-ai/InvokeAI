@@ -1,10 +1,10 @@
+import { getStore } from 'app/store/nanostores/store';
 import { useAppDispatch } from 'app/store/storeHooks';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
 import {
   $cursorPosition,
   $isMouseDown,
   $isMouseOver,
-  $tool,
   lineAdded,
   pointsAdded,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
@@ -12,6 +12,8 @@ import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { MutableRefObject } from 'react';
 import { useCallback } from 'react';
+
+const getTool = () => getStore().getState().regionalPrompts.tool;
 
 const getIsFocused = (stage: Konva.Stage) => {
   return stage.container().contains(document.activeElement);
@@ -38,7 +40,8 @@ export const useMouseDown = (stageRef: MutableRefObject<Konva.Stage | null>) => 
         return;
       }
       $isMouseDown.set(true);
-      if ($tool.get() === 'brush') {
+      const tool = getTool();
+      if (tool === 'brush' || tool === 'eraser') {
         dispatch(lineAdded([pos.x, pos.y]));
       }
     },
@@ -54,7 +57,8 @@ export const useMouseUp = (stageRef: MutableRefObject<Konva.Stage | null>) => {
       if (!stageRef.current) {
         return;
       }
-      if ($tool.get() === 'brush' && $isMouseDown.get()) {
+      const tool = getTool();
+      if ((tool === 'brush' || tool === 'eraser') && $isMouseDown.get()) {
         // Add another point to the last line.
         $isMouseDown.set(false);
         const pos = syncCursorPos(stageRef.current);
@@ -80,7 +84,13 @@ export const useMouseMove = (stageRef: MutableRefObject<Konva.Stage | null>) => 
       if (!pos) {
         return;
       }
-      if (getIsFocused(stageRef.current) && $isMouseOver.get() && $isMouseDown.get() && $tool.get() === 'brush') {
+      const tool = getTool();
+      if (
+        getIsFocused(stageRef.current) &&
+        $isMouseOver.get() &&
+        $isMouseDown.get() &&
+        (tool === 'brush' || tool === 'eraser')
+      ) {
         dispatch(pointsAdded([pos.x, pos.y]));
       }
     },
@@ -123,7 +133,8 @@ export const useMouseEnter = (stageRef: MutableRefObject<Konva.Stage | null>) =>
         $isMouseDown.set(false);
       } else {
         $isMouseDown.set(true);
-        if ($tool.get() === 'brush') {
+        const tool = getTool();
+        if (tool === 'brush' || tool === 'eraser') {
           dispatch(lineAdded([pos.x, pos.y]));
         }
       }

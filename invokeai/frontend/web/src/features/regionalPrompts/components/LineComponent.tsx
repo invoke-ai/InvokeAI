@@ -24,6 +24,7 @@ export const LineComponent = ({ line, color }: Props) => {
       lineJoin="round"
       shadowForStrokeEnabled={false}
       listening={false}
+      globalCompositeOperation={line.tool === 'brush' ? 'source-over' : 'destination-out'}
     />
   );
 };

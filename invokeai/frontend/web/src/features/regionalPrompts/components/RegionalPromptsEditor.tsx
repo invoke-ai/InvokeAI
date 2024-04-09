@@ -5,6 +5,7 @@ import { AddLayerButton } from 'features/regionalPrompts/components/AddLayerButt
 import { BrushSize } from 'features/regionalPrompts/components/BrushSize';
 import { LayerListItem } from 'features/regionalPrompts/components/LayerListItem';
 import { RegionalPromptsStage } from 'features/regionalPrompts/components/RegionalPromptsStage';
+import { ToolChooser } from 'features/regionalPrompts/components/ToolChooser';
 import { selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 
 const selectLayerIdsReversed = createSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
@@ -18,6 +19,7 @@ export const RegionalPromptsEditor = () => {
       <Flex flexDir="column" w={200} gap={4}>
         <AddLayerButton />
         <BrushSize />
+        <ToolChooser />
         {layerIdsReversed.map((id) => (
           <LayerListItem key={id} id={id} />
         ))}

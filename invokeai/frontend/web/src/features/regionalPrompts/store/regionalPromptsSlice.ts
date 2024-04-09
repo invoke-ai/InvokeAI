@@ -9,6 +9,8 @@ import type { RgbColor } from 'react-colorful';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
+export type Tool = 'brush' | 'eraser';
+
 type LayerObjectBase = {
   id: string;
   isSelected: boolean;
@@ -25,6 +27,7 @@ type ImageObject = LayerObjectBase & {
 
 export type LineObject = LayerObjectBase & {
   kind: 'line';
+  tool: Tool;
   strokeWidth: number;
   points: number[];
 };
@@ -53,10 +56,9 @@ type PromptRegionLayer = LayerBase & {
 
 type Layer = PromptRegionLayer;
 
-type Tool = 'brush';
-
 type RegionalPromptsState = {
   _version: 1;
+  tool: Tool;
   selectedLayer: string | null;
   layers: PromptRegionLayer[];
   brushSize: number;
@@ -64,6 +66,7 @@ type RegionalPromptsState = {
 
 const initialRegionalPromptsState: RegionalPromptsState = {
   _version: 1,
+  tool: 'brush',
   selectedLayer: null,
   brushSize: 40,
   layers: [],
@@ -144,7 +147,7 @@ export const regionalPromptsSlice = createSlice({
         if (!selectedLayer || selectedLayer.kind !== 'promptRegionLayer') {
           return;
         }
-        selectedLayer.objects.push(buildLine(action.meta.id, action.payload, state.brushSize));
+        selectedLayer.objects.push(buildLine(action.meta.id, action.payload, state.brushSize, state.tool));
       },
       prepare: (payload: number[]) => ({ payload, meta: { id: uuidv4() } }),
     },
@@ -161,6 +164,9 @@ export const regionalPromptsSlice = createSlice({
     },
     brushSizeChanged: (state, action: PayloadAction<number>) => {
       state.brushSize = action.payload;
+    },
+    toolChanged: (state, action: PayloadAction<Tool>) => {
+      state.tool = action.payload;
     },
   },
 });
@@ -190,9 +196,10 @@ const buildLayer = (id: string, kind: Layer['kind'], layerCount: number): Layer 
   assert(false, `Unknown layer kind: ${kind}`);
 };
 
-const buildLine = (id: string, points: number[], brushSize: number): LineObject => ({
+const buildLine = (id: string, points: number[], brushSize: number, tool: Tool): LineObject => ({
   isSelected: false,
   kind: 'line',
+  tool,
   id,
   points,
   strokeWidth: brushSize,
@@ -213,6 +220,7 @@ export const {
   layerMovedToFront,
   layerMovedBackward,
   layerMovedToBack,
+  toolChanged,
 } = regionalPromptsSlice.actions;
 
 export const selectRegionalPromptsSlice = (state: RootState) => state.regionalPrompts;
@@ -232,5 +240,4 @@ export const regionalPromptsPersistConfig: PersistConfig<RegionalPromptsState> =
 export const $isMouseDown = atom(false);
 export const $isMouseOver = atom(false);
 export const $cursorPosition = atom<Vector2d | null>(null);
-export const $tool = atom<Tool>('brush');
 export const $stage = atom<Konva.Stage | null>(null);
