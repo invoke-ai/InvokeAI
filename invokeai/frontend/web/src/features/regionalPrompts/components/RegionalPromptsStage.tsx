@@ -56,7 +56,7 @@ export const RegionalPromptsStage: React.FC = memo(() => {
       sx={stageSx}
     >
       {layers.map((layer) => (
-        <Layer key={layer.id}>
+        <Layer key={layer.id} id={layer.id} name="regionalPromptLayer">
           {layer.objects.map((obj) => {
             if (obj.kind === 'line') {
               return <LineComponent key={obj.id} line={obj} color={layer.color} />;
