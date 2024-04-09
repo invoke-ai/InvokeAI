@@ -341,9 +341,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 ).to(device=orig_latents.device, dtype=orig_latents.dtype)
 
                 latents = self.scheduler.add_noise(latents, noise, batched_t)
-                latents = torch.lerp(
-                    orig_latents, latents.to(dtype=orig_latents.dtype), mask.to(dtype=orig_latents.dtype)
-                )
 
             if is_inpainting_model(self.unet):
                 if masked_latents is None:

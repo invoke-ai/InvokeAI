@@ -156,7 +156,7 @@ export const buildCanvasSDXLOutpaintGraph = async (
         is_intermediate,
         coherence_mode: canvasCoherenceMode,
         edge_radius: canvasCoherenceEdgeSize,
-        minimum_denoise: canvasCoherenceMinDenoise,
+        minimum_denoise: refinerModel ? Math.max(0.2, canvasCoherenceMinDenoise) : canvasCoherenceMinDenoise,
       },
       [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -582,7 +582,7 @@ export const buildCanvasSDXLOutpaintGraph = async (
 
   // Add Refiner if enabled
   if (refinerModel) {
-    await addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId, canvasInitImage);
+    await addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
     if (seamlessXAxis || seamlessYAxis) {
       modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
     }
