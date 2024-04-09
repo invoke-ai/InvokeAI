@@ -129,7 +129,7 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
         # End unmodified block from AttnProcessor2_0.
 
         # Apply IP-Adapter conditioning.
-        if is_cross_attention and self._is_ip_adapter_enabled():
+        if is_cross_attention:
             if self._is_ip_adapter_enabled():
                 assert regional_ip_data is not None
                 ip_masks = regional_ip_data.get_masks(query_seq_len=query_seq_len)
