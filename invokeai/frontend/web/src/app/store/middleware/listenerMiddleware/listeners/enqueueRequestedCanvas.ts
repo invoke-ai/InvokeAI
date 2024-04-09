@@ -123,14 +123,16 @@ export const addEnqueueRequestedCanvasListener = (startAppListening: AppStartLis
         const batchId = enqueueResult.batch.batch_id as string; // we know the is a string, backend provides it
 
         // Prep the canvas staging area if it is not yet initialized
-        dispatch(
-          stagingAreaInitialized({
-            boundingBox: {
-              ...state.canvas.boundingBoxCoordinates,
-              ...state.canvas.boundingBoxDimensions,
-            },
-          })
-        );
+        if (!state.canvas.layerState.stagingArea.boundingBox) {
+          dispatch(
+            stagingAreaInitialized({
+              boundingBox: {
+                ...state.canvas.boundingBoxCoordinates,
+                ...state.canvas.boundingBoxDimensions,
+              },
+            })
+          );
+        }
 
         // Associate the session with the canvas session ID
         dispatch(canvasBatchIdAdded(batchId));
