@@ -2,9 +2,11 @@ import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { brushSizeChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const BrushSize = () => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const brushSize = useAppSelector((s) => s.regionalPrompts.brushSize);
   const onChange = useCallback(
     (v: number) => {
@@ -14,7 +16,7 @@ export const BrushSize = () => {
   );
   return (
     <FormControl orientation="vertical">
-      <FormLabel>Brush Size</FormLabel>
+      <FormLabel>{t('regionalPrompts.brushSize')}</FormLabel>
       <CompositeSlider min={1} max={100} value={brushSize} onChange={onChange} />
       <CompositeNumberInput min={1} max={500} value={brushSize} onChange={onChange} />
     </FormControl>

@@ -7,18 +7,18 @@ import { LayerListItem } from 'features/regionalPrompts/components/LayerListItem
 import { RegionalPromptsStage } from 'features/regionalPrompts/components/RegionalPromptsStage';
 import { selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 
-const selectLayerIds = createSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
-  regionalPrompts.layers.map((l) => l.id)
+const selectLayerIdsReversed = createSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
+  regionalPrompts.layers.map((l) => l.id).reverse()
 );
 
 export const RegionalPromptsEditor = () => {
-  const layerIds = useAppSelector(selectLayerIds);
+  const layerIdsReversed = useAppSelector(selectLayerIdsReversed);
   return (
     <Flex gap={4}>
-      <Flex flexDir="column" w={200}>
+      <Flex flexDir="column" w={200} gap={4}>
         <AddLayerButton />
         <BrushSize />
-        {layerIds.map((id) => (
+        {layerIdsReversed.map((id) => (
           <LayerListItem key={id} id={id} />
         ))}
       </Flex>

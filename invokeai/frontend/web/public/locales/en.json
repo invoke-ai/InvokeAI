@@ -1505,5 +1505,13 @@
     },
     "app": {
         "storeNotInitialized": "Store is not initialized"
+    },
+    "regionalPrompts": {
+        "addLayer": "Add Layer",
+        "moveToFront": "Move to Front",
+        "moveToBack": "Move to Back",
+        "moveForward": "Move Forward",
+        "moveBackward": "Move Backward",
+        "brushSize": "Brush Size"
     }
 }
