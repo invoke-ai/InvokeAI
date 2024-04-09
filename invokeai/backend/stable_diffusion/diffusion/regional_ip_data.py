@@ -59,8 +59,11 @@ class RegionalIPData:
             if downscale_factor <= max_downscale_factor:
                 # We use max pooling because we downscale to a pretty low resolution, so we don't want small mask
                 # regions to be lost entirely.
+                #
+                # ceil_mode=True is set to mirror the downsampling behavior of SD and SDXL.
+                #
                 # TODO(ryand): In the future, we may want to experiment with other downsampling methods.
-                mask_tensor = torch.nn.functional.max_pool2d(mask_tensor, kernel_size=2, stride=2)
+                mask_tensor = torch.nn.functional.max_pool2d(mask_tensor, kernel_size=2, stride=2, ceil_mode=True)
 
         return masks_by_seq_len
 
