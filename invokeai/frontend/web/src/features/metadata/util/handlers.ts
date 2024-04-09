@@ -189,6 +189,12 @@ export const handlers = {
     recaller: recallers.cfgScale,
   }),
   height: buildHandlers({ getLabel: () => t('metadata.height'), parser: parsers.height, recaller: recallers.height }),
+  initialImage: buildHandlers({
+    getLabel: () => t('metadata.initImage'),
+    parser: parsers.initialImage,
+    recaller: recallers.initialImage,
+    renderValue: async (imageDTO) => imageDTO.image_name,
+  }),
   negativePrompt: buildHandlers({
     getLabel: () => t('metadata.negativePrompt'),
     parser: parsers.negativePrompt,
@@ -405,6 +411,6 @@ export const parseAndRecallAllMetadata = async (metadata: unknown, skip: (keyof 
       })
   );
   if (results.some((result) => result.status === 'fulfilled')) {
-    parameterSetToast(t('toast.parametersSet'));
+    parameterSetToast(t('toast.parameters'));
   }
 };

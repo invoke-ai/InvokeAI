@@ -67,7 +67,7 @@ class IPAdapterInvocation(BaseInvocation):
     )
     clip_vision_model: Literal["ViT-H", "ViT-G"] = InputField(
         description="CLIP Vision model to use. Overrides model settings. Mandatory for checkpoint models.",
-        default="auto",
+        default="ViT-H",
         ui_order=2,
     )
     weight: Union[float, List[float]] = InputField(

@@ -6,8 +6,7 @@ from typing import Literal, Optional, Union
 import torch
 from torch import autocast
 
-from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.config.config_default import PRECISION, get_config
 
 CPU_DEVICE = torch.device("cpu")
 CUDA_DEVICE = torch.device("cuda")
@@ -33,35 +32,34 @@ def get_torch_device_name() -> str:
     return torch.cuda.get_device_name(device) if device.type == "cuda" else device.type.upper()
 
 
-# We are in transition here from using a single global AppConfig to allowing multiple
-# configurations. It is strongly recommended to pass the app_config to this function.
-def choose_precision(
-    device: torch.device, app_config: Optional[InvokeAIAppConfig] = None
-) -> Literal["float32", "float16", "bfloat16"]:
+def choose_precision(device: torch.device) -> Literal["float32", "float16", "bfloat16"]:
     """Return an appropriate precision for the given torch device."""
-    app_config = app_config or get_config()
+    app_config = get_config()
     if device.type == "cuda":
         device_name = torch.cuda.get_device_name(device)
-        if not ("GeForce GTX 1660" in device_name or "GeForce GTX 1650" in device_name):
-            if app_config.precision == "float32":
-                return "float32"
-            elif app_config.precision == "bfloat16":
-                return "bfloat16"
-            else:
-                return "float16"
+        if "GeForce GTX 1660" in device_name or "GeForce GTX 1650" in device_name:
+            # These GPUs have limited support for float16
+            return "float32"
+        elif app_config.precision == "auto" or app_config.precision == "autocast":
+            # Default to float16 for CUDA devices
+            return "float16"
+        else:
+            # Use the user-defined precision
+            return app_config.precision
     elif device.type == "mps":
-        return "float16"
+        if app_config.precision == "auto" or app_config.precision == "autocast":
+            # Default to float16 for MPS devices
+            return "float16"
+        else:
+            # Use the user-defined precision
+            return app_config.precision
+    # CPU / safe fallback
     return "float32"
 
 
-# We are in transition here from using a single global AppConfig to allowing multiple
-# configurations. It is strongly recommended to pass the app_config to this function.
-def torch_dtype(
-    device: Optional[torch.device] = None,
-    app_config: Optional[InvokeAIAppConfig] = None,
-) -> torch.dtype:
+def torch_dtype(device: Optional[torch.device] = None) -> torch.dtype:
     device = device or choose_torch_device()
-    precision = choose_precision(device, app_config)
+    precision = choose_precision(device)
     if precision == "float16":
         return torch.float16
     if precision == "bfloat16":
@@ -71,7 +69,7 @@ def torch_dtype(
         return torch.float32
 
 
-def choose_autocast(precision):
+def choose_autocast(precision: PRECISION):
     """Returns an autocast context or nullcontext for the given precision string"""
     # float16 currently requires autocast to avoid errors like:
     # 'expected scalar type Half but found Float'

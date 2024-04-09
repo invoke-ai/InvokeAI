@@ -269,9 +269,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
         if torch.device(source_device).type == torch.device(target_device).type:
             return
 
-        # may raise an exception here if insufficient GPU VRAM
-        self._check_free_vram(target_device, cache_entry.size)
-
         start_model_to_time = time.time()
         snapshot_before = self._capture_memory_snapshot()
         cache_entry.model.to(target_device)
@@ -329,11 +326,11 @@ class ModelCache(ModelCacheBase[AnyModel]):
                     f" {in_ram_models}/{in_vram_models}({locked_in_vram_models})"
                 )
 
-    def make_room(self, model_size: int) -> None:
+    def make_room(self, size: int) -> None:
         """Make enough room in the cache to accommodate a new model of indicated size."""
         # calculate how much memory this model will require
         # multiplier = 2 if self.precision==torch.float32 else 1
-        bytes_needed = model_size
+        bytes_needed = size
         maximum_size = self.max_cache_size * GIG  # stored in GB, convert to bytes
         current_size = self.cache_size()
 
@@ -388,7 +385,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
             # 1 from onnx runtime object
             if not cache_entry.locked and refs <= (3 if "onnx" in model_key else 2):
                 self.logger.debug(
-                    f"Removing {model_key} from RAM cache to free at least {(model_size/GIG):.2f} GB (-{(cache_entry.size/GIG):.2f} GB)"
+                    f"Removing {model_key} from RAM cache to free at least {(size/GIG):.2f} GB (-{(cache_entry.size/GIG):.2f} GB)"
                 )
                 current_size -= cache_entry.size
                 models_cleared += 1
@@ -420,24 +417,3 @@ class ModelCache(ModelCacheBase[AnyModel]):
             mps.empty_cache()
 
         self.logger.debug(f"After making room: cached_models={len(self._cached_models)}")
-
-    def _free_vram(self, device: torch.device) -> int:
-        vram_device = (  # mem_get_info() needs an indexed device
-            device if device.index is not None else torch.device(str(device), index=0)
-        )
-        free_mem, _ = torch.cuda.mem_get_info(vram_device)
-        for _, cache_entry in self._cached_models.items():
-            if cache_entry.loaded and not cache_entry.locked:
-                free_mem += cache_entry.size
-        return free_mem
-
-    def _check_free_vram(self, target_device: torch.device, needed_size: int) -> None:
-        if target_device.type != "cuda":
-            return
-        free_mem = self._free_vram(target_device)
-        if needed_size > free_mem:
-            needed_gb = round(needed_size / GIG, 2)
-            free_gb = round(free_mem / GIG, 2)
-            raise torch.cuda.OutOfMemoryError(
-                f"Insufficient VRAM to load model, requested {needed_gb}GB but only had {free_gb}GB free"
-            )

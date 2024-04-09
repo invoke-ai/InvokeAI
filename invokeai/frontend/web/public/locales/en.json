@@ -849,6 +849,7 @@
         "version": "Version",
         "versionUnknown": " Version Unknown",
         "workflow": "Workflow",
+        "graph": "Graph",
         "workflowAuthor": "Author",
         "workflowContact": "Contact",
         "workflowDescription": "Short Description",
@@ -1041,10 +1042,10 @@
         "metadataLoadFailed": "Failed to load metadata",
         "modelAddedSimple": "Model Added to Queue",
         "modelImportCanceled": "Model Import Canceled",
+        "parameters": "Parameters",
         "parameterNotSet": "{{parameter}} not set",
         "parameterSet": "{{parameter}} set",
         "parametersNotSet": "Parameters Not Set",
-        "parametersSet": "Parameters Set",
         "problemCopyingCanvas": "Problem Copying Canvas",
         "problemCopyingCanvasDesc": "Unable to export base layer",
         "problemCopyingImage": "Unable to Copy Image",
@@ -1482,7 +1483,11 @@
         "workflowName": "Workflow Name",
         "newWorkflowCreated": "New Workflow Created",
         "workflowCleared": "Workflow Cleared",
-        "workflowEditorMenu": "Workflow Editor Menu"
+        "workflowEditorMenu": "Workflow Editor Menu",
+        "loadFromGraph": "Load Workflow from Graph",
+        "convertGraph": "Convert Graph",
+        "loadWorkflow": "$t(common.load) Workflow",
+        "autoLayout": "Auto Layout"
     },
     "app": {
         "storeNotInitialized": "Store is not initialized"

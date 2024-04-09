@@ -3,6 +3,7 @@ import 'reactflow/dist/style.css';
 import { Flex } from '@invoke-ai/ui-library';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import TopPanel from 'features/nodes/components/flow/panels/TopPanel/TopPanel';
+import { LoadWorkflowFromGraphModal } from 'features/workflowLibrary/components/LoadWorkflowFromGraphModal/LoadWorkflowFromGraphModal';
 import { SaveWorkflowAsDialog } from 'features/workflowLibrary/components/SaveWorkflowAsDialog/SaveWorkflowAsDialog';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -61,6 +62,7 @@ const NodeEditor = () => {
             <BottomLeftPanel />
             <MinimapPanel />
             <SaveWorkflowAsDialog />
+            <LoadWorkflowFromGraphModal />
           </motion.div>
         )}
       </AnimatePresence>

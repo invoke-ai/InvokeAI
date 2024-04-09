@@ -487,7 +487,6 @@
         "canvasMerged": "画布已合并",
         "sentToImageToImage": "已发送到图生图",
         "sentToUnifiedCanvas": "已发送到统一画布",
-        "parametersSet": "参数已设定",
         "parametersNotSet": "参数未设定",
         "metadataLoadFailed": "加载元数据失败",
         "uploadFailedInvalidUploadDesc": "必须是单张的 PNG 或 JPEG 图片",
