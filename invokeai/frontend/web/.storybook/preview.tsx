@@ -11,6 +11,7 @@ import { createStore } from '../src/app/store/store';
 // @ts-ignore
 import translationEN from '../public/locales/en.json';
 import { ReduxInit } from './ReduxInit';
+import { $store } from 'app/store/nanostores/store';
 
 i18n.use(initReactI18next).init({
   lng: 'en',
@@ -25,6 +26,7 @@ i18n.use(initReactI18next).init({
 });
 
 const store = createStore(undefined, false);
+$store.set(store)
 $baseUrl.set('http://localhost:9090');
 
 const preview: Preview = {
