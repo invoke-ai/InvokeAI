@@ -1,20 +1,18 @@
 import { rgbColorToString } from 'features/canvas/util/colorToString';
-import { useTransform } from 'features/regionalPrompts/hooks/useTransform';
 import type { LineObject } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import type { RgbColor } from 'react-colorful';
 import { Line } from 'react-konva';
 
 type Props = {
+  layerId: string;
   line: LineObject;
   color: RgbColor;
 };
 
-export const LineComponent = ({ line, color }: Props) => {
-  const { shapeRef } = useTransform(line);
-
+export const LineComponent = ({ layerId, line, color }: Props) => {
   return (
     <Line
-      ref={shapeRef}
+      id={`layer-${layerId}.line-${line.id}`}
       key={line.id}
       points={line.points}
       strokeWidth={line.strokeWidth}
@@ -23,8 +21,8 @@ export const LineComponent = ({ line, color }: Props) => {
       lineCap="round"
       lineJoin="round"
       shadowForStrokeEnabled={false}
-      listening={false}
       globalCompositeOperation={line.tool === 'brush' ? 'source-over' : 'destination-out'}
+      listening={false}
     />
   );
 };

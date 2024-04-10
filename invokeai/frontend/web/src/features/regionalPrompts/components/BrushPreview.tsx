@@ -4,8 +4,9 @@ import { rgbColorToString } from 'features/canvas/util/colorToString';
 import { $cursorPosition } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { Circle, Group } from 'react-konva';
 
-export const BrushPreviewFill = () => {
+const useBrushData = () => {
   const brushSize = useAppSelector((s) => s.regionalPrompts.brushSize);
+  const tool = useAppSelector((s) => s.regionalPrompts.tool);
   const color = useAppSelector((s) => {
     const _color = s.regionalPrompts.layers.find((l) => l.id === s.regionalPrompts.selectedLayer)?.color;
     if (!_color) {
@@ -15,25 +16,29 @@ export const BrushPreviewFill = () => {
   });
   const pos = useStore($cursorPosition);
 
-  if (!brushSize || !color || !pos) {
+  return { brushSize, tool, color, pos };
+};
+
+export const BrushPreviewFill = () => {
+  const { brushSize, tool, color, pos } = useBrushData();
+  if (!brushSize || !color || !pos || tool === 'move') {
     return null;
   }
 
-  return <Circle x={pos.x} y={pos.y} radius={brushSize / 2} fill={color} />;
+  return (
+    <Circle
+      x={pos.x}
+      y={pos.y}
+      radius={brushSize / 2}
+      fill={color}
+      globalCompositeOperation={tool === 'brush' ? 'source-over' : 'destination-out'}
+    />
+  );
 };
 
 export const BrushPreviewOutline = () => {
-  const brushSize = useAppSelector((s) => s.regionalPrompts.brushSize);
-  const color = useAppSelector((s) => {
-    const _color = s.regionalPrompts.layers.find((l) => l.id === s.regionalPrompts.selectedLayer)?.color;
-    if (!_color) {
-      return null;
-    }
-    return rgbColorToString(_color);
-  });
-  const pos = useStore($cursorPosition);
-
-  if (!brushSize || !color || !pos) {
+  const { brushSize, tool, color, pos } = useBrushData();
+  if (!brushSize || !color || !pos || tool === 'move') {
     return null;
   }
 

@@ -3,17 +3,16 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { moveBackward, moveForward, moveToBack, moveToFront } from 'common/util/arrayUtils';
 import type Konva from 'konva';
-import type { Vector2d } from 'konva/lib/types';
+import type { IRect, Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
 import type { RgbColor } from 'react-colorful';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-export type Tool = 'brush' | 'eraser';
+export type Tool = 'brush' | 'eraser' | 'move';
 
 type LayerObjectBase = {
   id: string;
-  isSelected: boolean;
 };
 
 type ImageObject = LayerObjectBase & {
@@ -45,6 +44,9 @@ export type LayerObject = ImageObject | LineObject | FillRectObject;
 type LayerBase = {
   id: string;
   isVisible: boolean;
+  x: number;
+  y: number;
+  bbox: IRect | null;
 };
 
 type PromptRegionLayer = LayerBase & {
@@ -54,7 +56,7 @@ type PromptRegionLayer = LayerBase & {
   color: RgbColor;
 };
 
-type Layer = PromptRegionLayer;
+export type Layer = PromptRegionLayer;
 
 type RegionalPromptsState = {
   _version: 1;
@@ -81,7 +83,7 @@ export const regionalPromptsSlice = createSlice({
     layerAdded: {
       reducer: (state, action: PayloadAction<Layer['kind'], string, { id: string }>) => {
         const newLayer = buildLayer(action.meta.id, action.payload, state.layers.length);
-        state.layers.unshift(newLayer);
+        state.layers.push(newLayer);
         state.selectedLayer = newLayer.id;
       },
       prepare: (payload: Layer['kind']) => ({ payload, meta: { id: uuidv4() } }),
@@ -102,6 +104,9 @@ export const regionalPromptsSlice = createSlice({
         return;
       }
       layer.objects = [];
+      layer.bbox = null;
+      layer.isVisible = true;
+      layer.prompt = '';
     },
     layerDeleted: (state, action: PayloadAction<string>) => {
       state.layers = state.layers.filter((l) => l.id !== action.payload);
@@ -125,6 +130,23 @@ export const regionalPromptsSlice = createSlice({
       // Because the layers are in reverse order, moving to the back is equivalent to moving to the front
       moveToFront(state.layers, cb);
     },
+    layerTranslated: (state, action: PayloadAction<{ layerId: string; x: number; y: number }>) => {
+      const { layerId, x, y } = action.payload;
+      const layer = state.layers.find((l) => l.id === layerId);
+      if (!layer) {
+        return;
+      }
+      layer.x = x;
+      layer.y = y;
+    },
+    layerBboxChanged: (state, action: PayloadAction<{ layerId: string; bbox: IRect | null }>) => {
+      const { layerId, bbox } = action.payload;
+      const layer = state.layers.find((l) => l.id === layerId);
+      if (!layer) {
+        return;
+      }
+      layer.bbox = bbox;
+    },
     promptChanged: (state, action: PayloadAction<{ layerId: string; prompt: string }>) => {
       const { layerId, prompt } = action.payload;
       const layer = state.layers.find((l) => l.id === layerId);
@@ -142,25 +164,31 @@ export const regionalPromptsSlice = createSlice({
       layer.color = color;
     },
     lineAdded: {
-      reducer: (state, action: PayloadAction<number[], string, { id: string }>) => {
-        const selectedLayer = state.layers.find((l) => l.id === state.selectedLayer);
-        if (!selectedLayer || selectedLayer.kind !== 'promptRegionLayer') {
+      reducer: (state, action: PayloadAction<[number, number], string, { id: string }>) => {
+        const layer = state.layers.find((l) => l.id === state.selectedLayer);
+        if (!layer || layer.kind !== 'promptRegionLayer') {
           return;
         }
-        selectedLayer.objects.push(buildLine(action.meta.id, action.payload, state.brushSize, state.tool));
+        layer.objects.push({
+          kind: 'line',
+          tool: state.tool,
+          id: action.meta.id,
+          points: [action.payload[0] - layer.x, action.payload[1] - layer.y],
+          strokeWidth: state.brushSize,
+        });
       },
-      prepare: (payload: number[]) => ({ payload, meta: { id: uuidv4() } }),
+      prepare: (payload: [number, number]) => ({ payload, meta: { id: uuidv4() } }),
     },
-    pointsAdded: (state, action: PayloadAction<number[]>) => {
-      const selectedLayer = state.layers.find((l) => l.id === state.selectedLayer);
-      if (!selectedLayer || selectedLayer.kind !== 'promptRegionLayer') {
+    pointsAdded: (state, action: PayloadAction<[number, number]>) => {
+      const layer = state.layers.find((l) => l.id === state.selectedLayer);
+      if (!layer || layer.kind !== 'promptRegionLayer') {
         return;
       }
-      const lastLine = selectedLayer.objects.findLast(isLine);
+      const lastLine = layer.objects.findLast(isLine);
       if (!lastLine) {
         return;
       }
-      lastLine.points.push(...action.payload);
+      lastLine.points.push(action.payload[0] - layer.x, action.payload[1] - layer.y);
     },
     brushSizeChanged: (state, action: PayloadAction<number>) => {
       state.brushSize = action.payload;
@@ -187,23 +215,17 @@ const buildLayer = (id: string, kind: Layer['kind'], layerCount: number): Layer 
     return {
       id,
       isVisible: true,
+      bbox: null,
       kind,
       prompt: '',
       objects: [],
       color,
+      x: 0,
+      y: 0,
     };
   }
   assert(false, `Unknown layer kind: ${kind}`);
 };
-
-const buildLine = (id: string, points: number[], brushSize: number, tool: Tool): LineObject => ({
-  isSelected: false,
-  kind: 'line',
-  tool,
-  id,
-  points,
-  strokeWidth: brushSize,
-});
 
 export const {
   layerAdded,
@@ -221,6 +243,8 @@ export const {
   layerMovedBackward,
   layerMovedToBack,
   toolChanged,
+  layerTranslated,
+  layerBboxChanged,
 } = regionalPromptsSlice.actions;
 
 export const selectRegionalPromptsSlice = (state: RootState) => state.regionalPrompts;
@@ -241,3 +265,8 @@ export const $isMouseDown = atom(false);
 export const $isMouseOver = atom(false);
 export const $cursorPosition = atom<Vector2d | null>(null);
 export const $stage = atom<Konva.Stage | null>(null);
+export const getStage = (): Konva.Stage => {
+  const stage = $stage.get();
+  assert(stage);
+  return stage;
+};

@@ -48,6 +48,7 @@ class AlphaMaskToTensorInvocation(BaseInvocation):
     """Convert a mask image to a tensor. Opaque regions are 1 and transparent regions are 0."""
 
     image: ImageField = InputField(description="The mask image to convert.")
+    invert: bool = InputField(default=False, description="Invert the mask (1s become 0s and 0s become 1s).")
 
     def invoke(self, context: InvocationContext) -> MaskOutput:
         image = context.images.get_pil(self.image.image_name)
