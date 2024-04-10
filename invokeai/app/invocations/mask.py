@@ -24,9 +24,9 @@ class RectangleMaskInvocation(BaseInvocation, WithMetadata):
 
     def invoke(self, context: InvocationContext) -> MaskOutput:
         mask = torch.zeros((1, self.height, self.width), dtype=torch.bool)
-        mask[
-            :, self.y_top : self.y_top + self.rectangle_height, self.x_left : self.x_left + self.rectangle_width
-        ] = True
+        mask[:, self.y_top : self.y_top + self.rectangle_height, self.x_left : self.x_left + self.rectangle_width] = (
+            True
+        )
 
         mask_tensor_name = context.tensors.save(mask)
         return MaskOutput(
