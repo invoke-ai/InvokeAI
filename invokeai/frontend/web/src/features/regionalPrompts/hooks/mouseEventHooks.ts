@@ -13,7 +13,7 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import type { MutableRefObject } from 'react';
 import { useCallback } from 'react';
 
-const getTool = () => getStore().getState().regionalPrompts.tool;
+export const getTool = () => getStore().getState().regionalPrompts.tool;
 
 const getIsFocused = (stage: Konva.Stage) => {
   return stage.container().contains(document.activeElement);
