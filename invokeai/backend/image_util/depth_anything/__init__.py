@@ -56,7 +56,7 @@ class DepthAnythingDetector:
     def __init__(self) -> None:
         self.model = None
         self.model_size: Union[Literal["large", "base", "small"], None] = None
-        self.device = TorchDeviceSelect().choose_torch_device()
+        self.device = TorchDeviceSelect.choose_torch_device()
 
     def load_model(self, model_size: Literal["large", "base", "small"] = "small"):
         DEPTH_ANYTHING_MODEL_PATH = config.models_path / DEPTH_ANYTHING_MODELS[model_size]["local"]

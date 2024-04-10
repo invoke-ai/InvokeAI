@@ -637,7 +637,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _guess_variant(self) -> Optional[ModelRepoVariant]:
         """Guess the best HuggingFace variant type to download."""
-        precision = TorchDeviceSelect().choose_torch_dtype
+        precision = TorchDeviceSelect.choose_torch_dtype()
         return ModelRepoVariant.FP16 if precision == torch.float16 else None
 
     def _import_local_model(self, source: LocalModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:

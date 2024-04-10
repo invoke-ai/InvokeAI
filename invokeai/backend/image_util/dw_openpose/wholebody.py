@@ -28,7 +28,7 @@ config = get_config()
 
 class Wholebody:
     def __init__(self):
-        device = TorchDeviceSelect().choose_torch_device()
+        device = TorchDeviceSelect.choose_torch_device()
 
         providers = ["CUDAExecutionProvider"] if device.type == "cuda" else ["CPUExecutionProvider"]
 

@@ -63,7 +63,7 @@ logger = InvokeAILogger.get_logger(config=app_config)
 mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("text/css", ".css")
 
-torch_device_name = TorchDeviceSelect().get_torch_device_name()
+torch_device_name = TorchDeviceSelect.get_torch_device_name()
 logger.info(f"Using torch device: {torch_device_name}")
 
 

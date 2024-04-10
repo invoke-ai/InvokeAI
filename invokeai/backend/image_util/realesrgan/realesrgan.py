@@ -65,7 +65,7 @@ class RealESRGAN:
         self.pre_pad = pre_pad
         self.mod_scale: Optional[int] = None
         self.half = half
-        self.device = TorchDeviceSelect().choose_torch_device()
+        self.device = TorchDeviceSelect.choose_torch_device()
 
         loadnet = torch.load(model_path, map_location=torch.device("cpu"))
 

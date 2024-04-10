@@ -46,7 +46,7 @@ def get_noise(
             height // downsampling_factor,
             width // downsampling_factor,
         ],
-        dtype=TorchDeviceSelect().choose_torch_dtype(device),
+        dtype=TorchDeviceSelect.choose_torch_dtype(device=device),
         device=noise_device_type,
         generator=generator,
     ).to("cpu")
@@ -118,7 +118,7 @@ class NoiseInvocation(BaseInvocation):
         noise = get_noise(
             width=self.width,
             height=self.height,
-            device=TorchDeviceSelect(context).choose_torch_device(),
+            device=TorchDeviceSelect.choose_torch_device(context=context),
             seed=self.seed,
             use_cpu=self.use_cpu,
         )

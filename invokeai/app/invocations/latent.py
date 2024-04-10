@@ -68,7 +68,7 @@ from .baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, in
 from .controlnet_image_processors import ControlField
 from .model import ModelIdentifierField, UNetField, VAEField
 
-DEFAULT_PRECISION = TorchDeviceSelect().choose_torch_dtype
+DEFAULT_PRECISION = TorchDeviceSelect.choose_torch_dtype()
 
 
 @invocation_output("scheduler_output")
@@ -910,7 +910,7 @@ class ResizeLatentsInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         latents = context.tensors.load(self.latents.latents_name)
 
-        device = TorchDeviceSelect(context).choose_torch_device()
+        device = TorchDeviceSelect.choose_torch_device(context=context)
 
         resized_latents = torch.nn.functional.interpolate(
             latents.to(device),
@@ -949,7 +949,7 @@ class ScaleLatentsInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         latents = context.tensors.load(self.latents.latents_name)
 
-        device = TorchDeviceSelect(context).choose_torch_device()
+        device = TorchDeviceSelect.choose_torch_device(context=context)
 
         # resizing
         resized_latents = torch.nn.functional.interpolate(
@@ -1093,7 +1093,7 @@ class BlendLatentsInvocation(BaseInvocation):
         if latents_a.shape != latents_b.shape:
             raise Exception("Latents to blend must be the same size.")
 
-        device = TorchDeviceSelect(context).choose_torch_device()
+        device = TorchDeviceSelect.choose_torch_device(context=context)
 
         def slerp(
             t: Union[float, npt.NDArray[Any]],  # FIXME: maybe use np.float32 here?

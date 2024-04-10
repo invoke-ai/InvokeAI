@@ -51,7 +51,7 @@ class SafetyChecker:
         cls._load_safety_checker()
         if cls.safety_checker is None or cls.feature_extractor is None:
             return False
-        device = TorchDeviceSelect().choose_torch_device()
+        device = TorchDeviceSelect.choose_torch_device()
         features = cls.feature_extractor([image], return_tensors="pt")
         features.to(device)
         cls.safety_checker.to(device)

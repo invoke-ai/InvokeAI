@@ -1,10 +1,8 @@
-from contextlib import AbstractContextManager, nullcontext
 from typing import TYPE_CHECKING, Optional, Union
 
 import torch
-from torch import autocast
 
-from invokeai.app.services.config.config_default import InvokeAIAppConfig, get_config
+from invokeai.app.services.config.config_default import get_config
 
 if TYPE_CHECKING:
     from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -21,95 +19,65 @@ NAME_TO_PRECISION = {
 class TorchDeviceSelect:
     """Abstraction layer for torch devices."""
 
-    def __init__(self, context: Optional["InvocationContext"] = None):
-        if context:
-            self._app_config = context.config.get()
-            self._model_mgr = context.models
-        else:
-            self._app_config = get_config()
-            self._model_mgr = None
-
     @classmethod
-    @property
-    def has_cuda(cls) -> bool:
-        """Return true if cuda is available."""
-        return torch.cuda.is_available()
-
-    @classmethod
-    @property
-    def has_mps(cls) -> bool:
-        return torch.backends.mps.is_available()
-
-    @property
-    def app_config(self) -> InvokeAIAppConfig:
-        """Return the InvokeAIAppConfig."""
-        return self._app_config
-
-    @property
-    def context(self) -> Optional["InvocationContext"]:
-        """Return the InvocationContext, if any."""
-        return self._context
-
-    def choose_torch_device(self) -> torch.device:
+    def choose_torch_device(cls, context: Optional["InvocationContext"] = None) -> torch.device:
         """Return the torch.device to use for accelerated inference."""
-
         # A future version of the model manager will have methods that mediate
         # among multiple GPUs to balance load. This provides a forward hook
         # to support those methods.
-        if self._model_mgr:
+        if context:
+            model_mgr = context.models
+            app_config = context.config.get()
             try:
-                device = self._model_mgr.get_free_device()
-                return self.normalize(device)
+                device = model_mgr.get_free_device()
+                return cls.normalize(device)
             except NotImplementedError:
                 pass
 
-        if self.app_config.device != "auto":
-            device = torch.device(self.app_config.device)
-        elif self.has_cuda:
+        app_config = get_config()
+        if app_config.device != "auto":
+            device = torch.device(app_config.device)
+        elif torch.cuda.is_available():
             device = torch.device("cuda")
-        elif self.has_mps:
+        elif torch.backends.mps.is_available():
             device = torch.device("mps")
         else:
             device = torch.device("cpu")
-        return self.normalize(device)
+        return cls.normalize(device)
 
-    def choose_torch_dtype(self, device: Optional[torch.device] = None) -> torch.dtype:
+    @classmethod
+    def choose_torch_dtype(
+        cls, device: Optional[torch.device] = None, context: Optional["InvocationContext"] = None
+    ) -> torch.dtype:
         """Return the precision to use for accelerated inference."""
-        device = device or self.choose_torch_device()
-        config = self.app_config
-        if device.type == "cuda" and self.has_cuda:
+        device = device or cls.choose_torch_device(context)
+        config = context.config.get() if context else get_config()
+        if device.type == "cuda" and torch.cuda.is_available():
             device_name = torch.cuda.get_device_name(device)
             if "GeForce GTX 1660" in device_name or "GeForce GTX 1650" in device_name:
                 # These GPUs have limited support for float16
-                return self._to_dtype("float32")
+                return cls._to_dtype("float32")
             elif config.precision in ["auto", "autocast"]:
                 # Default to float16 for CUDA devices
-                return self._to_dtype("float16")
+                return cls._to_dtype("float16")
             else:
                 # Use the user-defined precision
-                return self._to_dtype(config.precision)
+                return cls._to_dtype(config.precision)
 
-        elif device.type == "mps" and self.has_mps:
+        elif device.type == "mps" and torch.backends.mps.is_available():
             if config.precision == "auto" or config.precision == "autocast":
                 # Default to float16 for MPS devices
-                return self._to_dtype("float16")
+                return cls._to_dtype("float16")
             else:
                 # Use the user-defined precision
-                return self._to_dtype(config.precision)
+                return cls._to_dtype(config.precision)
         # CPU / safe fallback
-        return self._to_dtype("float32")
+        return cls._to_dtype("float32")
 
-    def choose_autocast(self) -> AbstractContextManager:
-        """Return an autocast context or nullcontext for the given precision string."""
-        # float16 currently requires autocast to avoid errors like:
-        # 'expected scalar type Half but found Float'
-        precision = self.app_config.precision
-        if precision == "autocast" or precision == "float16":
-            return autocast
-        return nullcontext
-
-    def get_torch_device_name(self) -> str:
-        device = self.choose_torch_device()
+    @classmethod
+    def get_torch_device_name(cls, context: Optional[torch.device] = None) -> str:
+        """Return the device name for the current torch device."""
+        device = cls.choose_torch_device(context)
         return torch.cuda.get_device_name(device) if device.type == "cuda" else device.type.upper()
 
     @classmethod
@@ -123,15 +91,17 @@ class TorchDeviceSelect:
     @classmethod
     def empty_cache(cls) -> None:
         """Clear the GPU device cache."""
-        if cls.has_mps:
+        if torch.backends.mps.is_available():
             torch.mps.empty_cache()
-        if cls.has_cuda:
+        if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    def _to_dtype(self, precision_name: str) -> torch.dtype:
+    @classmethod
+    def _to_dtype(cls, precision_name: str) -> torch.dtype:
         return NAME_TO_PRECISION[precision_name]
 
-    def _device_from_model_manager(self) -> torch.device:
-        context = self.context
+    @classmethod
+    def _device_from_model_manager(cls) -> torch.device:
+        context = cls.context
         assert context is not None
         return context.models.get_free_device()

@@ -89,7 +89,7 @@ class CompelInvocation(BaseInvocation):
                 tokenizer=tokenizer,
                 text_encoder=text_encoder,
                 textual_inversion_manager=ti_manager,
-                dtype_for_device_getter=TorchDeviceSelect(context).choose_torch_dtype,
+                dtype_for_device_getter=TorchDeviceSelect.choose_torch_dtype,
                 truncate_long_prompts=False,
             )
 
@@ -191,7 +191,7 @@ class SDXLPromptInvocationBase:
                 tokenizer=tokenizer,
                 text_encoder=text_encoder,
                 textual_inversion_manager=ti_manager,
-                dtype_for_device_getter=TorchDeviceSelect(context).choose_torch_dtype,
+                dtype_for_device_getter=TorchDeviceSelect.choose_torch_dtype,
                 truncate_long_prompts=False,  # TODO:
                 returned_embeddings_type=ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED,  # TODO: clip skip
                 requires_pooled=get_pooled,

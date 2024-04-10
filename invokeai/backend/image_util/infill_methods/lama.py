@@ -29,7 +29,7 @@ def load_jit_model(url_or_path, device):
 
 class LaMA:
     def __call__(self, input_image: Image.Image, *args: Any, **kwds: Any) -> Any:
-        device = TorchDeviceSelect().choose_torch_device()
+        device = TorchDeviceSelect.choose_torch_device()
         model_location = get_config().models_path / "core/misc/lama/lama.pt"
 
         if not model_location.exists():
