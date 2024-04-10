@@ -25,7 +25,7 @@ def test_device_choice(device_name):
 
 
 @pytest.mark.parametrize("device_dtype_pair", device_types_cpu)
-def test_device_dtype_cpu(device_dtype_pair, mocker):
+def test_device_dtype_cpu(device_dtype_pair):
     with (
         patch("torch.cuda.is_available", return_value=False),
         patch("torch.backends.mps.is_available", return_value=False),
