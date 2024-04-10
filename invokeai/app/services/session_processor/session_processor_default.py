@@ -86,6 +86,12 @@ class DefaultSessionProcessor(SessionProcessorBase):
             self._poll_now()
         elif event_name == "batch_enqueued":
             self._poll_now()
+        elif event_name == "queue_item_status_changed" and event[1]["data"]["queue_item"]["status"] in [
+            "completed",
+            "failed",
+            "canceled",
+        ]:
+            self._poll_now()
 
     def resume(self) -> SessionProcessorStatus:
         if not self._resume_event.is_set():
