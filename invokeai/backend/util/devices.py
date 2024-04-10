@@ -8,8 +8,6 @@ NAME_TO_PRECISION = {
     "float32": torch.float32,
     "float16": torch.float16,
     "bfloat16": torch.bfloat16,
-    "auto": torch.float32,
-    "autocast": torch.float32,
 }
 
 

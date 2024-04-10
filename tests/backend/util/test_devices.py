@@ -2,6 +2,8 @@
 Test abstract device class.
 """
 
+from unittest.mock import patch
+
 import pytest
 import torch
 
@@ -9,11 +11,9 @@ from invokeai.app.services.config import get_config
 from invokeai.backend.util.devices import TorchDeviceSelect
 
 devices = ["cpu", "cuda:0", "cuda:1", "mps"]
-device_types = [
-    ("cpu", torch.float32),
-    ("cuda:0", torch.float16 if torch.cuda.is_available() else torch.float32),
-    ("mps", torch.float16 if torch.backends.mps.is_available() else torch.float32),
-]
+device_types_cpu = [("cpu", torch.float32), ("cuda:0", torch.float32), ("mps", torch.float32)]
+device_types_cuda = [("cpu", torch.float32), ("cuda:0", torch.float16), ("mps", torch.float32)]
+device_types_mps = [("cpu", torch.float32), ("cuda:0", torch.float32), ("mps", torch.float16)]
 
 
 @pytest.mark.parametrize("device_name", devices)
@@ -24,23 +24,57 @@ def test_device_choice(device_name):
     assert torch_device == torch.device(device_name)
 
 
-@pytest.mark.parametrize("device_dtype_pair", device_types)
-def test_device_dtype(device_dtype_pair):
-    device_name, dtype = device_dtype_pair
-    config = get_config()
-    config.device = device_name
-    torch_dtype = TorchDeviceSelect.choose_torch_dtype()
-    assert torch_dtype == dtype
+@pytest.mark.parametrize("device_dtype_pair", device_types_cpu)
+def test_device_dtype_cpu(device_dtype_pair, mocker):
+    with (
+        patch("torch.cuda.is_available", return_value=False),
+        patch("torch.backends.mps.is_available", return_value=False),
+    ):
+        device_name, dtype = device_dtype_pair
+        config = get_config()
+        config.device = device_name
+        torch_dtype = TorchDeviceSelect.choose_torch_dtype()
+        assert torch_dtype == dtype
 
 
-@pytest.mark.parametrize("device_dtype_pair", device_types)
+@pytest.mark.parametrize("device_dtype_pair", device_types_cuda)
+def test_device_dtype_cuda(device_dtype_pair):
+    with (
+        patch("torch.cuda.is_available", return_value=True),
+        patch("torch.backends.mps.is_available", return_value=False),
+    ):
+        device_name, dtype = device_dtype_pair
+        config = get_config()
+        config.device = device_name
+        torch_dtype = TorchDeviceSelect.choose_torch_dtype()
+        assert torch_dtype == dtype
+
+
+@pytest.mark.parametrize("device_dtype_pair", device_types_mps)
+def test_device_dtype_mps(device_dtype_pair):
+    with (
+        patch("torch.cuda.is_available", return_value=False),
+        patch("torch.backends.mps.is_available", return_value=True),
+    ):
+        device_name, dtype = device_dtype_pair
+        config = get_config()
+        config.device = device_name
+        torch_dtype = TorchDeviceSelect.choose_torch_dtype()
+        assert torch_dtype == dtype
+
+
+@pytest.mark.parametrize("device_dtype_pair", device_types_cuda)
 def test_device_dtype_override(device_dtype_pair):
-    device_name, dtype = device_dtype_pair
-    config = get_config()
-    config.device = device_name
-    config.precision = "float32"
-    torch_dtype = TorchDeviceSelect.choose_torch_dtype()
-    assert torch_dtype == torch.float32
+    with (
+        patch("torch.cuda.is_available", return_value=True),
+        patch("torch.backends.mps.is_available", return_value=True),
+    ):
+        device_name, dtype = device_dtype_pair
+        config = get_config()
+        config.device = device_name
+        config.precision = "float32"
+        torch_dtype = TorchDeviceSelect.choose_torch_dtype()
+        assert torch_dtype == torch.float32
 
 
 def test_normalize():
