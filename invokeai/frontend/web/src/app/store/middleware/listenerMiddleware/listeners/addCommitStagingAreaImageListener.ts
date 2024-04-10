@@ -1,12 +1,18 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { canvasBatchIdsReset, commitStagingAreaImage, discardStagedImages } from 'features/canvas/store/canvasSlice';
+import {
+  canvasBatchIdsReset,
+  commitStagingAreaImage,
+  discardStagedImages,
+  resetCanvas,
+  setInitialCanvasImage,
+} from 'features/canvas/store/canvasSlice';
 import { addToast } from 'features/system/store/systemSlice';
 import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
 
-const matcher = isAnyOf(commitStagingAreaImage, discardStagedImages);
+const matcher = isAnyOf(commitStagingAreaImage, discardStagedImages, resetCanvas, setInitialCanvasImage);
 
 export const addCommitStagingAreaImageListener = (startAppListening: AppStartListening) => {
   startAppListening({

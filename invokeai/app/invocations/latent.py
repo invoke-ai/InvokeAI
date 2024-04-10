@@ -1,5 +1,5 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
-
+import inspect
 import math
 from contextlib import ExitStack
 from functools import singledispatchmethod
@@ -9,6 +9,7 @@ import einops
 import numpy as np
 import numpy.typing as npt
 import torch
+import torchvision
 import torchvision.transforms as T
 from diffusers import AutoencoderKL, AutoencoderTiny
 from diffusers.configuration_utils import ConfigMixin
@@ -52,12 +53,20 @@ from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import BaseModelType, LoadedModel
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningData, IPAdapterConditioningInfo
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    BasicConditioningInfo,
+    IPAdapterConditioningInfo,
+    IPAdapterData,
+    Range,
+    SDXLConditioningInfo,
+    TextConditioningData,
+    TextConditioningRegions,
+)
+from invokeai.backend.util.mask import to_standard_float_mask
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 from ...backend.stable_diffusion.diffusers_pipeline import (
     ControlNetData,
-    IPAdapterData,
     StableDiffusionGeneratorPipeline,
     T2IAdapterData,
     image_resized_to_grid_as_tensor,
@@ -272,10 +281,10 @@ def get_scheduler(
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
 
-    positive_conditioning: ConditioningField = InputField(
+    positive_conditioning: Union[ConditioningField, list[ConditioningField]] = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection, ui_order=0
     )
-    negative_conditioning: ConditioningField = InputField(
+    negative_conditioning: Union[ConditioningField, list[ConditioningField]] = InputField(
         description=FieldDescriptions.negative_cond, input=Input.Connection, ui_order=1
     )
     noise: Optional[LatentsField] = InputField(
@@ -353,33 +362,168 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 raise ValueError("cfg_scale must be greater than 1")
         return v
 
+    def _get_text_embeddings_and_masks(
+        self,
+        cond_list: list[ConditioningField],
+        context: InvocationContext,
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> tuple[Union[list[BasicConditioningInfo], list[SDXLConditioningInfo]], list[Optional[torch.Tensor]]]:
+        """Get the text embeddings and masks from the input conditioning fields."""
+        text_embeddings: Union[list[BasicConditioningInfo], list[SDXLConditioningInfo]] = []
+        text_embeddings_masks: list[Optional[torch.Tensor]] = []
+        for cond in cond_list:
+            cond_data = context.conditioning.load(cond.conditioning_name)
+            text_embeddings.append(cond_data.conditionings[0].to(device=device, dtype=dtype))
+
+            mask = cond.mask
+            if mask is not None:
+                mask = context.tensors.load(mask.tensor_name)
+            text_embeddings_masks.append(mask)
+
+        return text_embeddings, text_embeddings_masks
+
+    def _preprocess_regional_prompt_mask(
+        self, mask: Optional[torch.Tensor], target_height: int, target_width: int, dtype: torch.dtype
+    ) -> torch.Tensor:
+        """Preprocess a regional prompt mask to match the target height and width.
+        If mask is None, returns a mask of all ones with the target height and width.
+        If mask is not None, resizes the mask to the target height and width using 'nearest' interpolation.
+
+        Returns:
+            torch.Tensor: The processed mask. shape: (1, 1, target_height, target_width).
+        """
+
+        if mask is None:
+            return torch.ones((1, 1, target_height, target_width), dtype=dtype)
+
+        mask = to_standard_float_mask(mask, out_dtype=dtype)
+
+        tf = torchvision.transforms.Resize(
+            (target_height, target_width), interpolation=torchvision.transforms.InterpolationMode.NEAREST
+        )
+
+        # Add a batch dimension to the mask, because torchvision expects shape (batch, channels, h, w).
+        mask = mask.unsqueeze(0)  # Shape: (1, h, w) -> (1, 1, h, w)
+        resized_mask = tf(mask)
+        return resized_mask
+
+    def _concat_regional_text_embeddings(
+        self,
+        text_conditionings: Union[list[BasicConditioningInfo], list[SDXLConditioningInfo]],
+        masks: Optional[list[Optional[torch.Tensor]]],
+        latent_height: int,
+        latent_width: int,
+        dtype: torch.dtype,
+    ) -> tuple[Union[BasicConditioningInfo, SDXLConditioningInfo], Optional[TextConditioningRegions]]:
+        """Concatenate regional text embeddings into a single embedding and track the region masks accordingly."""
+        if masks is None:
+            masks = [None] * len(text_conditionings)
+        assert len(text_conditionings) == len(masks)
+
+        is_sdxl = type(text_conditionings[0]) is SDXLConditioningInfo
+
+        all_masks_are_none = all(mask is None for mask in masks)
+
+        text_embedding = []
+        pooled_embedding = None
+        add_time_ids = None
+        cur_text_embedding_len = 0
+        processed_masks = []
+        embedding_ranges = []
+
+        for prompt_idx, text_embedding_info in enumerate(text_conditionings):
+            mask = masks[prompt_idx]
+
+            if is_sdxl:
+                # We choose a random SDXLConditioningInfo's pooled_embeds and add_time_ids here, with a preference for
+                # prompts without a mask. We prefer prompts without a mask, because they are more likely to contain
+                # global prompt information.  In an ideal case, there should be exactly one global prompt without a
+                # mask, but we don't enforce this.
+
+                # HACK(ryand): The fact that we have to choose a single pooled_embedding and add_time_ids here is a
+                # fundamental interface issue. The SDXL Compel nodes are not designed to be used in the way that we use
+                # them for regional prompting. Ideally, the DenoiseLatents invocation should accept a single
+                # pooled_embeds tensor and a list of standard text embeds with region masks. This change would be a
+                # pretty major breaking change to a popular node, so for now we use this hack.
+                if pooled_embedding is None or mask is None:
+                    pooled_embedding = text_embedding_info.pooled_embeds
+                if add_time_ids is None or mask is None:
+                    add_time_ids = text_embedding_info.add_time_ids
+
+            text_embedding.append(text_embedding_info.embeds)
+            if not all_masks_are_none:
+                embedding_ranges.append(
+                    Range(
+                        start=cur_text_embedding_len, end=cur_text_embedding_len + text_embedding_info.embeds.shape[1]
+                    )
+                )
+                processed_masks.append(
+                    self._preprocess_regional_prompt_mask(mask, latent_height, latent_width, dtype=dtype)
+                )
+
+            cur_text_embedding_len += text_embedding_info.embeds.shape[1]
+
+        text_embedding = torch.cat(text_embedding, dim=1)
+        assert len(text_embedding.shape) == 3  # batch_size, seq_len, token_len
+
+        regions = None
+        if not all_masks_are_none:
+            regions = TextConditioningRegions(
+                masks=torch.cat(processed_masks, dim=1),
+                ranges=embedding_ranges,
+            )
+
+        if is_sdxl:
+            return SDXLConditioningInfo(
+                embeds=text_embedding, pooled_embeds=pooled_embedding, add_time_ids=add_time_ids
+            ), regions
+        return BasicConditioningInfo(embeds=text_embedding), regions
+
     def get_conditioning_data(
         self,
         context: InvocationContext,
-        scheduler: Scheduler,
         unet: UNet2DConditionModel,
-        seed: int,
-    ) -> ConditioningData:
-        positive_cond_data = context.conditioning.load(self.positive_conditioning.conditioning_name)
-        c = positive_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
+        latent_height: int,
+        latent_width: int,
+    ) -> TextConditioningData:
+        # Normalize self.positive_conditioning and self.negative_conditioning to lists.
+        cond_list = self.positive_conditioning
+        if not isinstance(cond_list, list):
+            cond_list = [cond_list]
+        uncond_list = self.negative_conditioning
+        if not isinstance(uncond_list, list):
+            uncond_list = [uncond_list]
 
-        negative_cond_data = context.conditioning.load(self.negative_conditioning.conditioning_name)
-        uc = negative_cond_data.conditionings[0].to(device=unet.device, dtype=unet.dtype)
-
-        conditioning_data = ConditioningData(
-            unconditioned_embeddings=uc,
-            text_embeddings=c,
-            guidance_scale=self.cfg_scale,
-            guidance_rescale_multiplier=self.cfg_rescale_multiplier,
+        cond_text_embeddings, cond_text_embedding_masks = self._get_text_embeddings_and_masks(
+            cond_list, context, unet.device, unet.dtype
+        )
+        uncond_text_embeddings, uncond_text_embedding_masks = self._get_text_embeddings_and_masks(
+            uncond_list, context, unet.device, unet.dtype
         )
 
-        conditioning_data = conditioning_data.add_scheduler_args_if_applicable(  # FIXME
-            scheduler,
-            # for ddim scheduler
-            eta=0.0,  # ddim_eta
-            # for ancestral and sde schedulers
-            # flip all bits to have noise different from initial
-            generator=torch.Generator(device=unet.device).manual_seed(seed ^ 0xFFFFFFFF),
+        cond_text_embedding, cond_regions = self._concat_regional_text_embeddings(
+            text_conditionings=cond_text_embeddings,
+            masks=cond_text_embedding_masks,
+            latent_height=latent_height,
+            latent_width=latent_width,
+            dtype=unet.dtype,
+        )
+        uncond_text_embedding, uncond_regions = self._concat_regional_text_embeddings(
+            text_conditionings=uncond_text_embeddings,
+            masks=uncond_text_embedding_masks,
+            latent_height=latent_height,
+            latent_width=latent_width,
+            dtype=unet.dtype,
+        )
+
+        conditioning_data = TextConditioningData(
+            uncond_text=uncond_text_embedding,
+            cond_text=cond_text_embedding,
+            uncond_regions=uncond_regions,
+            cond_regions=cond_regions,
+            guidance_scale=self.cfg_scale,
+            guidance_rescale_multiplier=self.cfg_rescale_multiplier,
         )
         return conditioning_data
 
@@ -485,8 +629,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
         self,
         context: InvocationContext,
         ip_adapter: Optional[Union[IPAdapterField, list[IPAdapterField]]],
-        conditioning_data: ConditioningData,
         exit_stack: ExitStack,
+        latent_height: int,
+        latent_width: int,
+        dtype: torch.dtype,
     ) -> Optional[list[IPAdapterData]]:
         """If IP-Adapter is enabled, then this function loads the requisite models, and adds the image prompt embeddings
         to the `conditioning_data` (in-place).
@@ -502,7 +648,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             return None
 
         ip_adapter_data_list = []
-        conditioning_data.ip_adapter_conditioning = []
         for single_ip_adapter in ip_adapter:
             ip_adapter_model: Union[IPAdapter, IPAdapterPlus] = exit_stack.enter_context(
                 context.models.load(single_ip_adapter.ip_adapter_model)
@@ -525,9 +670,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     single_ipa_images, image_encoder_model
                 )
 
-                conditioning_data.ip_adapter_conditioning.append(
-                    IPAdapterConditioningInfo(image_prompt_embeds, uncond_image_prompt_embeds)
-                )
+            mask = single_ip_adapter.mask
+            if mask is not None:
+                mask = context.tensors.load(mask.tensor_name)
+            mask = self._preprocess_regional_prompt_mask(mask, latent_height, latent_width, dtype=dtype)
 
             ip_adapter_data_list.append(
                 IPAdapterData(
@@ -535,6 +681,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     weight=single_ip_adapter.weight,
                     begin_step_percent=single_ip_adapter.begin_step_percent,
                     end_step_percent=single_ip_adapter.end_step_percent,
+                    ip_adapter_conditioning=IPAdapterConditioningInfo(image_prompt_embeds, uncond_image_prompt_embeds),
+                    mask=mask,
                 )
             )
 
@@ -624,6 +772,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         steps: int,
         denoising_start: float,
         denoising_end: float,
+        seed: int,
     ) -> Tuple[int, List[int], int]:
         assert isinstance(scheduler, ConfigMixin)
         if scheduler.config.get("cpu_only", False):
@@ -652,7 +801,15 @@ class DenoiseLatentsInvocation(BaseInvocation):
         timesteps = timesteps[t_start_idx : t_start_idx + t_end_idx]
         num_inference_steps = len(timesteps) // scheduler.order
 
-        return num_inference_steps, timesteps, init_timestep
+        scheduler_step_kwargs = {}
+        scheduler_step_signature = inspect.signature(scheduler.step)
+        if "generator" in scheduler_step_signature.parameters:
+            # At some point, someone decided that schedulers that accept a generator should use the original seed with
+            # all bits flipped. I don't know the original rationale for this, but now we must keep it like this for
+            # reproducibility.
+            scheduler_step_kwargs = {"generator": torch.Generator(device=device).manual_seed(seed ^ 0xFFFFFFFF)}
+
+        return num_inference_steps, timesteps, init_timestep, scheduler_step_kwargs
 
     def prep_inpaint_mask(
         self, context: InvocationContext, latents: torch.Tensor
@@ -746,7 +903,11 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 )
 
                 pipeline = self.create_pipeline(unet, scheduler)
-                conditioning_data = self.get_conditioning_data(context, scheduler, unet, seed)
+
+                _, _, latent_height, latent_width = latents.shape
+                conditioning_data = self.get_conditioning_data(
+                    context=context, unet=unet, latent_height=latent_height, latent_width=latent_width
+                )
 
                 controlnet_data = self.prep_control_data(
                     context=context,
@@ -760,16 +921,19 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 ip_adapter_data = self.prep_ip_adapter_data(
                     context=context,
                     ip_adapter=self.ip_adapter,
-                    conditioning_data=conditioning_data,
                     exit_stack=exit_stack,
+                    latent_height=latent_height,
+                    latent_width=latent_width,
+                    dtype=unet.dtype,
                 )
 
-                num_inference_steps, timesteps, init_timestep = self.init_scheduler(
+                num_inference_steps, timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
                     scheduler,
                     device=unet.device,
                     steps=self.steps,
                     denoising_start=self.denoising_start,
                     denoising_end=self.denoising_end,
+                    seed=seed,
                 )
 
                 result_latents = pipeline.latents_from_embeddings(
@@ -782,6 +946,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     masked_latents=masked_latents,
                     gradient_mask=gradient_mask,
                     num_inference_steps=num_inference_steps,
+                    scheduler_step_kwargs=scheduler_step_kwargs,
                     conditioning_data=conditioning_data,
                     control_data=controlnet_data,
                     ip_adapter_data=ip_adapter_data,
