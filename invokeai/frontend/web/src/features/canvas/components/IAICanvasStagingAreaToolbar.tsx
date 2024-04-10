@@ -49,14 +49,20 @@ const selector = createMemoizedSelector(selectCanvasSlice, (canvas) => {
 const ClearStagingIntermediatesIconButton = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const totalStagedImages = useAppSelector((s) => s.canvas.layerState.stagingArea.images.length);
 
   const handleDiscardStagingArea = useCallback(() => {
     dispatch(discardStagedImages());
   }, [dispatch]);
 
   const handleDiscardStagingImage = useCallback(() => {
-    dispatch(discardStagedImage());
-  }, [dispatch]);
+    // Discarding all staged images triggers cancelation of all canvas batches. It's too easy to accidentally
+    // click the discard button, so to prevent accidental cancelation of all batches, we only discard the current
+    // image if there are more than one staged images.
+    if (totalStagedImages > 1) {
+      dispatch(discardStagedImage());
+    }
+  }, [dispatch, totalStagedImages]);
 
   return (
     <>
@@ -67,6 +73,7 @@ const ClearStagingIntermediatesIconButton = () => {
         onClick={handleDiscardStagingImage}
         colorScheme="invokeBlue"
         fontSize={16}
+        isDisabled={totalStagedImages <= 1}
       />
       <IconButton
         tooltip={`${t('unifiedCanvas.discardAll')} (Esc)`}
