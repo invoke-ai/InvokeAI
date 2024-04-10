@@ -19,6 +19,7 @@ from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType,
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
+from invokeai.backend.util.devices import TorchDeviceSelect
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation
@@ -426,18 +427,19 @@ class ModelsInterface(InvocationContextInterface):
             model_format=format,
         )
 
-    def get_free_device(self) -> torch.device:
-        """Return a free GPU for accelerated torch operations.
+    def get_execution_device(self) -> torch.device:
+        """Return the execution device to use for accelerated torch operations.
         Args:
            none
 
         Returns:
            A torch.dtype object.
 
-        Will raise a NotImplementedError until the multi-GPU support
-        PR is merged.
+        Note:
+           Currently this is equivalent to calling TorchDeviceSelect.choose_torch_device(),
+           but in the future the GPU may be dynamically assigned to support multi-GPU systems.
         """
-        return self._services.model_manager.load.ram_cache.get_execution_device()
+        return TorchDeviceSelect.choose_torch_device(self._services.configuration)
 
 
 class ConfigInterface(InvocationContextInterface):

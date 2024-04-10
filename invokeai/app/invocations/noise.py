@@ -118,7 +118,7 @@ class NoiseInvocation(BaseInvocation):
         noise = get_noise(
             width=self.width,
             height=self.height,
-            device=TorchDeviceSelect.choose_torch_device(context=context),
+            device=context.models.get_execution_device(),
             seed=self.seed,
             use_cpu=self.use_cpu,
         )
