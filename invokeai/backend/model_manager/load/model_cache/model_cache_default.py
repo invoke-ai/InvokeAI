@@ -273,7 +273,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         snapshot_before = self._capture_memory_snapshot()
         try:
             cache_entry.model.to(target_device)
-        except RuntimeError as e:  # blow away cache entry
+        except Exception as e:  # blow away cache entry
             self._delete_cache_entry(cache_entry)
             raise e
 
