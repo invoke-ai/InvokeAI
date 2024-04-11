@@ -275,7 +275,7 @@ class CreateGradientMaskInvocation(BaseInvocation):
                 if image_tensor.dim() == 3:
                     image_tensor = image_tensor.unsqueeze(0)
                 img_mask = tv_resize(mask, image_tensor.shape[-2:], T.InterpolationMode.BILINEAR, antialias=False)
-                masked_image = image_tensor * torch.where(img_mask < 1, 0.0, 1.0) # <1 to include gradient area
+                masked_image = image_tensor * torch.where(img_mask < 0.5, 0.0, 1.0) # <1 to include gradient area
                 masked_latents = ImageToLatentsInvocation.vae_encode(vae_info, self.fp32, self.tiled, masked_image.clone())
                 masked_latents_name = context.tensors.save(tensor=masked_latents)
 
