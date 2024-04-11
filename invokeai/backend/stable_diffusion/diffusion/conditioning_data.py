@@ -1,23 +1,10 @@
+import math
 from dataclasses import dataclass
 from typing import List, Optional, Union
 
 import torch
 
-from .cross_attention_control import Arguments
-
-
-@dataclass
-class ExtraConditioningInfo:
-    """Extra conditioning information produced by Compel.
-    This is used for prompt-to-prompt cross-attention control (a.k.a. `.swap()` in Compel).
-    """
-
-    tokens_count_including_eos_bos: int
-    cross_attention_control_args: Optional[Arguments] = None
-
-    @property
-    def wants_cross_attention_control(self):
-        return self.cross_attention_control_args is not None
+from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 
 
 @dataclass
@@ -25,7 +12,6 @@ class BasicConditioningInfo:
     """SD 1/2 text conditioning information produced by Compel."""
 
     embeds: torch.Tensor
-    extra_conditioning: Optional[ExtraConditioningInfo]
 
     def to(self, device, dtype=None):
         self.embeds = self.embeds.to(device=device, dtype=dtype)
@@ -60,6 +46,28 @@ class IPAdapterConditioningInfo:
     """IP-Adapter image encoding embeddings to use for unconditional generation.
     Shape: (num_images, num_tokens, encoding_dim).
     """
+
+
+@dataclass
+class IPAdapterData:
+    ip_adapter_model: IPAdapter
+    ip_adapter_conditioning: IPAdapterConditioningInfo
+    mask: torch.Tensor
+
+    # Either a single weight applied to all steps, or a list of weights for each step.
+    weight: Union[float, List[float]] = 1.0
+    begin_step_percent: float = 0.0
+    end_step_percent: float = 1.0
+
+    def scale_for_step(self, step_index: int, total_steps: int) -> float:
+        first_adapter_step = math.floor(self.begin_step_percent * total_steps)
+        last_adapter_step = math.ceil(self.end_step_percent * total_steps)
+        weight = self.weight[step_index] if isinstance(self.weight, List) else self.weight
+        if step_index >= first_adapter_step and step_index <= last_adapter_step:
+            # Only apply this IP-Adapter if the current step is within the IP-Adapter's begin/end step range.
+            return weight
+        # Otherwise, set the IP-Adapter's scale to 0, so it has no effect.
+        return 0.0
 
 
 @dataclass

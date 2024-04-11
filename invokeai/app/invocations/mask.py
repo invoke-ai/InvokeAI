@@ -10,17 +10,17 @@ from invokeai.app.invocations.primitives import MaskOutput
     title="Create Rectangle Mask",
     tags=["conditioning"],
     category="conditioning",
-    version="1.0.0",
+    version="1.0.1",
 )
 class RectangleMaskInvocation(BaseInvocation, WithMetadata):
     """Create a rectangular mask."""
 
-    height: int = InputField(description="The height of the entire mask.")
     width: int = InputField(description="The width of the entire mask.")
-    y_top: int = InputField(description="The top y-coordinate of the rectangular masked region (inclusive).")
+    height: int = InputField(description="The height of the entire mask.")
     x_left: int = InputField(description="The left x-coordinate of the rectangular masked region (inclusive).")
-    rectangle_height: int = InputField(description="The height of the rectangular masked region.")
+    y_top: int = InputField(description="The top y-coordinate of the rectangular masked region (inclusive).")
     rectangle_width: int = InputField(description="The width of the rectangular masked region.")
+    rectangle_height: int = InputField(description="The height of the rectangular masked region.")
 
     def invoke(self, context: InvocationContext) -> MaskOutput:
         mask = torch.zeros((1, self.height, self.width), dtype=torch.bool)
