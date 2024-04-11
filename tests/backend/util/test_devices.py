@@ -41,6 +41,7 @@ def test_device_dtype_cpu(device_dtype_pair):
 def test_device_dtype_cuda(device_dtype_pair):
     with (
         patch("torch.cuda.is_available", return_value=True),
+        patch("torch.cuda.get_device_name", return_value="RTX4070"),
         patch("torch.backends.mps.is_available", return_value=False),
     ):
         device_name, dtype = device_dtype_pair
@@ -66,8 +67,9 @@ def test_device_dtype_mps(device_dtype_pair):
 @pytest.mark.parametrize("device_dtype_pair", device_types_cuda)
 def test_device_dtype_override(device_dtype_pair):
     with (
+        patch("torch.cuda.get_device_name", return_value="RTX4070"),
         patch("torch.cuda.is_available", return_value=True),
-        patch("torch.backends.mps.is_available", return_value=True),
+        patch("torch.backends.mps.is_available", return_value=False),
     ):
         device_name, dtype = device_dtype_pair
         config = get_config()
