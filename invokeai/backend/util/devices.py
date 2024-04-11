@@ -40,7 +40,7 @@ class TorchDeviceSelect:
             if "GeForce GTX 1660" in device_name or "GeForce GTX 1650" in device_name:
                 # These GPUs have limited support for float16
                 return cls._to_dtype("float32")
-            elif config.precision in ["auto", "autocast"]:
+            elif config.precision == "auto":
                 # Default to float16 for CUDA devices
                 return cls._to_dtype("float16")
             else:
@@ -48,7 +48,7 @@ class TorchDeviceSelect:
                 return cls._to_dtype(config.precision)
 
         elif device.type == "mps" and torch.backends.mps.is_available():
-            if config.precision in ["auto", "autocast"]:
+            if config.precision == "auto":
                 # Default to float16 for MPS devices
                 return cls._to_dtype("float16")
             else:
