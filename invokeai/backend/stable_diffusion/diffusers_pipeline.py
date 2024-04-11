@@ -301,7 +301,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         mask: Optional[torch.Tensor] = None,
         masked_latents: Optional[torch.Tensor] = None,
         gradient_mask: Optional[bool] = False,
-        seed: Optional[int] = None,
+        seed: int,
     ) -> torch.Tensor:
         if init_timestep.shape[0] == 0:
             return latents
@@ -319,17 +319,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             latents = self.scheduler.add_noise(latents, noise, batched_t)
 
         if mask is not None:
-            # if no noise provided, noisify unmasked area based on seed(or 0 as fallback)
-            if noise is None:
-                noise = torch.randn(
-                    orig_latents.shape,
-                    dtype=torch.float32,
-                    device="cpu",
-                    generator=torch.Generator(device="cpu").manual_seed(seed or 0),
-                ).to(device=orig_latents.device, dtype=orig_latents.dtype)
-
-                latents = self.scheduler.add_noise(latents, noise, batched_t)
-
             if is_inpainting_model(self.unet):
                 if masked_latents is None:
                     raise Exception("Source image required for inpaint mask when inpaint model used!")
@@ -338,6 +327,15 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     self._unet_forward, mask, masked_latents
                 )
             else:
+                # if no noise provided, noisify unmasked area based on seed
+                if noise is None:
+                    noise = torch.randn(
+                        orig_latents.shape,
+                        dtype=torch.float32,
+                        device="cpu",
+                        generator=torch.Generator(device="cpu").manual_seed(seed),
+                    ).to(device=orig_latents.device, dtype=orig_latents.dtype)
+
                 additional_guidance.append(AddsMaskGuidance(mask, orig_latents, self.scheduler, noise, gradient_mask))
 
         try:
