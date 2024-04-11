@@ -86,7 +86,6 @@ export const ControlNetOrT2IAdapterDefaultSettings = () => {
           colorScheme="invokeYellow"
           isDisabled={!formState.isDirty}
           onClick={handleSubmit(onSubmit)}
-          type="submit"
           isLoading={isLoadingUpdateModel}
         >
           {t('common.save')}
