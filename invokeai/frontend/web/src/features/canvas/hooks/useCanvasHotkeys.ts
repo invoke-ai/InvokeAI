@@ -10,7 +10,6 @@ import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
 import {
   clearMask,
   setIsMaskEnabled,
-  setShouldShowBoundingBox,
   setShouldSnapToGrid,
 } from 'features/canvas/store/canvasSlice';
 import { isInteractiveTarget } from 'features/canvas/util/isInteractiveTarget';
@@ -21,7 +20,6 @@ import { useHotkeys } from 'react-hotkeys-hook';
 const useInpaintingCanvasHotkeys = () => {
   const dispatch = useAppDispatch();
   const activeTabName = useAppSelector(activeTabNameSelector);
-  const shouldShowBoundingBox = useAppSelector((s) => s.canvas.shouldShowBoundingBox);
   const isStaging = useAppSelector(isStagingSelector);
   const isMaskEnabled = useAppSelector((s) => s.canvas.isMaskEnabled);
   const shouldSnapToGrid = useAppSelector((s) => s.canvas.shouldSnapToGrid);
@@ -77,18 +75,6 @@ const useInpaintingCanvasHotkeys = () => {
       enabled: () => true,
       preventDefault: true,
     }
-  );
-
-  useHotkeys(
-    'shift+h',
-    () => {
-      dispatch(setShouldShowBoundingBox(!shouldShowBoundingBox));
-    },
-    {
-      enabled: () => !isStaging,
-      preventDefault: true,
-    },
-    [activeTabName, shouldShowBoundingBox]
   );
 
   const onKeyDown = useCallback(
