@@ -299,16 +299,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
                     f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
                 )
 
-    def get_execution_device(self) -> torch.device:
-        """
-        Return a GPU device in a multi-GPU environment.
-
-        Device should be reserved with reserve_gpu_device()
-        before calling this. If not, it will return the
-        default device.
-        """
-        raise NotImplementedError
-
     def print_cuda_stats(self) -> None:
         """Log CUDA diagnostics."""
         vram = "%4.2fG" % (torch.cuda.memory_allocated() / GIG)

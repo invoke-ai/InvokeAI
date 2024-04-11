@@ -115,17 +115,6 @@ class ModelCacheBase(ABC, Generic[T]):
         """Move model into the indicated device."""
         pass
 
-    @abstractmethod
-    def get_execution_device(self) -> torch.device:
-        """
-        Return a GPU device in a multi-GPU environment.
-
-        Device should be reserved with reserve_gpu_device()
-        before calling this. If not, it will return the
-        default device.
-        """
-        pass
-
     @property
     @abstractmethod
     def stats(self) -> Optional[CacheStats]:
