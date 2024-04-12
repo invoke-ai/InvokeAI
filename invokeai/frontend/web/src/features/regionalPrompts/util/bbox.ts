@@ -11,7 +11,7 @@ import { assert } from 'tsafe';
  * @param imageData The ImageData object to get the bounding box of.
  * @returns The minimum and maximum x and y values of the image's bounding box.
  */
-export const getImageDataBbox = (imageData: ImageData) => {
+const getImageDataBbox = (imageData: ImageData) => {
   const { data, width, height } = imageData;
   let minX = width;
   let minY = height;
