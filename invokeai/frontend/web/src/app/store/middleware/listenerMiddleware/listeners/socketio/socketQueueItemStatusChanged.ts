@@ -13,7 +13,7 @@ const log = logger('socketio');
  * @param {number} activeQueueLength - The number of active items in the queue.
  */
 const updatePageTitle = (activeQueueLength: number) => {
-  const baseString: string = document.title.replace(/\(\d+\)/ , '');
+  const baseString: string = document.title.replace(/\(\d+\) /, '');
   document.title = activeQueueLength > 0 ? `(${activeQueueLength}) ${baseString}` : baseString;
 };
 
@@ -38,7 +38,7 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
       const { queue_item, batch_status, queue_status } = action.payload.data;
 
       // Keep track of the active queue length by summing up pending and in_progress count
-      const activeQueueLength: number = (queue_status.pending + queue_status.in_progress) || 0;
+      const activeQueueLength: number = queue_status.pending + queue_status.in_progress || 0;
 
       log.debug(action.payload, `Queue item ${queue_item.item_id} status updated: ${queue_item.status}`);
 
