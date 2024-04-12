@@ -1,5 +1,5 @@
 import { IconButton, Menu, MenuButton, MenuDivider, MenuItem, MenuList } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   layerDeleted,
@@ -10,8 +10,7 @@ import {
   layerReset,
   selectRegionalPromptsSlice,
 } from 'features/regionalPrompts/store/regionalPromptsSlice';
-import type React from 'react';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiArrowCounterClockwiseBold,
@@ -25,12 +24,12 @@ import {
 
 type Props = { id: string };
 
-export const LayerMenu: React.FC<Props> = ({ id }) => {
+export const LayerMenu = memo(({ id }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const selectValidActions = useMemo(
     () =>
-      createSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
+      createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) => {
         const layerIndex = regionalPrompts.layers.findIndex((l) => l.id === id);
         const layerCount = regionalPrompts.layers.length;
         return {
@@ -87,4 +86,6 @@ export const LayerMenu: React.FC<Props> = ({ id }) => {
       </MenuList>
     </Menu>
   );
-};
+});
+
+LayerMenu.displayName = 'LayerMenu';

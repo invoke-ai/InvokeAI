@@ -1,5 +1,6 @@
 import { rgbColorToString } from 'features/canvas/util/colorToString';
 import type { LineObject } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { memo } from 'react';
 import type { RgbColor } from 'react-colorful';
 import { Line } from 'react-konva';
 
@@ -9,7 +10,7 @@ type Props = {
   color: RgbColor;
 };
 
-export const LineComponent = ({ layerId, line, color }: Props) => {
+export const LineComponent = memo(({ layerId, line, color }: Props) => {
   return (
     <Line
       id={`layer-${layerId}.line-${line.id}`}
@@ -25,4 +26,6 @@ export const LineComponent = ({ layerId, line, color }: Props) => {
       listening={false}
     />
   );
-};
+});
+
+LineComponent.displayName = 'LineComponent';

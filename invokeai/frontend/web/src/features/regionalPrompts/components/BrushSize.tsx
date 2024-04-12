@@ -1,10 +1,10 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { brushSizeChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const BrushSize = () => {
+export const BrushSize = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const brushSize = useAppSelector((s) => s.regionalPrompts.brushSize);
@@ -21,4 +21,6 @@ export const BrushSize = () => {
       <CompositeNumberInput min={1} max={500} value={brushSize} onChange={onChange} />
     </FormControl>
   );
-};
+});
+
+BrushSize.displayName = 'BrushSize';

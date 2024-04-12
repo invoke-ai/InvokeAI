@@ -1,6 +1,5 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import getScaledCursorPosition from 'features/canvas/util/getScaledCursorPosition';
-import { BrushPreviewFill } from 'features/regionalPrompts/components/BrushPreview';
 import { LayerBoundingBox } from 'features/regionalPrompts/components/LayerBoundingBox';
 import { LineComponent } from 'features/regionalPrompts/components/LineComponent';
 import { RectComponent } from 'features/regionalPrompts/components/RectComponent';
@@ -17,8 +16,7 @@ import type { Group as KonvaGroupType } from 'konva/lib/Group';
 import type { Layer as KonvaLayerType } from 'konva/lib/Layer';
 import type { KonvaEventObject, Node as KonvaNodeType, NodeConfig as KonvaNodeConfigType } from 'konva/lib/Node';
 import type { IRect, Vector2d } from 'konva/lib/types';
-import type React from 'react';
-import { useCallback, useEffect, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import { Group as KonvaGroup, Layer as KonvaLayer } from 'react-konva';
 
 type Props = {
@@ -28,15 +26,13 @@ type Props = {
 export const selectPromptLayerObjectGroup = (item: KonvaNodeType<KonvaNodeConfigType>) =>
   item.name() !== REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME;
 
-export const LayerComponent: React.FC<Props> = ({ id }) => {
+export const LayerComponent = memo(({ id }: Props) => {
   const dispatch = useAppDispatch();
   const layer = useLayer(id);
-  const selectedLayer = useAppSelector((s) => s.regionalPrompts.selectedLayer);
   const promptLayerOpacity = useAppSelector((s) => s.regionalPrompts.promptLayerOpacity);
   const tool = useAppSelector((s) => s.regionalPrompts.tool);
   const layerRef = useRef<KonvaLayerType>(null);
   const groupRef = useRef<KonvaGroupType>(null);
-
   const onChangeBbox = useCallback(
     (bbox: IRect | null) => {
       dispatch(layerBboxChanged({ layerId: layer.id, bbox }));
@@ -94,39 +90,39 @@ export const LayerComponent: React.FC<Props> = ({ id }) => {
     }
     // Caching the group allows its opacity to apply to all shapes at once. We should cache only when the layer's
     // objects or attributes with a visual effect (e.g. color) change.
+    // TODO: Figure out a more efficient way to handle opacity - maybe a separate rect w/ globalCompositeOperation...
     groupRef.current.cache();
   }, [layer.objects, layer.color, layer.isVisible]);
 
   return (
-    <>
-      <KonvaLayer
-        ref={layerRef}
-        id={layer.id}
-        name={REGIONAL_PROMPT_LAYER_NAME}
-        onDragMove={onDragMove}
-        dragBoundFunc={dragBoundFunc}
-        visible={layer.isVisible}
-        draggable
+    <KonvaLayer
+      ref={layerRef}
+      id={layer.id}
+      name={REGIONAL_PROMPT_LAYER_NAME}
+      onDragMove={onDragMove}
+      dragBoundFunc={dragBoundFunc}
+      visible={layer.isVisible}
+      draggable
+    >
+      <KonvaGroup
+        id={`layer-${layer.id}-group`}
+        name={REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME}
+        ref={groupRef}
+        listening={false}
+        opacity={promptLayerOpacity}
       >
-        <KonvaGroup
-          id={`layer-${layer.id}-group`}
-          name={REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME}
-          ref={groupRef}
-          listening={false}
-          opacity={promptLayerOpacity}
-        >
-          {layer.objects.map((obj) => {
-            if (obj.kind === 'line') {
-              return <LineComponent key={obj.id} line={obj} color={layer.color} layerId={layer.id} />;
-            }
-            if (obj.kind === 'fillRect') {
-              return <RectComponent key={obj.id} rect={obj} color={layer.color} />;
-            }
-          })}
-        </KonvaGroup>
-        <LayerBoundingBox layerId={layer.id} />
-      </KonvaLayer>
-      <KonvaLayer name="brushPreviewFill">{layer.id === selectedLayer && <BrushPreviewFill />}</KonvaLayer>
-    </>
+        {layer.objects.map((obj) => {
+          if (obj.kind === 'line') {
+            return <LineComponent key={obj.id} line={obj} color={layer.color} layerId={layer.id} />;
+          }
+          if (obj.kind === 'fillRect') {
+            return <RectComponent key={obj.id} rect={obj} color={layer.color} />;
+          }
+        })}
+      </KonvaGroup>
+      <LayerBoundingBox layerId={layer.id} />
+    </KonvaLayer>
   );
-};
+});
+
+LayerComponent.displayName = 'LayerComponent';
