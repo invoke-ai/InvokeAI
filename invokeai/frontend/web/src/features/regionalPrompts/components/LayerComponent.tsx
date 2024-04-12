@@ -100,10 +100,6 @@ export const LayerComponent: React.FC<Props> = ({ id }) => {
     groupRef.current.cache();
   }, [layer.objects, layer.color, layer.isVisible]);
 
-  if (!layer.isVisible) {
-    return null;
-  }
-
   return (
     <>
       <KonvaLayer
@@ -112,6 +108,7 @@ export const LayerComponent: React.FC<Props> = ({ id }) => {
         name={REGIONAL_PROMPT_LAYER_NAME}
         onDragMove={onDragMove}
         dragBoundFunc={dragBoundFunc}
+        visible={layer.isVisible}
         draggable
       >
         <KonvaGroup
