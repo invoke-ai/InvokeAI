@@ -30,6 +30,7 @@ import torch
 
 from invokeai.backend.model_manager import AnyModel, SubModelType
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
+from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
 from invokeai.backend.util.devices import choose_torch_device
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -157,13 +158,13 @@ class ModelCache(ModelCacheBase[AnyModel]):
         self,
         key: str,
         model: AnyModel,
-        size: int,
         submodel_type: Optional[SubModelType] = None,
     ) -> None:
         """Store model under key and optional submodel_type."""
         key = self._make_cache_key(key, submodel_type)
         if key in self._cached_models:
             return
+        size = calc_model_size_by_data(model)
         self.make_room(size)
         cache_record = CacheRecord(key, model, size)
         self._cached_models[key] = cache_record

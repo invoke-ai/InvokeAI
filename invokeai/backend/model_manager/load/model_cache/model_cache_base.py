@@ -143,7 +143,6 @@ class ModelCacheBase(ABC, Generic[T]):
         self,
         key: str,
         model: T,
-        size: int,
         submodel_type: Optional[SubModelType] = None,
     ) -> None:
         """Store model under key and optional submodel_type."""
