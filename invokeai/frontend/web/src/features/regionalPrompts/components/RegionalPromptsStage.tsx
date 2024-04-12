@@ -1,5 +1,5 @@
 import { chakra } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { BrushPreviewOutline } from 'features/regionalPrompts/components/BrushPreview';
 import { LayerComponent } from 'features/regionalPrompts/components/LayerComponent';
@@ -15,7 +15,7 @@ import type Konva from 'konva';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { Layer, Stage } from 'react-konva';
 
-const selectLayerIds = createSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
+const selectLayerIds = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
   regionalPrompts.layers.map((l) => l.id)
 );
 

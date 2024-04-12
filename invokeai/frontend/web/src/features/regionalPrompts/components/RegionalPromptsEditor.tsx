@@ -1,6 +1,6 @@
 /* eslint-disable i18next/no-literal-string */
 import { Button, Flex } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { AddLayerButton } from 'features/regionalPrompts/components/AddLayerButton';
 import { BrushSize } from 'features/regionalPrompts/components/BrushSize';
@@ -11,8 +11,9 @@ import { ToolChooser } from 'features/regionalPrompts/components/ToolChooser';
 import { selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { getRegionalPromptLayerBlobs } from 'features/regionalPrompts/util/getLayerBlobs';
 import { ImageSizeLinear } from 'features/settingsAccordions/components/ImageSettingsAccordion/ImageSizeLinear';
+import { memo } from 'react';
 
-const selectLayerIdsReversed = createSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
+const selectLayerIdsReversed = createMemoizedSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
   regionalPrompts.layers.map((l) => l.id).reverse()
 );
 
@@ -20,7 +21,7 @@ const debugBlobs = () => {
   getRegionalPromptLayerBlobs(true);
 };
 
-export const RegionalPromptsEditor = () => {
+export const RegionalPromptsEditor = memo(() => {
   const layerIdsReversed = useAppSelector(selectLayerIdsReversed);
   return (
     <Flex gap={4}>
@@ -40,4 +41,6 @@ export const RegionalPromptsEditor = () => {
       </Flex>
     </Flex>
   );
-};
+});
+
+RegionalPromptsEditor.displayName = 'RegionalPromptsEditor';

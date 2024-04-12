@@ -1,49 +1,38 @@
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import { rgbColorToString } from 'features/canvas/util/colorToString';
+import { rgbaColorToString } from 'features/canvas/util/colorToString';
 import { $cursorPosition } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { memo } from 'react';
 import { Circle, Group } from 'react-konva';
 
-const useBrushData = () => {
+export const BrushPreviewOutline = memo(() => {
   const brushSize = useAppSelector((s) => s.regionalPrompts.brushSize);
   const tool = useAppSelector((s) => s.regionalPrompts.tool);
+  const a = useAppSelector((s) => s.regionalPrompts.promptLayerOpacity);
   const color = useAppSelector((s) => {
     const _color = s.regionalPrompts.layers.find((l) => l.id === s.regionalPrompts.selectedLayer)?.color;
     if (!_color) {
       return null;
     }
-    return rgbColorToString(_color);
+    return rgbaColorToString({ ..._color, a });
   });
+
   const pos = useStore($cursorPosition);
 
-  return { brushSize, tool, color, pos };
-};
-
-export const BrushPreviewFill = () => {
-  const { brushSize, tool, color, pos } = useBrushData();
   if (!brushSize || !color || !pos || tool === 'move') {
     return null;
   }
 
   return (
-    <Circle
-      x={pos.x}
-      y={pos.y}
-      radius={brushSize / 2}
-      fill={color}
-      globalCompositeOperation={tool === 'brush' ? 'source-over' : 'destination-out'}
-    />
-  );
-};
-
-export const BrushPreviewOutline = () => {
-  const { brushSize, tool, color, pos } = useBrushData();
-  if (!brushSize || !color || !pos || tool === 'move') {
-    return null;
-  }
-
-  return (
-    <Group>
+    <Group listening={false}>
+      <Circle
+        x={pos.x}
+        y={pos.y}
+        radius={brushSize / 2}
+        fill={color}
+        globalCompositeOperation={tool === 'brush' ? 'source-over' : 'destination-out'}
+        listening={false}
+      />
       <Circle
         x={pos.x}
         y={pos.y}
@@ -64,4 +53,6 @@ export const BrushPreviewOutline = () => {
       />
     </Group>
   );
-};
+});
+
+BrushPreviewOutline.displayName = 'BrushPreviewOutline';

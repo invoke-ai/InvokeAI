@@ -6,14 +6,14 @@ import { LayerMenu } from 'features/regionalPrompts/components/LayerMenu';
 import { LayerVisibilityToggle } from 'features/regionalPrompts/components/LayerVisibilityToggle';
 import { RegionalPromptsPrompt } from 'features/regionalPrompts/components/RegionalPromptsPrompt';
 import { layerSelected } from 'features/regionalPrompts/store/regionalPromptsSlice';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
   id: string;
 };
 
-export const LayerListItem = ({ id }: Props) => {
+export const LayerListItem = memo(({ id }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const selectedLayer = useAppSelector((s) => s.regionalPrompts.selectedLayer);
@@ -46,4 +46,6 @@ export const LayerListItem = ({ id }: Props) => {
       </Flex>
     </Flex>
   );
-};
+});
+
+LayerListItem.displayName = 'LayerListItem';

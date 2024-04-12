@@ -2,7 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { moveBackward, moveForward, moveToBack, moveToFront } from 'common/util/arrayUtils';
-import type Konva from 'konva';
+import type { Stage } from 'konva/lib/Stage';
 import type { IRect, Vector2d } from 'konva/lib/types';
 import { atom } from 'nanostores';
 import type { RgbColor } from 'react-colorful';
@@ -270,8 +270,8 @@ export const regionalPromptsPersistConfig: PersistConfig<RegionalPromptsState> =
 export const $isMouseDown = atom(false);
 export const $isMouseOver = atom(false);
 export const $cursorPosition = atom<Vector2d | null>(null);
-export const $stage = atom<Konva.Stage | null>(null);
-export const getStage = (): Konva.Stage => {
+export const $stage = atom<Stage | null>(null);
+export const getStage = (): Stage => {
   const stage = $stage.get();
   assert(stage);
   return stage;
