@@ -136,7 +136,8 @@
         "red": "Red",
         "green": "Green",
         "blue": "Blue",
-        "alpha": "Alpha"
+        "alpha": "Alpha",
+        "selected": "Selected"
     },
     "controlnet": {
         "controlAdapter_one": "Control Adapter",
