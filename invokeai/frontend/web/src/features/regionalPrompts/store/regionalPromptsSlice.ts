@@ -270,3 +270,5 @@ export const getStage = (): Konva.Stage => {
   assert(stage);
   return stage;
 };
+export const REGIONAL_PROMPT_LAYER_NAME = 'regionalPromptLayer';
+export const REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME = 'regionalPromptLayerObjectGroup';

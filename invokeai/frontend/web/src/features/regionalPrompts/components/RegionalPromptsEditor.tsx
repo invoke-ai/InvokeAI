@@ -8,19 +8,23 @@ import { LayerListItem } from 'features/regionalPrompts/components/LayerListItem
 import { RegionalPromptsStage } from 'features/regionalPrompts/components/RegionalPromptsStage';
 import { ToolChooser } from 'features/regionalPrompts/components/ToolChooser';
 import { selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
-import { getLayerBlobs } from 'features/regionalPrompts/util/getLayerBlobs';
+import { getRegionalPromptLayerBlobs } from 'features/regionalPrompts/util/getLayerBlobs';
 import { ImageSizeLinear } from 'features/settingsAccordions/components/ImageSettingsAccordion/ImageSizeLinear';
 
 const selectLayerIdsReversed = createSelector(selectRegionalPromptsSlice, (regionalPrompts) =>
   regionalPrompts.layers.map((l) => l.id).reverse()
 );
 
+const debugBlobs = () => {
+  getRegionalPromptLayerBlobs(true);
+};
+
 export const RegionalPromptsEditor = () => {
   const layerIdsReversed = useAppSelector(selectLayerIdsReversed);
   return (
     <Flex gap={4}>
       <Flex flexDir="column" gap={4} flexShrink={0}>
-        <Button onClick={getLayerBlobs}>DEBUG LAYERS</Button>
+        <Button onClick={debugBlobs}>DEBUG LAYERS</Button>
         <AddLayerButton />
         <BrushSize />
         <ImageSizeLinear />

@@ -26,7 +26,7 @@ export const LayerColorPicker = ({ id }: Props) => {
         <ColorPreview previewColor={layer.color} />
       </PopoverTrigger>
       <PopoverContent>
-        <PopoverBody w={64} h={64}>
+        <PopoverBody minH={64}>
           <RgbColorPicker color={layer.color} onChange={onColorChange} withNumberInput />
         </PopoverBody>
       </PopoverContent>

@@ -5,7 +5,13 @@ import { LayerBoundingBox } from 'features/regionalPrompts/components/LayerBound
 import { LineComponent } from 'features/regionalPrompts/components/LineComponent';
 import { RectComponent } from 'features/regionalPrompts/components/RectComponent';
 import { useLayer } from 'features/regionalPrompts/hooks/layerStateHooks';
-import { $stage, layerBboxChanged, layerTranslated } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import {
+  $stage,
+  layerBboxChanged,
+  layerTranslated,
+  REGIONAL_PROMPT_LAYER_NAME,
+  REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME,
+} from 'features/regionalPrompts/store/regionalPromptsSlice';
 import { getKonvaLayerBbox } from 'features/regionalPrompts/util/bbox';
 import type { Group as KonvaGroupType } from 'konva/lib/Group';
 import type { Layer as KonvaLayerType } from 'konva/lib/Layer';
@@ -19,7 +25,8 @@ type Props = {
   id: string;
 };
 
-const filterChildren = (item: KonvaNodeType<KonvaNodeConfigType>) => item.name() !== 'regionalPromptLayerObjectGroup';
+export const selectPromptLayerObjectGroup = (item: KonvaNodeType<KonvaNodeConfigType>) =>
+  item.name() !== REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME;
 
 export const LayerComponent: React.FC<Props> = ({ id }) => {
   const dispatch = useAppDispatch();
@@ -74,7 +81,7 @@ export const LayerComponent: React.FC<Props> = ({ id }) => {
       onChangeBbox(null);
       return;
     }
-    onChangeBbox(getKonvaLayerBbox(layerRef.current, filterChildren));
+    onChangeBbox(getKonvaLayerBbox(layerRef.current, selectPromptLayerObjectGroup));
   }, [tool, layer.objects, onChangeBbox]);
 
   if (!layer.isVisible) {
@@ -85,8 +92,8 @@ export const LayerComponent: React.FC<Props> = ({ id }) => {
     <>
       <KonvaLayer
         ref={layerRef}
-        id={`layer-${layer.id}`}
-        name="regionalPromptLayer"
+        id={layer.id}
+        name={REGIONAL_PROMPT_LAYER_NAME}
         onDragEnd={onDragEnd}
         onDragMove={onDragMove}
         dragBoundFunc={dragBoundFunc}
@@ -94,7 +101,7 @@ export const LayerComponent: React.FC<Props> = ({ id }) => {
       >
         <KonvaGroup
           id={`layer-${layer.id}-group`}
-          name="regionalPromptLayerObjectGroup"
+          name={REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME}
           ref={groupRef}
           listening={false}
         >
