@@ -34,7 +34,7 @@ export const LayerBoundingBox = ({ layerId }: Props) => {
   return (
     <KonvaRect
       onMouseDown={onMouseDown}
-      stroke={selectedLayer === layerId ? 'rgba(0, 238, 255, 1)' : 'rgba(255,255,255,0.3)'}
+      stroke={selectedLayer === layerId ? 'rgba(153, 187, 189, 1)' : 'rgba(255, 255, 255, 0.149)'}
       strokeWidth={1}
       x={bbox.x}
       y={bbox.y}
