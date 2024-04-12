@@ -135,7 +135,6 @@ export const buildCanvasSDXLInpaintGraph = async (
         coherence_mode: canvasCoherenceMode,
         minimum_denoise: refinerModel ? Math.max(0.2, canvasCoherenceMinDenoise) : canvasCoherenceMinDenoise,
         edge_radius: canvasCoherenceEdgeSize,
-        image: canvasInitImage,
         tiled: false,
         fp32: fp32,
       },

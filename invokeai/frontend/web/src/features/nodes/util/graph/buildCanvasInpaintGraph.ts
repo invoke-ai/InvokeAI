@@ -133,7 +133,6 @@ export const buildCanvasInpaintGraph = async (
         coherence_mode: canvasCoherenceMode,
         minimum_denoise: canvasCoherenceMinDenoise,
         edge_radius: canvasCoherenceEdgeSize,
-        image: canvasInitImage,
         tiled: false,
         fp32: fp32,
       },
