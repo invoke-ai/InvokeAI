@@ -32,6 +32,7 @@ export const LayerComponent: React.FC<Props> = ({ id }) => {
   const dispatch = useAppDispatch();
   const layer = useLayer(id);
   const selectedLayer = useAppSelector((s) => s.regionalPrompts.selectedLayer);
+  const promptLayerOpacity = useAppSelector((s) => s.regionalPrompts.promptLayerOpacity);
   const tool = useAppSelector((s) => s.regionalPrompts.tool);
   const layerRef = useRef<KonvaLayerType>(null);
   const groupRef = useRef<KonvaGroupType>(null);
@@ -43,15 +44,10 @@ export const LayerComponent: React.FC<Props> = ({ id }) => {
     [dispatch, layer.id]
   );
 
-  const onDragEnd = useCallback(
-    (e: KonvaEventObject<DragEvent>) => {
-      dispatch(layerTranslated({ layerId: id, x: e.target.x(), y: e.target.y() }));
-    },
-    [dispatch, id]
-  );
-
   const onDragMove = useCallback(
     (e: KonvaEventObject<DragEvent>) => {
+      // We must track the layer's coordinates to accurately position objects. For example, when drawing a line, the
+      // mouse events are handled by the stage, but the line is drawn on the layer.
       dispatch(layerTranslated({ layerId: id, x: e.target.x(), y: e.target.y() }));
     },
     [dispatch, id]
@@ -66,6 +62,7 @@ export const LayerComponent: React.FC<Props> = ({ id }) => {
     if (!cursorPos) {
       return this.getAbsolutePosition();
     }
+    // This prevents the user from dragging the object out of the stage.
     if (cursorPos.x < 0 || cursorPos.x > stage.width() || cursorPos.y < 0 || cursorPos.y > stage.height()) {
       return this.getAbsolutePosition();
     }
@@ -75,14 +72,33 @@ export const LayerComponent: React.FC<Props> = ({ id }) => {
 
   useEffect(() => {
     if (!layerRef.current || tool !== 'move') {
+      // This effectively makes the bbox only calculate as the tool is changed to 'move'.
       return;
     }
     if (layer.objects.length === 0) {
+      // Reset the bbox when we have no objects.
       onChangeBbox(null);
       return;
     }
+    // We could debounce this, remove the early return when the tool isn't move, and always show the bbox. For now,
+    // it is only shown when we are using the move tool.
     onChangeBbox(getKonvaLayerBbox(layerRef.current, selectPromptLayerObjectGroup));
   }, [tool, layer.objects, onChangeBbox]);
+
+  useEffect(() => {
+    if (!groupRef.current) {
+      return;
+    }
+    // Caching is not allowed for "empty" nodes. We must draw here to render the group instead. This is required
+    // to clear the layer when the layer is reset and on first render, when the layer has no objects.
+    if (layer.objects.length === 0) {
+      groupRef.current.draw();
+      return;
+    }
+    // Caching the group allows its opacity to apply to all shapes at once. We should cache only when the layer's
+    // objects or attributes with a visual effect (e.g. color) change.
+    groupRef.current.cache();
+  }, [layer.objects, layer.color, layer.isVisible]);
 
   if (!layer.isVisible) {
     return null;
@@ -94,7 +110,6 @@ export const LayerComponent: React.FC<Props> = ({ id }) => {
         ref={layerRef}
         id={layer.id}
         name={REGIONAL_PROMPT_LAYER_NAME}
-        onDragEnd={onDragEnd}
         onDragMove={onDragMove}
         dragBoundFunc={dragBoundFunc}
         draggable
@@ -104,6 +119,7 @@ export const LayerComponent: React.FC<Props> = ({ id }) => {
           name={REGIONAL_PROMPT_LAYER_OBJECT_GROUP_NAME}
           ref={groupRef}
           listening={false}
+          opacity={promptLayerOpacity}
         >
           {layer.objects.map((obj) => {
             if (obj.kind === 'line') {

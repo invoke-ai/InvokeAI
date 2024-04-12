@@ -64,6 +64,7 @@ type RegionalPromptsState = {
   selectedLayer: string | null;
   layers: PromptRegionLayer[];
   brushSize: number;
+  promptLayerOpacity: number;
 };
 
 const initialRegionalPromptsState: RegionalPromptsState = {
@@ -72,6 +73,7 @@ const initialRegionalPromptsState: RegionalPromptsState = {
   selectedLayer: null,
   brushSize: 40,
   layers: [],
+  promptLayerOpacity: 0.5,
 };
 
 const isLine = (obj: LayerObject): obj is LineObject => obj.kind === 'line';
@@ -196,6 +198,9 @@ export const regionalPromptsSlice = createSlice({
     toolChanged: (state, action: PayloadAction<Tool>) => {
       state.tool = action.payload;
     },
+    promptLayerOpacityChanged: (state, action: PayloadAction<number>) => {
+      state.promptLayerOpacity = action.payload;
+    },
   },
 });
 
@@ -245,6 +250,7 @@ export const {
   toolChanged,
   layerTranslated,
   layerBboxChanged,
+  promptLayerOpacityChanged,
 } = regionalPromptsSlice.actions;
 
 export const selectRegionalPromptsSlice = (state: RootState) => state.regionalPrompts;

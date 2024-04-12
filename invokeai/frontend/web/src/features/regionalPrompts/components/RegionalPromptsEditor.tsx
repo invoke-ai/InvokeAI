@@ -5,6 +5,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { AddLayerButton } from 'features/regionalPrompts/components/AddLayerButton';
 import { BrushSize } from 'features/regionalPrompts/components/BrushSize';
 import { LayerListItem } from 'features/regionalPrompts/components/LayerListItem';
+import { PromptLayerOpacity } from 'features/regionalPrompts/components/PromptLayerOpacity';
 import { RegionalPromptsStage } from 'features/regionalPrompts/components/RegionalPromptsStage';
 import { ToolChooser } from 'features/regionalPrompts/components/ToolChooser';
 import { selectRegionalPromptsSlice } from 'features/regionalPrompts/store/regionalPromptsSlice';
@@ -27,6 +28,7 @@ export const RegionalPromptsEditor = () => {
         <Button onClick={debugBlobs}>DEBUG LAYERS</Button>
         <AddLayerButton />
         <BrushSize />
+        <PromptLayerOpacity />
         <ImageSizeLinear />
         <ToolChooser />
         {layerIdsReversed.map((id) => (
