@@ -66,6 +66,9 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
       dispatch(
         queueApi.util.invalidateTags(['CurrentSessionQueueItem', 'NextSessionQueueItem', 'InvocationCacheStatus'])
       );
+
+      updatePageTitle(queue_item.status);
+      updatePageFavicon(queue_item.status);
     },
   });
 };
