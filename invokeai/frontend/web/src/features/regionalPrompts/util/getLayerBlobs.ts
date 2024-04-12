@@ -10,6 +10,8 @@ export const getRegionalPromptLayerBlobs = async (preview: boolean = false): Pro
   const state = getStore().getState();
   const stage = $stage.get();
   assert(stage !== null, 'Stage is null');
+
+  // This automatically omits layers that are not rendered. Rendering is controlled by the layer's `isVisible` flag in redux.
   const regionalPromptLayers = stage.getLayers().filter((l) => l.name() === REGIONAL_PROMPT_LAYER_NAME);
 
   // We need to reconstruct each layer to only output the desired data. This logic mirrors the logic in
