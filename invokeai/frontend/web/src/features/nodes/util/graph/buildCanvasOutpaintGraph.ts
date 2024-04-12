@@ -157,6 +157,9 @@ export const buildCanvasOutpaintGraph = async (
         coherence_mode: canvasCoherenceMode,
         edge_radius: canvasCoherenceEdgeSize,
         minimum_denoise: canvasCoherenceMinDenoise,
+        image: canvasInitImage,
+        tiled: false,
+        fp32: fp32,
       },
       [DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -194,6 +197,16 @@ export const buildCanvasOutpaintGraph = async (
         },
         destination: {
           node_id: DENOISE_LATENTS,
+          field: 'unet',
+        },
+      },
+      {
+        source: {
+          node_id: modelLoaderNodeId,
+          field: 'unet',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
           field: 'unet',
         },
       },
@@ -450,6 +463,16 @@ export const buildCanvasOutpaintGraph = async (
         },
         destination: {
           node_id: MASK_RESIZE_UP,
+          field: 'image',
+        },
+      },
+      {
+        source: {
+          node_id: INPAINT_IMAGE_RESIZE_UP,
+          field: 'image',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
           field: 'image',
         },
       },

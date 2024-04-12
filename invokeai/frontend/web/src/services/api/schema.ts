@@ -2879,6 +2879,25 @@ export type components = {
        */
       minimum_denoise?: number;
       /**
+       * UNet
+       * @description The UNet input used to detect if it is an inpainting model
+       */
+      unet?: components["schemas"]["UNetField"] | null;
+      /** Image */
+      image?: components["schemas"]["ImageField"] | null;
+      /** vae */
+      vae?: components["schemas"]["VAEField"] | null;
+      /** 
+       * @description tiled is used by the VAE 
+       * @default false
+       * */
+      tiled?: boolean;
+      /** 
+       * @description fp32 is used by the VAE
+       * @default false
+       */
+      fp32?: boolean;
+      /**
        * type
        * @default create_gradient_mask
        * @constant

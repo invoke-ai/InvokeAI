@@ -10,6 +10,7 @@ import {
   IMAGE_TO_IMAGE_GRAPH,
   IMAGE_TO_LATENTS,
   INPAINT_IMAGE,
+  INPAINT_CREATE_MASK,
   LATENTS_TO_IMAGE,
   MAIN_MODEL_LOADER,
   SDXL_CANVAS_IMAGE_TO_IMAGE_GRAPH,
@@ -142,6 +143,16 @@ export const addVAEToGraph = async (
         },
         destination: {
           node_id: INPAINT_IMAGE,
+          field: 'vae',
+        },
+      },
+      {
+        source: {
+          node_id: isSeamlessEnabled ? SEAMLESS : isAutoVae ? modelLoaderNodeId : VAE_LOADER,
+          field: 'vae',
+        },
+        destination: {
+          node_id: INPAINT_CREATE_MASK,
           field: 'vae',
         },
       },
