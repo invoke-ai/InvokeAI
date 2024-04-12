@@ -8,13 +8,17 @@ const log = logger('socketio');
 const updatePageTitle = (itemStatus: string) => {
   const baseString: string = document.title.replace('(1) ', '');
   document.title = itemStatus === 'in_progress' ? `(1) ${baseString}` : baseString;
+const updatePageTitle = (activeQueueLength: number) => {
+  const baseString: string = document.title.replace(/\(\d+\)/ , '');
+  document.title = activeQueueLength > 0 ? `(${activeQueueLength}) ${baseString}` : baseString;
 };
 
 const updatePageFavicon = (itemStatus: string) => {
+const updatePageFavicon = (activeQueueLength: number) => {
   const InvokeLogoSVG: string = 'assets/images/invoke-favicon.svg';
   const InvokeAlertLogoSVG: string = 'assets/images/invoke-alert-favicon.svg';
   const faviconEl: HTMLLinkElement = document.getElementById('invoke-favicon') as HTMLLinkElement;
-  faviconEl.href = itemStatus === 'in_progress' ? InvokeAlertLogoSVG : InvokeLogoSVG;
+  faviconEl.href = activeQueueLength > 0 ? InvokeAlertLogoSVG : InvokeLogoSVG;
 };
 
 export const addSocketQueueItemStatusChangedEventListener = (startAppListening: AppStartListening) => {
@@ -23,6 +27,9 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
     effect: async (action, { dispatch }) => {
       // we've got new status for the queue item, batch and queue
       const { queue_item, batch_status, queue_status } = action.payload.data;
+
+      // Keep track of the active queue length by summing up pending and in_progress count
+      const activeQueueLength: number = (queue_status.pending + queue_status.in_progress) || 0;
 
       log.debug(action.payload, `Queue item ${queue_item.item_id} status updated: ${queue_item.status}`);
 
@@ -67,8 +74,8 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
         queueApi.util.invalidateTags(['CurrentSessionQueueItem', 'NextSessionQueueItem', 'InvocationCacheStatus'])
       );
 
-      updatePageTitle(queue_item.status);
-      updatePageFavicon(queue_item.status);
+      updatePageTitle(activeQueueLength);
+      updatePageFavicon(activeQueueLength);
     },
   });
 };
