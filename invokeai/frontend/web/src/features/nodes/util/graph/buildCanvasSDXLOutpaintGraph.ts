@@ -201,16 +201,6 @@ export const buildCanvasSDXLOutpaintGraph = async (
       },
       {
         source: {
-          node_id: modelLoaderNodeId,
-          field: 'unet',
-        },
-        destination: {
-          node_id: INPAINT_CREATE_MASK,
-          field: 'unet',
-        },
-      },
-      {
-        source: {
           node_id: SDXL_MODEL_LOADER,
           field: 'clip',
         },
