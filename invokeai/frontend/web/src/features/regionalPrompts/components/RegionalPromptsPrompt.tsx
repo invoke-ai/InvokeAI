@@ -1,13 +1,11 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/components/ShowDynamicPromptsPreviewButton';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
 import { useLayerPrompt } from 'features/regionalPrompts/hooks/layerStateHooks';
 import { promptChanged } from 'features/regionalPrompts/store/regionalPromptsSlice';
-import { SDXLConcatButton } from 'features/sdxl/components/SDXLPrompts/SDXLConcatButton';
 import { memo, useCallback, useRef } from 'react';
 import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -20,7 +18,6 @@ type Props = {
 export const RegionalPromptsPrompt = memo((props: Props) => {
   const prompt = useLayerPrompt(props.layerId);
   const dispatch = useAppDispatch();
-  const baseModel = useAppSelector((s) => s.generation.model)?.base;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const _onChange = useCallback(
@@ -46,7 +43,7 @@ export const RegionalPromptsPrompt = memo((props: Props) => {
 
   return (
     <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
-      <Box pos="relative">
+      <Box pos="relative" w="full">
         <Textarea
           id="prompt"
           name="prompt"
@@ -62,8 +59,6 @@ export const RegionalPromptsPrompt = memo((props: Props) => {
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
-          {baseModel === 'sdxl' && <SDXLConcatButton />}
-          <ShowDynamicPromptsPreviewButton />
         </PromptOverlayButtonWrapper>
       </Box>
     </PromptPopover>

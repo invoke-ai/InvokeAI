@@ -40,7 +40,8 @@ export const RegionalPromptsStage: React.FC = memo(() => {
   }, []);
   const sx = useMemo(
     () => ({
-      border: '1px solid cyan',
+      borderRadius: 'base',
+      borderWidth: 1,
       cursor: tool === 'move' ? 'default' : 'none',
     }),
     [tool]
