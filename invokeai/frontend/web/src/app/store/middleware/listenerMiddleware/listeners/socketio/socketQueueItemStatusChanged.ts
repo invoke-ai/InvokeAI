@@ -5,15 +5,24 @@ import { socketQueueItemStatusChanged } from 'services/events/actions';
 
 const log = logger('socketio');
 
-const updatePageTitle = (itemStatus: string) => {
-  const baseString: string = document.title.replace('(1) ', '');
-  document.title = itemStatus === 'in_progress' ? `(1) ${baseString}` : baseString;
+/**
+ * Updates the page's title to reflect the current length of the active queue.
+ * If there are items in the queue, the title will be prefixed with the count inside parentheses.
+ * If the queue is empty, the title will revert to its original state without any count.
+ *
+ * @param {number} activeQueueLength - The number of active items in the queue.
+ */
 const updatePageTitle = (activeQueueLength: number) => {
   const baseString: string = document.title.replace(/\(\d+\)/ , '');
   document.title = activeQueueLength > 0 ? `(${activeQueueLength}) ${baseString}` : baseString;
 };
 
-const updatePageFavicon = (itemStatus: string) => {
+/**
+ * Updates the favicon of the page based on the presence of items in the queue.
+ * If there are items in the queue, it uses an alert favicon. Otherwise, it reverts to the default favicon.
+ *
+ * @param {number} activeQueueLength - The number of active items in the queue.
+ */
 const updatePageFavicon = (activeQueueLength: number) => {
   const InvokeLogoSVG: string = 'assets/images/invoke-favicon.svg';
   const InvokeAlertLogoSVG: string = 'assets/images/invoke-alert-favicon.svg';
