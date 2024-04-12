@@ -180,16 +180,6 @@ export const buildCanvasSDXLInpaintGraph = async (
       {
         source: {
           node_id: modelLoaderNodeId,
-          field: 'unet',
-        },
-        destination: {
-          node_id: INPAINT_CREATE_MASK,
-          field: 'unet',
-        },
-      },
-      {
-        source: {
-          node_id: modelLoaderNodeId,
           field: 'clip',
         },
         destination: {
