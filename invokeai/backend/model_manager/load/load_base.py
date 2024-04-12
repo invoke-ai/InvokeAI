@@ -23,8 +23,8 @@ from invokeai.backend.model_manager.load.model_cache.model_cache_base import Mod
 class LoadedModel:
     """Context manager object that mediates transfer from RAM<->VRAM."""
 
-    config: AnyModelConfig
     _locker: ModelLockerBase
+    config: Optional[AnyModelConfig] = None
 
     def __enter__(self) -> AnyModel:
         """Context entry."""

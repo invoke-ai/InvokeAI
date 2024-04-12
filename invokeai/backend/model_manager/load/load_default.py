@@ -16,7 +16,7 @@ from invokeai.backend.model_manager.config import DiffusersConfigBase, ModelType
 from invokeai.backend.model_manager.load.convert_cache import ModelConvertCacheBase
 from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase, ModelLockerBase
-from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data, calc_model_size_by_fs
+from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.util.devices import choose_torch_device, torch_dtype
 
@@ -95,7 +95,6 @@ class ModelLoader(ModelLoaderBase):
             config.key,
             submodel_type=submodel_type,
             model=loaded_model,
-            size=calc_model_size_by_data(loaded_model),
         )
 
         return self._ram_cache.get(
@@ -126,9 +125,7 @@ class ModelLoader(ModelLoaderBase):
                 if subtype == submodel_type:
                     continue
                 if submodel := getattr(pipeline, subtype.value, None):
-                    self._ram_cache.put(
-                        config.key, submodel_type=subtype, model=submodel, size=calc_model_size_by_data(submodel)
-                    )
+                    self._ram_cache.put(config.key, submodel_type=subtype, model=submodel)
         return getattr(pipeline, submodel_type.value) if submodel_type else pipeline
 
     def _needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -> bool:
