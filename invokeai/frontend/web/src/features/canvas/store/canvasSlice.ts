@@ -66,6 +66,7 @@ const initialCanvasState: CanvasState = {
   shouldAutoSave: false,
   shouldCropToBoundingBoxOnSave: false,
   shouldDarkenOutsideBoundingBox: false,
+  shouldFitImageSize: true,
   shouldInvertBrushSizeScrollDirection: false,
   shouldLockBoundingBox: false,
   shouldPreserveMaskedArea: false,
@@ -144,12 +145,20 @@ export const canvasSlice = createSlice({
       reducer: (state, action: PayloadActionWithOptimalDimension<ImageDTO>) => {
         const { width, height, image_name } = action.payload;
         const { optimalDimension } = action.meta;
-        const { stageDimensions } = state;
+        const { stageDimensions, shouldFitImageSize } = state;
 
-        const newBoundingBoxDimensions = {
-          width: roundDownToMultiple(clamp(width, CANVAS_GRID_SIZE_FINE, optimalDimension), CANVAS_GRID_SIZE_FINE),
-          height: roundDownToMultiple(clamp(height, CANVAS_GRID_SIZE_FINE, optimalDimension), CANVAS_GRID_SIZE_FINE),
-        };
+        const newBoundingBoxDimensions = shouldFitImageSize
+          ? {
+              width: roundDownToMultiple(width, CANVAS_GRID_SIZE_FINE),
+              height: roundDownToMultiple(height, CANVAS_GRID_SIZE_FINE),
+            }
+          : {
+              width: roundDownToMultiple(clamp(width, CANVAS_GRID_SIZE_FINE, optimalDimension), CANVAS_GRID_SIZE_FINE),
+              height: roundDownToMultiple(
+                clamp(height, CANVAS_GRID_SIZE_FINE, optimalDimension),
+                CANVAS_GRID_SIZE_FINE
+              ),
+            };
 
         const newBoundingBoxCoordinates = {
           x: roundToMultiple(width / 2 - newBoundingBoxDimensions.width / 2, CANVAS_GRID_SIZE_FINE),
@@ -181,7 +190,6 @@ export const canvasSlice = createSlice({
           ],
         };
         state.futureLayerStates = [];
-        state.batchIds = [];
 
         const newScale = calculateScale(
           stageDimensions.width,
@@ -277,33 +285,14 @@ export const canvasSlice = createSlice({
     },
     discardStagedImages: (state) => {
       pushToPrevLayerStates(state);
-
-      state.layerState.stagingArea = deepClone(initialLayerState.stagingArea);
-
+      resetStagingArea(state);
       state.futureLayerStates = [];
-      state.shouldShowStagingOutline = true;
-      state.shouldShowStagingImage = true;
-      state.batchIds = [];
     },
     discardStagedImage: (state) => {
       const { images, selectedImageIndex } = state.layerState.stagingArea;
       pushToPrevLayerStates(state);
-
-      if (!images.length) {
-        return;
-      }
-
       images.splice(selectedImageIndex, 1);
-
-      if (selectedImageIndex >= images.length) {
-        state.layerState.stagingArea.selectedImageIndex = images.length - 1;
-      }
-
-      if (!images.length) {
-        state.shouldShowStagingImage = false;
-        state.shouldShowStagingOutline = false;
-      }
-
+      state.layerState.stagingArea.selectedImageIndex = Math.max(0, images.length - 1);
       state.futureLayerStates = [];
     },
     addFillRect: (state) => {
@@ -417,7 +406,6 @@ export const canvasSlice = createSlice({
       pushToPrevLayerStates(state);
       state.layerState = deepClone(initialLayerState);
       state.futureLayerStates = [];
-      state.batchIds = [];
       state.boundingBoxCoordinates = {
         ...initialCanvasState.boundingBoxCoordinates,
       };
@@ -518,12 +506,9 @@ export const canvasSlice = createSlice({
           ...imageToCommit,
         });
       }
-      state.layerState.stagingArea = deepClone(initialLayerState.stagingArea);
 
+      resetStagingArea(state);
       state.futureLayerStates = [];
-      state.shouldShowStagingOutline = true;
-      state.shouldShowStagingImage = true;
-      state.batchIds = [];
     },
     setBoundingBoxScaleMethod: {
       reducer: (state, action: PayloadActionWithOptimalDimension<BoundingBoxScaleMethod>) => {
@@ -574,6 +559,9 @@ export const canvasSlice = createSlice({
     },
     setShouldAntialias: (state, action: PayloadAction<boolean>) => {
       state.shouldAntialias = action.payload;
+    },
+    setShouldFitImageSize: (state, action: PayloadAction<boolean>) => {
+      state.shouldFitImageSize = action.payload;
     },
     setShouldCropToBoundingBoxOnSave: (state, action: PayloadAction<boolean>) => {
       state.shouldCropToBoundingBoxOnSave = action.payload;
@@ -628,12 +616,19 @@ export const canvasSlice = createSlice({
       if (batch_status.in_progress === 0 && batch_status.pending === 0) {
         state.batchIds = state.batchIds.filter((id) => id !== batch_status.batch_id);
       }
+
+      const queueItemStatus = action.payload.data.queue_item.status;
+      if (queueItemStatus === 'canceled' || queueItemStatus === 'failed') {
+        resetStagingAreaIfEmpty(state);
+      }
     });
     builder.addMatcher(queueApi.endpoints.clearQueue.matchFulfilled, (state) => {
       state.batchIds = [];
+      resetStagingAreaIfEmpty(state);
     });
     builder.addMatcher(queueApi.endpoints.cancelByBatchIds.matchFulfilled, (state, action) => {
       state.batchIds = state.batchIds.filter((id) => !action.meta.arg.originalArgs.batch_ids.includes(id));
+      resetStagingAreaIfEmpty(state);
     });
   },
 });
@@ -685,6 +680,7 @@ export const {
   setShouldRestrictStrokesToBox,
   stagingAreaInitialized,
   setShouldAntialias,
+  setShouldFitImageSize,
   canvasResized,
   canvasBatchIdAdded,
   canvasBatchIdsReset,
@@ -706,7 +702,7 @@ export const canvasPersistConfig: PersistConfig<CanvasState> = {
   name: canvasSlice.name,
   initialState: initialCanvasState,
   migrate: migrateCanvasState,
-  persistDenylist: [],
+  persistDenylist: ['shouldShowStagingImage', 'shouldShowStagingOutline'],
 };
 
 const pushToPrevLayerStates = (state: CanvasState) => {
@@ -721,4 +717,16 @@ const pushToFutureLayerStates = (state: CanvasState) => {
   if (state.futureLayerStates.length > MAX_HISTORY) {
     state.futureLayerStates = state.futureLayerStates.slice(0, MAX_HISTORY);
   }
+};
+
+const resetStagingAreaIfEmpty = (state: CanvasState) => {
+  if (state.batchIds.length === 0 && state.layerState.stagingArea.images.length === 0) {
+    resetStagingArea(state);
+  }
+};
+
+const resetStagingArea = (state: CanvasState) => {
+  state.layerState.stagingArea = { ...initialCanvasState.layerState.stagingArea };
+  state.shouldShowStagingImage = initialCanvasState.shouldShowStagingImage;
+  state.shouldShowStagingOutline = initialCanvasState.shouldShowStagingOutline;
 };

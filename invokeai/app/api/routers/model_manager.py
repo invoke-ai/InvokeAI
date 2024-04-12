@@ -219,28 +219,13 @@ async def scan_for_models(
         non_core_model_paths = [p for p in found_model_paths if not p.is_relative_to(core_models_path)]
 
         installed_models = ApiDependencies.invoker.services.model_manager.store.search_by_attr()
-        resolved_installed_model_paths: list[str] = []
-        installed_model_sources: list[str] = []
-
-        # This call lists all installed models.
-        for model in installed_models:
-            path = pathlib.Path(model.path)
-            # If the model has a source, we need to add it to the list of installed sources.
-            if model.source:
-                installed_model_sources.append(model.source)
-            # If the path is not absolute, that means it is in the app models directory, and we need to join it with
-            # the models path before resolving.
-            if not path.is_absolute():
-                resolved_installed_model_paths.append(str(pathlib.Path(models_path, path).resolve()))
-                continue
-            resolved_installed_model_paths.append(str(path.resolve()))
 
         scan_results: list[FoundModel] = []
 
-        # Check if the model is installed by comparing the resolved paths, appending to the scan result.
+        # Check if the model is installed by comparing paths, appending to the scan result.
         for p in non_core_model_paths:
             path = str(p)
-            is_installed = path in resolved_installed_model_paths or path in installed_model_sources
+            is_installed = any(str(models_path / m.path) == path for m in installed_models)
             found_model = FoundModel(path=path, is_installed=is_installed)
             scan_results.append(found_model)
     except Exception as e:

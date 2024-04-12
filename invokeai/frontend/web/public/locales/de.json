@@ -75,7 +75,8 @@
         "copy": "Kopieren",
         "aboutHeading": "Nutzen Sie Ihre kreative Energie",
         "toResolve": "Lösen",
-        "add": "Hinzufügen"
+        "add": "Hinzufügen",
+        "loglevel": "Protokoll Stufe"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
@@ -388,7 +389,14 @@
         "vaePrecision": "VAE-Präzision",
         "variant": "Variante",
         "modelDeleteFailed": "Modell konnte nicht gelöscht werden",
-        "noModelSelected": "Kein Modell ausgewählt"
+        "noModelSelected": "Kein Modell ausgewählt",
+        "huggingFace": "HuggingFace",
+        "defaultSettings": "Standardeinstellungen",
+        "edit": "Bearbeiten",
+        "cancel": "Stornieren",
+        "defaultSettingsSaved": "Standardeinstellungen gespeichert",
+        "addModels": "Model hinzufügen",
+        "deleteModelImage": "Lösche Model Bild"
     },
     "parameters": {
         "images": "Bilder",
@@ -472,7 +480,6 @@
         "canvasMerged": "Leinwand zusammengeführt",
         "sentToImageToImage": "Gesendet an Bild zu Bild",
         "sentToUnifiedCanvas": "Gesendet an Leinwand",
-        "parametersSet": "Parameter festlegen",
         "parametersNotSet": "Parameter nicht festgelegt",
         "metadataLoadFailed": "Metadaten konnten nicht geladen werden",
         "setCanvasInitialImage": "Ausgangsbild setzen",
@@ -677,7 +684,8 @@
         "body": "Körper",
         "hands": "Hände",
         "dwOpenpose": "DW Openpose",
-        "dwOpenposeDescription": "Posenschätzung mit DW Openpose"
+        "dwOpenposeDescription": "Posenschätzung mit DW Openpose",
+        "selectCLIPVisionModel": "Wähle ein CLIP Vision Model aus"
     },
     "queue": {
         "status": "Status",
@@ -765,7 +773,10 @@
         "recallParameters": "Parameter wiederherstellen",
         "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
         "allPrompts": "Alle Prompts",
-        "imageDimensions": "Bilder Auslösungen"
+        "imageDimensions": "Bilder Auslösungen",
+        "parameterSet": "Parameter {{parameter}} setzen",
+        "recallParameter": "{{label}} Abrufen",
+        "parsingFailed": "Parsing Fehlgeschlagen"
     },
     "popovers": {
         "noiseUseCPU": {
@@ -1030,7 +1041,8 @@
             "title": "Bild"
         },
         "advanced": {
-            "title": "Erweitert"
+            "title": "Erweitert",
+            "options": "$t(accordions.advanced.title) Optionen"
         },
         "control": {
             "title": "Kontrolle"

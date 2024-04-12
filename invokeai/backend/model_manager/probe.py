@@ -230,9 +230,10 @@ class ModelProbe(object):
                 return ModelType.LoRA
             elif any(key.startswith(v) for v in {"controlnet", "control_model", "input_blocks"}):
                 return ModelType.ControlNet
+            elif any(key.startswith(v) for v in {"image_proj.", "ip_adapter."}):
+                return ModelType.IPAdapter
             elif key in {"emb_params", "string_to_param"}:
                 return ModelType.TextualInversion
-
         else:
             # diffusers-ti
             if len(ckpt) < 10 and all(isinstance(v, torch.Tensor) for v in ckpt.values()):
@@ -323,7 +324,7 @@ class ModelProbe(object):
         with SilenceWarnings():
             if model_path.suffix.endswith((".ckpt", ".pt", ".pth", ".bin")):
                 cls._scan_model(model_path.name, model_path)
-                model = torch.load(model_path)
+                model = torch.load(model_path, map_location="cpu")
                 assert isinstance(model, dict)
                 return model
             else:
@@ -527,8 +528,25 @@ class ControlNetCheckpointProbe(CheckpointProbeBase):
 
 
 class IPAdapterCheckpointProbe(CheckpointProbeBase):
+    """Class for probing IP Adapters"""
+
     def get_base_type(self) -> BaseModelType:
-        raise NotImplementedError()
+        checkpoint = self.checkpoint
+        for key in checkpoint.keys():
+            if not key.startswith(("image_proj.", "ip_adapter.")):
+                continue
+            cross_attention_dim = checkpoint["ip_adapter.1.to_k_ip.weight"].shape[-1]
+            if cross_attention_dim == 768:
+                return BaseModelType.StableDiffusion1
+            elif cross_attention_dim == 1024:
+                return BaseModelType.StableDiffusion2
+            elif cross_attention_dim == 2048:
+                return BaseModelType.StableDiffusionXL
+            else:
+                raise InvalidModelConfigException(
+                    f"IP-Adapter had unexpected cross-attention dimension: {cross_attention_dim}."
+                )
+        raise InvalidModelConfigException(f"{self.model_path}: Unable to determine base type")
 
 
 class CLIPVisionCheckpointProbe(CheckpointProbeBase):
@@ -768,7 +786,7 @@ class T2IAdapterFolderProbe(FolderProbeBase):
             )
 
 
-############## register probe classes ######
+# Register probe classes
 ModelProbe.register_probe("diffusers", ModelType.Main, PipelineFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.VAE, VaeFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.LoRA, LoRAFolderProbe)

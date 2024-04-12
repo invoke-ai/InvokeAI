@@ -77,7 +77,7 @@ export const ControlSettingsAccordion: React.FC = memo(() => {
 
   return (
     <StandaloneAccordion label={t('accordions.control.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
-      <Flex gap={2} p={4} flexDir="column">
+      <Flex gap={2} p={4} flexDir="column" data-testid="control-accordion">
         <ButtonGroup size="sm" w="full" justifyContent="space-between" variant="ghost" isAttached={false}>
           <Button
             tooltip={t('controlnet.addControlNet')}

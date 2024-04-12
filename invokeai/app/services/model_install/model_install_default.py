@@ -1,5 +1,6 @@
 """Model installation class."""
 
+import locale
 import os
 import re
 import signal
@@ -323,7 +324,8 @@ class ModelInstallService(ModelInstallServiceBase):
             legacy_models_yaml_path = Path(self._app_config.root_path, legacy_models_yaml_path)
 
         if legacy_models_yaml_path.exists():
-            legacy_models_yaml = yaml.safe_load(legacy_models_yaml_path.read_text())
+            with open(legacy_models_yaml_path, "rt", encoding=locale.getpreferredencoding()) as file:
+                legacy_models_yaml = yaml.safe_load(file)
 
             yaml_metadata = legacy_models_yaml.pop("__metadata__")
             yaml_version = yaml_metadata.get("version")
@@ -564,7 +566,7 @@ class ModelInstallService(ModelInstallServiceBase):
             # The model is not in the models directory - we don't need to move it.
             return model
 
-        new_path = (models_dir / model.base.value / model.type.value / model.name).with_suffix(old_path.suffix)
+        new_path = models_dir / model.base.value / model.type.value / old_path.name
 
         if old_path == new_path or new_path.exists() and old_path == new_path.resolve():
             return model

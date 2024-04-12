@@ -66,6 +66,11 @@ export const buildCanvasSDXLOutpaintGraph = async (
     infillTileSize,
     infillPatchmatchDownscaleSize,
     infillMethod,
+    // infillMosaicTileWidth,
+    // infillMosaicTileHeight,
+    // infillMosaicMinColor,
+    // infillMosaicMaxColor,
+    infillColorValue,
     seamlessXAxis,
     seamlessYAxis,
     canvasCoherenceMode,
@@ -151,7 +156,7 @@ export const buildCanvasSDXLOutpaintGraph = async (
         is_intermediate,
         coherence_mode: canvasCoherenceMode,
         edge_radius: canvasCoherenceEdgeSize,
-        minimum_denoise: canvasCoherenceMinDenoise,
+        minimum_denoise: refinerModel ? Math.max(0.2, canvasCoherenceMinDenoise) : canvasCoherenceMinDenoise,
       },
       [SDXL_DENOISE_LATENTS]: {
         type: 'denoise_latents',
@@ -365,6 +370,28 @@ export const buildCanvasSDXLOutpaintGraph = async (
     };
   }
 
+  // TODO: add mosaic back
+  // if (infillMethod === 'mosaic') {
+  //   graph.nodes[INPAINT_INFILL] = {
+  //     type: 'infill_mosaic',
+  //     id: INPAINT_INFILL,
+  //     is_intermediate,
+  //     tile_width: infillMosaicTileWidth,
+  //     tile_height: infillMosaicTileHeight,
+  //     min_color: infillMosaicMinColor,
+  //     max_color: infillMosaicMaxColor,
+  //   };
+  // }
+
+  if (infillMethod === 'color') {
+    graph.nodes[INPAINT_INFILL] = {
+      type: 'infill_rgba',
+      id: INPAINT_INFILL,
+      is_intermediate,
+      color: infillColorValue,
+    };
+  }
+
   // Handle Scale Before Processing
   if (isUsingScaledDimensions) {
     const scaledWidth: number = scaledBoundingBoxDimensions.width;
@@ -555,7 +582,7 @@ export const buildCanvasSDXLOutpaintGraph = async (
 
   // Add Refiner if enabled
   if (refinerModel) {
-    await addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId, canvasInitImage);
+    await addSDXLRefinerToGraph(state, graph, SDXL_DENOISE_LATENTS, modelLoaderNodeId);
     if (seamlessXAxis || seamlessYAxis) {
       modelLoaderNodeId = SDXL_REFINER_SEAMLESS;
     }

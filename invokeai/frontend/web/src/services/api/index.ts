@@ -29,6 +29,7 @@ const tagTypes = [
   'InvocationCacheStatus',
   'ModelConfig',
   'ModelInstalls',
+  'ModelScanFolderResults',
   'T2IAdapterModel',
   'MainModel',
   'VaeModel',

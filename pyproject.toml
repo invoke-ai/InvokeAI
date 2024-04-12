@@ -256,7 +256,6 @@ module = [
   "invokeai.backend.model_management.seamless",
   "invokeai.backend.model_management.util",
   "invokeai.backend.stable_diffusion.diffusers_pipeline",
-  "invokeai.backend.stable_diffusion.diffusion.cross_attention_control",
   "invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion",
   "invokeai.backend.util.hotfixes",
   "invokeai.backend.util.mps_fixes",
