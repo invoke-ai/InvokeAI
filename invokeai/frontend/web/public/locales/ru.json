@@ -575,7 +575,6 @@
         "canvasMerged": "Холст объединен",
         "sentToImageToImage": "Отправить в img2img",
         "sentToUnifiedCanvas": "Отправлено на Единый холст",
-        "parametersSet": "Параметры заданы",
         "parametersNotSet": "Параметры не заданы",
         "metadataLoadFailed": "Не удалось загрузить метаданные",
         "serverError": "Ошибка сервера",

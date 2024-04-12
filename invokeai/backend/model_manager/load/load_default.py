@@ -37,7 +37,7 @@ class ModelLoader(ModelLoaderBase):
         self._logger = logger
         self._ram_cache = ram_cache
         self._convert_cache = convert_cache
-        self._torch_dtype = torch_dtype(choose_torch_device(), app_config)
+        self._torch_dtype = torch_dtype(choose_torch_device())
 
     def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
         """

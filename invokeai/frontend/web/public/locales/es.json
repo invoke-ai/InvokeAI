@@ -363,7 +363,6 @@
         "canvasMerged": "Lienzo consolidado",
         "sentToImageToImage": "Enviar hacia Imagen a Imagen",
         "sentToUnifiedCanvas": "Enviar hacia Lienzo Consolidado",
-        "parametersSet": "Parámetros establecidos",
         "parametersNotSet": "Parámetros no establecidos",
         "metadataLoadFailed": "Error al cargar metadatos",
         "serverError": "Error en el servidor",

@@ -134,7 +134,6 @@ export type CollectInvocation = S['CollectInvocation'];
 export type ImageResizeInvocation = S['ImageResizeInvocation'];
 export type InfillPatchMatchInvocation = S['InfillPatchMatchInvocation'];
 export type InfillTileInvocation = S['InfillTileInvocation'];
-export type CreateDenoiseMaskInvocation = S['CreateDenoiseMaskInvocation'];
 export type CreateGradientMaskInvocation = S['CreateGradientMaskInvocation'];
 export type CanvasPasteBackInvocation = S['CanvasPasteBackInvocation'];
 export type NoiseInvocation = S['NoiseInvocation'];

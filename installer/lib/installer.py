@@ -3,6 +3,7 @@
 InvokeAI installer script
 """
 
+import locale
 import os
 import platform
 import re
@@ -316,7 +317,9 @@ def upgrade_pip(venv_path: Path) -> str | None:
     python = str(venv_path.expanduser().resolve() / python)
 
     try:
-        result = subprocess.check_output([python, "-m", "pip", "install", "--upgrade", "pip"]).decode()
+        result = subprocess.check_output([python, "-m", "pip", "install", "--upgrade", "pip"]).decode(
+            encoding=locale.getpreferredencoding()
+        )
     except subprocess.CalledProcessError as e:
         print(e)
         result = None

@@ -3,7 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig } from 'app/store/store';
 import type { ModelType } from 'services/api/types';
 
-export type FilterableModelType = Exclude<ModelType, 'onnx' | 'clip_vision'>;
+export type FilterableModelType = Exclude<ModelType, 'onnx' | 'clip_vision'> | 'refiner';
 
 type ModelManagerState = {
   _version: 1;
