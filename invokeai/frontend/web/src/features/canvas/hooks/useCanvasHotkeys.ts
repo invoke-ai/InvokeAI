@@ -7,11 +7,7 @@ import {
   resetToolInteractionState,
 } from 'features/canvas/store/canvasNanostore';
 import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
-import {
-  clearMask,
-  setIsMaskEnabled,
-  setShouldSnapToGrid,
-} from 'features/canvas/store/canvasSlice';
+import { clearMask, setIsMaskEnabled, setShouldSnapToGrid } from 'features/canvas/store/canvasSlice';
 import { isInteractiveTarget } from 'features/canvas/util/isInteractiveTarget';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect } from 'react';
