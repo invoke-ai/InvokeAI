@@ -5,8 +5,8 @@ import { socketQueueItemStatusChanged } from 'services/events/actions';
 
 const log = logger('socketio');
 
-const updatePageTitle = (itemStatus: string)=> {
-  let baseString: string = document.title.replace('(1) ', '');
+const updatePageTitle = (itemStatus: string) => {
+  const baseString: string = document.title.replace('(1) ', '');
   document.title = itemStatus === 'in_progress' ? `(1) ${baseString}` : baseString;
 }
 
