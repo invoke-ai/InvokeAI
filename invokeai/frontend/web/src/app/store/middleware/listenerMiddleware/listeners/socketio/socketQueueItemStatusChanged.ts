@@ -5,6 +5,18 @@ import { socketQueueItemStatusChanged } from 'services/events/actions';
 
 const log = logger('socketio');
 
+const updatePageTitle = (itemStatus: string)=> {
+  let baseString: string = document.title.replace('(1) ', '');
+  document.title = itemStatus === 'in_progress' ? `(1) ${baseString}` : baseString;
+}
+
+const updatePageFavicon = (itemStatus: string)=> {
+  const InvokeLogoSVG: string = 'assets/images/invoke-favicon.svg';
+  const InvokeAlertLogoSVG: string = 'assets/images/invoke-alert-favicon.svg';
+  const faviconEl: HTMLLinkElement = document.getElementById('invoke-favicon') as HTMLLinkElement;
+  faviconEl.href = itemStatus === 'in_progress' ? InvokeAlertLogoSVG : InvokeLogoSVG;
+}
+
 export const addSocketQueueItemStatusChangedEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketQueueItemStatusChanged,
