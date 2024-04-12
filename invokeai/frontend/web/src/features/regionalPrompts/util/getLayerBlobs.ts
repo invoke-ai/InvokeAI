@@ -6,6 +6,11 @@ import { $stage, REGIONAL_PROMPT_LAYER_NAME } from 'features/regionalPrompts/sto
 import Konva from 'konva';
 import { assert } from 'tsafe';
 
+/**
+ * Get the blobs of all regional prompt layers.
+ * @param preview Whether to open a new tab displaying each layer.
+ * @returns A map of layer IDs to blobs.
+ */
 export const getRegionalPromptLayerBlobs = async (preview: boolean = false): Promise<Record<string, Blob>> => {
   const state = getStore().getState();
   const stage = $stage.get();
@@ -27,8 +32,13 @@ export const getRegionalPromptLayerBlobs = async (preview: boolean = false): Pro
 
   for (const layer of regionalPromptLayers) {
     const layerClone = layer.clone();
-    for (const child of layerClone.getChildren(selectPromptLayerObjectGroup)) {
-      child.destroy();
+    for (const child of layerClone.getChildren()) {
+      if (selectPromptLayerObjectGroup(child)) {
+        child.destroy();
+      } else {
+        // We need to re-cache to handle children with transparency and multiple objects - like prompt region layers.
+        child.cache();
+      }
     }
     offscreenStage.add(layerClone);
     const blob = await new Promise<Blob>((resolve) => {
