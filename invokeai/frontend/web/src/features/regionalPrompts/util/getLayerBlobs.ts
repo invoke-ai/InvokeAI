@@ -2,7 +2,7 @@ import { getStore } from 'app/store/nanostores/store';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
 import { blobToDataURL } from 'features/canvas/util/blobToDataURL';
 import { selectPromptLayerObjectGroup } from 'features/regionalPrompts/components/LayerComponent';
-import { $stage, REGIONAL_PROMPT_LAYER_NAME } from 'features/regionalPrompts/store/regionalPromptsSlice';
+import { getStage, REGIONAL_PROMPT_LAYER_NAME } from 'features/regionalPrompts/store/regionalPromptsSlice';
 import Konva from 'konva';
 import { assert } from 'tsafe';
 
@@ -13,8 +13,7 @@ import { assert } from 'tsafe';
  */
 export const getRegionalPromptLayerBlobs = async (preview: boolean = false): Promise<Record<string, Blob>> => {
   const state = getStore().getState();
-  const stage = $stage.get();
-  assert(stage !== null, 'Stage is null');
+  const stage = getStage();
 
   // This automatically omits layers that are not rendered. Rendering is controlled by the layer's `isVisible` flag in redux.
   const regionalPromptLayers = stage.getLayers().filter((l) => l.name() === REGIONAL_PROMPT_LAYER_NAME);

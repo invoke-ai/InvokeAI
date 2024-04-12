@@ -26,7 +26,7 @@ i18n.use(initReactI18next).init({
 });
 
 const store = createStore(undefined, false);
-$store.set(store)
+$store.set(store);
 $baseUrl.set('http://localhost:9090');
 
 const preview: Preview = {

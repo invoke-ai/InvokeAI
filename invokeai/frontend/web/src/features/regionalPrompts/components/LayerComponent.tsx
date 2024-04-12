@@ -6,7 +6,7 @@ import { LineComponent } from 'features/regionalPrompts/components/LineComponent
 import { RectComponent } from 'features/regionalPrompts/components/RectComponent';
 import { useLayer } from 'features/regionalPrompts/hooks/layerStateHooks';
 import {
-  $stage,
+  getStage,
   layerBboxChanged,
   layerTranslated,
   REGIONAL_PROMPT_LAYER_NAME,
@@ -54,10 +54,7 @@ export const LayerComponent: React.FC<Props> = ({ id }) => {
   );
 
   const dragBoundFunc = useCallback(function (this: KonvaNodeType<KonvaNodeConfigType>, pos: Vector2d) {
-    const stage = $stage.get();
-    if (!stage) {
-      return this.getAbsolutePosition();
-    }
+    const stage = getStage();
     const cursorPos = getScaledCursorPosition(stage);
     if (!cursorPos) {
       return this.getAbsolutePosition();

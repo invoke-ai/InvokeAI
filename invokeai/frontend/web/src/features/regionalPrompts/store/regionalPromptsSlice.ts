@@ -9,7 +9,7 @@ import type { RgbColor } from 'react-colorful';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-export type Tool = 'brush' | 'eraser' | 'move';
+type Tool = 'brush' | 'eraser' | 'move';
 
 type LayerObjectBase = {
   id: string;
@@ -39,7 +39,7 @@ export type FillRectObject = LayerObjectBase & {
   height: number;
 };
 
-export type LayerObject = ImageObject | LineObject | FillRectObject;
+type LayerObject = ImageObject | LineObject | FillRectObject;
 
 type LayerBase = {
   id: string;
@@ -56,7 +56,7 @@ type PromptRegionLayer = LayerBase & {
   color: RgbColor;
 };
 
-export type Layer = PromptRegionLayer;
+type Layer = PromptRegionLayer;
 
 type RegionalPromptsState = {
   _version: 1;
