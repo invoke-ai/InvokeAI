@@ -123,8 +123,8 @@ class IPAdapterInvocation(BaseInvocation):
             if ip_adapter_info.base == "sdxl":
                 target_blocks = ["up_blocks.0.attentions.1"]
         elif self.method == "composition":
-            if ip_adapter_info.base == "sd1":
-                target_blocks = ["down_blocks.2", "mid_block", "up_blocks.1"]
+            if ip_adapter_info.base == "sd-1":
+                target_blocks = ["down_blocks.2", "mid_block"]
             if ip_adapter_info.base == "sdxl":
                 target_blocks = ["down_blocks.2.attentions.1"]
 
