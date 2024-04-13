@@ -1,5 +1,4 @@
-import pathlib
-from typing import Literal, Union
+from typing import Literal, Optional, Union
 
 import cv2
 import numpy as np
@@ -10,7 +9,7 @@ from PIL import Image
 from torchvision.transforms import Compose
 
 from invokeai.app.services.config.config_default import get_config
-from invokeai.app.util.download_with_progress import download_with_progress_bar
+from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.depth_anything.model.dpt import DPT_DINOv2
 from invokeai.backend.image_util.depth_anything.utilities.util import NormalizeImage, PrepareForNet, Resize
 from invokeai.backend.util.devices import choose_torch_device
@@ -20,18 +19,9 @@ config = get_config()
 logger = InvokeAILogger.get_logger(config=config)
 
 DEPTH_ANYTHING_MODELS = {
-    "large": {
-        "url": "https://huggingface.co/spaces/LiheYoung/Depth-Anything/resolve/main/checkpoints/depth_anything_vitl14.pth?download=true",
-        "local": "any/annotators/depth_anything/depth_anything_vitl14.pth",
-    },
-    "base": {
-        "url": "https://huggingface.co/spaces/LiheYoung/Depth-Anything/resolve/main/checkpoints/depth_anything_vitb14.pth?download=true",
-        "local": "any/annotators/depth_anything/depth_anything_vitb14.pth",
-    },
-    "small": {
-        "url": "https://huggingface.co/spaces/LiheYoung/Depth-Anything/resolve/main/checkpoints/depth_anything_vits14.pth?download=true",
-        "local": "any/annotators/depth_anything/depth_anything_vits14.pth",
-    },
+    "large": "https://huggingface.co/spaces/LiheYoung/Depth-Anything/resolve/main/checkpoints/depth_anything_vitl14.pth?download=true",
+    "base": "https://huggingface.co/spaces/LiheYoung/Depth-Anything/resolve/main/checkpoints/depth_anything_vitb14.pth?download=true",
+    "small": "https://huggingface.co/spaces/LiheYoung/Depth-Anything/resolve/main/checkpoints/depth_anything_vits14.pth?download=true",
 }
 
 
@@ -53,18 +43,14 @@ transform = Compose(
 
 
 class DepthAnythingDetector:
-    def __init__(self) -> None:
-        self.model = None
+    def __init__(self, context: InvocationContext) -> None:
+        self.context = context
+        self.model: Optional[DPT_DINOv2] = None
         self.model_size: Union[Literal["large", "base", "small"], None] = None
         self.device = choose_torch_device()
 
-    def load_model(self, model_size: Literal["large", "base", "small"] = "small"):
-        DEPTH_ANYTHING_MODEL_PATH = config.models_path / DEPTH_ANYTHING_MODELS[model_size]["local"]
-        download_with_progress_bar(
-            pathlib.Path(DEPTH_ANYTHING_MODELS[model_size]["url"]).name,
-            DEPTH_ANYTHING_MODELS[model_size]["url"],
-            DEPTH_ANYTHING_MODEL_PATH,
-        )
+    def load_model(self, model_size: Literal["large", "base", "small"] = "small") -> DPT_DINOv2:
+        depth_anything_model_path = self.context.models.download_and_cache_ckpt(DEPTH_ANYTHING_MODELS[model_size])
 
         if not self.model or model_size != self.model_size:
             del self.model
@@ -78,7 +64,8 @@ class DepthAnythingDetector:
                 case "large":
                     self.model = DPT_DINOv2(encoder="vitl", features=256, out_channels=[256, 512, 1024, 1024])
 
-            self.model.load_state_dict(torch.load(DEPTH_ANYTHING_MODEL_PATH.as_posix(), map_location="cpu"))
+            assert self.model is not None
+            self.model.load_state_dict(torch.load(depth_anything_model_path.as_posix(), map_location="cpu"))
             self.model.eval()
 
         self.model.to(choose_torch_device())

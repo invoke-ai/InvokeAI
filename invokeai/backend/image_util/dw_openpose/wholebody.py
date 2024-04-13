@@ -4,44 +4,31 @@
 
 import numpy as np
 import onnxruntime as ort
+import torch
 
 from invokeai.app.services.config.config_default import get_config
-from invokeai.app.util.download_with_progress import download_with_progress_bar
+from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.util.devices import choose_torch_device
 
 from .onnxdet import inference_detector
 from .onnxpose import inference_pose
 
 DWPOSE_MODELS = {
-    "yolox_l.onnx": {
-        "local": "any/annotators/dwpose/yolox_l.onnx",
-        "url": "https://huggingface.co/yzd-v/DWPose/resolve/main/yolox_l.onnx?download=true",
-    },
-    "dw-ll_ucoco_384.onnx": {
-        "local": "any/annotators/dwpose/dw-ll_ucoco_384.onnx",
-        "url": "https://huggingface.co/yzd-v/DWPose/resolve/main/dw-ll_ucoco_384.onnx?download=true",
-    },
+    "yolox_l.onnx": "https://huggingface.co/yzd-v/DWPose/resolve/main/yolox_l.onnx?download=true",
+    "dw-ll_ucoco_384.onnx": "https://huggingface.co/yzd-v/DWPose/resolve/main/dw-ll_ucoco_384.onnx?download=true",
 }
 
 config = get_config()
 
 
 class Wholebody:
-    def __init__(self):
+    def __init__(self, context: InvocationContext):
         device = choose_torch_device()
 
-        providers = ["CUDAExecutionProvider"] if device == "cuda" else ["CPUExecutionProvider"]
+        providers = ["CUDAExecutionProvider"] if device == torch.device("cuda") else ["CPUExecutionProvider"]
 
-        DET_MODEL_PATH = config.models_path / DWPOSE_MODELS["yolox_l.onnx"]["local"]
-        download_with_progress_bar("yolox_l.onnx", DWPOSE_MODELS["yolox_l.onnx"]["url"], DET_MODEL_PATH)
-
-        POSE_MODEL_PATH = config.models_path / DWPOSE_MODELS["dw-ll_ucoco_384.onnx"]["local"]
-        download_with_progress_bar(
-            "dw-ll_ucoco_384.onnx", DWPOSE_MODELS["dw-ll_ucoco_384.onnx"]["url"], POSE_MODEL_PATH
-        )
-
-        onnx_det = DET_MODEL_PATH
-        onnx_pose = POSE_MODEL_PATH
+        onnx_det = context.models.download_and_cache_ckpt(DWPOSE_MODELS["yolox_l.onnx"])
+        onnx_pose = context.models.download_and_cache_ckpt(DWPOSE_MODELS["dw-ll_ucoco_384.onnx"])
 
         self.session_det = ort.InferenceSession(path_or_bytes=onnx_det, providers=providers)
         self.session_pose = ort.InferenceSession(path_or_bytes=onnx_pose, providers=providers)

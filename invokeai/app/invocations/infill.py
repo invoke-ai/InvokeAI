@@ -38,7 +38,7 @@ class InfillImageProcessorInvocation(BaseInvocation, WithMetadata, WithBoard):
     image: ImageField = InputField(description="The image to process")
 
     @abstractmethod
-    def infill(self, image: Image.Image) -> Image.Image:
+    def infill(self, image: Image.Image, context: InvocationContext) -> Image.Image:
         """Infill the image with the specified method"""
         pass
 
@@ -57,7 +57,7 @@ class InfillImageProcessorInvocation(BaseInvocation, WithMetadata, WithBoard):
             return ImageOutput.build(context.images.get_dto(self.image.image_name))
 
         # Perform Infill action
-        infilled_image = self.infill(input_image)
+        infilled_image = self.infill(input_image, context)
 
         # Create ImageDTO for Infilled Image
         infilled_image_dto = context.images.save(image=infilled_image)
@@ -75,7 +75,7 @@ class InfillColorInvocation(InfillImageProcessorInvocation):
         description="The color to use to infill",
     )
 
-    def infill(self, image: Image.Image):
+    def infill(self, image: Image.Image, context: InvocationContext):
         solid_bg = Image.new("RGBA", image.size, self.color.tuple())
         infilled = Image.alpha_composite(solid_bg, image.convert("RGBA"))
         infilled.paste(image, (0, 0), image.split()[-1])
@@ -94,7 +94,7 @@ class InfillTileInvocation(InfillImageProcessorInvocation):
         description="The seed to use for tile generation (omit for random)",
     )
 
-    def infill(self, image: Image.Image):
+    def infill(self, image: Image.Image, context: InvocationContext):
         output = infill_tile(image, seed=self.seed, tile_size=self.tile_size)
         return output.infilled
 
@@ -108,7 +108,7 @@ class InfillPatchMatchInvocation(InfillImageProcessorInvocation):
     downscale: float = InputField(default=2.0, gt=0, description="Run patchmatch on downscaled image to speedup infill")
     resample_mode: PIL_RESAMPLING_MODES = InputField(default="bicubic", description="The resampling mode")
 
-    def infill(self, image: Image.Image):
+    def infill(self, image: Image.Image, context: InvocationContext):
         resample_mode = PIL_RESAMPLING_MAP[self.resample_mode]
 
         width = int(image.width / self.downscale)
@@ -132,8 +132,8 @@ class InfillPatchMatchInvocation(InfillImageProcessorInvocation):
 class LaMaInfillInvocation(InfillImageProcessorInvocation):
     """Infills transparent areas of an image using the LaMa model"""
 
-    def infill(self, image: Image.Image):
-        lama = LaMA()
+    def infill(self, image: Image.Image, context: InvocationContext):
+        lama = LaMA(context)
         return lama(image)
 
 
@@ -141,7 +141,7 @@ class LaMaInfillInvocation(InfillImageProcessorInvocation):
 class CV2InfillInvocation(InfillImageProcessorInvocation):
     """Infills transparent areas of an image using OpenCV Inpainting"""
 
-    def infill(self, image: Image.Image):
+    def infill(self, image: Image.Image, context: InvocationContext):
         return cv2_inpaint(image)
 
 
@@ -163,5 +163,5 @@ class MosaicInfillInvocation(InfillImageProcessorInvocation):
         description="The max threshold for color",
     )
 
-    def infill(self, image: Image.Image):
+    def infill(self, image: Image.Image, context: InvocationContext):
         return infill_mosaic(image, (self.tile_width, self.tile_height), self.min_color.tuple(), self.max_color.tuple())

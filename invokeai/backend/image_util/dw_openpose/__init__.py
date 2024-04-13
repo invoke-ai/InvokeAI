@@ -3,6 +3,7 @@ import torch
 from controlnet_aux.util import resize_image
 from PIL import Image
 
+from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.dw_openpose.utils import draw_bodypose, draw_facepose, draw_handpose
 from invokeai.backend.image_util.dw_openpose.wholebody import Wholebody
 
@@ -39,8 +40,8 @@ class DWOpenposeDetector:
     Credits: https://github.com/IDEA-Research/DWPose
     """
 
-    def __init__(self) -> None:
-        self.pose_estimation = Wholebody()
+    def __init__(self, context: InvocationContext) -> None:
+        self.pose_estimation = Wholebody(context)
 
     def __call__(
         self, image: Image.Image, draw_face=False, draw_body=True, draw_hands=False, resolution=512
