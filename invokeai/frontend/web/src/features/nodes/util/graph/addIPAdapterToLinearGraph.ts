@@ -57,6 +57,7 @@ export const addIPAdapterToLinearGraph = async (
         type: 'ip_adapter',
         is_intermediate: true,
         weight: weight,
+        method: 'composition',
         ip_adapter_model: model,
         clip_vision_model: clipVisionModel,
         begin_step_percent: beginStepPct,
