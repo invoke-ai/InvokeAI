@@ -156,7 +156,6 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
                     # Expected ip_hidden_state shape: (batch_size, num_ip_images, ip_seq_len, ip_image_embedding)
 
                     if self._ip_adapter_attention_weights["skip"]:
-
                         ip_key = ipa_weights.to_k_ip(ip_hidden_states)
                         ip_value = ipa_weights.to_v_ip(ip_hidden_states)
 

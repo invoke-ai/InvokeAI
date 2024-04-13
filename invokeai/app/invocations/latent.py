@@ -15,10 +15,12 @@ from diffusers import AutoencoderKL, AutoencoderTiny
 from diffusers.configuration_utils import ConfigMixin
 from diffusers.image_processor import VaeImageProcessor
 from diffusers.models.adapter import T2IAdapter
-from diffusers.models.attention_processor import (AttnProcessor2_0,
-                                                  LoRAAttnProcessor2_0,
-                                                  LoRAXFormersAttnProcessor,
-                                                  XFormersAttnProcessor)
+from diffusers.models.attention_processor import (
+    AttnProcessor2_0,
+    LoRAAttnProcessor2_0,
+    LoRAXFormersAttnProcessor,
+    XFormersAttnProcessor,
+)
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from diffusers.schedulers import DPMSolverSDEScheduler
 from diffusers.schedulers import SchedulerMixin as Scheduler
@@ -27,17 +29,22 @@ from pydantic import field_validator
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPVisionModelWithProjection
 
-from invokeai.app.invocations.constants import (LATENT_SCALE_FACTOR,
-                                                SCHEDULER_NAME_VALUES)
-from invokeai.app.invocations.fields import (ConditioningField,
-                                             DenoiseMaskField,
-                                             FieldDescriptions, ImageField,
-                                             Input, InputField, LatentsField,
-                                             OutputField, UIType, WithBoard,
-                                             WithMetadata)
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR, SCHEDULER_NAME_VALUES
+from invokeai.app.invocations.fields import (
+    ConditioningField,
+    DenoiseMaskField,
+    FieldDescriptions,
+    ImageField,
+    Input,
+    InputField,
+    LatentsField,
+    OutputField,
+    UIType,
+    WithBoard,
+    WithMetadata,
+)
 from invokeai.app.invocations.ip_adapter import IPAdapterField
-from invokeai.app.invocations.primitives import (DenoiseMaskOutput,
-                                                 ImageOutput, LatentsOutput)
+from invokeai.app.invocations.primitives import DenoiseMaskOutput, ImageOutput, LatentsOutput
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import prepare_control_image
@@ -45,21 +52,28 @@ from invokeai.backend.ip_adapter.ip_adapter import IPAdapter, IPAdapterPlus
 from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import BaseModelType, LoadedModel
 from invokeai.backend.model_patcher import ModelPatcher
-from invokeai.backend.stable_diffusion import (PipelineIntermediateState,
-                                               set_seamless)
+from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
-    BasicConditioningInfo, IPAdapterConditioningInfo, IPAdapterData, Range,
-    SDXLConditioningInfo, TextConditioningData, TextConditioningRegions)
+    BasicConditioningInfo,
+    IPAdapterConditioningInfo,
+    IPAdapterData,
+    Range,
+    SDXLConditioningInfo,
+    TextConditioningData,
+    TextConditioningRegions,
+)
 from invokeai.backend.util.mask import to_standard_float_mask
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 from ...backend.stable_diffusion.diffusers_pipeline import (
-    ControlNetData, StableDiffusionGeneratorPipeline, T2IAdapterData,
-    image_resized_to_grid_as_tensor)
+    ControlNetData,
+    StableDiffusionGeneratorPipeline,
+    T2IAdapterData,
+    image_resized_to_grid_as_tensor,
+)
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from ...backend.util.devices import choose_precision, choose_torch_device
-from .baseinvocation import (BaseInvocation, BaseInvocationOutput, invocation,
-                             invocation_output)
+from .baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 from .controlnet_image_processors import ControlField
 from .model import ModelIdentifierField, UNetField, VAEField
 
