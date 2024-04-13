@@ -137,7 +137,7 @@ class ImageProcessorInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     image: ImageField = InputField(description="The image to process")
 
-    def run_processor(self, image: Image.Image) -> Image.Image:
+    def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
         # superclass just passes through image without processing
         return image
 
@@ -148,7 +148,7 @@ class ImageProcessorInvocation(BaseInvocation, WithMetadata, WithBoard):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         raw_image = self.load_image(context)
         # image type should be PIL.PngImagePlugin.PngImageFile ?
-        processed_image = self.run_processor(raw_image)
+        processed_image = self.run_processor(raw_image, context)
 
         # currently can't see processed image in node UI without a showImage node,
         #    so for now setting image_type to RESULT instead of INTERMEDIATE so will get saved in gallery
@@ -189,7 +189,7 @@ class CannyImageProcessorInvocation(ImageProcessorInvocation):
         # Keep alpha channel for Canny processing to detect edges of transparent areas
         return context.images.get_pil(self.image.image_name, "RGBA")
 
-    def run_processor(self, image: Image.Image) -> Image.Image:
+    def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
         processed_image = get_canny_edges(
             image,
             self.low_threshold,
@@ -216,7 +216,7 @@ class HedImageProcessorInvocation(ImageProcessorInvocation):
     # safe: bool = InputField(default=False, description=FieldDescriptions.safe_mode)
     scribble: bool = InputField(default=False, description=FieldDescriptions.scribble_mode)
 
-    def run_processor(self, image: Image.Image) -> Image.Image:
+    def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
         hed_processor = HEDProcessor()
         processed_image = hed_processor.run(
             image,
@@ -243,7 +243,7 @@ class LineartImageProcessorInvocation(ImageProcessorInvocation):
     image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
     coarse: bool = InputField(default=False, description="Whether to use coarse mode")
 
-    def run_processor(self, image: Image.Image) -> Image.Image:
+    def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
         lineart_processor = LineartProcessor()
         processed_image = lineart_processor.run(
             image, detect_resolution=self.detect_resolution, image_resolution=self.image_resolution, coarse=self.coarse
@@ -264,7 +264,7 @@ class LineartAnimeImageProcessorInvocation(ImageProcessorInvocation):
     detect_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.detect_res)
     image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
 
-    def run_processor(self, image: Image.Image) -> Image.Image:
+    def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
         processor = LineartAnimeProcessor()
         processed_image = processor.run(
             image,
@@ -291,7 +291,8 @@ class MidasDepthImageProcessorInvocation(ImageProcessorInvocation):
     # depth_and_normal not supported in controlnet_aux v0.0.3
     # depth_and_normal: bool = InputField(default=False, description="whether to use depth and normal mode")
 
-    def run_processor(self, image):
+    def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
+        # TODO: replace from_pretrained() calls with context.models.download_and_cache() (or similar)
         midas_processor = MidasDetector.from_pretrained("lllyasviel/Annotators")
         processed_image = midas_processor(
             image,
@@ -318,9 +319,9 @@ class NormalbaeImageProcessorInvocation(ImageProcessorInvocation):
     detect_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.detect_res)
     image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
 
-    def run_processor(self, image):
+    def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
         normalbae_processor = NormalBaeDetector.from_pretrained("lllyasviel/Annotators")
-        processed_image = normalbae_processor(
+        processed_image: Image.Image = normalbae_processor(
             image, detect_resolution=self.detect_resolution, image_resolution=self.image_resolution
         )
         return processed_image
@@ -337,7 +338,7 @@ class MlsdImageProcessorInvocation(ImageProcessorInvocation):
     thr_v: float = InputField(default=0.1, ge=0, description="MLSD parameter `thr_v`")
     thr_d: float = InputField(default=0.1, ge=0, description="MLSD parameter `thr_d`")
 
-    def run_processor(self, image):
+    def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
         mlsd_processor = MLSDdetector.from_pretrained("lllyasviel/Annotators")
         processed_image = mlsd_processor(
             image,
@@ -360,7 +361,7 @@ class PidiImageProcessorInvocation(ImageProcessorInvocation):
     safe: bool = InputField(default=False, description=FieldDescriptions.safe_mode)
     scribble: bool = InputField(default=False, description=FieldDescriptions.scribble_mode)
 
-    def run_processor(self, image):
+    def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
         pidi_processor = PidiNetDetector.from_pretrained("lllyasviel/Annotators")
         processed_image = pidi_processor(
             image,
@@ -388,7 +389,7 @@ class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation):
     w: int = InputField(default=512, ge=0, description="Content shuffle `w` parameter")
     f: int = InputField(default=256, ge=0, description="Content shuffle `f` parameter")
 
-    def run_processor(self, image):
+    def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
         content_shuffle_processor = ContentShuffleDetector()
         processed_image = content_shuffle_processor(
             image,
@@ -412,7 +413,7 @@ class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation):
 class ZoeDepthImageProcessorInvocation(ImageProcessorInvocation):
     """Applies Zoe depth processing to image"""
 
-    def run_processor(self, image):
+    def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
         zoe_depth_processor = ZoeDetector.from_pretrained("lllyasviel/Annotators")
         processed_image = zoe_depth_processor(image)
         return processed_image
@@ -433,7 +434,7 @@ class MediapipeFaceProcessorInvocation(ImageProcessorInvocation):
     detect_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.detect_res)
     image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
 
-    def run_processor(self, image):
+    def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
         mediapipe_face_processor = MediapipeFaceDetector()
         processed_image = mediapipe_face_processor(
             image,
@@ -461,7 +462,7 @@ class LeresImageProcessorInvocation(ImageProcessorInvocation):
     detect_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.detect_res)
     image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
 
-    def run_processor(self, image):
+    def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
         leres_processor = LeresDetector.from_pretrained("lllyasviel/Annotators")
         processed_image = leres_processor(
             image,
@@ -503,7 +504,7 @@ class TileResamplerProcessorInvocation(ImageProcessorInvocation):
         np_img = cv2.resize(np_img, (W, H), interpolation=cv2.INTER_AREA)
         return np_img
 
-    def run_processor(self, img):
+    def run_processor(self, img: Image.Image, context: InvocationContext) -> Image.Image:
         np_img = np.array(img, dtype=np.uint8)
         processed_np_image = self.tile_resample(
             np_img,
@@ -527,7 +528,7 @@ class SegmentAnythingProcessorInvocation(ImageProcessorInvocation):
     detect_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.detect_res)
     image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
 
-    def run_processor(self, image):
+    def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
         # segment_anything_processor = SamDetector.from_pretrained("ybelkada/segment-anything", subfolder="checkpoints")
         segment_anything_processor = SamDetectorReproducibleColors.from_pretrained(
             "ybelkada/segment-anything", subfolder="checkpoints"
@@ -573,7 +574,7 @@ class ColorMapImageProcessorInvocation(ImageProcessorInvocation):
 
     color_map_tile_size: int = InputField(default=64, ge=0, description=FieldDescriptions.tile_size)
 
-    def run_processor(self, image: Image.Image):
+    def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
         np_image = np.array(image, dtype=np.uint8)
         height, width = np_image.shape[:2]
 
@@ -608,8 +609,8 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
     )
     resolution: int = InputField(default=512, ge=64, multiple_of=64, description=FieldDescriptions.image_res)
 
-    def run_processor(self, image: Image.Image):
-        depth_anything_detector = DepthAnythingDetector()
+    def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
+        depth_anything_detector = DepthAnythingDetector(context)
         depth_anything_detector.load_model(model_size=self.model_size)
 
         processed_image = depth_anything_detector(image=image, resolution=self.resolution)
@@ -631,8 +632,8 @@ class DWOpenposeImageProcessorInvocation(ImageProcessorInvocation):
     draw_hands: bool = InputField(default=False)
     image_resolution: int = InputField(default=512, ge=0, description=FieldDescriptions.image_res)
 
-    def run_processor(self, image: Image.Image):
-        dw_openpose = DWOpenposeDetector()
+    def run_processor(self, image: Image.Image, context: InvocationContext) -> Image.Image:
+        dw_openpose = DWOpenposeDetector(context)
         processed_image = dw_openpose(
             image,
             draw_face=self.draw_face,
