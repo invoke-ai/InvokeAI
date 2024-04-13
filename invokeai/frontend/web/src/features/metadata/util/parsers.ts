@@ -386,6 +386,7 @@ const parseIPAdapter: MetadataParseFunc<IPAdapterConfigMetadata> = async (metada
     clipVisionModel: 'ViT-H',
     controlImage: image?.image_name ?? null,
     weight: weight ?? initialIPAdapter.weight,
+    method: 'full',
     beginStepPct: begin_step_percent ?? initialIPAdapter.beginStepPct,
     endStepPct: end_step_percent ?? initialIPAdapter.endStepPct,
   };
