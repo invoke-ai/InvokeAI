@@ -44,7 +44,7 @@ Each board has a context menu (ctrl+click / right-click).
 - ***Download Board*** this will add all the images in the board into a zip file and provide a link to it in a notification (image of notification)
 - ***Delete Board*** this will delete the board
 > [!CAUTION]
-> *** This will delete all the images in the board and the board itself. ***
+> This will delete all the images in the board and the board itself.
 
 ### Board Contents
 
