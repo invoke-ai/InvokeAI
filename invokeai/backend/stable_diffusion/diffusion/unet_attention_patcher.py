@@ -36,10 +36,10 @@ class UNetAttentionPatcher:
                 ip_adapter_attention_weights: IPAdapterAttentionWeights = {"ip_adapter_weights": [], "skip": False}
                 for ip_adapter in self._ip_adapters:
                     ip_adapter_weight = ip_adapter["ip_adapter"].attn_weights.get_attention_processor_weights(idx)
-                    skip = False
+                    skip = True
                     for block in ip_adapter["target_blocks"]:
                         if block in name:
-                            skip = True
+                            skip = False
                             break
 
                     ip_adapter_attention_weights.update({"ip_adapter_weights": [ip_adapter_weight], "skip": skip})
