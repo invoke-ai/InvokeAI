@@ -116,11 +116,17 @@ class IPAdapterInvocation(BaseInvocation):
 
         image_encoder_model = self._get_image_encoder(context, image_encoder_model_name)
 
-        target_blocks = ["up_blocks.0.attentions.1", "down_blocks.2.attentions.1"]
+        target_blocks = ["block"]
         if self.method == "style":
-            target_blocks = ["up_blocks.0.attentions.1"]
+            if ip_adapter_info.base == "sd-1":
+                target_blocks = ["up_blocks.1"]
+            if ip_adapter_info.base == "sdxl":
+                target_blocks = ["up_blocks.0.attentions.1"]
         elif self.method == "composition":
-            target_blocks = ["down_blocks.2.attentions.1"]
+            if ip_adapter_info.base == "sd1":
+                target_blocks = ["down_blocks.2", "mid_block", "up_blocks.1"]
+            if ip_adapter_info.base == "sdxl":
+                target_blocks = ["down_blocks.2.attentions.1"]
 
         return IPAdapterOutput(
             ip_adapter=IPAdapterField(
