@@ -1,5 +1,6 @@
 import { Box, useGlobalModifiersInit } from '@invoke-ai/ui-library';
 import { useSocketIO } from 'app/hooks/useSocketIO';
+import { useSyncQueueStatus } from 'app/hooks/useSyncQueueStatus';
 import { useLogger } from 'app/logging/useLogger';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -70,6 +71,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   }, [dispatch]);
 
   useStarterModelsToast();
+  useSyncQueueStatus();
 
   return (
     <ErrorBoundary onReset={handleReset} FallbackComponent={AppErrorBoundaryFallback}>

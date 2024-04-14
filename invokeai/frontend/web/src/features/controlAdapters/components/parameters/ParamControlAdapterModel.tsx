@@ -103,7 +103,7 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
 
   return (
     <Flex sx={{ gap: 2 }}>
-      <Tooltip label={value?.description}>
+      <Tooltip label={selectedModel?.description}>
         <FormControl
           isDisabled={!isEnabled}
           isInvalid={!value || mainModel?.base !== modelConfig?.base}
