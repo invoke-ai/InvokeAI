@@ -80,7 +80,9 @@ const DeleteImageModal = () => {
 
   return (
     <ConfirmationAlertDialog
-      title={t(imagesToDelete.length > 1 ? 'gallery.deleteImage_plural' : 'gallery.deleteImage', { 'count': imagesToDelete.length } )}
+      title={t(imagesToDelete.length > 1 ? 'gallery.deleteImage_plural' : 'gallery.deleteImage', {
+        count: imagesToDelete.length,
+      })}
       isOpen={isModalOpen}
       onClose={handleClose}
       cancelButtonText={t('boards.cancel')}
