@@ -448,7 +448,9 @@
         "loraModels": "LoRAs",
         "main": "Основные",
         "noModelsInstalled": "Нет установленных моделей",
-        "noModelsInstalledDesc1": "Установите модели с помощью"
+        "noModelsInstalledDesc1": "Установите модели с помощью",
+        "noMatchingModels": "Нет подходящих моделей",
+        "ipAdapters": "IP адаптеры"
     },
     "parameters": {
         "images": "Изображения",
@@ -532,7 +534,12 @@
         "lockAspectRatio": "Заблокировать соотношение",
         "remixImage": "Ремикс изображения",
         "coherenceMinDenoise": "Мин. шумоподавление",
-        "coherenceEdgeSize": "Размер края"
+        "coherenceEdgeSize": "Размер края",
+        "infillMosaicTileWidth": "Ширина плиток",
+        "infillMosaicTileHeight": "Высота плиток",
+        "infillMosaicMinColor": "Мин цвет",
+        "infillMosaicMaxColor": "Макс цвет",
+        "infillColorValue": "Цвет заливки"
     },
     "settings": {
         "models": "Модели",
@@ -626,7 +633,8 @@
         "uploadInitialImage": "Загрузить начальное изображение",
         "resetInitialImage": "Сбросить начальное изображение",
         "prunedQueue": "Урезанная очередь",
-        "modelImportCanceled": "Импорт модели отменен"
+        "modelImportCanceled": "Импорт модели отменен",
+        "parameters": "Параметры"
     },
     "tooltip": {
         "feature": {
@@ -695,7 +703,8 @@
         "coherenceModeGaussianBlur": "Размытие по Гауссу",
         "coherenceModeBoxBlur": "коробчатое размытие",
         "discardCurrent": "Отбросить текущее",
-        "invertBrushSizeScrollDirection": "Инвертировать прокрутку для размера кисти"
+        "invertBrushSizeScrollDirection": "Инвертировать прокрутку для размера кисти",
+        "initialFitImageSize": "Подогнать размер изображения при перебросе"
     },
     "accessibility": {
         "uploadImage": "Загрузить изображение",
@@ -921,7 +930,8 @@
         "modelSize": "Размер модели",
         "small": "Маленький",
         "body": "Тело",
-        "hands": "Руки"
+        "hands": "Руки",
+        "selectCLIPVisionModel": "Выбрать модель CLIP Vision"
     },
     "boards": {
         "autoAddBoard": "Авто добавление Доски",
