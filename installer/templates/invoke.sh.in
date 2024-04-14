@@ -32,6 +32,95 @@ if [ "$(uname -s)" == "Darwin" ]; then
     export PYTORCH_ENABLE_MPS_FALLBACK=1
 fi
 
+## This section checks to see if there is a new version of Invoke available, and will alert the user if there is.
+
+# This gets the current version from the activated venv
+current_version=$(python -c "from invokeai.version.invokeai_version import __version__; print(__version__);")
+
+# This gets the latest release info from the GitHub repo and stores it in a variable called latest_release to avoid excessive API calls
+latest_release=$(curl -sL https://api.github.com/repos/invoke-ai/InvokeAI/releases/latest)
+
+# This gets the latest release version from the latest_release variable
+latest_version=$(echo $latest_release | grep -o '"tag_name": ".*"' | cut -d '"' -f4 | sed 's/^v//')
+
+# This function checks to see if the user wishes to update or reinstall Invoke
+invokeai_update_checker() {
+
+    printf "########## InvokeAI Updater - CHECKING FOR UPDATES ##########\n\n"
+
+    # Compare the versions. If a newer one is available, prompt the user to download it
+    if [ "$current_version" = "$latest_version" ]; then
+        printf "Curent version is $current_version. You are using the latest version of InvokeAI.\n"
+
+        printf "Do you want to download and reinstall the latest version of InvokeAI? (1 -> yes/ 2 -> no)\n\n"
+        select yn in "yes" "no"; do
+            case $yn in
+            yes)
+                # Deactivate the venv to avoid any issues while reinstalling
+                deactivate
+                invokeai_updater
+                # Re-activate the venv
+                source .venv/bin/activate
+                break
+                ;;
+            no)
+                echo "Exiting InvokeAI Updater..."
+                exit
+                ;;
+            esac
+        done
+    else
+        printf "Curent version is $current_version.\n"
+        printf "Latest version is $latest_version.\n\n"
+        printf "Do you want to download and install the latest version of InvokeAI? (1 -> yes/2 -> no)\n\n"
+        select yn in "yes" "no"; do
+            case $yn in
+            yes)
+                # Deactivate the venv to avoid any issues while reinstalling
+                deactivate
+                invokeai_updater
+                # Re-activate the venv
+                source .venv/bin/activate
+                break
+                ;;
+            no)
+                echo "Exiting InvokeAI Updater..."
+                clear
+                exit
+                ;;
+            esac
+        done
+    fi
+}
+
+# This function downloads and installs the latest Invoke version
+invokeai_updater() {
+    printf "\n########## InvokeAI Updater - DOWNLOADING UPDATER ##########\n\n"
+
+    if [ -d "invoke-updates" ]; then
+        printf "Invoke Update Directory Already Exists.\n"
+    else
+        printf "Creating Invoke Update Directory.\n"
+        mkdir invoke-updates
+    fi
+
+    printf "Downloading latest version from GitHub.\n"
+    echo $latest_release | grep -o '"browser_download_url": "https://[^"]*\.zip"' | cut -d'"' -f4 | xargs curl -o invoke-updates/invokeai-latest-version.zip -L
+
+    printf "Extracting Invoke Updater.\n"
+    unzip invoke-updates/invokeai-latest-version.zip -d invoke-updates
+
+    printf "\n########## InvokeAI Updater - RUNNING UPDATER ##########\n\n"
+    ./invoke-updates/InvokeAI-Installer/install.sh
+
+    clear
+
+    printf "########## InvokeAI Updater - CLEANING UP ##########\n\n"
+    printf "Removing Invoke Updater Directory...\n"
+    rm -rf invoke-updates
+    printf "\n\n########## InvokeAI Updater - UPDATING COMPLETE! ##########\n\n"
+} #End of updater section
+
 # Primary function for the case statement to determine user input
 do_choice() {
     case $1 in
@@ -48,10 +137,15 @@ do_choice() {
         ;;
     3)
         clear
+        printf "Running the Invoke updater\n"
+        invokeai_update_checker
+        ;;
+    4)
+        clear
         printf "Running the db maintenance script\n"
         invokeai-db-maintenance --root ${INVOKEAI_ROOT}
         ;;
-    4)
+    5)
         clear
         printf "Command-line help\n"
         invokeai-web --help
@@ -68,14 +162,18 @@ do_choice() {
 # Command-line interface for launching Invoke functions
 do_line_input() {
     clear
+    # Compare the versions. If a newer one is available, alert the user to there being a new version available.
+    if [ "$current_version" != "$latest_version" ]; then
+        printf "There is an update available for Invoke: v$latest_version\n\n"
+    fi
     printf "What would you like to do?\n"
     printf "1: Generate images using the browser-based interface\n"
     printf "2: Open the developer console\n"
-    printf "3: Run the InvokeAI image database maintenance script\n"
-    printf "4: Command-line help\n"
+    printf "3: Run the InvokeAI updater\n"
+    printf "4: Run the InvokeAI image database maintenance script\n"
+    printf "5: Command-line help\n"
     printf "Q: Quit\n\n"
-    printf "To update, download and run the installer from https://github.com/invoke-ai/InvokeAI/releases/latest.\n\n"
-    read -p "Please enter 1-4, Q: [1] " yn
+    read -p "Please enter 1-5, Q: [1] " yn
     choice=${yn:='1'}
     do_choice $choice
     clear
