@@ -326,7 +326,7 @@
         "drop": "Drop",
         "dropOrUpload": "$t(gallery.drop) or Upload",
         "dropToUpload": "$t(gallery.drop) to Upload",
-        "deleteImage": "Delete single Image",
+        "deleteImage": "Delete Image",
         "deleteImage_plural": "Delete {{count}} Images",
         "deleteImageBin": "Deleted images will be sent to your operating system's Bin.",
         "deleteImagePermanent": "Deleted images cannot be restored.",
