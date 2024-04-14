@@ -959,7 +959,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             TorchDevice.empty_cache()
 
             name = context.tensors.save(tensor=result_latents)
-        return LatentsOutput.build(latents_name=name, latents=result_latents, seed=seed)
+        return LatentsOutput.build(latents_name=name, latents=result_latents, seed=None)
 
 
 @invocation(

@@ -177,11 +177,11 @@ const recallLoRA: MetadataRecallFunc<LoRA> = (lora) => {
 };
 
 const recallAllLoRAs: MetadataRecallFunc<LoRA[]> = (loras) => {
+  const { dispatch } = getStore();
+  dispatch(lorasReset());
   if (!loras.length) {
     return;
   }
-  const { dispatch } = getStore();
-  dispatch(lorasReset());
   loras.forEach((lora) => {
     dispatch(loraRecalled(lora));
   });
@@ -192,11 +192,11 @@ const recallControlNet: MetadataRecallFunc<ControlNetConfigMetadata> = (controlN
 };
 
 const recallControlNets: MetadataRecallFunc<ControlNetConfigMetadata[]> = (controlNets) => {
+  const { dispatch } = getStore();
+  dispatch(controlNetsReset());
   if (!controlNets.length) {
     return;
   }
-  const { dispatch } = getStore();
-  dispatch(controlNetsReset());
   controlNets.forEach((controlNet) => {
     dispatch(controlAdapterRecalled(controlNet));
   });
@@ -207,11 +207,11 @@ const recallT2IAdapter: MetadataRecallFunc<T2IAdapterConfigMetadata> = (t2iAdapt
 };
 
 const recallT2IAdapters: MetadataRecallFunc<T2IAdapterConfigMetadata[]> = (t2iAdapters) => {
+  const { dispatch } = getStore();
+  dispatch(t2iAdaptersReset());
   if (!t2iAdapters.length) {
     return;
   }
-  const { dispatch } = getStore();
-  dispatch(t2iAdaptersReset());
   t2iAdapters.forEach((t2iAdapter) => {
     dispatch(controlAdapterRecalled(t2iAdapter));
   });
@@ -222,11 +222,11 @@ const recallIPAdapter: MetadataRecallFunc<IPAdapterConfigMetadata> = (ipAdapter)
 };
 
 const recallIPAdapters: MetadataRecallFunc<IPAdapterConfigMetadata[]> = (ipAdapters) => {
+  const { dispatch } = getStore();
+  dispatch(ipAdaptersReset());
   if (!ipAdapters.length) {
     return;
   }
-  const { dispatch } = getStore();
-  dispatch(ipAdaptersReset());
   ipAdapters.forEach((ipAdapter) => {
     dispatch(controlAdapterRecalled(ipAdapter));
   });
