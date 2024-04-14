@@ -1,6 +1,7 @@
 import type { KnipConfig } from 'knip';
 
 const config: KnipConfig = {
+  project: ['src/**/*.{ts,tsx}!'],
   ignore: [
     // This file is only used during debugging
     'src/app/store/middleware/debugLoggerMiddleware.ts',
