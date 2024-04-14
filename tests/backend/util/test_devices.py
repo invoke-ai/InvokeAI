@@ -107,6 +107,7 @@ def test_legacy_device_dtype_cpu(device_dtype_pair):
     with (
         patch("torch.cuda.is_available", return_value=False),
         patch("torch.backends.mps.is_available", return_value=False),
+        patch("torch.cuda.get_device_name", return_value="RTX9090"),
     ):
         device_name, dtype = device_dtype_pair
         config = get_config()
@@ -124,6 +125,7 @@ def test_legacy_precision_name():
         pytest.deprecated_call(),
         patch("torch.cuda.is_available", return_value=True),
         patch("torch.backends.mps.is_available", return_value=True),
+        patch("torch.cuda.get_device_name", return_value="RTX9090"),
     ):
         assert "float16" == choose_precision(torch.device("cuda"))
         assert "float16" == choose_precision(torch.device("mps"))
