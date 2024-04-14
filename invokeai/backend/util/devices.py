@@ -1,33 +1,50 @@
 from typing import Dict, Literal, Optional, Union
+from warnings import warn
 
 import torch
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig, get_config
 
 # legacy APIs
-TorchDeviceNames = Literal["float32", "float16", "bfloat16"]
+TorchPrecisionNames = Literal["float32", "float16", "bfloat16"]
 CPU_DEVICE = torch.device("cpu")
 CUDA_DEVICE = torch.device("cuda")
 MPS_DEVICE = torch.device("mps")
 
 
-def choose_precision(device: torch.device) -> TorchDeviceNames:
+def choose_precision(device: torch.device) -> TorchPrecisionNames:
     """Return the string representation of the recommended torch device."""
+    warn(
+        "choose_precision() is deprecated. Use TorchDevice.choose_torch_dtype() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     torch_dtype = TorchDevice.choose_torch_dtype(device)
     return PRECISION_TO_NAME[torch_dtype]
 
 
 def choose_torch_device() -> torch.device:
     """Return the torch.device to use for accelerated inference."""
+    warn(
+        "choose_torch_device() is deprecated. Use TorchDevice.choose_torch_device() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return TorchDevice.choose_torch_device()
 
 
-NAME_TO_PRECISION: Dict[TorchDeviceNames, torch.dtype] = {
+def torch_dtype(device: torch.device) -> torch.dtype:
+    """Return the torch precision for the recommended torch device."""
+    warn("torch_dtype() is deprecated. Use TorchDevice.choose_torch_dtype() instead.", DeprecationWarning, stacklevel=2)
+    return TorchDevice.choose_torch_dtype(device)
+
+
+NAME_TO_PRECISION: Dict[TorchPrecisionNames, torch.dtype] = {
     "float32": torch.float32,
     "float16": torch.float16,
     "bfloat16": torch.bfloat16,
 }
-PRECISION_TO_NAME: Dict[torch.dtype, TorchDeviceNames] = {v: k for k, v in NAME_TO_PRECISION.items()}
+PRECISION_TO_NAME: Dict[torch.dtype, TorchPrecisionNames] = {v: k for k, v in NAME_TO_PRECISION.items()}
 
 
 class TorchDevice:
@@ -40,11 +57,11 @@ class TorchDevice:
         if app_config.device != "auto":
             device = torch.device(app_config.device)
         elif torch.cuda.is_available():
-            device = torch.device("cuda")
+            device = CUDA_DEVICE
         elif torch.backends.mps.is_available():
-            device = torch.device("mps")
+            device = MPS_DEVICE
         else:
-            device = torch.device("cpu")
+            device = CPU_DEVICE
         return cls.normalize(device)
 
     @classmethod
@@ -99,5 +116,5 @@ class TorchDevice:
             torch.cuda.empty_cache()
 
     @classmethod
-    def _to_dtype(cls, precision_name: TorchDeviceNames) -> torch.dtype:
+    def _to_dtype(cls, precision_name: TorchPrecisionNames) -> torch.dtype:
         return NAME_TO_PRECISION[precision_name]
