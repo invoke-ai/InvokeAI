@@ -10,6 +10,9 @@ const config: KnipConfig = {
     'src/features/nodes/types/v2/**',
   ],
   ignoreBinaries: ['only-allow'],
+  paths: {
+    'public/*': ['public/*'],
+  },
 };
 
 export default config;
