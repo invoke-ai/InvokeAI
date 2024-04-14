@@ -13,11 +13,8 @@ export const DeleteImageButton = memo((props: DeleteImageButtonProps) => {
   const { onClick, isDisabled } = props;
   const { t } = useTranslation();
   const isConnected = useAppSelector((s) => s.system.isConnected);
-  const imageSelectionLength: number = (useAppSelector((s) => s.gallery.selection) || []).length;
-  const labelMessage: string =
-    imageSelectionLength > 1
-      ? t('gallery.deleteImage_plural', { count: imageSelectionLength })
-      : t('gallery.deleteImage');
+  const imageSelectionLength: number = useAppSelector((s) => s.gallery.selection.length);
+  const labelMessage: string = `${t('gallery.deleteImage', { count: imageSelectionLength })} (Del)`;
 
   return (
     <IconButton
