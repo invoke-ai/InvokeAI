@@ -5,30 +5,6 @@ import { socketQueueItemStatusChanged } from 'services/events/actions';
 
 const log = logger('socketio');
 
-/**
- * Updates the page's title to reflect the current length of the active queue.
- * If there are items in the queue, the title will be prefixed with the count inside parentheses.
- * If the queue is empty, the title will revert to its original state without any count.
- *
- * @param {number} activeQueueLength - The number of active items in the queue.
- */
-const updatePageTitle = (activeQueueLength: number) => {
-  const baseString: string = document.title.replace(/\(\d+\) /, '');
-  document.title = activeQueueLength > 0 ? `(${activeQueueLength}) ${baseString}` : baseString;
-};
-
-/**
- * Updates the favicon of the page based on the presence of items in the queue.
- * If there are items in the queue, it uses an alert favicon. Otherwise, it reverts to the default favicon.
- *
- * @param {number} activeQueueLength - The number of active items in the queue.
- */
-const updatePageFavicon = (activeQueueLength: number) => {
-  const InvokeLogoSVG: string = 'assets/images/invoke-favicon.svg';
-  const InvokeAlertLogoSVG: string = 'assets/images/invoke-alert-favicon.svg';
-  const faviconEl: HTMLLinkElement = document.getElementById('invoke-favicon') as HTMLLinkElement;
-  faviconEl.href = activeQueueLength > 0 ? InvokeAlertLogoSVG : InvokeLogoSVG;
-};
 
 export const addSocketQueueItemStatusChangedEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -36,9 +12,6 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
     effect: async (action, { dispatch }) => {
       // we've got new status for the queue item, batch and queue
       const { queue_item, batch_status, queue_status } = action.payload.data;
-
-      // Keep track of the active queue length by summing up pending and in_progress count
-      const activeQueueLength: number = queue_status.pending + queue_status.in_progress || 0;
 
       log.debug(action.payload, `Queue item ${queue_item.item_id} status updated: ${queue_item.status}`);
 
@@ -82,9 +55,6 @@ export const addSocketQueueItemStatusChangedEventListener = (startAppListening: 
       dispatch(
         queueApi.util.invalidateTags(['CurrentSessionQueueItem', 'NextSessionQueueItem', 'InvocationCacheStatus'])
       );
-
-      updatePageTitle(activeQueueLength);
-      updatePageFavicon(activeQueueLength);
     },
   });
 };
