@@ -188,7 +188,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       )}
       <MenuDivider />
       <MenuItem color="error.300" icon={<PiTrashSimpleBold />} onClickCapture={handleDelete}>
-        {t('gallery.deleteImage')}
+        {t('gallery.deleteImage', { count: 1 })}
       </MenuItem>
     </>
   );
