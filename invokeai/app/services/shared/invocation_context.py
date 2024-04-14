@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
 
 from PIL.Image import Image
-from torch import Tensor, torch
+from torch import Tensor
 
 from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import MetadataField, WithBoard, WithMetadata
@@ -19,7 +19,6 @@ from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType,
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
-from invokeai.backend.util.devices import TorchDeviceSelect
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation
@@ -426,20 +425,6 @@ class ModelsInterface(InvocationContextInterface):
             model_type=type,
             model_format=format,
         )
-
-    def get_execution_device(self) -> torch.device:
-        """Return the execution device to use for accelerated torch operations.
-        Args:
-           none
-
-        Returns:
-           A torch.dtype object.
-
-        Note:
-           Currently this is equivalent to calling TorchDeviceSelect.choose_torch_device(),
-           but in the future the GPU may be dynamically assigned to support multi-GPU systems.
-        """
-        return TorchDeviceSelect.choose_torch_device(self._services.configuration)
 
 
 class ConfigInterface(InvocationContextInterface):

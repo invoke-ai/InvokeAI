@@ -72,12 +72,12 @@ from ...backend.stable_diffusion.diffusers_pipeline import (
     image_resized_to_grid_as_tensor,
 )
 from ...backend.stable_diffusion.schedulers import SCHEDULER_MAP
-from ...backend.util.devices import TorchDeviceSelect
+from ...backend.util.devices import TorchDevice
 from .baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 from .controlnet_image_processors import ControlField
 from .model import ModelIdentifierField, UNetField, VAEField
 
-DEFAULT_PRECISION = TorchDeviceSelect.choose_torch_dtype()
+DEFAULT_PRECISION = TorchDevice.choose_torch_dtype()
 
 
 @invocation_output("scheduler_output")
@@ -956,7 +956,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
             # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
             result_latents = result_latents.to("cpu")
-            TorchDeviceSelect.empty_cache()
+            TorchDevice.empty_cache()
 
             name = context.tensors.save(tensor=result_latents)
         return LatentsOutput.build(latents_name=name, latents=result_latents, seed=seed)
@@ -1023,7 +1023,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 vae.disable_tiling()
 
             # clear memory as vae decode can request a lot
-            TorchDeviceSelect.empty_cache()
+            TorchDevice.empty_cache()
 
             with torch.inference_mode():
                 # copied from diffusers pipeline
@@ -1035,7 +1035,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
                 image = VaeImageProcessor.numpy_to_pil(np_image)[0]
 
-        TorchDeviceSelect.empty_cache()
+        TorchDevice.empty_cache()
 
         image_dto = context.images.save(image=image)
 
@@ -1074,7 +1074,7 @@ class ResizeLatentsInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         latents = context.tensors.load(self.latents.latents_name)
-        device = context.models.get_execution_device()
+        device = TorchDevice.choose_torch_device(context.config.get())
 
         resized_latents = torch.nn.functional.interpolate(
             latents.to(device),
@@ -1086,7 +1086,7 @@ class ResizeLatentsInvocation(BaseInvocation):
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         resized_latents = resized_latents.to("cpu")
 
-        TorchDeviceSelect.empty_cache()
+        TorchDevice.empty_cache()
 
         name = context.tensors.save(tensor=resized_latents)
         return LatentsOutput.build(latents_name=name, latents=resized_latents, seed=self.latents.seed)
@@ -1113,7 +1113,7 @@ class ScaleLatentsInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         latents = context.tensors.load(self.latents.latents_name)
 
-        device = context.models.get_execution_device()
+        device = TorchDevice.choose_torch_device(context.config.get())
 
         # resizing
         resized_latents = torch.nn.functional.interpolate(
@@ -1125,7 +1125,7 @@ class ScaleLatentsInvocation(BaseInvocation):
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         resized_latents = resized_latents.to("cpu")
-        TorchDeviceSelect.empty_cache()
+        TorchDevice.empty_cache()
 
         name = context.tensors.save(tensor=resized_latents)
         return LatentsOutput.build(latents_name=name, latents=resized_latents, seed=self.latents.seed)
@@ -1257,7 +1257,7 @@ class BlendLatentsInvocation(BaseInvocation):
         if latents_a.shape != latents_b.shape:
             raise Exception("Latents to blend must be the same size.")
 
-        device = context.models.get_execution_device()
+        device = TorchDevice.choose_torch_device(context.config.get())
 
         def slerp(
             t: Union[float, npt.NDArray[Any]],  # FIXME: maybe use np.float32 here?
@@ -1311,7 +1311,7 @@ class BlendLatentsInvocation(BaseInvocation):
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         blended_latents = blended_latents.to("cpu")
 
-        TorchDeviceSelect.empty_cache()
+        TorchDevice.empty_cache()
 
         name = context.tensors.save(tensor=blended_latents)
         return LatentsOutput.build(latents_name=name, latents=blended_latents)

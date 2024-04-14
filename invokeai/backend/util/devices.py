@@ -1,17 +1,36 @@
-from typing import Optional, Union
+from typing import Dict, Literal, Optional, Union
 
 import torch
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig, get_config
 
-NAME_TO_PRECISION = {
+# legacy APIs
+TorchDeviceNames = Literal["float32", "float16", "bfloat16"]
+CPU_DEVICE = torch.device("cpu")
+CUDA_DEVICE = torch.device("cuda")
+MPS_DEVICE = torch.device("mps")
+
+
+def choose_precision(device: torch.device) -> TorchDeviceNames:
+    """Return the string representation of the recommended torch device."""
+    torch_dtype = TorchDevice.choose_torch_dtype(device)
+    return PRECISION_TO_NAME[torch_dtype]
+
+
+def choose_torch_device() -> torch.device:
+    """Return the torch.device to use for accelerated inference."""
+    return TorchDevice.choose_torch_device()
+
+
+NAME_TO_PRECISION: Dict[TorchDeviceNames, torch.dtype] = {
     "float32": torch.float32,
     "float16": torch.float16,
     "bfloat16": torch.bfloat16,
 }
+PRECISION_TO_NAME: Dict[torch.dtype, TorchDeviceNames] = {v: k for k, v in NAME_TO_PRECISION.items()}
 
 
-class TorchDeviceSelect:
+class TorchDevice:
     """Abstraction layer for torch devices."""
 
     @classmethod
@@ -80,5 +99,5 @@ class TorchDeviceSelect:
             torch.cuda.empty_cache()
 
     @classmethod
-    def _to_dtype(cls, precision_name: str) -> torch.dtype:
+    def _to_dtype(cls, precision_name: TorchDeviceNames) -> torch.dtype:
         return NAME_TO_PRECISION[precision_name]

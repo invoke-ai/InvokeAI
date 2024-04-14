@@ -13,7 +13,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.download_with_progress import download_with_progress_bar
 from invokeai.backend.image_util.basicsr.rrdbnet_arch import RRDBNet
 from invokeai.backend.image_util.realesrgan.realesrgan import RealESRGAN
-from invokeai.backend.util.devices import TorchDeviceSelect
+from invokeai.backend.util.devices import TorchDevice
 
 from .baseinvocation import BaseInvocation, invocation
 from .fields import InputField, WithBoard, WithMetadata
@@ -116,7 +116,7 @@ class ESRGANInvocation(BaseInvocation, WithMetadata, WithBoard):
         upscaled_image = upscaler.upscale(cv2_image)
         pil_image = Image.fromarray(cv2.cvtColor(upscaled_image, cv2.COLOR_BGR2RGB)).convert("RGBA")
 
-        TorchDeviceSelect.empty_cache()
+        TorchDevice.empty_cache()
 
         image_dto = context.images.save(image=pil_image)
 

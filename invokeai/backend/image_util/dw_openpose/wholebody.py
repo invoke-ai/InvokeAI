@@ -7,7 +7,7 @@ import onnxruntime as ort
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.util.download_with_progress import download_with_progress_bar
-from invokeai.backend.util.devices import TorchDeviceSelect
+from invokeai.backend.util.devices import TorchDevice
 
 from .onnxdet import inference_detector
 from .onnxpose import inference_pose
@@ -28,7 +28,7 @@ config = get_config()
 
 class Wholebody:
     def __init__(self):
-        device = TorchDeviceSelect.choose_torch_device()
+        device = TorchDevice.choose_torch_device()
 
         providers = ["CUDAExecutionProvider"] if device.type == "cuda" else ["CPUExecutionProvider"]
 

@@ -32,7 +32,7 @@ ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
 ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
-CONFIG_SCHEMA_VERSION = "4.0.0"
+CONFIG_SCHEMA_VERSION = "4.0.1"
 
 
 def get_default_ram_cache_size() -> float:
@@ -370,6 +370,9 @@ def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
             # `max_vram_cache_size` was renamed to `vram` some time in v3, but both names were used
             if k == "max_vram_cache_size" and "vram" not in category_dict:
                 parsed_config_dict["vram"] = v
+            # autocast was removed in v4.0.1
+            if k == "precision" and v == "autocast":
+                parsed_config_dict["precision"] = "auto"
             if k == "conf_path":
                 parsed_config_dict["legacy_models_yaml_path"] = v
             if k == "legacy_conf_dir":
@@ -389,6 +392,28 @@ def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
     # When migrating the config file, we should not include currently-set environment variables.
     config = DefaultInvokeAIAppConfig.model_validate(parsed_config_dict)
 
+    return config
+
+
+def migrate_v4_0_0_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
+    """Migrate v4.0.0 config dictionary to a current config object.
+
+    Args:
+        config_dict: A dictionary of settings from a v4.0.0 config file.
+
+    Returns:
+        An instance of `InvokeAIAppConfig` with the migrated settings.
+    """
+    parsed_config_dict: dict[str, Any] = {}
+    for k, v in config_dict.items():
+        # autocast was removed from precision in v4.0.1
+        if k == "precision" and v == "autocast":
+            parsed_config_dict["precision"] = "auto"
+        else:
+            parsed_config_dict[k] = v
+        if k == "schema_version":
+            parsed_config_dict[k] = CONFIG_SCHEMA_VERSION
+    config = DefaultInvokeAIAppConfig.model_validate(parsed_config_dict)
     return config
 
 
@@ -418,17 +443,21 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
             raise RuntimeError(f"Failed to load and migrate v3 config file {config_path}: {e}") from e
         migrated_config.write_file(config_path)
         return migrated_config
-    else:
-        # Attempt to load as a v4 config file
-        try:
-            # Meta is not included in the model fields, so we need to validate it separately
-            config = InvokeAIAppConfig.model_validate(loaded_config_dict)
-            assert (
-                config.schema_version == CONFIG_SCHEMA_VERSION
-            ), f"Invalid schema version, expected {CONFIG_SCHEMA_VERSION}: {config.schema_version}"
-            return config
-        except Exception as e:
-            raise RuntimeError(f"Failed to load config file {config_path}: {e}") from e
+
+    if loaded_config_dict["schema_version"] == "4.0.0":
+        loaded_config_dict = migrate_v4_0_0_config_dict(loaded_config_dict)
+        loaded_config_dict.write_file(config_path)
+
+    # Attempt to load as a v4 config file
+    try:
+        # Meta is not included in the model fields, so we need to validate it separately
+        config = InvokeAIAppConfig.model_validate(loaded_config_dict)
+        assert (
+            config.schema_version == CONFIG_SCHEMA_VERSION
+        ), f"Invalid schema version, expected {CONFIG_SCHEMA_VERSION}: {config.schema_version}"
+        return config
+    except Exception as e:
+        raise RuntimeError(f"Failed to load config file {config_path}: {e}") from e
 
 
 @lru_cache(maxsize=1)

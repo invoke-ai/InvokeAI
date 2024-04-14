@@ -43,7 +43,7 @@ from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMet
 from invokeai.backend.model_manager.probe import ModelProbe
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util import InvokeAILogger
-from invokeai.backend.util.devices import TorchDeviceSelect
+from invokeai.backend.util.devices import TorchDevice
 
 from .model_install_base import (
     MODEL_SOURCE_TO_TYPE_MAP,
@@ -637,7 +637,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _guess_variant(self) -> Optional[ModelRepoVariant]:
         """Guess the best HuggingFace variant type to download."""
-        precision = TorchDeviceSelect.choose_torch_dtype()
+        precision = TorchDevice.choose_torch_dtype()
         return ModelRepoVariant.FP16 if precision == torch.float16 else None
 
     def _import_local_model(self, source: LocalModelSource, config: Optional[Dict[str, Any]]) -> ModelInstallJob:

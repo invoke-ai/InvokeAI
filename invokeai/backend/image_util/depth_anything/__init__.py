@@ -13,7 +13,7 @@ from invokeai.app.services.config.config_default import get_config
 from invokeai.app.util.download_with_progress import download_with_progress_bar
 from invokeai.backend.image_util.depth_anything.model.dpt import DPT_DINOv2
 from invokeai.backend.image_util.depth_anything.utilities.util import NormalizeImage, PrepareForNet, Resize
-from invokeai.backend.util.devices import TorchDeviceSelect
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
 config = get_config()
@@ -56,7 +56,7 @@ class DepthAnythingDetector:
     def __init__(self) -> None:
         self.model = None
         self.model_size: Union[Literal["large", "base", "small"], None] = None
-        self.device = TorchDeviceSelect.choose_torch_device()
+        self.device = TorchDevice.choose_torch_device()
 
     def load_model(self, model_size: Literal["large", "base", "small"] = "small"):
         DEPTH_ANYTHING_MODEL_PATH = config.models_path / DEPTH_ANYTHING_MODELS[model_size]["local"]
