@@ -103,8 +103,8 @@ const CurrentImageButtons = () => {
     if (!imageDTO) {
       return;
     }
-    dispatch(imagesToDeleteSelected([imageDTO]));
-  }, [dispatch, imageDTO]);
+    dispatch(imagesToDeleteSelected(selection));
+  }, [dispatch, imageDTO, selection]);
 
   useHotkeys(
     'Shift+U',
