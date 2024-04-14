@@ -29,7 +29,7 @@ def test_download_and_cache(mock_context: InvocationContext, mm2_root_dir: Path)
     assert downloaded_path.is_file()
     assert downloaded_path.exists()
     assert downloaded_path.name == "test_embedding.safetensors"
-    assert downloaded_path.parent.parent == mm2_root_dir / "models/.cache"
+    assert downloaded_path.parent.parent == mm2_root_dir / "models/.download_cache"
 
     downloaded_path_2 = mock_context.models.download_and_cache_ckpt(
         "https://www.test.foo/download/test_embedding.safetensors"

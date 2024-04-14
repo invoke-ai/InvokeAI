@@ -393,6 +393,11 @@ class ModelInstallService(ModelInstallServiceBase):
             rmtree(model_path)
         self.unregister(key)
 
+    @classmethod
+    def _download_cache_path(cls, source: Union[str, AnyHttpUrl], app_config: InvokeAIAppConfig) -> Path:
+        model_hash = sha256(str(source).encode("utf-8")).hexdigest()[0:32]
+        return app_config.download_cache_path / model_hash
+
     def download_and_cache(
         self,
         source: Union[str, AnyHttpUrl],
@@ -400,8 +405,7 @@ class ModelInstallService(ModelInstallServiceBase):
         timeout: int = 0,
     ) -> Path:
         """Download the model file located at source to the models cache and return its Path."""
-        model_hash = sha256(str(source).encode("utf-8")).hexdigest()[0:32]
-        model_path = self._app_config.convert_cache_path / model_hash
+        model_path = self._download_cache_path(source, self._app_config)
 
         # We expect the cache directory to contain one and only one downloaded file.
         # We don't know the file's name in advance, as it is set by the download
@@ -532,8 +536,13 @@ class ModelInstallService(ModelInstallServiceBase):
             if resolved_path in installed_model_paths:
                 return True
             # Skip core models entirely - these aren't registered with the model manager.
-            if str(resolved_path).startswith(str(self.app_config.models_path / "core")):
-                return False
+            for special_directory in [
+                self.app_config.models_path / "core",
+                self.app_config.convert_cache_dir,
+                self.app_config.download_cache_dir,
+            ]:
+                if resolved_path.is_relative_to(special_directory):
+                    return False
             try:
                 model_id = self.register_path(model_path)
                 self._logger.info(f"Registered {model_path.name} with id {model_id}")
