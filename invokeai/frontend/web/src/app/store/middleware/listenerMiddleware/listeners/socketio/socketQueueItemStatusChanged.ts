@@ -5,7 +5,6 @@ import { socketQueueItemStatusChanged } from 'services/events/actions';
 
 const log = logger('socketio');
 
-
 export const addSocketQueueItemStatusChangedEventListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: socketQueueItemStatusChanged,
