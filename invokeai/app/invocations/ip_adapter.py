@@ -116,17 +116,24 @@ class IPAdapterInvocation(BaseInvocation):
 
         image_encoder_model = self._get_image_encoder(context, image_encoder_model_name)
 
-        target_blocks = ["block"]
         if self.method == "style":
             if ip_adapter_info.base == "sd-1":
                 target_blocks = ["up_blocks.1"]
-            if ip_adapter_info.base == "sdxl":
+            elif ip_adapter_info.base == "sdxl":
                 target_blocks = ["up_blocks.0.attentions.1"]
+            else:
+                raise ValueError(f"Unsupported IP-Adapter base type: '{ip_adapter_info.base}'.")
         elif self.method == "composition":
             if ip_adapter_info.base == "sd-1":
                 target_blocks = ["down_blocks.2", "mid_block"]
-            if ip_adapter_info.base == "sdxl":
+            elif ip_adapter_info.base == "sdxl":
                 target_blocks = ["down_blocks.2.attentions.1"]
+            else:
+                raise ValueError(f"Unsupported IP-Adapter base type: '{ip_adapter_info.base}'.")
+        elif self.method == "full":
+            target_blocks = ["block"]
+        else:
+            raise ValueError(f"Unexpected IP-Adapter method: '{self.method}'.")
 
         return IPAdapterOutput(
             ip_adapter=IPAdapterField(
