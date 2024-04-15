@@ -18,7 +18,7 @@ Short-form videos that introduce parts of InvokeAI.
 
 |<h2>AI Image Generation</h2>|  |
 |:---:|---|
-| ***InvokeAI - Fundamentals - Creating with AI (13:39)***<BR>[![img](https://img.youtube.com/vi/m8hnpX2XzL0/0.jpg)](https://www.youtube.com/watch?v=m8hnpX2XzL0) |  how Diffusion image modelling works, how images are generated, how prompts are structured (Subject, Category, Quality Modifiers, Aesthetics & Composition)  |
+| ***InvokeAI - Fundamentals - Creating with AI (13:39)***<BR>[![img](https://img.youtube.com/vi/m8hnpX2XzL0/0.jpg)](https://www.youtube.com/watch?v=m8hnpX2XzL0) |  how Diffusion image modelling works, how images are generated, how prompts are structured (Subject, Category, Quality Modifiers, Aesthetics & Composition), how Image2Image works (Denoising Strength), brief overview of Control Adapters (Denoising Timeline, Begin / End Step Percentage), |
 | ***InvokeAI - SDXL Getting Started (6:39)***<BR>[![img](https://img.youtube.com/vi/c7zAhlC7xKE/0.jpg)](https://www.youtube.com/watch?v=c7zAhlC7xKE) |  NEEDS DESCRIPTION  |
 | ***InvokeAI - AI Image Prompting (25:34)***<BR>[![img](https://img.youtube.com/vi/WpPVf_XepIg/0.jpg)](https://www.youtube.com/watch?v=WpPVf_XepIg) |  NEEDS DESCRIPTION  |
 | ***Using AI Image to Image Transformation<br>(Invoke - Getting Started Series #3) (8:26)***<BR>[![img](https://img.youtube.com/vi/z4uT-tppfEc/0.jpg)](https://www.youtube.com/watch?v=z4uT-tppfEc) |  NEEDS DESCRIPTION  |
