@@ -6,7 +6,7 @@ title: InvokeAI YouTube Videos
 
 ## Living list of all InvokeAI YouTube Videos
 
-The InvokeAI team has produced many detailed and informative videos on many of the ways InvokeAI works on the [InvokeAI YouTube channel](https://www.youtube.com/@invokeai). This page will be maintained with links and brief descriptions of what those videos cover. This is a curated list and is organized, as much as possible, by theme not by release date.
+The InvokeAI team has produced many detailed and informative videos on many of the ways InvokeAI works on the [InvokeAI YouTube channel](https://www.youtube.com/@invokeai). This page will be maintained with links and brief descriptions of what those videos cover. This is a curated list and is organized, as much as possible, by theme not by release date, this can also mean that some of the content may have changed in more-recent versions of Invoke.
 
 [![img](https://img.youtube.com/vi/YOUTUBE_VIDEO_ID_HERE/0.jpg)](https://www.youtube.com/watch?v=YOUTUBE_VIDEO_ID_HERE)
 
@@ -19,6 +19,7 @@ Short-form videos that introduce parts of InvokeAI.
 |AI Image Generation| |
 |:---:|---|
 | ***InvokeAI - Fundamentals - Creating with AI (13:39)***<BR>[![img](https://img.youtube.com/vi/m8hnpX2XzL0/0.jpg)](https://www.youtube.com/watch?v=m8hnpX2XzL0) |  NEEDS DESCRIPTION  |
+| ***InvokeAI - AI Image Prompting (25:34)***<BR>[![img](https://img.youtube.com/vi/WpPVf_XepIg/0.jpg)](https://www.youtube.com/watch?v=WpPVf_XepIg) |  NEEDS DESCRIPTION  |
 
 
 
