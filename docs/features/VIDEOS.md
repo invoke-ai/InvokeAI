@@ -10,17 +10,16 @@ The InvokeAI team has produced many detailed and informative videos on many of t
 
 [![img](https://img.youtube.com/vi/YOUTUBE_VIDEO_ID_HERE/0.jpg)](https://www.youtube.com/watch?v=YOUTUBE_VIDEO_ID_HERE)
 
-![image](../assets/gallery/gallery.png)
-
 ### Basic Concepts
 
 Short-form videos that introduce parts of InvokeAI.
 
-
 #### AI Image Generation
 
 ***InvokeAI - Fundamentals - Creating with AI (13:39)***
+
 NEEDS DESCRIPTION
+
 [![img](https://img.youtube.com/vi/m8hnpX2XzL0/0.jpg)](https://www.youtube.com/watch?v=m8hnpX2XzL0)
 
 
