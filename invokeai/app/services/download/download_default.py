@@ -270,7 +270,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
             job.dest.parent.mkdir(parents=True, exist_ok=True)
             job.download_path = job.dest
 
-        assert job.download_path
+        assert job.download_path is not None
 
         # Don't clobber an existing file. See commit 82c2c85202f88c6d24ff84710f297cfc6ae174af
         # for code that instead resumes an interrupted download.
@@ -279,6 +279,9 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
         # append ".downloading" to the path
         in_progress_path = self._in_progress_path(job.download_path)
+
+        # catch rare race condition that is appearing in unit tests.
+        assert in_progress_path.parent.exists(), f"Directory doesn't exist! in_progress_path={in_progress_path}; parent={in_progress_path.parent}"
 
         # signal caller that the download is starting. At this point, key fields such as
         # download_path and total_bytes will be populated. We call it here because the might
