@@ -16,12 +16,26 @@ Short-form videos that introduce parts of InvokeAI.
 
 
 
-|<h2>AI Image Generation</h2>| |
+|<h2>AI Image Generation</h2>|  |
 |:---:|---|
 | ***InvokeAI - Fundamentals - Creating with AI (13:39)***<BR>[![img](https://img.youtube.com/vi/m8hnpX2XzL0/0.jpg)](https://www.youtube.com/watch?v=m8hnpX2XzL0) |  NEEDS DESCRIPTION  |
 | ***InvokeAI - AI Image Prompting (25:34)***<BR>[![img](https://img.youtube.com/vi/WpPVf_XepIg/0.jpg)](https://www.youtube.com/watch?v=WpPVf_XepIg) |  NEEDS DESCRIPTION  |
 
 
+|<h2>Unified Canvas</h2>| |
+|:---:|---|
+| ***InvokeAI - Unified Canvas Basics (28:37)***<BR>[![img](https://img.youtube.com/vi/s4EqQRxRR7k/0.jpg)](https://www.youtube.com/watch?v=s4EqQRxRR7k) |  NEEDS DESCRIPTION  |
+| ***InvokeAI - Canvas Fundamentals (38:06)***<BR>[![img](https://img.youtube.com/vi/kzRL88ffv1o/0.jpg)](https://www.youtube.com/watch?v=kzRL88ffv1o) |  NEEDS DESCRIPTION  |
+| ***InvokeAI - Canvas Overdrive #1 (7:22)***<BR>[![img](https://img.youtube.com/vi/RwVGDGc6-3o/0.jpg)](https://www.youtube.com/watch?v=RwVGDGc6-3o) |  NEEDS DESCRIPTION  |
+| ***InvokeAI - Canvas Overdrive #2 (4:43)***<BR>[![img](https://img.youtube.com/vi/WmOUl8Gab5U/0.jpg)](https://www.youtube.com/watch?v=WmOUl8Gab5U) |  NEEDS DESCRIPTION  |
+| ***InvokeAI - Canvas Overdrive #3 (7:01)***<BR>[![img](https://img.youtube.com/vi/e_rRQeee6-0/0.jpg)](https://www.youtube.com/watch?v=e_rRQeee6-0) |  NEEDS DESCRIPTION  |
+| ***InvokeAI - Canvas Overdrive #4 (7:08)***<BR>[![img](https://img.youtube.com/vi/OFiJ1Bv0FIM/0.jpg)](https://www.youtube.com/watch?v=OFiJ1Bv0FIM) |  NEEDS DESCRIPTION  |
+| ***InvokeAI - Canvas Overdrive #5 (7:09)***<BR>[![img](https://img.youtube.com/vi/afSbZEJj2r8/0.jpg)](https://www.youtube.com/watch?v=afSbZEJj2r8) |  NEEDS DESCRIPTION  |
+| ***InvokeAI - Canvas Overdrive #6 - Titans in the Gorge - Featuring Canvas Controls, Gradient Denoising (6:42)***<BR>[![img](https://img.youtube.com/vi/gY7II-fjgiw/0.jpg)](https://www.youtube.com/watch?v=gY7II-fjgiw) |  NEEDS DESCRIPTION  |
+| ***InvokeAI - Canvas Drivethrough #1 (50:39)***<BR>[![img](https://img.youtube.com/vi/QSmQ_19rszU/0.jpg)](https://www.youtube.com/watch?v=QSmQ_19rszU) |  NEEDS DESCRIPTION  |
+| ***InvokeAI - Canvas Drivethrough #2 (23:45)***<BR>[![img](https://img.youtube.com/vi/GAlaOlihZ20/0.jpg)](https://www.youtube.com/watch?v=GAlaOlihZ20) |  NEEDS DESCRIPTION  |
+| ***InvokeAI - Canvas Tips & Tricks #1 (17:58)***<BR>[![img](https://img.youtube.com/vi/2pcBtNkTZ40/0.jpg)](https://www.youtube.com/watch?v=2pcBtNkTZ40) |  NEEDS DESCRIPTION  |
+| ***Advanced Canvas Inpainting Techniques with Invoke for Concept Art | Pro Diffusion Deep Dive (21:05)***<BR>[![img](https://img.youtube.com/vi/xzvIpfGTXg/0.jpg)](https://www.youtube.com/watch?v=xzvIpfGTXg) |  NEEDS DESCRIPTION  |
 
 
 
