@@ -54,7 +54,7 @@ const CurrentImageButtons = () => {
   const selection = useAppSelector((s) => s.gallery.selection);
   const shouldDisableToolbarButtons = useAppSelector(selectShouldDisableToolbarButtons);
 
-  const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
+  const isUpscalingEnabled = useFeatureStatus('upscaling');
   const isQueueMutationInProgress = useIsQueueMutationInProgress();
   const toaster = useAppToaster();
   const { t } = useTranslation();

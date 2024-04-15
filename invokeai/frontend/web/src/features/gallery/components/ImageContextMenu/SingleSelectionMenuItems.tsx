@@ -45,7 +45,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const toaster = useAppToaster();
-  const isCanvasEnabled = useFeatureStatus('unifiedCanvas').isFeatureEnabled;
+  const isCanvasEnabled = useFeatureStatus('unifiedCanvas');
   const customStarUi = useStore($customStarUI);
   const { downloadImage } = useDownloadImage();
 
