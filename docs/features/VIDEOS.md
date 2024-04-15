@@ -6,7 +6,7 @@ title: InvokeAI YouTube Videos
 
 ## Living list of all InvokeAI YouTube Videos
 
-The InvokeAI team has produced many detailed and informative videos on many of the ways InvokeAI works on the [InvokeAI YouTube channel](https://www.youtube.com/@invokeai). This page will be maintained with links and brief descriptions of what those videos cover. This is a curated list and is organized, as much as possible, by theme not by release date, this can also mean that some of the content may have changed in more-recent versions of Invoke.
+The InvokeAI team has produced many detailed and informative videos on many of the ways InvokeAI works on the [InvokeAI YouTube channel](https://www.youtube.com/@invokeai). This page will be maintained with links and brief descriptions of what those videos cover. This is a curated list and is organized, as much as possible, by theme not by release date, this can mean that some of the content may have changed in more-recent versions of Invoke.
 
 [![img](https://img.youtube.com/vi/YOUTUBE_VIDEO_ID_HERE/0.jpg)](https://www.youtube.com/watch?v=YOUTUBE_VIDEO_ID_HERE)
 
@@ -18,40 +18,40 @@ Short-form videos that introduce parts of InvokeAI.
 
 |<h2>AI Image Generation</h2>|  |
 |:---:|---|
-| ***InvokeAI - Fundamentals - Creating with AI (13:39)***<BR>[![img](https://img.youtube.com/vi/m8hnpX2XzL0/0.jpg)](https://www.youtube.com/watch?v=m8hnpX2XzL0) |  how Diffusion image modelling works, how images are generated, how prompts are structured (Subject, Category, Quality Modifiers, Aesthetics & Composition), how Image2Image works (Denoising Strength), brief overview of Control Adapters (Denoising Timeline, Begin / End Step Percentage), |
-| ***InvokeAI - SDXL Getting Started (6:39)***<BR>[![img](https://img.youtube.com/vi/c7zAhlC7xKE/0.jpg)](https://www.youtube.com/watch?v=c7zAhlC7xKE) |  NEEDS DESCRIPTION  |
-| ***InvokeAI - AI Image Prompting (25:34)***<BR>[![img](https://img.youtube.com/vi/WpPVf_XepIg/0.jpg)](https://www.youtube.com/watch?v=WpPVf_XepIg) |  NEEDS DESCRIPTION  |
-| ***Using AI Image to Image Transformation<br>(Invoke - Getting Started Series #3) (8:26)***<BR>[![img](https://img.youtube.com/vi/z4uT-tppfEc/0.jpg)](https://www.youtube.com/watch?v=z4uT-tppfEc) |  NEEDS DESCRIPTION  |
-| ***Using Schedulers and CFG Scale - Advanced Generation Settings<br>(Invoke - Getting Started Series #4) (9:35)***<BR>[![img](https://img.youtube.com/vi/1OeHEJrsTpI/0.jpg)](https://www.youtube.com/watch?v=1OeHEJrsTpI) |  NEEDS DESCRIPTION  |
-| ***Controlling AI Image Generation with ControlNet & IP Adapter<br>(Invoke - Getting Started Series #2) (13:57)***<BR>[![img](https://img.youtube.com/vi/7Q5PcxkbEjE/0.jpg)](https://www.youtube.com/watch?v=7Q5PcxkbEjE) |  NEEDS DESCRIPTION  |
-| ***InvokeAI - Workflow Fundamentals - Creating with Generative AI (23:29)***<BR>[![img](https://img.youtube.com/vi/L3isi26qy0Y/0.jpg)](https://www.youtube.com/watch?v=L3isi26qy0Y) |  NEEDS DESCRIPTION  |
-| ***AI Workflows that Accelerate Production &<br>Respect Artists' Process (GDC 2024) (35:56)***<BR>[![img](https://img.youtube.com/vi/cdpnazNI4Ig/0.jpg)](https://www.youtube.com/watch?v=cdpnazNI4Ig) |  NEEDS DESCRIPTION  |
+| ***InvokeAI - Fundamentals - Creating with AI (13:39)***<BR>[![img](https://img.youtube.com/vi/m8hnpX2XzL0/0.jpg)](https://www.youtube.com/watch?v=m8hnpX2XzL0) |  how Diffusion image modelling works, how images are generated, how prompts are structured (Subject, Category, Quality Modifiers, Aesthetics & Composition), how Image2Image works (Denoising Strength), brief overview of Control Adapters (Denoising Timeline, Begin / End Step Percentage) |
+| ***InvokeAI - SDXL Getting Started (6:39)***<BR>[![img](https://img.youtube.com/vi/c7zAhlC7xKE/0.jpg)](https://www.youtube.com/watch?v=c7zAhlC7xKE) |  SDXL prompting (Concatenate Prompt with Style button), VAE Precision, ideal image ratios, Refiner (refinger steps to denoising steps ratio), [keturn SDXL Prompt Styles](https://gist.github.com/keturn/beb33f4f71cf88aaa34ae9e59c5e719f)
+| ***InvokeAI - AI Image Prompting (25:34)***<BR>[![img](https://img.youtube.com/vi/WpPVf_XepIg/0.jpg)](https://www.youtube.com/watch?v=WpPVf_XepIg) |  DESCRIPTION |
+| ***Using AI Image to Image Transformation<br>(Invoke - Getting Started Series #3) (8:26)***<BR>[![img](https://img.youtube.com/vi/z4uT-tppfEc/0.jpg)](https://www.youtube.com/watch?v=z4uT-tppfEc) |  DESCRIPTION |
+| ***Using Schedulers and CFG Scale - Advanced Generation Settings<br>(Invoke - Getting Started Series #4) (9:35)***<BR>[![img](https://img.youtube.com/vi/1OeHEJrsTpI/0.jpg)](https://www.youtube.com/watch?v=1OeHEJrsTpI) |  DESCRIPTION |
+| ***Controlling AI Image Generation with ControlNet & IP Adapter<br>(Invoke - Getting Started Series #2) (13:57)***<BR>[![img](https://img.youtube.com/vi/7Q5PcxkbEjE/0.jpg)](https://www.youtube.com/watch?v=7Q5PcxkbEjE) |  DESCRIPTION |
+| ***InvokeAI - Workflow Fundamentals - Creating with Generative AI (23:29)***<BR>[![img](https://img.youtube.com/vi/L3isi26qy0Y/0.jpg)](https://www.youtube.com/watch?v=L3isi26qy0Y) |  DESCRIPTION |
+| ***AI Workflows that Accelerate Production &<br>Respect Artists' Process (GDC 2024) (35:56)***<BR>[![img](https://img.youtube.com/vi/cdpnazNI4Ig/0.jpg)](https://www.youtube.com/watch?v=cdpnazNI4Ig) |  DESCRIPTION |
 
 
 <br>
 
 |<h2>Unified Canvas</h2>| |
 |:---:|---|
-| ***InvokeAI - Unified Canvas Basics (28:37)***<BR>[![img](https://img.youtube.com/vi/s4EqQRxRR7k/0.jpg)](https://www.youtube.com/watch?v=s4EqQRxRR7k) |  NEEDS DESCRIPTION  |
-| ***InvokeAI - Canvas Fundamentals (38:06)***<BR>[![img](https://img.youtube.com/vi/kzRL88ffv1o/0.jpg)](https://www.youtube.com/watch?v=kzRL88ffv1o) |  NEEDS DESCRIPTION  |
-| ***Creating and Composing on the Unified Canvas<br>(Invoke - Getting Started Series #6) (21:23)***<BR>[![img](https://img.youtube.com/vi/6pxr9B3fl_Q/0.jpg)](https://www.youtube.com/watch?v=6pxr9B3fl_Q) |  NEEDS DESCRIPTION  |
-| ***InvokeAI - Canvas Overdrive #1 (7:22)***<BR>[![img](https://img.youtube.com/vi/RwVGDGc6-3o/0.jpg)](https://www.youtube.com/watch?v=RwVGDGc6-3o) |  NEEDS DESCRIPTION  |
-| ***InvokeAI - Canvas Overdrive #2 (4:43)***<BR>[![img](https://img.youtube.com/vi/WmOUl8Gab5U/0.jpg)](https://www.youtube.com/watch?v=WmOUl8Gab5U) |  NEEDS DESCRIPTION  |
-| ***InvokeAI - Canvas Overdrive #3 (7:01)***<BR>[![img](https://img.youtube.com/vi/e_rRQeee6-0/0.jpg)](https://www.youtube.com/watch?v=e_rRQeee6-0) |  NEEDS DESCRIPTION  |
-| ***InvokeAI - Canvas Overdrive #4 (7:08)***<BR>[![img](https://img.youtube.com/vi/OFiJ1Bv0FIM/0.jpg)](https://www.youtube.com/watch?v=OFiJ1Bv0FIM) |  NEEDS DESCRIPTION  |
-| ***InvokeAI - Canvas Overdrive #5 (7:09)***<BR>[![img](https://img.youtube.com/vi/afSbZEJj2r8/0.jpg)](https://www.youtube.com/watch?v=afSbZEJj2r8) |  NEEDS DESCRIPTION  |
-| ***InvokeAI - Canvas Overdrive #6 - Titans in the Gorge<br> Featuring Canvas Controls, Gradient Denoising (6:42)***<BR>[![img](https://img.youtube.com/vi/gY7II-fjgiw/0.jpg)](https://www.youtube.com/watch?v=gY7II-fjgiw) |  NEEDS DESCRIPTION  |
-| ***InvokeAI - Canvas Drivethrough #1 (50:39)***<BR>[![img](https://img.youtube.com/vi/QSmQ_19rszU/0.jpg)](https://www.youtube.com/watch?v=QSmQ_19rszU) |  NEEDS DESCRIPTION  |
-| ***InvokeAI - Canvas Drivethrough #2 (23:45)***<BR>[![img](https://img.youtube.com/vi/GAlaOlihZ20/0.jpg)](https://www.youtube.com/watch?v=GAlaOlihZ20) |  NEEDS DESCRIPTION  |
-| ***InvokeAI - Canvas Tips & Tricks #1 (17:58)***<BR>[![img](https://img.youtube.com/vi/2pcBtNkTZ40/0.jpg)](https://www.youtube.com/watch?v=2pcBtNkTZ40) |  NEEDS DESCRIPTION  |
-| ***Advanced Canvas Inpainting Techniques with Invoke for Concept Art <br> Pro Diffusion Deep Dive (21:05)***<BR>[![img](https://img.youtube.com/vi/-xzvIpfGTXg/0.jpg)](https://www.youtube.com/watch?v=-xzvIpfGTXg) |  NEEDS DESCRIPTION  |
+| ***InvokeAI - Unified Canvas Basics (28:37)***<BR>[![img](https://img.youtube.com/vi/s4EqQRxRR7k/0.jpg)](https://www.youtube.com/watch?v=s4EqQRxRR7k) |  DESCRIPTION |
+| ***InvokeAI - Canvas Fundamentals (38:06)***<BR>[![img](https://img.youtube.com/vi/kzRL88ffv1o/0.jpg)](https://www.youtube.com/watch?v=kzRL88ffv1o) |  DESCRIPTION |
+| ***Creating and Composing on the Unified Canvas<br>(Invoke - Getting Started Series #6) (21:23)***<BR>[![img](https://img.youtube.com/vi/6pxr9B3fl_Q/0.jpg)](https://www.youtube.com/watch?v=6pxr9B3fl_Q) |  DESCRIPTION |
+| ***InvokeAI - Canvas Overdrive #1 (7:22)***<BR>[![img](https://img.youtube.com/vi/RwVGDGc6-3o/0.jpg)](https://www.youtube.com/watch?v=RwVGDGc6-3o) |  DESCRIPTION |
+| ***InvokeAI - Canvas Overdrive #2 (4:43)***<BR>[![img](https://img.youtube.com/vi/WmOUl8Gab5U/0.jpg)](https://www.youtube.com/watch?v=WmOUl8Gab5U) |  DESCRIPTION |
+| ***InvokeAI - Canvas Overdrive #3 (7:01)***<BR>[![img](https://img.youtube.com/vi/e_rRQeee6-0/0.jpg)](https://www.youtube.com/watch?v=e_rRQeee6-0) |  DESCRIPTION |
+| ***InvokeAI - Canvas Overdrive #4 (7:08)***<BR>[![img](https://img.youtube.com/vi/OFiJ1Bv0FIM/0.jpg)](https://www.youtube.com/watch?v=OFiJ1Bv0FIM) |  DESCRIPTION |
+| ***InvokeAI - Canvas Overdrive #5 (7:09)***<BR>[![img](https://img.youtube.com/vi/afSbZEJj2r8/0.jpg)](https://www.youtube.com/watch?v=afSbZEJj2r8) |  DESCRIPTION |
+| ***InvokeAI - Canvas Overdrive #6 - Titans in the Gorge<br> Featuring Canvas Controls, Gradient Denoising (6:42)***<BR>[![img](https://img.youtube.com/vi/gY7II-fjgiw/0.jpg)](https://www.youtube.com/watch?v=gY7II-fjgiw) |  DESCRIPTION |
+| ***InvokeAI - Canvas Drivethrough #1 (50:39)***<BR>[![img](https://img.youtube.com/vi/QSmQ_19rszU/0.jpg)](https://www.youtube.com/watch?v=QSmQ_19rszU) |  DESCRIPTION |
+| ***InvokeAI - Canvas Drivethrough #2 (23:45)***<BR>[![img](https://img.youtube.com/vi/GAlaOlihZ20/0.jpg)](https://www.youtube.com/watch?v=GAlaOlihZ20) |  DESCRIPTION |
+| ***InvokeAI - Canvas Tips & Tricks #1 (17:58)***<BR>[![img](https://img.youtube.com/vi/2pcBtNkTZ40/0.jpg)](https://www.youtube.com/watch?v=2pcBtNkTZ40) |  DESCRIPTION |
+| ***Advanced Canvas Inpainting Techniques with Invoke for Concept Art <br> Pro Diffusion Deep Dive (21:05)***<BR>[![img](https://img.youtube.com/vi/-xzvIpfGTXg/0.jpg)](https://www.youtube.com/watch?v=-xzvIpfGTXg) |  DESCRIPTION |
 
 <br>
 
 |<h2>Models</h2>|  |
 |:---:|---|
-| ***InvokeAI - Adding Models (v2.2.5) (4:59)***<BR>[![img](https://img.youtube.com/vi/4aCsmiwwyEI/0.jpg)](https://www.youtube.com/watch?v=4aCsmiwwyEI) |  NEEDS DESCRIPTION  |
-| ***Exploring AI Models and Concept Adapters/LoRAs<br>(Invoke - Getting Started Series #5) (8:52)***<BR>[![img](https://img.youtube.com/vi/iwBmBQMZ0UA/0.jpg)](https://www.youtube.com/watch?v=iwBmBQMZ0UA) |  NEEDS DESCRIPTION  |
+| ***InvokeAI - Adding Models (v2.2.5) (4:59)***<BR>[![img](https://img.youtube.com/vi/4aCsmiwwyEI/0.jpg)](https://www.youtube.com/watch?v=4aCsmiwwyEI) |  DESCRIPTION |
+| ***Exploring AI Models and Concept Adapters/LoRAs<br>(Invoke - Getting Started Series #5) (8:52)***<BR>[![img](https://img.youtube.com/vi/iwBmBQMZ0UA/0.jpg)](https://www.youtube.com/watch?v=iwBmBQMZ0UA) |  DESCRIPTION |
 
 <br>
 
