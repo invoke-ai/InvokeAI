@@ -1,9 +1,9 @@
 from typing import Dict, Literal, Optional, Union
-from warnings import warn
 
 import torch
+from deprecated import deprecated
 
-from invokeai.app.services.config.config_default import InvokeAIAppConfig, get_config
+from invokeai.app.services.config.config_default import get_config
 
 # legacy APIs
 TorchPrecisionNames = Literal["float32", "float16", "bfloat16"]
@@ -12,30 +12,22 @@ CUDA_DEVICE = torch.device("cuda")
 MPS_DEVICE = torch.device("mps")
 
 
+@deprecated("Use TorchDevice.choose_torch_dtype() instead.")  # type: ignore
 def choose_precision(device: torch.device) -> TorchPrecisionNames:
     """Return the string representation of the recommended torch device."""
-    warn(
-        "choose_precision() is deprecated. Use TorchDevice.choose_torch_dtype() instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
     torch_dtype = TorchDevice.choose_torch_dtype(device)
     return PRECISION_TO_NAME[torch_dtype]
 
 
+@deprecated("Use TorchDevice.choose_torch_device() instead.")  # type: ignore
 def choose_torch_device() -> torch.device:
     """Return the torch.device to use for accelerated inference."""
-    warn(
-        "choose_torch_device() is deprecated. Use TorchDevice.choose_torch_device() instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
     return TorchDevice.choose_torch_device()
 
 
+@deprecated("Use TorchDevice.choose_torch_dtype() instead.")  # type: ignore
 def torch_dtype(device: torch.device) -> torch.dtype:
     """Return the torch precision for the recommended torch device."""
-    warn("torch_dtype() is deprecated. Use TorchDevice.choose_torch_dtype() instead.", DeprecationWarning, stacklevel=2)
     return TorchDevice.choose_torch_dtype(device)
 
 
@@ -51,9 +43,9 @@ class TorchDevice:
     """Abstraction layer for torch devices."""
 
     @classmethod
-    def choose_torch_device(cls, app_config: Optional[InvokeAIAppConfig] = None) -> torch.device:
+    def choose_torch_device(cls) -> torch.device:
         """Return the torch.device to use for accelerated inference."""
-        app_config = app_config or get_config()
+        app_config = get_config()
         if app_config.device != "auto":
             device = torch.device(app_config.device)
         elif torch.cuda.is_available():
@@ -65,12 +57,10 @@ class TorchDevice:
         return cls.normalize(device)
 
     @classmethod
-    def choose_torch_dtype(
-        cls, device: Optional[torch.device] = None, app_config: Optional[InvokeAIAppConfig] = None
-    ) -> torch.dtype:
+    def choose_torch_dtype(cls, device: Optional[torch.device] = None) -> torch.dtype:
         """Return the precision to use for accelerated inference."""
         device = device or cls.choose_torch_device()
-        config = app_config or get_config()
+        config = get_config()
         if device.type == "cuda" and torch.cuda.is_available():
             device_name = torch.cuda.get_device_name(device)
             if "GeForce GTX 1660" in device_name or "GeForce GTX 1650" in device_name:

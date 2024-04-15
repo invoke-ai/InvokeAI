@@ -1074,7 +1074,7 @@ class ResizeLatentsInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         latents = context.tensors.load(self.latents.latents_name)
-        device = TorchDevice.choose_torch_device(context.config.get())
+        device = TorchDevice.choose_torch_device()
 
         resized_latents = torch.nn.functional.interpolate(
             latents.to(device),
@@ -1113,7 +1113,7 @@ class ScaleLatentsInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         latents = context.tensors.load(self.latents.latents_name)
 
-        device = TorchDevice.choose_torch_device(context.config.get())
+        device = TorchDevice.choose_torch_device()
 
         # resizing
         resized_latents = torch.nn.functional.interpolate(
@@ -1257,7 +1257,7 @@ class BlendLatentsInvocation(BaseInvocation):
         if latents_a.shape != latents_b.shape:
             raise Exception("Latents to blend must be the same size.")
 
-        device = TorchDevice.choose_torch_device(context.config.get())
+        device = TorchDevice.choose_torch_device()
 
         def slerp(
             t: Union[float, npt.NDArray[Any]],  # FIXME: maybe use np.float32 here?

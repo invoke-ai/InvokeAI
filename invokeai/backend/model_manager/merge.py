@@ -17,6 +17,7 @@ from diffusers.utils import logging as dlogging
 
 from invokeai.app.services.model_install import ModelInstallServiceBase
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
+from invokeai.backend.util.devices import TorchDevice
 
 from . import (
     AnyModelConfig,
@@ -42,7 +43,7 @@ class ModelMerger(object):
         Initialize a ModelMerger object with the model installer.
         """
         self._installer = installer
-        self._dtype = installer.app_config
+        self._dtype = TorchDevice.choose_torch_dtype()
 
     def merge_diffusion_models(
         self,

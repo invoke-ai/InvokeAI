@@ -111,14 +111,14 @@ class NoiseInvocation(BaseInvocation):
 
     @field_validator("seed", mode="before")
     def modulo_seed(cls, v):
-        """Returns the seed modulo (SEED_MAX + 1) to ensure it is within the valid range."""
+        """Return the seed modulo (SEED_MAX + 1) to ensure it is within the valid range."""
         return v % (SEED_MAX + 1)
 
     def invoke(self, context: InvocationContext) -> NoiseOutput:
         noise = get_noise(
             width=self.width,
             height=self.height,
-            device=TorchDevice.choose_torch_device(context.config.get()),
+            device=TorchDevice.choose_torch_device(),
             seed=self.seed,
             use_cpu=self.use_cpu,
         )
