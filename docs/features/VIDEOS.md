@@ -19,10 +19,13 @@ Short-form videos that introduce parts of InvokeAI.
 |<h2>AI Image Generation</h2>|  |
 |:---:|---|
 | ***InvokeAI - Fundamentals - Creating with AI (13:39)***<BR>[![img](https://img.youtube.com/vi/m8hnpX2XzL0/0.jpg)](https://www.youtube.com/watch?v=m8hnpX2XzL0) |  NEEDS DESCRIPTION  |
+| ***InvokeAI - SDXL Getting Started (6:39)***<BR>[![img](https://img.youtube.com/vi/c7zAhlC7xKE/0.jpg)](https://www.youtube.com/watch?v=c7zAhlC7xKE) |  NEEDS DESCRIPTION  |
 | ***InvokeAI - AI Image Prompting (25:34)***<BR>[![img](https://img.youtube.com/vi/WpPVf_XepIg/0.jpg)](https://www.youtube.com/watch?v=WpPVf_XepIg) |  NEEDS DESCRIPTION  |
 | ***Using AI Image to Image Transformation<br>(Invoke - Getting Started Series #3) (8:26)***<BR>[![img](https://img.youtube.com/vi/z4uT-tppfEc/0.jpg)](https://www.youtube.com/watch?v=z4uT-tppfEc) |  NEEDS DESCRIPTION  |
 | ***Using Schedulers and CFG Scale - Advanced Generation Settings<br>(Invoke - Getting Started Series #4) (9:35)***<BR>[![img](https://img.youtube.com/vi/1OeHEJrsTpI/0.jpg)](https://www.youtube.com/watch?v=1OeHEJrsTpI) |  NEEDS DESCRIPTION  |
 | ***Controlling AI Image Generation with ControlNet & IP Adapter<br>(Invoke - Getting Started Series #2) (13:57)***<BR>[![img](https://img.youtube.com/vi/7Q5PcxkbEjE/0.jpg)](https://www.youtube.com/watch?v=7Q5PcxkbEjE) |  NEEDS DESCRIPTION  |
+| ***InvokeAI - Workflow Fundamentals - Creating with Generative AI (23:29)***<BR>[![img](https://img.youtube.com/vi/L3isi26qy0Y/0.jpg)](https://www.youtube.com/watch?v=L3isi26qy0Y) |  NEEDS DESCRIPTION  |
+| ***AI Workflows that Accelerate Production & Respect Artists' Process (GDC 2024) (35:56)***<BR>[![img](https://img.youtube.com/vi/cdpnazNI4Ig/0.jpg)](https://www.youtube.com/watch?v=cdpnazNI4Ig) |  NEEDS DESCRIPTION  |
 
 
 <br>
@@ -57,6 +60,46 @@ Short-form videos that introduce parts of InvokeAI.
 
 Long-form videos that go into depth about how to use InvokeAI at a deep level.
 
+***Creating Consistent Character Concepts with IP Adapter and Img2Img (1:05:35)***
+<br>[![img](https://img.youtube.com/vi/8p92pqHU9Ag/0.jpg)](https://www.youtube.com/watch?v=8p92pqHU9Ag)
+
+
+***Creating 2D to 3D Environment Art Renders with AI feat. Blender and Depth Anything (56:22)***
+<br>[![img](https://img.youtube.com/vi/Bh-dBXlmh4Q/0.jpg)](https://www.youtube.com/watch?v=Bh-dBXlmh4Q)
+
+
+***Generate Character and Environment Textures for 3D Renders using Stable Diffusion (58:20)***
+<br>[![img](https://img.youtube.com/vi/4F9w4akbnI8/0.jpg)](https://www.youtube.com/watch?v=4F9w4akbnI8)
+
+
+***Inpainting, Outpainting, and Image Refinement in the Unified Canvas (55:24)***
+<br>[![img](https://img.youtube.com/vi/32hyxQQfkW0/0.jpg)](https://www.youtube.com/watch?v=32hyxQQfkW0)
+
+
+***Workflow to Improve Your Vehicle Concept Art using Shapes and Generative AI (59:07)***
+<br>[![img](https://img.youtube.com/vi/NNTUGQhzJE4/0.jpg)](https://www.youtube.com/watch?v=NNTUGQhzJE4)
+
+
+***Mastering Inpainting: Turn Sketches into Detailed Characters with AI (56:24)***
+<br>[![img](https://img.youtube.com/vi/_w5RYKUsN74/0.jpg)](https://www.youtube.com/watch?v=_w5RYKUsN74)
+
+
+***Mastering Text Prompts and Embeddings in Your Image Creation Workflow (59:04)***
+<br>[![img](https://img.youtube.com/vi/ZDYM8ftVGlM/0.jpg)](https://www.youtube.com/watch?v=ZDYM8ftVGlM)
+
+
+***Create UI/UX Components for Games in Minutes with AI (57:13)***
+<br>[![img](https://img.youtube.com/vi/Vp2dEr7KV9o/0.jpg)](https://www.youtube.com/watch?v=Vp2dEr7KV9o)
+
+
+***How to Create Digital Wallpaper Art for Your Game with Advanced Inpainting and SDXL Models (55:19)***
+<br>[![img](https://img.youtube.com/vi/VP44x66gYcg/0.jpg)](https://www.youtube.com/watch?v=VP44x66gYcg)
+
+
+***How to Train, Test, and Use a LoRA Model for Character Art Consistency (1:01:59)***
+<br>[![img](https://img.youtube.com/vi/ej7ruT7aF04/0.jpg)](https://www.youtube.com/watch?v=ej7ruT7aF04)
+
+<br>
 
 ### Version Releases 
 
