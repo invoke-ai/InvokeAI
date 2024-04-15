@@ -18,13 +18,13 @@ const selectLayerIdsReversed = createMemoizedSelector(selectRegionalPromptsSlice
 );
 
 const debugBlobs = () => {
-  getRegionalPromptLayerBlobs(true);
+  getRegionalPromptLayerBlobs(undefined, true);
 };
 
 export const RegionalPromptsEditor = memo(() => {
   const layerIdsReversed = useAppSelector(selectLayerIdsReversed);
   return (
-    <Flex gap={4}>
+    <Flex gap={4} w="full" h="full">
       <Flex flexDir="column" gap={4} flexShrink={0}>
         <Button onClick={debugBlobs}>DEBUG LAYERS</Button>
         <AddLayerButton />

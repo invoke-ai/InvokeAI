@@ -46,6 +46,10 @@ export const SDXL_REFINER_DENOISE_LATENTS = 'sdxl_refiner_denoise_latents';
 export const SDXL_REFINER_INPAINT_CREATE_MASK = 'refiner_inpaint_create_mask';
 export const SEAMLESS = 'seamless';
 export const SDXL_REFINER_SEAMLESS = 'refiner_seamless';
+export const PROMPT_REGION_MASK_PREFIX = 'prompt_region_mask';
+export const PROMPT_REGION_COND_PREFIX = 'prompt_region_cond';
+export const POSITIVE_CONDITIONING_COLLECT = 'positive_conditioning_collect';
+export const NEGATIVE_CONDITIONING_COLLECT = 'negative_conditioning_collect';
 
 // friendly graph ids
 export const TEXT_TO_IMAGE_GRAPH = 'text_to_image_graph';
