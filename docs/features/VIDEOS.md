@@ -20,6 +20,10 @@ Short-form videos that introduce parts of InvokeAI.
 |:---:|---|
 | ***InvokeAI - Fundamentals - Creating with AI (13:39)***<BR>[![img](https://img.youtube.com/vi/m8hnpX2XzL0/0.jpg)](https://www.youtube.com/watch?v=m8hnpX2XzL0) |  NEEDS DESCRIPTION  |
 | ***InvokeAI - AI Image Prompting (25:34)***<BR>[![img](https://img.youtube.com/vi/WpPVf_XepIg/0.jpg)](https://www.youtube.com/watch?v=WpPVf_XepIg) |  NEEDS DESCRIPTION  |
+| ***Using AI Image to Image Transformation<br>(Invoke - Getting Started Series #3) (8:26)***<BR>[![img](https://img.youtube.com/vi/z4uT-tppfEc/0.jpg)](https://www.youtube.com/watch?v=z4uT-tppfEc) |  NEEDS DESCRIPTION  |
+| ***Using Schedulers and CFG Scale - Advanced Generation Settings<br>(Invoke - Getting Started Series #4) (9:35)***<BR>[![img](https://img.youtube.com/vi/1OeHEJrsTpI/0.jpg)](https://www.youtube.com/watch?v=1OeHEJrsTpI) |  NEEDS DESCRIPTION  |
+| ***Controlling AI Image Generation with ControlNet & IP Adapter<br>(Invoke - Getting Started Series #2) (13:57)***<BR>[![img](https://img.youtube.com/vi/7Q5PcxkbEjE/0.jpg)](https://www.youtube.com/watch?v=7Q5PcxkbEjE) |  NEEDS DESCRIPTION  |
+
 
 <br>
 
@@ -27,6 +31,7 @@ Short-form videos that introduce parts of InvokeAI.
 |:---:|---|
 | ***InvokeAI - Unified Canvas Basics (28:37)***<BR>[![img](https://img.youtube.com/vi/s4EqQRxRR7k/0.jpg)](https://www.youtube.com/watch?v=s4EqQRxRR7k) |  NEEDS DESCRIPTION  |
 | ***InvokeAI - Canvas Fundamentals (38:06)***<BR>[![img](https://img.youtube.com/vi/kzRL88ffv1o/0.jpg)](https://www.youtube.com/watch?v=kzRL88ffv1o) |  NEEDS DESCRIPTION  |
+| ***Creating and Composing on the Unified Canvas<br>(Invoke - Getting Started Series #6) (21:23)***<BR>[![img](https://img.youtube.com/vi/6pxr9B3fl_Q/0.jpg)](https://www.youtube.com/watch?v=6pxr9B3fl_Q) |  NEEDS DESCRIPTION  |
 | ***InvokeAI - Canvas Overdrive #1 (7:22)***<BR>[![img](https://img.youtube.com/vi/RwVGDGc6-3o/0.jpg)](https://www.youtube.com/watch?v=RwVGDGc6-3o) |  NEEDS DESCRIPTION  |
 | ***InvokeAI - Canvas Overdrive #2 (4:43)***<BR>[![img](https://img.youtube.com/vi/WmOUl8Gab5U/0.jpg)](https://www.youtube.com/watch?v=WmOUl8Gab5U) |  NEEDS DESCRIPTION  |
 | ***InvokeAI - Canvas Overdrive #3 (7:01)***<BR>[![img](https://img.youtube.com/vi/e_rRQeee6-0/0.jpg)](https://www.youtube.com/watch?v=e_rRQeee6-0) |  NEEDS DESCRIPTION  |
@@ -38,8 +43,14 @@ Short-form videos that introduce parts of InvokeAI.
 | ***InvokeAI - Canvas Tips & Tricks #1 (17:58)***<BR>[![img](https://img.youtube.com/vi/2pcBtNkTZ40/0.jpg)](https://www.youtube.com/watch?v=2pcBtNkTZ40) |  NEEDS DESCRIPTION  |
 | ***Advanced Canvas Inpainting Techniques with Invoke for Concept Art <br> Pro Diffusion Deep Dive (21:05)***<BR>[![img](https://img.youtube.com/vi/-xzvIpfGTXg/0.jpg)](https://www.youtube.com/watch?v=-xzvIpfGTXg) |  NEEDS DESCRIPTION  |
 
+<br>
 
+|<h2>Models</h2>|  |
+|:---:|---|
+| ***InvokeAI - Adding Models (v2.2.5) (4:59)***<BR>[![img](https://img.youtube.com/vi/4aCsmiwwyEI/0.jpg)](https://www.youtube.com/watch?v=4aCsmiwwyEI) |  NEEDS DESCRIPTION  |
+| ***Exploring AI Models and Concept Adapters/LoRAs<br>(Invoke - Getting Started Series #5) (8:52)***<BR>[![img](https://img.youtube.com/vi/iwBmBQMZ0UA/0.jpg)](https://www.youtube.com/watch?v=iwBmBQMZ0UA) |  NEEDS DESCRIPTION  |
 
+<br>
 
 
 ### Studio Sessions
@@ -53,6 +64,10 @@ Short-form videos that show new versions of InvokeAI as they're released (from n
 
 ***Invoke - 4.0 Open Source Release - New Model Manager Interface, Gradient Denoising & More... (6:42)***
 <br>[![img](https://img.youtube.com/vi/rpWgSMIPwN4/0.jpg)](https://www.youtube.com/watch?v=rpWgSMIPwN4)
+
+
+***Invoke - 3.7 Release - New Workflow Interface, Seamless Textures, and DW Pose (4:35)***
+<br>[![img](https://img.youtube.com/vi/kmJ9VFQNNhU/0.jpg)](https://www.youtube.com/watch?v=kmJ9VFQNNhU)
 
 
 ***Invoke - 3.6 Release - New User Interface Updates, and more (18:48)***
