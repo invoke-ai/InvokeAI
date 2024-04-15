@@ -29,6 +29,7 @@ const selector = createMemoizedSelector(
     const { shouldRandomizeSeed, model } = generation;
     const { hrfEnabled } = hrf;
     const badges: string[] = [];
+    const isSDXL = model?.base === 'sdxl';
 
     if (activeTabName === 'unifiedCanvas') {
       const {
@@ -53,10 +54,10 @@ const selector = createMemoizedSelector(
       badges.push('Manual Seed');
     }
 
-    if (hrfEnabled) {
+    if (hrfEnabled && !isSDXL) {
       badges.push('HiRes Fix');
     }
-    return { badges, activeTabName, isSDXL: model?.base === 'sdxl' };
+    return { badges, activeTabName, isSDXL };
   }
 );
 

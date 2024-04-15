@@ -23,9 +23,9 @@ const SettingsMenu = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   useGlobalMenuClose(onClose);
 
-  const isBugLinkEnabled = useFeatureStatus('bugLink').isFeatureEnabled;
-  const isDiscordLinkEnabled = useFeatureStatus('discordLink').isFeatureEnabled;
-  const isGithubLinkEnabled = useFeatureStatus('githubLink').isFeatureEnabled;
+  const isBugLinkEnabled = useFeatureStatus('bugLink');
+  const isDiscordLinkEnabled = useFeatureStatus('discordLink');
+  const isGithubLinkEnabled = useFeatureStatus('githubLink');
 
   return (
     <Menu isOpen={isOpen} onOpen={onOpen} onClose={onClose}>

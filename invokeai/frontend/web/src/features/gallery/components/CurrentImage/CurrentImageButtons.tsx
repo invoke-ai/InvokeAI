@@ -51,9 +51,10 @@ const CurrentImageButtons = () => {
   const shouldShowImageDetails = useAppSelector((s) => s.ui.shouldShowImageDetails);
   const shouldShowProgressInViewer = useAppSelector((s) => s.ui.shouldShowProgressInViewer);
   const lastSelectedImage = useAppSelector(selectLastSelectedImage);
+  const selection = useAppSelector((s) => s.gallery.selection);
   const shouldDisableToolbarButtons = useAppSelector(selectShouldDisableToolbarButtons);
 
-  const isUpscalingEnabled = useFeatureStatus('upscaling').isFeatureEnabled;
+  const isUpscalingEnabled = useFeatureStatus('upscaling');
   const isQueueMutationInProgress = useIsQueueMutationInProgress();
   const toaster = useAppToaster();
   const { t } = useTranslation();
@@ -102,8 +103,8 @@ const CurrentImageButtons = () => {
     if (!imageDTO) {
       return;
     }
-    dispatch(imagesToDeleteSelected([imageDTO]));
-  }, [dispatch, imageDTO]);
+    dispatch(imagesToDeleteSelected(selection));
+  }, [dispatch, imageDTO, selection]);
 
   useHotkeys(
     'Shift+U',
