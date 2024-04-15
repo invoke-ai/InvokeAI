@@ -10,7 +10,7 @@ const TOAST_ID = 'starterModels';
 
 export const useStarterModelsToast = () => {
   const { t } = useTranslation();
-  const isEnabled = useFeatureStatus('starterModels').isFeatureEnabled;
+  const isEnabled = useFeatureStatus('starterModels');
   const [didToast, setDidToast] = useState(false);
   const [mainModels, { data }] = useMainModels();
   const toast = useToast();
