@@ -78,7 +78,7 @@
         "autoSwitchNewImages": "自动切换到新图像",
         "loadMore": "加载更多",
         "noImagesInGallery": "无图像可用于显示",
-        "deleteImage": "删除图片",
+        "deleteImage_other": "删除图片",
         "deleteImageBin": "被删除的图片会发送到你操作系统的回收站。",
         "deleteImagePermanent": "删除的图片无法被恢复。",
         "assets": "素材",
