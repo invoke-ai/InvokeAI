@@ -18,14 +18,14 @@ Short-form videos that introduce parts of InvokeAI.
 
 |<h2>AI Image Generation</h2>|  |
 |:---:|---|
-| ***InvokeAI - Fundamentals - Creating with AI (13:39)***<BR>[![img](https://img.youtube.com/vi/m8hnpX2XzL0/0.jpg)](https://www.youtube.com/watch?v=m8hnpX2XzL0) |  NEEDS DESCRIPTION  |
+| ***InvokeAI - Fundamentals - Creating with AI (13:39)***<BR>[![img](https://img.youtube.com/vi/m8hnpX2XzL0/0.jpg)](https://www.youtube.com/watch?v=m8hnpX2XzL0) |  how Diffusion image modelling works, how images are generated, how prompts are structured (Subject, Category, Quality Modifiers, Aesthetics & Composition)  |
 | ***InvokeAI - SDXL Getting Started (6:39)***<BR>[![img](https://img.youtube.com/vi/c7zAhlC7xKE/0.jpg)](https://www.youtube.com/watch?v=c7zAhlC7xKE) |  NEEDS DESCRIPTION  |
 | ***InvokeAI - AI Image Prompting (25:34)***<BR>[![img](https://img.youtube.com/vi/WpPVf_XepIg/0.jpg)](https://www.youtube.com/watch?v=WpPVf_XepIg) |  NEEDS DESCRIPTION  |
 | ***Using AI Image to Image Transformation<br>(Invoke - Getting Started Series #3) (8:26)***<BR>[![img](https://img.youtube.com/vi/z4uT-tppfEc/0.jpg)](https://www.youtube.com/watch?v=z4uT-tppfEc) |  NEEDS DESCRIPTION  |
 | ***Using Schedulers and CFG Scale - Advanced Generation Settings<br>(Invoke - Getting Started Series #4) (9:35)***<BR>[![img](https://img.youtube.com/vi/1OeHEJrsTpI/0.jpg)](https://www.youtube.com/watch?v=1OeHEJrsTpI) |  NEEDS DESCRIPTION  |
 | ***Controlling AI Image Generation with ControlNet & IP Adapter<br>(Invoke - Getting Started Series #2) (13:57)***<BR>[![img](https://img.youtube.com/vi/7Q5PcxkbEjE/0.jpg)](https://www.youtube.com/watch?v=7Q5PcxkbEjE) |  NEEDS DESCRIPTION  |
 | ***InvokeAI - Workflow Fundamentals - Creating with Generative AI (23:29)***<BR>[![img](https://img.youtube.com/vi/L3isi26qy0Y/0.jpg)](https://www.youtube.com/watch?v=L3isi26qy0Y) |  NEEDS DESCRIPTION  |
-| ***AI Workflows that Accelerate Production & Respect Artists' Process (GDC 2024) (35:56)***<BR>[![img](https://img.youtube.com/vi/cdpnazNI4Ig/0.jpg)](https://www.youtube.com/watch?v=cdpnazNI4Ig) |  NEEDS DESCRIPTION  |
+| ***AI Workflows that Accelerate Production &<br>Respect Artists' Process (GDC 2024) (35:56)***<BR>[![img](https://img.youtube.com/vi/cdpnazNI4Ig/0.jpg)](https://www.youtube.com/watch?v=cdpnazNI4Ig) |  NEEDS DESCRIPTION  |
 
 
 <br>
