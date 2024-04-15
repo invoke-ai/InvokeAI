@@ -33,7 +33,7 @@ class UNetAttentionPatcher:
                 # "attn1" processors do not use IP-Adapters.
                 attn_procs[name] = CustomAttnProcessor2_0()
             else:
-                ip_adapter_attention_weights: IPAdapterAttentionWeights = {"ip_adapter_weights": [], "skip": False}
+                ip_adapter_attention_weights = IPAdapterAttentionWeights(ip_adapter_weights=[], skip=False)
                 for ip_adapter in self._ip_adapters:
                     ip_adapter_weight = ip_adapter["ip_adapter"].attn_weights.get_attention_processor_weights(idx)
                     skip = True
@@ -41,8 +41,8 @@ class UNetAttentionPatcher:
                         if block in name:
                             skip = False
                             break
-
-                    ip_adapter_attention_weights.update({"ip_adapter_weights": [ip_adapter_weight], "skip": skip})
+                    ip_adapter_attention_weights.ip_adapter_weights = [ip_adapter_weight]
+                    ip_adapter_attention_weights.skip = skip
 
                 # Collect the weights from each IP Adapter for the idx'th attention processor.
 
