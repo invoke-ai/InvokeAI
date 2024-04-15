@@ -17,8 +17,8 @@ Short-form videos that introduce parts of InvokeAI.
 #### AI Image Generation
 
 |***InvokeAI - Fundamentals - Creating with AI (13:39)***|
-|---|
-| [![img](https://img.youtube.com/vi/m8hnpX2XzL0/0.jpg)](https://www.youtube.com/watch?v=m8hnpX2XzL0)  | NEEDS DESCRIPTION  |
+|---|---|
+| [![img](https://img.youtube.com/vi/m8hnpX2XzL0/0.jpg)](https://www.youtube.com/watch?v=m8hnpX2XzL0) | NEEDS DESCRIPTION  |
 
 
 
