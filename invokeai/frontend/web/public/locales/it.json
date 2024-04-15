@@ -444,7 +444,8 @@
         "hfTokenInvalidErrorMessage2": "Aggiornalo in ",
         "main": "Principali",
         "noModelsInstalledDesc1": "Installa i modelli con",
-        "ipAdapters": "Adattatori IP"
+        "ipAdapters": "Adattatori IP",
+        "noMatchingModels": "Nessun modello corrispondente"
     },
     "parameters": {
         "images": "Immagini",
@@ -526,7 +527,12 @@
         "aspect": "Aspetto",
         "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (potrebbe essere troppo grande)",
         "remixImage": "Remixa l'immagine",
-        "coherenceEdgeSize": "Dim. bordo"
+        "coherenceEdgeSize": "Dim. bordo",
+        "infillMosaicTileWidth": "Larghezza piastrella",
+        "infillMosaicMinColor": "Colore minimo",
+        "infillMosaicMaxColor": "Colore massimo",
+        "infillMosaicTileHeight": "Altezza piastrella",
+        "infillColorValue": "Colore di riempimento"
     },
     "settings": {
         "models": "Modelli",
@@ -620,7 +626,8 @@
         "uploadInitialImage": "Carica l'immagine iniziale",
         "problemDownloadingImage": "Impossibile scaricare l'immagine",
         "prunedQueue": "Coda ripulita",
-        "modelImportCanceled": "Importazione del modello annullata"
+        "modelImportCanceled": "Importazione del modello annullata",
+        "parameters": "Parametri"
     },
     "tooltip": {
         "feature": {
@@ -689,7 +696,10 @@
         "coherenceModeBoxBlur": "Sfocatura Box",
         "coherenceModeStaged": "Maschera espansa",
         "invertBrushSizeScrollDirection": "Inverti scorrimento per dimensione pennello",
-        "discardCurrent": "Scarta l'attuale"
+        "discardCurrent": "Scarta l'attuale",
+        "initialFitImageSize": "Adatta dimensione immagine al rilascio",
+        "hideBoundingBox": "Nascondi il rettangolo di selezione",
+        "showBoundingBox": "Mostra il rettangolo di selezione"
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -832,7 +842,8 @@
         "editMode": "Modifica nell'editor del flusso di lavoro",
         "resetToDefaultValue": "Ripristina il valore predefinito",
         "noFieldsViewMode": "Questo flusso di lavoro non ha campi selezionati da visualizzare. Visualizza il flusso di lavoro completo per configurare i valori.",
-        "edit": "Modifica"
+        "edit": "Modifica",
+        "graph": "Grafico"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1346,13 +1357,13 @@
             ]
         },
         "seamlessTilingXAxis": {
-            "heading": "Asse X di piastrellatura senza cuciture",
+            "heading": "Piastrella senza giunte sull'asse X",
             "paragraphs": [
                 "Affianca senza soluzione di continuità un'immagine lungo l'asse orizzontale."
             ]
         },
         "seamlessTilingYAxis": {
-            "heading": "Asse Y di piastrellatura senza cuciture",
+            "heading": "Piastrella senza giunte sull'asse Y",
             "paragraphs": [
                 "Affianca senza soluzione di continuità un'immagine lungo l'asse verticale."
             ]
@@ -1476,7 +1487,11 @@
         "name": "Nome",
         "updated": "Aggiornato",
         "projectWorkflows": "Flussi di lavoro del progetto",
-        "opened": "Aperto"
+        "opened": "Aperto",
+        "convertGraph": "Converti grafico",
+        "loadWorkflow": "$t(common.load) Flusso di lavoro",
+        "autoLayout": "Disposizione automatica",
+        "loadFromGraph": "Carica il flusso di lavoro dal grafico"
     },
     "app": {
         "storeNotInitialized": "Il negozio non è inizializzato"
