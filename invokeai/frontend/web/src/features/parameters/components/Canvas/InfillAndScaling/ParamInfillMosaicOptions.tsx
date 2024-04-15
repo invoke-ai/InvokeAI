@@ -1,35 +1,23 @@
 import { Box, CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import {
-  selectGenerationSlice,
   setInfillMosaicMaxColor,
   setInfillMosaicMinColor,
   setInfillMosaicTileHeight,
   setInfillMosaicTileWidth,
 } from 'features/parameters/store/generationSlice';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 import type { RgbaColor } from 'react-colorful';
 import { useTranslation } from 'react-i18next';
 
 const ParamInfillMosaicTileSize = () => {
   const dispatch = useAppDispatch();
 
-  const selector = useMemo(
-    () =>
-      createSelector(selectGenerationSlice, (generation) => ({
-        infillMosaicTileWidth: generation.infillMosaicTileWidth,
-        infillMosaicTileHeight: generation.infillMosaicTileHeight,
-        infillMosaicMinColor: generation.infillMosaicMinColor,
-        infillMosaicMaxColor: generation.infillMosaicMaxColor,
-      })),
-    []
-  );
-
-  const { infillMosaicTileWidth, infillMosaicTileHeight, infillMosaicMinColor, infillMosaicMaxColor } =
-    useAppSelector(selector);
-
+  const infillMosaicTileWidth = useAppSelector((s) => s.generation.infillMosaicTileWidth);
+  const infillMosaicTileHeight = useAppSelector((s) => s.generation.infillMosaicTileHeight);
+  const infillMosaicMinColor = useAppSelector((s) => s.generation.infillMosaicMinColor);
+  const infillMosaicMaxColor = useAppSelector((s) => s.generation.infillMosaicMaxColor);
   const infillMethod = useAppSelector((s) => s.generation.infillMethod);
 
   const { t } = useTranslation();
