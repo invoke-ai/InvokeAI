@@ -28,7 +28,7 @@ from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
-from invokeai.backend.util.devices import get_torch_device_name
+from invokeai.backend.util.devices import TorchDevice
 
 from ..backend.util.logging import InvokeAILogger
 from .api.dependencies import ApiDependencies
@@ -63,7 +63,7 @@ logger = InvokeAILogger.get_logger(config=app_config)
 mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("text/css", ".css")
 
-torch_device_name = get_torch_device_name()
+torch_device_name = TorchDevice.get_torch_device_name()
 logger.info(f"Using torch device: {torch_device_name}")
 
 
