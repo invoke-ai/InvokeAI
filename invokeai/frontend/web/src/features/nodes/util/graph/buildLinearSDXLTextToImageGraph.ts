@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { addRegionalPromptsToGraph } from 'features/nodes/util/graph/addRegionalPromptsToGraph';
 import { isNonRefinerMainModelConfig, type NonNullableGraph } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
@@ -272,6 +273,8 @@ export const buildLinearSDXLTextToImageGraph = async (state: RootState): Promise
   await addIPAdapterToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   await addT2IAdaptersToLinearGraph(state, graph, SDXL_DENOISE_LATENTS);
+
+  await addRegionalPromptsToGraph(state, graph, SDXL_DENOISE_LATENTS);
 
   // NSFW & watermark - must be last thing added to graph
   if (state.system.shouldUseNSFWChecker) {
