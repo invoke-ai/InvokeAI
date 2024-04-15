@@ -255,6 +255,10 @@ def test_huggingface_download(mm2_installer: ModelInstallServiceBase, mm2_app_co
     assert isinstance(bus, EventServiceBase)
     assert store is not None
 
+    # test hypothesis that there is a race condition between
+    # creating temporary directory and downloading into it.
+    time.sleep(2)  
+    
     job = mm2_installer.import_model(source)
     job_list = mm2_installer.wait_for_installs(timeout=10)
     assert len(job_list) == 1
