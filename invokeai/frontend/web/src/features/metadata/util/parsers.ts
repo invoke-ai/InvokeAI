@@ -369,6 +369,10 @@ const parseIPAdapter: MetadataParseFunc<IPAdapterConfigMetadata> = async (metada
     .nullish()
     .catch(null)
     .parse(await getProperty(metadataItem, 'weight'));
+  const method = zIPAdapterField.shape.method
+    .nullish()
+    .catch(null)
+    .parse(await getProperty(metadataItem, 'method'));
   const begin_step_percent = zIPAdapterField.shape.begin_step_percent
     .nullish()
     .catch(null)
@@ -386,7 +390,7 @@ const parseIPAdapter: MetadataParseFunc<IPAdapterConfigMetadata> = async (metada
     clipVisionModel: 'ViT-H',
     controlImage: image?.image_name ?? null,
     weight: weight ?? initialIPAdapter.weight,
-    method: 'full',
+    method: method ?? initialIPAdapter.method,
     beginStepPct: begin_step_percent ?? initialIPAdapter.beginStepPct,
     endStepPct: end_step_percent ?? initialIPAdapter.endStepPct,
   };
