@@ -112,7 +112,7 @@ const ControlAdapterConfig = (props: { id: string; number: number }) => {
 
       <Flex w="full" flexDir="column" gap={4}>
         <Flex gap={8} w="full" alignItems="center">
-          <Flex flexDir="column" gap={4} h={40} w="full">
+          <Flex flexDir="column" gap={4} h={controlAdapterType === 'ip_adapter' ? 40 : 32} w="full">
             <ParamControlAdapterIPMethod id={id} />
             <ParamControlAdapterWeight id={id} />
             <ParamControlAdapterBeginEnd id={id} />
