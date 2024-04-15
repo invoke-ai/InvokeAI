@@ -35,7 +35,7 @@ Short-form videos that introduce parts of InvokeAI.
 | ***InvokeAI - Canvas Drivethrough #1 (50:39)***<BR>[![img](https://img.youtube.com/vi/QSmQ_19rszU/0.jpg)](https://www.youtube.com/watch?v=QSmQ_19rszU) |  NEEDS DESCRIPTION  |
 | ***InvokeAI - Canvas Drivethrough #2 (23:45)***<BR>[![img](https://img.youtube.com/vi/GAlaOlihZ20/0.jpg)](https://www.youtube.com/watch?v=GAlaOlihZ20) |  NEEDS DESCRIPTION  |
 | ***InvokeAI - Canvas Tips & Tricks #1 (17:58)***<BR>[![img](https://img.youtube.com/vi/2pcBtNkTZ40/0.jpg)](https://www.youtube.com/watch?v=2pcBtNkTZ40) |  NEEDS DESCRIPTION  |
-| ***Advanced Canvas Inpainting Techniques with Invoke for Concept Art <br> Pro Diffusion Deep Dive (21:05)***<BR>[![img](https://img.youtube.com/vi/xzvIpfGTXg/0.jpg)](https://www.youtube.com/watch?v=xzvIpfGTXg) |  NEEDS DESCRIPTION  |
+| ***Advanced Canvas Inpainting Techniques with Invoke for Concept Art <br> Pro Diffusion Deep Dive (21:05)***<BR>[![img](https://img.youtube.com/vi/-xzvIpfGTXg/0.jpg)](https://www.youtube.com/watch?v=-xzvIpfGTXg) |  NEEDS DESCRIPTION  |
 
 
 
