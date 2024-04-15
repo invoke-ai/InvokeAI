@@ -27,4 +27,5 @@ Long-form videos that go into depth about how to use InvokeAI at a deep level.
 Short-form videos that show new versions of InvokeAI as they're released.
 
 ***InvokeAI 2.1 Release (14:59)***
+
 [![img](https://img.youtube.com/vi/iRTGti44dp4/0.jpg)](https://www.youtube.com/watch?v=iRTGti44dp4)
