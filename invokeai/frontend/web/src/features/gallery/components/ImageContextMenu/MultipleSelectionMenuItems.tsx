@@ -20,7 +20,7 @@ const MultipleSelectionMenuItems = () => {
   const selection = useAppSelector((s) => s.gallery.selection);
   const customStarUi = useStore($customStarUI);
 
-  const isBulkDownloadEnabled = useFeatureStatus('bulkDownload').isFeatureEnabled;
+  const isBulkDownloadEnabled = useFeatureStatus('bulkDownload');
 
   const [starImages] = useStarImagesMutation();
   const [unstarImages] = useUnstarImagesMutation();

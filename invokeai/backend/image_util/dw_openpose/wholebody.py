@@ -4,11 +4,10 @@
 
 import numpy as np
 import onnxruntime as ort
-import torch
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.util.devices import choose_torch_device
+from invokeai.backend.util.devices import TorchDevice
 
 from .onnxdet import inference_detector
 from .onnxpose import inference_pose
@@ -23,9 +22,9 @@ config = get_config()
 
 class Wholebody:
     def __init__(self, context: InvocationContext):
-        device = choose_torch_device()
+        device = TorchDevice.choose_torch_device()
 
-        providers = ["CUDAExecutionProvider"] if device == torch.device("cuda") else ["CPUExecutionProvider"]
+        providers = ["CUDAExecutionProvider"] if device.type == "cuda" else ["CPUExecutionProvider"]
 
         onnx_det = context.models.download_and_cache_ckpt(DWPOSE_MODELS["yolox_l.onnx"])
         onnx_pose = context.models.download_and_cache_ckpt(DWPOSE_MODELS["dw-ll_ucoco_384.onnx"])

@@ -28,7 +28,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import UNetAttentionPatcher
 from invokeai.backend.util.attention import auto_detect_slice_size
-from invokeai.backend.util.devices import normalize_device
+from invokeai.backend.util.devices import TorchDevice
 
 
 @dataclass
@@ -258,7 +258,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         if self.unet.device.type == "cpu" or self.unet.device.type == "mps":
             mem_free = psutil.virtual_memory().free
         elif self.unet.device.type == "cuda":
-            mem_free, _ = torch.cuda.mem_get_info(normalize_device(self.unet.device))
+            mem_free, _ = torch.cuda.mem_get_info(TorchDevice.normalize(self.unet.device))
         else:
             raise ValueError(f"unrecognized device {self.unet.device}")
         # input tensor of [1, 4, h/8, w/8]

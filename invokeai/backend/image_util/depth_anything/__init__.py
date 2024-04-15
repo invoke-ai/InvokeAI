@@ -12,7 +12,7 @@ from invokeai.app.services.config.config_default import get_config
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.depth_anything.model.dpt import DPT_DINOv2
 from invokeai.backend.image_util.depth_anything.utilities.util import NormalizeImage, PrepareForNet, Resize
-from invokeai.backend.util.devices import choose_torch_device
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
 config = get_config()
@@ -47,7 +47,7 @@ class DepthAnythingDetector:
         self.context = context
         self.model: Optional[DPT_DINOv2] = None
         self.model_size: Union[Literal["large", "base", "small"], None] = None
-        self.device = choose_torch_device()
+        self.device = TorchDevice.choose_torch_device()
 
     def load_model(self, model_size: Literal["large", "base", "small"] = "small") -> DPT_DINOv2:
         depth_anything_model_path = self.context.models.download_and_cache_ckpt(DEPTH_ANYTHING_MODELS[model_size])
@@ -68,7 +68,7 @@ class DepthAnythingDetector:
             self.model.load_state_dict(torch.load(depth_anything_model_path.as_posix(), map_location="cpu"))
             self.model.eval()
 
-        self.model.to(choose_torch_device())
+        self.model.to(self.device)
         return self.model
 
     def __call__(self, image: Image.Image, resolution: int = 512) -> Image.Image:
@@ -81,7 +81,7 @@ class DepthAnythingDetector:
 
         image_height, image_width = np_image.shape[:2]
         np_image = transform({"image": np_image})["image"]
-        tensor_image = torch.from_numpy(np_image).unsqueeze(0).to(choose_torch_device())
+        tensor_image = torch.from_numpy(np_image).unsqueeze(0).to(self.device)
 
         with torch.no_grad():
             depth = self.model(tensor_image)

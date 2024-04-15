@@ -27,12 +27,12 @@ DEFAULT_RAM_CACHE = 10.0
 DEFAULT_VRAM_CACHE = 0.25
 DEFAULT_CONVERT_CACHE = 20.0
 DEVICE = Literal["auto", "cpu", "cuda", "cuda:1", "mps"]
-PRECISION = Literal["auto", "float16", "bfloat16", "float32", "autocast"]
+PRECISION = Literal["auto", "float16", "bfloat16", "float32"]
 ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
 ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
-CONFIG_SCHEMA_VERSION = "4.0.0"
+CONFIG_SCHEMA_VERSION = "4.0.1"
 
 
 def get_default_ram_cache_size() -> float:
@@ -106,7 +106,7 @@ class InvokeAIAppConfig(BaseSettings):
         lazy_offload: Keep models in VRAM until their space is needed.
         log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
         device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `cuda:1`, `mps`
-        precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`, `autocast`
+        precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`
         sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
         attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
         attention_slice_size: Slice size, valid when attention_type=="sliced".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`
@@ -377,6 +377,9 @@ def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
             # `max_vram_cache_size` was renamed to `vram` some time in v3, but both names were used
             if k == "max_vram_cache_size" and "vram" not in category_dict:
                 parsed_config_dict["vram"] = v
+            # autocast was removed in v4.0.1
+            if k == "precision" and v == "autocast":
+                parsed_config_dict["precision"] = "auto"
             if k == "conf_path":
                 parsed_config_dict["legacy_models_yaml_path"] = v
             if k == "legacy_conf_dir":
@@ -396,6 +399,28 @@ def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
     # When migrating the config file, we should not include currently-set environment variables.
     config = DefaultInvokeAIAppConfig.model_validate(parsed_config_dict)
 
+    return config
+
+
+def migrate_v4_0_0_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
+    """Migrate v4.0.0 config dictionary to a current config object.
+
+    Args:
+        config_dict: A dictionary of settings from a v4.0.0 config file.
+
+    Returns:
+        An instance of `InvokeAIAppConfig` with the migrated settings.
+    """
+    parsed_config_dict: dict[str, Any] = {}
+    for k, v in config_dict.items():
+        # autocast was removed from precision in v4.0.1
+        if k == "precision" and v == "autocast":
+            parsed_config_dict["precision"] = "auto"
+        else:
+            parsed_config_dict[k] = v
+        if k == "schema_version":
+            parsed_config_dict[k] = CONFIG_SCHEMA_VERSION
+    config = DefaultInvokeAIAppConfig.model_validate(parsed_config_dict)
     return config
 
 
@@ -425,17 +450,21 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
             raise RuntimeError(f"Failed to load and migrate v3 config file {config_path}: {e}") from e
         migrated_config.write_file(config_path)
         return migrated_config
-    else:
-        # Attempt to load as a v4 config file
-        try:
-            # Meta is not included in the model fields, so we need to validate it separately
-            config = InvokeAIAppConfig.model_validate(loaded_config_dict)
-            assert (
-                config.schema_version == CONFIG_SCHEMA_VERSION
-            ), f"Invalid schema version, expected {CONFIG_SCHEMA_VERSION}: {config.schema_version}"
-            return config
-        except Exception as e:
-            raise RuntimeError(f"Failed to load config file {config_path}: {e}") from e
+
+    if loaded_config_dict["schema_version"] == "4.0.0":
+        loaded_config_dict = migrate_v4_0_0_config_dict(loaded_config_dict)
+        loaded_config_dict.write_file(config_path)
+
+    # Attempt to load as a v4 config file
+    try:
+        # Meta is not included in the model fields, so we need to validate it separately
+        config = InvokeAIAppConfig.model_validate(loaded_config_dict)
+        assert (
+            config.schema_version == CONFIG_SCHEMA_VERSION
+        ), f"Invalid schema version, expected {CONFIG_SCHEMA_VERSION}: {config.schema_version}"
+        return config
+    except Exception as e:
+        raise RuntimeError(f"Failed to load config file {config_path}: {e}") from e
 
 
 @lru_cache(maxsize=1)

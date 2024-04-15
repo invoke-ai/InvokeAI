@@ -18,7 +18,7 @@ from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoad
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase, ModelLockerBase
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
-from invokeai.backend.util.devices import choose_torch_device, torch_dtype
+from invokeai.backend.util.devices import TorchDevice
 
 
 # TO DO: The loader is not thread safe!
@@ -37,7 +37,7 @@ class ModelLoader(ModelLoaderBase):
         self._logger = logger
         self._ram_cache = ram_cache
         self._convert_cache = convert_cache
-        self._torch_dtype = torch_dtype(choose_torch_device())
+        self._torch_dtype = TorchDevice.choose_torch_dtype()
 
     def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
         """

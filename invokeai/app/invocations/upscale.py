@@ -3,7 +3,6 @@ from typing import Literal
 
 import cv2
 import numpy as np
-import torch
 from PIL import Image
 from pydantic import ConfigDict
 
@@ -12,7 +11,7 @@ from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.basicsr.rrdbnet_arch import RRDBNet
 from invokeai.backend.image_util.realesrgan.realesrgan import RealESRGAN
-from invokeai.backend.util.devices import choose_torch_device
+from invokeai.backend.util.devices import TorchDevice
 
 from .baseinvocation import BaseInvocation, invocation
 from .fields import InputField, WithBoard, WithMetadata
@@ -32,9 +31,6 @@ ESRGAN_MODEL_URLS: dict[str, str] = {
     "ESRGAN_SRx4_DF2KOST_official-ff704c30.pth": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
     "RealESRGAN_x2plus.pth": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth",
 }
-
-if choose_torch_device() == torch.device("mps"):
-    from torch import mps
 
 
 @invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="esrgan", version="1.3.2")
@@ -115,9 +111,7 @@ class ESRGANInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         pil_image = Image.fromarray(cv2.cvtColor(upscaled_image, cv2.COLOR_BGR2RGB)).convert("RGBA")
 
-        torch.cuda.empty_cache()
-        if choose_torch_device() == torch.device("mps"):
-            mps.empty_cache()
+        TorchDevice.empty_cache()
 
         image_dto = context.images.save(image=pil_image)
 

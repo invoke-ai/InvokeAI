@@ -24,6 +24,7 @@ import {
   selectNodesSlice,
   shouldAnimateEdgesChanged,
   shouldColorEdgesChanged,
+  shouldShowEdgeLabelsChanged,
   shouldSnapToGridChanged,
   shouldValidateGraphChanged,
 } from 'features/nodes/store/nodesSlice';
@@ -35,12 +36,20 @@ import { SelectionMode } from 'reactflow';
 const formLabelProps: FormLabelProps = { flexGrow: 1 };
 
 const selector = createMemoizedSelector(selectNodesSlice, (nodes) => {
-  const { shouldAnimateEdges, shouldValidateGraph, shouldSnapToGrid, shouldColorEdges, selectionMode } = nodes;
+  const {
+    shouldAnimateEdges,
+    shouldValidateGraph,
+    shouldSnapToGrid,
+    shouldColorEdges,
+    shouldShowEdgeLabels,
+    selectionMode,
+  } = nodes;
   return {
     shouldAnimateEdges,
     shouldValidateGraph,
     shouldSnapToGrid,
     shouldColorEdges,
+    shouldShowEdgeLabels,
     selectionModeIsChecked: selectionMode === SelectionMode.Full,
   };
 });
@@ -52,8 +61,14 @@ type Props = {
 const WorkflowEditorSettings = ({ children }: Props) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const dispatch = useAppDispatch();
-  const { shouldAnimateEdges, shouldValidateGraph, shouldSnapToGrid, shouldColorEdges, selectionModeIsChecked } =
-    useAppSelector(selector);
+  const {
+    shouldAnimateEdges,
+    shouldValidateGraph,
+    shouldSnapToGrid,
+    shouldColorEdges,
+    shouldShowEdgeLabels,
+    selectionModeIsChecked,
+  } = useAppSelector(selector);
 
   const handleChangeShouldValidate = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -86,6 +101,13 @@ const WorkflowEditorSettings = ({ children }: Props) => {
   const handleChangeSelectionMode = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(selectionModeChanged(e.target.checked));
+    },
+    [dispatch]
+  );
+
+  const handleChangeShouldShowEdgeLabels = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(shouldShowEdgeLabelsChanged(e.target.checked));
     },
     [dispatch]
   );
@@ -135,6 +157,14 @@ const WorkflowEditorSettings = ({ children }: Props) => {
                     <Switch isChecked={selectionModeIsChecked} onChange={handleChangeSelectionMode} />
                   </Flex>
                   <FormHelperText>{t('nodes.fullyContainNodesHelp')}</FormHelperText>
+                </FormControl>
+                <Divider />
+                <FormControl>
+                  <Flex w="full">
+                    <FormLabel>{t('nodes.showEdgeLabels')}</FormLabel>
+                    <Switch isChecked={shouldShowEdgeLabels} onChange={handleChangeShouldShowEdgeLabels} />
+                  </Flex>
+                  <FormHelperText>{t('nodes.showEdgeLabelsHelp')}</FormHelperText>
                 </FormControl>
                 <Divider />
                 <Heading size="sm" pt={4}>
