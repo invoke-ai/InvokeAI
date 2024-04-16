@@ -8,7 +8,7 @@ title: InvokeAI YouTube Videos
 
 The InvokeAI team has produced many detailed and informative videos on many of the ways InvokeAI works on the [InvokeAI YouTube channel](https://www.youtube.com/@invokeai). This page will be maintained with links and annotated descriptions of what those videos cover. This is a curated list and is organized, as much as possible, by theme not by release date, this can mean that some of the content may have changed in more-recent versions of Invoke. The Invoke team has also created curated [playlists](https://www.youtube.com/@invokeai/playlists) if you'd prefer to watch a series of videos one after the other.
 
-### Topic Videos
+## Topic Videos
 
 Short-form videos that introduce parts of InvokeAI.
 
@@ -138,7 +138,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=kzRL88ffv1o" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/kzRL88ffv1o/0.jpg"></a>
   </td>
   <td>
-  DESCRIPTIOPN
+  explanation of the Bounding Box (connection to Context, use of low and high Denoising Strength, use with ControlNet, generation methods), diagram showing Infill techniques, Scale Before Processing, Compositing (Mask Adjustments, blur size and types, coherence pass), slow detailed step-by-step demonstration of generating a scene from scratch on the Unified Canvas using drawing on the Base layer, Inpainting, and multiple iterations, followed by an "overdrive" demonstration of creating a "yellow mage of the dunes" from scratch
   </td>
 </tr>
 
@@ -294,7 +294,7 @@ Short-form videos that introduce parts of InvokeAI.
 <br>
 
 
-### Studio Sessions
+## Studio Sessions
 
 Long-form videos that go into depth about how to use InvokeAI at a deep level.
 
@@ -339,7 +339,7 @@ Long-form videos that go into depth about how to use InvokeAI at a deep level.
 
 <br>
 
-### Version Releases 
+## Version Releases 
 
 Short-form videos that show new versions of InvokeAI as they're released (from newest to oldest).
 
