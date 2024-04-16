@@ -123,7 +123,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         assert current_thread is not None
         assigned = [x for x, tid in self._execution_devices.items() if current_thread == tid]
         if not assigned:
-            raise ValueError("No GPU has been reserved for the use of thread {current_thread}")
+            raise ValueError(f"No GPU has been reserved for the use of thread {current_thread}")
         return assigned[0]
 
     @contextmanager
