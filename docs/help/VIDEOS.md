@@ -121,6 +121,17 @@ Short-form videos that introduce parts of InvokeAI.
 <table width="100%">
 <tr><th colspan="2"><h2>Unified Canvas</h2></th></tr>
 <tr>
+<tr>
+  <td width="40%">
+  <strong>Creating and Composing on the Unified Canvas (Invoke - Getting Started Series #6) (21:23)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=6pxr9B3fl_Q" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/6pxr9B3fl_Q/0.jpg"></a>
+  </td>
+  <td>
+  detailed exploration of using the Unified Canvas, hotkeys, settings, Inpainting and prompting to change images, Staging Area, Inpainting to correct small details, Scale Before Generating, starting from scratch on the Unified Canvas (Outpainting, Denoising Strength, Coherence Pass settings), Manual Infills (painting to the Base layer to extend images)
+  </td>
+</tr>
+
   <td width="40%">
   <strong>InvokeAI - Unified Canvas Basics (28:37)</strong>
   <br>
@@ -139,17 +150,6 @@ Short-form videos that introduce parts of InvokeAI.
   </td>
   <td>
   explanation of the Bounding Box (connection to Context, use of low and high Denoising Strength, use with ControlNet, generation methods), diagram showing Infill techniques, Scale Before Processing, Compositing (Mask Adjustments, blur size and types, coherence pass), slow detailed step-by-step demonstration of generating a scene from scratch on the Unified Canvas using drawing on the Base layer, Inpainting, and multiple iterations, followed by an "overdrive" demonstration of creating a "yellow mage of the dunes" from scratch
-  </td>
-</tr>
-
-<tr>
-  <td width="40%">
-  <strong>Creating and Composing on the Unified Canvas (Invoke - Getting Started Series #6) (21:23)</strong>
-  <br>
-  <a href="https://www.youtube.com/watch?v=6pxr9B3fl_Q" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/6pxr9B3fl_Q/0.jpg"></a>
-  </td>
-  <td>
-  DESCRIPTION
   </td>
 </tr>
 
