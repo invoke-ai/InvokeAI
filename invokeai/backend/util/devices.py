@@ -59,13 +59,7 @@ class TorchDevice:
     def choose_torch_device(cls) -> torch.device:
         """Return the torch.device to use for accelerated inference."""
         if cls._model_cache:
-            try:
-                return cls._model_cache.get_execution_device()
-            except ValueError as e:  # May happen if no gpu was reserved. Return a generic device.
-                if str(e).startswith("No GPU has been reserved"):
-                    pass
-                else:
-                    raise e
+            return cls._model_cache.get_execution_device()
         app_config = get_config()
         if app_config.device != "auto":
             device = torch.device(app_config.device)
