@@ -100,7 +100,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=L3isi26qy0Y" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/L3isi26qy0Y/0.jpg"></a>
   </td>
   <td>
-  DESC
+  deeper discussion of the denoising process (CLIP: Text Encoder, UNet: Model Weights, VAE: Image Decoder), overview of the Denoise Latents node (Positive Conditioning, Negative Conditioning, UNet, Noise, Denoising Start, Denoising End, Latents Object), overview of the Latents to Image node, overview of the Basic Workflow (Positive Prompt, Negative Prompot, Noise, Denoising, Decoding), demonstration of using the Workflow Editor (adding nodes, connecting nodes, renaming nodes and fields, adding nodes to the Linear View, Noise Node, Random Integer Node, minimizing nodes, selecting nodes to see their output, Image Primitive Node, Image to Latents Node, Progress Image Node, Resize Latents Node, errors and error indicators, adding workflow details for distribution, Notes Node)
   </td>
 </tr>
 
