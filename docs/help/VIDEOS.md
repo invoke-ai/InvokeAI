@@ -28,6 +28,95 @@ Short-form videos that introduce parts of InvokeAI.
 
 <tr>
   <td width="40%">
+  <center><strong>InvokeAI - Fundamentals - Creating with AI (13:39)</strong></center>
+  <br>
+  <a href="https://www.youtube.com/watch?v=m8hnpX2XzL0" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/m8hnpX2XzL0/0.jpg"></a>
+  </td>
+  <td>
+  how Diffusion image modelling works, how images are generated, how prompts are structured (Subject, Category, Quality Modifiers, Aesthetics & Composition), how Image2Image works (Denoising Strength), brief overview of Control Adapters (Denoising Timeline, Begin / End Step Percentage)
+  </td>
+</tr>
+
+|******<BR>[![img]()]()||
+
+<tr>
+  <td width="40%">
+  <center><strong>InvokeAI - SDXL Getting Started (6:39)</strong></center>
+  <br>
+  <a href="https://www.youtube.com/watch?v=c7zAhlC7xKE" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/c7zAhlC7xKE/0.jpg"></a>
+  </td>
+  <td>
+  SDXL prompting (Concatenate Prompt with Style button), VAE Precision, ideal image ratios, Refiner (refinger steps to denoising steps ratio), <a href="https://gist.github.com/keturn/beb33f4f71cf88aaa34ae9e59c5e719f">keturn SDXL Prompt Styles</a>
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <center><strong>Using AI Image to Image Transformation<br>(Invoke - Getting Started Series #3) (8:26)</strong></center>
+  <br>
+  <a href="https://www.youtube.com/watch?v=z4uT-tppfEc" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/z4uT-tppfEc/0.jpg"></a>
+  </td>
+  <td>
+  review of denoising process in Image2Image, Denoising Strength, using high contrast images to control composition and placement
+  </td>
+</tr>
+
+|***InvokeAI - AI Image Prompting (25:34)***<BR>[![img](https://img.youtube.com/vi/WpPVf_XepIg/0.jpg)](https://www.youtube.com/watch?v=WpPVf_XepIg)|Controlnet Adapters (SDXLcanny), IP Adapters (ip_adapter_sdxl_vit_h, Weight influence, using result images as input), use of Controlnet Adapters and IP Adapters with Image2Image, Unified Canvas and Controlnet Adapters (SDXLsoftedge), Controlnet Adapters to imitate style|
+
+<tr>
+  <td width="40%">
+  <center><strong>TITLE</strong></center>
+  <br>
+  <a href="VIDEO" style="color: inherit; text-decoration: inherit;"><img src="IMAGE"></a>
+  </td>
+  <td>
+  DESC
+  </td>
+</tr>
+
+|***Using Schedulers and CFG Scale - Advanced Generation Settings<br>(Invoke - Getting Started Series #4) (9:35)***<BR>[![img](https://img.youtube.com/vi/1OeHEJrsTpI/0.jpg)](https://www.youtube.com/watch?v=1OeHEJrsTpI)|using advanced generation settings, brief explanation of sampler/scheduler, explanation of Steps and relationship to quality/efficiency, brief explanation of CFG Scale setting|
+
+<tr>
+  <td width="40%">
+  <center><strong>TITLE</strong></center>
+  <br>
+  <a href="VIDEO" style="color: inherit; text-decoration: inherit;"><img src="IMAGE"></a>
+  </td>
+  <td>
+  DESC
+  </td>
+</tr>
+|***Controlling AI Image Generation with ControlNet & IP Adapter<br>(Invoke - Getting Started Series #2) (13:57)***<BR>[![img](https://img.youtube.com/vi/7Q5PcxkbEjE/0.jpg)](https://www.youtube.com/watch?v=7Q5PcxkbEjE)|explanation of SDXLcanny ControlNet (Weight, Begin/End Step Percentage, Control Mode, Resize Mode, Processor, Low & High Threshold), explanation of using multiple ControlNets at the same time (SDXLDepth & SDXLcanny), explanation of IP Adapters (Weight, ip_adapter_sdxl vs ip-adapter-plus_sdxl_vit-h)|
+
+<tr>
+  <td width="40%">
+  <center><strong>TITLE</strong></center>
+  <br>
+  <a href="VIDEO" style="color: inherit; text-decoration: inherit;"><img src="IMAGE"></a>
+  </td>
+  <td>
+  DESC
+  </td>
+</tr>
+
+|***InvokeAI - Workflow Fundamentals - Creating with Generative AI (23:29)***<BR>[![img](https://img.youtube.com/vi/L3isi26qy0Y/0.jpg)](https://www.youtube.com/watch?v=L3isi26qy0Y)|DESCRIPTION|
+
+<tr>
+  <td width="40%">
+  <center><strong>TITLE</strong></center>
+  <br>
+  <a href="VIDEO" style="color: inherit; text-decoration: inherit;"><img src="IMAGE"></a>
+  </td>
+  <td>
+  DESC
+  </td>
+</tr>
+
+
+|***AI Workflows that Accelerate Production &<br>Respect Artists' Process (GDC 2024) (35:56)***<BR>[![img](https://img.youtube.com/vi/cdpnazNI4Ig/0.jpg)](https://www.youtube.com/watch?v=cdpnazNI4Ig)|DESCRIPTION|
+
+<tr>
+  <td width="40%">
   <center><strong>TITLE</strong></center>
   <br>
   <a href="VIDEO" style="color: inherit; text-decoration: inherit;"><img src="IMAGE"></a>
@@ -40,15 +129,13 @@ Short-form videos that introduce parts of InvokeAI.
 
 |<h2 style="width:400ox">AI Image Generation</h2>|  |
 |:---:|---|
-|***The Basics of AI Image Generation<br>(Invoke - Getting Started Series #1) (13:12)***<BR>[![img](https://img.youtube.com/vi/GCt_tr-TAQw/0.jpg)](https://www.youtube.com/watch?v=GCt_tr-TAQw)|overview of Invoke Studio interface, positive and negative prompts, Embeddings, image settings, generation settings (Model and Concepts), Controlnet, IP Adapter|
-|***InvokeAI - Fundamentals - Creating with AI (13:39)***<BR>[![img](https://img.youtube.com/vi/m8hnpX2XzL0/0.jpg)](https://www.youtube.com/watch?v=m8hnpX2XzL0)|how Diffusion image modelling works, how images are generated, how prompts are structured (Subject, Category, Quality Modifiers, Aesthetics & Composition), how Image2Image works (Denoising Strength), brief overview of Control Adapters (Denoising Timeline, Begin / End Step Percentage)|
-|***InvokeAI - SDXL Getting Started (6:39)***<BR>[![img](https://img.youtube.com/vi/c7zAhlC7xKE/0.jpg)](https://www.youtube.com/watch?v=c7zAhlC7xKE)|SDXL prompting (Concatenate Prompt with Style button), VAE Precision, ideal image ratios, Refiner (refinger steps to denoising steps ratio), [keturn SDXL Prompt Styles](https://gist.github.com/keturn/beb33f4f71cf88aaa34ae9e59c5e719f)|
-|***Using AI Image to Image Transformation<br>(Invoke - Getting Started Series #3) (8:26)***<BR>[![img](https://img.youtube.com/vi/z4uT-tppfEc/0.jpg)](https://www.youtube.com/watch?v=z4uT-tppfEc)|review of denoising process in Image2Image, Denoising Strength, using high contrast images to control composition and placement|
-|***InvokeAI - AI Image Prompting (25:34)***<BR>[![img](https://img.youtube.com/vi/WpPVf_XepIg/0.jpg)](https://www.youtube.com/watch?v=WpPVf_XepIg)|Controlnet Adapters (SDXLcanny), IP Adapters (ip_adapter_sdxl_vit_h, Weight influence, using result images as input), use of Controlnet Adapters and IP Adapters with Image2Image, Unified Canvas and Controlnet Adapters (SDXLsoftedge), Controlnet Adapters to imitate style|
-|***Using Schedulers and CFG Scale - Advanced Generation Settings<br>(Invoke - Getting Started Series #4) (9:35)***<BR>[![img](https://img.youtube.com/vi/1OeHEJrsTpI/0.jpg)](https://www.youtube.com/watch?v=1OeHEJrsTpI)|using advanced generation settings, brief explanation of sampler/scheduler, explanation of Steps and relationship to quality/efficiency, brief explanation of CFG Scale setting|
-|***Controlling AI Image Generation with ControlNet & IP Adapter<br>(Invoke - Getting Started Series #2) (13:57)***<BR>[![img](https://img.youtube.com/vi/7Q5PcxkbEjE/0.jpg)](https://www.youtube.com/watch?v=7Q5PcxkbEjE)|explanation of SDXLcanny ControlNet (Weight, Begin/End Step Percentage, Control Mode, Resize Mode, Processor, Low & High Threshold), explanation of using multiple ControlNets at the same time (SDXLDepth & SDXLcanny), explanation of IP Adapters (Weight, ip_adapter_sdxl vs ip-adapter-plus_sdxl_vit-h)|
-|***InvokeAI - Workflow Fundamentals - Creating with Generative AI (23:29)***<BR>[![img](https://img.youtube.com/vi/L3isi26qy0Y/0.jpg)](https://www.youtube.com/watch?v=L3isi26qy0Y)|DESCRIPTION|
-|***AI Workflows that Accelerate Production &<br>Respect Artists' Process (GDC 2024) (35:56)***<BR>[![img](https://img.youtube.com/vi/cdpnazNI4Ig/0.jpg)](https://www.youtube.com/watch?v=cdpnazNI4Ig)|DESCRIPTION|
+
+
+
+
+
+
+
 
 
 <br>
