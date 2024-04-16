@@ -1,15 +1,20 @@
-from typing import Dict, Literal, Optional, Union
+from typing import TYPE_CHECKING, Dict, Literal, Optional, Union
 
 import torch
 from deprecated import deprecated
 
 from invokeai.app.services.config.config_default import get_config
 
+if TYPE_CHECKING:
+    from invokeai.backend.model_manager.config import AnyModel
+    from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
+
 # legacy APIs
 TorchPrecisionNames = Literal["float32", "float16", "bfloat16"]
 CPU_DEVICE = torch.device("cpu")
 CUDA_DEVICE = torch.device("cuda")
 MPS_DEVICE = torch.device("mps")
+
 
 @deprecated("Use TorchDevice.choose_torch_dtype() instead.")  # type: ignore
 def choose_precision(device: torch.device) -> TorchPrecisionNames:
@@ -41,9 +46,18 @@ PRECISION_TO_NAME: Dict[torch.dtype, TorchPrecisionNames] = {v: k for k, v in NA
 class TorchDevice:
     """Abstraction layer for torch devices."""
 
+    _model_cache: Optional["ModelCacheBase[AnyModel]"] = None
+
+    @classmethod
+    def set_model_cache(cls, cache: "ModelCacheBase[AnyModel]"):
+        """Set the current model cache."""
+        cls._model_cache = cache
+
     @classmethod
     def choose_torch_device(cls) -> torch.device:
         """Return the torch.device to use for accelerated inference."""
+        if cls._model_cache:
+            return cls._model_cache.get_execution_device()
         app_config = get_config()
         if app_config.device != "auto":
             device = torch.device(app_config.device)

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
 
+import torch
 from PIL.Image import Image
 from torch import Tensor
 
@@ -15,15 +16,24 @@ from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
-from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
+from invokeai.backend.model_manager.config import (
+    AnyModel,
+    AnyModelConfig,
+    BaseModelType,
+    ModelFormat,
+    ModelType,
+    SubModelType,
+)
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
+from invokeai.backend.util.devices import TorchDevice
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation
     from invokeai.app.invocations.model import ModelIdentifierField
     from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
+    from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
 
 """
 The InvocationContext provides access to various services and data about the current invocation.
@@ -472,6 +482,28 @@ class UtilInterface(InvocationContextInterface):
             events=self._services.events,
             is_canceled=self.is_canceled,
         )
+
+    def torch_device(self) -> torch.device:
+        """
+        Return a torch device to use in the current invocation.
+
+        Returns:
+            A torch.device not currently in use by the system.
+        """
+        ram_cache: "ModelCacheBase[AnyModel]" = self._services.model_manager.load.ram_cache
+        return ram_cache.get_execution_device()
+
+    def torch_dtype(self, device: Optional[torch.device] = None) -> torch.dtype:
+        """
+        Return a precision type to use with the current invocation and torch device.
+
+        Args:
+            device: Optional device.
+
+        Returns:
+            A torch.dtype suited for the current device.
+        """
+        return TorchDevice.choose_torch_dtype(device)
 
 
 class InvocationContext:

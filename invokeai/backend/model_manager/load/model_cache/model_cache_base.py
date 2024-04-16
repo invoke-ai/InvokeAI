@@ -106,7 +106,7 @@ class ModelCacheBase(ABC, Generic[T]):
         Return an execution device that has been reserved for current thread.
 
         Note that reservations are done using the current thread's TID.
-        It would be better to do this using the session ID, but that involves
+        It might be better to do this using the session ID, but that involves
         too many detailed changes to model manager calls.
 
         May generate a ValueError if no GPU has been reserved.

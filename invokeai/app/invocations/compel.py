@@ -68,15 +68,18 @@ class CompelInvocation(BaseInvocation):
         tokenizer_model = tokenizer_info.model
         assert isinstance(tokenizer_model, CLIPTokenizer)
         text_encoder_info = context.models.load(self.clip.text_encoder)
+        text_encoder_model = text_encoder_info.model
+        assert isinstance(text_encoder_model, CLIPTextModel)
 
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
             for lora in self.clip.loras:
                 lora_info = context.models.load(lora.lora)
                 assert isinstance(lora_info.model, LoRAModelRaw)
-                with lora_info as model:
-                    yield (model, lora.weight)
+                yield (lora_info.model, lora.weight)
                 del lora_info
             return
+
+        # loras = [(context.models.get(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
 
         ti_list = generate_ti_list(self.prompt, text_encoder_info.config.base, context)
 
@@ -136,7 +139,8 @@ class SDXLPromptInvocationBase:
         tokenizer_model = tokenizer_info.model
         assert isinstance(tokenizer_model, CLIPTokenizer)
         text_encoder_info = context.models.load(clip_field.text_encoder)
-        assert isinstance(text_encoder_info.model, (CLIPTextModel, CLIPTextModelWithProjection))
+        text_encoder_model = text_encoder_info.model
+        assert isinstance(text_encoder_model, (CLIPTextModel, CLIPTextModelWithProjection))
 
         # return zero on empty
         if prompt == "" and zero_on_empty:
@@ -195,11 +199,11 @@ class SDXLPromptInvocationBase:
                 requires_pooled=get_pooled,
             )
 
-                conjunction = Compel.parse_prompt_string(prompt)
+            conjunction = Compel.parse_prompt_string(prompt)
 
-                if context.config.get().log_tokenization:
-                    # TODO: better logging for and syntax
-                    log_tokenization_for_conjunction(conjunction, tokenizer)
+            if context.config.get().log_tokenization:
+                # TODO: better logging for and syntax
+                log_tokenization_for_conjunction(conjunction, tokenizer)
 
             # TODO: ask for optimizations? to not run text_encoder twice
             c, _options = compel.build_conditioning_tensor_for_conjunction(conjunction)

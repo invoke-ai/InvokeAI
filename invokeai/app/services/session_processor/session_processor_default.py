@@ -187,8 +187,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     profiler.start(profile_id=session.session_id)
 
                 # reserve a GPU for this session - may block
-                with self._invoker.services.model_manager.load.ram_cache.reserve_execution_device() as gpu:
-
+                with self._invoker.services.model_manager.load.ram_cache.reserve_execution_device():
                     # Prepare invocations and take the first
                     with self._process_lock:
                         invocation = session.session.next()

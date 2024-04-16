@@ -4,7 +4,7 @@ import math
 from contextlib import ExitStack
 from functools import singledispatchmethod
 from typing import Any, Iterator, List, Literal, Optional, Tuple, Union
-import threading
+
 import einops
 import numpy as np
 import numpy.typing as npt
@@ -525,11 +525,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             guidance_scale=self.cfg_scale,
             guidance_rescale_multiplier=self.cfg_rescale_multiplier,
         )
-
-        if conditioning_data.unconditioned_embeddings.embeds.device != conditioning_data.text_embeddings.embeds.device:
-            print(f'DEBUG; ERROR uc={conditioning_data.unconditioned_embeddings.embeds.device} c={conditioning_data.text_embeddings.embeds.device} unet={unet.device}, tid={threading.current_thread().ident}')
-
-
         return conditioning_data
 
     def create_pipeline(
@@ -899,6 +894,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     mask = mask.to(device=unet.device, dtype=unet.dtype)
                 if masked_latents is not None:
                     masked_latents = masked_latents.to(device=unet.device, dtype=unet.dtype)
+
                 scheduler = get_scheduler(
                     context=context,
                     scheduler_info=self.unet.scheduler,

@@ -399,11 +399,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             unet_attention_patcher = UNetAttentionPatcher(ip_adapters)
             attn_ctx = unet_attention_patcher.apply_ip_adapter_attention(self.invokeai_diffuser.model)
 
-        # NOTE error is not here!
-        if conditioning_data.unconditioned_embeddings.embeds.device != \
-           conditioning_data.text_embeddings.embeds.device:
-            print('DEBUG; HERE IS THE ERROR 1')
-
         with attn_ctx:
             if callback is not None:
                 callback(
@@ -418,10 +413,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
             # print("timesteps:", timesteps)
             for i, t in enumerate(self.progress_bar(timesteps)):
-                if conditioning_data.unconditioned_embeddings.embeds.device != \
-                   conditioning_data.text_embeddings.embeds.device:
-                    print('DEBUG; HERE IS THE ERROR 2')
-
                 batched_t = t.expand(batch_size)
                 step_output = self.step(
                     batched_t,
@@ -466,7 +457,6 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         ip_adapter_data: Optional[list[IPAdapterData]] = None,
         t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
     ):
-
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
         if additional_guidance is None:

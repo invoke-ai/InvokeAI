@@ -1,6 +1,6 @@
+import threading
 from queue import Queue
 from typing import TYPE_CHECKING, Optional, TypeVar
-import threading
 
 from invokeai.app.services.object_serializer.object_serializer_base import ObjectSerializerBase
 

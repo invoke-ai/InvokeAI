@@ -127,7 +127,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
         assigned = [x for x, tid in self._execution_devices.items() if current_thread == tid]
         if not assigned:
             raise ValueError("No GPU has been reserved for the use of thread {current_thread}")
-        print(f'DEBUG: TID={current_thread}; owns {assigned[0]}')
         return assigned[0]
 
     @contextmanager
@@ -157,12 +156,15 @@ class ModelCache(ModelCacheBase[AnyModel]):
                 device = free_device[0]
 
         # we are outside the lock region now
-        print(f'DEBUG: RESERVED {device} for TID {current_thread}')
+        self.logger.info("Reserved torch device {device} for execution thread {current_thread}")
+
+        # Tell TorchDevice to use this object to get the torch device.
+        TorchDevice.set_model_cache(self)
         try:
             yield device
         finally:
             with self._device_lock:
-                print(f'DEBUG: RELEASED {device} for TID {current_thread}')
+                self.logger.info("Released torch device {device}")
                 self._execution_devices[device] = 0
                 self._free_execution_device.release()
                 torch.cuda.empty_cache()
@@ -407,12 +409,11 @@ class ModelCache(ModelCacheBase[AnyModel]):
             if torch.cuda.is_available():
                 devices = {torch.device(f"cuda:{x}") for x in range(0, torch.cuda.device_count())}
             elif torch.backends.mps.is_available():
-                devices = {torch.device('mps')}
+                devices = {torch.device("mps")}
             else:
-                devices = {torch.device('cpu')}
+                devices = {torch.device("cpu")}
         return devices
 
     @staticmethod
     def _device_name(device: torch.device) -> str:
         return f"{device.type}:{device.index}"
-
