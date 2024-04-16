@@ -14,10 +14,12 @@ Short-form videos that introduce parts of InvokeAI.
 
 
 <table width="100%">
-<tr><td><h2>AI Image Generation</h2></td></tr>
+<tr><td colspan="2"><h2>AI Image Generation</h2></td></tr>
 <tr>
   <td>
-  ***The Basics of AI Image Generation<br>(Invoke - Getting Started Series #1) (13:12)***<BR>[![img](https://img.youtube.com/vi/GCt_tr-TAQw/0.jpg)
+  <strong>The Basics of AI Image Generation<br>(Invoke - Getting Started Series #1) (13:12)</strong>
+  <br>
+  [![img](https://img.youtube.com/vi/GCt_tr-TAQw/0.jpg)](https://www.youtube.com/watch?v=GCt_tr-TAQw)
   </td>
   <td>
   overview of Invoke Studio interface, positive and negative prompts, Embeddings, image settings, generation settings (Model and Concepts), Controlnet, IP Adapter
