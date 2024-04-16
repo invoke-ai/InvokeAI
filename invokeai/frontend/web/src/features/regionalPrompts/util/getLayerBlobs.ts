@@ -19,7 +19,7 @@ export const getRegionalPromptLayerBlobs = async (
 
   // This automatically omits layers that are not rendered. Rendering is controlled by the layer's `isVisible` flag in redux.
   const regionalPromptLayers = stage.getLayers().filter((l) => {
-    console.log(l.name(), l.id())
+    console.log(l.name(), l.id());
     const isRegionalPromptLayer = l.name() === REGIONAL_PROMPT_LAYER_NAME;
     const isRequestedLayerId = layerIds ? layerIds.includes(l.id()) : true;
     return isRegionalPromptLayer && isRequestedLayerId;
