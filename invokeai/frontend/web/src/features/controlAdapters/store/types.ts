@@ -210,6 +210,10 @@ const zResizeMode = z.enum(['just_resize', 'crop_resize', 'fill_resize', 'just_r
 export type ResizeMode = z.infer<typeof zResizeMode>;
 export const isResizeMode = (v: unknown): v is ResizeMode => zResizeMode.safeParse(v).success;
 
+const zIPMethod = z.enum(['full', 'style', 'composition']);
+export type IPMethod = z.infer<typeof zIPMethod>;
+export const isIPMethod = (v: unknown): v is IPMethod => zIPMethod.safeParse(v).success;
+
 export type ControlNetConfig = {
   type: 'controlnet';
   id: string;
@@ -253,6 +257,7 @@ export type IPAdapterConfig = {
   model: ParameterIPAdapterModel | null;
   clipVisionModel: CLIPVisionModel;
   weight: number;
+  method: IPMethod;
   beginStepPct: number;
   endStepPct: number;
 };

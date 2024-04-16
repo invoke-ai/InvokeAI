@@ -679,6 +679,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 IPAdapterData(
                     ip_adapter_model=ip_adapter_model,
                     weight=single_ip_adapter.weight,
+                    target_blocks=single_ip_adapter.target_blocks,
                     begin_step_percent=single_ip_adapter.begin_step_percent,
                     end_step_percent=single_ip_adapter.end_step_percent,
                     ip_adapter_conditioning=IPAdapterConditioningInfo(image_prompt_embeds, uncond_image_prompt_embeds),

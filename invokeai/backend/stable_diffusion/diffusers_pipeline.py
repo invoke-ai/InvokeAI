@@ -21,12 +21,9 @@ from pydantic import Field
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from invokeai.app.services.config.config_default import get_config
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
-    IPAdapterData,
-    TextConditioningData,
-)
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import IPAdapterData, TextConditioningData
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
-from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import UNetAttentionPatcher
+from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import UNetAttentionPatcher, UNetIPAdapterData
 from invokeai.backend.util.attention import auto_detect_slice_size
 from invokeai.backend.util.devices import TorchDevice
 
@@ -394,8 +391,13 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         unet_attention_patcher = None
         self.use_ip_adapter = use_ip_adapter
         attn_ctx = nullcontext()
+
         if use_ip_adapter or use_regional_prompting:
-            ip_adapters = [ipa.ip_adapter_model for ipa in ip_adapter_data] if use_ip_adapter else None
+            ip_adapters: Optional[List[UNetIPAdapterData]] = (
+                [{"ip_adapter": ipa.ip_adapter_model, "target_blocks": ipa.target_blocks} for ipa in ip_adapter_data]
+                if use_ip_adapter
+                else None
+            )
             unet_attention_patcher = UNetAttentionPatcher(ip_adapters)
             attn_ctx = unet_attention_patcher.apply_ip_adapter_attention(self.invokeai_diffuser.model)
 
