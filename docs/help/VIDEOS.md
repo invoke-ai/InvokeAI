@@ -14,7 +14,7 @@ Short-form videos that introduce parts of InvokeAI.
 
 
 <table width="100%">
-<tr><th colspan="2">AI Image Generation</th></tr>
+<tr><th colspan="2"><h2>AI Image Generation</h2></th></tr>
 <tr>
   <td width="40%">
   <center><strong>The Basics of AI Image Generation<br>(Invoke - Getting Started Series #1) (13:12)</strong></center>
@@ -37,7 +37,6 @@ Short-form videos that introduce parts of InvokeAI.
   </td>
 </tr>
 
-|******<BR>[![img]()]()||
 
 <tr>
   <td width="40%">
@@ -61,74 +60,63 @@ Short-form videos that introduce parts of InvokeAI.
   </td>
 </tr>
 
-|***InvokeAI - AI Image Prompting (25:34)***<BR>[![img](https://img.youtube.com/vi/WpPVf_XepIg/0.jpg)](https://www.youtube.com/watch?v=WpPVf_XepIg)|Controlnet Adapters (SDXLcanny), IP Adapters (ip_adapter_sdxl_vit_h, Weight influence, using result images as input), use of Controlnet Adapters and IP Adapters with Image2Image, Unified Canvas and Controlnet Adapters (SDXLsoftedge), Controlnet Adapters to imitate style|
+<tr>
+  <td width="40%">
+  <center><strong>InvokeAI - AI Image Prompting (25:34)</strong></center>
+  <br>
+  <a href="https://www.youtube.com/watch?v=WpPVf_XepIg" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/WpPVf_XepIg/0.jpg"></a>
+  </td>
+  <td>
+  Controlnet Adapters (SDXLcanny), IP Adapters (ip_adapter_sdxl_vit_h, Weight influence, using result images as input), use of Controlnet Adapters and IP Adapters with Image2Image, Unified Canvas and Controlnet Adapters (SDXLsoftedge), Controlnet Adapters to imitate style
+  </td>
+</tr>
 
 <tr>
   <td width="40%">
-  <center><strong>TITLE</strong></center>
+  <center><strong>Using Schedulers and CFG Scale - Advanced Generation Settings<br>(Invoke - Getting Started Series #4) (9:35)</strong></center>
   <br>
-  <a href="VIDEO" style="color: inherit; text-decoration: inherit;"><img src="IMAGE"></a>
+  <a href="Vhttps://www.youtube.com/watch?v=1OeHEJrsTpIIDEO" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/1OeHEJrsTpI/0.jpg"></a>
+  </td>
+  <td>
+  DESusing advanced generation settings, brief explanation of sampler/scheduler, explanation of Steps and relationship to quality/efficiency, brief explanation of CFG Scale settingC
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <center><strong>Controlling AI Image Generation with ControlNet & IP Adapter<br>(Invoke - Getting Started Series #2) (13:57)***<BR></strong></center>
+  <br>
+  <a href="https://www.youtube.com/watch?v=7Q5PcxkbEjE" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/7Q5PcxkbEjE/0.jpg"></a>
+  </td>
+  <td>
+  explanation of SDXLcanny ControlNet (Weight, Begin/End Step Percentage, Control Mode, Resize Mode, Processor, Low & High Threshold), explanation of using multiple ControlNets at the same time (SDXLDepth & SDXLcanny), explanation of IP Adapters (Weight, ip_adapter_sdxl vs ip-adapter-plus_sdxl_vit-h)
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <center><strong>InvokeAI - Workflow Fundamentals - Creating with Generative AI (23:29)</strong></center>
+  <br>
+  <a href="ttps://www.youtube.com/watch?v=L3isi26qy0Y" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/L3isi26qy0Y/0.jpg"></a>
   </td>
   <td>
   DESC
   </td>
 </tr>
 
-|***Using Schedulers and CFG Scale - Advanced Generation Settings<br>(Invoke - Getting Started Series #4) (9:35)***<BR>[![img](https://img.youtube.com/vi/1OeHEJrsTpI/0.jpg)](https://www.youtube.com/watch?v=1OeHEJrsTpI)|using advanced generation settings, brief explanation of sampler/scheduler, explanation of Steps and relationship to quality/efficiency, brief explanation of CFG Scale setting|
-
 <tr>
   <td width="40%">
-  <center><strong>TITLE</strong></center>
+  <center><strong>AI Workflows that Accelerate Production &<br>Respect Artists' Process (GDC 2024) (35:56)<BR></strong></center>
   <br>
-  <a href="VIDEO" style="color: inherit; text-decoration: inherit;"><img src="IMAGE"></a>
+  <a href="VIDhttps://www.youtube.com/watch?v=cdpnazNI4IgEO" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/cdpnazNI4Ig/0.jpg"></a>
   </td>
   <td>
-  DESC
-  </td>
-</tr>
-|***Controlling AI Image Generation with ControlNet & IP Adapter<br>(Invoke - Getting Started Series #2) (13:57)***<BR>[![img](https://img.youtube.com/vi/7Q5PcxkbEjE/0.jpg)](https://www.youtube.com/watch?v=7Q5PcxkbEjE)|explanation of SDXLcanny ControlNet (Weight, Begin/End Step Percentage, Control Mode, Resize Mode, Processor, Low & High Threshold), explanation of using multiple ControlNets at the same time (SDXLDepth & SDXLcanny), explanation of IP Adapters (Weight, ip_adapter_sdxl vs ip-adapter-plus_sdxl_vit-h)|
-
-<tr>
-  <td width="40%">
-  <center><strong>TITLE</strong></center>
-  <br>
-  <a href="VIDEO" style="color: inherit; text-decoration: inherit;"><img src="IMAGE"></a>
-  </td>
-  <td>
-  DESC
-  </td>
-</tr>
-
-|***InvokeAI - Workflow Fundamentals - Creating with Generative AI (23:29)***<BR>[![img](https://img.youtube.com/vi/L3isi26qy0Y/0.jpg)](https://www.youtube.com/watch?v=L3isi26qy0Y)|DESCRIPTION|
-
-<tr>
-  <td width="40%">
-  <center><strong>TITLE</strong></center>
-  <br>
-  <a href="VIDEO" style="color: inherit; text-decoration: inherit;"><img src="IMAGE"></a>
-  </td>
-  <td>
-  DESC
-  </td>
-</tr>
-
-
-|***AI Workflows that Accelerate Production &<br>Respect Artists' Process (GDC 2024) (35:56)***<BR>[![img](https://img.youtube.com/vi/cdpnazNI4Ig/0.jpg)](https://www.youtube.com/watch?v=cdpnazNI4Ig)|DESCRIPTION|
-
-<tr>
-  <td width="40%">
-  <center><strong>TITLE</strong></center>
-  <br>
-  <a href="VIDEO" style="color: inherit; text-decoration: inherit;"><img src="IMAGE"></a>
-  </td>
-  <td>
-  DESC
+  DESCRIPTION
   </td>
 </tr>
 </table>
 
-|<h2 style="width:400ox">AI Image Generation</h2>|  |
-|:---:|---|
+
 
 
 
