@@ -181,7 +181,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
         while True:
             # Outer try block. Any error here is a fatal processor error
             try:
+                self._resume_event.wait()
                 session = self._session_worker_queue.get()
+
                 if self._cancel_event.is_set():
                     if session.item_id in self._sessions_to_cancel:
                         continue
