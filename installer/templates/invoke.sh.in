@@ -59,8 +59,6 @@ invokeai_update_checker() {
                 # Deactivate the venv to avoid any issues while reinstalling
                 deactivate
                 invokeai_updater
-                # Re-activate the venv
-                source .venv/bin/activate
                 break
                 ;;
             no)
@@ -79,8 +77,6 @@ invokeai_update_checker() {
                 # Deactivate the venv to avoid any issues while reinstalling
                 deactivate
                 invokeai_updater
-                # Re-activate the venv
-                source .venv/bin/activate
                 break
                 ;;
             no)
@@ -119,6 +115,8 @@ invokeai_updater() {
     printf "Removing Invoke Updater Directory...\n"
     rm -rf invoke-updates
     printf "\n\n########## InvokeAI Updater - UPDATING COMPLETE! ##########\n\n"
+    printf "Please restart your invoke.sh to use the new version.\n\n"
+    exit
 } #End of updater section
 
 # Primary function for the case statement to determine user input
