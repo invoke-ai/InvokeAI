@@ -13,7 +13,7 @@ The InvokeAI team has produced many detailed and informative videos on many of t
 Short-form videos that introduce parts of InvokeAI.
 
 
-<table>
+<table style="width:100%">
 <tr><td><h2>AI Image Generation</h2></td></tr>
 </table>
 
