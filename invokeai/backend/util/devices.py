@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Dict, Literal, Optional, Union
+"""Torch Device class provides torch device selection services."""
+
+from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Union
 
 import torch
 from deprecated import deprecated
@@ -68,6 +70,14 @@ class TorchDevice:
         else:
             device = CPU_DEVICE
         return cls.normalize(device)
+
+    @classmethod
+    def execution_devices(cls) -> List[torch.device]:
+        """Return a list of torch.devices that can be used for accelerated inference."""
+        if cls._model_cache:
+            return cls._model_cache.execution_devices
+        else:
+            return [cls.choose_torch_device]
 
     @classmethod
     def choose_torch_dtype(cls, device: Optional[torch.device] = None) -> torch.dtype:

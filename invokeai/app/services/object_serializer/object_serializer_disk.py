@@ -1,5 +1,5 @@
-import threading
 import tempfile
+import threading
 import typing
 from dataclasses import dataclass
 from pathlib import Path
@@ -72,7 +72,9 @@ class ObjectSerializerDisk(ObjectSerializerBase[T]):
 
     def _new_name(self) -> str:
         tid = threading.current_thread().ident
-        return f"{self._obj_class_name}_{tid}_{uuid_string()}"
+        # Add tid to the object name because uuid4 not thread-safe on windows
+        # See https://stackoverflow.com/questions/2759644/python-multiprocessing-doesnt-play-nicely-with-uuid-uuid4
+        return f"{self._obj_class_name}_{tid}-{uuid_string()}"
 
     def _tempdir_cleanup(self) -> None:
         """Calls `cleanup` on the temporary directory, if it exists."""

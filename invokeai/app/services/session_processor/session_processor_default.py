@@ -16,6 +16,7 @@ from invokeai.app.services.session_processor.session_processor_common import Can
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
 from invokeai.app.util.profiler import Profiler
+from invokeai.backend.util.devices import TorchDevice
 
 from ..invoker import Invoker
 from .session_processor_base import SessionProcessorBase
@@ -40,7 +41,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self._thread_semaphore = BoundedSemaphore(self._thread_limit)
         self._polling_interval = polling_interval
 
-        self._worker_thread_count = self._invoker.services.configuration.max_threads
+        self._worker_thread_count = self._invoker.services.configuration.max_threads or len(
+            TorchDevice.execution_devices()
+        )
         self._session_worker_queue: Queue[SessionQueueItem] = Queue()
         self._process_lock = Lock()
 

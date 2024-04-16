@@ -110,7 +110,7 @@ class InvokeAIAppConfig(BaseSettings):
         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
         max_queue_size: Maximum number of items in the session queue.
-        max_threads: Maximum number of session queue execution threads.
+        max_threads: Maximum number of session queue execution threads. Autocalculated from number of GPUs if not set.
         allow_nodes: List of nodes to allow. Omit to allow all.
         deny_nodes: List of nodes to deny. Omit to deny none.
         node_cache_size: How many cached nodes to keep in memory.
@@ -182,7 +182,7 @@ class InvokeAIAppConfig(BaseSettings):
     force_tiled_decode:            bool = Field(default=False,              description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).")
     pil_compress_level:             int = Field(default=1,                  description="The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.")
     max_queue_size:                 int = Field(default=10000, gt=0,        description="Maximum number of items in the session queue.")
-    max_threads:                    int = Field(default=4,                  description="Maximum number of session queue execution threads.")
+    max_threads:          Optional[int] = Field(default=None,               description="Maximum number of session queue execution threads. Autocalculated from number of GPUs if not set.")
 
     # NODES
     allow_nodes:    Optional[list[str]] = Field(default=None,               description="List of nodes to allow. Omit to allow all.")
