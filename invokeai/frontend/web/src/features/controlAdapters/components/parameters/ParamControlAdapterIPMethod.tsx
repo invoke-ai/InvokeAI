@@ -23,8 +23,8 @@ const ParamControlAdapterIPMethod = ({ id }: Props) => {
   const options: { label: string; value: IPMethod }[] = useMemo(
     () => [
       { label: t('controlnet.full'), value: 'full' },
-      { label: t('controlnet.style'), value: 'style' },
-      { label: t('controlnet.composition'), value: 'composition' },
+      { label: `${t('controlnet.style')} (${t('common.beta')})`, value: 'style' },
+      { label: `${t('controlnet.composition')} (${t('common.beta')})`, value: 'composition' },
     ],
     [t]
   );

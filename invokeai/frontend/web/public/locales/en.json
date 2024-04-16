@@ -69,6 +69,7 @@
         "auto": "Auto",
         "back": "Back",
         "batch": "Batch Manager",
+        "beta": "Beta",
         "cancel": "Cancel",
         "copy": "Copy",
         "copyError": "$t(gallery.copy) Error",
