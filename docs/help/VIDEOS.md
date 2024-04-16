@@ -17,7 +17,7 @@ Short-form videos that introduce parts of InvokeAI.
 <tr><th colspan="2">AI Image Generation</th></tr>
 <tr>
   <td width="40%" text-align="center">
-  <strong>The Basics of AI Image Generation<br>(Invoke - Getting Started Series #1) (13:12)</strong>
+  <center><strong>The Basics of AI Image Generation<br>(Invoke - Getting Started Series #1) (13:12)</strong></center>
   <br>
   <a href="https://www.youtube.com/watch?v=GCt_tr-TAQw" style="color: inherit; text-decoration: inherit;"><img src=https://img.youtube.com/vi/GCt_tr-TAQw/0.jpg></a>
   </td>
