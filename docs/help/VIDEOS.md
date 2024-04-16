@@ -111,7 +111,7 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=cdpnazNI4Ig" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/cdpnazNI4Ig/0.jpg"></a>
   </td>
   <td>
-  DESCRIPTION
+  presentation on AI image generation at time of recording, Invoke's philosophy and approach to AI image generation, 
   </td>
 </tr>
 </table>
