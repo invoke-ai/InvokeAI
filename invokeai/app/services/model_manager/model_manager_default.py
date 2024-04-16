@@ -85,7 +85,6 @@ class ModelManagerService(ModelManagerServiceBase):
         ram_cache = ModelCache(
             max_cache_size=app_config.ram,
             logger=logger,
-            execution_devices=execution_devices,
         )
         convert_cache = ModelConvertCache(cache_path=app_config.convert_cache_path, max_size=app_config.convert_cache)
         loader = ModelLoadService(

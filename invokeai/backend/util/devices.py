@@ -1,6 +1,6 @@
 """Torch Device class provides torch device selection services."""
 
-from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Union
+from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Union, Set
 
 import torch
 from deprecated import deprecated
@@ -72,12 +72,12 @@ class TorchDevice:
         return cls.normalize(device)
 
     @classmethod
-    def execution_devices(cls) -> List[torch.device]:
+    def execution_devices(cls) -> Set[torch.device]:
         """Return a list of torch.devices that can be used for accelerated inference."""
-        if cls._model_cache:
-            return cls._model_cache.execution_devices
-        else:
-            return [cls.choose_torch_device]
+        app_config = get_config()
+        if app_config.devices is None:
+            return cls._lookup_execution_devices()
+        return {torch.device(x) for x in app_config.devices}
 
     @classmethod
     def choose_torch_dtype(cls, device: Optional[torch.device] = None) -> torch.dtype:
@@ -131,3 +131,14 @@ class TorchDevice:
     @classmethod
     def _to_dtype(cls, precision_name: TorchPrecisionNames) -> torch.dtype:
         return NAME_TO_PRECISION[precision_name]
+
+    @classmethod
+    def _lookup_execution_devices(cls) -> Set[torch.device]:
+        if torch.cuda.is_available():
+            devices = {torch.device(f"cuda:{x}") for x in range(0, torch.cuda.device_count())}
+        elif torch.backends.mps.is_available():
+            devices = {torch.device("mps")}
+        else:
+            devices = {torch.device("cpu")}
+        return devices
+

@@ -65,7 +65,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
         Initialize the model RAM cache.
 
         :param max_cache_size: Maximum size of the RAM cache [6.0 GB]
-        :param execution_devices: Set of torch device to load active model into [calculated]
         :param storage_device: Torch device to save inactive model in [torch.device('cpu')]
         :param precision: Precision for loaded models [torch.float16]
         :param sequential_offload: Conserve VRAM by loading and unloading each stage of the pipeline sequentially
@@ -88,7 +87,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         # device to thread id
         self._device_lock = threading.Lock()
         self._execution_devices: Dict[torch.device, int] = {
-            x: 0 for x in execution_devices or self._get_execution_devices()
+            x: 0 for x in TorchDevice.execution_devices()
         }
         self._free_execution_device = BoundedSemaphore(len(self._execution_devices))
 
@@ -402,17 +401,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
     def _delete_cache_entry(self, cache_entry: CacheRecord[AnyModel]) -> None:
         self._cache_stack.remove(cache_entry.key)
         del self._cached_models[cache_entry.key]
-
-    @staticmethod
-    def _get_execution_devices(devices: Optional[Set[torch.device]] = None) -> Set[torch.device]:
-        if not devices:
-            if torch.cuda.is_available():
-                devices = {torch.device(f"cuda:{x}") for x in range(0, torch.cuda.device_count())}
-            elif torch.backends.mps.is_available():
-                devices = {torch.device("mps")}
-            else:
-                devices = {torch.device("cpu")}
-        return devices
 
     @staticmethod
     def _device_name(device: torch.device) -> str:
