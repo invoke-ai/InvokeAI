@@ -98,6 +98,12 @@ class DefaultSessionProcessor(SessionProcessorBase):
             self._poll_now()
         elif event_name == "batch_enqueued":
             self._poll_now()
+        elif event_name == "queue_item_status_changed" and event[1]["data"]["queue_item"]["status"] in [
+            "completed",
+            "failed",
+            "canceled",
+        ]:
+            self._poll_now()
 
     def resume(self) -> SessionProcessorStatus:
         if not self._resume_event.is_set():
@@ -188,11 +194,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         invocation = session.session.next()
 
                     # Loop over invocations until the session is complete or canceled
-                    while invocation is not None:
-                        if self._stop_event.is_set():
-                            break
-                        self._resume_event.wait()
-
+                    while invocation is not None and not self._cancel_event.is_set():
                         self._process_next_invocation(session, invocation, stats_service)
 
                         # The session is complete if all invocations are complete or there was an error

@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { deepClone } from 'common/util/deepClone';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesChanged, nodesDeleted } from 'features/nodes/store/nodesSlice';
 import type {
@@ -11,7 +12,7 @@ import type {
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import type { WorkflowCategory, WorkflowV3 } from 'features/nodes/types/workflow';
-import { cloneDeep, isEqual, omit, uniqBy } from 'lodash-es';
+import { isEqual, omit, uniqBy } from 'lodash-es';
 
 const blankWorkflow: Omit<WorkflowV3, 'nodes' | 'edges'> = {
   name: '',
@@ -131,8 +132,8 @@ export const workflowSlice = createSlice({
       });
 
       return {
-        ...cloneDeep(initialWorkflowState),
-        ...cloneDeep(workflowExtra),
+        ...deepClone(initialWorkflowState),
+        ...deepClone(workflowExtra),
         originalExposedFieldValues,
         mode: state.mode,
       };
@@ -144,7 +145,7 @@ export const workflowSlice = createSlice({
       });
     });
 
-    builder.addCase(nodeEditorReset, () => cloneDeep(initialWorkflowState));
+    builder.addCase(nodeEditorReset, () => deepClone(initialWorkflowState));
 
     builder.addCase(nodesChanged, (state, action) => {
       // Not all changes to nodes should result in the workflow being marked touched

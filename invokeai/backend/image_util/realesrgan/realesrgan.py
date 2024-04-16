@@ -11,7 +11,7 @@ from cv2.typing import MatLike
 from tqdm import tqdm
 
 from invokeai.backend.image_util.basicsr.rrdbnet_arch import RRDBNet
-from invokeai.backend.util.devices import choose_torch_device
+from invokeai.backend.util.devices import TorchDevice
 
 """
 Adapted from https://github.com/xinntao/Real-ESRGAN/blob/master/realesrgan/utils.py
@@ -65,7 +65,7 @@ class RealESRGAN:
         self.pre_pad = pre_pad
         self.mod_scale: Optional[int] = None
         self.half = half
-        self.device = choose_torch_device()
+        self.device = TorchDevice.choose_torch_device()
 
         loadnet = torch.load(model_path, map_location=torch.device("cpu"))
 

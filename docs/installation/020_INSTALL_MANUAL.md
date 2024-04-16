@@ -6,11 +6,7 @@
 
 ## Introduction
 
-!!! tip "Conda"
-
-    As of InvokeAI v2.3.0 installation using the `conda` package manager is no longer being supported. It will likely still work, but we are not testing this installation method.
-
-InvokeAI is distributed as a python package on PyPI, installable with `pip`. There are a few things that are handled by the installer that you'll need to manage manually, described in this guide.
+InvokeAI is distributed as a python package on PyPI, installable with `pip`. There are a few things that are handled by the installer and launcher that you'll need to manage manually, described in this guide.
 
 ### Requirements
 
@@ -40,11 +36,11 @@ Before you start, go through the [installation requirements].
 
 1. Enter the root (invokeai) directory and create a virtual Python environment within it named `.venv`.
 
-    !!! info "Virtual Environment Location"
+    !!! warning "Virtual Environment Location"
 
         While you may create the virtual environment anywhere in the file system, we recommend that you create it within the root directory as shown here. This allows the application to automatically detect its data directories.
 
-        If you choose a different location for the venv, then you must set the `INVOKEAI_ROOT` environment variable or pass the directory using the `--root` CLI arg.
+        If you choose a different location for the venv, then you _must_ set the `INVOKEAI_ROOT` environment variable or specify the root directory using the `--root` CLI arg.
 
     ```terminal
     cd $INVOKEAI_ROOT
@@ -81,31 +77,23 @@ Before you start, go through the [installation requirements].
     python3 -m pip install --upgrade pip
     ```
 
-1. Install the InvokeAI Package. The `--extra-index-url` option is used to select the correct `torch` backend:
+1. Install the InvokeAI Package. The base command is `pip install InvokeAI --use-pep517`, but you may need to change this depending on your system and the desired features.
 
-    === "CUDA (NVidia)"
+    - You may need to provide an [extra index URL]. Select your platform configuration using [this tool on the PyTorch website]. Copy the `--extra-index-url` string from this and append it to your install command.
 
-         ```bash
-         pip install "InvokeAI[xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
-         ```
+        !!! example "Install with an extra index URL"
 
-    === "ROCm (AMD)"
+            ```bash
+            pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
+            ```
 
-         ```bash
-         pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/rocm5.6
-         ```
+    - If you have a CUDA GPU and want to install with `xformers`, you need to add an option to the package name. Note that `xformers` is not necessary. PyTorch includes an implementation of the SDP attention algorithm with the same performance.
 
-    === "CPU (Intel Macs & non-GPU systems)"
+        !!! example "Install with `xformers`"
 
-         ```bash
-         pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/cpu
-         ```
-
-    === "MPS (Apple Silicon)"
-
-         ```bash
-         pip install InvokeAI --use-pep517
-         ```
+            ```bash
+            pip install "InvokeAI[xformers]" --use-pep517
+            ```
 
 1. Deactivate and reactivate your runtime directory so that the invokeai-specific commands become available in the environment:
 
@@ -126,37 +114,6 @@ Before you start, go through the [installation requirements].
 
     Run `invokeai-web` to start the UI. You must activate the virtual environment before running the app.
 
-    If the virtual environment you selected is NOT inside `INVOKEAI_ROOT`, then you must specify the path to the root directory by adding
-    `--root_dir \path\to\invokeai`.
+    !!! warning
 
-    !!! tip
-
-        You can permanently set the location of the runtime directory
-        by setting the environment variable `INVOKEAI_ROOT` to the
-        path of the directory. As mentioned previously, this is
-        recommended if your virtual environment is located outside of
-        your runtime directory.
-
-## Unsupported Conda Install
-
-Congratulations, you found the "secret" Conda installation instructions. If you really **really** want to use Conda with InvokeAI, you can do so using this unsupported recipe:
-
-```sh
-mkdir ~/invokeai
-conda create -n invokeai python=3.11
-conda activate invokeai
-# Adjust this as described above for the appropriate torch backend
-pip install InvokeAI[xformers] --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
-invokeai-web --root ~/invokeai
-```
-
-The `pip install` command shown in this recipe is for Linux/Windows
-systems with an NVIDIA GPU. See step (6) above for the command to use
-with other platforms/GPU combinations. If you don't wish to pass the
-`--root` argument to `invokeai` with each launch, you may set the
-environment variable `INVOKEAI_ROOT` to point to the installation directory.
-
-Note that if you run into problems with the Conda installation, the InvokeAI
-staff will **not** be able to help you out. Caveat Emptor!
-
-[installation requirements]: INSTALL_REQUIREMENTS.md
+        If the virtual environment is _not_ inside the root directory, then you _must_ specify the path to the root directory with `--root_dir \path\to\invokeai` or the `INVOKEAI_ROOT` environment variable.

@@ -195,6 +195,7 @@ export const modelsApi = api.injectEndpoints({
           url: buildModelsUrl(`scan_folder?${folderQueryStr}`),
         };
       },
+      providesTags: [{ type: 'ModelScanFolderResults', id: LIST_TAG }],
     }),
     getHuggingFaceModels: build.query<GetHuggingFaceModelsResponse, string>({
       query: (hugging_face_repo) => {

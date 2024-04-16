@@ -32,6 +32,7 @@ export type NodesState = {
   isAddNodePopoverOpen: boolean;
   addNewNodePosition: XYPosition | null;
   selectionMode: SelectionMode;
+  shouldShowEdgeLabels: boolean;
 };
 
 export type WorkflowMode = 'edit' | 'view';

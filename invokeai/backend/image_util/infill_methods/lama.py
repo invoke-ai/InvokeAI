@@ -7,7 +7,8 @@ from PIL import Image
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.services.config.config_default import get_config
-from invokeai.backend.util.devices import choose_torch_device
+from invokeai.app.util.download_with_progress import download_with_progress_bar
+from invokeai.backend.util.devices import TorchDevice
 
 
 def norm_img(np_img):
@@ -28,8 +29,16 @@ def load_jit_model(url_or_path, device):
 
 class LaMA:
     def __call__(self, input_image: Image.Image, *args: Any, **kwds: Any) -> Any:
-        device = choose_torch_device()
+        device = TorchDevice.choose_torch_device()
         model_location = get_config().models_path / "core/misc/lama/lama.pt"
+
+        if not model_location.exists():
+            download_with_progress_bar(
+                name="LaMa Inpainting Model",
+                url="https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt",
+                dest_path=model_location,
+            )
+
         model = load_jit_model(model_location, device)
 
         image = np.asarray(input_image.convert("RGB"))

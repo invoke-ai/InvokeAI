@@ -54,7 +54,6 @@ class ModelLocker(ModelLockerBase):
 
         # NOTE that the model has to have the to() method in order for this code to move it into GPU!
         self._cache_entry.lock()
-
         try:
             # We wait for a gpu to be free - may raise a ValueError
             self._execution_device = self._cache.get_execution_device()

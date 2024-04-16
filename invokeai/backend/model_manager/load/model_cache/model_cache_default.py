@@ -30,6 +30,7 @@ import torch
 
 from invokeai.backend.model_manager import AnyModel, SubModelType
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
 from .model_cache_base import CacheRecord, CacheStats, ModelCacheBase, ModelLockerBase
@@ -299,11 +300,11 @@ class ModelCache(ModelCacheBase[AnyModel]):
                     f" {in_ram_models}/{in_vram_models}({locked_in_vram_models})"
                 )
 
-    def make_room(self, model_size: int) -> None:
+    def make_room(self, size: int) -> None:
         """Make enough room in the cache to accommodate a new model of indicated size."""
         # calculate how much memory this model will require
         # multiplier = 2 if self.precision==torch.float32 else 1
-        bytes_needed = model_size
+        bytes_needed = size
         maximum_size = self.max_cache_size * GIG  # stored in GB, convert to bytes
         current_size = self.cache_size()
 
@@ -358,12 +359,11 @@ class ModelCache(ModelCacheBase[AnyModel]):
             # 1 from onnx runtime object
             if not cache_entry.locked and refs <= (3 if "onnx" in model_key else 2):
                 self.logger.debug(
-                    f"Removing {model_key} from RAM cache to free at least {(model_size/GIG):.2f} GB (-{(cache_entry.size/GIG):.2f} GB)"
+                    f"Removing {model_key} from RAM cache to free at least {(size/GIG):.2f} GB (-{(cache_entry.size/GIG):.2f} GB)"
                 )
                 current_size -= cache_entry.size
                 models_cleared += 1
-                del self._cache_stack[pos]
-                del self._cached_models[model_key]
+                self._delete_cache_entry(cache_entry)
                 del cache_entry
 
             else:
@@ -384,6 +384,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
             if self.stats:
                 self.stats.cleared = models_cleared
             gc.collect()
+        TorchDevice.empty_cache()
         self.logger.debug(f"After making room: cached_models={len(self._cached_models)}")
 
     def _check_free_vram(self, target_device: torch.device, needed_size: int) -> None:
@@ -395,6 +396,10 @@ class ModelCache(ModelCacheBase[AnyModel]):
         free_mem, _ = torch.cuda.mem_get_info(torch.device(vram_device))
         if needed_size > free_mem:
             raise torch.cuda.OutOfMemoryError
+
+    def _delete_cache_entry(self, cache_entry: CacheRecord[AnyModel]) -> None:
+        self._cache_stack.remove(cache_entry.key)
+        del self._cached_models[cache_entry.key]
 
     @staticmethod
     def _get_execution_devices(devices: Optional[Set[torch.device]] = None) -> Set[torch.device]:
@@ -410,3 +415,4 @@ class ModelCache(ModelCacheBase[AnyModel]):
     @staticmethod
     def _device_name(device: torch.device) -> str:
         return f"{device.type}:{device.index}"
+

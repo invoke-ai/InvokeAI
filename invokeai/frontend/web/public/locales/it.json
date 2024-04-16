@@ -73,7 +73,8 @@
         "ai": "ia",
         "file": "File",
         "toResolve": "Da risolvere",
-        "add": "Aggiungi"
+        "add": "Aggiungi",
+        "loglevel": "Livello di log"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -365,7 +366,7 @@
         "modelConverted": "Modello convertito",
         "alpha": "Alpha",
         "convertToDiffusersHelpText1": "Questo modello verrà convertito nel formato 🧨 Diffusori.",
-        "convertToDiffusersHelpText3": "Il file Checkpoint su disco verrà eliminato se si trova nella cartella principale di InvokeAI. Se si trova invece in una posizione personalizzata, NON verrà eliminato.",
+        "convertToDiffusersHelpText3": "Il file del modello su disco verrà eliminato se si trova nella cartella principale di InvokeAI. Se si trova invece in una posizione personalizzata, NON verrà eliminato.",
         "v2_base": "v2 (512px)",
         "v2_768": "v2 (768px)",
         "none": "nessuno",
@@ -442,7 +443,9 @@
         "noModelsInstalled": "Nessun modello installato",
         "hfTokenInvalidErrorMessage2": "Aggiornalo in ",
         "main": "Principali",
-        "noModelsInstalledDesc1": "Installa i modelli con"
+        "noModelsInstalledDesc1": "Installa i modelli con",
+        "ipAdapters": "Adattatori IP",
+        "noMatchingModels": "Nessun modello corrispondente"
     },
     "parameters": {
         "images": "Immagini",
@@ -524,7 +527,12 @@
         "aspect": "Aspetto",
         "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (potrebbe essere troppo grande)",
         "remixImage": "Remixa l'immagine",
-        "coherenceEdgeSize": "Dim. bordo"
+        "coherenceEdgeSize": "Dim. bordo",
+        "infillMosaicTileWidth": "Larghezza piastrella",
+        "infillMosaicMinColor": "Colore minimo",
+        "infillMosaicMaxColor": "Colore massimo",
+        "infillMosaicTileHeight": "Altezza piastrella",
+        "infillColorValue": "Colore di riempimento"
     },
     "settings": {
         "models": "Modelli",
@@ -567,7 +575,6 @@
         "canvasMerged": "Tela unita",
         "sentToImageToImage": "Inviato a Immagine a Immagine",
         "sentToUnifiedCanvas": "Inviato a Tela Unificata",
-        "parametersSet": "Parametri impostati",
         "parametersNotSet": "Parametri non impostati",
         "metadataLoadFailed": "Impossibile caricare i metadati",
         "serverError": "Errore del Server",
@@ -619,7 +626,8 @@
         "uploadInitialImage": "Carica l'immagine iniziale",
         "problemDownloadingImage": "Impossibile scaricare l'immagine",
         "prunedQueue": "Coda ripulita",
-        "modelImportCanceled": "Importazione del modello annullata"
+        "modelImportCanceled": "Importazione del modello annullata",
+        "parameters": "Parametri"
     },
     "tooltip": {
         "feature": {
@@ -688,7 +696,10 @@
         "coherenceModeBoxBlur": "Sfocatura Box",
         "coherenceModeStaged": "Maschera espansa",
         "invertBrushSizeScrollDirection": "Inverti scorrimento per dimensione pennello",
-        "discardCurrent": "Scarta l'attuale"
+        "discardCurrent": "Scarta l'attuale",
+        "initialFitImageSize": "Adatta dimensione immagine al rilascio",
+        "hideBoundingBox": "Nascondi il rettangolo di selezione",
+        "showBoundingBox": "Mostra il rettangolo di selezione"
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -831,7 +842,8 @@
         "editMode": "Modifica nell'editor del flusso di lavoro",
         "resetToDefaultValue": "Ripristina il valore predefinito",
         "noFieldsViewMode": "Questo flusso di lavoro non ha campi selezionati da visualizzare. Visualizza il flusso di lavoro completo per configurare i valori.",
-        "edit": "Modifica"
+        "edit": "Modifica",
+        "graph": "Grafico"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -934,7 +946,10 @@
         "base": "Base",
         "lineart": "Linea",
         "controlnet": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.controlNet))",
-        "mediapipeFace": "Mediapipe Volto"
+        "mediapipeFace": "Mediapipe Volto",
+        "ip_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.ipAdapter))",
+        "t2i_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.t2iAdapter))",
+        "selectCLIPVisionModel": "Seleziona un modello CLIP Vision"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -1342,13 +1357,13 @@
             ]
         },
         "seamlessTilingXAxis": {
-            "heading": "Asse X di piastrellatura senza cuciture",
+            "heading": "Piastrella senza giunte sull'asse X",
             "paragraphs": [
                 "Affianca senza soluzione di continuità un'immagine lungo l'asse orizzontale."
             ]
         },
         "seamlessTilingYAxis": {
-            "heading": "Asse Y di piastrellatura senza cuciture",
+            "heading": "Piastrella senza giunte sull'asse Y",
             "paragraphs": [
                 "Affianca senza soluzione di continuità un'immagine lungo l'asse verticale."
             ]
@@ -1472,7 +1487,11 @@
         "name": "Nome",
         "updated": "Aggiornato",
         "projectWorkflows": "Flussi di lavoro del progetto",
-        "opened": "Aperto"
+        "opened": "Aperto",
+        "convertGraph": "Converti grafico",
+        "loadWorkflow": "$t(common.load) Flusso di lavoro",
+        "autoLayout": "Disposizione automatica",
+        "loadFromGraph": "Carica il flusso di lavoro dal grafico"
     },
     "app": {
         "storeNotInitialized": "Il negozio non è inizializzato"
@@ -1490,7 +1509,8 @@
             "title": "Generazione"
         },
         "advanced": {
-            "title": "Avanzate"
+            "title": "Avanzate",
+            "options": "Opzioni $t(accordions.advanced.title)"
         },
         "image": {
             "title": "Immagine"

@@ -315,7 +315,6 @@
         "canvasMerged": "Полотно об'єднане",
         "sentToImageToImage": "Надіслати до img2img",
         "sentToUnifiedCanvas": "Надіслати на полотно",
-        "parametersSet": "Параметри задані",
         "parametersNotSet": "Параметри не задані",
         "metadataLoadFailed": "Не вдалося завантажити метадані",
         "serverError": "Помилка сервера",

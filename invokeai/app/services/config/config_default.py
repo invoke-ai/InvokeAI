@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import locale
 import os
 import re
 import shutil
@@ -24,13 +25,13 @@ DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 DEFAULT_RAM_CACHE = 10.0
 DEFAULT_CONVERT_CACHE = 20.0
-DEVICE = Literal["auto", "cpu", "cuda:0", "cuda:1", "cuda:2", "cuda:3", "cuda:4", "cuda:5", "mps"]
+DEVICE = Literal["auto", "cpu", "cuda:0", "cuda:1", "cuda:2", "cuda:3", "cuda:4", "cuda:5", "cuda:6", "cuda:7", "mps"]
 PRECISION = Literal["auto", "float16", "bfloat16", "float32", "autocast"]
 ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
 ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
-CONFIG_SCHEMA_VERSION = "4.0.0"
+CONFIG_SCHEMA_VERSION = "4.0.1"
 
 
 def get_default_ram_cache_size() -> float:
@@ -100,9 +101,9 @@ class InvokeAIAppConfig(BaseSettings):
         ram: Maximum memory amount used by memory model cache for rapid switching (GB).
         convert_cache: Maximum size of on-disk converted models cache (GB).
         log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
-        device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda:0`, `cuda:1`, `cuda:2`, `cuda:3`, `cuda:4`, `cuda:5`, `mps`
-        devices: List of execution devices; will override default device selected.
-        precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`, `autocast`
+        device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda:0`, `cuda:1`, `cuda:2`, `cuda:3`, `cuda:4`, `cuda:5`, `cuda:6`, `cuda:7`, `cuda:8`, `mps`
+        devices: List of execution devices to use in a multi-GPU environment; will override default device selected.
+        precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`
         sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
         attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
         attention_slice_size: Slice size, valid when attention_type=="sliced".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`
@@ -316,11 +317,10 @@ class InvokeAIAppConfig(BaseSettings):
     @staticmethod
     def find_root() -> Path:
         """Choose the runtime root directory when not specified on command line or init file."""
-        venv = Path(os.environ.get("VIRTUAL_ENV") or ".")
         if os.environ.get("INVOKEAI_ROOT"):
             root = Path(os.environ["INVOKEAI_ROOT"])
-        elif any((venv.parent / x).exists() for x in [INIT_FILE, LEGACY_INIT_FILE]):
-            root = (venv.parent).resolve()
+        elif venv := os.environ.get("VIRTUAL_ENV", None):
+            root = Path(venv).parent.resolve()
         else:
             root = Path("~/invokeai").expanduser().resolve()
         return root
@@ -366,22 +366,53 @@ def migrate_v3_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
             # `max_cache_size` was renamed to `ram` some time in v3, but both names were used
             if k == "max_cache_size" and "ram" not in category_dict:
                 parsed_config_dict["ram"] = v
+            # `max_vram_cache_size` was renamed to `vram` some time in v3, but both names were used
+            if k == "max_vram_cache_size" and "vram" not in category_dict:
+                parsed_config_dict["vram"] = v
+            # autocast was removed in v4.0.1
+            if k == "precision" and v == "autocast":
+                parsed_config_dict["precision"] = "auto"
             if k == "conf_path":
                 parsed_config_dict["legacy_models_yaml_path"] = v
             if k == "legacy_conf_dir":
-                # The old default for this was "configs/stable-diffusion". If if the incoming config has that as the value, we won't set it.
-                # Else if the path ends in "stable-diffusion", we assume the parent is the new correct path.
-                # Else we do not attempt to migrate this setting
-                if v != "configs/stable-diffusion":
-                    parsed_config_dict["legacy_conf_dir"] = v
+                # The old default for this was "configs/stable-diffusion" ("configs\stable-diffusion" on Windows).
+                if v == "configs/stable-diffusion" or v == "configs\\stable-diffusion":
+                    # If if the incoming config has the default value, skip
+                    continue
                 elif Path(v).name == "stable-diffusion":
+                    # Else if the path ends in "stable-diffusion", we assume the parent is the new correct path.
                     parsed_config_dict["legacy_conf_dir"] = str(Path(v).parent)
+                else:
+                    # Else we do not attempt to migrate this setting
+                    parsed_config_dict["legacy_conf_dir"] = v
             elif k in InvokeAIAppConfig.model_fields:
                 # skip unknown fields
                 parsed_config_dict[k] = v
     # When migrating the config file, we should not include currently-set environment variables.
     config = DefaultInvokeAIAppConfig.model_validate(parsed_config_dict)
 
+    return config
+
+
+def migrate_v4_0_0_config_dict(config_dict: dict[str, Any]) -> InvokeAIAppConfig:
+    """Migrate v4.0.0 config dictionary to a current config object.
+
+    Args:
+        config_dict: A dictionary of settings from a v4.0.0 config file.
+
+    Returns:
+        An instance of `InvokeAIAppConfig` with the migrated settings.
+    """
+    parsed_config_dict: dict[str, Any] = {}
+    for k, v in config_dict.items():
+        # autocast was removed from precision in v4.0.1
+        if k == "precision" and v == "autocast":
+            parsed_config_dict["precision"] = "auto"
+        else:
+            parsed_config_dict[k] = v
+        if k == "schema_version":
+            parsed_config_dict[k] = CONFIG_SCHEMA_VERSION
+    config = DefaultInvokeAIAppConfig.model_validate(parsed_config_dict)
     return config
 
 
@@ -395,7 +426,7 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
         An instance of `InvokeAIAppConfig` with the loaded and migrated settings.
     """
     assert config_path.suffix == ".yaml"
-    with open(config_path) as file:
+    with open(config_path, "rt", encoding=locale.getpreferredencoding()) as file:
         loaded_config_dict = yaml.safe_load(file)
 
     assert isinstance(loaded_config_dict, dict)
@@ -411,17 +442,21 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
             raise RuntimeError(f"Failed to load and migrate v3 config file {config_path}: {e}") from e
         migrated_config.write_file(config_path)
         return migrated_config
-    else:
-        # Attempt to load as a v4 config file
-        try:
-            # Meta is not included in the model fields, so we need to validate it separately
-            config = InvokeAIAppConfig.model_validate(loaded_config_dict)
-            assert (
-                config.schema_version == CONFIG_SCHEMA_VERSION
-            ), f"Invalid schema version, expected {CONFIG_SCHEMA_VERSION}: {config.schema_version}"
-            return config
-        except Exception as e:
-            raise RuntimeError(f"Failed to load config file {config_path}: {e}") from e
+
+    if loaded_config_dict["schema_version"] == "4.0.0":
+        loaded_config_dict = migrate_v4_0_0_config_dict(loaded_config_dict)
+        loaded_config_dict.write_file(config_path)
+
+    # Attempt to load as a v4 config file
+    try:
+        # Meta is not included in the model fields, so we need to validate it separately
+        config = InvokeAIAppConfig.model_validate(loaded_config_dict)
+        assert (
+            config.schema_version == CONFIG_SCHEMA_VERSION
+        ), f"Invalid schema version, expected {CONFIG_SCHEMA_VERSION}: {config.schema_version}"
+        return config
+    except Exception as e:
+        raise RuntimeError(f"Failed to load config file {config_path}: {e}") from e
 
 
 @lru_cache(maxsize=1)

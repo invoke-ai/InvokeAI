@@ -88,7 +88,6 @@ export const TriggerPhrases = () => {
               <Button
                 leftIcon={<PiPlusBold />}
                 size="sm"
-                type="submit"
                 onClick={addTriggerPhrase}
                 isDisabled={!phrase || Boolean(errors.length)}
                 isLoading={isLoading}

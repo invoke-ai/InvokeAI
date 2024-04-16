@@ -1,3 +1,4 @@
+import { deepClone } from 'common/util/deepClone';
 import { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
 import type {
   ControlAdapterConfig,
@@ -7,7 +8,7 @@ import type {
   RequiredCannyImageProcessorInvocation,
   T2IAdapterConfig,
 } from 'features/controlAdapters/store/types';
-import { cloneDeep, merge } from 'lodash-es';
+import { merge } from 'lodash-es';
 
 export const initialControlNet: Omit<ControlNetConfig, 'id'> = {
   type: 'controlnet',
@@ -45,6 +46,7 @@ export const initialIPAdapter: Omit<IPAdapterConfig, 'id'> = {
   isEnabled: true,
   controlImage: null,
   model: null,
+  clipVisionModel: 'ViT-H',
   weight: 1,
   beginStepPct: 0,
   endStepPct: 1,
@@ -57,11 +59,11 @@ export const buildControlAdapter = (
 ): ControlAdapterConfig => {
   switch (type) {
     case 'controlnet':
-      return merge(cloneDeep(initialControlNet), { id, ...overrides });
+      return merge(deepClone(initialControlNet), { id, ...overrides });
     case 't2i_adapter':
-      return merge(cloneDeep(initialT2IAdapter), { id, ...overrides });
+      return merge(deepClone(initialT2IAdapter), { id, ...overrides });
     case 'ip_adapter':
-      return merge(cloneDeep(initialIPAdapter), { id, ...overrides });
+      return merge(deepClone(initialIPAdapter), { id, ...overrides });
     default:
       throw new Error(`Unknown control adapter type: ${type}`);
   }

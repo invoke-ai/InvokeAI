@@ -243,12 +243,15 @@ export type T2IAdapterConfig = {
   shouldAutoConfig: boolean;
 };
 
+export type CLIPVisionModel = 'ViT-H' | 'ViT-G';
+
 export type IPAdapterConfig = {
   type: 'ip_adapter';
   id: string;
   isEnabled: boolean;
   controlImage: string | null;
   model: ParameterIPAdapterModel | null;
+  clipVisionModel: CLIPVisionModel;
   weight: number;
   beginStepPct: number;
   endStepPct: number;

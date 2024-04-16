@@ -62,7 +62,7 @@ const selector = createMemoizedSelector(selectControlAdaptersSlice, (controlAdap
 export const ControlSettingsAccordion: React.FC = memo(() => {
   const { t } = useTranslation();
   const { controlAdapterIds, badges } = useAppSelector(selector);
-  const isControlNetDisabled = useFeatureStatus('controlNet').isFeatureDisabled;
+  const isControlNetEnabled = useFeatureStatus('controlNet');
   const { isOpen, onToggle } = useStandaloneAccordionToggle({
     id: 'control-settings',
     defaultIsOpen: true,
@@ -71,13 +71,13 @@ export const ControlSettingsAccordion: React.FC = memo(() => {
   const [addIPAdapter, isAddIPAdapterDisabled] = useAddControlAdapter('ip_adapter');
   const [addT2IAdapter, isAddT2IAdapterDisabled] = useAddControlAdapter('t2i_adapter');
 
-  if (isControlNetDisabled) {
+  if (!isControlNetEnabled) {
     return null;
   }
 
   return (
     <StandaloneAccordion label={t('accordions.control.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
-      <Flex gap={2} p={4} flexDir="column">
+      <Flex gap={2} p={4} flexDir="column" data-testid="control-accordion">
         <ButtonGroup size="sm" w="full" justifyContent="space-between" variant="ghost" isAttached={false}>
           <Button
             tooltip={t('controlnet.addControlNet')}

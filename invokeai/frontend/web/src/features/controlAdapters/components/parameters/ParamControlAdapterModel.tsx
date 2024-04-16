@@ -1,12 +1,18 @@
-import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui-library';
+import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { Combobox, Flex, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
+import { useControlAdapterCLIPVisionModel } from 'features/controlAdapters/hooks/useControlAdapterCLIPVisionModel';
 import { useControlAdapterIsEnabled } from 'features/controlAdapters/hooks/useControlAdapterIsEnabled';
 import { useControlAdapterModel } from 'features/controlAdapters/hooks/useControlAdapterModel';
 import { useControlAdapterModels } from 'features/controlAdapters/hooks/useControlAdapterModels';
 import { useControlAdapterType } from 'features/controlAdapters/hooks/useControlAdapterType';
-import { controlAdapterModelChanged } from 'features/controlAdapters/store/controlAdaptersSlice';
+import {
+  controlAdapterCLIPVisionModelChanged,
+  controlAdapterModelChanged,
+} from 'features/controlAdapters/store/controlAdaptersSlice';
+import type { CLIPVisionModel } from 'features/controlAdapters/store/types';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +35,7 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
   const { modelConfig } = useControlAdapterModel(id);
   const dispatch = useAppDispatch();
   const currentBaseModel = useAppSelector((s) => s.generation.model?.base);
+  const currentCLIPVisionModel = useControlAdapterCLIPVisionModel(id);
   const mainModel = useAppSelector(selectMainModel);
   const { t } = useTranslation();
 
@@ -45,6 +52,16 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
           modelConfig,
         })
       );
+    },
+    [dispatch, id]
+  );
+
+  const onCLIPVisionModelChange = useCallback<ComboboxOnChange>(
+    (v) => {
+      if (!v?.value) {
+        return;
+      }
+      dispatch(controlAdapterCLIPVisionModelChanged({ id, clipVisionModel: v.value as CLIPVisionModel }));
     },
     [dispatch, id]
   );
@@ -71,18 +88,51 @@ const ParamControlAdapterModel = ({ id }: ParamControlAdapterModelProps) => {
     isLoading,
   });
 
+  const clipVisionOptions = useMemo<ComboboxOption[]>(
+    () => [
+      { label: 'ViT-H', value: 'ViT-H' },
+      { label: 'ViT-G', value: 'ViT-G' },
+    ],
+    []
+  );
+
+  const clipVisionModel = useMemo(
+    () => clipVisionOptions.find((o) => o.value === currentCLIPVisionModel),
+    [clipVisionOptions, currentCLIPVisionModel]
+  );
+
   return (
-    <Tooltip label={value?.description}>
-      <FormControl isDisabled={!isEnabled} isInvalid={!value || mainModel?.base !== modelConfig?.base}>
-        <Combobox
-          options={options}
-          placeholder={t('controlnet.selectModel')}
-          value={value}
-          onChange={onChange}
-          noOptionsMessage={noOptionsMessage}
-        />
-      </FormControl>
-    </Tooltip>
+    <Flex sx={{ gap: 2 }}>
+      <Tooltip label={selectedModel?.description}>
+        <FormControl
+          isDisabled={!isEnabled}
+          isInvalid={!value || mainModel?.base !== modelConfig?.base}
+          sx={{ width: '100%' }}
+        >
+          <Combobox
+            options={options}
+            placeholder={t('controlnet.selectModel')}
+            value={value}
+            onChange={onChange}
+            noOptionsMessage={noOptionsMessage}
+          />
+        </FormControl>
+      </Tooltip>
+      {modelConfig?.type === 'ip_adapter' && modelConfig.format === 'checkpoint' && (
+        <FormControl
+          isDisabled={!isEnabled}
+          isInvalid={!value || mainModel?.base !== modelConfig?.base}
+          sx={{ width: 'max-content', minWidth: 28 }}
+        >
+          <Combobox
+            options={clipVisionOptions}
+            placeholder={t('controlnet.selectCLIPVisionModel')}
+            value={clipVisionModel}
+            onChange={onCLIPVisionModelChange}
+          />
+        </FormControl>
+      )}
+    </Flex>
   );
 };
 
