@@ -111,35 +111,185 @@ Short-form videos that introduce parts of InvokeAI.
   <a href="https://www.youtube.com/watch?v=cdpnazNI4Ig" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/cdpnazNI4Ig/0.jpg"></a>
   </td>
   <td>
-  presentation on AI image generation at time of recording, Invoke's philosophy and approach to AI image generation, 
+  presentation at the Game Developers Conference (2024) on AI image generation at time of recording, Invoke's philosophy and approach to AI image generation, how workflows work and generate images, demonstration of the Unified Canvas
   </td>
 </tr>
 </table>
 
 <br>
 
-|<h2>Unified Canvas</h2>| |
-|:---:|---|
-| ***InvokeAI - Unified Canvas Basics (28:37)***<BR>[![img](https://img.youtube.com/vi/s4EqQRxRR7k/0.jpg)](https://www.youtube.com/watch?v=s4EqQRxRR7k) |  DESCRIPTION |
-| ***InvokeAI - Canvas Fundamentals (38:06)***<BR>[![img](https://img.youtube.com/vi/kzRL88ffv1o/0.jpg)](https://www.youtube.com/watch?v=kzRL88ffv1o) |  DESCRIPTION |
-| ***Creating and Composing on the Unified Canvas<br>(Invoke - Getting Started Series #6) (21:23)***<BR>[![img](https://img.youtube.com/vi/6pxr9B3fl_Q/0.jpg)](https://www.youtube.com/watch?v=6pxr9B3fl_Q) |  DESCRIPTION |
-| ***InvokeAI - Canvas Overdrive #1 (7:22)***<BR>[![img](https://img.youtube.com/vi/RwVGDGc6-3o/0.jpg)](https://www.youtube.com/watch?v=RwVGDGc6-3o) |  DESCRIPTION |
-| ***InvokeAI - Canvas Overdrive #2 (4:43)***<BR>[![img](https://img.youtube.com/vi/WmOUl8Gab5U/0.jpg)](https://www.youtube.com/watch?v=WmOUl8Gab5U) |  DESCRIPTION |
-| ***InvokeAI - Canvas Overdrive #3 (7:01)***<BR>[![img](https://img.youtube.com/vi/e_rRQeee6-0/0.jpg)](https://www.youtube.com/watch?v=e_rRQeee6-0) |  DESCRIPTION |
-| ***InvokeAI - Canvas Overdrive #4 (7:08)***<BR>[![img](https://img.youtube.com/vi/OFiJ1Bv0FIM/0.jpg)](https://www.youtube.com/watch?v=OFiJ1Bv0FIM) |  DESCRIPTION |
-| ***InvokeAI - Canvas Overdrive #5 (7:09)***<BR>[![img](https://img.youtube.com/vi/afSbZEJj2r8/0.jpg)](https://www.youtube.com/watch?v=afSbZEJj2r8) |  DESCRIPTION |
-| ***InvokeAI - Canvas Overdrive #6 - Titans in the Gorge<br> Featuring Canvas Controls, Gradient Denoising (6:42)***<BR>[![img](https://img.youtube.com/vi/gY7II-fjgiw/0.jpg)](https://www.youtube.com/watch?v=gY7II-fjgiw) |  DESCRIPTION |
-| ***InvokeAI - Canvas Drivethrough #1 (50:39)***<BR>[![img](https://img.youtube.com/vi/QSmQ_19rszU/0.jpg)](https://www.youtube.com/watch?v=QSmQ_19rszU) |  DESCRIPTION |
-| ***InvokeAI - Canvas Drivethrough #2 (23:45)***<BR>[![img](https://img.youtube.com/vi/GAlaOlihZ20/0.jpg)](https://www.youtube.com/watch?v=GAlaOlihZ20) |  DESCRIPTION |
-| ***InvokeAI - Canvas Tips & Tricks #1 (17:58)***<BR>[![img](https://img.youtube.com/vi/2pcBtNkTZ40/0.jpg)](https://www.youtube.com/watch?v=2pcBtNkTZ40) |  DESCRIPTION |
-| ***Advanced Canvas Inpainting Techniques with Invoke for Concept Art <br> Pro Diffusion Deep Dive (21:05)***<BR>[![img](https://img.youtube.com/vi/-xzvIpfGTXg/0.jpg)](https://www.youtube.com/watch?v=-xzvIpfGTXg) |  DESCRIPTION |
+<table width="100%">
+<tr><th colspan="2"><h2>Unified Canvas</h2></th></tr>
+<tr>
+  <td width="40%">
+  <strong>InvokeAI - Unified Canvas Basics (28:37)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=s4EqQRxRR7k" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/s4EqQRxRR7k/0.jpg"></a>
+  </td>
+  <td>
+  DESCRIPTION
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <strong>InvokeAI - Canvas Fundamentals (38:06)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=kzRL88ffv1o" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/kzRL88ffv1o/0.jpg"></a>
+  </td>
+  <td>
+  DESCRIPTION
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <strong>Creating and Composing on the Unified Canvas (Invoke - Getting Started Series #6) (21:23)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=6pxr9B3fl_Q" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/6pxr9B3fl_Q/0.jpg"></a>
+  </td>
+  <td>
+  DESCRIPTION
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <strong>InvokeAI - Canvas Overdrive #1 (7:22)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=RwVGDGc6-3o" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/RwVGDGc6-3o/0.jpg"></a>
+  </td>
+  <td>
+  DESCRIPTION
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <strong>InvokeAI - Canvas Overdrive #2 (4:43)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=WmOUl8Gab5U" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/WmOUl8Gab5U/0.jpg"></a>
+  </td>
+  <td>
+  DESCRIPTION
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <strong>InvokeAI - Canvas Overdrive #3 (7:01)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=e_rRQeee6-0" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/e_rRQeee6-0/0.jpg"></a>
+  </td>
+  <td>
+  DESCRIPTION
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <strong>InvokeAI - Canvas Overdrive #4 (7:08)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=OFiJ1Bv0FIM" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/OFiJ1Bv0FIM/0.jpg"></a>
+  </td>
+  <td>
+  DESCRIPTION
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <strong>InvokeAI - Canvas Overdrive #5 (7:09)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=afSbZEJj2r8" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/afSbZEJj2r8/0.jpg"></a>
+  </td>
+  <td>
+  DESCRIPTION
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <strong>InvokeAI - Canvas Overdrive #6 - Titans in the Gorge Featuring Canvas Controls, Gradient Denoising (6:42)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=gY7II-fjgiw" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/gY7II-fjgiw/0.jpg"></a>
+  </td>
+  <td>
+  DESCRIPTION
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <strong>InvokeAI - Canvas Drivethrough #1 (50:39)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=QSmQ_19rszU" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/QSmQ_19rszU/0.jpg"></a>
+  </td>
+  <td>
+  DESCRIPTION
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <strong>InvokeAI - Canvas Drivethrough #2 (23:45)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=GAlaOlihZ20" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/GAlaOlihZ20/0.jpg"></a>
+  </td>
+  <td>
+  DESCRIPTION
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <strong>InvokeAI - Canvas Tips & Tricks #1 (17:58)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=2pcBtNkTZ40" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/2pcBtNkTZ40/0.jpg"></a>
+  </td>
+  <td>
+  DESCRIPTION
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <strong>Advanced Canvas Inpainting Techniques with Invoke for Concept Art Pro Diffusion Deep Dive (21:05)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=-xzvIpfGTXg" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/-xzvIpfGTXg/0.jpg"></a>
+  </td>
+  <td>
+  DESCRIPTION
+  </td>
+</tr>
+</table>
 
 <br>
 
-|<h2>Models</h2>|  |
-|:---:|---|
-| ***InvokeAI - Adding Models (v2.2.5) (4:59)***<BR>[![img](https://img.youtube.com/vi/4aCsmiwwyEI/0.jpg)](https://www.youtube.com/watch?v=4aCsmiwwyEI) |  DESCRIPTION |
-| ***Exploring AI Models and Concept Adapters/LoRAs<br>(Invoke - Getting Started Series #5) (8:52)***<BR>[![img](https://img.youtube.com/vi/iwBmBQMZ0UA/0.jpg)](https://www.youtube.com/watch?v=iwBmBQMZ0UA) |  DESCRIPTION |
+<table width="100%">
+<tr><th colspan="2"><h2>Models</h2></th></tr>
+<tr>
+  <td width="40%">
+  <strong>InvokeAI - Adding Models (v2.2.5) (4:59)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=4aCsmiwwyEI" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/4aCsmiwwyEI/0.jpg"></a>
+  </td>
+  <td>
+  DESCRIPTION
+  </td>
+</tr>
+
+<tr>
+  <td width="40%">
+  <strong>Exploring AI Models and Concept Adapters/LoRAs (Invoke - Getting Started Series #5) (8:52)</strong>
+  <br>
+  <a href="https://www.youtube.com/watch?v=iwBmBQMZ0UA" style="color: inherit; text-decoration: inherit;"><img src="https://img.youtube.com/vi/iwBmBQMZ0UA/0.jpg"></a>
+  </td>
+  <td>
+  DESCRIPTION
+  </td>
+</tr>
+</table>
 
 <br>
 
