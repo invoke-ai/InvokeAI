@@ -60,6 +60,11 @@ class TorchDevice:
         """Return the torch.device to use for accelerated inference."""
         if cls._model_cache:
             return cls._model_cache.get_execution_device()
+        else:
+            return cls._choose_device()
+
+    @classmethod
+    def _choose_device(cls) -> torch.device:
         app_config = get_config()
         if app_config.device != "auto":
             device = torch.device(app_config.device)
@@ -82,8 +87,8 @@ class TorchDevice:
     @classmethod
     def choose_torch_dtype(cls, device: Optional[torch.device] = None) -> torch.dtype:
         """Return the precision to use for accelerated inference."""
-        device = device or cls.choose_torch_device()
         config = get_config()
+        device = device or cls._choose_device()
         if device.type == "cuda" and torch.cuda.is_available():
             device_name = torch.cuda.get_device_name(device)
             if "GeForce GTX 1660" in device_name or "GeForce GTX 1650" in device_name:
