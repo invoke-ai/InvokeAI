@@ -1,4 +1,4 @@
-import { Combobox, FormControl, FormLabel, Tooltip } from '@invoke-ai/ui-library';
+import { Box, Combobox, FormControl, FormLabel, Tooltip } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
@@ -46,20 +46,22 @@ const ParamMainModelSelect = () => {
   });
 
   return (
-    <Tooltip label={tooltipLabel}>
-      <FormControl isDisabled={!modelConfigs.length} isInvalid={!value || !modelConfigs.length}>
-        <InformationalPopover feature="paramModel">
-          <FormLabel>{t('modelManager.model')}</FormLabel>
-        </InformationalPopover>
-        <Combobox
-          value={value}
-          placeholder={placeholder}
-          options={options}
-          onChange={onChange}
-          noOptionsMessage={noOptionsMessage}
-        />
-      </FormControl>
-    </Tooltip>
+    <FormControl isDisabled={!modelConfigs.length} isInvalid={!value || !modelConfigs.length}>
+      <InformationalPopover feature="paramModel">
+        <FormLabel>{t('modelManager.model')}</FormLabel>
+      </InformationalPopover>
+      <Tooltip label={tooltipLabel}>
+        <Box w="full">
+          <Combobox
+            value={value}
+            placeholder={placeholder}
+            options={options}
+            onChange={onChange}
+            noOptionsMessage={noOptionsMessage}
+          />
+        </Box>
+      </Tooltip>
+    </FormControl>
   );
 };
 

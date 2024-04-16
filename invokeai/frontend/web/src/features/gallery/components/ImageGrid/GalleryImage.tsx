@@ -180,7 +180,7 @@ const GalleryImage = (props: HoverableImageProps) => {
               <IAIDndImageIcon
                 onClick={handleDelete}
                 icon={<PiTrashSimpleFill size="16px" />}
-                tooltip={t('gallery.deleteImage')}
+                tooltip={t('gallery.deleteImage', { count: 1 })}
                 styleOverrides={imageIconStyleOverrides}
               />
             )}

@@ -13,7 +13,7 @@ export const useQueueFront = () => {
   const [_, { isLoading }] = useEnqueueBatchMutation({
     fixedCacheKey: 'enqueueBatch',
   });
-  const prependEnabled = useFeatureStatus('prependQueue').isFeatureEnabled;
+  const prependEnabled = useFeatureStatus('prependQueue');
 
   const isDisabled = useMemo(() => {
     return !isReady || !prependEnabled;

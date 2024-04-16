@@ -9,7 +9,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 
 export const useGlobalHotkeys = () => {
   const dispatch = useAppDispatch();
-  const isModelManagerEnabled = useFeatureStatus('modelManager').isFeatureEnabled;
+  const isModelManagerEnabled = useFeatureStatus('modelManager');
   const { queueBack, isDisabled: isDisabledQueueBack, isLoading: isLoadingQueueBack } = useQueueBack();
 
   useHotkeys(

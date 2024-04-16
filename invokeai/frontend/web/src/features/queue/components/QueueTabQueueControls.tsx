@@ -8,8 +8,8 @@ import PruneQueueButton from './PruneQueueButton';
 import ResumeProcessorButton from './ResumeProcessorButton';
 
 const QueueTabQueueControls = () => {
-  const isPauseEnabled = useFeatureStatus('pauseQueue').isFeatureEnabled;
-  const isResumeEnabled = useFeatureStatus('resumeQueue').isFeatureEnabled;
+  const isPauseEnabled = useFeatureStatus('pauseQueue');
+  const isResumeEnabled = useFeatureStatus('resumeQueue');
   return (
     <Flex layerStyle="first" borderRadius="base" p={2} gap={2}>
       {isPauseEnabled || isResumeEnabled ? (
