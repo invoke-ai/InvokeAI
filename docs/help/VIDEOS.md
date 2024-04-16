@@ -14,7 +14,7 @@ Short-form videos that introduce parts of InvokeAI.
 
 
 
-|<h2>AI Image Generation</h2>|  |
+|<div style="width:50%">AI Image Generation</div>|  |
 |:---:|---|
 |***The Basics of AI Image Generation<br>(Invoke - Getting Started Series #1) (13:12)***<BR>[![img](https://img.youtube.com/vi/GCt_tr-TAQw/0.jpg)](https://www.youtube.com/watch?v=GCt_tr-TAQw)|overview of Invoke Studio interface, positive and negative prompts, Embeddings, image settings, generation settings (Model and Concepts), Controlnet, IP Adapter|
 |***InvokeAI - Fundamentals - Creating with AI (13:39)***<BR>[![img](https://img.youtube.com/vi/m8hnpX2XzL0/0.jpg)](https://www.youtube.com/watch?v=m8hnpX2XzL0)|how Diffusion image modelling works, how images are generated, how prompts are structured (Subject, Category, Quality Modifiers, Aesthetics & Composition), how Image2Image works (Denoising Strength), brief overview of Control Adapters (Denoising Timeline, Begin / End Step Percentage)|
