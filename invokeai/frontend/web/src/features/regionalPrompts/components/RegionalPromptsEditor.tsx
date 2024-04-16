@@ -4,6 +4,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { AddLayerButton } from 'features/regionalPrompts/components/AddLayerButton';
 import { BrushSize } from 'features/regionalPrompts/components/BrushSize';
+import { StageComponent } from 'features/regionalPrompts/components/imperative/konvaApiDraft';
 import { LayerListItem } from 'features/regionalPrompts/components/LayerListItem';
 import { PromptLayerOpacity } from 'features/regionalPrompts/components/PromptLayerOpacity';
 import { RegionalPromptsStage } from 'features/regionalPrompts/components/RegionalPromptsStage';
@@ -37,7 +38,8 @@ export const RegionalPromptsEditor = memo(() => {
         ))}
       </Flex>
       <Flex>
-        <RegionalPromptsStage />
+        <StageComponent />
+        {/* <RegionalPromptsStage /> */}
       </Flex>
     </Flex>
   );
